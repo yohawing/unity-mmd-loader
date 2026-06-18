@@ -41,6 +41,7 @@ packages/**/Runtime/Plugins/**/*.exp.meta
 AGENTS.md
 CLAUDE.md
 .ai/
+.claude
 .claude-code-subagent/
 .claudex/
 .codex/
