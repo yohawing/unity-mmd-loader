@@ -188,123 +188,84 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void CreateMotionSnapshotUsesVmdSummaryAccessorWithoutNativeInvocation()
+        public void LoadMotionUsesVmdJsonParserWithoutSummaryAccessor()
         {
-            var accessor = new FakeVmdSummaryAccessor();
-
-            NativeMmdParser.VmdMotionSourceSnapshot snapshot = NativeMmdParser.CreateMotionSnapshot(accessor);
-            MmdMotionDefinition motion = NativeMmdParser.BuildMotionDefinition(snapshot);
-
-            Assert.That(motion.targetModelName, Is.EqualTo("native-target"));
-            Assert.That(motion.maxFrame, Is.EqualTo(24));
-            Assert.That(motion.cameraKeyframeCount, Is.EqualTo(4));
-            Assert.That(motion.lightKeyframeCount, Is.EqualTo(5));
-            Assert.That(motion.selfShadowKeyframeCount, Is.EqualTo(6));
-
-            Assert.That(motion.boneKeyframes, Has.Count.EqualTo(1));
-            Assert.That(motion.boneKeyframes[0].boneName, Is.EqualTo("native-center"));
-            Assert.That(motion.boneKeyframes[0].frame, Is.EqualTo(12));
-            CollectionAssert.AreEqual(new[] { 1.0f, 2.0f, 3.0f }, motion.boneKeyframes[0].translation);
-            CollectionAssert.AreEqual(new[] { 0.1f, 0.2f, 0.3f, 0.4f }, motion.boneKeyframes[0].rotation);
-            CollectionAssert.AreEqual(new byte[] { 1, 5, 9, 13 }, motion.boneKeyframes[0].interpolation.translationX);
-            CollectionAssert.AreEqual(new byte[] { 4, 8, 12, 16 }, motion.boneKeyframes[0].interpolation.rotation);
-
-            Assert.That(motion.morphKeyframes, Has.Count.EqualTo(1));
-            Assert.That(motion.morphKeyframes[0].morphName, Is.EqualTo("native-smile"));
-            Assert.That(motion.morphKeyframes[0].frame, Is.EqualTo(13));
-            Assert.That(motion.morphKeyframes[0].weight, Is.EqualTo(0.75f));
-
-            Assert.That(motion.modelKeyframes, Has.Count.EqualTo(1));
-            Assert.That(motion.modelKeyframes[0].frame, Is.EqualTo(14));
-            Assert.That(motion.modelKeyframes[0].visible, Is.False);
-            Assert.That(motion.modelKeyframes[0].constraintStates, Has.Count.EqualTo(1));
-            Assert.That(motion.modelKeyframes[0].constraintStates[0].boneName, Is.EqualTo("native-leg-ik"));
-            Assert.That(motion.modelKeyframes[0].constraintStates[0].enabled, Is.False);
-
-            // CameraFrameCount is 4, so the accessor must be read frame-by-frame into the IR.
-            Assert.That(motion.cameraKeyframes, Has.Count.EqualTo(4));
-            Assert.That(motion.cameraKeyframes[0].frame, Is.EqualTo(20));
-            Assert.That(motion.cameraKeyframes[2].frame, Is.EqualTo(22));
-            Assert.That(motion.cameraKeyframes[0].distance, Is.EqualTo(-45.0f));
-            CollectionAssert.AreEqual(new[] { 1.0f, 2.0f, 3.0f }, motion.cameraKeyframes[0].position);
-            CollectionAssert.AreEqual(new[] { 0.1f, 0.2f, 0.3f }, motion.cameraKeyframes[0].rotation);
-            Assert.That(motion.cameraKeyframes[0].viewAngle, Is.EqualTo(30));
-            Assert.That(motion.cameraKeyframes[0].perspective, Is.True);
-            Assert.That(motion.cameraKeyframes[0].interpolation, Has.Length.EqualTo(24));
-            Assert.That(motion.cameraKeyframes[0].interpolation[0], Is.EqualTo(0));
-            Assert.That(motion.cameraKeyframes[0].interpolation[23], Is.EqualTo(23));
-
-            Assert.That(motion.lightKeyframes, Has.Count.EqualTo(5));
-            Assert.That(motion.lightKeyframes[0].frame, Is.EqualTo(40));
-            CollectionAssert.AreEqual(new[] { 0.1f, 0.2f, 0.3f }, motion.lightKeyframes[0].color);
-            CollectionAssert.AreEqual(new[] { 0.1f, 0.2f, 0.3f }, motion.lightKeyframes[0].direction);
-        }
-
-        [Test]
-        public void LoadMotionUsesVmdSummaryFactoryAndDisposesAccessorWithoutJsonEntryPoint()
-        {
-            var accessor = new FakeVmdSummaryAccessor();
             byte[] observedBytes = null;
             var parser = new NativeMmdParser(
-                _ => throw new AssertionException("PMX summary factory must not be used when loading VMD."),
                 bytes =>
                 {
                     observedBytes = bytes;
-                    return accessor;
+                    return @"{
+                        ""metadata"": {
+                            ""modelName"": ""json-target"",
+                            ""maxFrame"": 24,
+                            ""counts"": {
+                                ""bones"": 1,
+                                ""morphs"": 1,
+                                ""cameras"": 1,
+                                ""lights"": 1,
+                                ""selfShadows"": 1,
+                                ""properties"": 1
+                            }
+                        },
+                        ""boneFrames"": [{
+                            ""boneName"": ""json-center"",
+                            ""frame"": 12,
+                            ""translation"": [1.0, 2.0, 3.0],
+                            ""rotation"": [0.1, 0.2, 0.3, 0.4],
+                            ""interpolation"": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+                        }],
+                        ""morphFrames"": [{
+                            ""morphName"": ""json-smile"",
+                            ""frame"": 13,
+                            ""weight"": 0.75
+                        }],
+                        ""propertyFrames"": [{
+                            ""frame"": 14,
+                            ""visible"": false,
+                            ""ikStates"": [{
+                                ""boneName"": ""json-leg-ik"",
+                                ""enabled"": false
+                            }]
+                        }],
+                        ""cameraFrames"": [{
+                            ""frame"": 20,
+                            ""distance"": -45.0,
+                            ""position"": [1.0, 2.0, 3.0],
+                            ""rotation"": [0.1, 0.2, 0.3],
+                            ""interpolation"": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23],
+                            ""viewAngle"": 30,
+                            ""perspective"": true
+                        }],
+                        ""lightFrames"": [{
+                            ""frame"": 40,
+                            ""color"": [0.1, 0.2, 0.3],
+                            ""direction"": [0.4, 0.5, 0.6]
+                        }],
+                        ""selfShadowFrames"": [{
+                            ""frame"": 50,
+                            ""mode"": 1,
+                            ""distance"": 0.5
+                        }]
+                    }";
                 });
 
             MmdMotionDefinition motion = parser.LoadMotion(new byte[] { 4, 5, 6 });
 
             CollectionAssert.AreEqual(new byte[] { 4, 5, 6 }, observedBytes);
-            Assert.That(motion.targetModelName, Is.EqualTo("native-target"));
+            Assert.That(motion.targetModelName, Is.EqualTo("json-target"));
             Assert.That(motion.boneKeyframes, Has.Count.EqualTo(1));
-            Assert.That(accessor.Disposed, Is.True);
+            Assert.That(motion.boneKeyframes[0].boneName, Is.EqualTo("json-center"));
+            CollectionAssert.AreEqual(new byte[] { 1, 5, 9, 13 }, motion.boneKeyframes[0].interpolation.translationX);
+            CollectionAssert.AreEqual(new byte[] { 4, 8, 12, 16 }, motion.boneKeyframes[0].interpolation.rotation);
+            Assert.That(motion.morphKeyframes[0].morphName, Is.EqualTo("json-smile"));
+            Assert.That(motion.modelKeyframes[0].constraintStates[0].boneName, Is.EqualTo("json-leg-ik"));
+            Assert.That(motion.cameraKeyframes, Has.Count.EqualTo(1));
+            Assert.That(motion.cameraKeyframes[0].interpolation[23], Is.EqualTo(23));
+            Assert.That(motion.lightKeyframes, Has.Count.EqualTo(1));
+            CollectionAssert.AreEqual(new[] { 0.4f, 0.5f, 0.6f }, motion.lightKeyframes[0].direction);
+            Assert.That(motion.selfShadowKeyframeCount, Is.EqualTo(1));
         }
 
-        private sealed class FakeVmdSummaryAccessor : MmdParserFfiMethods.IVmdSummaryAccessor, IDisposable
-        {
-            public bool Disposed { get; private set; }
-            public string TargetModelName => "native-target";
-            public uint MaxFrame => 24;
-            public int BoneFrameCount => 1;
-            public int MorphFrameCount => 1;
-            public int PropertyFrameCount => 1;
-            public int CameraFrameCount => 4;
-            public int LightFrameCount => 5;
-            public int SelfShadowFrameCount => 6;
-
-            public string GetBoneFrameName(int frameIndex) => "native-center";
-            public uint GetBoneFrameFrame(int frameIndex) => 12;
-            public float GetBoneFrameTranslation(int frameIndex, int component) => component + 1.0f;
-            public float GetBoneFrameRotation(int frameIndex, int component) => (component + 1) * 0.1f;
-            public byte GetBoneFrameInterpolationByte(int frameIndex, int offset) => (byte)(offset + 1);
-
-            public string GetMorphFrameName(int frameIndex) => "native-smile";
-            public uint GetMorphFrameFrame(int frameIndex) => 13;
-            public float GetMorphFrameWeight(int frameIndex) => 0.75f;
-
-            public uint GetPropertyFrameFrame(int frameIndex) => 14;
-            public bool GetPropertyFrameVisible(int frameIndex) => false;
-            public int GetPropertyFrameIkStateCount(int frameIndex) => 1;
-            public string GetPropertyFrameIkStateName(int frameIndex, int ikStateIndex) => "native-leg-ik";
-            public bool GetPropertyFrameIkStateEnabled(int frameIndex, int ikStateIndex) => false;
-
-            public uint GetLightFrameFrame(int frameIndex) => (uint)(40 + frameIndex);
-            public float GetLightFrameColor(int frameIndex, int component) => (component + 1) * 0.1f;
-            public float GetLightFrameDirection(int frameIndex, int component) => (component + 1) * 0.1f;
-
-            public uint GetCameraFrameFrame(int frameIndex) => (uint)(20 + frameIndex);
-            public float GetCameraFrameDistance(int frameIndex) => -45.0f;
-            public float GetCameraFramePosition(int frameIndex, int component) => component + 1.0f;
-            public float GetCameraFrameRotation(int frameIndex, int component) => (component + 1) * 0.1f;
-            public byte GetCameraFrameInterpolationByte(int frameIndex, int offset) => (byte)offset;
-            public uint GetCameraFrameFov(int frameIndex) => 30;
-            public bool GetCameraFramePerspective(int frameIndex) => true;
-
-            public void Dispose()
-            {
-                Disposed = true;
-            }
-        }
     }
 }
