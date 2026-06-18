@@ -3,7 +3,7 @@ unity-mmd/
 
 # Local development automation (not part of the distributed UPM package)
 scripts/
-packages/com.yohawing.mmd-unity.devtools/
+packages/com.yohawing.mmd-loader.devtools/
 
 # Local-only artifacts and licensed data references
 artifacts/

@@ -1,13 +1,13 @@
-# How to use Yohawing MMD Unity
+# How to use MMD Loader
 
-この手順は、UPM package として `com.yohawing.mmd-unity` を Unity project に追加した利用者向けです。
+この手順は、UPM package として `com.yohawing.mmd-loader` を Unity project に追加した利用者向けです。
 
 ## 1. Package を追加する
 
 Unity の **Window > Package Manager** を開き、**Add package from git URL** に以下を入力します。
 
 ```text
-https://github.com/yohawing/unity-mmd-loader.git?path=packages/com.yohawing.mmd-unity
+https://github.com/yohawing/unity-mmd-loader.git?path=packages/com.yohawing.mmd-loader
 ```
 
 Unity version は 6000.4 以降を想定しています。

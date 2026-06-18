@@ -31,7 +31,7 @@ if(MSVC)
     target_compile_options(yohawing_mmd_unity_bullet PRIVATE /EHsc)
 endif()
 
-set(PLUGINS_DIR "${CMAKE_SOURCE_DIR}/../../packages/com.yohawing.mmd-unity/Runtime/Plugins/x86_64")
+set(PLUGINS_DIR "${CMAKE_SOURCE_DIR}/../../packages/com.yohawing.mmd-loader/Runtime/Plugins/x86_64")
 set_target_properties(yohawing_mmd_unity_bullet PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY_DEBUG   "${PLUGINS_DIR}"
     RUNTIME_OUTPUT_DIRECTORY_RELEASE "${PLUGINS_DIR}"

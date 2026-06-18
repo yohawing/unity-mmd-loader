@@ -1,0 +1,29 @@
+{
+  "name": "Mmd.PlayModeTests",
+  "rootNamespace": "Mmd.Tests",
+  "references": [
+    "Mmd.Runtime",
+    "Mmd.Timeline",
+    "Unity.Timeline",
+    "UnityEngine.TestRunner"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "nunit.framework.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "ENABLE_TIMELINE"
+  ],
+  "versionDefines": [
+    {
+      "name": "com.unity.timeline",
+      "expression": "1.0.0",
+      "define": "ENABLE_TIMELINE"
+    }
+  ],
+  "noEngineReferences": false
+}

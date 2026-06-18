@@ -1,0 +1,21 @@
+{
+  "name": "Mmd.Editor",
+  "rootNamespace": "Mmd.Editor",
+  "references": [
+    "Mmd.Runtime",
+    "Mmd.Timeline",
+    "Mmd.Editor.Timeline",
+    "Unity.Timeline"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

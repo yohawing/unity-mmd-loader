@@ -1,11 +1,11 @@
-# Yohawing MMD Unity
+# MMD Loader
 
 Unity package for importing, placing, and playing MMD assets as ordinary Unity
 assets.
 
 [日本語](./docs/README.ja.md) / [How to use](./docs/HOW_TO_USE.md)
 
-Yohawing MMD Unity targets the practical Unity workflow: drag a PMX model into a
+MMD Loader targets the practical Unity workflow: drag a PMX model into a
 project, place it in a scene, add VMD motion to Timeline, and keep the result on
 Unity's standard authoring rails instead of a separate viewer-only runtime.
 
@@ -32,7 +32,7 @@ through the `native/mmd-anim` submodule.
 | Feature | Status |
 | --- | --- |
 | Unity version | Unity 6000.4 or newer |
-| Package name | `com.yohawing.mmd-unity` |
+| Package name | `com.yohawing.mmd-loader` |
 | PMX / VMD import | `ScriptedImporter` assets for `.pmx` and `.vmd` |
 | Scene placement | PMX drag-and-drop and selected-asset scene loading |
 | Timeline | VMD Timeline clip workflow |
@@ -48,7 +48,7 @@ through the `native/mmd-anim` submodule.
 Add the package from a Git URL:
 
 ```text
-https://github.com/yohawing/unity-mmd-loader.git?path=packages/com.yohawing.mmd-unity
+https://github.com/yohawing/unity-mmd-loader.git?path=packages/com.yohawing.mmd-loader
 ```
 
 In Unity:
@@ -60,7 +60,7 @@ In Unity:
 For local development inside this repository, the package root is:
 
 ```text
-packages/com.yohawing.mmd-unity
+packages/com.yohawing.mmd-loader
 ```
 
 If another Unity project sits next to this repository, add a local file
@@ -69,7 +69,7 @@ dependency to that project's `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.yohawing.mmd-unity": "file:../../packages/com.yohawing.mmd-unity"
+    "com.yohawing.mmd-loader": "file:../../packages/com.yohawing.mmd-loader"
   }
 }
 ```
@@ -85,7 +85,7 @@ Adjust the relative path for your project layout.
 5. Enter Play Mode for forward playback with Live physics, or scrub in Edit
    Mode for animation-only Timeline preview.
 
-The package also exposes explicit editor actions under **Tools > Yohawing MMD**
+The package also exposes explicit editor actions under **Tools > MMD Loader**
 for scene loading, diagnostics, and authoring workflows.
 
 ## Usage - Raw PMX/VMD Playback
@@ -111,7 +111,7 @@ so it is intentionally not part of the public package surface.
 ## Development
 
 This repository is organized around the distributable UPM package under
-`packages/com.yohawing.mmd-unity`. Local validation scripts, generated logs,
+`packages/com.yohawing.mmd-loader`. Local validation scripts, generated logs,
 screenshots, test reports, local datasets, and the consumer Unity project are
 development artifacts and are kept out of the public package-first history.
 

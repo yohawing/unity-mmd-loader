@@ -16,15 +16,15 @@ on:
   push:
     branches: [main]
     paths:
-      - 'packages/**'
-      - 'native/**'
-      - '.github/workflows/unity-ci.yml'
+      - "packages/**"
+      - "native/**"
+      - ".github/workflows/unity-ci.yml"
   pull_request:
     branches: [main]
     paths:
-      - 'packages/**'
-      - 'native/**'
-      - '.github/workflows/unity-ci.yml'
+      - "packages/**"
+      - "native/**"
+      - ".github/workflows/unity-ci.yml"
 
 permissions:
   contents: read
@@ -69,9 +69,9 @@ jobs:
             native/mmd-anim/target/release/mmd_runtime_ffi.dll
             native/mmd-anim/target/release/libmmd_runtime_ffi.so
             native/mmd-anim/target/release/libmmd_runtime_ffi.dylib
-            packages/com.yohawing.mmd-unity/Runtime/Plugins/x86_64/yohawing_mmd_unity_bullet.dll
-            packages/com.yohawing.mmd-unity/Runtime/Plugins/x86_64/yohawing_mmd_unity_bullet.so
-            packages/com.yohawing.mmd-unity/Runtime/Plugins/x86_64/yohawing_mmd_unity_bullet.dylib
+            packages/com.yohawing.mmd-loader/Runtime/Plugins/x86_64/yohawing_mmd_unity_bullet.dll
+            packages/com.yohawing.mmd-loader/Runtime/Plugins/x86_64/yohawing_mmd_unity_bullet.so
+            packages/com.yohawing.mmd-loader/Runtime/Plugins/x86_64/yohawing_mmd_unity_bullet.dylib
           if-no-files-found: warn
 
   # Checks whether UNITY_LICENSE is configured.
@@ -112,7 +112,7 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
           packageMode: true
-          projectPath: packages/com.yohawing.mmd-unity
+          projectPath: packages/com.yohawing.mmd-loader
           unityVersion: 6000.4.8f1
           testMode: editmode
           artifactsPath: test-artifacts

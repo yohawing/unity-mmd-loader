@@ -1,0 +1,26 @@
+{
+  "name": "com.yohawing.mmd-loader",
+  "version": "0.1.0",
+  "displayName": "MMD Loader",
+  "description": "Unity package for importing, placing, and playing PMX/VMD assets through standard Unity workflows.",
+  "unity": "6000.4",
+  "author": {
+    "name": "MMD Loader contributors"
+  },
+  "keywords": [
+    "mmd",
+    "pmx",
+    "vmd",
+    "runtime"
+  ],
+  "dependencies": {
+    "com.unity.timeline": "1.8.12"
+  },
+  "samples": [
+    {
+      "displayName": "Basic Playback",
+      "description": "PMX/VMD golden path sample (PMX drag -> Scene placement -> VMD to Timeline -> optional Humanoid Clip bake) using local assets.",
+      "path": "Samples~/BasicPlayback"
+    }
+  ]
+}

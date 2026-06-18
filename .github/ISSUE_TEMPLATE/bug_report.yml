@@ -25,7 +25,7 @@ body:
         - Broad Burst/Jobs optimization, Compute Skinning
         - 30-model benchmark scenarios
 
-        See `packages/com.yohawing.mmd-unity/Documentation~/README.md`
+        See `packages/com.yohawing.mmd-loader/Documentation~/README.md`
         ("Release-Facing Known Limitations") for the full list.
 
   - type: textarea
@@ -101,7 +101,7 @@ body:
     id: install-method
     attributes:
       label: Package install method
-      description: How is `com.yohawing.mmd-unity` consumed?
+      description: How is `com.yohawing.mmd-loader` consumed?
       options:
         - Cloned repository / local path
         - UPM local file reference (file: path)
