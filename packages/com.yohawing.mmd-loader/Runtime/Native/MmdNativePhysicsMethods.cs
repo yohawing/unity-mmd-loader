@@ -7,7 +7,7 @@ namespace Mmd.Native
 {
     internal static class MmdNativePhysicsMethods
     {
-        internal const string LibraryName = "yohawing_mmd_unity_bullet";
+        internal const string LibraryName = "mmd_bullet";
 
         [DllImport(LibraryName, EntryPoint = "ymu_bullet_get_version")]
         internal static extern IntPtr GetVersion();

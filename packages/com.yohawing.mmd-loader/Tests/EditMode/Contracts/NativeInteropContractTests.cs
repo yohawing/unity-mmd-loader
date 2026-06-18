@@ -279,7 +279,7 @@ namespace Mmd.Tests
         {
             Assert.That(MmdRuntimeFfiMethods.LibraryName, Is.EqualTo("mmd_runtime_ffi"));
             Assert.That(MmdRuntimeFfiMethods.ExpectedAbiVersion, Is.EqualTo(1));
-            Assert.That(MmdNativePhysicsMethods.LibraryName, Is.EqualTo("yohawing_mmd_unity_bullet"));
+            Assert.That(MmdNativePhysicsMethods.LibraryName, Is.EqualTo("mmd_bullet"));
         }
 
         [Test]
@@ -293,10 +293,10 @@ namespace Mmd.Tests
 
             Assert.That(Path.Combine(pluginRoot, "mmd_runtime_ffi.dll"), Does.Exist);
             Assert.That(Path.Combine(pluginRoot, "mmd_runtime_ffi.dll.meta"), Does.Exist);
-            Assert.That(Path.Combine(pluginRoot, "yohawing_mmd_unity_bullet.dll"), Does.Exist);
-            Assert.That(Path.Combine(pluginRoot, "yohawing_mmd_unity_bullet.dll.meta"), Does.Exist);
+            Assert.That(Path.Combine(pluginRoot, "mmd_bullet.dll"), Does.Exist);
+            Assert.That(Path.Combine(pluginRoot, "mmd_bullet.dll.meta"), Does.Exist);
             CollectionAssert.AreEqual(
-                new[] { "mmd_runtime_ffi.dll", "yohawing_mmd_unity_bullet.dll" },
+                new[] { "mmd_bullet.dll", "mmd_runtime_ffi.dll" },
                 dllNames);
             Assert.That(Path.Combine(pluginRoot, "yohawing_mmd_unity_native.dll"), Does.Not.Exist);
             Assert.That(Path.Combine(pluginRoot, "yohawing_mmd_unity_native.dll.meta"), Does.Not.Exist);

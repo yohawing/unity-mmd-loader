@@ -3,7 +3,7 @@
 #include <stddef.h>
 
 #ifdef _WIN32
-  #ifdef YMU_BULLET_BUILDING_DLL
+  #ifdef MMD_BULLET_BUILDING_DLL
     #define YMU_BULLET_API __declspec(dllexport)
   #else
     #define YMU_BULLET_API __declspec(dllimport)
