@@ -88,7 +88,7 @@ namespace Mmd.Editor.Timeline
             if (motionAssetProperty?.objectReferenceValue is not MmdVmdAsset motionAsset)
             {
                 EditorGUILayout.HelpBox(
-                    "Assign a camera VMD Motion Asset. The Scene Environment binding belongs to the Timeline track.",
+                    "Assign a camera motion VMD asset. Camera motions may drive camera and/or light keyframes.",
                     MessageType.Info);
                 return;
             }

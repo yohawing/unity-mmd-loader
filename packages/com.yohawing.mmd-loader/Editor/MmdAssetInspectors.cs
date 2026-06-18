@@ -755,10 +755,13 @@ namespace Mmd.Editor
             int shd = asset.SelfShadowKeyframeCount;
             int mf = asset.MaxFrame;
 
-            string sceneStatus = (cam > 0 || lit > 0 || shd > 0)
+            string sceneStatus = (cam > 0 || lit > 0)
                 ? string.Format(System.Globalization.CultureInfo.InvariantCulture,
                     "Present (camera:{0}, light:{1}, selfShadow:{2})", cam, lit, shd)
-                : "None (model motion only)";
+                : shd > 0
+                    ? string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                        "None (camera/light only; selfShadow:{0} deferred)", shd)
+                    : "None (model motion only)";
 
             string durationSrc = string.Format(System.Globalization.CultureInfo.InvariantCulture,
                 "Cached VMD MaxFrame ({0})", mf);
@@ -992,7 +995,7 @@ namespace Mmd.Editor
             CameraKeyframeCount = Math.Max(0, cameraKeyframeCount);
             LightKeyframeCount = Math.Max(0, lightKeyframeCount);
             SelfShadowKeyframeCount = Math.Max(0, selfShadowKeyframeCount);
-            HasSceneMotion = (CameraKeyframeCount > 0) || (LightKeyframeCount > 0) || (SelfShadowKeyframeCount > 0);
+            HasSceneMotion = (CameraKeyframeCount > 0) || (LightKeyframeCount > 0);
             ClipDurationSource = string.IsNullOrWhiteSpace(clipDurationSource) ? "Unavailable" : clipDurationSource;
             SceneMotionStatus = string.IsNullOrWhiteSpace(sceneMotionStatus) ? "None" : sceneMotionStatus;
             ClipCreationRequirement = string.IsNullOrWhiteSpace(clipCreationRequirement)
