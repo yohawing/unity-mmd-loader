@@ -7,58 +7,60 @@ namespace Mmd.Parser
 {
     public sealed class NativeMmdParser : IMmdParser
     {
-        private readonly Func<byte[], MmdParserFfiMethods.IPmxSummaryAccessor> createPmxSummary;
-        private readonly Func<byte[], MmdParserFfiMethods.IVmdSummaryAccessor> createVmdSummary;
+        private readonly Func<byte[], string> parseVmdJson;
+        private readonly Func<byte[], string> parsePmxNonGeometryJson;
+        private readonly Func<byte[], PmxModelSourceGeometry> createPmxGeometry;
 
         public NativeMmdParser()
-            : this(MmdParserFfiMethods.CreatePmxSummary, MmdParserFfiMethods.CreateVmdSummary)
+            : this(MmdParserFfiMethods.ParseVmdJson,
+                   MmdParserFfiMethods.ParsePmxNonGeometryJson, CreatePmxGeometryFromNativeBuffers)
         {
         }
 
         internal NativeMmdParser(
-            Func<byte[], MmdParserFfiMethods.IPmxSummaryAccessor> createPmxSummary,
-            Func<byte[], MmdParserFfiMethods.IVmdSummaryAccessor> createVmdSummary)
+            Func<byte[], string> parseVmdJson)
+            : this(parseVmdJson,
+                   MmdParserFfiMethods.ParsePmxNonGeometryJson, CreatePmxGeometryFromNativeBuffers)
         {
-            this.createPmxSummary = createPmxSummary ?? throw new ArgumentNullException(nameof(createPmxSummary));
-            this.createVmdSummary = createVmdSummary ?? throw new ArgumentNullException(nameof(createVmdSummary));
+        }
+
+        internal NativeMmdParser(
+            Func<byte[], string> parseVmdJson,
+            Func<byte[], string> parsePmxNonGeometryJson,
+            Func<byte[], PmxModelSourceGeometry> createPmxGeometry)
+        {
+            this.parseVmdJson = parseVmdJson ?? throw new ArgumentNullException(nameof(parseVmdJson));
+            this.parsePmxNonGeometryJson = parsePmxNonGeometryJson ?? throw new ArgumentNullException(nameof(parsePmxNonGeometryJson));
+            this.createPmxGeometry = createPmxGeometry ?? throw new ArgumentNullException(nameof(createPmxGeometry));
         }
 
         public MmdModelDefinition LoadModel(ReadOnlySpan<byte> data)
         {
             MmdParserInput.RequireNonEmpty(data, nameof(data));
-            MmdParserFfiMethods.IPmxSummaryAccessor summary = createPmxSummary(data.ToArray());
-            if (summary == null)
+            byte[] bytes = data.ToArray();
+            string json = parsePmxNonGeometryJson(bytes);
+            if (string.IsNullOrWhiteSpace(json))
             {
-                throw new InvalidOperationException("mmd-runtime PMX summary parser returned a null accessor.");
+                throw new InvalidOperationException("mmd-runtime PMX non-geometry JSON parser returned empty JSON.");
             }
 
-            try
-            {
-                return BuildModelDefinition(CreateModelSnapshot(summary));
-            }
-            finally
-            {
-                (summary as IDisposable)?.Dispose();
-            }
+            PmxModelSourceSnapshot snapshot = UnityEngine.JsonUtility.FromJson<PmxModelSourceSnapshot>(json)
+                ?? new PmxModelSourceSnapshot();
+            snapshot.geometry = createPmxGeometry(bytes);
+            return BuildModelDefinition(snapshot);
         }
 
         public MmdMotionDefinition LoadMotion(ReadOnlySpan<byte> data)
         {
             MmdParserInput.RequireNonEmpty(data, nameof(data));
-            MmdParserFfiMethods.IVmdSummaryAccessor summary = createVmdSummary(data.ToArray());
-            if (summary == null)
+            string json = parseVmdJson(data.ToArray());
+            if (string.IsNullOrWhiteSpace(json))
             {
-                throw new InvalidOperationException("mmd-runtime VMD summary parser returned a null accessor.");
+                throw new InvalidOperationException("mmd-runtime VMD JSON parser returned empty JSON.");
             }
 
-            try
-            {
-                return BuildMotionDefinition(CreateMotionSnapshot(summary));
-            }
-            finally
-            {
-                (summary as IDisposable)?.Dispose();
-            }
+            VmdParsedAnimationJson parsed = UnityEngine.JsonUtility.FromJson<VmdParsedAnimationJson>(json);
+            return BuildMotionDefinition(CreateMotionSnapshot(parsed));
         }
 
         internal static MmdModelDefinition BuildModelDefinition(PmxModelSourceSnapshot source)
@@ -435,79 +437,80 @@ namespace Mmd.Parser
             return motion;
         }
 
-        internal static VmdMotionSourceSnapshot CreateMotionSnapshot(MmdParserFfiMethods.IVmdSummaryAccessor accessor)
+        internal static VmdMotionSourceSnapshot CreateMotionSnapshot(VmdParsedAnimationJson parsed)
         {
-            if (accessor == null)
+            if (parsed == null)
             {
                 return new VmdMotionSourceSnapshot();
             }
 
+            VmdParsedMetadataJson metadata = parsed.metadata ?? new VmdParsedMetadataJson();
+            VmdParsedBoneFrameJson[] boneFrames = parsed.boneFrames ?? Array.Empty<VmdParsedBoneFrameJson>();
+            VmdParsedMorphFrameJson[] morphFrames = parsed.morphFrames ?? Array.Empty<VmdParsedMorphFrameJson>();
+            VmdParsedPropertyFrameJson[] propertyFrames = parsed.propertyFrames ?? Array.Empty<VmdParsedPropertyFrameJson>();
+            VmdParsedCameraFrameJson[] cameraFrames = parsed.cameraFrames ?? Array.Empty<VmdParsedCameraFrameJson>();
+            VmdParsedLightFrameJson[] lightFrames = parsed.lightFrames ?? Array.Empty<VmdParsedLightFrameJson>();
+            VmdParsedSelfShadowFrameJson[] selfShadowFrames = parsed.selfShadowFrames ?? Array.Empty<VmdParsedSelfShadowFrameJson>();
+
             var source = new VmdMotionSourceSnapshot
             {
-                TargetModelName = accessor.TargetModelName ?? string.Empty,
-                MaxFrame = accessor.MaxFrame,
-                CameraKeyframeCount = CountToUInt(accessor.CameraFrameCount),
-                LightKeyframeCount = CountToUInt(accessor.LightFrameCount),
-                SelfShadowKeyframeCount = CountToUInt(accessor.SelfShadowFrameCount),
-                BoneFrames = new VmdMotionSourceBoneFrame[CountToArrayLength(accessor.BoneFrameCount, "VMD bone frame count")],
-                MorphFrames = new VmdMotionSourceMorphFrame[CountToArrayLength(accessor.MorphFrameCount, "VMD morph frame count")],
-                PropertyFrames = new VmdMotionSourcePropertyFrame[CountToArrayLength(accessor.PropertyFrameCount, "VMD property frame count")],
-                CameraFrames = new VmdMotionSourceCameraFrame[CountToArrayLength(accessor.CameraFrameCount, "VMD camera frame count")],
-                LightFrames = new VmdMotionSourceLightFrame[CountToArrayLength(accessor.LightFrameCount, "VMD light frame count")]
+                TargetModelName = metadata.modelName ?? string.Empty,
+                MaxFrame = metadata.maxFrame,
+                CameraKeyframeCount = CountToUInt(cameraFrames.Length),
+                LightKeyframeCount = CountToUInt(lightFrames.Length),
+                SelfShadowKeyframeCount = CountToUInt(selfShadowFrames.Length),
+                BoneFrames = new VmdMotionSourceBoneFrame[boneFrames.Length],
+                MorphFrames = new VmdMotionSourceMorphFrame[morphFrames.Length],
+                PropertyFrames = new VmdMotionSourcePropertyFrame[propertyFrames.Length],
+                CameraFrames = new VmdMotionSourceCameraFrame[cameraFrames.Length],
+                LightFrames = new VmdMotionSourceLightFrame[lightFrames.Length]
             };
 
             for (int i = 0; i < source.BoneFrames.Length; i++)
             {
+                VmdParsedBoneFrameJson frame = boneFrames[i] ?? new VmdParsedBoneFrameJson();
                 source.BoneFrames[i] = new VmdMotionSourceBoneFrame
                 {
-                    BoneName = accessor.GetBoneFrameName(i) ?? string.Empty,
-                    Frame = accessor.GetBoneFrameFrame(i),
-                    Translation = new[]
-                    {
-                        accessor.GetBoneFrameTranslation(i, 0),
-                        accessor.GetBoneFrameTranslation(i, 1),
-                        accessor.GetBoneFrameTranslation(i, 2)
-                    },
-                    Rotation = new[]
-                    {
-                        accessor.GetBoneFrameRotation(i, 0),
-                        accessor.GetBoneFrameRotation(i, 1),
-                        accessor.GetBoneFrameRotation(i, 2),
-                        accessor.GetBoneFrameRotation(i, 3)
-                    },
-                    TranslationXInterpolation = VmdSummaryInterpolation(accessor, i, 0),
-                    TranslationYInterpolation = VmdSummaryInterpolation(accessor, i, 1),
-                    TranslationZInterpolation = VmdSummaryInterpolation(accessor, i, 2),
-                    RotationInterpolation = VmdSummaryInterpolation(accessor, i, 3)
+                    BoneName = frame.boneName ?? string.Empty,
+                    Frame = frame.frame,
+                    Translation = CopyVec3(frame.translation),
+                    Rotation = CopyVec4(frame.rotation),
+                    TranslationXInterpolation = VmdJsonBoneInterpolation(frame.interpolation, 0),
+                    TranslationYInterpolation = VmdJsonBoneInterpolation(frame.interpolation, 1),
+                    TranslationZInterpolation = VmdJsonBoneInterpolation(frame.interpolation, 2),
+                    RotationInterpolation = VmdJsonBoneInterpolation(frame.interpolation, 3)
                 };
             }
 
             for (int i = 0; i < source.MorphFrames.Length; i++)
             {
+                VmdParsedMorphFrameJson frame = morphFrames[i] ?? new VmdParsedMorphFrameJson();
                 source.MorphFrames[i] = new VmdMotionSourceMorphFrame
                 {
-                    MorphName = accessor.GetMorphFrameName(i) ?? string.Empty,
-                    Frame = accessor.GetMorphFrameFrame(i),
-                    Weight = accessor.GetMorphFrameWeight(i)
+                    MorphName = frame.morphName ?? string.Empty,
+                    Frame = frame.frame,
+                    Weight = frame.weight
                 };
             }
 
             for (int i = 0; i < source.PropertyFrames.Length; i++)
             {
-                int ikStateCount = CountToArrayLength(accessor.GetPropertyFrameIkStateCount(i), "VMD property IK state count");
+                VmdParsedPropertyFrameJson frame = propertyFrames[i] ?? new VmdParsedPropertyFrameJson();
+                VmdParsedIkStateJson[] ikStates = frame.ikStates ?? Array.Empty<VmdParsedIkStateJson>();
                 var propertyFrame = new VmdMotionSourcePropertyFrame
                 {
-                    Frame = accessor.GetPropertyFrameFrame(i),
-                    Visible = accessor.GetPropertyFrameVisible(i),
-                    IkStates = new VmdMotionSourceIkState[ikStateCount]
+                    Frame = frame.frame,
+                    Visible = frame.visible,
+                    IkStates = new VmdMotionSourceIkState[ikStates.Length]
                 };
 
                 for (int j = 0; j < propertyFrame.IkStates.Length; j++)
                 {
+                    VmdParsedIkStateJson state = ikStates[j] ?? new VmdParsedIkStateJson();
                     propertyFrame.IkStates[j] = new VmdMotionSourceIkState
                     {
-                        BoneName = accessor.GetPropertyFrameIkStateName(i, j) ?? string.Empty,
-                        Enabled = accessor.GetPropertyFrameIkStateEnabled(i, j)
+                        BoneName = state.boneName ?? string.Empty,
+                        Enabled = state.enabled
                     };
                 }
 
@@ -516,506 +519,60 @@ namespace Mmd.Parser
 
             for (int i = 0; i < source.CameraFrames.Length; i++)
             {
-                var interpolation = new byte[24];
-                for (int b = 0; b < interpolation.Length; b++)
-                {
-                    interpolation[b] = accessor.GetCameraFrameInterpolationByte(i, b);
-                }
-
+                VmdParsedCameraFrameJson frame = cameraFrames[i] ?? new VmdParsedCameraFrameJson();
                 source.CameraFrames[i] = new VmdMotionSourceCameraFrame
                 {
-                    Frame = accessor.GetCameraFrameFrame(i),
-                    Distance = accessor.GetCameraFrameDistance(i),
-                    Position = new[]
-                    {
-                        accessor.GetCameraFramePosition(i, 0),
-                        accessor.GetCameraFramePosition(i, 1),
-                        accessor.GetCameraFramePosition(i, 2)
-                    },
-                    Rotation = new[]
-                    {
-                        accessor.GetCameraFrameRotation(i, 0),
-                        accessor.GetCameraFrameRotation(i, 1),
-                        accessor.GetCameraFrameRotation(i, 2)
-                    },
-                    ViewAngle = accessor.GetCameraFrameFov(i),
-                    Perspective = accessor.GetCameraFramePerspective(i),
-                    Interpolation = interpolation
+                    Frame = frame.frame,
+                    Distance = frame.distance,
+                    Position = CopyVec3(frame.position),
+                    Rotation = CopyVec3(frame.rotation),
+                    ViewAngle = frame.viewAngle,
+                    Perspective = frame.perspective,
+                    Interpolation = CopyByteArray(frame.interpolation)
                 };
             }
 
             for (int i = 0; i < source.LightFrames.Length; i++)
             {
+                VmdParsedLightFrameJson frame = lightFrames[i] ?? new VmdParsedLightFrameJson();
                 source.LightFrames[i] = new VmdMotionSourceLightFrame
                 {
-                    Frame = accessor.GetLightFrameFrame(i),
-                    Color = new[]
-                    {
-                        accessor.GetLightFrameColor(i, 0),
-                        accessor.GetLightFrameColor(i, 1),
-                        accessor.GetLightFrameColor(i, 2)
-                    },
-                    Direction = new[]
-                    {
-                        accessor.GetLightFrameDirection(i, 0),
-                        accessor.GetLightFrameDirection(i, 1),
-                        accessor.GetLightFrameDirection(i, 2)
-                    }
+                    Frame = frame.frame,
+                    Color = CopyVec3(frame.color),
+                    Direction = CopyVec3(frame.direction)
                 };
             }
 
             return source;
         }
 
-        internal static PmxModelSourceSnapshot CreateModelSnapshot(MmdParserFfiMethods.IPmxSummaryAccessor accessor)
+        internal static PmxModelSourceGeometry CreatePmxGeometryFromNativeBuffers(byte[] data)
         {
-            if (accessor == null)
-            {
-                return new PmxModelSourceSnapshot();
-            }
+            string modesJson = MmdParserFfiMethods.ParsePmxSkinningModesJson(data);
+            SkinningModesWrapper modesWrapper = string.IsNullOrWhiteSpace(modesJson)
+                ? new SkinningModesWrapper()
+                : (UnityEngine.JsonUtility.FromJson<SkinningModesWrapper>(modesJson) ?? new SkinningModesWrapper());
 
-            return new PmxModelSourceSnapshot
+            return new PmxModelSourceGeometry
             {
-                metadata = new PmxModelSourceMetadata { name = accessor.ModelName ?? string.Empty },
-                geometry = CreatePmxGeometry(accessor),
-                materials = CreatePmxMaterials(accessor),
-                skeleton = new PmxModelSourceSkeleton { bones = CreatePmxBones(accessor) },
-                morphs = CreatePmxMorphs(accessor),
-                rigidBodies = CreatePmxRigidBodies(accessor),
-                joints = CreatePmxJoints(accessor)
+                positions = MmdParserFfiMethods.ParsePmxPositions(data),
+                normals = MmdParserFfiMethods.ParsePmxNormals(data),
+                uvs = MmdParserFfiMethods.ParsePmxUvs(data),
+                indices = MmdParserFfiMethods.ParsePmxIndices(data),
+                skinningModes = modesWrapper.skinningModes,
+                skinIndices = MmdParserFfiMethods.ParsePmxSkinIndices(data),
+                skinWeights = MmdParserFfiMethods.ParsePmxSkinWeights(data),
+                hasSdefParameters = MmdParserFfiMethods.ParsePmxSdefEnabled(data),
+                sdefC = MmdParserFfiMethods.ParsePmxSdefC(data),
+                sdefR0 = MmdParserFfiMethods.ParsePmxSdefR0(data),
+                sdefR1 = MmdParserFfiMethods.ParsePmxSdefR1(data),
             };
         }
 
-        private static PmxModelSourceGeometry CreatePmxGeometry(MmdParserFfiMethods.IPmxSummaryAccessor accessor)
+        [Serializable]
+        private sealed class SkinningModesWrapper
         {
-            int vertexCount = CountToArrayLength(accessor.VertexCount, "PMX vertex count");
-            int indexCount = CountToArrayLength(accessor.IndexCount, "PMX index count");
-            var geometry = new PmxModelSourceGeometry
-            {
-                positions = new float[vertexCount * 3],
-                normals = new float[vertexCount * 3],
-                uvs = new float[vertexCount * 2],
-                indices = new uint[indexCount],
-                skinningModes = new string[vertexCount],
-                skinIndices = new uint[vertexCount * 4],
-                skinWeights = new float[vertexCount * 4],
-                hasSdefParameters = new bool[vertexCount],
-                sdefC = new float[vertexCount * 3],
-                sdefR0 = new float[vertexCount * 3],
-                sdefR1 = new float[vertexCount * 3]
-            };
-
-            for (int i = 0; i < indexCount; i++)
-            {
-                geometry.indices[i] = accessor.GetIndex(i);
-            }
-
-            for (int i = 0; i < vertexCount; i++)
-            {
-                for (int component = 0; component < 3; component++)
-                {
-                    geometry.positions[i * 3 + component] = accessor.GetVertexPosition(i, component);
-                    geometry.normals[i * 3 + component] = accessor.GetVertexNormal(i, component);
-                    geometry.sdefC[i * 3 + component] = accessor.GetVertexSdef(i, 0, component);
-                    geometry.sdefR0[i * 3 + component] = accessor.GetVertexSdef(i, 1, component);
-                    geometry.sdefR1[i * 3 + component] = accessor.GetVertexSdef(i, 2, component);
-                }
-
-                for (int component = 0; component < 2; component++)
-                {
-                    geometry.uvs[i * 2 + component] = accessor.GetVertexUv(i, component);
-                }
-
-                for (int slot = 0; slot < 4; slot++)
-                {
-                    int boneIndex = accessor.GetVertexSkinBoneIndex(i, slot);
-                    int offset = i * 4 + slot;
-                    if (boneIndex < 0)
-                    {
-                        geometry.skinIndices[offset] = 0u;
-                        geometry.skinWeights[offset] = 0.0f;
-                    }
-                    else
-                    {
-                        geometry.skinIndices[offset] = (uint)boneIndex;
-                        geometry.skinWeights[offset] = accessor.GetVertexSkinWeight(i, slot);
-                    }
-                }
-
-                geometry.hasSdefParameters[i] = accessor.GetVertexSdefEnabled(i);
-                geometry.skinningModes[i] = ExactOrInferredPmxSkinningMode(accessor, i);
-            }
-
-            return geometry;
-        }
-
-        private static string ExactOrInferredPmxSkinningMode(MmdParserFfiMethods.IPmxSummaryAccessor accessor, int vertexIndex)
-        {
-            string exact = accessor.GetVertexSkinningKind(vertexIndex);
-            return string.IsNullOrWhiteSpace(exact) ? InferPmxSkinningMode(accessor, vertexIndex) : exact;
-        }
-
-        private static string InferPmxSkinningMode(MmdParserFfiMethods.IPmxSummaryAccessor accessor, int vertexIndex)
-        {
-            if (accessor.GetVertexSdefEnabled(vertexIndex))
-            {
-                return "sdef";
-            }
-
-            int weightedSlotCount = 0;
-            for (int slot = 0; slot < 4; slot++)
-            {
-                if (accessor.GetVertexSkinBoneIndex(vertexIndex, slot) >= 0 &&
-                    Math.Abs(accessor.GetVertexSkinWeight(vertexIndex, slot)) > 0.000001f)
-                {
-                    weightedSlotCount++;
-                }
-            }
-
-            return weightedSlotCount switch
-            {
-                <= 1 => "bdef1",
-                2 => "bdef2",
-                _ => "bdef4"
-            };
-        }
-
-        private static PmxModelSourceMaterial[] CreatePmxMaterials(MmdParserFfiMethods.IPmxSummaryAccessor accessor)
-        {
-            int count = CountToArrayLength(accessor.MaterialCount, "PMX material count");
-            var materials = new PmxModelSourceMaterial[count];
-            for (int i = 0; i < count; i++)
-            {
-                materials[i] = new PmxModelSourceMaterial
-                {
-                    name = accessor.GetMaterialName(i) ?? string.Empty,
-                    texturePath = accessor.GetMaterialTexturePath(i) ?? string.Empty,
-                    sphereTexturePath = accessor.GetMaterialSphereTexturePath(i) ?? string.Empty,
-                    sphereMode = accessor.GetMaterialSphereMode(i) ?? string.Empty,
-                    toonTexturePath = accessor.GetMaterialToonTexturePath(i) ?? string.Empty,
-                    sharedToonIndex = accessor.GetMaterialSharedToonIndex(i),
-                    diffuse = ReadVec4(component => accessor.GetMaterialDiffuse(i, component)),
-                    ambient = ReadVec3(component => accessor.GetMaterialAmbient(i, component)),
-                    edgeColor = ReadVec4(component => accessor.GetMaterialEdgeColor(i, component)),
-                    edgeSize = accessor.GetMaterialEdgeSize(i),
-                    flags = new PmxModelSourceMaterialFlags
-                    {
-                        doubleSided = accessor.GetMaterialDoubleSided(i),
-                        edge = accessor.GetMaterialEdgeFlag(i)
-                    },
-                    faceCount = accessor.GetMaterialFaceCount(i)
-                };
-            }
-
-            return materials;
-        }
-
-        private static PmxModelSourceBone[] CreatePmxBones(MmdParserFfiMethods.IPmxSummaryAccessor accessor)
-        {
-            int count = CountToArrayLength(accessor.BoneCount, "PMX bone count");
-            var bones = new PmxModelSourceBone[count];
-            for (int i = 0; i < count; i++)
-            {
-                bool appendRotate = accessor.GetBoneAppendRotate(i);
-                bool appendTranslate = accessor.GetBoneAppendTranslate(i);
-                bool fixedAxisPresent = accessor.GetBoneFixedAxisPresent(i);
-                bool localAxisPresent = accessor.GetBoneLocalAxisPresent(i);
-                bool externalParentPresent = accessor.GetBoneExternalParentPresent(i);
-                bool ikPresent = accessor.GetBoneIkPresent(i);
-                bones[i] = new PmxModelSourceBone
-                {
-                    name = accessor.GetBoneName(i) ?? string.Empty,
-                    parentIndex = accessor.GetBoneParentIndex(i),
-                    layer = accessor.GetBoneLayer(i),
-                    position = ReadVec3(component => accessor.GetBonePosition(i, component)),
-                    flags = new PmxModelSourceBoneFlags
-                    {
-                        rotatable = accessor.GetBoneRotatable(i),
-                        translatable = accessor.GetBoneTranslatable(i),
-                        appendRotate = appendRotate,
-                        appendTranslate = appendTranslate,
-                        appendLocal = accessor.GetBoneAppendLocal(i),
-                        externalParentTransform = externalParentPresent
-                    },
-                    appendTransform = (appendRotate || appendTranslate)
-                        ? new PmxModelSourceAppendTransform
-                        {
-                            parentIndex = accessor.GetBoneAppendParentIndex(i),
-                            weight = accessor.GetBoneAppendWeight(i)
-                        }
-                        : null,
-                    fixedAxis = fixedAxisPresent ? ReadVec3(component => accessor.GetBoneFixedAxis(i, component)) : null,
-                    localAxis = localAxisPresent
-                        ? new PmxModelSourceLocalAxis
-                        {
-                            x = ReadVec3(component => accessor.GetBoneLocalAxisX(i, component)),
-                            z = ReadVec3(component => accessor.GetBoneLocalAxisZ(i, component))
-                        }
-                        : null,
-                    externalParentKey = externalParentPresent ? accessor.GetBoneExternalParentKey(i) : -1,
-                    ik = ikPresent ? CreatePmxIk(accessor, i) : null
-                };
-            }
-
-            return bones;
-        }
-
-        private static PmxModelSourceIk CreatePmxIk(MmdParserFfiMethods.IPmxSummaryAccessor accessor, int boneIndex)
-        {
-            int linkCount = CountToArrayLength(accessor.GetBoneIkLinkCount(boneIndex), "PMX IK link count");
-            var links = new PmxModelSourceIkLink[linkCount];
-            for (int i = 0; i < linkCount; i++)
-            {
-                bool limitPresent = accessor.GetBoneIkLinkLimitPresent(boneIndex, i);
-                links[i] = new PmxModelSourceIkLink
-                {
-                    boneIndex = accessor.GetBoneIkLinkBoneIndex(boneIndex, i),
-                    limits = limitPresent
-                        ? new PmxModelSourceIkLimit
-                        {
-                            lower = ReadVec3(component => accessor.GetBoneIkLinkLimitLower(boneIndex, i, component)),
-                            upper = ReadVec3(component => accessor.GetBoneIkLinkLimitUpper(boneIndex, i, component))
-                        }
-                        : null
-                };
-            }
-
-            return new PmxModelSourceIk
-            {
-                targetIndex = accessor.GetBoneIkTargetIndex(boneIndex),
-                loopCount = accessor.GetBoneIkLoopCount(boneIndex),
-                limitAngle = accessor.GetBoneIkLimitAngle(boneIndex),
-                links = links
-            };
-        }
-
-        private static PmxModelSourceMorph[] CreatePmxMorphs(MmdParserFfiMethods.IPmxSummaryAccessor accessor)
-        {
-            int count = CountToArrayLength(accessor.MorphCount, "PMX morph count");
-            var morphs = new PmxModelSourceMorph[count];
-            for (int i = 0; i < count; i++)
-            {
-                morphs[i] = new PmxModelSourceMorph
-                {
-                    name = accessor.GetMorphName(i) ?? string.Empty,
-                    type = accessor.GetMorphKind(i) ?? string.Empty,
-                    panel = accessor.GetMorphPanel(i) ?? string.Empty,
-                    vertexOffsets = CreatePmxVertexMorphOffsets(accessor, i),
-                    groupOffsets = CreatePmxGroupMorphOffsets(accessor, i),
-                    boneOffsets = CreatePmxBoneMorphOffsets(accessor, i),
-                    uvOffsets = CreatePmxUvMorphOffsets(accessor, i),
-                    additionalUvOffsets = CreatePmxAdditionalUvMorphOffsets(accessor, i),
-                    materialOffsets = CreatePmxMaterialMorphOffsets(accessor, i),
-                    flipOffsets = CreatePmxFlipMorphOffsets(accessor, i),
-                    impulseOffsets = CreatePmxImpulseMorphOffsets(accessor, i)
-                };
-            }
-
-            return morphs;
-        }
-
-        private static PmxModelSourceVertexMorphOffset[] CreatePmxVertexMorphOffsets(MmdParserFfiMethods.IPmxSummaryAccessor accessor, int morphIndex)
-        {
-            int count = CountToArrayLength(accessor.GetMorphVertexOffsetCount(morphIndex), "PMX vertex morph offset count");
-            var offsets = new PmxModelSourceVertexMorphOffset[count];
-            for (int i = 0; i < count; i++)
-            {
-                offsets[i] = new PmxModelSourceVertexMorphOffset
-                {
-                    vertexIndex = accessor.GetMorphVertexOffsetVertexIndex(morphIndex, i),
-                    position = ReadVec3(component => accessor.GetMorphVertexOffsetPosition(morphIndex, i, component))
-                };
-            }
-
-            return offsets;
-        }
-
-        private static PmxModelSourceGroupMorphOffset[] CreatePmxGroupMorphOffsets(MmdParserFfiMethods.IPmxSummaryAccessor accessor, int morphIndex)
-        {
-            int count = CountToArrayLength(accessor.GetMorphGroupOffsetCount(morphIndex), "PMX group morph offset count");
-            var offsets = new PmxModelSourceGroupMorphOffset[count];
-            for (int i = 0; i < count; i++)
-            {
-                offsets[i] = new PmxModelSourceGroupMorphOffset
-                {
-                    morphIndex = accessor.GetMorphGroupOffsetMorphIndex(morphIndex, i),
-                    weight = accessor.GetMorphGroupOffsetWeight(morphIndex, i)
-                };
-            }
-
-            return offsets;
-        }
-
-        private static PmxModelSourceBoneMorphOffset[] CreatePmxBoneMorphOffsets(MmdParserFfiMethods.IPmxSummaryAccessor accessor, int morphIndex)
-        {
-            int count = CountToArrayLength(accessor.GetMorphBoneOffsetCount(morphIndex), "PMX bone morph offset count");
-            var offsets = new PmxModelSourceBoneMorphOffset[count];
-            for (int i = 0; i < count; i++)
-            {
-                offsets[i] = new PmxModelSourceBoneMorphOffset
-                {
-                    boneIndex = accessor.GetMorphBoneOffsetBoneIndex(morphIndex, i),
-                    translation = ReadVec3(component => accessor.GetMorphBoneOffsetTranslation(morphIndex, i, component)),
-                    rotation = ReadVec4(component => accessor.GetMorphBoneOffsetRotation(morphIndex, i, component))
-                };
-            }
-
-            return offsets;
-        }
-
-        private static PmxModelSourceUvMorphOffset[] CreatePmxUvMorphOffsets(MmdParserFfiMethods.IPmxSummaryAccessor accessor, int morphIndex)
-        {
-            int count = CountToArrayLength(accessor.GetMorphUvOffsetCount(morphIndex), "PMX UV morph offset count");
-            var offsets = new PmxModelSourceUvMorphOffset[count];
-            for (int i = 0; i < count; i++)
-            {
-                offsets[i] = new PmxModelSourceUvMorphOffset
-                {
-                    vertexIndex = accessor.GetMorphUvOffsetVertexIndex(morphIndex, i),
-                    uv = ReadVec4(component => accessor.GetMorphUvOffsetValue(morphIndex, i, component))
-                };
-            }
-
-            return offsets;
-        }
-
-        private static PmxModelSourceAdditionalUvMorphOffset[] CreatePmxAdditionalUvMorphOffsets(MmdParserFfiMethods.IPmxSummaryAccessor accessor, int morphIndex)
-        {
-            int count = CountToArrayLength(accessor.GetMorphAdditionalUvOffsetCount(morphIndex), "PMX additional UV morph offset count");
-            var offsets = new PmxModelSourceAdditionalUvMorphOffset[count];
-            for (int i = 0; i < count; i++)
-            {
-                offsets[i] = new PmxModelSourceAdditionalUvMorphOffset
-                {
-                    vertexIndex = accessor.GetMorphAdditionalUvOffsetVertexIndex(morphIndex, i),
-                    uvIndex = accessor.GetMorphAdditionalUvOffsetUvIndex(morphIndex, i),
-                    uv = ReadVec4(component => accessor.GetMorphAdditionalUvOffsetValue(morphIndex, i, component))
-                };
-            }
-
-            return offsets;
-        }
-
-        private static PmxModelSourceMaterialMorphOffset[] CreatePmxMaterialMorphOffsets(MmdParserFfiMethods.IPmxSummaryAccessor accessor, int morphIndex)
-        {
-            int count = CountToArrayLength(accessor.GetMorphMaterialOffsetCount(morphIndex), "PMX material morph offset count");
-            var offsets = new PmxModelSourceMaterialMorphOffset[count];
-            for (int i = 0; i < count; i++)
-            {
-                offsets[i] = new PmxModelSourceMaterialMorphOffset
-                {
-                    materialIndex = accessor.GetMorphMaterialOffsetMaterialIndex(morphIndex, i),
-                    operation = accessor.GetMorphMaterialOffsetOperation(morphIndex, i) ?? "unknown",
-                    diffuse = ReadVec4(component => accessor.GetMorphMaterialOffsetDiffuse(morphIndex, i, component)),
-                    specular = ReadVec3(component => accessor.GetMorphMaterialOffsetSpecular(morphIndex, i, component)),
-                    specularPower = accessor.GetMorphMaterialOffsetSpecularPower(morphIndex, i),
-                    ambient = ReadVec3(component => accessor.GetMorphMaterialOffsetAmbient(morphIndex, i, component)),
-                    edgeColor = ReadVec4(component => accessor.GetMorphMaterialOffsetEdgeColor(morphIndex, i, component)),
-                    edgeSize = accessor.GetMorphMaterialOffsetEdgeSize(morphIndex, i),
-                    textureFactor = ReadVec4(component => accessor.GetMorphMaterialOffsetTextureFactor(morphIndex, i, component)),
-                    sphereTextureFactor = ReadVec4(component => accessor.GetMorphMaterialOffsetSphereTextureFactor(morphIndex, i, component)),
-                    toonTextureFactor = ReadVec4(component => accessor.GetMorphMaterialOffsetToonTextureFactor(morphIndex, i, component))
-                };
-            }
-
-            return offsets;
-        }
-
-        private static PmxModelSourceGroupMorphOffset[] CreatePmxFlipMorphOffsets(MmdParserFfiMethods.IPmxSummaryAccessor accessor, int morphIndex)
-        {
-            int count = CountToArrayLength(accessor.GetMorphFlipOffsetCount(morphIndex), "PMX flip morph offset count");
-            var offsets = new PmxModelSourceGroupMorphOffset[count];
-            for (int i = 0; i < count; i++)
-            {
-                offsets[i] = new PmxModelSourceGroupMorphOffset
-                {
-                    morphIndex = accessor.GetMorphFlipOffsetMorphIndex(morphIndex, i),
-                    weight = accessor.GetMorphFlipOffsetWeight(morphIndex, i)
-                };
-            }
-
-            return offsets;
-        }
-
-        private static PmxModelSourceImpulseMorphOffset[] CreatePmxImpulseMorphOffsets(MmdParserFfiMethods.IPmxSummaryAccessor accessor, int morphIndex)
-        {
-            int count = CountToArrayLength(accessor.GetMorphImpulseOffsetCount(morphIndex), "PMX impulse morph offset count");
-            var offsets = new PmxModelSourceImpulseMorphOffset[count];
-            for (int i = 0; i < count; i++)
-            {
-                offsets[i] = new PmxModelSourceImpulseMorphOffset
-                {
-                    rigidBodyIndex = accessor.GetMorphImpulseOffsetRigidbodyIndex(morphIndex, i),
-                    local = accessor.GetMorphImpulseOffsetLocal(morphIndex, i),
-                    velocity = ReadVec3(component => accessor.GetMorphImpulseOffsetVelocity(morphIndex, i, component)),
-                    torque = ReadVec3(component => accessor.GetMorphImpulseOffsetTorque(morphIndex, i, component))
-                };
-            }
-
-            return offsets;
-        }
-
-        private static PmxModelSourceRigidBody[] CreatePmxRigidBodies(MmdParserFfiMethods.IPmxSummaryAccessor accessor)
-        {
-            int count = CountToArrayLength(accessor.RigidbodyCount, "PMX rigidbody count");
-            var bodies = new PmxModelSourceRigidBody[count];
-            for (int i = 0; i < count; i++)
-            {
-                bodies[i] = new PmxModelSourceRigidBody
-                {
-                    name = accessor.GetRigidbodyName(i) ?? string.Empty,
-                    boneIndex = accessor.GetRigidbodyBoneIndex(i),
-                    group = accessor.GetRigidbodyGroup(i),
-                    mask = accessor.GetRigidbodyMask(i),
-                    shape = accessor.GetRigidbodyShape(i) ?? string.Empty,
-                    size = ReadVec3(component => accessor.GetRigidbodySize(i, component)),
-                    position = ReadVec3(component => accessor.GetRigidbodyPosition(i, component)),
-                    rotation = ReadVec3(component => accessor.GetRigidbodyRotation(i, component)),
-                    mass = accessor.GetRigidbodyMass(i),
-                    linearDamping = accessor.GetRigidbodyLinearDamping(i),
-                    angularDamping = accessor.GetRigidbodyAngularDamping(i),
-                    restitution = accessor.GetRigidbodyRestitution(i),
-                    friction = accessor.GetRigidbodyFriction(i),
-                    mode = accessor.GetRigidbodyMode(i) ?? string.Empty
-                };
-            }
-
-            return bodies;
-        }
-
-        private static PmxModelSourceJoint[] CreatePmxJoints(MmdParserFfiMethods.IPmxSummaryAccessor accessor)
-        {
-            int count = CountToArrayLength(accessor.JointCount, "PMX joint count");
-            var joints = new PmxModelSourceJoint[count];
-            for (int i = 0; i < count; i++)
-            {
-                joints[i] = new PmxModelSourceJoint
-                {
-                    name = accessor.GetJointName(i) ?? string.Empty,
-                    rigidBodyIndexA = accessor.GetJointRigidbodyAIndex(i),
-                    rigidBodyIndexB = accessor.GetJointRigidbodyBIndex(i),
-                    position = ReadVec3(component => accessor.GetJointPosition(i, component)),
-                    rotation = ReadVec3(component => accessor.GetJointRotation(i, component)),
-                    translationLowerLimit = ReadVec3(component => accessor.GetJointTranslationLowerLimit(i, component)),
-                    translationUpperLimit = ReadVec3(component => accessor.GetJointTranslationUpperLimit(i, component)),
-                    rotationLowerLimit = ReadVec3(component => accessor.GetJointRotationLowerLimit(i, component)),
-                    rotationUpperLimit = ReadVec3(component => accessor.GetJointRotationUpperLimit(i, component)),
-                    springTranslationFactor = ReadVec3(component => accessor.GetJointSpringTranslationFactor(i, component)),
-                    springRotationFactor = ReadVec3(component => accessor.GetJointSpringRotationFactor(i, component))
-                };
-            }
-
-            return joints;
-        }
-
-        private static float[] ReadVec3(Func<int, float> readComponent)
-        {
-            return new[] { readComponent(0), readComponent(1), readComponent(2) };
-        }
-
-        private static float[] ReadVec4(Func<int, float> readComponent)
-        {
-            return new[] { readComponent(0), readComponent(1), readComponent(2), readComponent(3) };
+            public string[] skinningModes = Array.Empty<string>();
         }
 
         private static int InferIkEffectorIndex(MmdModelDefinition model, MmdIkDefinition ik)
@@ -1055,15 +612,42 @@ namespace Mmd.Parser
             };
         }
 
-        private static byte[] VmdSummaryInterpolation(MmdParserFfiMethods.IVmdSummaryAccessor accessor, int frameIndex, int component)
+        private static byte[] VmdJsonBoneInterpolation(int[] values, int component)
         {
             return new[]
             {
-                accessor.GetBoneFrameInterpolationByte(frameIndex, component),
-                accessor.GetBoneFrameInterpolationByte(frameIndex, component + 4),
-                accessor.GetBoneFrameInterpolationByte(frameIndex, component + 8),
-                accessor.GetBoneFrameInterpolationByte(frameIndex, component + 12)
+                JsonByteAt(values, component),
+                JsonByteAt(values, component + 4),
+                JsonByteAt(values, component + 8),
+                JsonByteAt(values, component + 12)
             };
+        }
+
+        private static byte JsonByteAt(int[] values, int index)
+        {
+            if (values == null || index < 0 || index >= values.Length)
+            {
+                return 0;
+            }
+
+            int value = values[index];
+            return value < 0 ? (byte)0 : value > byte.MaxValue ? byte.MaxValue : (byte)value;
+        }
+
+        private static byte[] CopyByteArray(int[] values)
+        {
+            if (values == null || values.Length == 0)
+            {
+                return Array.Empty<byte>();
+            }
+
+            var result = new byte[values.Length];
+            for (int i = 0; i < values.Length; i++)
+            {
+                result[i] = JsonByteAt(values, i);
+            }
+
+            return result;
         }
 
         private static int CountToArrayLength(int value, string label)
@@ -1355,6 +939,98 @@ namespace Mmd.Parser
         {
             public string BoneName = string.Empty;
             public bool Enabled = true;
+        }
+
+        [Serializable]
+        internal sealed class VmdParsedAnimationJson
+        {
+            public VmdParsedMetadataJson metadata = new();
+            public VmdParsedBoneFrameJson[] boneFrames = Array.Empty<VmdParsedBoneFrameJson>();
+            public VmdParsedMorphFrameJson[] morphFrames = Array.Empty<VmdParsedMorphFrameJson>();
+            public VmdParsedCameraFrameJson[] cameraFrames = Array.Empty<VmdParsedCameraFrameJson>();
+            public VmdParsedLightFrameJson[] lightFrames = Array.Empty<VmdParsedLightFrameJson>();
+            public VmdParsedSelfShadowFrameJson[] selfShadowFrames = Array.Empty<VmdParsedSelfShadowFrameJson>();
+            public VmdParsedPropertyFrameJson[] propertyFrames = Array.Empty<VmdParsedPropertyFrameJson>();
+        }
+
+        [Serializable]
+        internal sealed class VmdParsedMetadataJson
+        {
+            public string modelName = string.Empty;
+            public VmdParsedCountsJson counts = new();
+            public uint maxFrame;
+        }
+
+        [Serializable]
+        internal sealed class VmdParsedCountsJson
+        {
+            public int bones;
+            public int morphs;
+            public int cameras;
+            public int lights;
+            public int selfShadows;
+            public int properties;
+        }
+
+        [Serializable]
+        internal sealed class VmdParsedBoneFrameJson
+        {
+            public string boneName = string.Empty;
+            public uint frame;
+            public float[] translation = Array.Empty<float>();
+            public float[] rotation = Array.Empty<float>();
+            public int[] interpolation = Array.Empty<int>();
+        }
+
+        [Serializable]
+        internal sealed class VmdParsedMorphFrameJson
+        {
+            public string morphName = string.Empty;
+            public uint frame;
+            public float weight;
+        }
+
+        [Serializable]
+        internal sealed class VmdParsedPropertyFrameJson
+        {
+            public uint frame;
+            public bool visible = true;
+            public VmdParsedIkStateJson[] ikStates = Array.Empty<VmdParsedIkStateJson>();
+        }
+
+        [Serializable]
+        internal sealed class VmdParsedIkStateJson
+        {
+            public string boneName = string.Empty;
+            public bool enabled = true;
+        }
+
+        [Serializable]
+        internal sealed class VmdParsedCameraFrameJson
+        {
+            public uint frame;
+            public float distance;
+            public float[] position = Array.Empty<float>();
+            public float[] rotation = Array.Empty<float>();
+            public int[] interpolation = Array.Empty<int>();
+            public uint viewAngle;
+            public bool perspective = true;
+        }
+
+        [Serializable]
+        internal sealed class VmdParsedLightFrameJson
+        {
+            public uint frame;
+            public float[] color = Array.Empty<float>();
+            public float[] direction = Array.Empty<float>();
+        }
+
+        [Serializable]
+        internal sealed class VmdParsedSelfShadowFrameJson
+        {
+            public uint frame;
+            public byte mode;
+            public float distance;
         }
 
         [Serializable]
