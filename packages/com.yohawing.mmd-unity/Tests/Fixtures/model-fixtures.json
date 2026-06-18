@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "fixtures": [
+    {
+      "id": "test-1bone-cube-pmx",
+      "format": "pmx",
+      "model": "Assets/test_1bone_cube.pmx",
+      "golden": "Golden/test_1bone_cube_model.json",
+      "expected": {
+        "minVertices": 1,
+        "minIndices": 3,
+        "minBones": 1,
+        "minMaterials": 1
+      },
+      "notes": "Self-generated redistributable PMX parser fixture."
+    },
+    {
+      "id": "test-basic-bone-pmx",
+      "format": "pmx",
+      "model": "Assets/test_basic_bone.pmx",
+      "golden": "Golden/test_basic_bone_model.json",
+      "expected": {
+        "minVertices": 0,
+        "minIndices": 0,
+        "minBones": 1,
+        "minMaterials": 0
+      },
+      "notes": "Self-generated redistributable PMX bone-structure fixture."
+    },
+    {
+      "id": "redistributable-append-bone-pmx",
+      "format": "pmx",
+      "model": "Assets/test_append_bone.pmx",
+      "golden": "Golden/test_append_bone_model.json",
+      "expected": {
+        "minVertices": 0,
+        "minIndices": 0,
+        "minBones": 1,
+        "minMaterials": 0
+      },
+      "notes": "Redistributable PMX fixture for append transform parser coverage."
+    },
+    {
+      "id": "redistributable-fix-axis-pmx",
+      "format": "pmx",
+      "model": "Assets/test_fix_axis.pmx",
+      "golden": "Golden/test_fix_axis_model.json",
+      "expected": {
+        "minVertices": 0,
+        "minIndices": 0,
+        "minBones": 1,
+        "minMaterials": 0
+      },
+      "notes": "Redistributable PMX fixture for fixed-axis bone parser coverage."
+    },
+    {
+      "id": "redistributable-given-bone-comprehensive-pmx",
+      "format": "pmx",
+      "model": "Assets/test_given_bone_comprehensive.pmx",
+      "golden": "Golden/test_given_bone_comprehensive_model.json",
+      "expected": {
+        "minVertices": 0,
+        "minIndices": 0,
+        "minBones": 1,
+        "minMaterials": 0
+      },
+      "notes": "Redistributable PMX fixture for broad bone flag parser coverage."
+    },
+    {
+      "id": "redistributable-semi-basic-bone-pmx",
+      "format": "pmx",
+      "model": "Assets/test_semi_basic_bone.pmx",
+      "golden": "Golden/test_semi_basic_bone_model.json",
+      "expected": {
+        "minVertices": 0,
+        "minIndices": 0,
+        "minBones": 1,
+        "minMaterials": 0
+      },
+      "notes": "Redistributable PMX fixture for semi-basic bone parser coverage."
+    }
+  ]
+}

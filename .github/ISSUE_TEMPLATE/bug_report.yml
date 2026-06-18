@@ -1,0 +1,173 @@
+name: Bug report
+description: Report a reproducible bug in the unity-mmd-loader package, runtime, or Unity workflow.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. Please give us enough to reproduce it from a
+        fresh Unity project without your local licensed MMD assets.
+
+        Before filing, please check that this is an actual guard/claim/regression,
+        not a known release-boundary limitation. The following are **deferred or
+        out-of-release-path** by design and are **not** current bugs unless your
+        report is about an existing guard, documented claim, or a regression in
+        behavior that used to work:
+
+        - SDEF/QDEF exact deformation parity
+        - uva1-uva4 runtime evaluation
+        - Physics Cache readback
+        - Timeline random-access live physics
+        - Full Inspector UI
+        - Explicit prefab/mesh/material/texture export and AnimationClip writer
+        - Humanoid Bridge, rayMMD compatibility, experimental physics backends
+        - Broad Burst/Jobs optimization, Compute Skinning
+        - 30-model benchmark scenarios
+
+        See `packages/com.yohawing.mmd-unity/Documentation~/README.md`
+        ("Release-Facing Known Limitations") for the full list.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One or two sentences describing the bug.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      description: Which part of the project does this bug touch? Pick the closest match.
+      options:
+        - Parser / native interop
+        - Runtime / motion / IK / morph
+        - Rendering / URP / materials
+        - Unity asset workflow / importer
+        - Timeline / physics
+        - Packaging / release docs
+        - Performance / benchmark
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: golden-path-step
+    attributes:
+      label: Golden path step
+      description: >
+        If this is reproducible in the main flow, choose where it appears.
+        For no relevant step, choose Not applicable.
+        Do not attach licensed/local PMX/VMD, texture, motion, audio, or captures
+        without confirmed redistribution rights.
+      options:
+        - PMX drag
+        - Scene placement
+        - VMD to Timeline
+        - optional Humanoid Clip bake
+        - Not applicable
+    validations:
+      required: false
+
+  - type: input
+    id: repo-version
+    attributes:
+      label: Repository version / commit
+      description: Tag, release version, or `git rev-parse HEAD` short SHA.
+      placeholder: "e.g. v0.4 or 53e0a6a"
+    validations:
+      required: true
+
+  - type: input
+    id: unity-version
+    attributes:
+      label: Unity version
+      description: Exact editor version, if the bug involves Unity.
+      placeholder: "e.g. 6000.4.8f1"
+    validations:
+      required: false
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "e.g. Windows 11 26200"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install-method
+    attributes:
+      label: Package install method
+      description: How is `com.yohawing.mmd-unity` consumed?
+      options:
+        - Cloned repository / local path
+        - UPM local file reference (file: path)
+        - UPM git URL
+        - Copied into Assets/
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro-commands
+    attributes:
+      label: Exact reproduction steps
+      description: >
+        The exact steps to reproduce, copy-pasteable. Prefer Unity Editor steps
+        (e.g. drag PMX into Project window, open Window > Test Runner > Edit Mode,
+        observe Console errors) or minimal C# snippets that demonstrate the failure.
+      render: csharp
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: artifacts
+    attributes:
+      label: Relevant artifacts / log paths
+      description: >
+        Paste the few key lines from the Unity Console or Test Runner that show
+        the failure. For large outputs, attach a file or link to a gist.
+      placeholder: "e.g. NullReferenceException in MmdPmxScriptedImporter at line 42"
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmations
+      description: Please confirm the following before submitting.
+      options:
+        - label: >
+            I have **not** attached licensed/local PMX/VMD files, textures,
+            motions, audio, or captures unless redistribution rights and
+            provenance are explicitly cleared.
+          required: true
+        - label: >
+            I have **not** changed tolerances, golden values, comparer pass/fail
+            criteria, or test/CI skip conditions just to make a test pass.
+          required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Anything else that helps us localize the failure.
+    validations:
+      required: false

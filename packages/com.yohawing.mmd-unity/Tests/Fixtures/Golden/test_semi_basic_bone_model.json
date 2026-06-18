@@ -1,0 +1,3731 @@
+{
+    "name": "準標準ボーン",
+    "vertices": [],
+    "indices": [],
+    "bones": [
+        {
+            "index": 0,
+            "name": "センター",
+            "parentIndex": -1,
+            "transformOrder": 0,
+            "origin": [
+                0.0,
+                8.0,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 1,
+            "name": "センター先",
+            "parentIndex": 0,
+            "transformOrder": 0,
+            "origin": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 2,
+            "name": "上半身",
+            "parentIndex": 0,
+            "transformOrder": 0,
+            "origin": [
+                0.0,
+                13.301188468933106,
+                -0.25527799129486086
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 3,
+            "name": "上半身2",
+            "parentIndex": 2,
+            "transformOrder": 0,
+            "origin": [
+                0.0,
+                14.392106056213379,
+                -0.16593068838119508
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 4,
+            "name": "上半身2先",
+            "parentIndex": 3,
+            "transformOrder": 0,
+            "origin": [
+                0.0,
+                16.4180965423584,
+                0.0
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 5,
+            "name": "首",
+            "parentIndex": 3,
+            "transformOrder": 0,
+            "origin": [
+                0.0,
+                16.4180965423584,
+                0.0
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 6,
+            "name": "頭",
+            "parentIndex": 5,
+            "transformOrder": 0,
+            "origin": [
+                0.0,
+                16.798503875732423,
+                0.0
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 7,
+            "name": "頭先",
+            "parentIndex": 6,
+            "transformOrder": 0,
+            "origin": [
+                0.0,
+                19.0,
+                0.0
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 8,
+            "name": "両目",
+            "parentIndex": 6,
+            "transformOrder": 0,
+            "origin": [
+                0.0,
+                21.0,
+                -0.699999988079071
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 9,
+            "name": "両目先",
+            "parentIndex": 8,
+            "transformOrder": 0,
+            "origin": [
+                0.0,
+                21.0,
+                -1.5
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 10,
+            "name": "左目",
+            "parentIndex": 6,
+            "transformOrder": 0,
+            "origin": [
+                0.3498789966106415,
+                17.857934951782228,
+                -0.348349004983902
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": 8,
+            "appendRatio": 1.0,
+            "appendRotation": true,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 11,
+            "name": "左目先",
+            "parentIndex": 10,
+            "transformOrder": 2,
+            "origin": [
+                0.6200000047683716,
+                17.799999237060548,
+                -0.8971959948539734
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 12,
+            "name": "右目",
+            "parentIndex": 6,
+            "transformOrder": 0,
+            "origin": [
+                -0.3498789966106415,
+                17.857934951782228,
+                -0.348349004983902
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": 8,
+            "appendRatio": 1.0,
+            "appendRotation": true,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 13,
+            "name": "右目先",
+            "parentIndex": 12,
+            "transformOrder": 2,
+            "origin": [
+                -0.6200000047683716,
+                17.799999237060548,
+                -0.8971959948539734
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 14,
+            "name": "下半身",
+            "parentIndex": 0,
+            "transformOrder": 0,
+            "origin": [
+                0.0,
+                13.24257755279541,
+                -0.25526899099349978
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 15,
+            "name": "下半身先",
+            "parentIndex": 14,
+            "transformOrder": 0,
+            "origin": [
+                0.0,
+                11.360588073730469,
+                -0.24647699296474458
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 16,
+            "name": "左肩",
+            "parentIndex": 3,
+            "transformOrder": 0,
+            "origin": [
+                0.1363620012998581,
+                16.129985809326173,
+                0.2648870050907135
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 17,
+            "name": "左腕",
+            "parentIndex": 16,
+            "transformOrder": 0,
+            "origin": [
+                0.890766978263855,
+                15.68908977508545,
+                0.31782999634742739
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 18,
+            "name": "左腕捩",
+            "parentIndex": 17,
+            "transformOrder": 0,
+            "origin": [
+                1.84449303150177,
+                15.367975234985352,
+                0.3049960136413574
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": true,
+            "fixedAxisVector": [
+                0.8197414875030518,
+                -0.5727338194847107,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                0.8196918368339539,
+                -0.5726991891860962,
+                -0.010997345671057701
+            ],
+            "localZAxis": [
+                -0.009010078385472298,
+                0.006305565591901541,
+                -0.999939501285553
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 19,
+            "name": "左腕捩先",
+            "parentIndex": 18,
+            "transformOrder": 0,
+            "origin": [
+                3.590635061264038,
+                14.147987365722657,
+                0.3049960136413574
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 20,
+            "name": "左腕捩1",
+            "parentIndex": 17,
+            "transformOrder": 0,
+            "origin": [
+                1.84449303150177,
+                15.367975234985352,
+                0.3049960136413574
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": 18,
+            "appendRatio": 0.25,
+            "appendRotation": true,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 21,
+            "name": "左腕捩2",
+            "parentIndex": 17,
+            "transformOrder": 0,
+            "origin": [
+                1.84449303150177,
+                15.367975234985352,
+                0.3049960136413574
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": 18,
+            "appendRatio": 0.5,
+            "appendRotation": true,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 22,
+            "name": "左腕捩3",
+            "parentIndex": 17,
+            "transformOrder": 0,
+            "origin": [
+                1.84449303150177,
+                15.367975234985352,
+                0.3049960136413574
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": 18,
+            "appendRatio": 0.75,
+            "appendRotation": true,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 23,
+            "name": "左ひじ",
+            "parentIndex": 18,
+            "transformOrder": 0,
+            "origin": [
+                3.590635061264038,
+                14.147990226745606,
+                0.2815690040588379
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 24,
+            "name": "左手捩",
+            "parentIndex": 23,
+            "transformOrder": 0,
+            "origin": [
+                4.036135196685791,
+                13.7823486328125,
+                0.27586400508880618
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": true,
+            "fixedAxisVector": [
+                0.7592273354530335,
+                -0.6508212089538574,
+                -0.002366748172789812
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                0.7592273354530335,
+                -0.6508212089538574,
+                -0.002366748172789812
+            ],
+            "localZAxis": [
+                -0.0018163295462727547,
+                0.0015176740707829595,
+                -0.9999971985816956
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 25,
+            "name": "左手捩先",
+            "parentIndex": 24,
+            "transformOrder": 0,
+            "origin": [
+                5.269571781158447,
+                12.725028038024903,
+                0.27201899886131289
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 26,
+            "name": "左手捩1",
+            "parentIndex": 23,
+            "transformOrder": 0,
+            "origin": [
+                4.036135196685791,
+                13.782349586486817,
+                0.27586400508880618
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": 24,
+            "appendRatio": 0.25,
+            "appendRotation": true,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 27,
+            "name": "左手捩2",
+            "parentIndex": 23,
+            "transformOrder": 0,
+            "origin": [
+                4.036135196685791,
+                13.782349586486817,
+                0.27586400508880618
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": 24,
+            "appendRatio": 0.5,
+            "appendRotation": true,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 28,
+            "name": "左手捩3",
+            "parentIndex": 23,
+            "transformOrder": 0,
+            "origin": [
+                4.036135196685791,
+                13.782349586486817,
+                0.27586400508880618
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": 24,
+            "appendRatio": 0.75,
+            "appendRotation": true,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 29,
+            "name": "左手首",
+            "parentIndex": 24,
+            "transformOrder": 0,
+            "origin": [
+                5.269571781158447,
+                12.725029945373536,
+                0.27201899886131289
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 30,
+            "name": "左手先",
+            "parentIndex": 29,
+            "transformOrder": 0,
+            "origin": [
+                6.01922607421875,
+                12.00930404663086,
+                0.31607699394226076
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 31,
+            "name": "左親指１",
+            "parentIndex": 29,
+            "transformOrder": 0,
+            "origin": [
+                5.600428104400635,
+                12.176280975341797,
+                -0.18524600565433503
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                0.5807533860206604,
+                -0.7093926668167114,
+                -0.39935892820358279
+            ],
+            "localZAxis": [
+                -0.2529786229133606,
+                0.3090135455131531,
+                -0.9167946577072144
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 32,
+            "name": "左親指２",
+            "parentIndex": 31,
+            "transformOrder": 0,
+            "origin": [
+                5.834853172302246,
+                11.88992977142334,
+                -0.34645000100135805
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                0.6672027707099915,
+                -0.6348788738250732,
+                -0.38957589864730837
+            ],
+            "localZAxis": [
+                -0.2822231948375702,
+                0.2685506343841553,
+                -0.9209944009780884
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 33,
+            "name": "左親指先",
+            "parentIndex": 32,
+            "transformOrder": 0,
+            "origin": [
+                6.078082084655762,
+                11.65848445892334,
+                -0.4884699881076813
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 34,
+            "name": "左人指１",
+            "parentIndex": 29,
+            "transformOrder": 0,
+            "origin": [
+                6.133938789367676,
+                11.974482536315918,
+                0.046114999800920489
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                0.8086991310119629,
+                -0.588194727897644,
+                0.005710991565138102
+            ],
+            "localZAxis": [
+                0.004598644096404314,
+                -0.003386597614735365,
+                -0.9999836683273315
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 35,
+            "name": "左人指２",
+            "parentIndex": 34,
+            "transformOrder": 0,
+            "origin": [
+                6.407234191894531,
+                11.775705337524414,
+                0.048044998198747638
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                0.7802301645278931,
+                -0.6251741051673889,
+                -0.019955333322286607
+            ],
+            "localZAxis": [
+                -0.01557887438684702,
+                0.012470527552068234,
+                -0.9998008608818054
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 36,
+            "name": "左人指３",
+            "parentIndex": 35,
+            "transformOrder": 0,
+            "origin": [
+                6.621143817901611,
+                11.6043062210083,
+                0.04257399961352348
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                0.8540854454040527,
+                -0.5200725197792053,
+                0.007912775501608849
+            ],
+            "localZAxis": [
+                0.006735276896506548,
+                -0.0041533163748681549,
+                -0.9999687075614929
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 37,
+            "name": "左人差指先",
+            "parentIndex": 36,
+            "transformOrder": 0,
+            "origin": [
+                6.909553050994873,
+                11.42868709564209,
+                0.045246001332998279
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 38,
+            "name": "左中指１",
+            "parentIndex": 29,
+            "transformOrder": 0,
+            "origin": [
+                6.147389888763428,
+                11.963058471679688,
+                0.22967800498008729
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                0.8700781464576721,
+                -0.4928722679615021,
+                -0.006400273647159338
+            ],
+            "localZAxis": [
+                -0.0055665927939116959,
+                0.0031585702672600748,
+                -0.9999794960021973
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 39,
+            "name": "左中指２",
+            "parentIndex": 38,
+            "transformOrder": 0,
+            "origin": [
+                6.492824077606201,
+                11.767380714416504,
+                0.2271369993686676
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                0.7826876044273377,
+                -0.6221251487731934,
+                -0.01898403838276863
+            ],
+            "localZAxis": [
+                -0.014868684113025666,
+                0.011803224682807923,
+                -0.999819815158844
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 40,
+            "name": "左中指３",
+            "parentIndex": 39,
+            "transformOrder": 0,
+            "origin": [
+                6.73599100112915,
+                11.574097633361817,
+                0.22123900055885316
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                0.845838189125061,
+                -0.5334231853485107,
+                -0.004168927203863859
+            ],
+            "localZAxis": [
+                -0.0035309274680912496,
+                0.002216434571892023,
+                -0.9999912977218628
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 41,
+            "name": "左中指先",
+            "parentIndex": 40,
+            "transformOrder": 0,
+            "origin": [
+                7.0230817794799809,
+                11.393045425415039,
+                0.21982400119304658
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 42,
+            "name": "左薬指１",
+            "parentIndex": 29,
+            "transformOrder": 0,
+            "origin": [
+                6.147587776184082,
+                11.940882682800293,
+                0.39838799834251406
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                0.77137291431427,
+                -0.6363046169281006,
+                -0.010016500018537045
+            ],
+            "localZAxis": [
+                -0.007733302190899849,
+                0.006366036366671324,
+                -0.9999498724937439
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 43,
+            "name": "左薬指２",
+            "parentIndex": 42,
+            "transformOrder": 0,
+            "origin": [
+                6.384624004364014,
+                11.745351791381836,
+                0.39531001448631289
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                0.8394123315811157,
+                -0.542889416217804,
+                0.02565114200115204
+            ],
+            "localZAxis": [
+                0.02155235968530178,
+                -0.013909618370234967,
+                -0.9996709823608398
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 44,
+            "name": "左薬指３",
+            "parentIndex": 43,
+            "transformOrder": 0,
+            "origin": [
+                6.620760917663574,
+                11.592630386352539,
+                0.40252599120140078
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                0.8713045120239258,
+                -0.4905166029930115,
+                -0.014895190484821797
+            ],
+            "localZAxis": [
+                -0.012986502610147,
+                0.007295046467334032,
+                -0.9998891353607178
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 45,
+            "name": "左薬指先",
+            "parentIndex": 44,
+            "transformOrder": 0,
+            "origin": [
+                6.891419887542725,
+                11.440258026123047,
+                0.39789900183677676
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 46,
+            "name": "左小指１",
+            "parentIndex": 29,
+            "transformOrder": 0,
+            "origin": [
+                6.013045787811279,
+                11.92386531829834,
+                0.5760869979858398
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                0.836304783821106,
+                -0.5476360321044922,
+                -0.02624918706715107
+            ],
+            "localZAxis": [
+                -0.021970007568597795,
+                0.014364507049322129,
+                -0.9996554851531982
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 47,
+            "name": "左小指２",
+            "parentIndex": 46,
+            "transformOrder": 0,
+            "origin": [
+                6.24301290512085,
+                11.773276329040528,
+                0.5688689947128296
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                0.7537195682525635,
+                -0.6549826860427856,
+                -0.053893670439720157
+            ],
+            "localZAxis": [
+                -0.04067961126565933,
+                0.03535105288028717,
+                -0.9985466599464417
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 48,
+            "name": "左小指３",
+            "parentIndex": 47,
+            "transformOrder": 0,
+            "origin": [
+                6.384838104248047,
+                11.650030136108399,
+                0.5587279796600342
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                0.873641848564148,
+                -0.48625919222831728,
+                -0.017374850809574128
+            ],
+            "localZAxis": [
+                -0.015179242007434368,
+                0.00845435168594122,
+                -0.9998490214347839
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 49,
+            "name": "左小指先",
+            "parentIndex": 48,
+            "transformOrder": 0,
+            "origin": [
+                6.633882999420166,
+                11.511414527893067,
+                0.5537750124931336
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 50,
+            "name": "左足",
+            "parentIndex": 14,
+            "transformOrder": 0,
+            "origin": [
+                0.7968109846115112,
+                10.752734184265137,
+                -0.0727429986000061
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 51,
+            "name": "左ひざ",
+            "parentIndex": 50,
+            "transformOrder": 0,
+            "origin": [
+                0.6736760139465332,
+                5.927076816558838,
+                -0.053481001406908038
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 52,
+            "name": "左足首",
+            "parentIndex": 51,
+            "transformOrder": 0,
+            "origin": [
+                0.8754240274429321,
+                1.340000033378601,
+                0.0
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 53,
+            "name": "左足ＩＫ",
+            "parentIndex": -1,
+            "transformOrder": 0,
+            "origin": [
+                0.8754240274429321,
+                1.340000033378601,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 54,
+            "name": "左足ＩＫ先",
+            "parentIndex": 53,
+            "transformOrder": 1,
+            "origin": [
+                0.8754240274429321,
+                1.340000033378601,
+                1.5
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 55,
+            "name": "左つま先",
+            "parentIndex": 52,
+            "transformOrder": 0,
+            "origin": [
+                0.9286990165710449,
+                0.0,
+                -2.463567018508911
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 56,
+            "name": "左つま先ＩＫ",
+            "parentIndex": 53,
+            "transformOrder": 0,
+            "origin": [
+                0.9286990165710449,
+                0.0,
+                -2.463567018508911
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 57,
+            "name": "左つま先ＩＫ先",
+            "parentIndex": 56,
+            "transformOrder": 1,
+            "origin": [
+                0.9286990165710449,
+                -1.0,
+                -2.463567018508911
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 58,
+            "name": "右肩",
+            "parentIndex": 3,
+            "transformOrder": 0,
+            "origin": [
+                -0.1363620012998581,
+                16.129985809326173,
+                0.2648870050907135
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 59,
+            "name": "右腕",
+            "parentIndex": 58,
+            "transformOrder": 0,
+            "origin": [
+                -0.890766978263855,
+                15.68908977508545,
+                0.31782999634742739
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 60,
+            "name": "右腕捩",
+            "parentIndex": 59,
+            "transformOrder": 0,
+            "origin": [
+                -1.84449303150177,
+                15.367975234985352,
+                0.3049960136413574
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": true,
+            "fixedAxisVector": [
+                -0.8197414875030518,
+                -0.5727338194847107,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                -0.8196918964385986,
+                -0.5726991891860962,
+                -0.010997346602380276
+            ],
+            "localZAxis": [
+                0.009013643488287926,
+                0.00630046334117651,
+                -0.999939501285553
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 61,
+            "name": "右腕捩先",
+            "parentIndex": 60,
+            "transformOrder": 0,
+            "origin": [
+                -3.590635061264038,
+                14.147987365722657,
+                0.3049960136413574
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 62,
+            "name": "右腕捩1",
+            "parentIndex": 59,
+            "transformOrder": 0,
+            "origin": [
+                -1.84449303150177,
+                15.367975234985352,
+                0.3049960136413574
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": 60,
+            "appendRatio": 0.25,
+            "appendRotation": true,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 63,
+            "name": "右腕捩2",
+            "parentIndex": 59,
+            "transformOrder": 0,
+            "origin": [
+                -1.84449303150177,
+                15.367975234985352,
+                0.3049960136413574
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": 60,
+            "appendRatio": 0.5,
+            "appendRotation": true,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 64,
+            "name": "右腕捩3",
+            "parentIndex": 59,
+            "transformOrder": 0,
+            "origin": [
+                -1.84449303150177,
+                15.367975234985352,
+                0.3049960136413574
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": 60,
+            "appendRatio": 0.75,
+            "appendRotation": true,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 65,
+            "name": "右ひじ",
+            "parentIndex": 60,
+            "transformOrder": 0,
+            "origin": [
+                -3.590635061264038,
+                14.147990226745606,
+                0.2815690040588379
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 66,
+            "name": "右手捩",
+            "parentIndex": 65,
+            "transformOrder": 0,
+            "origin": [
+                -4.036135196685791,
+                13.7823486328125,
+                0.27586400508880618
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": true,
+            "fixedAxisVector": [
+                -0.7592273354530335,
+                -0.6508212089538574,
+                -0.002366748172789812
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                -0.7592273950576782,
+                -0.6508212089538574,
+                -0.0023667484056204559
+            ],
+            "localZAxis": [
+                0.001800975063815713,
+                0.0015355864306911827,
+                -0.9999972581863403
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 67,
+            "name": "右手捩先",
+            "parentIndex": 66,
+            "transformOrder": 0,
+            "origin": [
+                -5.269571781158447,
+                12.725028038024903,
+                0.27201899886131289
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 68,
+            "name": "右手捩1",
+            "parentIndex": 65,
+            "transformOrder": 0,
+            "origin": [
+                -4.036135196685791,
+                13.782349586486817,
+                0.27586400508880618
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": 66,
+            "appendRatio": 0.25,
+            "appendRotation": true,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 69,
+            "name": "右手捩2",
+            "parentIndex": 65,
+            "transformOrder": 0,
+            "origin": [
+                -4.036135196685791,
+                13.782349586486817,
+                0.27586400508880618
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": 66,
+            "appendRatio": 0.5,
+            "appendRotation": true,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 70,
+            "name": "右手捩3",
+            "parentIndex": 65,
+            "transformOrder": 0,
+            "origin": [
+                -4.036135196685791,
+                13.782349586486817,
+                0.27586400508880618
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": 66,
+            "appendRatio": 0.75,
+            "appendRotation": true,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 71,
+            "name": "右手首",
+            "parentIndex": 66,
+            "transformOrder": 0,
+            "origin": [
+                -5.269571781158447,
+                12.725029945373536,
+                0.27201899886131289
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 72,
+            "name": "右手先",
+            "parentIndex": 71,
+            "transformOrder": 0,
+            "origin": [
+                -6.01922607421875,
+                12.00930404663086,
+                0.31607699394226076
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 73,
+            "name": "右親指１",
+            "parentIndex": 71,
+            "transformOrder": 0,
+            "origin": [
+                -5.600428104400635,
+                12.176280975341797,
+                -0.18524600565433503
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                -0.5807534456253052,
+                -0.7093926668167114,
+                -0.39935898780822756
+            ],
+            "localZAxis": [
+                0.2529781460762024,
+                0.3090139627456665,
+                -0.9167945981025696
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 74,
+            "name": "右親指２",
+            "parentIndex": 73,
+            "transformOrder": 0,
+            "origin": [
+                -5.834853172302246,
+                11.88992977142334,
+                -0.34645000100135805
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                -0.6672025918960571,
+                -0.634878933429718,
+                -0.3895759880542755
+            ],
+            "localZAxis": [
+                0.28222331404685976,
+                0.26855066418647768,
+                -0.9209943413734436
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 75,
+            "name": "右親指先",
+            "parentIndex": 74,
+            "transformOrder": 0,
+            "origin": [
+                -6.078082084655762,
+                11.65848445892334,
+                -0.4884699881076813
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 76,
+            "name": "右人指１",
+            "parentIndex": 71,
+            "transformOrder": 0,
+            "origin": [
+                -6.133938789367676,
+                11.974482536315918,
+                0.046114999800920489
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                -0.8086989521980286,
+                -0.5881949067115784,
+                0.005710992030799389
+            ],
+            "localZAxis": [
+                -0.004618875682353973,
+                -0.003358782734721899,
+                -0.9999836683273315
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 77,
+            "name": "右人指２",
+            "parentIndex": 76,
+            "transformOrder": 0,
+            "origin": [
+                -6.407234191894531,
+                11.775705337524414,
+                0.048044998198747638
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                -0.7802302241325378,
+                -0.6251740455627441,
+                -0.019955337047576906
+            ],
+            "localZAxis": [
+                0.015572645701467991,
+                0.012478308752179146,
+                -0.9998008608818054
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 78,
+            "name": "右人指３",
+            "parentIndex": 77,
+            "transformOrder": 0,
+            "origin": [
+                -6.621143817901611,
+                11.6043062210083,
+                0.04257399961352348
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                -0.8540854454040527,
+                -0.5200725197792053,
+                0.007912779226899147
+            ],
+            "localZAxis": [
+                -0.0067594051361083988,
+                -0.004113699775189161,
+                -0.9999687075614929
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 79,
+            "name": "右人差指先",
+            "parentIndex": 78,
+            "transformOrder": 0,
+            "origin": [
+                -6.909553050994873,
+                11.42868709564209,
+                0.045246001332998279
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 80,
+            "name": "右中指１",
+            "parentIndex": 71,
+            "transformOrder": 0,
+            "origin": [
+                -6.147389888763428,
+                11.963058471679688,
+                0.22967800498008729
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                -0.8700782060623169,
+                -0.4928721487522125,
+                -0.006400275509804487
+            ],
+            "localZAxis": [
+                0.005567382555454969,
+                0.003157180268317461,
+                -0.9999794960021973
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 81,
+            "name": "右中指２",
+            "parentIndex": 80,
+            "transformOrder": 0,
+            "origin": [
+                -6.492824077606201,
+                11.767380714416504,
+                0.2271369993686676
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                -0.7826876640319824,
+                -0.6221252083778381,
+                -0.01898404210805893
+            ],
+            "localZAxis": [
+                0.014861559495329857,
+                0.011812190525233746,
+                -0.999819815158844
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 82,
+            "name": "右中指３",
+            "parentIndex": 81,
+            "transformOrder": 0,
+            "origin": [
+                -6.73599100112915,
+                11.574097633361817,
+                0.22123900055885316
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                -0.8458382487297058,
+                -0.5334232449531555,
+                -0.0041689262725412849
+            ],
+            "localZAxis": [
+                0.0035226133186370136,
+                0.002229616278782487,
+                -0.9999913573265076
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 83,
+            "name": "右中指先",
+            "parentIndex": 82,
+            "transformOrder": 0,
+            "origin": [
+                -7.0230817794799809,
+                11.393045425415039,
+                0.21982400119304658
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 84,
+            "name": "右薬指１",
+            "parentIndex": 71,
+            "transformOrder": 0,
+            "origin": [
+                -6.147587776184082,
+                11.940882682800293,
+                0.39838799834251406
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                -0.77137291431427,
+                -0.6363045573234558,
+                -0.010016500018537045
+            ],
+            "localZAxis": [
+                0.007726632058620453,
+                0.006374121177941561,
+                -0.9999498128890991
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 85,
+            "name": "右薬指２",
+            "parentIndex": 84,
+            "transformOrder": 0,
+            "origin": [
+                -6.384624004364014,
+                11.745351791381836,
+                0.39531001448631289
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                -0.8394123315811157,
+                -0.542889416217804,
+                0.025651125237345697
+            ],
+            "localZAxis": [
+                -0.021538145840168,
+                -0.01393156684935093,
+                -0.9996710419654846
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 86,
+            "name": "右薬指３",
+            "parentIndex": 85,
+            "transformOrder": 0,
+            "origin": [
+                -6.620760917663574,
+                11.592630386352539,
+                0.40252599120140078
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                -0.871304452419281,
+                -0.4905167818069458,
+                -0.014895191416144371
+            ],
+            "localZAxis": [
+                0.012978603132069111,
+                0.007309072185307741,
+                -0.9998890161514282
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 87,
+            "name": "右薬指先",
+            "parentIndex": 86,
+            "transformOrder": 0,
+            "origin": [
+                -6.891419887542725,
+                11.440258026123047,
+                0.39789900183677676
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 88,
+            "name": "右小指１",
+            "parentIndex": 71,
+            "transformOrder": 0,
+            "origin": [
+                -6.013045787811279,
+                11.92386531829834,
+                0.5760869979858398
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                -0.836304783821106,
+                -0.5476361513137817,
+                -0.02624918520450592
+            ],
+            "localZAxis": [
+                0.021959709003567697,
+                0.014380227774381638,
+                -0.9996554851531982
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 89,
+            "name": "右小指２",
+            "parentIndex": 88,
+            "transformOrder": 0,
+            "origin": [
+                -6.24301290512085,
+                11.773276329040528,
+                0.5688689947128296
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                -0.7537193298339844,
+                -0.6549829244613648,
+                -0.053893670439720157
+            ],
+            "localZAxis": [
+                0.04067978262901306,
+                0.03535085916519165,
+                -0.9985467195510864
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 90,
+            "name": "右小指３",
+            "parentIndex": 89,
+            "transformOrder": 0,
+            "origin": [
+                -6.384838104248047,
+                11.650030136108399,
+                0.5587279796600342
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                -0.8736417889595032,
+                -0.4862593412399292,
+                -0.017374858260154725
+            ],
+            "localZAxis": [
+                0.015181280672550202,
+                0.00845070369541645,
+                -0.9998490214347839
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 91,
+            "name": "右小指先",
+            "parentIndex": 90,
+            "transformOrder": 0,
+            "origin": [
+                -6.633882999420166,
+                11.511414527893067,
+                0.5537750124931336
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 92,
+            "name": "右足",
+            "parentIndex": 14,
+            "transformOrder": 0,
+            "origin": [
+                -0.7968109846115112,
+                10.752734184265137,
+                -0.0727429986000061
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 93,
+            "name": "右ひざ",
+            "parentIndex": 92,
+            "transformOrder": 0,
+            "origin": [
+                -0.6736760139465332,
+                5.927076816558838,
+                -0.053481001406908038
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 94,
+            "name": "右足首",
+            "parentIndex": 93,
+            "transformOrder": 0,
+            "origin": [
+                -0.8754240274429321,
+                1.340000033378601,
+                0.0
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 95,
+            "name": "右足ＩＫ",
+            "parentIndex": -1,
+            "transformOrder": 0,
+            "origin": [
+                -0.8754240274429321,
+                1.340000033378601,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 96,
+            "name": "右足ＩＫ先",
+            "parentIndex": 95,
+            "transformOrder": 1,
+            "origin": [
+                -0.8754240274429321,
+                1.340000033378601,
+                1.5
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 97,
+            "name": "右つま先",
+            "parentIndex": 94,
+            "transformOrder": 0,
+            "origin": [
+                -0.9286990165710449,
+                0.0,
+                -2.463567018508911
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 98,
+            "name": "右つま先ＩＫ",
+            "parentIndex": 95,
+            "transformOrder": 0,
+            "origin": [
+                -0.9286990165710449,
+                0.0,
+                -2.463567018508911
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 99,
+            "name": "右つま先ＩＫ先",
+            "parentIndex": 98,
+            "transformOrder": 1,
+            "origin": [
+                -0.9286990165710449,
+                -1.0,
+                -2.463567018508911
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        }
+    ],
+    "morphs": [],
+    "materials": [],
+    "ik": [
+        {
+            "boneIndex": 53,
+            "targetBoneIndex": 52,
+            "iterationCount": 40,
+            "angleLimit": 2.0,
+            "links": [
+                {
+                    "boneIndex": 51,
+                    "hasLimit": true,
+                    "minimumAngle": [
+                        -3.1415927410125734,
+                        0.0,
+                        0.0
+                    ],
+                    "maximumAngle": [
+                        -0.008726646192371846,
+                        0.0,
+                        0.0
+                    ]
+                },
+                {
+                    "boneIndex": 50,
+                    "hasLimit": false,
+                    "minimumAngle": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "maximumAngle": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ]
+                }
+            ]
+        },
+        {
+            "boneIndex": 56,
+            "targetBoneIndex": 55,
+            "iterationCount": 3,
+            "angleLimit": 4.0,
+            "links": [
+                {
+                    "boneIndex": 52,
+                    "hasLimit": false,
+                    "minimumAngle": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "maximumAngle": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ]
+                }
+            ]
+        },
+        {
+            "boneIndex": 95,
+            "targetBoneIndex": 94,
+            "iterationCount": 40,
+            "angleLimit": 2.0,
+            "links": [
+                {
+                    "boneIndex": 93,
+                    "hasLimit": true,
+                    "minimumAngle": [
+                        -3.1415927410125734,
+                        0.0,
+                        0.0
+                    ],
+                    "maximumAngle": [
+                        -0.008726646192371846,
+                        0.0,
+                        0.0
+                    ]
+                },
+                {
+                    "boneIndex": 92,
+                    "hasLimit": false,
+                    "minimumAngle": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "maximumAngle": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ]
+                }
+            ]
+        },
+        {
+            "boneIndex": 98,
+            "targetBoneIndex": 97,
+            "iterationCount": 3,
+            "angleLimit": 4.0,
+            "links": [
+                {
+                    "boneIndex": 94,
+                    "hasLimit": false,
+                    "minimumAngle": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "maximumAngle": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ]
+                }
+            ]
+        }
+    ],
+    "physics": {
+        "rigidbodies": [],
+        "joints": []
+    }
+}

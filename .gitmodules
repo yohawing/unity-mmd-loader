@@ -1,0 +1,6 @@
+[submodule "native/mmd-anim"]
+	path = native/mmd-anim
+	url = https://github.com/yohawing/mmd-anim
+[submodule "native/bullet3"]
+	path = native/bullet3
+	url = https://github.com/bulletphysics/bullet3

@@ -1,0 +1,842 @@
+{
+    "name": "付与ボーン検証モデル",
+    "vertices": [],
+    "indices": [],
+    "bones": [
+        {
+            "index": 0,
+            "name": "全ての親",
+            "parentIndex": -1,
+            "transformOrder": 0,
+            "origin": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 1,
+            "name": "センター",
+            "parentIndex": 0,
+            "transformOrder": 0,
+            "origin": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 2,
+            "name": "親ボーン1",
+            "parentIndex": 1,
+            "transformOrder": 0,
+            "origin": [
+                2.0,
+                0.0,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 3,
+            "name": "子ボーン1",
+            "parentIndex": 2,
+            "transformOrder": 0,
+            "origin": [
+                2.0,
+                2.0,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 4,
+            "name": "付与元2",
+            "parentIndex": 1,
+            "transformOrder": 0,
+            "origin": [
+                4.0,
+                0.0,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 5,
+            "name": "グローバル回転付与2",
+            "parentIndex": 4,
+            "transformOrder": 1,
+            "origin": [
+                4.0,
+                2.0,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": 3,
+            "appendRatio": 1.0,
+            "appendRotation": true,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 6,
+            "name": "付与元3",
+            "parentIndex": 1,
+            "transformOrder": 0,
+            "origin": [
+                6.0,
+                0.0,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 7,
+            "name": "グローバル移動付与3",
+            "parentIndex": 6,
+            "transformOrder": 1,
+            "origin": [
+                6.0,
+                2.0,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": 3,
+            "appendRatio": 0.5,
+            "appendRotation": false,
+            "appendTranslation": true,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 8,
+            "name": "付与元4",
+            "parentIndex": 1,
+            "transformOrder": 0,
+            "origin": [
+                8.0,
+                0.0,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 9,
+            "name": "グローバル回転移動付与4",
+            "parentIndex": 8,
+            "transformOrder": 1,
+            "origin": [
+                8.0,
+                2.0,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": 3,
+            "appendRatio": 0.800000011920929,
+            "appendRotation": true,
+            "appendTranslation": true,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 10,
+            "name": "付与元5",
+            "parentIndex": 1,
+            "transformOrder": 0,
+            "origin": [
+                10.0,
+                0.0,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 11,
+            "name": "ローカル回転付与5",
+            "parentIndex": 10,
+            "transformOrder": 1,
+            "origin": [
+                10.0,
+                2.0,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": 10,
+            "appendRatio": 1.0,
+            "appendRotation": true,
+            "appendTranslation": false,
+            "appendLocal": true,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 12,
+            "name": "付与元6",
+            "parentIndex": 1,
+            "transformOrder": 0,
+            "origin": [
+                12.0,
+                0.0,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 13,
+            "name": "ローカル移動付与6",
+            "parentIndex": 12,
+            "transformOrder": 1,
+            "origin": [
+                12.0,
+                2.0,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": 12,
+            "appendRatio": 0.699999988079071,
+            "appendRotation": false,
+            "appendTranslation": true,
+            "appendLocal": true,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 14,
+            "name": "付与元7",
+            "parentIndex": 1,
+            "transformOrder": 0,
+            "origin": [
+                14.0,
+                0.0,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 15,
+            "name": "ローカル回転移動付与7",
+            "parentIndex": 14,
+            "transformOrder": 1,
+            "origin": [
+                14.0,
+                2.0,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": 14,
+            "appendRatio": 1.0,
+            "appendRotation": true,
+            "appendTranslation": true,
+            "appendLocal": true,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 16,
+            "name": "付与元8",
+            "parentIndex": 1,
+            "transformOrder": 0,
+            "origin": [
+                16.0,
+                0.0,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 17,
+            "name": "付与チェーン8A",
+            "parentIndex": 16,
+            "transformOrder": 1,
+            "origin": [
+                16.0,
+                2.0,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": 3,
+            "appendRatio": 0.5,
+            "appendRotation": true,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 18,
+            "name": "付与チェーン8B",
+            "parentIndex": 17,
+            "transformOrder": 2,
+            "origin": [
+                16.0,
+                4.0,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": 17,
+            "appendRatio": 0.5,
+            "appendRotation": true,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 19,
+            "name": "付与元9",
+            "parentIndex": 1,
+            "transformOrder": 0,
+            "origin": [
+                18.0,
+                0.0,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 20,
+            "name": "負の付与率9",
+            "parentIndex": 19,
+            "transformOrder": 1,
+            "origin": [
+                18.0,
+                2.0,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": 3,
+            "appendRatio": -0.5,
+            "appendRotation": true,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 21,
+            "name": "付与元10",
+            "parentIndex": 1,
+            "transformOrder": 0,
+            "origin": [
+                20.0,
+                0.0,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 22,
+            "name": "付与率1.5_10",
+            "parentIndex": 21,
+            "transformOrder": 1,
+            "origin": [
+                20.0,
+                2.0,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": 3,
+            "appendRatio": 1.5,
+            "appendRotation": true,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        }
+    ],
+    "morphs": [],
+    "materials": [],
+    "ik": [],
+    "physics": {
+        "rigidbodies": [],
+        "joints": []
+    }
+}

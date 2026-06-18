@@ -1,0 +1,139 @@
+name: Feature request
+description: Propose a scoped package, runtime, tooling, or documentation improvement.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for proposing an improvement. Please keep the request scoped to a
+        verifiable package, runtime, tooling, or documentation change.
+
+        Deferred fidelity and future integration topics are welcome as feature
+        proposals, but they are not current release bugs by themselves. If your
+        request is about a deferred area, please describe the concrete artifact,
+        trace, benchmark, or Unity workflow that would prove the feature is done.
+
+        Do not attach licensed/local PMX, VMD, texture, motion, audio, or capture
+        files unless redistribution rights and provenance are explicitly cleared.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One or two sentences describing the requested improvement.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: request-type
+    attributes:
+      label: Request type
+      description: Which part of the project does this proposal touch? Pick the closest match.
+      options:
+        - Release / documentation / packaging
+        - Runtime correctness
+        - Runtime performance / allocation
+        - Rendering / material / texture
+        - Unity workflow / importer / Timeline
+        - Deferred fidelity proposal
+        - Future integration proposal
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: release-scope
+    attributes:
+      label: Release scope
+      description: How should this be considered relative to the current release path?
+      options:
+        - Phase16 release polish
+        - Phase17/18 evidence already covered
+        - Future/deferred, needs a dedicated artifact
+        - Unsure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: golden-path-step
+    attributes:
+      label: Golden path step impact
+      description: >
+        If this affects the main flow, select the related golden path step.
+        PMX drag / Scene placement / VMD to Timeline /
+        optional Humanoid Clip bake.
+        Licensed PMX/VMD files should not be attached unless rights and
+        provenance are confirmed.
+      options:
+        - PMX drag
+        - Scene placement
+        - VMD to Timeline
+        - optional Humanoid Clip bake
+        - Not applicable
+    validations:
+      required: false
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or user workflow
+      description: Describe the concrete workflow, performance cost, missing guard, or release-facing gap.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed solution
+      description: Describe the smallest useful change, if you have one in mind.
+    validations:
+      required: false
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence, steps, or logs
+      description: >
+        Include relevant Unity Editor steps, benchmark output, Console logs,
+        or Test Runner results if available. Keep pasted output short; attach
+        files or link to a gist for large logs.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: asset-provenance
+    attributes:
+      label: Asset provenance
+      description: Confirm the proposal can be discussed without redistributing restricted local assets.
+      options:
+        - label: >
+            I have **not** attached licensed/local PMX/VMD files, textures,
+            motions, audio, or captures unless redistribution rights and
+            provenance are explicitly cleared.
+          required: true
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmations
+      description: Please confirm the following before submitting.
+      options:
+        - label: >
+            I understand deferred or future-integration topics need a dedicated
+            artifact, trace, benchmark, or Unity workflow before they can become
+            release criteria.
+          required: true
+        - label: >
+            I am **not** asking to relax tolerances, golden values, comparer
+            pass/fail criteria, or test/CI skip conditions without a documented
+            compatibility plan.
+          required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Anything else that helps scope or verify the feature.
+    validations:
+      required: false

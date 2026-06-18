@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 6d98e36f0e935ed44806b8ad64d60daf
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: fb2638297b0cb9847997eb94e8615e91, type: 3}
+  importScale: 1
+  modelPreset: 0
+  meshGenerationMode: 0
+  materialTexturePolicy: 0
+  animationType: 1
+  shaderPreset: 0
+  materialRemaps: []

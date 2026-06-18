@@ -1,0 +1,127 @@
+name: Unity CI
+
+# Triggers:
+#   - workflow_dispatch: safe manual trigger at any time.
+#   - push/pull_request on package/native/workflow changes.
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   UNITY_LICENSE   — base64-encoded Unity .ulf activation file
+#   UNITY_EMAIL     — optional Unity account email, depending on license mode
+#   UNITY_PASSWORD  — optional Unity account password, depending on license mode
+#
+# Until UNITY_LICENSE is added, the Unity job is skipped with a workflow notice.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/**'
+      - 'native/**'
+      - '.github/workflows/unity-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'packages/**'
+      - 'native/**'
+      - '.github/workflows/unity-ci.yml'
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  native-build:
+    name: Native Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup MSVC
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Build mmd-anim FFI
+        run: cargo build -p mmd-anim-ffi --release --manifest-path native/mmd-anim/Cargo.toml
+
+      - name: Configure Bullet physics plugin
+        run: cmake -S native/bullet -B build/bullet -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build Bullet physics plugin
+        run: cmake --build build/bullet --config Release --target yohawing_mmd_unity_bullet
+
+      - name: Upload native artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-${{ matrix.os }}
+          path: |
+            native/mmd-anim/target/release/mmd_runtime_ffi.dll
+            native/mmd-anim/target/release/libmmd_runtime_ffi.so
+            native/mmd-anim/target/release/libmmd_runtime_ffi.dylib
+            packages/com.yohawing.mmd-unity/Runtime/Plugins/x86_64/yohawing_mmd_unity_bullet.dll
+            packages/com.yohawing.mmd-unity/Runtime/Plugins/x86_64/yohawing_mmd_unity_bullet.so
+            packages/com.yohawing.mmd-unity/Runtime/Plugins/x86_64/yohawing_mmd_unity_bullet.dylib
+          if-no-files-found: warn
+
+  # Checks whether UNITY_LICENSE is configured.
+  # Emits a workflow notice and skips downstream jobs when the secret is absent.
+  license-check:
+    runs-on: ubuntu-latest
+    outputs:
+      has-license: ${{ steps.check.outputs.result }}
+    steps:
+      - id: check
+        env:
+          _LIC: ${{ secrets.UNITY_LICENSE }}
+        run: |
+          if [ -n "$_LIC" ]; then
+            echo "result=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::UNITY_LICENSE secret not configured — Unity CI skipped. Add UNITY_LICENSE, UNITY_EMAIL, and UNITY_PASSWORD in repository Settings → Secrets and variables → Actions."
+          fi
+
+  package-editmode-tests:
+    needs: license-check
+    if: needs.license-check.outputs.has-license == 'true'
+    name: Package Edit Mode Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Run Edit Mode tests
+        uses: game-ci/unity-test-runner@v4
+        id: tests
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          packageMode: true
+          projectPath: packages/com.yohawing.mmd-unity
+          unityVersion: 6000.4.8f1
+          testMode: editmode
+          artifactsPath: test-artifacts
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unity-editmode-results
+          path: ${{ steps.tests.outputs.artifactsPath }}
+          if-no-files-found: warn

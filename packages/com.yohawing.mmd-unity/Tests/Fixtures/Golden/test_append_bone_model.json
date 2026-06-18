@@ -1,0 +1,338 @@
+{
+    "name": "test_append_bone",
+    "vertices": [],
+    "indices": [],
+    "bones": [
+        {
+            "index": 0,
+            "name": "全ての親",
+            "parentIndex": -1,
+            "transformOrder": 0,
+            "origin": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 1,
+            "name": "センター",
+            "parentIndex": 0,
+            "transformOrder": 0,
+            "origin": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 2,
+            "name": "A親",
+            "parentIndex": 0,
+            "transformOrder": 0,
+            "origin": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 3,
+            "name": "A",
+            "parentIndex": 2,
+            "transformOrder": 0,
+            "origin": [
+                1.0,
+                2.0,
+                2.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 4,
+            "name": "B親",
+            "parentIndex": -1,
+            "transformOrder": 0,
+            "origin": [
+                2.0,
+                0.0,
+                0.0
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 5,
+            "name": "B",
+            "parentIndex": 4,
+            "transformOrder": 0,
+            "origin": [
+                2.0,
+                2.0,
+                2.0
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": 3,
+            "appendRatio": 1.0,
+            "appendRotation": true,
+            "appendTranslation": true,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 6,
+            "name": "C親",
+            "parentIndex": -1,
+            "transformOrder": 0,
+            "origin": [
+                3.0,
+                0.0,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 7,
+            "name": "C",
+            "parentIndex": 6,
+            "transformOrder": 0,
+            "origin": [
+                3.0,
+                2.0,
+                2.0
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": 6,
+            "appendRatio": 1.0,
+            "appendRotation": true,
+            "appendTranslation": true,
+            "appendLocal": true,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 8,
+            "name": "D",
+            "parentIndex": -1,
+            "transformOrder": 0,
+            "origin": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": 5,
+            "appendRatio": -1.0,
+            "appendRotation": true,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        }
+    ],
+    "morphs": [],
+    "materials": [],
+    "ik": [],
+    "physics": {
+        "rigidbodies": [],
+        "joints": []
+    }
+}

@@ -1,0 +1,560 @@
+{
+    "targetModelName": "test_given_bone",
+    "maxFrame": 5,
+    "boneKeyframes": [
+        {
+            "boneName": "全ての親",
+            "frame": 0,
+            "translation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+            ],
+            "interpolation": {
+                "translationX": [
+                    20,
+                    20,
+                    107,
+                    107
+                ],
+                "translationY": [
+                    20,
+                    20,
+                    107,
+                    107
+                ],
+                "translationZ": [
+                    0,
+                    20,
+                    107,
+                    107
+                ],
+                "rotation": [
+                    0,
+                    20,
+                    107,
+                    107
+                ]
+            },
+            "physicsEnabled": true
+        },
+        {
+            "boneName": "センター",
+            "frame": 0,
+            "translation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+            ],
+            "interpolation": {
+                "translationX": [
+                    20,
+                    20,
+                    107,
+                    107
+                ],
+                "translationY": [
+                    20,
+                    20,
+                    107,
+                    107
+                ],
+                "translationZ": [
+                    0,
+                    20,
+                    107,
+                    107
+                ],
+                "rotation": [
+                    0,
+                    20,
+                    107,
+                    107
+                ]
+            },
+            "physicsEnabled": true
+        },
+        {
+            "boneName": "A親",
+            "frame": 0,
+            "translation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+            ],
+            "interpolation": {
+                "translationX": [
+                    20,
+                    20,
+                    107,
+                    107
+                ],
+                "translationY": [
+                    20,
+                    20,
+                    107,
+                    107
+                ],
+                "translationZ": [
+                    0,
+                    20,
+                    107,
+                    107
+                ],
+                "rotation": [
+                    0,
+                    20,
+                    107,
+                    107
+                ]
+            },
+            "physicsEnabled": true
+        },
+        {
+            "boneName": "A",
+            "frame": 0,
+            "translation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+            ],
+            "interpolation": {
+                "translationX": [
+                    20,
+                    20,
+                    107,
+                    107
+                ],
+                "translationY": [
+                    20,
+                    20,
+                    107,
+                    107
+                ],
+                "translationZ": [
+                    0,
+                    20,
+                    107,
+                    107
+                ],
+                "rotation": [
+                    0,
+                    20,
+                    107,
+                    107
+                ]
+            },
+            "physicsEnabled": true
+        },
+        {
+            "boneName": "B親",
+            "frame": 0,
+            "translation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+            ],
+            "interpolation": {
+                "translationX": [
+                    20,
+                    20,
+                    107,
+                    107
+                ],
+                "translationY": [
+                    20,
+                    20,
+                    107,
+                    107
+                ],
+                "translationZ": [
+                    0,
+                    20,
+                    107,
+                    107
+                ],
+                "rotation": [
+                    0,
+                    20,
+                    107,
+                    107
+                ]
+            },
+            "physicsEnabled": true
+        },
+        {
+            "boneName": "B",
+            "frame": 0,
+            "translation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+            ],
+            "interpolation": {
+                "translationX": [
+                    20,
+                    20,
+                    107,
+                    107
+                ],
+                "translationY": [
+                    20,
+                    20,
+                    107,
+                    107
+                ],
+                "translationZ": [
+                    0,
+                    20,
+                    107,
+                    107
+                ],
+                "rotation": [
+                    0,
+                    20,
+                    107,
+                    107
+                ]
+            },
+            "physicsEnabled": true
+        },
+        {
+            "boneName": "C親",
+            "frame": 0,
+            "translation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+            ],
+            "interpolation": {
+                "translationX": [
+                    20,
+                    20,
+                    107,
+                    107
+                ],
+                "translationY": [
+                    20,
+                    20,
+                    107,
+                    107
+                ],
+                "translationZ": [
+                    0,
+                    20,
+                    107,
+                    107
+                ],
+                "rotation": [
+                    0,
+                    20,
+                    107,
+                    107
+                ]
+            },
+            "physicsEnabled": true
+        },
+        {
+            "boneName": "C",
+            "frame": 0,
+            "translation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+            ],
+            "interpolation": {
+                "translationX": [
+                    20,
+                    20,
+                    107,
+                    107
+                ],
+                "translationY": [
+                    20,
+                    20,
+                    107,
+                    107
+                ],
+                "translationZ": [
+                    0,
+                    20,
+                    107,
+                    107
+                ],
+                "rotation": [
+                    0,
+                    20,
+                    107,
+                    107
+                ]
+            },
+            "physicsEnabled": true
+        },
+        {
+            "boneName": "D",
+            "frame": 0,
+            "translation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+            ],
+            "interpolation": {
+                "translationX": [
+                    20,
+                    20,
+                    107,
+                    107
+                ],
+                "translationY": [
+                    20,
+                    20,
+                    107,
+                    107
+                ],
+                "translationZ": [
+                    0,
+                    20,
+                    107,
+                    107
+                ],
+                "rotation": [
+                    0,
+                    20,
+                    107,
+                    107
+                ]
+            },
+            "physicsEnabled": true
+        },
+        {
+            "boneName": "A親",
+            "frame": 5,
+            "translation": [
+                -1.0,
+                0.0,
+                0.0
+            ],
+            "rotation": [
+                0.3826833665370941,
+                0.0,
+                0.0,
+                0.9238795638084412
+            ],
+            "interpolation": {
+                "translationX": [
+                    64,
+                    0,
+                    64,
+                    127
+                ],
+                "translationY": [
+                    20,
+                    20,
+                    107,
+                    107
+                ],
+                "translationZ": [
+                    0,
+                    20,
+                    107,
+                    107
+                ],
+                "rotation": [
+                    0,
+                    20,
+                    107,
+                    107
+                ]
+            },
+            "physicsEnabled": true
+        },
+        {
+            "boneName": "A",
+            "frame": 5,
+            "translation": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "rotation": [
+                0.3826833665370941,
+                0.0,
+                0.0,
+                0.9238795638084412
+            ],
+            "interpolation": {
+                "translationX": [
+                    64,
+                    0,
+                    64,
+                    127
+                ],
+                "translationY": [
+                    20,
+                    20,
+                    107,
+                    107
+                ],
+                "translationZ": [
+                    0,
+                    20,
+                    107,
+                    107
+                ],
+                "rotation": [
+                    0,
+                    20,
+                    107,
+                    107
+                ]
+            },
+            "physicsEnabled": true
+        },
+        {
+            "boneName": "B",
+            "frame": 5,
+            "translation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "rotation": [
+                0.3826833665370941,
+                0.0,
+                0.0,
+                0.9238795638084412
+            ],
+            "interpolation": {
+                "translationX": [
+                    20,
+                    20,
+                    107,
+                    107
+                ],
+                "translationY": [
+                    20,
+                    20,
+                    107,
+                    107
+                ],
+                "translationZ": [
+                    0,
+                    20,
+                    107,
+                    107
+                ],
+                "rotation": [
+                    0,
+                    20,
+                    107,
+                    107
+                ]
+            },
+            "physicsEnabled": true
+        },
+        {
+            "boneName": "C親",
+            "frame": 5,
+            "translation": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "rotation": [
+                0.3826833665370941,
+                0.0,
+                0.0,
+                0.9238795638084412
+            ],
+            "interpolation": {
+                "translationX": [
+                    20,
+                    20,
+                    107,
+                    107
+                ],
+                "translationY": [
+                    20,
+                    20,
+                    107,
+                    107
+                ],
+                "translationZ": [
+                    0,
+                    20,
+                    107,
+                    107
+                ],
+                "rotation": [
+                    0,
+                    20,
+                    107,
+                    107
+                ]
+            },
+            "physicsEnabled": true
+        }
+    ],
+    "morphKeyframes": [],
+    "modelKeyframes": [
+        {
+            "frame": 0,
+            "visible": true,
+            "constraintStates": []
+        }
+    ]
+}

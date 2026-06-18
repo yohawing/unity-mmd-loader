@@ -1,0 +1,194 @@
+{
+    "name": "test_fix_axis",
+    "vertices": [],
+    "indices": [],
+    "bones": [
+        {
+            "index": 0,
+            "name": "センター",
+            "parentIndex": -1,
+            "transformOrder": 0,
+            "origin": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "isMovable": true,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 1,
+            "name": "軸固定",
+            "parentIndex": -1,
+            "transformOrder": 0,
+            "origin": [
+                0.0,
+                1.0,
+                0.0
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": true,
+            "fixedAxisVector": [
+                0.796999990940094,
+                -0.6036999821662903,
+                -0.017000000923871995
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 2,
+            "name": "ローカル軸",
+            "parentIndex": -1,
+            "transformOrder": 0,
+            "origin": [
+                0.0,
+                2.0,
+                0.0
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                0.018500398844480516,
+                -0.0038000820204615595,
+                0.9998216032981873
+            ],
+            "localZAxis": [
+                0.7970184087753296,
+                -0.6037144660949707,
+                -0.017042363062500955
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 3,
+            "name": "両方",
+            "parentIndex": -1,
+            "transformOrder": 0,
+            "origin": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": true,
+            "fixedAxisVector": [
+                0.796999990940094,
+                -0.6036999821662903,
+                -0.017000000923871995
+            ],
+            "localAxes": true,
+            "localXAxis": [
+                0.018500398844480516,
+                -0.003800081554800272,
+                0.9998216032981873
+            ],
+            "localZAxis": [
+                0.7970184087753296,
+                -0.6037144660949707,
+                -0.017042363062500955
+            ],
+            "externalParentTransform": false
+        },
+        {
+            "index": 4,
+            "name": "参考",
+            "parentIndex": -1,
+            "transformOrder": 0,
+            "origin": [
+                0.796999990940094,
+                -0.6036999821662903,
+                -0.017000000923871995
+            ],
+            "isMovable": false,
+            "isRotatable": true,
+            "appendParentIndex": -1,
+            "appendRatio": 1.0,
+            "appendRotation": false,
+            "appendTranslation": false,
+            "appendLocal": false,
+            "fixedAxis": false,
+            "fixedAxisVector": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "localAxes": false,
+            "localXAxis": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "localZAxis": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "externalParentTransform": false
+        }
+    ],
+    "morphs": [],
+    "materials": [],
+    "ik": [],
+    "physics": {
+        "rigidbodies": [],
+        "joints": []
+    }
+}

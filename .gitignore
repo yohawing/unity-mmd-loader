@@ -1,0 +1,52 @@
+# Unity consumer project (preview / local-only)
+unity-mmd/
+
+# Local development automation (not part of the distributed UPM package)
+scripts/
+packages/com.yohawing.mmd-unity.devtools/
+
+# Local-only artifacts and licensed data references
+artifacts/
+data-local/*
+unity-tests.log
+unity-tests.xml
+native/build*/
+native/out*/
+native/**/build*/
+native/**/*.dll
+native/**/*.pdb
+native/**/*.lib
+native/**/*.lib.meta
+native/**/*.exp
+native/**/*.exp.meta
+native/**/*.obj
+native/**/*.ilk
+packages/**/Runtime/Plugins/**/*.lib
+packages/**/Runtime/Plugins/**/*.lib.meta
+packages/**/Runtime/Plugins/**/*.exp
+packages/**/Runtime/Plugins/**/*.exp.meta
+
+# OS/editor noise
+.vs/
+.idea/
+*.user
+*.suo
+*.tmp
+**/bin/
+**/obj/
+**/__pycache__/
+*.py[cod]
+
+# AI development logs and instruction files
+AGENTS.md
+CLAUDE.md
+.ai/
+.claude-code-subagent/
+.claudex/
+.codex/
+.opencode/
+
+# dev documents
+docs/*
+!docs/README.ja.md
+!docs/HOW_TO_USE.md
