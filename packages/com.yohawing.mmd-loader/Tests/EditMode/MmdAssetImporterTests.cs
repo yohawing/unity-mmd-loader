@@ -133,8 +133,8 @@ namespace Mmd.Tests
             Assert.That(notice, Does.Contain("PMX import"));
             Assert.That(notice, Does.Contain("VMD"));
             Assert.That(notice, Does.Contain("Timeline"));
-            Assert.That(notice, Does.Contain("MMD EditorWindow"));
-            Assert.That(notice, Does.Contain("VMD Asset context menu"));
+            Assert.That(notice, Does.Contain("PMX controller"));
+            Assert.That(notice, Does.Contain("MMD VMD track"));
         }
 
         [Test]
@@ -1572,7 +1572,7 @@ namespace Mmd.Tests
                     MmdSceneDragAndDrop.TryGetDraggedVmdAssetForExistingModel(new Object[] { pmxAsset, firstVmd }, Array.Empty<string>(), out _),
                     Is.False);
                 Assert.That(
-                    MmdSceneDragAndDrop.TryGetDraggedVmdAssetForExistingModel(new Object[] { firstVmd }, new[] { "External/Motion/motion.vmd" }, out _),
+                    MmdSceneDragAndDrop.TryGetDraggedVmdAssetForExistingModel(new Object[] { firstVmd }, new[] { Path.Combine(Path.GetTempPath(), "External", "Motion", "motion.vmd") }, out _),
                     Is.False);
             }
             finally
@@ -2385,30 +2385,6 @@ namespace Mmd.Tests
             Assert.That(Directory.Exists(Path.Combine(ProjectRoot, outsideDirectoryName)), Is.False);
         }
 
-        [Test]
-        public void HumanoidSetupAssetMenuValidationRequiresPmxAssetSelection()
-        {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
-            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
-            MmdVmdAsset? vmdAsset = null;
-            try
-            {
-                Selection.activeObject = pmxAsset;
-                Assert.That(MmdHumanoidSetupAssetBuilder.ValidateCreateSelectedHumanoidSetupAssetFromMenu(), Is.True);
-
-                vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
-                Selection.activeObject = vmdAsset;
-                Assert.That(MmdHumanoidSetupAssetBuilder.ValidateCreateSelectedHumanoidSetupAssetFromMenu(), Is.False);
-            }
-            finally
-            {
-                Selection.activeObject = null;
-                if (vmdAsset != null)
-                {
-                    Object.DestroyImmediate(vmdAsset);
-                }
-            }
-        }
 
         [Test]
         public void HumanoidSetupAssetUsesCustomMetadataInspector()

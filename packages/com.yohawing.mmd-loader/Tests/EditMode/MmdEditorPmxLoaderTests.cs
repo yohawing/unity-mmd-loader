@@ -283,25 +283,15 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void D1_LoadSelectedPmxAssetMenuValidationAcceptsGameObjectMain()
+        public void D1_PmxAssetResolverAcceptsGameObjectMain()
         {
             CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
 
             GameObject? mainGo = AssetDatabase.LoadAssetAtPath<GameObject>(TempPmxPath);
             Assert.That(mainGo, Is.Not.Null, "precondition: imported .pmx must have a GameObject main object");
 
-            Object? previousSelection = Selection.activeObject;
-            try
-            {
-                Selection.activeObject = mainGo;
-
-                Assert.That(MmdEditorPmxLoader.ValidateLoadSelectedPmxAssetIntoSceneFromMenu(), Is.True,
-                    "selected .pmx GameObject main object must be accepted by the PMX load menu compatibility layer");
-            }
-            finally
-            {
-                Selection.activeObject = previousSelection;
-            }
+            Assert.That(MmdEditorPmxLoader.TryResolveMmdPmxAssetFromMainGameObject(mainGo), Is.Not.Null,
+                "selected .pmx GameObject main object must resolve to the PMX metadata asset");
         }
     }
 }

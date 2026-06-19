@@ -16,9 +16,9 @@ using Object = UnityEngine.Object;
 
 namespace Mmd.Tests
 {
-    public sealed class MmdEditorWindowTests
+    public sealed class MmdEditorWorkflowTests
     {
-        private const string TempDirectory = "Assets/__MmdEditorWindowTests";
+        private const string TempDirectory = "Assets/__MmdEditorWorkflowTests";
         private const string TempPmxPath = TempDirectory + "/test_1bone_cube.pmx";
         private const string TempVmdPath = TempDirectory + "/test_1bone_cube_motion.vmd";
 
@@ -69,17 +69,6 @@ namespace Mmd.Tests
         private static string ProjectRoot => Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
         private static string RepositoryRoot => Path.GetFullPath(Path.Combine(ProjectRoot, ".."));
         [Test]
-        public void OpenWindowCreatesEditorWindow()
-        {
-            MmdEditorWindow.OpenWindow();
-            MmdEditorWindow window = EditorWindow.GetWindow<MmdEditorWindow>();
-
-            Assert.That(window, Is.Not.Null);
-
-            window.Close();
-        }
-
-        [Test]
         public void SelectionSnapshotResolvesPmxAndVmdAssets()
         {
             MmdPmxAsset pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
@@ -91,7 +80,7 @@ namespace Mmd.Tests
                 pmxAsset.Initialize(new byte[] { 1 }, "model.pmx", "External/Model/model.pmx");
                 vmdAsset.Initialize(new byte[] { 2 }, "motion.vmd", "External/Motion/motion.vmd");
 
-                MmdEditorSelectionSnapshot snapshot = MmdEditorWindow.BuildSelectionSnapshot(
+                MmdEditorSelectionSnapshot snapshot = MmdEditorWorkflow.BuildSelectionSnapshot(
                     new Object[] { pmxAsset, vmdAsset },
                     activeGameObject: null);
 
@@ -119,7 +108,7 @@ namespace Mmd.Tests
                 PlayableDirector director = root.AddComponent<PlayableDirector>();
                 director.playableAsset = timelineAsset;
 
-                MmdEditorSelectionSnapshot snapshot = MmdEditorWindow.BuildSelectionSnapshot(
+                MmdEditorSelectionSnapshot snapshot = MmdEditorWorkflow.BuildSelectionSnapshot(
                     new Object[] { root },
                     root);
 
@@ -137,21 +126,20 @@ namespace Mmd.Tests
         [Test]
         public void SelectionSnapshotResolvesRuntimeImporter()
         {
-            // CanCreatePlaybackConfig resolver still works for direct builder API callers,
-            // but the EditorWindow no longer advertises "Create Playback Config" as a primary button.
+            // CanCreatePlaybackConfig resolver still works for direct builder API callers.
             GameObject root = new("MMD Source Snapshot Root");
             try
             {
                 MmdUnityPlaybackController controller = root.AddComponent<MmdUnityPlaybackController>();
                 MmdRuntimeImporterComponent importer = root.AddComponent<MmdRuntimeImporterComponent>();
 
-                MmdEditorSelectionSnapshot snapshot = MmdEditorWindow.BuildSelectionSnapshot(
+                MmdEditorSelectionSnapshot snapshot = MmdEditorWorkflow.BuildSelectionSnapshot(
                     new Object[] { root },
                     root);
 
                 Assert.That(snapshot.Controller, Is.SameAs(controller));
                 Assert.That(snapshot.RuntimeImporter, Is.SameAs(importer));
-                Assert.That(MmdEditorWindow.CanCreatePlaybackConfig(snapshot), Is.True);
+                Assert.That(MmdEditorWorkflow.CanCreatePlaybackConfig(snapshot), Is.True);
             }
             finally
             {
@@ -167,7 +155,7 @@ namespace Mmd.Tests
             try
             {
                 Assert.That(
-                    MmdEditorWindow.CanCreatePlaybackConfig(new MmdEditorSelectionSnapshot(
+                    MmdEditorWorkflow.CanCreatePlaybackConfig(new MmdEditorSelectionSnapshot(
                         pmxAsset: null,
                         vmdAsset: null,
                         controller: null,
@@ -205,9 +193,9 @@ namespace Mmd.Tests
                     director,
                     timelineAsset);
 
-                Assert.That(MmdEditorWindow.CanCreateTimelineClip(ready), Is.True);
+                Assert.That(MmdEditorWorkflow.CanCreateTimelineClip(ready), Is.True);
                 Assert.That(
-                    MmdEditorWindow.CanCreateTimelineClip(new MmdEditorSelectionSnapshot(
+                    MmdEditorWorkflow.CanCreateTimelineClip(new MmdEditorSelectionSnapshot(
                         pmxAsset,
                         null,
                         controller,
@@ -220,7 +208,7 @@ namespace Mmd.Tests
                 {
                     MmdUnityPlaybackController unconfiguredController = unconfiguredRoot.AddComponent<MmdUnityPlaybackController>();
                     Assert.That(
-                        MmdEditorWindow.CanCreateTimelineClip(new MmdEditorSelectionSnapshot(
+                        MmdEditorWorkflow.CanCreateTimelineClip(new MmdEditorSelectionSnapshot(
                             pmxAsset,
                             vmdAsset,
                             unconfiguredController,
@@ -261,9 +249,9 @@ namespace Mmd.Tests
                     director: null,
                     timelineAsset: null);
 
-                Assert.That(MmdEditorWindow.CanCreatePlaybackSource(ready), Is.True);
+                Assert.That(MmdEditorWorkflow.CanCreatePlaybackSource(ready), Is.True);
                 Assert.That(
-                    MmdEditorWindow.CanCreatePlaybackSource(new MmdEditorSelectionSnapshot(
+                    MmdEditorWorkflow.CanCreatePlaybackSource(new MmdEditorSelectionSnapshot(
                         pmxAsset,
                         vmdAsset,
                         controller: null,
@@ -271,7 +259,7 @@ namespace Mmd.Tests
                         timelineAsset: null)),
                     Is.False);
                 Assert.That(
-                    MmdEditorWindow.CanCreatePlaybackSource(new MmdEditorSelectionSnapshot(
+                    MmdEditorWorkflow.CanCreatePlaybackSource(new MmdEditorSelectionSnapshot(
                         pmxAsset,
                         vmdAsset: null,
                         controller,
@@ -303,7 +291,7 @@ namespace Mmd.Tests
                 controller.SetPlayOnStart(false);
                 controller.SetPhysicsMode(MmdPhysicsMode.Off);
 
-                var created = MmdEditorWindow.ExecuteCreatePlaybackSource(
+                var created = MmdEditorWorkflow.ExecuteCreatePlaybackSource(
                     pmxAsset,
                     vmdAsset,
                     controller,
@@ -316,7 +304,7 @@ namespace Mmd.Tests
                 Assert.That(controller.PlayOnStart, Is.False);
                 Assert.That(controller.PhysicsMode, Is.EqualTo(MmdPhysicsMode.Live));
 
-                var updated = MmdEditorWindow.ExecuteCreatePlaybackSource(
+                var updated = MmdEditorWorkflow.ExecuteCreatePlaybackSource(
                     updatedPmxAsset,
                     updatedVmdAsset,
                     controller,
@@ -351,7 +339,7 @@ namespace Mmd.Tests
             {
                 MmdUnityPlaybackController controller = root.AddComponent<MmdUnityPlaybackController>();
 
-                var created = MmdEditorWindow.ExecuteCreatePlaybackSource(
+                var created = MmdEditorWorkflow.ExecuteCreatePlaybackSource(
                     pmxAsset,
                     vmdAsset,
                     controller,
@@ -361,7 +349,7 @@ namespace Mmd.Tests
                 Assert.That(controller.ModelAssetSource, Is.SameAs(pmxAsset));
                 Assert.That(controller.MotionAssetSource, Is.SameAs(vmdAsset));
 
-                var updated = MmdEditorWindow.ExecuteCreatePlaybackSource(
+                var updated = MmdEditorWorkflow.ExecuteCreatePlaybackSource(
                     updatedPmxAsset,
                     updatedVmdAsset,
                     controller,
@@ -396,9 +384,9 @@ namespace Mmd.Tests
                     director: null,
                     timelineAsset: null);
 
-                Assert.That(MmdEditorWindow.CanCreatePlaybackConfig(ready), Is.True);
+                Assert.That(MmdEditorWorkflow.CanCreatePlaybackConfig(ready), Is.True);
                 Assert.That(
-                    MmdEditorWindow.CanCreatePlaybackConfig(new MmdEditorSelectionSnapshot(
+                    MmdEditorWorkflow.CanCreatePlaybackConfig(new MmdEditorSelectionSnapshot(
                         pmxAsset: null,
                         vmdAsset: null,
                         controller: null,
@@ -452,7 +440,7 @@ namespace Mmd.Tests
             GameObject? mainGo = AssetDatabase.LoadAssetAtPath<GameObject>(TempPmxPath);
             Assert.That(mainGo, Is.Not.Null, "precondition: imported .pmx must have a GameObject main object");
 
-            MmdEditorSelectionSnapshot snapshot = MmdEditorWindow.BuildSelectionSnapshot(
+            MmdEditorSelectionSnapshot snapshot = MmdEditorWorkflow.BuildSelectionSnapshot(
                 new Object[] { mainGo },
                 activeGameObject: null);
 
@@ -476,7 +464,7 @@ namespace Mmd.Tests
             Assert.That(mainGo, Is.Not.Null);
 
             // Both in selection: MmdPmxAsset cast should be found first (iteration order).
-            MmdEditorSelectionSnapshot snapshot = MmdEditorWindow.BuildSelectionSnapshot(
+            MmdEditorSelectionSnapshot snapshot = MmdEditorWorkflow.BuildSelectionSnapshot(
                 new Object[] { mainGo, pmxAsset },
                 activeGameObject: null);
 
@@ -502,7 +490,7 @@ namespace Mmd.Tests
                 director.playableAsset = timelineAsset;
                 controller.ConfigureModelAsset(pmxAsset);
 
-                var result = MmdEditorWindow.ExecuteCreateTimelineClip(
+                var result = MmdEditorWorkflow.ExecuteCreateTimelineClip(
                     vmdAsset,
                     director,
                     controller,

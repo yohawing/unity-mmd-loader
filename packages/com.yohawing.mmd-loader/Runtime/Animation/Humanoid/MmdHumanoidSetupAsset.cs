@@ -14,9 +14,6 @@ namespace Mmd
         Custom = 2
     }
 
-    [CreateAssetMenu(
-        fileName = "MmdHumanoidSetup",
-        menuName = "MMD Loader/Humanoid Setup")]
     public sealed class MmdHumanoidSetupAsset : ScriptableObject
     {
         public const string NotEvaluatedReadiness = "NotEvaluated";
