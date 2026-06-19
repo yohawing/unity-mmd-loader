@@ -2,6 +2,7 @@
 
 using UnityEngine;
 using Mmd;
+using System.Collections.Generic;
 
 namespace Mmd.UnityIntegration
 {
@@ -25,6 +26,7 @@ namespace Mmd.UnityIntegration
         {
             public Avatar? Avatar { get; }
             public GameObject? ProxyRoot { get; }
+            public IReadOnlyList<MmdHumanoidRetargetBinding> RetargetBindings { get; }
             public string Readiness { get; }
             public string Diagnostic { get; }
             public MmdHumanoidBoneMappingDiagnosticSummary MappingDiagnostics { get; }
@@ -34,10 +36,12 @@ namespace Mmd.UnityIntegration
                 string readiness,
                 string diagnostic,
                 MmdHumanoidBoneMappingDiagnosticSummary? mappingDiagnostics = null,
-                GameObject? proxyRoot = null)
+                GameObject? proxyRoot = null,
+                IReadOnlyList<MmdHumanoidRetargetBinding>? retargetBindings = null)
             {
                 Avatar = avatar;
                 ProxyRoot = proxyRoot;
+                RetargetBindings = retargetBindings ?? System.Array.Empty<MmdHumanoidRetargetBinding>();
                 Readiness = readiness ?? string.Empty;
                 Diagnostic = diagnostic ?? string.Empty;
                 MappingDiagnostics = mappingDiagnostics ?? MmdHumanoidBoneMappingDiagnosticSummary.Empty;
@@ -97,6 +101,8 @@ namespace Mmd.UnityIntegration
                     ? "Avatar"
                     : modelName + " Avatar";
                 PrepareProxyRootForImportAsset(proxyRig.ProxyRoot);
+                IReadOnlyList<MmdHumanoidRetargetBinding> retargetBindings =
+                    BuildRuntimeRetargetBindings(asset, proxyRig);
                 readiness = MmdHumanoidSetupAsset.ReadyReadiness;
                 keepProxyRoot = true;
                 return new MmdPmxHumanoidAvatarImportResult(
@@ -104,7 +110,8 @@ namespace Mmd.UnityIntegration
                     readiness,
                     diagnostic,
                     mappingDiagnostics,
-                    proxyRig.ProxyRoot);
+                    proxyRig.ProxyRoot,
+                    retargetBindings);
             }
             finally
             {
@@ -113,6 +120,38 @@ namespace Mmd.UnityIntegration
                     Object.DestroyImmediate(proxyRig.ProxyRoot);
                 }
             }
+        }
+
+        private static IReadOnlyList<MmdHumanoidRetargetBinding> BuildRuntimeRetargetBindings(
+            MmdPmxAsset asset,
+            MmdHumanoidProxyRigResult proxyRig)
+        {
+            if (asset.ImportedRoot == null || proxyRig.ProxyRoot == null || proxyRig.Matches.Count == 0)
+            {
+                return System.Array.Empty<MmdHumanoidRetargetBinding>();
+            }
+
+            SkinnedMeshRenderer? smr = asset.ImportedRoot.GetComponentInChildren<SkinnedMeshRenderer>(
+                includeInactive: true);
+            Transform[] nativeBones = smr != null && smr.bones != null
+                ? smr.bones
+                : System.Array.Empty<Transform>();
+
+            var bindings = new List<MmdHumanoidRetargetBinding>(proxyRig.Matches.Count);
+            foreach (MmdHumanoidBoneMappingMatch match in proxyRig.Matches)
+            {
+                proxyRig.BoneMap.TryGetValue(match.HumanBone, out Transform proxyTransform);
+                Transform? nativeTransform = match.MmdBoneIndex >= 0 && match.MmdBoneIndex < nativeBones.Length
+                    ? nativeBones[match.MmdBoneIndex]
+                    : null;
+                bindings.Add(new MmdHumanoidRetargetBinding(
+                    match.HumanBone,
+                    match.MmdBoneIndex,
+                    proxyTransform,
+                    nativeTransform));
+            }
+
+            return bindings;
         }
 
         private static void PrepareProxyRootForImportAsset(GameObject proxyRoot)

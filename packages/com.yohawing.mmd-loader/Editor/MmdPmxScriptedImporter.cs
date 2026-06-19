@@ -40,7 +40,7 @@ namespace Mmd.Editor
         MmdBasicUrpToon = 0
     }
 
-    [ScriptedImporter(16, "pmx")]
+    [ScriptedImporter(17, "pmx")]
     public sealed class MmdPmxScriptedImporter : ScriptedImporter
     {
         [SerializeField] private float importScale = 1.0f;
@@ -142,6 +142,13 @@ namespace Mmd.Editor
                     animationType,
                     importedAvatar,
                     genericAvatar);
+                ConfigureHumanoidRuntimeRetargeter(
+                    generatedAssets.Root,
+                    animationType,
+                    importedAvatar,
+                    importedHumanoidProxyRoot,
+                    avatarReadiness,
+                    avatarImport.RetargetBindings);
 
                 if (animationType == MmdPmxAnimationType.Generic && genericAvatar == null)
                 {
@@ -206,6 +213,33 @@ namespace Mmd.Editor
                 ? humanoidAvatar
                 : genericAvatar;
             return animator;
+        }
+
+        private static MmdHumanoidRuntimeRetargeter? ConfigureHumanoidRuntimeRetargeter(
+            GameObject root,
+            MmdPmxAnimationType importedAnimationType,
+            Avatar? humanoidAvatar,
+            GameObject? proxyRoot,
+            string avatarReadiness,
+            System.Collections.Generic.IReadOnlyList<MmdHumanoidRetargetBinding> retargetBindings)
+        {
+            if (importedAnimationType != MmdPmxAnimationType.Humanoid
+                || humanoidAvatar == null
+                || !humanoidAvatar.isHuman
+                || proxyRoot == null
+                || !string.Equals(avatarReadiness, MmdHumanoidSetupAsset.ReadyReadiness, System.StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            MmdHumanoidRuntimeRetargeter retargeter = root.GetComponent<MmdHumanoidRuntimeRetargeter>();
+            if (retargeter == null)
+            {
+                retargeter = root.AddComponent<MmdHumanoidRuntimeRetargeter>();
+            }
+
+            retargeter.Configure(proxyRoot.transform, retargetBindings);
+            return retargeter;
         }
 
         private static void ClearImportHierarchyHideFlags(Transform root)

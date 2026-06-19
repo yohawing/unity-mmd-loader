@@ -136,6 +136,7 @@ namespace Mmd.Tests
             Assert.That(root, Is.Not.Null);
             Assert.That(pmxAsset.AnimationType, Is.EqualTo(nameof(MmdPmxAnimationType.None)));
             Assert.That(root.GetComponent<Animator>(), Is.Null);
+            Assert.That(root.GetComponent<MmdHumanoidRuntimeRetargeter>(), Is.Null);
             Assert.That(GetAvatarSubAssets(TempPmxPath), Is.Empty);
         }
 
@@ -159,6 +160,7 @@ namespace Mmd.Tests
             Assert.That(animator.avatar, Is.Not.Null);
             Assert.That(animator.avatar.isValid, Is.True);
             Assert.That(animator.avatar.isHuman, Is.False);
+            Assert.That(root.GetComponent<MmdHumanoidRuntimeRetargeter>(), Is.Null);
 
             System.Collections.Generic.List<Avatar> avatarSubAssets = GetAvatarSubAssets(TempPmxPath);
             Assert.That(avatarSubAssets, Has.Count.EqualTo(1));
@@ -292,6 +294,18 @@ namespace Mmd.Tests
                 "persisted proxy must be visible in hierarchy (not HideInHierarchy)");
             Assert.That(proxyRoot.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true), Is.Null,
                 "Slice 1 proxy rig must not add a second skinning renderer.");
+
+            MmdHumanoidRuntimeRetargeter retargeter = root.GetComponent<MmdHumanoidRuntimeRetargeter>();
+            Assert.That(retargeter, Is.Not.Null,
+                "Humanoid import must add the runtime retargeter bridge on the imported root.");
+            Assert.That(retargeter.ProxyRoot, Is.SameAs(proxyRoot));
+            Assert.That(retargeter.Entries, Is.Not.Empty);
+            foreach (MmdHumanoidRetargetBinding entry in retargeter.Entries)
+            {
+                Assert.That(entry.ProxyTransform, Is.Not.Null, entry.HumanBone + " proxy transform");
+                Assert.That(entry.NativeTransform, Is.Not.Null, entry.HumanBone + " native transform");
+                Assert.That(entry.MmdBoneIndex, Is.GreaterThanOrEqualTo(0), entry.HumanBone + " MMD bone index");
+            }
         }
 
         [Test]

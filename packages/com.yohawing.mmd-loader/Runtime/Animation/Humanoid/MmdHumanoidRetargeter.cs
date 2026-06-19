@@ -7,6 +7,39 @@ using Mmd.UnityIntegration;
 
 namespace Mmd
 {
+    [Serializable]
+    public sealed class MmdHumanoidRetargetBinding
+    {
+        [SerializeField] private HumanBodyBones humanBone = HumanBodyBones.LastBone;
+        [SerializeField] private int mmdBoneIndex = -1;
+        [SerializeField] private Transform? proxyTransform;
+        [SerializeField] private Transform? nativeTransform;
+
+        public MmdHumanoidRetargetBinding()
+        {
+        }
+
+        public MmdHumanoidRetargetBinding(
+            HumanBodyBones humanBone,
+            int mmdBoneIndex,
+            Transform? proxyTransform,
+            Transform? nativeTransform)
+        {
+            this.humanBone = humanBone;
+            this.mmdBoneIndex = mmdBoneIndex;
+            this.proxyTransform = proxyTransform;
+            this.nativeTransform = nativeTransform;
+        }
+
+        public HumanBodyBones HumanBone => humanBone;
+
+        public int MmdBoneIndex => mmdBoneIndex;
+
+        public Transform? ProxyTransform => proxyTransform;
+
+        public Transform? NativeTransform => nativeTransform;
+    }
+
     /// <summary>
     /// Result of a single MmdHumanoidRetargeter.RetargetPose call.
     /// Records copied bone count, skipped bones with reasons, diagnostics,
@@ -90,22 +123,58 @@ namespace Mmd
             if (modelInstance == null)
                 throw new ArgumentNullException(nameof(modelInstance));
 
-            var diagnostics = new List<string>();
-            int copiedCount = 0;
-            int skippedCount = 0;
-
             // If the proxy rig has no root, no proxy transforms exist to read from.
             if (proxyRig.ProxyRoot == null)
             {
+                var diagnostics = new List<string>();
                 diagnostics.Add("retarget: skipped because ProxyRoot is null");
                 return new MmdHumanoidRetargeterResult(
-                    copiedCount,
-                    skippedCount + 1,
+                    0,
+                    1,
                     diagnostics.ToArray());
             }
 
             IReadOnlyList<MmdHumanoidBoneMappingMatch> matches = proxyRig.Matches;
             if (matches == null || matches.Count == 0)
+            {
+                var diagnostics = new List<string>();
+                diagnostics.Add("retarget: no bone matches to retarget");
+                return new MmdHumanoidRetargeterResult(
+                    0,
+                    0,
+                    diagnostics.ToArray());
+            }
+
+            IReadOnlyDictionary<HumanBodyBones, Transform> boneMap = proxyRig.BoneMap;
+            Transform[] nativeTransforms = modelInstance.BoneTransforms;
+            var entries = new List<MmdHumanoidRetargetBinding>(matches.Count);
+            foreach (MmdHumanoidBoneMappingMatch match in matches)
+            {
+                boneMap.TryGetValue(match.HumanBone, out Transform proxyTransform);
+                Transform? nativeTransform = match.MmdBoneIndex >= 0 && match.MmdBoneIndex < nativeTransforms.Length
+                    ? nativeTransforms[match.MmdBoneIndex]
+                    : null;
+                entries.Add(new MmdHumanoidRetargetBinding(
+                    match.HumanBone,
+                    match.MmdBoneIndex,
+                    proxyTransform,
+                    nativeTransform));
+            }
+
+            return RetargetPose(entries);
+        }
+
+        public static MmdHumanoidRetargeterResult RetargetPose(
+            IReadOnlyList<MmdHumanoidRetargetBinding> entries)
+        {
+            if (entries == null)
+                throw new ArgumentNullException(nameof(entries));
+
+            var diagnostics = new List<string>();
+            int copiedCount = 0;
+            int skippedCount = 0;
+
+            if (entries.Count == 0)
             {
                 diagnostics.Add("retarget: no bone matches to retarget");
                 return new MmdHumanoidRetargeterResult(
@@ -114,46 +183,46 @@ namespace Mmd
                     diagnostics.ToArray());
             }
 
-            IReadOnlyDictionary<HumanBodyBones, Transform> boneMap = proxyRig.BoneMap;
-            Transform[] nativeTransforms = modelInstance.BoneTransforms;
-            int nativeCount = nativeTransforms.Length;
-
             // Track which native MMD bone indices we've already written to,
             // to detect duplicate target indices.
             var usedNativeIndices = new HashSet<int>();
 
-            foreach (MmdHumanoidBoneMappingMatch match in matches)
+            foreach (MmdHumanoidRetargetBinding entry in entries)
             {
-                // Validate MmdBoneIndex is in range.
-                if (match.MmdBoneIndex < 0 || match.MmdBoneIndex >= nativeCount)
+                if (entry.MmdBoneIndex < 0)
                 {
                     diagnostics.Add(
-                        $"retarget: skipped MmdBoneIndex {match.MmdBoneIndex} " +
-                        $"(HumanBone={match.HumanBone}, MmdBoneName='{match.MmdBoneName}'): " +
-                        $"out of range [0, {nativeCount})");
+                        $"retarget: skipped MmdBoneIndex {entry.MmdBoneIndex} " +
+                        $"(HumanBone={entry.HumanBone}): invalid negative index");
                     skippedCount++;
                     continue;
                 }
 
                 // Detect duplicate target MMD bone indices.
-                if (!usedNativeIndices.Add(match.MmdBoneIndex))
+                if (!usedNativeIndices.Add(entry.MmdBoneIndex))
                 {
                     diagnostics.Add(
-                        $"retarget: skipped duplicate target MmdBoneIndex {match.MmdBoneIndex} " +
-                        $"(HumanBone={match.HumanBone}, MmdBoneName='{match.MmdBoneName}')");
+                        $"retarget: skipped duplicate target MmdBoneIndex {entry.MmdBoneIndex} " +
+                        $"(HumanBone={entry.HumanBone})");
                     skippedCount++;
                     continue;
                 }
 
-                // Get the proxy Transform for this HumanBodyBones.
-                // Use ContainsKey + indexer as TryGetValue is not available on IReadOnlyDictionary
-                // in this project's C# version. Check via ContainsKey first.
-                bool hasProxy = boneMap.TryGetValue(match.HumanBone, out Transform proxyTransform);
-                if (!hasProxy || proxyTransform == null)
+                Transform? proxyTransform = entry.ProxyTransform;
+                if (proxyTransform == null)
                 {
                     diagnostics.Add(
-                        $"retarget: skipped missing proxy transform for {match.HumanBone} " +
-                        $"(MmdBoneName='{match.MmdBoneName}')");
+                        $"retarget: skipped missing proxy transform for {entry.HumanBone}");
+                    skippedCount++;
+                    continue;
+                }
+
+                Transform? nativeTransform = entry.NativeTransform;
+                if (nativeTransform == null)
+                {
+                    diagnostics.Add(
+                        $"retarget: skipped MmdBoneIndex {entry.MmdBoneIndex} " +
+                        $"(HumanBone={entry.HumanBone}): native transform is null or out of range");
                     skippedCount++;
                     continue;
                 }
@@ -163,21 +232,19 @@ namespace Mmd
                 if (!IsFiniteQuaternion(proxyRot))
                 {
                     diagnostics.Add(
-                        $"retarget: skipped non-finite proxy rotation for {match.HumanBone} " +
-                        $"(MmdBoneName='{match.MmdBoneName}'): " +
+                        $"retarget: skipped non-finite proxy rotation for {entry.HumanBone}: " +
                         $"rotation=({proxyRot.x}, {proxyRot.y}, {proxyRot.z}, {proxyRot.w})");
                     skippedCount++;
                     continue;
                 }
 
                 // Copy localRotation only. localPosition is NOT copied.
-                Transform nativeTransform = nativeTransforms[match.MmdBoneIndex];
                 nativeTransform.localRotation = proxyRot;
                 copiedCount++;
             }
 
             diagnostics.Add(
-                $"retarget: copied={copiedCount} skipped={skippedCount} total-matches={matches.Count}");
+                $"retarget: copied={copiedCount} skipped={skippedCount} total-matches={entries.Count}");
 
             return new MmdHumanoidRetargeterResult(
                 copiedCount,
