@@ -8,7 +8,7 @@ namespace Mmd.UnityIntegration
     /// <summary>
     /// Editor-independent helper for the Humanoid Avatar sub-asset build step during PMX import.
     /// Owns only the readiness/diagnostic selection for non-Humanoid, the proxy rig creation,
-    /// Avatar build, diagnostics combination, naming/hideFlags adjustment, and proxy root cleanup.
+    /// Avatar build, diagnostics combination, naming/hideFlags adjustment, and proxy root ownership.
     /// </summary>
     /// <remarks>
     /// This type lives in Runtime/Import under Mmd.UnityIntegration for API compat
@@ -19,11 +19,12 @@ namespace Mmd.UnityIntegration
     {
         /// <summary>
         /// Result of the (optional) Humanoid Avatar import build.
-        /// Avatar is non-null only on successful Ready case (with hideFlags=None and name applied).
+        /// Avatar and ProxyRoot are non-null only on successful Ready case.
         /// </summary>
         public readonly struct MmdPmxHumanoidAvatarImportResult
         {
             public Avatar? Avatar { get; }
+            public GameObject? ProxyRoot { get; }
             public string Readiness { get; }
             public string Diagnostic { get; }
             public MmdHumanoidBoneMappingDiagnosticSummary MappingDiagnostics { get; }
@@ -32,9 +33,11 @@ namespace Mmd.UnityIntegration
                 Avatar? avatar,
                 string readiness,
                 string diagnostic,
-                MmdHumanoidBoneMappingDiagnosticSummary? mappingDiagnostics = null)
+                MmdHumanoidBoneMappingDiagnosticSummary? mappingDiagnostics = null,
+                GameObject? proxyRoot = null)
             {
                 Avatar = avatar;
+                ProxyRoot = proxyRoot;
                 Readiness = readiness ?? string.Empty;
                 Diagnostic = diagnostic ?? string.Empty;
                 MappingDiagnostics = mappingDiagnostics ?? MmdHumanoidBoneMappingDiagnosticSummary.Empty;
@@ -74,6 +77,7 @@ namespace Mmd.UnityIntegration
                 return new MmdPmxHumanoidAvatarImportResult(null, readiness, diagnostic, mappingDiagnostics);
             }
 
+            bool keepProxyRoot = false;
             try
             {
                 MmdHumanoidAvatarBuildResult avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(proxyRig);
@@ -92,12 +96,33 @@ namespace Mmd.UnityIntegration
                 avatar.name = string.IsNullOrWhiteSpace(modelName)
                     ? "Avatar"
                     : modelName + " Avatar";
+                PrepareProxyRootForImportAsset(proxyRig.ProxyRoot);
                 readiness = MmdHumanoidSetupAsset.ReadyReadiness;
-                return new MmdPmxHumanoidAvatarImportResult(avatar, readiness, diagnostic, mappingDiagnostics);
+                keepProxyRoot = true;
+                return new MmdPmxHumanoidAvatarImportResult(
+                    avatar,
+                    readiness,
+                    diagnostic,
+                    mappingDiagnostics,
+                    proxyRig.ProxyRoot);
             }
             finally
             {
-                Object.DestroyImmediate(proxyRig.ProxyRoot);
+                if (!keepProxyRoot)
+                {
+                    Object.DestroyImmediate(proxyRig.ProxyRoot);
+                }
+            }
+        }
+
+        private static void PrepareProxyRootForImportAsset(GameObject proxyRoot)
+        {
+            proxyRoot.hideFlags = HideFlags.None;
+            proxyRoot.SetActive(true);
+            foreach (Transform child in proxyRoot.GetComponentsInChildren<Transform>(includeInactive: true))
+            {
+                child.hideFlags = HideFlags.None;
+                child.gameObject.hideFlags = HideFlags.None;
             }
         }
 

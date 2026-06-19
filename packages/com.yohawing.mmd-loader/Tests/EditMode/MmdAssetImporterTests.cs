@@ -125,6 +125,47 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void NoneAnimationTypeImportsWithoutAnimator()
+        {
+            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            SetPmxImporterAnimationType(TempPmxPath, MmdPmxAnimationType.None);
+
+            GameObject root = AssetDatabase.LoadAssetAtPath<GameObject>(TempPmxPath);
+            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+
+            Assert.That(root, Is.Not.Null);
+            Assert.That(pmxAsset.AnimationType, Is.EqualTo(nameof(MmdPmxAnimationType.None)));
+            Assert.That(root.GetComponent<Animator>(), Is.Null);
+            Assert.That(GetAvatarSubAssets(TempPmxPath), Is.Empty);
+        }
+
+        [Test]
+        public void GenericAnimationTypeImportsRootAnimatorWithGenericAvatar()
+        {
+            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            SetPmxImporterAnimationType(TempPmxPath, MmdPmxAnimationType.Generic);
+
+            GameObject root = AssetDatabase.LoadAssetAtPath<GameObject>(TempPmxPath);
+            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+
+            Assert.That(root, Is.Not.Null);
+            Assert.That(pmxAsset.AnimationType, Is.EqualTo(nameof(MmdPmxAnimationType.Generic)));
+            Assert.That(pmxAsset.ImportedAvatar, Is.Null,
+                "Generic Avatar belongs to the imported root Animator, not MmdPmxAsset.ImportedAvatar.");
+
+            Animator animator = root.GetComponent<Animator>();
+            Assert.That(animator, Is.Not.Null);
+            Assert.That(animator.runtimeAnimatorController, Is.Null);
+            Assert.That(animator.avatar, Is.Not.Null);
+            Assert.That(animator.avatar.isValid, Is.True);
+            Assert.That(animator.avatar.isHuman, Is.False);
+
+            System.Collections.Generic.List<Avatar> avatarSubAssets = GetAvatarSubAssets(TempPmxPath);
+            Assert.That(avatarSubAssets, Has.Count.EqualTo(1));
+            Assert.That(avatarSubAssets[0], Is.SameAs(animator.avatar));
+        }
+
+        [Test]
         public void PmxImporterReimportUpdatesImportedAssetSettingsSummary()
         {
             CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
@@ -209,7 +250,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void HumanoidAnimationTypeCreatesAvatarSubAssetOnlyWhenAvatarBuilderSucceeds()
+        public void HumanoidAnimationTypeImportsRootAnimatorWithReadyAvatar()
         {
             CopyFixtureToAssetDatabase("test_semi_basic_bone.pmx", TempHumanoidPmxPath);
 
@@ -224,33 +265,33 @@ namespace Mmd.Tests
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempHumanoidPmxPath);
             Assert.That(pmxAsset, Is.Not.Null);
             Assert.That(pmxAsset.AnimationType, Is.EqualTo(nameof(MmdPmxAnimationType.Humanoid)));
-            Assert.That(pmxAsset.HumanoidAvatarReadiness, Is.Not.EqualTo("NotRequested"));
+            Assert.That(pmxAsset.HumanoidAvatarReadiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
             Assert.That(pmxAsset.HumanoidAvatarDiagnostic, Is.Not.Empty);
 
-            var avatarSubAssets = new System.Collections.Generic.List<Avatar>();
-            foreach (Object subAsset in AssetDatabase.LoadAllAssetsAtPath(TempHumanoidPmxPath))
-            {
-                if (subAsset is Avatar avatar)
-                {
-                    avatarSubAssets.Add(avatar);
-                }
-            }
+            GameObject root = AssetDatabase.LoadAssetAtPath<GameObject>(TempHumanoidPmxPath);
+            Assert.That(root, Is.Not.Null);
+            Animator animator = root.GetComponent<Animator>();
+            Assert.That(animator, Is.Not.Null);
+            Assert.That(animator.runtimeAnimatorController, Is.Null);
 
-            if (pmxAsset.HumanoidAvatarReadiness == MmdHumanoidSetupAsset.ReadyReadiness)
-            {
-                Assert.That(pmxAsset.ImportedAvatar, Is.Not.Null,
-                    "Ready Humanoid import must expose the Avatar sub-asset from MmdPmxAsset.");
-                Assert.That(avatarSubAssets, Has.Count.EqualTo(1));
-                Assert.That(avatarSubAssets[0], Is.SameAs(pmxAsset.ImportedAvatar));
-                Assert.That(pmxAsset.ImportedAvatar!.isValid, Is.True);
-                Assert.That(pmxAsset.ImportedAvatar.isHuman, Is.True);
-            }
-            else
-            {
-                Assert.That(pmxAsset.ImportedAvatar, Is.Null,
-                    "Importer must not expose an Avatar when mapping or AvatarBuilder did not produce a valid human Avatar.");
-                Assert.That(avatarSubAssets, Is.Empty);
-            }
+            System.Collections.Generic.List<Avatar> avatarSubAssets = GetAvatarSubAssets(TempHumanoidPmxPath);
+
+            Assert.That(pmxAsset.ImportedAvatar, Is.Not.Null,
+                "Ready Humanoid import must expose the Avatar sub-asset from MmdPmxAsset.");
+            Assert.That(avatarSubAssets, Has.Count.EqualTo(1));
+            Assert.That(avatarSubAssets[0], Is.SameAs(pmxAsset.ImportedAvatar));
+            Assert.That(pmxAsset.ImportedAvatar!.isValid, Is.True);
+            Assert.That(pmxAsset.ImportedAvatar.isHuman, Is.True);
+            Assert.That(animator.avatar, Is.SameAs(pmxAsset.ImportedAvatar));
+
+            Transform? proxyRoot = root.transform.Find("MmdHumanoidProxyRig");
+            Assert.That(proxyRoot, Is.Not.Null,
+                "Humanoid import must persist the proxy rig under the imported hierarchy root for Animator binding.");
+            Assert.That(proxyRoot!.parent, Is.SameAs(root.transform));
+            Assert.That(proxyRoot.gameObject.hideFlags & HideFlags.HideInHierarchy, Is.EqualTo(HideFlags.None),
+                "persisted proxy must be visible in hierarchy (not HideInHierarchy)");
+            Assert.That(proxyRoot.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true), Is.Null,
+                "Slice 1 proxy rig must not add a second skinning renderer.");
         }
 
         [Test]
@@ -2587,6 +2628,31 @@ namespace Mmd.Tests
             Directory.CreateDirectory(Path.Combine(ProjectRoot, TempDirectory));
             File.Copy(source, Path.Combine(ProjectRoot, destinationAssetPath), overwrite: true);
             AssetDatabase.ImportAsset(destinationAssetPath, ImportAssetOptions.ForceUpdate);
+        }
+
+        private static void SetPmxImporterAnimationType(string assetPath, MmdPmxAnimationType value)
+        {
+            var importer = AssetImporter.GetAtPath(assetPath) as MmdPmxScriptedImporter;
+            Assert.That(importer, Is.Not.Null);
+
+            var serializedImporter = new SerializedObject(importer!);
+            serializedImporter.FindProperty("animationType").enumValueIndex = (int)value;
+            serializedImporter.ApplyModifiedPropertiesWithoutUndo();
+            importer!.SaveAndReimport();
+        }
+
+        private static System.Collections.Generic.List<Avatar> GetAvatarSubAssets(string assetPath)
+        {
+            var avatarSubAssets = new System.Collections.Generic.List<Avatar>();
+            foreach (Object subAsset in AssetDatabase.LoadAllAssetsAtPath(assetPath))
+            {
+                if (subAsset is Avatar avatar)
+                {
+                    avatarSubAssets.Add(avatar);
+                }
+            }
+
+            return avatarSubAssets;
         }
 
         private static string ProjectRoot => Path.GetFullPath(Path.Combine(Application.dataPath, ".."));

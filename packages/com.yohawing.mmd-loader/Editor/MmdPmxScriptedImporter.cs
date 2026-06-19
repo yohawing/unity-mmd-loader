@@ -40,7 +40,7 @@ namespace Mmd.Editor
         MmdBasicUrpToon = 0
     }
 
-    [ScriptedImporter(14, "pmx")]
+    [ScriptedImporter(16, "pmx")]
     public sealed class MmdPmxScriptedImporter : ScriptedImporter
     {
         [SerializeField] private float importScale = 1.0f;
@@ -109,8 +109,17 @@ namespace Mmd.Editor
                         animationTypeLabel: animationType.ToString(),
                         mappingOverrides: humanoidBoneMappingOverrides);
                 Avatar? importedAvatar = avatarImport.Avatar;
+                GameObject? importedHumanoidProxyRoot = avatarImport.ProxyRoot;
                 string avatarReadiness = avatarImport.Readiness;
                 string avatarDiagnostic = avatarImport.Diagnostic;
+
+                if (animationType == MmdPmxAnimationType.Humanoid && importedHumanoidProxyRoot != null)
+                {
+                    importedHumanoidProxyRoot.transform.SetParent(
+                        generatedAssets.Root.transform,
+                        worldPositionStays: false);
+                    ClearImportHierarchyHideFlags(importedHumanoidProxyRoot.transform);
+                }
 
                 asset.ApplyHumanoidAvatarImportSummary(
                     animationType.ToString(),
@@ -118,6 +127,26 @@ namespace Mmd.Editor
                     avatarReadiness,
                     avatarDiagnostic,
                     avatarImport.MappingDiagnostics);
+
+                MmdPmxGenericAvatarImportBuilder.MmdPmxGenericAvatarImportResult genericAvatarImport =
+                    MmdPmxGenericAvatarImportBuilder.TryBuildGenericAvatar(
+                        generatedAssets.Root,
+                        model.name,
+                        shouldBuildGeneric: animationType == MmdPmxAnimationType.Generic,
+                        animationTypeLabel: animationType.ToString(),
+                        rootMotionTransformName: string.Empty);
+                Avatar? genericAvatar = genericAvatarImport.Avatar;
+
+                ConfigureImportedAnimator(
+                    generatedAssets.Root,
+                    animationType,
+                    importedAvatar,
+                    genericAvatar);
+
+                if (animationType == MmdPmxAnimationType.Generic && genericAvatar == null)
+                {
+                    ctx.LogImportWarning(genericAvatarImport.Diagnostic);
+                }
 
                 ctx.AddObjectToAsset("PMX", asset);
                 ctx.AddObjectToAsset("Mesh", importedMesh);
@@ -130,6 +159,11 @@ namespace Mmd.Editor
                 if (importedAvatar != null)
                 {
                     ctx.AddObjectToAsset("Avatar", importedAvatar);
+                }
+
+                if (genericAvatar != null)
+                {
+                    ctx.AddObjectToAsset("GenericAvatar", genericAvatar);
                 }
 
                 ctx.SetMainObject(generatedAssets.Root);
@@ -148,6 +182,40 @@ namespace Mmd.Editor
         private static float NormalizeImportScale(float value)
         {
             return float.IsFinite(value) && value > 0.0f ? value : 1.0f;
+        }
+
+        private static Animator? ConfigureImportedAnimator(
+            GameObject root,
+            MmdPmxAnimationType importedAnimationType,
+            Avatar? humanoidAvatar,
+            Avatar? genericAvatar)
+        {
+            if (importedAnimationType == MmdPmxAnimationType.None)
+            {
+                return null;
+            }
+
+            Animator? animator = root.GetComponent<Animator>();
+            if (animator == null)
+            {
+                animator = root.AddComponent<Animator>();
+            }
+
+            animator.runtimeAnimatorController = null;
+            animator.avatar = importedAnimationType == MmdPmxAnimationType.Humanoid
+                ? humanoidAvatar
+                : genericAvatar;
+            return animator;
+        }
+
+        private static void ClearImportHierarchyHideFlags(Transform root)
+        {
+            root.gameObject.hideFlags = HideFlags.None;
+            root.hideFlags = HideFlags.None;
+            foreach (Transform child in root)
+            {
+                ClearImportHierarchyHideFlags(child);
+            }
         }
     }
 }
