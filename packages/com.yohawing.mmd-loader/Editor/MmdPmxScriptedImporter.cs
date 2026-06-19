@@ -116,7 +116,8 @@ namespace Mmd.Editor
                     animationType.ToString(),
                     importedAvatar,
                     avatarReadiness,
-                    avatarDiagnostic);
+                    avatarDiagnostic,
+                    avatarImport.MappingDiagnostics);
 
                 ctx.AddObjectToAsset("PMX", asset);
                 ctx.AddObjectToAsset("Mesh", importedMesh);

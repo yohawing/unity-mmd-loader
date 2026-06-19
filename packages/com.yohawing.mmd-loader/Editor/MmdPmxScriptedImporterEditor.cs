@@ -23,6 +23,7 @@ namespace Mmd.Editor
 
         private bool toonShaderSettingsExpanded = true;
         private bool humanoidMappingOverridesExpanded;
+        private bool humanoidMappingDiagnosticsExpanded = true;
 
         private int selectedTab;
         private static readonly string[] TabNames = { "Model", "Rig", "Materials" };
@@ -192,6 +193,8 @@ namespace Mmd.Editor
                                 : asset.HumanoidAvatarDiagnostic,
                             MessageType.Info);
                     }
+
+                    DrawHumanoidMappingDiagnostics(asset);
                 }
             }
             else if (asset == null)
@@ -200,6 +203,90 @@ namespace Mmd.Editor
             }
 
             DrawPendingImportSettingsWarning(HasModified());
+        }
+
+        private void DrawHumanoidMappingDiagnostics(MmdPmxAsset asset)
+        {
+            EditorGUILayout.Space();
+            humanoidMappingDiagnosticsExpanded = EditorGUILayout.Foldout(
+                humanoidMappingDiagnosticsExpanded,
+                "Humanoid Bone Mapping Diagnostics",
+                toggleOnLabelClick: true);
+            if (!humanoidMappingDiagnosticsExpanded)
+            {
+                return;
+            }
+
+            MmdHumanoidBoneMappingDiagnosticSummary summary = asset.HumanoidBoneMappingDiagnostics;
+            using (new EditorGUI.DisabledScope(true))
+            {
+                EditorGUILayout.TextField("Readiness", summary.Readiness);
+            }
+
+            DrawMissingRequiredBones(summary);
+            DrawMappedHumanoidBones(summary);
+            DrawConflictDiagnostics(summary);
+        }
+
+        private static void DrawMissingRequiredBones(MmdHumanoidBoneMappingDiagnosticSummary summary)
+        {
+            if (summary.MissingRequiredBones.Count == 0)
+            {
+                EditorGUILayout.HelpBox("All required Humanoid bones are mapped.", MessageType.Info);
+                return;
+            }
+
+            EditorGUILayout.HelpBox(
+                "Missing required Humanoid bones prevent a valid Avatar. Add manual overrides for these targets.",
+                MessageType.Warning);
+            foreach (MmdHumanoidMissingRequiredBone missing in summary.MissingRequiredBones)
+            {
+                EditorGUILayout.LabelField(
+                    missing.HumanBone.ToString(),
+                    string.IsNullOrWhiteSpace(missing.ExpectedMmdBoneName)
+                        ? "(expected MMD bone unknown)"
+                        : "Expected MMD bone: " + missing.ExpectedMmdBoneName,
+                    EditorStyles.boldLabel);
+            }
+        }
+
+        private static void DrawMappedHumanoidBones(MmdHumanoidBoneMappingDiagnosticSummary summary)
+        {
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Mapped Bones", EditorStyles.boldLabel);
+            if (summary.MappedEntries.Count == 0)
+            {
+                EditorGUILayout.LabelField("No mapped Humanoid bones.");
+                return;
+            }
+
+            foreach (MmdHumanoidBoneMappingDiagnosticEntry entry in summary.MappedEntries)
+            {
+                string mmdName = string.IsNullOrWhiteSpace(entry.MmdBoneName)
+                    ? "(unnamed MMD bone)"
+                    : entry.MmdBoneName + "#" + entry.MmdBoneIndex;
+                string source = string.IsNullOrWhiteSpace(entry.Source) ? "Automatic" : entry.Source;
+                string suffix = entry.Required ? "required" : "optional";
+                DrawReadOnlySelectableText(
+                    entry.HumanBone.ToString(),
+                    mmdName + "  [" + source + ", " + suffix + "]");
+            }
+        }
+
+        private static void DrawConflictDiagnostics(MmdHumanoidBoneMappingDiagnosticSummary summary)
+        {
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Conflicts / Suppressed Overrides", EditorStyles.boldLabel);
+            if (summary.ConflictDiagnostics.Count == 0)
+            {
+                EditorGUILayout.LabelField("No conflicts or suppressed override entries.");
+                return;
+            }
+
+            foreach (string diagnostic in summary.ConflictDiagnostics)
+            {
+                EditorGUILayout.HelpBox(diagnostic, MessageType.Warning);
+            }
         }
 
         private void DrawHumanoidMappingOverrides(MmdPmxAsset? asset)

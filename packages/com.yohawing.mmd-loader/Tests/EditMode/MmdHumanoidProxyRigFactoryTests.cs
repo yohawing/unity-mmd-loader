@@ -280,6 +280,70 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void MappingDiagnosticSummaryClassifiesManualSourceMissingRequiredAndSuppressedOverrides()
+        {
+            MmdModelDefinition model = CreateHumanoidMappingModel(
+                "下半身",
+                "上半身",
+                "首",
+                "custom-head",
+                "左足",
+                "左ひざ",
+                "左足首",
+                "右足",
+                "右ひざ",
+                "右足首",
+                "左腕",
+                "左ひじ",
+                "左手首",
+                "右腕",
+                "右ひじ",
+                "右手首");
+
+            var overrides = new[]
+            {
+                new MmdHumanoidBoneMappingOverride("custom-head", HumanBodyBones.Head),
+                new MmdHumanoidBoneMappingOverride("custom-head", HumanBodyBones.Spine),
+                new MmdHumanoidBoneMappingOverride("does-not-exist", HumanBodyBones.LeftEye),
+            };
+
+            MmdHumanoidProxyRigResult result = MmdHumanoidProxyRigFactory.CreateProxyRig(
+                model,
+                mappingOverrides: overrides);
+
+            try
+            {
+                MmdHumanoidBoneMappingDiagnosticSummary summary =
+                    MmdHumanoidBoneMappingDiagnosticsBuilder.Build(result, overrides);
+
+                Assert.That(summary.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.MissingRequiredReadiness));
+                Assert.That(
+                    summary.MappedEntries.Any(entry =>
+                        entry.HumanBone == HumanBodyBones.Head
+                        && entry.MmdBoneName == "custom-head"
+                        && entry.Source == MmdHumanoidBoneMappingDiagnosticsBuilder.ManualOverrideSource),
+                    Is.True,
+                    "The final Head mapping must be labeled as manual override.");
+                Assert.That(
+                    summary.MissingRequiredBones.Any(missing => missing.HumanBone == HumanBodyBones.Spine),
+                    Is.True,
+                    "The duplicate-source Spine override suppresses the automatic Spine mapping, so Spine is missing.");
+                Assert.That(
+                    string.Join("\n", summary.ConflictDiagnostics),
+                    Does.Contain("manual-override: skipped duplicate MMD bone 'custom-head'#3")
+                        .And.Contain("manual-override: ignored missing MMD bone 'does-not-exist' for LeftEye")
+                        .And.Contain("manual-overrides: applied=2 ignored=1"));
+            }
+            finally
+            {
+                if (result.ProxyRoot != null)
+                {
+                    Object.DestroyImmediate(result.ProxyRoot);
+                }
+            }
+        }
+
+        [Test]
         public void ProxyRigDoesNotCreateAvatarOrAnimatorOrStoreAvatarFields()
         {
             // Arrange

@@ -288,6 +288,19 @@ namespace Mmd
         public bool Required { get; }
     }
 
+    public readonly struct MmdHumanoidRequiredBoneInfo
+    {
+        public MmdHumanoidRequiredBoneInfo(HumanBodyBones humanBone, string mmdBoneName)
+        {
+            HumanBone = humanBone;
+            MmdBoneName = mmdBoneName ?? string.Empty;
+        }
+
+        public HumanBodyBones HumanBone { get; }
+
+        public string MmdBoneName { get; }
+    }
+
     [Serializable]
     public sealed class MmdHumanoidBoneMappingOverride
     {
@@ -562,6 +575,18 @@ namespace Mmd
         }
 
         public static int RequiredHumanBoneCount => RequiredRules.Length;
+
+        internal static MmdHumanoidRequiredBoneInfo[] GetRequiredHumanBones()
+        {
+            var required = new MmdHumanoidRequiredBoneInfo[RequiredRules.Length];
+            for (int i = 0; i < RequiredRules.Length; i++)
+            {
+                BoneRule rule = RequiredRules[i];
+                required[i] = new MmdHumanoidRequiredBoneInfo(rule.HumanBone, rule.MmdBoneName);
+            }
+
+            return required;
+        }
 
         private static Dictionary<HumanBodyBones, List<MmdHumanoidBoneMappingMatch>> CreateMatchBuckets(BoneRule[] rules)
         {

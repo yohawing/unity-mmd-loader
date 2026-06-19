@@ -26,12 +26,18 @@ namespace Mmd.UnityIntegration
             public Avatar? Avatar { get; }
             public string Readiness { get; }
             public string Diagnostic { get; }
+            public MmdHumanoidBoneMappingDiagnosticSummary MappingDiagnostics { get; }
 
-            public MmdPmxHumanoidAvatarImportResult(Avatar? avatar, string readiness, string diagnostic)
+            public MmdPmxHumanoidAvatarImportResult(
+                Avatar? avatar,
+                string readiness,
+                string diagnostic,
+                MmdHumanoidBoneMappingDiagnosticSummary? mappingDiagnostics = null)
             {
                 Avatar = avatar;
                 Readiness = readiness ?? string.Empty;
                 Diagnostic = diagnostic ?? string.Empty;
+                MappingDiagnostics = mappingDiagnostics ?? MmdHumanoidBoneMappingDiagnosticSummary.Empty;
             }
         }
 
@@ -58,12 +64,14 @@ namespace Mmd.UnityIntegration
             MmdHumanoidProxyRigResult proxyRig = MmdHumanoidProxyRigFactory.CreateProxyRig(
                 asset,
                 mappingOverrides: mappingOverrides);
+            MmdHumanoidBoneMappingDiagnosticSummary mappingDiagnostics =
+                MmdHumanoidBoneMappingDiagnosticsBuilder.Build(proxyRig, mappingOverrides);
             string readiness = proxyRig.Readiness;
             string diagnostic = string.Join("; ", proxyRig.Diagnostics);
 
             if (proxyRig.ProxyRoot == null)
             {
-                return new MmdPmxHumanoidAvatarImportResult(null, readiness, diagnostic);
+                return new MmdPmxHumanoidAvatarImportResult(null, readiness, diagnostic, mappingDiagnostics);
             }
 
             try
@@ -76,7 +84,7 @@ namespace Mmd.UnityIntegration
                     readiness = string.Equals(proxyRig.Readiness, MmdHumanoidSetupAsset.ReadyReadiness, System.StringComparison.Ordinal)
                         ? "AvatarInvalid"
                         : proxyRig.Readiness;
-                    return new MmdPmxHumanoidAvatarImportResult(null, readiness, diagnostic);
+                    return new MmdPmxHumanoidAvatarImportResult(null, readiness, diagnostic, mappingDiagnostics);
                 }
 
                 Avatar avatar = avatarResult.Avatar;
@@ -85,7 +93,7 @@ namespace Mmd.UnityIntegration
                     ? "Avatar"
                     : modelName + " Avatar";
                 readiness = MmdHumanoidSetupAsset.ReadyReadiness;
-                return new MmdPmxHumanoidAvatarImportResult(avatar, readiness, diagnostic);
+                return new MmdPmxHumanoidAvatarImportResult(avatar, readiness, diagnostic, mappingDiagnostics);
             }
             finally
             {
