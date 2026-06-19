@@ -9,10 +9,9 @@ namespace Mmd
 {
     /// <summary>
     /// Result of creating a hidden Humanoid proxy rig from an MMD model definition.
-    /// The proxy rig is a Transform hierarchy matching mapped HumanBodyBones only.
-    /// Transform localPosition is derived from MmdBoneDefinition.origin with
-    /// MMD->Unity conversion [-x, y, -z]. No Avatar, Animator, or mapping assets
-    /// are created.
+    /// The proxy rig is a Transform hierarchy matching mapped HumanBodyBones only,
+    /// parented with Unity Humanoid relationships. No Avatar, Animator, or mapping
+    /// assets are created.
     /// </summary>
     public sealed class MmdHumanoidProxyRigResult
     {
@@ -92,14 +91,14 @@ namespace Mmd
     }
 
     /// <summary>
-    /// Creates a hidden Unity Transform hierarchy that mirrors the HumanBodyBones
-    /// detected from an MMD model's bone list. No Avatar, Animator, or mapping assets
-    /// are created.
+    /// Creates a hidden Unity Transform hierarchy using Unity Humanoid parent
+    /// relationships for the HumanBodyBones detected from an MMD model's bone
+    /// list. No Avatar, Animator, or mapping assets are created.
     ///
-    /// Transform localPosition is set from MmdBoneDefinition.origin with
-    /// MMD->Unity conversion [-x, y, -z]. When the parent bone is also mapped,
-    /// localPosition is parent-relative (origin child minus origin parent in Unity space).
-    /// Bones with null or short origin arrays fall back to Vector3.zero.
+    /// Transform world position is set from MmdBoneDefinition.origin with
+    /// MMD->Unity conversion [-x, y, -z], then preserved while reparenting into
+    /// the Humanoid hierarchy. MMD helper bones and unmapped MMD parents are not
+    /// mirrored into the proxy rig.
     ///
     /// Design: Dual Rig 方式の Hidden Humanoid Proxy Rig 生成を担当する。
     /// 生成された Transform 階層は HumanBodyBones 名にマッピングされた MMD ボーンのみを含む。
@@ -185,10 +184,10 @@ namespace Mmd
             }
 
             // Step 3: Build the proxy Transform hierarchy.
-            // We build a hierarchy that mirrors the parent-child relationships of the
-            // MMD bones, but only includes bones that were successfully mapped.
+            // The hidden proxy uses Unity Humanoid parent relationships, not the
+            // MMD/imported hierarchy. This keeps helpers such as center/groove/waist
+            // out of the Avatar skeleton while preserving source world pose.
             var boneMap = new Dictionary<HumanBodyBones, Transform>();
-            var mmdBoneIndexToTransform = new Dictionary<int, Transform>();
             var mmdBoneIndexToUnityPos = new Dictionary<int, Vector3>();
 
             GameObject root = new GameObject(proxyRootName);
@@ -204,43 +203,30 @@ namespace Mmd
                 boneTransform.SetParent(root.transform, worldPositionStays: false);
                 boneTransform.hideFlags = HideFlags.HideInHierarchy;
                 boneMap[match.HumanBone] = boneTransform;
-                mmdBoneIndexToTransform[match.MmdBoneIndex] = boneTransform;
 
                 // Record Unity-space origin position for localPosition calculation.
                 MmdBoneDefinition? boneDef = FindBoneByIndex(model, match.MmdBoneIndex);
                 Vector3 unityPos = MmdOriginToUnityPosition(boneDef?.origin);
                 mmdBoneIndexToUnityPos[match.MmdBoneIndex] = unityPos;
+                boneTransform.SetPositionAndRotation(unityPos, Quaternion.identity);
+                boneTransform.localScale = Vector3.one;
             }
 
-            // Second pass: set parent-child relationships based on MMD bone parentIndex
-            // and compute parent-relative localPosition from origin.
-            foreach (MmdHumanoidBoneMappingMatch match in matches)
+            foreach (MmdHumanoidBoneMappingMatch match in EnumerateMatchesInHumanoidOrder(matches))
             {
                 if (!boneMap.TryGetValue(match.HumanBone, out Transform currentTransform))
                     continue;
 
-                MmdBoneDefinition? boneDef = FindBoneByIndex(model, match.MmdBoneIndex);
-                if (boneDef == null)
-                    continue;
-
-                // Compute localPosition from origin.
                 Vector3 myUnityPos = mmdBoneIndexToUnityPos[match.MmdBoneIndex];
+                Quaternion myUnityRot = Quaternion.identity;
+                Transform parentTransform = ResolveHumanoidParent(match.HumanBone, boneMap, root.transform);
 
-                if (boneDef.parentIndex >= 0 &&
-                    mmdBoneIndexToTransform.TryGetValue(boneDef.parentIndex, out Transform parentTransform))
-                {
-                    // Reparent under the mapped parent.
-                    currentTransform.SetParent(parentTransform, worldPositionStays: false);
-                    // Parent-relative: child origin minus parent origin in Unity space.
-                    Vector3 parentUnityPos = mmdBoneIndexToUnityPos[boneDef.parentIndex];
-                    currentTransform.localPosition = myUnityPos - parentUnityPos;
-                }
-                else
-                {
-                    // No mapped parent; position relative to root (origin directly).
-                    currentTransform.localPosition = myUnityPos;
-                }
+                currentTransform.SetPositionAndRotation(myUnityPos, myUnityRot);
+                currentTransform.SetParent(parentTransform, worldPositionStays: true);
+                currentTransform.SetPositionAndRotation(myUnityPos, myUnityRot);
+                currentTransform.localScale = Vector3.one;
             }
+            ApplyHumanoidSiblingOrder(root.transform, boneMap);
 
             // Build combined diagnostics.
             int originCount = 0;
@@ -359,7 +345,7 @@ namespace Mmd
         /// Create a hidden proxy rig from imported hierarchy bone transforms.
         /// </summary>
         /// <param name="bones">Ordered transform list matching MMD bone indices.</param>
-        /// <param name="hierarchyRoot">Hierarchy root transform used when no mapped parent exists.</param>
+        /// <param name="hierarchyRoot">Hierarchy root transform used as the proxy rig root pose.</param>
         /// <param name="proxyRootName">Name for the proxy root GameObject.</param>
         /// <returns>A result containing the proxy rig root and related mapping info.</returns>
         internal static MmdHumanoidProxyRigResult CreateProxyRigFromBoneTransforms(
@@ -379,15 +365,10 @@ namespace Mmd
             }
 
             var sourceBoneNames = new string[bones.Count];
-            var indexByTransform = new Dictionary<Transform, int>(bones.Count);
             for (int i = 0; i < bones.Count; i++)
             {
                 Transform? bone = bones[i];
                 sourceBoneNames[i] = bone != null ? bone.name : string.Empty;
-                if (bone != null)
-                {
-                    indexByTransform[bone] = i;
-                }
             }
 
             MmdHumanoidBoneMappingReport report = MmdHumanoidBoneMappingEvaluator.EvaluateBoneNames(sourceBoneNames);
@@ -445,12 +426,12 @@ namespace Mmd
             }
 
             var boneMap = new Dictionary<HumanBodyBones, Transform>();
-            var proxyBySourceIndex = new Dictionary<int, Transform>(bones.Count);
             var root = new GameObject(proxyRootName);
             root.hideFlags = HideFlags.HideInHierarchy;
             root.SetActive(false);
             root.transform.SetPositionAndRotation(hierarchyRoot.position, hierarchyRoot.rotation);
             root.transform.localScale = hierarchyRoot.localScale;
+            var sourceWorldPoseByHumanBone = new Dictionary<HumanBodyBones, (Vector3 position, Quaternion rotation, Vector3 scale)>();
 
             foreach (MmdHumanoidBoneMappingMatch match in matches)
             {
@@ -460,54 +441,27 @@ namespace Mmd
                 Transform proxyBoneTransform = proxyBone.transform;
                 proxyBoneTransform.SetParent(root.transform, worldPositionStays: false);
                 boneMap[match.HumanBone] = proxyBoneTransform;
-                proxyBySourceIndex[match.MmdBoneIndex] = proxyBoneTransform;
-            }
-
-            foreach (MmdHumanoidBoneMappingMatch match in matches)
-            {
-                Transform sourceBone = bones[match.MmdBoneIndex];
-                if (!boneMap.TryGetValue(match.HumanBone, out Transform proxyBoneTransform))
-                {
-                    continue;
-                }
-
-                Transform? mappedParent = null;
-                for (Transform parent = sourceBone.parent; parent != null; parent = parent.parent)
-                {
-                    if (parent == hierarchyRoot)
-                    {
-                        break;
-                    }
-
-                    if (indexByTransform.TryGetValue(parent, out int parentIndex)
-                        && proxyBySourceIndex.TryGetValue(parentIndex, out Transform parentProxy))
-                    {
-                        mappedParent = parentProxy;
-                        break;
-                    }
-                }
-
-                if (mappedParent != null)
-                {
-                    proxyBoneTransform.SetParent(mappedParent, worldPositionStays: false);
-                }
-                else
-                {
-                    proxyBoneTransform.SetParent(root.transform, worldPositionStays: false);
-                }
-            }
-
-            foreach (MmdHumanoidBoneMappingMatch match in matches)
-            {
-                Transform sourceBone = bones[match.MmdBoneIndex];
-                if (!boneMap.TryGetValue(match.HumanBone, out Transform proxyBoneTransform))
-                {
-                    continue;
-                }
-
+                sourceWorldPoseByHumanBone[match.HumanBone] =
+                    (sourceBone.position, sourceBone.rotation, sourceBone.localScale);
                 proxyBoneTransform.SetPositionAndRotation(sourceBone.position, sourceBone.rotation);
                 proxyBoneTransform.localScale = sourceBone.localScale;
             }
+
+            foreach (MmdHumanoidBoneMappingMatch match in EnumerateMatchesInHumanoidOrder(matches))
+            {
+                if (!boneMap.TryGetValue(match.HumanBone, out Transform proxyBoneTransform))
+                {
+                    continue;
+                }
+
+                Transform parentTransform = ResolveHumanoidParent(match.HumanBone, boneMap, root.transform);
+                (Vector3 position, Quaternion rotation, Vector3 scale) pose = sourceWorldPoseByHumanBone[match.HumanBone];
+                proxyBoneTransform.SetPositionAndRotation(pose.position, pose.rotation);
+                proxyBoneTransform.SetParent(parentTransform, worldPositionStays: true);
+                proxyBoneTransform.SetPositionAndRotation(pose.position, pose.rotation);
+                proxyBoneTransform.localScale = pose.scale;
+            }
+            ApplyHumanoidSiblingOrder(root.transform, boneMap);
 
             diagnostics.Add(
                 "proxy-rig: created " + boneMap.Count + " bone transforms, root hidden");
@@ -518,6 +472,240 @@ namespace Mmd
                 matches,
                 readiness,
                 diagnostics.ToArray());
+        }
+
+        private static readonly HumanBodyBones[] HumanoidTraversalOrder =
+        {
+            HumanBodyBones.Hips,
+            HumanBodyBones.Spine,
+            HumanBodyBones.Chest,
+            HumanBodyBones.Neck,
+            HumanBodyBones.Head,
+            HumanBodyBones.LeftEye,
+            HumanBodyBones.RightEye,
+            HumanBodyBones.LeftShoulder,
+            HumanBodyBones.LeftUpperArm,
+            HumanBodyBones.LeftLowerArm,
+            HumanBodyBones.LeftHand,
+            HumanBodyBones.LeftThumbProximal,
+            HumanBodyBones.LeftThumbIntermediate,
+            HumanBodyBones.LeftThumbDistal,
+            HumanBodyBones.LeftIndexProximal,
+            HumanBodyBones.LeftIndexIntermediate,
+            HumanBodyBones.LeftIndexDistal,
+            HumanBodyBones.LeftMiddleProximal,
+            HumanBodyBones.LeftMiddleIntermediate,
+            HumanBodyBones.LeftMiddleDistal,
+            HumanBodyBones.LeftRingProximal,
+            HumanBodyBones.LeftRingIntermediate,
+            HumanBodyBones.LeftRingDistal,
+            HumanBodyBones.LeftLittleProximal,
+            HumanBodyBones.LeftLittleIntermediate,
+            HumanBodyBones.LeftLittleDistal,
+            HumanBodyBones.RightShoulder,
+            HumanBodyBones.RightUpperArm,
+            HumanBodyBones.RightLowerArm,
+            HumanBodyBones.RightHand,
+            HumanBodyBones.RightThumbProximal,
+            HumanBodyBones.RightThumbIntermediate,
+            HumanBodyBones.RightThumbDistal,
+            HumanBodyBones.RightIndexProximal,
+            HumanBodyBones.RightIndexIntermediate,
+            HumanBodyBones.RightIndexDistal,
+            HumanBodyBones.RightMiddleProximal,
+            HumanBodyBones.RightMiddleIntermediate,
+            HumanBodyBones.RightMiddleDistal,
+            HumanBodyBones.RightRingProximal,
+            HumanBodyBones.RightRingIntermediate,
+            HumanBodyBones.RightRingDistal,
+            HumanBodyBones.RightLittleProximal,
+            HumanBodyBones.RightLittleIntermediate,
+            HumanBodyBones.RightLittleDistal,
+            HumanBodyBones.LeftUpperLeg,
+            HumanBodyBones.LeftLowerLeg,
+            HumanBodyBones.LeftFoot,
+            HumanBodyBones.LeftToes,
+            HumanBodyBones.RightUpperLeg,
+            HumanBodyBones.RightLowerLeg,
+            HumanBodyBones.RightFoot,
+            HumanBodyBones.RightToes,
+        };
+
+        private static IEnumerable<MmdHumanoidBoneMappingMatch> EnumerateMatchesInHumanoidOrder(
+            IReadOnlyList<MmdHumanoidBoneMappingMatch> matches)
+        {
+            var byHumanBone = new Dictionary<HumanBodyBones, MmdHumanoidBoneMappingMatch>();
+            foreach (MmdHumanoidBoneMappingMatch match in matches)
+            {
+                byHumanBone[match.HumanBone] = match;
+            }
+
+            var emitted = new HashSet<HumanBodyBones>();
+            foreach (HumanBodyBones humanBone in HumanoidTraversalOrder)
+            {
+                if (byHumanBone.TryGetValue(humanBone, out MmdHumanoidBoneMappingMatch match))
+                {
+                    emitted.Add(humanBone);
+                    yield return match;
+                }
+            }
+
+            foreach (MmdHumanoidBoneMappingMatch match in matches)
+            {
+                if (emitted.Add(match.HumanBone))
+                {
+                    yield return match;
+                }
+            }
+        }
+
+        private static Transform ResolveHumanoidParent(
+            HumanBodyBones humanBone,
+            IReadOnlyDictionary<HumanBodyBones, Transform> boneMap,
+            Transform root)
+        {
+            return TryResolveHumanoidParent(humanBone, boneMap, out Transform? parent)
+                ? parent
+                : root;
+        }
+
+        private static bool TryResolveHumanoidParent(
+            HumanBodyBones humanBone,
+            IReadOnlyDictionary<HumanBodyBones, Transform> boneMap,
+            out Transform? parent)
+        {
+            parent = null;
+            switch (humanBone)
+            {
+                case HumanBodyBones.Hips:
+                    return false;
+                case HumanBodyBones.Spine:
+                    return boneMap.TryGetValue(HumanBodyBones.Hips, out parent);
+                case HumanBodyBones.Chest:
+                    return boneMap.TryGetValue(HumanBodyBones.Spine, out parent);
+                case HumanBodyBones.Neck:
+                    return TryResolveTorsoParent(boneMap, out parent);
+                case HumanBodyBones.Head:
+                    return boneMap.TryGetValue(HumanBodyBones.Neck, out parent);
+                case HumanBodyBones.LeftEye:
+                case HumanBodyBones.RightEye:
+                    return boneMap.TryGetValue(HumanBodyBones.Head, out parent);
+                case HumanBodyBones.LeftShoulder:
+                case HumanBodyBones.RightShoulder:
+                    return TryResolveTorsoParent(boneMap, out parent);
+                case HumanBodyBones.LeftUpperArm:
+                    return boneMap.TryGetValue(HumanBodyBones.LeftShoulder, out parent)
+                           || TryResolveTorsoParent(boneMap, out parent);
+                case HumanBodyBones.LeftLowerArm:
+                    return boneMap.TryGetValue(HumanBodyBones.LeftUpperArm, out parent);
+                case HumanBodyBones.LeftHand:
+                    return boneMap.TryGetValue(HumanBodyBones.LeftLowerArm, out parent);
+                case HumanBodyBones.RightUpperArm:
+                    return boneMap.TryGetValue(HumanBodyBones.RightShoulder, out parent)
+                           || TryResolveTorsoParent(boneMap, out parent);
+                case HumanBodyBones.RightLowerArm:
+                    return boneMap.TryGetValue(HumanBodyBones.RightUpperArm, out parent);
+                case HumanBodyBones.RightHand:
+                    return boneMap.TryGetValue(HumanBodyBones.RightLowerArm, out parent);
+                case HumanBodyBones.LeftUpperLeg:
+                case HumanBodyBones.RightUpperLeg:
+                    return boneMap.TryGetValue(HumanBodyBones.Hips, out parent);
+                case HumanBodyBones.LeftLowerLeg:
+                    return boneMap.TryGetValue(HumanBodyBones.LeftUpperLeg, out parent);
+                case HumanBodyBones.LeftFoot:
+                    return boneMap.TryGetValue(HumanBodyBones.LeftLowerLeg, out parent);
+                case HumanBodyBones.LeftToes:
+                    return boneMap.TryGetValue(HumanBodyBones.LeftFoot, out parent);
+                case HumanBodyBones.RightLowerLeg:
+                    return boneMap.TryGetValue(HumanBodyBones.RightUpperLeg, out parent);
+                case HumanBodyBones.RightFoot:
+                    return boneMap.TryGetValue(HumanBodyBones.RightLowerLeg, out parent);
+                case HumanBodyBones.RightToes:
+                    return boneMap.TryGetValue(HumanBodyBones.RightFoot, out parent);
+                case HumanBodyBones.LeftThumbProximal:
+                case HumanBodyBones.LeftIndexProximal:
+                case HumanBodyBones.LeftMiddleProximal:
+                case HumanBodyBones.LeftRingProximal:
+                case HumanBodyBones.LeftLittleProximal:
+                    return boneMap.TryGetValue(HumanBodyBones.LeftHand, out parent);
+                case HumanBodyBones.LeftThumbIntermediate:
+                    return boneMap.TryGetValue(HumanBodyBones.LeftThumbProximal, out parent);
+                case HumanBodyBones.LeftThumbDistal:
+                    return boneMap.TryGetValue(HumanBodyBones.LeftThumbIntermediate, out parent);
+                case HumanBodyBones.LeftIndexIntermediate:
+                    return boneMap.TryGetValue(HumanBodyBones.LeftIndexProximal, out parent);
+                case HumanBodyBones.LeftIndexDistal:
+                    return boneMap.TryGetValue(HumanBodyBones.LeftIndexIntermediate, out parent);
+                case HumanBodyBones.LeftMiddleIntermediate:
+                    return boneMap.TryGetValue(HumanBodyBones.LeftMiddleProximal, out parent);
+                case HumanBodyBones.LeftMiddleDistal:
+                    return boneMap.TryGetValue(HumanBodyBones.LeftMiddleIntermediate, out parent);
+                case HumanBodyBones.LeftRingIntermediate:
+                    return boneMap.TryGetValue(HumanBodyBones.LeftRingProximal, out parent);
+                case HumanBodyBones.LeftRingDistal:
+                    return boneMap.TryGetValue(HumanBodyBones.LeftRingIntermediate, out parent);
+                case HumanBodyBones.LeftLittleIntermediate:
+                    return boneMap.TryGetValue(HumanBodyBones.LeftLittleProximal, out parent);
+                case HumanBodyBones.LeftLittleDistal:
+                    return boneMap.TryGetValue(HumanBodyBones.LeftLittleIntermediate, out parent);
+                case HumanBodyBones.RightThumbProximal:
+                case HumanBodyBones.RightIndexProximal:
+                case HumanBodyBones.RightMiddleProximal:
+                case HumanBodyBones.RightRingProximal:
+                case HumanBodyBones.RightLittleProximal:
+                    return boneMap.TryGetValue(HumanBodyBones.RightHand, out parent);
+                case HumanBodyBones.RightThumbIntermediate:
+                    return boneMap.TryGetValue(HumanBodyBones.RightThumbProximal, out parent);
+                case HumanBodyBones.RightThumbDistal:
+                    return boneMap.TryGetValue(HumanBodyBones.RightThumbIntermediate, out parent);
+                case HumanBodyBones.RightIndexIntermediate:
+                    return boneMap.TryGetValue(HumanBodyBones.RightIndexProximal, out parent);
+                case HumanBodyBones.RightIndexDistal:
+                    return boneMap.TryGetValue(HumanBodyBones.RightIndexIntermediate, out parent);
+                case HumanBodyBones.RightMiddleIntermediate:
+                    return boneMap.TryGetValue(HumanBodyBones.RightMiddleProximal, out parent);
+                case HumanBodyBones.RightMiddleDistal:
+                    return boneMap.TryGetValue(HumanBodyBones.RightMiddleIntermediate, out parent);
+                case HumanBodyBones.RightRingIntermediate:
+                    return boneMap.TryGetValue(HumanBodyBones.RightRingProximal, out parent);
+                case HumanBodyBones.RightRingDistal:
+                    return boneMap.TryGetValue(HumanBodyBones.RightRingIntermediate, out parent);
+                case HumanBodyBones.RightLittleIntermediate:
+                    return boneMap.TryGetValue(HumanBodyBones.RightLittleProximal, out parent);
+                case HumanBodyBones.RightLittleDistal:
+                    return boneMap.TryGetValue(HumanBodyBones.RightLittleIntermediate, out parent);
+                default:
+                    return false;
+            }
+        }
+
+        private static bool TryResolveTorsoParent(
+            IReadOnlyDictionary<HumanBodyBones, Transform> boneMap,
+            out Transform? parent)
+        {
+            return boneMap.TryGetValue(HumanBodyBones.Chest, out parent)
+                   || boneMap.TryGetValue(HumanBodyBones.Spine, out parent);
+        }
+
+        private static void ApplyHumanoidSiblingOrder(
+            Transform parent,
+            IReadOnlyDictionary<HumanBodyBones, Transform> boneMap)
+        {
+            int siblingIndex = 0;
+            foreach (HumanBodyBones humanBone in HumanoidTraversalOrder)
+            {
+                if (boneMap.TryGetValue(humanBone, out Transform child)
+                    && child.parent == parent)
+                {
+                    child.SetSiblingIndex(siblingIndex);
+                    siblingIndex++;
+                }
+            }
+
+            for (int i = 0; i < parent.childCount; i++)
+            {
+                ApplyHumanoidSiblingOrder(parent.GetChild(i), boneMap);
+            }
         }
 
         /// <summary>
@@ -571,28 +759,43 @@ namespace Mmd
                 scale = root.transform.localScale
             });
 
-            // Proxy bone transforms, preserving local transforms including origin positions.
             var humanBoneList = new List<HumanBone>(boneCount);
-            foreach (KeyValuePair<HumanBodyBones, Transform> kvp in proxyRig.BoneMap)
+            var humanBoneByTransform = new Dictionary<Transform, HumanBodyBones>(boneCount);
+            var emittedHumanBones = new HashSet<HumanBodyBones>();
+            foreach (MmdHumanoidBoneMappingMatch match in EnumerateMatchesInHumanoidOrder(proxyRig.Matches))
             {
-                string humanName = kvp.Key.ToString();
-                Transform t = kvp.Value;
+                if (!proxyRig.BoneMap.TryGetValue(match.HumanBone, out Transform t))
+                {
+                    continue;
+                }
 
+                emittedHumanBones.Add(match.HumanBone);
+                humanBoneByTransform[t] = match.HumanBone;
                 humanBoneList.Add(new HumanBone
                 {
-                    humanName = humanName,
+                    humanName = match.HumanBone.ToString(),
                     boneName = t.name,
                     limit = { useDefaultValues = true }
                 });
+            }
 
-                skeletonList.Add(new SkeletonBone
+            foreach (KeyValuePair<HumanBodyBones, Transform> kvp in proxyRig.BoneMap)
+            {
+                if (!emittedHumanBones.Add(kvp.Key))
                 {
-                    name = t.name,
-                    position = t.localPosition,
-                    rotation = t.localRotation,
-                    scale = t.localScale
+                    continue;
+                }
+
+                humanBoneByTransform[kvp.Value] = kvp.Key;
+                humanBoneList.Add(new HumanBone
+                {
+                    humanName = kvp.Key.ToString(),
+                    boneName = kvp.Value.name,
+                    limit = { useDefaultValues = true }
                 });
             }
+
+            AddSkeletonBonesPreOrder(root.transform, humanBoneByTransform, skeletonList);
 
             humanDescription.human = humanBoneList.ToArray();
             humanDescription.skeleton = skeletonList.ToArray();
@@ -641,6 +844,31 @@ namespace Mmd
             }
 
             return new MmdHumanoidAvatarBuildResult(avatar, diagnostics.ToArray());
+        }
+
+        private static void AddSkeletonBonesPreOrder(
+            Transform parent,
+            IReadOnlyDictionary<Transform, HumanBodyBones> humanBoneByTransform,
+            List<SkeletonBone> skeletonList)
+        {
+            for (int i = 0; i < parent.childCount; i++)
+            {
+                Transform t = parent.GetChild(i);
+                if (!humanBoneByTransform.ContainsKey(t))
+                {
+                    continue;
+                }
+
+                skeletonList.Add(new SkeletonBone
+                {
+                    name = t.name,
+                    position = t.localPosition,
+                    rotation = t.localRotation,
+                    scale = t.localScale
+                });
+
+                AddSkeletonBonesPreOrder(t, humanBoneByTransform, skeletonList);
+            }
         }
 
         /// <summary>
