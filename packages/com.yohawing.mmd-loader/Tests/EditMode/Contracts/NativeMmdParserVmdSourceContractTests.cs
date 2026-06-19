@@ -234,7 +234,7 @@ namespace Mmd.Tests
                             ""position"": [1.0, 2.0, 3.0],
                             ""rotation"": [0.1, 0.2, 0.3],
                             ""interpolation"": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23],
-                            ""viewAngle"": 30,
+                            ""fov"": 30,
                             ""perspective"": true
                         }],
                         ""lightFrames"": [{
@@ -261,6 +261,7 @@ namespace Mmd.Tests
             Assert.That(motion.morphKeyframes[0].morphName, Is.EqualTo("json-smile"));
             Assert.That(motion.modelKeyframes[0].constraintStates[0].boneName, Is.EqualTo("json-leg-ik"));
             Assert.That(motion.cameraKeyframes, Has.Count.EqualTo(1));
+            Assert.That(motion.cameraKeyframes[0].viewAngle, Is.EqualTo(30));
             Assert.That(motion.cameraKeyframes[0].interpolation[23], Is.EqualTo(23));
             Assert.That(motion.lightKeyframes, Has.Count.EqualTo(1));
             CollectionAssert.AreEqual(new[] { 0.4f, 0.5f, 0.6f }, motion.lightKeyframes[0].direction);

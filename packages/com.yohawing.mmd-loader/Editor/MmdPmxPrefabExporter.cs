@@ -13,22 +13,8 @@ namespace Mmd.Editor
 {
     public static class MmdPmxPrefabExporter
     {
-        public const string MenuPath = "Assets/MMD Loader/Create Prefab from PMX";
-
         private const string MeshSuffix = "_mesh.asset";
         private const string MaterialSuffix = "_material";
-
-        [MenuItem(MenuPath)]
-        public static void CreateSelectedPmxPrefabFromMenu()
-        {
-            if (Selection.activeObject is not MmdPmxAsset pmxAsset)
-            {
-                EditorUtility.DisplayDialog("MMD PMX Prefab Export Failed", "Select one imported PMX asset.", "OK");
-                return;
-            }
-
-            CreatePrefabWithFeedback(pmxAsset);
-        }
 
         public static MmdPmxPrefabExportResult? CreatePrefabWithFeedback(MmdPmxAsset pmxAsset)
         {
@@ -50,12 +36,6 @@ namespace Mmd.Editor
                 EditorUtility.DisplayDialog("MMD PMX Prefab Export Failed", ex.Message, "OK");
                 return null;
             }
-        }
-
-        [MenuItem(MenuPath, true)]
-        public static bool ValidateCreateSelectedPmxPrefabFromMenu()
-        {
-            return Selection.activeObject is MmdPmxAsset;
         }
 
         public static string GetDefaultPrefabPath(MmdPmxAsset pmxAsset)

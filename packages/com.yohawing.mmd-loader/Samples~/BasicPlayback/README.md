@@ -23,7 +23,7 @@ PMX/VMD golden path を次の順序で再確認する:
 1. ローカルの PMX / VMD ファイル（有効なモデル/モーション）を Unity の `Assets/` 配下にコピーします。
    同じライセンス条件で扱えるファイルのみ使用してください。
 2. Project ウィンドウから PMX をシーンにドラッグし、配置します。
-3. VMD をインポートし、`Assets/MMD Loader/Add VMD Clip to selected Timeline` または MMD EditorWindow の `Create VMD Timeline Clip` で上記モデルへ Timeline clip を作成します。
+3. VMD をインポートし、配置済み PMX の `MmdUnityPlaybackController` を Timeline の MMD VMD track に binding して、VMD clip の `Motion Asset` へインポート済み VMD を割り当てます。Scene / Hierarchy への drag-and-drop で PMX controller source が作られていることを確認してください。
 4. `Play` して PMX 拡張再生経路で再生を確認します。
 5. 必要に応じて、Humanoid 化している場合のみ `Humanoid Clip bake`（必要なら）を試します。
    試せない環境ではこの工程はスキップし、必須要件として扱いません。

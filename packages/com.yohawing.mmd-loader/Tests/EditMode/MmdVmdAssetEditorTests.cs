@@ -138,6 +138,54 @@ namespace Mmd.Tests
             }
         }
 
+        [Test]
+        public void GetVmdTimelineReadiness_LightOnlyCountsAsCameraTrackMotion()
+        {
+            MmdVmdAsset asset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+            try
+            {
+                byte[] garbage = new byte[] { 0x6C, 0x69, 0x67, 0x68, 0x74 };
+                var injected = new MmdVmdParseSummary("light-only", 120, 0, 0, 0, 0, 0, 3, 0);
+                asset.Initialize(garbage, "light-only.vmd", "light-only.vmd", injected, System.Array.Empty<string>());
+
+                MmdVmdTimelineReadiness r = MmdAssetInspectorUtility.GetVmdTimelineReadiness(asset);
+
+                Assert.That(r.CameraKeyframeCount, Is.EqualTo(0));
+                Assert.That(r.LightKeyframeCount, Is.EqualTo(3));
+                Assert.That(r.SelfShadowKeyframeCount, Is.EqualTo(0));
+                Assert.That(r.HasSceneMotion, Is.True);
+                Assert.That(r.SceneMotionStatus, Does.Contain("Present (camera:0, light:3, selfShadow:0)"));
+            }
+            finally
+            {
+                Object.DestroyImmediate(asset);
+            }
+        }
+
+        [Test]
+        public void GetVmdTimelineReadiness_SelfShadowOnlyIsNotCameraTrackMotionYet()
+        {
+            MmdVmdAsset asset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+            try
+            {
+                byte[] garbage = new byte[] { 0x73, 0x68, 0x64 };
+                var injected = new MmdVmdParseSummary("self-shadow-only", 90, 0, 0, 0, 0, 0, 0, 4);
+                asset.Initialize(garbage, "self-shadow-only.vmd", "self-shadow-only.vmd", injected, System.Array.Empty<string>());
+
+                MmdVmdTimelineReadiness r = MmdAssetInspectorUtility.GetVmdTimelineReadiness(asset);
+
+                Assert.That(r.CameraKeyframeCount, Is.EqualTo(0));
+                Assert.That(r.LightKeyframeCount, Is.EqualTo(0));
+                Assert.That(r.SelfShadowKeyframeCount, Is.EqualTo(4));
+                Assert.That(r.HasSceneMotion, Is.False);
+                Assert.That(r.SceneMotionStatus, Does.Contain("selfShadow:4 deferred"));
+            }
+            finally
+            {
+                Object.DestroyImmediate(asset);
+            }
+        }
+
         // -- Edge cases: in-memory asset with no bytes --------------------------------------------
 
         [Test]

@@ -1,61 +1,49 @@
 # How to use MMD Loader
 
-この手順は、UPM package として `com.yohawing.mmd-loader` を Unity project に追加した利用者向けです。
+This guide is for users who have added `com.yohawing.mmd-loader` to a Unity project as a UPM package.
 
-## 1. Package を追加する
+## 1. Add the package
 
-Unity の **Window > Package Manager** を開き、**Add package from git URL** に以下を入力します。
+![howtouse1](./assets/howtouse1.png)
+
+Open **Window > Package Manager** in Unity, and enter the following into **Add package from git URL**.
 
 ```text
 https://github.com/yohawing/unity-mmd-loader.git?path=packages/com.yohawing.mmd-loader
 ```
 
-Unity version は 6000.4 以降を想定しています。
+The supported Unity version is 6000.4 or newer.
 
-## 2. PMX を import する
+## 2. Import a PMX
 
-`.pmx` ファイルを Unity Project の `Assets/` 配下へ追加します。
+![howtouse2](./assets/howtouse2.png)
 
-import 後、Project window 上では PMX asset として扱われます。package は PMX の元 bytes と import summary を保持しますが、通常 import だけでは mesh、material、texture、prefab などの派生 asset を勝手に永続化しません。
+Add a `.pmx` file under your Unity project's `Assets/` folder.
 
-## 3. Scene に配置する
+A PMX is imported as a model file, just like an FBX. You can adjust the import settings in the Inspector.
 
-Project window から PMX asset を Scene または Hierarchy にドラッグします。
+## 3. Place it in the Scene
 
-これにより、scene playback object が作られます。PMX-only の配置でも playback controller が保持されるため、あとから Timeline に VMD を追加できます。
+![howtouse3](./assets/howtouse3.png)
 
-## 4. VMD を import する
+Drag the PMX asset from the Project window into the Scene or Hierarchy.
 
-`.vmd` ファイルを Unity Project の `Assets/` 配下へ追加します。
+This creates a playback object in the scene. Even when only a PMX is placed, the playback controller is kept, so you can add a VMD to the Timeline later.
 
-VMD asset は Timeline clip や runtime playback source から参照されます。VMD の元 bytes を複製した派生 asset を通常導線で作る設計ではありません。
+## 4. Import a VMD
 
-## 5. Timeline に VMD clip を作る
+![howtouse4](./assets/howtouse4.png)
 
-scene の MMD playback object を Timeline に bind し、VMD Timeline clip を作ります。
+Add a `.vmd` file under your Unity project's `Assets/` folder.
 
-利用できる editor action は package version により変わる可能性がありますが、基本方針は次の通りです。
+A VMD asset is referenced by Timeline clips and by the runtime playback source. It is not designed so that you create a separate, duplicated asset from the original VMD data through the normal workflow.
 
-- PMX asset は scene の playback controller を作る。
-- VMD asset は Timeline clip から参照する。
-- Timeline clip は VMD を AnimationClip に即 bake せず、MMD runtime evaluation に time を渡す。
+Bind the scene's MMD playback object to the Timeline and create a VMD Timeline clip.
 
-## 6. 再生と scrub の違い
+The available editor actions may change between package versions, but the basic idea is as follows.
 
-Play Mode の forward playback では Live physics を使えます。
+- A PMX asset creates the scene's playback controller.
+- A VMD asset is referenced from a Timeline clip.
+- A Timeline clip does not bake the VMD into an AnimationClip right away; it passes the playback time to MMD's runtime evaluation.
 
-Edit Mode の Timeline scrub は random access preview として扱い、physics は off です。これは physics simulation が random access と相性が悪いためです。physics 結果を固定して scrub する workflow は将来の Physics Cache 側で扱います。
-
-## 7. Raw path playback
-
-開発や local diagnostics では `MmdRuntimeImporterComponent` による raw PMX/VMD path playback も使えます。
-
-ただし通常の制作導線では、imported PMX/VMD asset と Timeline binding を優先してください。raw path playback は package 利用者向けの主導線ではなく、検証や移行のための補助経路です。
-
-## 8. Known limitations
-
-- Windows x86_64 native binary のみ packaged です。
-- macOS / Linux native binary は未配布です。
-- PMD、VPD、PMM、accessory、MME effect project は未対応です。
-- full Humanoid bridge、AnimationClip writer output、rayMMD compatibility、experimental physics backends、Compute Skinning は future work です。
-- third-party MMD assets は同梱しません。利用者側でライセンスを確認してください。
+> Credits — Model: [Sour](https://bowlroll.net/file/146103) / Motion: [mobiusP](https://www.nicovideo.jp/watch/sm42576784)

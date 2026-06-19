@@ -12,15 +12,6 @@ namespace Mmd.Editor
     {
         public const string ReadyReadiness = "prerequisites-ready";
         public const string NotReadyReadiness = "prerequisites-not-ready";
-        public const string DeferredReadiness = "writer-deferred";
-
-        public static MmdHumanoidClipConversionPlan Analyze(
-            MmdPmxAsset? pmxAsset,
-            MmdVmdAsset? vmdAsset,
-            MmdHumanoidSetupAsset? setupAsset)
-        {
-            return AnalyzePrerequisites(pmxAsset, vmdAsset, setupAsset);
-        }
 
         public static MmdHumanoidClipConversionPlan AnalyzePrerequisites(
             MmdPmxAsset? pmxAsset,
@@ -152,38 +143,6 @@ namespace Mmd.Editor
             boneKeyframeCount = vmdAsset.BoneKeyframeCount;
             morphKeyframeCount = vmdAsset.MorphKeyframeCount;
             modelKeyframeCount = vmdAsset.ModelKeyframeCount;
-        }
-
-        private static void ValidateVmdMotion(
-            MmdVmdAsset vmdAsset,
-            out MmdMotionDefinition? motion,
-            List<string> diagnostics)
-        {
-            motion = null;
-            if (vmdAsset == null)
-            {
-                diagnostics.Add("motion validation: skipped because vmd asset is null");
-                return;
-            }
-
-            try
-            {
-                motion = vmdAsset.LoadMotion();
-            }
-            catch (Exception ex)
-            {
-                diagnostics.Add("motion validation failed: load exception: " + ex.Message);
-                return;
-            }
-
-            try
-            {
-                MmdMotionValidator.ThrowIfInvalid(motion);
-            }
-            catch (Exception ex)
-            {
-                diagnostics.Add("motion validation failed: structural validation: " + ex.Message);
-            }
         }
 
         private static bool IsAllInputsPresent(

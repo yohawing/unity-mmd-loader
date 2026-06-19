@@ -526,7 +526,7 @@ namespace Mmd.Parser
                     Distance = frame.distance,
                     Position = CopyVec3(frame.position),
                     Rotation = CopyVec3(frame.rotation),
-                    ViewAngle = frame.viewAngle,
+                    ViewAngle = frame.ViewAngle,
                     Perspective = frame.perspective,
                     Interpolation = CopyByteArray(frame.interpolation)
                 };
@@ -1013,8 +1013,11 @@ namespace Mmd.Parser
             public float[] position = Array.Empty<float>();
             public float[] rotation = Array.Empty<float>();
             public int[] interpolation = Array.Empty<int>();
+            public uint fov;
             public uint viewAngle;
             public bool perspective = true;
+
+            public uint ViewAngle => fov != 0u || viewAngle == 0u ? fov : viewAngle;
         }
 
         [Serializable]

@@ -11,49 +11,6 @@ namespace Mmd.Editor
 {
     public static class MmdEditorPmxLoader
     {
-        private const string MenuPath = "Tools/MMD Loader/Load PMX Into Scene";
-        private const string SelectedAssetMenuPath = "Tools/MMD Loader/Load Selected PMX Asset Into Scene";
-
-        [MenuItem(MenuPath)]
-        public static void LoadPmxIntoSceneFromMenu()
-        {
-            string path = EditorUtility.OpenFilePanel("Load PMX Into Scene", string.Empty, "pmx");
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return;
-            }
-
-            try
-            {
-                MmdUnityModelInstance instance = LoadPmxIntoScene(path);
-                Selection.activeGameObject = instance.Root;
-                Debug.LogFormat(
-                    "Loaded PMX into scene: {0}; vertices={1}; indices={2}; submeshes={3}; bones={4}; loadedDiffuseTextures={5}; loadedSphereTextures={6}; loadedToonTextures={7}; missingTextures={8}; unsupportedTextures={9}; skippedSphereTextures={10}; skippedToonTextures={11}",
-                    path,
-                    instance.VertexCount,
-                    instance.IndexCount,
-                    instance.SubmeshCount,
-                    instance.BoneTransforms.Length,
-                    instance.LoadedDiffuseTextureCount,
-                    instance.LoadedSphereTextureCount,
-                    instance.LoadedToonTextureCount,
-                    instance.MissingTextureReferenceCount,
-                    instance.UnsupportedTextureReferenceCount,
-                    instance.SkippedSphereTextureReferenceCount,
-                    instance.SkippedToonTextureReferenceCount);
-
-                foreach (string diagnostic in instance.TextureDiagnostics.Messages)
-                {
-                    Debug.Log("MMD texture diagnostic: " + diagnostic);
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError("Failed to load PMX into scene: " + path + Environment.NewLine + ex);
-                EditorUtility.DisplayDialog("MMD PMX Load Failed", ex.Message, "OK");
-            }
-        }
-
         public static MmdUnityModelInstance LoadPmxIntoScene(string path)
         {
             MmdEditorPmxSceneLoadResult result = MmdEditorVerificationFacade.LoadPmxIntoScene(path);
@@ -61,46 +18,6 @@ namespace Mmd.Editor
             ConfigureRawPathModelSource(instance, result.ModelPath);
             Undo.RegisterCreatedObjectUndo(instance.Root, "Load PMX Into Scene");
             return instance;
-        }
-
-        [MenuItem(SelectedAssetMenuPath)]
-        public static void LoadSelectedPmxAssetIntoSceneFromMenu()
-        {
-            // D1 compatibility: resolve either direct MmdPmxAsset or the GameObject main object
-            // at a .pmx asset path to the metadata MmdPmxAsset sub-asset.
-            MmdPmxAsset? pmxAsset = Selection.activeObject as MmdPmxAsset
-                ?? TryResolveMmdPmxAssetFromMainGameObject(Selection.activeObject);
-            if (pmxAsset == null)
-            {
-                EditorUtility.DisplayDialog("MMD PMX Load Failed", "Select one imported PMX asset.", "OK");
-                return;
-            }
-
-            try
-            {
-                MmdUnityModelInstance instance = LoadPmxIntoScene(pmxAsset);
-                Selection.activeGameObject = instance.Root;
-                Debug.LogFormat(
-                    "Loaded PMX asset into scene: source={0}; vertices={1}; indices={2}; bones={3}",
-                    pmxAsset.SourceId,
-                    instance.VertexCount,
-                    instance.IndexCount,
-                    instance.BoneTransforms.Length);
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError("Failed to load selected PMX asset into scene:" + Environment.NewLine + ex);
-                EditorUtility.DisplayDialog("MMD PMX Load Failed", ex.Message, "OK");
-            }
-        }
-
-        [MenuItem(SelectedAssetMenuPath, true)]
-        public static bool ValidateLoadSelectedPmxAssetIntoSceneFromMenu()
-        {
-            // D1 compatibility: accept either the MmdPmxAsset metadata sub-asset
-            // or the GameObject main object at a .pmx asset path.
-            return Selection.activeObject is MmdPmxAsset
-                || TryResolveMmdPmxAssetFromMainGameObject(Selection.activeObject) != null;
         }
 
         /// <summary>

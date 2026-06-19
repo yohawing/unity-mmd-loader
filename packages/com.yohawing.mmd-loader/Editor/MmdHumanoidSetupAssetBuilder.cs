@@ -9,30 +9,6 @@ namespace Mmd.Editor
 {
     public static class MmdHumanoidSetupAssetBuilder
     {
-        private const string MenuPath = "Assets/MMD Loader/Create Humanoid Setup Asset";
-
-        [MenuItem(MenuPath)]
-        public static void CreateSelectedHumanoidSetupAssetFromMenu()
-        {
-            if (Selection.activeObject is not MmdPmxAsset pmxAsset)
-            {
-                EditorUtility.DisplayDialog("MMD Humanoid Setup Failed", "Select one imported PMX asset.", "OK");
-                return;
-            }
-
-            MmdHumanoidSetupAsset setup = CreateHumanoidSetupAsset(
-                pmxAsset,
-                GetDefaultSetupAssetPath(pmxAsset));
-            Selection.activeObject = setup;
-            EditorGUIUtility.PingObject(setup);
-        }
-
-        [MenuItem(MenuPath, true)]
-        public static bool ValidateCreateSelectedHumanoidSetupAssetFromMenu()
-        {
-            return Selection.activeObject is MmdPmxAsset;
-        }
-
         public static string GetDefaultSetupAssetPath(MmdPmxAsset pmxAsset)
         {
             string pmxPath = AssetDatabase.GetAssetPath(pmxAsset);

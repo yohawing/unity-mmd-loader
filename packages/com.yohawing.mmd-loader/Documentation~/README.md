@@ -1,62 +1,53 @@
-# MMD Loader
+# unity-mmd-loader
 
-Unity package for importing, placing, and playing MMD assets as ordinary Unity
-assets.
+unity-mmd-loader is a plugin for bringing PMX / VMD into Unity.
 
-MMD Loader targets the practical Unity workflow: drag a PMX model into a
-project, place it in a scene, add VMD motion to Timeline, and keep the result on
-Unity's standard authoring rails instead of a separate viewer-only runtime.
+It is designed to deliver a natural import experience that takes advantage of modern Unity, letting you work with PMX models and VMD motions directly in Unity's Project / Scene / Timeline / Runtime.
 
-The package is distributed as `com.yohawing.mmd-loader` and targets Unity 6000.4
-or newer.
+## Features
 
-## Compatibility Matrix
+- **Treat MMD files as standard Unity assets** — PMX / VMD go through Unity's import pipeline instead of a dedicated viewer. Just drop a `.pmx` into your project and it becomes a prefab, with materials and textures set up automatically.
+- **An import experience just like FBX** — Drag and drop into the Project window, then place it into the Scene / Hierarchy. There are no special MMD-specific steps to learn.
+- **Secondary (cloth) physics out of the box** — Imports the rigid bodies and joints defined in the PMX and simulates them in real time with MMD's physics engine during Play Mode forward playback.
+- **Edit VMD on the Timeline** — VMD motions are treated as Timeline clips, so you can use Unity's Timeline directly for blending multiple motions and scene direction. Camera and light VMD are also supported.
+- **MMD-style toon rendering** — URP-based toon shading reproduces MMD shading, including edges, alpha, and textures.
 
-### Formats
+## Support Status
 
-| Format | Import | Runtime apply |
-| --- | --- | --- |
-| PMX (model) | Supported | Supported |
-| VMD (motion) | Supported | Supported |
-| VMD Camera / Light | Supported | Supported |
-| PMD (model) | Not supported | Not supported |
-| VPD (pose) | Not supported | Not supported |
-| PMM (project) | Not supported | Not supported |
-| .x / .vac (accessory) | Not supported | Not supported |
-| .emm / .emd / .fx (MME effects) | Not supported | Not supported |
-
-### Features
-
-| Feature | Status |
+| Item | Status |
 | --- | --- |
-| Unity version | Unity 6000.4 or newer |
-| Package name | `com.yohawing.mmd-loader` |
-| PMX / VMD import | `ScriptedImporter` assets for `.pmx` and `.vmd` |
-| Scene placement | PMX drag-and-drop and selected-asset scene loading |
-| Timeline | VMD Timeline clip workflow |
-| Runtime playback | PMX/VMD playback controller with native runtime handoff |
-| Physics | Live physics for Play Mode forward playback; Timeline edit scrubbing keeps physics off |
-| Rendering | URP baseline toon material, alpha handling, texture diagnostics, and material order handoff |
-| Humanoid | Metadata/setup boundary only; full Humanoid bridge is future work |
-| Bake/export | Explicit export surfaces are limited; AnimationClip writer output is future work |
-| Platforms | Windows x86_64 native binary is packaged; other native platforms are not release-ready |
+| Target Unity | Currently verified only on Unity 6000.4 (Windows) |
+| PMX | Import and scene placement supported |
+| VMD | Import and Timeline clip supported. Motion playback is evaluated at runtime by [mmd-anim](https://github.com/yohawing/mmd-anim). Camera motion supported |
+| Morph | Vertex (blend shape) / UV / material / bone / group morphs supported |
+| Physics | Real-time physics during Play Mode forward playback |
+| Rendering | URP-based toon, alpha, texture diagnostics, material order handoff |
+| Humanoid | Metadata and setup foundation. Full Humanoid integration is future work |
+
+## Roadmap
+
+Items we plan to work on in future releases (scope and priority may change).
+
+| Item | Plan |
+| --- | --- |
+| Bake VMD to AnimationClip | Bake VMD motion into a Unity AnimationClip |
+| Timeline enhancements | Expand Timeline editing and direction features, including audio (music) synced playback |
+| Runtime MMD Rig | Runtime MMD rig support (IK, append parent, axis limits, etc.) |
+| Higher rendering fidelity | Improved outline fidelity and self-shadow (ShadowCaster pass + shadow sampling) |
+| URP pipeline integration | Implement outline as a ScriptableRendererFeature (custom pass), support Forward / Forward+ / Deferred passes, and integrate with Render Pipeline Asset / Volume settings |
+| Runtime loading | An API to load PMX / VMD dynamically at runtime |
+| macOS / Linux native | Distribute native binaries for each platform |
+| Broader Unity support | Verify on Unity versions other than 6000.4 |
 
 ## Install
 
-Add the package from a Git URL:
+Add the following URL through Unity Package Manager **Add package from git URL**.
 
 ```text
 https://github.com/yohawing/unity-mmd-loader.git?path=packages/com.yohawing.mmd-loader
 ```
 
-In Unity:
-
-1. Open **Window > Package Manager**.
-2. Select **Add package from git URL**.
-3. Paste the URL above.
-
-For local development, add a file dependency to your Unity project's
-`Packages/manifest.json`:
+When referencing a local checkout, add a file dependency to the Unity project's `Packages/manifest.json`.
 
 ```json
 {
@@ -66,59 +57,30 @@ For local development, add a file dependency to your Unity project's
 }
 ```
 
-Adjust the relative path for your project layout.
+Adjust the relative path for your Unity project layout.
 
-## Usage - Golden Path
+## Basic Flow
 
-1. Import a `.pmx` file into the Unity Project window.
+1. Import a `.pmx` file into the Unity Project.
 2. Drag the imported PMX asset into the Scene or Hierarchy.
 3. Import a `.vmd` file.
 4. Bind the scene playback object to Timeline and create a VMD Timeline clip.
-5. Enter Play Mode for forward playback with Live physics, or scrub in Edit
-   Mode for animation-only Timeline preview.
+5. In Play Mode, check forward playback and real-time physics.
+6. In Edit Mode, Timeline scrub is treated as physics-off animation preview.
 
-The package also exposes explicit editor actions under **Tools > MMD Loader**
-for scene loading, diagnostics, and authoring workflows.
-
-## Usage - Raw PMX/VMD Playback
-
-For local diagnostics or tool-driven workflows, `MmdRuntimeImporterComponent`
-can load PMX/VMD paths directly. This path is intended for development and
-local verification; normal project authoring should prefer imported assets and
-Timeline bindings.
-
-Local third-party MMD assets, textures, motions, audio, and captures are not
-redistributed by this package. Keep local licensed references outside the
-package.
-
-## Native Runtime
-
-The packaged Windows x86_64 runtime DLL is produced from the `native/mmd-anim`
-submodule and included under the package plugin folder. Other native platforms
-are not release-ready yet.
-
-Native rebuild automation is repository-local and platform-specific, so it is
-not part of the public package surface.
-
-## Tests
-
-Use Unity Test Runner for package EditMode and PlayMode tests. The package tests
-cover import contracts, runtime evaluation, scene binding, Timeline behavior,
-rendering handoff, and Live physics boundaries without requiring licensed
-third-party MMD assets.
+For detailed steps, see [HOW_TO_USE.md](https://github.com/yohawing/unity-mmd-loader/blob/main/docs/HOW_TO_USE.md).
 
 ## License Boundary
 
-Do not commit or redistribute licensed PMX/VMD files, textures, motions, audio,
-or captures unless redistribution provenance is explicitly cleared. Committed
-fixtures in this package are intended to be redistribution-safe; third-party MMD
-content is not included.
+This repository does not redistribute third-party PMX / VMD / texture / motion / audio / capture assets.
 
-## Acknowledgements
+When using MMD assets, users must confirm the license and redistribution terms themselves. Local verification assets, generated logs, screenshots, and test artifacts are not intended to be included in package commits.
 
-This project was developed with reference to:
+## Development Notes
 
-- [Babylon-MMD](https://github.com/noname0310/babylon-mmd)
-- [saba](https://github.com/benikabocha/saba)
-- [nanoem](https://github.com/hkrn/nanoem)
-- [MMD for Unity](https://github.com/mmd-for-unity-proj/mmd-for-unity)
+The public `main` branch is kept package-first.
+
+- The distributable package is centered on `packages/com.yohawing.mmd-loader/`.
+- `native/` remains as native source / rebuild reference.
+- Local scripts, the Unity consumer project, validation artifacts, and AI work notes are not public package surfaces.
+- Release preparation and branch policy are centralized in [RELEASE.md](https://github.com/yohawing/unity-mmd-loader/blob/main/docs/RELEASE.md).

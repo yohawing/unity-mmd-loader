@@ -106,6 +106,70 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void ApplyLightStateToNonDirectionalLightStillAppliesButReportsDiagnostic()
+        {
+            var go = new GameObject("binding");
+            var lightGo = new GameObject("light");
+            try
+            {
+                Light light = lightGo.AddComponent<Light>();
+                light.type = LightType.Point;
+                light.intensity = 2.5f;
+
+                MmdSceneEnvironmentBinding binding = go.AddComponent<MmdSceneEnvironmentBinding>();
+                binding.TargetLight = light;
+
+                MmdLightState state = new MmdLightState(
+                    new[] { 0.2f, 0.4f, 0.6f },
+                    new[] { -0.5f, -1f, 0.5f });
+
+                MmdSceneLightApplyStatus status = binding.ApplyLightState(state);
+
+                // Non-directional bind is a diagnostic, not a hard failure: color/direction are still applied.
+                Assert.That(status, Is.EqualTo(MmdSceneLightApplyStatus.AppliedNonDirectional));
+                Assert.That(binding.LastLightApplyStatus, Is.EqualTo(MmdSceneLightApplyStatus.AppliedNonDirectional));
+                Assert.That(light.color.r, Is.EqualTo(0.2f).Within(0.001f));
+                Assert.That(light.color.g, Is.EqualTo(0.4f).Within(0.001f));
+                Assert.That(light.color.b, Is.EqualTo(0.6f).Within(0.001f));
+                // v1 policy: intensity is never touched.
+                Assert.That(light.intensity, Is.EqualTo(2.5f).Within(0.001f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(lightGo);
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void ApplyLightStateLeavesDirectionalLightIntensityUnchanged()
+        {
+            var go = new GameObject("binding");
+            var lightGo = new GameObject("light");
+            try
+            {
+                Light light = lightGo.AddComponent<Light>();
+                light.type = LightType.Directional;
+                light.intensity = 3.0f;
+
+                MmdSceneEnvironmentBinding binding = go.AddComponent<MmdSceneEnvironmentBinding>();
+                binding.TargetLight = light;
+
+                MmdSceneLightApplyStatus status = binding.ApplyLightState(
+                    new MmdLightState(new[] { 0.2f, 0.4f, 0.6f }, new[] { -0.5f, -1f, 0.5f }));
+
+                Assert.That(status, Is.EqualTo(MmdSceneLightApplyStatus.Applied));
+                // v1 policy: VMD light carries color + direction only; intensity stays at the scene value.
+                Assert.That(light.intensity, Is.EqualTo(3.0f).Within(0.001f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(lightGo);
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
         public void ApplyCameraStateWithoutTargetReturnsNoTargetCameraAndDoesNotThrow()
         {
             var go = new GameObject("binding");
