@@ -38,7 +38,16 @@ namespace Mmd.UnityIntegration
         Applied = 1,
 
         /// <summary>No target Light is bound; nothing was applied (structured diagnostic).</summary>
-        NoTargetLight = 2
+        NoTargetLight = 2,
+
+        /// <summary>
+        /// Color and direction were applied, but the bound light is not a
+        /// <see cref="LightType.Directional"/> light. MMD light is a single directional source, so its
+        /// semantics do not fully map to point / spot / area lights (e.g. a point light ignores rotation).
+        /// v1 still applies and reports this so the caller can surface a warning rather than silently
+        /// driving a mismatched light.
+        /// </summary>
+        AppliedNonDirectional = 3
     }
 
     /// <summary>
@@ -47,7 +56,6 @@ namespace Mmd.UnityIntegration
     /// drives it. Nothing is auto-created; an unbound target is surfaced as a structured diagnostic
     /// (<see cref="MmdSceneCameraApplyStatus.NoTargetCamera"/>) rather than silently spawning a camera.
     /// </summary>
-    [AddComponentMenu("MMD/MMD Scene Environment Binding")]
     public sealed class MmdSceneEnvironmentBinding : MonoBehaviour
     {
         [SerializeField]
@@ -108,7 +116,11 @@ namespace Mmd.UnityIntegration
 
         /// <summary>
         /// Converts <paramref name="state"/> (via <see cref="MmdCoordinateSpace"/>) and applies it to
-        /// the bound Directional Light. Returns a structured status; never throws on a missing target.
+        /// the bound light's color and direction. Returns a structured status; never throws on a missing
+        /// target. v1 policy: <see cref="Light.intensity"/> is left unchanged (VMD light carries color +
+        /// direction only). A bound light that is not <see cref="LightType.Directional"/> still receives
+        /// color / direction but is reported as <see cref="MmdSceneLightApplyStatus.AppliedNonDirectional"/>
+        /// so the caller can warn (MMD light maps to a directional source).
         /// </summary>
         public MmdSceneLightApplyStatus ApplyLightState(MmdLightState state)
         {
@@ -135,7 +147,9 @@ namespace Mmd.UnityIntegration
                 targetLight.transform.rotation = Quaternion.LookRotation(unityDir);
             }
 
-            LastLightApplyStatus = MmdSceneLightApplyStatus.Applied;
+            LastLightApplyStatus = targetLight.type == LightType.Directional
+                ? MmdSceneLightApplyStatus.Applied
+                : MmdSceneLightApplyStatus.AppliedNonDirectional;
             return LastLightApplyStatus;
         }
 
