@@ -85,8 +85,7 @@ namespace Mmd.Editor.Timeline
                 throw new InvalidOperationException("A Timeline VMD clip requires an MMD playback controller with a PMX model source.");
             }
 
-            MmdMotionDefinition motion = motionAsset.LoadMotion();
-            double duration = CalculateClipDurationSeconds(motion, frameRate);
+            double duration = CalculateClipDurationSeconds(motionAsset.MaxFrame, frameRate);
 
             TimelineClip clip = track.CreateClip<MmdVmdTimelineClip>();
             clip.start = startSeconds;

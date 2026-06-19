@@ -123,6 +123,96 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void VmdTimelineClipEditorSetsDroppedClipDurationFromCachedMaxFrameWithoutParsing()
+        {
+            MmdVmdAsset? vmdAsset = null;
+            TimelineAsset? timelineAsset = null;
+
+            try
+            {
+                vmdAsset = CreateSyntheticVmdAssetWithCachedSummary("cache-only-motion.vmd", maxFrame: 89);
+                timelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
+                MmdVmdTimelineTrack track = timelineAsset.CreateTrack<MmdVmdTimelineTrack>(null, "MMD VMD");
+                TimelineClip clip = track.CreateClip<MmdVmdTimelineClip>();
+                var mmdClip = (MmdVmdTimelineClip)clip.asset;
+                mmdClip.MotionAsset = vmdAsset;
+                mmdClip.FrameRate = 45.0f;
+
+                bool applied = MmdVmdTimelineClipEditor.ApplyDurationFromMotionAsset(clip);
+
+                Assert.That(applied, Is.True);
+                Assert.That(clip.duration, Is.EqualTo(90.0 / 45.0).Within(0.00001));
+            }
+            finally
+            {
+                if (timelineAsset != null)
+                {
+                    Object.DestroyImmediate(timelineAsset);
+                }
+
+                if (vmdAsset != null)
+                {
+                    Object.DestroyImmediate(vmdAsset);
+                }
+            }
+        }
+
+        [Test]
+        public void CreateVmdClipSetsDurationFromCachedMaxFrameWithoutParsing()
+        {
+            MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
+            GameObject? controllerObject = null;
+            TimelineAsset? timelineAsset = null;
+
+            try
+            {
+                pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                pmxAsset.Initialize(new byte[] { 1 }, "synthetic-model.pmx", "External/Model/synthetic-model.pmx");
+                vmdAsset = CreateSyntheticVmdAssetWithCachedSummary("cache-only-motion.vmd", maxFrame: 89);
+                controllerObject = new GameObject("mmd-cache-only-controller");
+                MmdUnityPlaybackController controller = controllerObject.AddComponent<MmdUnityPlaybackController>();
+                controller.ConfigureModelAsset(pmxAsset);
+                timelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
+                MmdVmdTimelineTrack track = timelineAsset.CreateTrack<MmdVmdTimelineTrack>(null, "MMD VMD");
+
+                TimelineClip clip = MmdTimelineAssetWorkflow.CreateVmdClip(
+                    track,
+                    vmdAsset,
+                    controller,
+                    frameRate: 45.0f);
+                var mmdClip = (MmdVmdTimelineClip)clip.asset;
+
+                Assert.That(clip.duration, Is.EqualTo(90.0 / 45.0).Within(0.00001));
+                Assert.That(mmdClip.MotionAsset, Is.SameAs(vmdAsset));
+                Assert.That(mmdClip.MotionSourceId, Is.EqualTo("cache-only-motion.vmd"));
+                Assert.That(mmdClip.FrameRate, Is.EqualTo(45.0f));
+            }
+            finally
+            {
+                if (timelineAsset != null)
+                {
+                    Object.DestroyImmediate(timelineAsset);
+                }
+
+                if (controllerObject != null)
+                {
+                    Object.DestroyImmediate(controllerObject);
+                }
+
+                if (vmdAsset != null)
+                {
+                    Object.DestroyImmediate(vmdAsset);
+                }
+
+                if (pmxAsset != null)
+                {
+                    Object.DestroyImmediate(pmxAsset);
+                }
+            }
+        }
+
+        [Test]
         public void VmdTimelineClipEditorIgnoresClipWithoutMotionAsset()
         {
             TimelineAsset? timelineAsset = null;
@@ -374,6 +464,21 @@ namespace Mmd.Tests
             Directory.CreateDirectory(Path.Combine(ProjectRoot, TempDirectory));
             File.Copy(source, Path.Combine(ProjectRoot, destinationAssetPath), overwrite: true);
             AssetDatabase.ImportAsset(destinationAssetPath, ImportAssetOptions.ForceUpdate);
+        }
+
+        private static MmdVmdAsset CreateSyntheticVmdAssetWithCachedSummary(string sourceId, int maxFrame)
+        {
+            MmdVmdAsset asset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+            asset.name = Path.GetFileNameWithoutExtension(sourceId);
+            var summary = new MmdVmdParseSummary(
+                targetModelName: "cache-only-model",
+                maxFrame: maxFrame,
+                boneKeyframeCount: 1,
+                morphKeyframeCount: 0,
+                modelKeyframeCount: 0,
+                constraintStateCount: 0);
+            asset.Initialize(new byte[] { 0x00 }, sourceId, "External/Motion/" + sourceId, summary);
+            return asset;
         }
 
         private static string ProjectRoot => Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
