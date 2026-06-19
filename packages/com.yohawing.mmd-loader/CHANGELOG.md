@@ -2,7 +2,7 @@
 
 All notable changes to `com.yohawing.mmd-loader` are documented here.
 
-## [0.1.0] - Unreleased
+## [0.1.0] - 2026-06-19
 
 ### Added
 
