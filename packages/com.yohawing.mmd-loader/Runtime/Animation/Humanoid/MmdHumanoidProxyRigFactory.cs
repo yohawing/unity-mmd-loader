@@ -115,7 +115,8 @@ namespace Mmd
         /// <returns>A result containing the proxy root, bone map, matches, and diagnostics.</returns>
         public static MmdHumanoidProxyRigResult CreateProxyRig(
             MmdModelDefinition model,
-            string proxyRootName = "MmdHumanoidProxyRig")
+            string proxyRootName = "MmdHumanoidProxyRig",
+            IReadOnlyList<MmdHumanoidBoneMappingOverride>? mappingOverrides = null)
         {
             if (model == null)
             {
@@ -164,6 +165,23 @@ namespace Mmd
                     bone.name,
                     bone.index,
                     required));
+            }
+
+            var combinedDiagnostics = new List<string>();
+            combinedDiagnostics.AddRange(report.Diagnostics);
+            if (HasMappingOverrides(mappingOverrides))
+            {
+                matches = ApplyMappingOverrides(
+                    matches,
+                    BuildModelBoneNameList(model),
+                    BuildModelBoneIndexList(model),
+                    mappingOverrides,
+                    combinedDiagnostics,
+                    out int appliedOverrideCount);
+                if (appliedOverrideCount > 0)
+                {
+                    readiness = ClassifyMergedReadiness(matches, model.bones.Count);
+                }
             }
 
             // Step 3: Build the proxy Transform hierarchy.
@@ -234,8 +252,6 @@ namespace Mmd
                 else if (b != null)
                     originZeroCount++;
             }
-            var combinedDiagnostics = new List<string>();
-            combinedDiagnostics.AddRange(report.Diagnostics);
             combinedDiagnostics.Add("proxy-rig: created " + boneMap.Count + " bone transforms, root hidden");
             combinedDiagnostics.Add("proxy-rig: origins found=" + originCount + " fallback-zero=" + originZeroCount);
 
@@ -255,7 +271,8 @@ namespace Mmd
         /// <returns>A result containing the proxy root, bone map, matches, and diagnostics.</returns>
         public static MmdHumanoidProxyRigResult CreateProxyRig(
             MmdPmxAsset pmxAsset,
-            string proxyRootName = "MmdHumanoidProxyRig")
+            string proxyRootName = "MmdHumanoidProxyRig",
+            IReadOnlyList<MmdHumanoidBoneMappingOverride>? mappingOverrides = null)
         {
             if (pmxAsset == null)
             {
@@ -326,7 +343,8 @@ namespace Mmd
                 return CreateProxyRigFromBoneTransforms(
                     smr.bones!,
                     pmxAsset.ImportedRoot.transform,
-                    proxyRootName);
+                    proxyRootName,
+                    mappingOverrides);
             }
 
             return new MmdHumanoidProxyRigResult(
@@ -347,7 +365,8 @@ namespace Mmd
         internal static MmdHumanoidProxyRigResult CreateProxyRigFromBoneTransforms(
             IReadOnlyList<Transform> bones,
             Transform hierarchyRoot,
-            string proxyRootName = "MmdHumanoidProxyRig")
+            string proxyRootName = "MmdHumanoidProxyRig",
+            IReadOnlyList<MmdHumanoidBoneMappingOverride>? mappingOverrides = null)
         {
             if (bones == null)
             {
@@ -397,18 +416,32 @@ namespace Mmd
                 }
             }
 
-            if (report.Readiness == MmdHumanoidSetupAsset.NoBonesReadiness)
+            var diagnostics = new List<string> { "proxy-rig: input=ImportedHierarchy" };
+            diagnostics.AddRange(report.Diagnostics);
+            string readiness = report.Readiness;
+            if (HasMappingOverrides(mappingOverrides))
+            {
+                matches = ApplyMappingOverrides(
+                    matches,
+                    sourceBoneNames,
+                    null,
+                    mappingOverrides,
+                    diagnostics,
+                    out int appliedOverrideCount);
+                if (appliedOverrideCount > 0)
+                {
+                    readiness = ClassifyMergedReadiness(matches, bones.Count);
+                }
+            }
+
+            if (readiness == MmdHumanoidSetupAsset.NoBonesReadiness)
             {
                 return new MmdHumanoidProxyRigResult(
                     null,
                     null,
                     matches.AsReadOnly(),
                     MmdHumanoidSetupAsset.NoBonesReadiness,
-                    new[]
-                    {
-                        "proxy-rig: input=ImportedHierarchy",
-                        "proxy-rig: " + report.Readiness,
-                    });
+                    diagnostics.ToArray());
             }
 
             var boneMap = new Dictionary<HumanBodyBones, Transform>();
@@ -476,8 +509,6 @@ namespace Mmd
                 proxyBoneTransform.localScale = sourceBone.localScale;
             }
 
-            var diagnostics = new List<string> { "proxy-rig: input=ImportedHierarchy" };
-            diagnostics.AddRange(report.Diagnostics);
             diagnostics.Add(
                 "proxy-rig: created " + boneMap.Count + " bone transforms, root hidden");
 
@@ -485,7 +516,7 @@ namespace Mmd
                 root,
                 boneMap,
                 matches,
-                report.Readiness,
+                readiness,
                 diagnostics.ToArray());
         }
 
@@ -634,6 +665,192 @@ namespace Mmd
                     return b;
             }
             return null;
+        }
+
+        private static bool HasMappingOverrides(IReadOnlyList<MmdHumanoidBoneMappingOverride>? mappingOverrides)
+        {
+            return mappingOverrides != null && mappingOverrides.Count > 0;
+        }
+
+        private static string[] BuildModelBoneNameList(MmdModelDefinition model)
+        {
+            var names = new string[model.bones.Count];
+            for (int i = 0; i < model.bones.Count; i++)
+            {
+                names[i] = model.bones[i]?.name ?? string.Empty;
+            }
+
+            return names;
+        }
+
+        private static int[] BuildModelBoneIndexList(MmdModelDefinition model)
+        {
+            var indices = new int[model.bones.Count];
+            for (int i = 0; i < model.bones.Count; i++)
+            {
+                indices[i] = model.bones[i]?.index ?? i;
+            }
+
+            return indices;
+        }
+
+        private static List<MmdHumanoidBoneMappingMatch> ApplyMappingOverrides(
+            List<MmdHumanoidBoneMappingMatch> automaticMatches,
+            IReadOnlyList<string> sourceBoneNames,
+            IReadOnlyList<int>? sourceBoneIndices,
+            IReadOnlyList<MmdHumanoidBoneMappingOverride>? mappingOverrides,
+            List<string> diagnostics,
+            out int appliedOverrideCount)
+        {
+            var overrideMatches = new Dictionary<HumanBodyBones, MmdHumanoidBoneMappingMatch>();
+            var overrideOrder = new List<HumanBodyBones>();
+            int applied = 0;
+            int ignored = 0;
+
+            if (mappingOverrides != null)
+            {
+                for (int i = 0; i < mappingOverrides.Count; i++)
+                {
+                    MmdHumanoidBoneMappingOverride? mappingOverride = mappingOverrides[i];
+                    if (mappingOverride == null)
+                    {
+                        ignored++;
+                        diagnostics.Add("manual-override: ignored null entry at index " + i);
+                        continue;
+                    }
+
+                    HumanBodyBones humanBone = mappingOverride.HumanBone;
+                    if (humanBone == HumanBodyBones.LastBone || !Enum.IsDefined(typeof(HumanBodyBones), humanBone))
+                    {
+                        ignored++;
+                        diagnostics.Add("manual-override: ignored invalid HumanBodyBones at index " + i);
+                        continue;
+                    }
+
+                    string mmdBoneName = mappingOverride.MmdBoneName ?? string.Empty;
+                    int sourceIndex = FindSourceBoneIndex(sourceBoneNames, mmdBoneName);
+                    if (sourceIndex < 0)
+                    {
+                        ignored++;
+                        diagnostics.Add("manual-override: ignored missing MMD bone '" + mmdBoneName + "' for " + humanBone);
+                        continue;
+                    }
+
+                    int mmdBoneIndex = ResolveSourceBoneIndex(sourceBoneIndices, sourceIndex);
+                    if (!overrideMatches.ContainsKey(humanBone))
+                    {
+                        overrideOrder.Add(humanBone);
+                    }
+
+                    overrideMatches[humanBone] = new MmdHumanoidBoneMappingMatch(
+                        humanBone,
+                        sourceBoneNames[sourceIndex],
+                        mmdBoneIndex,
+                        MmdHumanoidBoneMappingEvaluator.IsRequiredHumanBone(humanBone));
+                    applied++;
+                }
+            }
+
+            var merged = new List<MmdHumanoidBoneMappingMatch>();
+            var usedHumanBones = new HashSet<HumanBodyBones>();
+            var usedSourceBoneIndices = new HashSet<int>();
+
+            foreach (HumanBodyBones humanBone in overrideOrder)
+            {
+                if (overrideMatches.TryGetValue(humanBone, out MmdHumanoidBoneMappingMatch match))
+                {
+                    AddMergedMatch(match, merged, usedHumanBones, usedSourceBoneIndices, diagnostics, "manual-override");
+                }
+            }
+
+            foreach (MmdHumanoidBoneMappingMatch match in automaticMatches)
+            {
+                if (overrideMatches.ContainsKey(match.HumanBone))
+                {
+                    continue;
+                }
+
+                AddMergedMatch(match, merged, usedHumanBones, usedSourceBoneIndices, diagnostics, "automatic");
+            }
+
+            diagnostics.Add("manual-overrides: applied=" + applied + " ignored=" + ignored);
+            appliedOverrideCount = applied;
+            return merged;
+        }
+
+        private static void AddMergedMatch(
+            MmdHumanoidBoneMappingMatch match,
+            List<MmdHumanoidBoneMappingMatch> merged,
+            HashSet<HumanBodyBones> usedHumanBones,
+            HashSet<int> usedSourceBoneIndices,
+            List<string> diagnostics,
+            string source)
+        {
+            if (!usedHumanBones.Add(match.HumanBone))
+            {
+                diagnostics.Add(source + ": skipped duplicate HumanBodyBones " + match.HumanBone);
+                return;
+            }
+
+            if (!usedSourceBoneIndices.Add(match.MmdBoneIndex))
+            {
+                diagnostics.Add(source + ": skipped duplicate MMD bone '" + match.MmdBoneName + "'#" + match.MmdBoneIndex);
+                return;
+            }
+
+            merged.Add(match);
+        }
+
+        private static int FindSourceBoneIndex(IReadOnlyList<string> sourceBoneNames, string mmdBoneName)
+        {
+            if (sourceBoneNames == null || string.IsNullOrWhiteSpace(mmdBoneName))
+            {
+                return -1;
+            }
+
+            string normalized = mmdBoneName.Trim();
+            for (int i = 0; i < sourceBoneNames.Count; i++)
+            {
+                if (string.Equals((sourceBoneNames[i] ?? string.Empty).Trim(), normalized, StringComparison.Ordinal))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        private static int ResolveSourceBoneIndex(IReadOnlyList<int>? sourceBoneIndices, int sourceListIndex)
+        {
+            if (sourceBoneIndices == null || sourceListIndex < 0 || sourceListIndex >= sourceBoneIndices.Count)
+            {
+                return sourceListIndex;
+            }
+
+            return sourceBoneIndices[sourceListIndex];
+        }
+
+        private static string ClassifyMergedReadiness(IReadOnlyList<MmdHumanoidBoneMappingMatch> matches, int sourceBoneCount)
+        {
+            if (sourceBoneCount == 0)
+            {
+                return MmdHumanoidSetupAsset.NoBonesReadiness;
+            }
+
+            int requiredMapped = 0;
+            var requiredBones = new HashSet<HumanBodyBones>();
+            foreach (MmdHumanoidBoneMappingMatch match in matches)
+            {
+                if (MmdHumanoidBoneMappingEvaluator.IsRequiredHumanBone(match.HumanBone)
+                    && requiredBones.Add(match.HumanBone))
+                {
+                    requiredMapped++;
+                }
+            }
+
+            return requiredMapped >= MmdHumanoidBoneMappingEvaluator.RequiredHumanBoneCount
+                ? MmdHumanoidSetupAsset.ReadyReadiness
+                : MmdHumanoidSetupAsset.MissingRequiredReadiness;
         }
     }
 }

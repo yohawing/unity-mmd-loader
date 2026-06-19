@@ -231,6 +231,55 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void ManualMappingOverrideCanFillMissingRequiredBone()
+        {
+            MmdModelDefinition model = CreateHumanoidMappingModel(
+                "下半身",
+                "上半身",
+                "首",
+                "custom-head",
+                "左足",
+                "左ひざ",
+                "左足首",
+                "右足",
+                "右ひざ",
+                "右足首",
+                "左腕",
+                "左ひじ",
+                "左手首",
+                "右腕",
+                "右ひじ",
+                "右手首");
+
+            MmdHumanoidProxyRigResult automatic = MmdHumanoidProxyRigFactory.CreateProxyRig(model);
+            Assert.That(automatic.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.MissingRequiredReadiness));
+
+            MmdHumanoidProxyRigResult result = MmdHumanoidProxyRigFactory.CreateProxyRig(
+                model,
+                mappingOverrides: new[]
+                {
+                    new MmdHumanoidBoneMappingOverride("custom-head", HumanBodyBones.Head),
+                });
+
+            Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
+            Assert.That(result.BoneMap.ContainsKey(HumanBodyBones.Head), Is.True);
+            MmdHumanoidBoneMappingMatch headMatch = result.Matches.Single(match => match.HumanBone == HumanBodyBones.Head);
+            Assert.That(headMatch.MmdBoneName, Is.EqualTo("custom-head"));
+            Assert.That(headMatch.MmdBoneIndex, Is.EqualTo(3));
+            Assert.That(result.Diagnostics, Has.Some.Contains("manual-overrides: applied=1 ignored=0"));
+
+            if (automatic.ProxyRoot != null)
+            {
+                Object.DestroyImmediate(automatic.ProxyRoot);
+            }
+
+            if (result.ProxyRoot != null)
+            {
+                Object.DestroyImmediate(result.ProxyRoot);
+            }
+        }
+
+        [Test]
         public void ProxyRigDoesNotCreateAvatarOrAnimatorOrStoreAvatarFields()
         {
             // Arrange

@@ -288,6 +288,25 @@ namespace Mmd
         public bool Required { get; }
     }
 
+    [Serializable]
+    public sealed class MmdHumanoidBoneMappingOverride
+    {
+        [SerializeField] private string mmdBoneName = string.Empty;
+        [SerializeField] private HumanBodyBones humanBone = HumanBodyBones.LastBone;
+
+        public MmdHumanoidBoneMappingOverride() { }
+
+        public MmdHumanoidBoneMappingOverride(string mmdBoneName, HumanBodyBones humanBone)
+        {
+            this.mmdBoneName = mmdBoneName ?? string.Empty;
+            this.humanBone = humanBone;
+        }
+
+        public string MmdBoneName => mmdBoneName;
+
+        public HumanBodyBones HumanBone => humanBone;
+    }
+
     public static class MmdHumanoidBoneMappingEvaluator
     {
         private static readonly BoneRule[] RequiredRules =
@@ -528,6 +547,21 @@ namespace Mmd
 
             return false;
         }
+
+        public static bool IsRequiredHumanBone(HumanBodyBones humanBone)
+        {
+            foreach (BoneRule rule in RequiredRules)
+            {
+                if (rule.HumanBone == humanBone)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public static int RequiredHumanBoneCount => RequiredRules.Length;
 
         private static Dictionary<HumanBodyBones, List<MmdHumanoidBoneMappingMatch>> CreateMatchBuckets(BoneRule[] rules)
         {

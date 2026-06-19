@@ -44,7 +44,8 @@ namespace Mmd.UnityIntegration
             MmdPmxAsset asset,
             string modelName,
             bool shouldBuildHumanoid,
-            string animationTypeLabel)
+            string animationTypeLabel,
+            System.Collections.Generic.IReadOnlyList<MmdHumanoidBoneMappingOverride>? mappingOverrides = null)
         {
             if (!shouldBuildHumanoid)
             {
@@ -54,7 +55,9 @@ namespace Mmd.UnityIntegration
                     "humanoid-avatar: animation type is " + animationTypeLabel);
             }
 
-            MmdHumanoidProxyRigResult proxyRig = MmdHumanoidProxyRigFactory.CreateProxyRig(asset);
+            MmdHumanoidProxyRigResult proxyRig = MmdHumanoidProxyRigFactory.CreateProxyRig(
+                asset,
+                mappingOverrides: mappingOverrides);
             string readiness = proxyRig.Readiness;
             string diagnostic = string.Join("; ", proxyRig.Diagnostics);
 

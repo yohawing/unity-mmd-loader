@@ -50,6 +50,8 @@ namespace Mmd.Editor
         [SerializeField] private MmdPmxAnimationType animationType = MmdPmxAnimationType.Generic;
         [SerializeField] private MmdPmxShaderPreset shaderPreset = MmdPmxShaderPreset.MmdBasicUrpToon;
         [SerializeField] private Material[] materialRemaps = System.Array.Empty<Material>();
+        [SerializeField] private MmdHumanoidBoneMappingOverride[] humanoidBoneMappingOverrides =
+            System.Array.Empty<MmdHumanoidBoneMappingOverride>();
 
         public float ImportScale => NormalizeImportScale(importScale);
 
@@ -64,6 +66,8 @@ namespace Mmd.Editor
         public MmdPmxShaderPreset ShaderPreset => shaderPreset;
 
         public Material[] MaterialRemaps => materialRemaps;
+
+        public MmdHumanoidBoneMappingOverride[] HumanoidBoneMappingOverrides => humanoidBoneMappingOverrides;
 
         public override void OnImportAsset(AssetImportContext ctx)
         {
@@ -102,7 +106,8 @@ namespace Mmd.Editor
                         asset,
                         model.name,
                         shouldBuildHumanoid: animationType == MmdPmxAnimationType.Humanoid,
-                        animationTypeLabel: animationType.ToString());
+                        animationTypeLabel: animationType.ToString(),
+                        mappingOverrides: humanoidBoneMappingOverrides);
                 Avatar? importedAvatar = avatarImport.Avatar;
                 string avatarReadiness = avatarImport.Readiness;
                 string avatarDiagnostic = avatarImport.Diagnostic;
