@@ -201,7 +201,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator NativePlaybackSceneLoadsAndEvaluatesPackageFixture()
         {
-            AsyncOperation loadOperation = SceneManager.LoadSceneAsync("Phase10NativePlayback", LoadSceneMode.Single);
+            AsyncOperation loadOperation = SceneManager.LoadSceneAsync("NativePlayback", LoadSceneMode.Single);
             Assert.That(loadOperation, Is.Not.Null);
             while (!loadOperation.isDone)
             {
@@ -226,7 +226,7 @@ namespace Mmd.Tests
             // importer-owned Mesh/Material/bone references instead of rebuilding with "Split Runtime".
             SkinnedMeshRenderer? foundSceneSMR = controller.ConfiguredInstanceRoot != null
                 ? controller.ConfiguredInstanceRoot.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true)
-                : GameObject.Find("Phase10 Native Playback")?.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true);
+                : GameObject.Find("Native Playback")?.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true);
             Assert.That(foundSceneSMR, Is.Not.Null, "scene must have an SMR (imported hierarchy) for domain reload rebind");
             SkinnedMeshRenderer sceneSMR = foundSceneSMR!;
             Mesh sharedMesh = sceneSMR.sharedMesh;
@@ -394,7 +394,7 @@ namespace Mmd.Tests
             string firstBoneName = snapshot.frame.bones.Count > 0
                 ? snapshot.frame.bones[0].name
                 : controller.ModelAssetSource!.LoadModel().bones[0].name;
-            GameObject root = controller.ConfiguredInstanceRoot ?? GameObject.Find("Phase10 Native Playback Runtime");
+            GameObject root = controller.ConfiguredInstanceRoot ?? GameObject.Find("Native Playback Runtime");
             Assert.That(root, Is.Not.Null);
             Transform firstBone = root.GetComponentsInChildren<Transform>()
                 .First(transform => string.Equals(transform.name, firstBoneName, StringComparison.Ordinal));
