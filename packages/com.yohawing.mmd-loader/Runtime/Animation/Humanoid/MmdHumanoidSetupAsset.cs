@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 using Mmd.Parser;
 
@@ -324,33 +325,33 @@ namespace Mmd
     {
         private static readonly BoneRule[] RequiredRules =
         {
-            new(HumanBodyBones.Hips, "下半身"),
-            new(HumanBodyBones.Spine, "上半身"),
-            new(HumanBodyBones.Neck, "首"),
-            new(HumanBodyBones.Head, "頭"),
-            new(HumanBodyBones.LeftUpperLeg, "左足"),
-            new(HumanBodyBones.LeftLowerLeg, "左ひざ"),
-            new(HumanBodyBones.LeftFoot, "左足首"),
-            new(HumanBodyBones.RightUpperLeg, "右足"),
-            new(HumanBodyBones.RightLowerLeg, "右ひざ"),
-            new(HumanBodyBones.RightFoot, "右足首"),
-            new(HumanBodyBones.LeftUpperArm, "左腕"),
-            new(HumanBodyBones.LeftLowerArm, "左ひじ"),
-            new(HumanBodyBones.LeftHand, "左手首"),
-            new(HumanBodyBones.RightUpperArm, "右腕"),
-            new(HumanBodyBones.RightLowerArm, "右ひじ"),
-            new(HumanBodyBones.RightHand, "右手首"),
+            new(HumanBodyBones.Hips, "下半身", "Hips", "Hip", "Pelvis", "Lower Body", "LowerBody"),
+            new(HumanBodyBones.Spine, "上半身", "Spine", "Upper Body", "UpperBody"),
+            new(HumanBodyBones.Neck, "首", "Neck"),
+            new(HumanBodyBones.Head, "頭", "Head"),
+            new(HumanBodyBones.LeftUpperLeg, "左足", "Left Leg", "Left Upper Leg", "LeftUpperLeg", "Left Thigh", "leg_L"),
+            new(HumanBodyBones.LeftLowerLeg, "左ひざ", "左膝", "Left Knee", "Left Lower Leg", "LeftLowerLeg", "knee_L"),
+            new(HumanBodyBones.LeftFoot, "左足首", "Left Ankle", "Left Foot", "LeftFoot", "ankle_L", "foot_L"),
+            new(HumanBodyBones.RightUpperLeg, "右足", "Right Leg", "Right Upper Leg", "RightUpperLeg", "Right Thigh", "leg_R"),
+            new(HumanBodyBones.RightLowerLeg, "右ひざ", "右膝", "Right Knee", "Right Lower Leg", "RightLowerLeg", "knee_R"),
+            new(HumanBodyBones.RightFoot, "右足首", "Right Ankle", "Right Foot", "RightFoot", "ankle_R", "foot_R"),
+            new(HumanBodyBones.LeftUpperArm, "左腕", "Left Arm", "Left Upper Arm", "LeftUpperArm", "arm_L"),
+            new(HumanBodyBones.LeftLowerArm, "左ひじ", "左肘", "Left Elbow", "Left Lower Arm", "LeftLowerArm", "elbow_L"),
+            new(HumanBodyBones.LeftHand, "左手首", "Left Wrist", "Left Hand", "LeftHand", "wrist_L", "hand_L"),
+            new(HumanBodyBones.RightUpperArm, "右腕", "Right Arm", "Right Upper Arm", "RightUpperArm", "arm_R"),
+            new(HumanBodyBones.RightLowerArm, "右ひじ", "右肘", "Right Elbow", "Right Lower Arm", "RightLowerArm", "elbow_R"),
+            new(HumanBodyBones.RightHand, "右手首", "Right Wrist", "Right Hand", "RightHand", "wrist_R", "hand_R"),
         };
 
         private static readonly BoneRule[] OptionalRules =
         {
-            new(HumanBodyBones.Chest, "上半身2"),
-            new(HumanBodyBones.LeftShoulder, "左肩"),
-            new(HumanBodyBones.RightShoulder, "右肩"),
-            new(HumanBodyBones.LeftToes, "左つま先"),
-            new(HumanBodyBones.RightToes, "右つま先"),
-            new(HumanBodyBones.LeftEye, "左目"),
-            new(HumanBodyBones.RightEye, "右目"),
+            new(HumanBodyBones.Chest, "上半身2", "胸", "Chest", "Upper Chest", "UpperChest", "Upper Body 2", "UpperBody2"),
+            new(HumanBodyBones.LeftShoulder, "左肩", "Left Shoulder", "LeftShoulder", "shoulder_L"),
+            new(HumanBodyBones.RightShoulder, "右肩", "Right Shoulder", "RightShoulder", "shoulder_R"),
+            new(HumanBodyBones.LeftToes, "左つま先", "左爪先", "Left Toe", "Left Toes", "LeftToes", "toe_L", "toes_L"),
+            new(HumanBodyBones.RightToes, "右つま先", "右爪先", "Right Toe", "Right Toes", "RightToes", "toe_R", "toes_R"),
+            new(HumanBodyBones.LeftEye, "左目", "Left Eye", "LeftEye", "eye_L"),
+            new(HumanBodyBones.RightEye, "右目", "Right Eye", "RightEye", "eye_R"),
         };
 
         private static readonly BoneRule[] FingerRules =
@@ -530,7 +531,7 @@ namespace Mmd
             string normalized = NormalizeBoneName(boneName);
             foreach (BoneRule rule in RequiredRules)
             {
-                if (string.Equals(normalized, NormalizeBoneName(rule.MmdBoneName), StringComparison.Ordinal))
+                if (rule.Matches(normalized))
                 {
                     humanBone = rule.HumanBone;
                     required = true;
@@ -540,7 +541,7 @@ namespace Mmd
 
             foreach (BoneRule rule in OptionalRules)
             {
-                if (string.Equals(normalized, NormalizeBoneName(rule.MmdBoneName), StringComparison.Ordinal))
+                if (rule.Matches(normalized))
                 {
                     humanBone = rule.HumanBone;
                     required = false;
@@ -550,7 +551,7 @@ namespace Mmd
 
             foreach (BoneRule rule in FingerRules)
             {
-                if (string.Equals(normalized, NormalizeBoneName(rule.MmdBoneName), StringComparison.Ordinal))
+                if (rule.Matches(normalized))
                 {
                     humanBone = rule.HumanBone;
                     required = false;
@@ -618,7 +619,7 @@ namespace Mmd
             string normalizedName = NormalizeBoneName(boneName);
             foreach (BoneRule rule in rules)
             {
-                if (!string.Equals(normalizedName, NormalizeBoneName(rule.MmdBoneName), StringComparison.Ordinal))
+                if (!rule.Matches(normalizedName))
                 {
                     continue;
                 }
@@ -804,20 +805,49 @@ namespace Mmd
 
         private static string NormalizeBoneName(string boneName)
         {
-            return (boneName ?? string.Empty).Trim();
+            return (boneName ?? string.Empty).Trim().Normalize(NormalizationForm.FormKC);
         }
 
         private readonly struct BoneRule
         {
-            public BoneRule(HumanBodyBones humanBone, string mmdBoneName)
+            public BoneRule(HumanBodyBones humanBone, string mmdBoneName, params string[] aliases)
             {
                 HumanBone = humanBone;
                 MmdBoneName = mmdBoneName;
+                Aliases = aliases != null ? (string[])aliases.Clone() : Array.Empty<string>();
             }
 
             public HumanBodyBones HumanBone { get; }
 
             public string MmdBoneName { get; }
+
+            private string[] Aliases { get; }
+
+            public bool Matches(string normalizedBoneName)
+            {
+                if (IsSameNormalizedName(normalizedBoneName, MmdBoneName))
+                {
+                    return true;
+                }
+
+                foreach (string alias in Aliases)
+                {
+                    if (IsSameNormalizedName(normalizedBoneName, alias))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            private static bool IsSameNormalizedName(string normalizedBoneName, string ruleName)
+            {
+                return string.Equals(
+                    normalizedBoneName,
+                    NormalizeBoneName(ruleName),
+                    StringComparison.OrdinalIgnoreCase);
+            }
         }
     }
 }
