@@ -492,8 +492,9 @@ namespace Mmd
             int optionalMapped = CountMapped(optionalMatches);
             int fingerMapped = CountMappedEntries(fingerMatches);
             int missingRequired = RequiredRules.Length - requiredMapped;
-            int ambiguous = CountAmbiguous(requiredMatches) + CountAmbiguous(optionalMatches) + CountAmbiguous(fingerMatches);
-            string readiness = ClassifyReadiness(boneNames.Count, missingRequired, ambiguous);
+            int requiredAmbiguous = CountAmbiguous(requiredMatches);
+            int ambiguous = requiredAmbiguous + CountAmbiguous(optionalMatches) + CountAmbiguous(fingerMatches);
+            string readiness = ClassifyReadiness(boneNames.Count, missingRequired, requiredAmbiguous);
             string[] diagnostics = BuildDiagnostics(
                 readiness,
                 requiredMatches,
@@ -671,21 +672,21 @@ namespace Mmd
             return count;
         }
 
-        private static string ClassifyReadiness(int boneCount, int missingRequired, int ambiguous)
+        private static string ClassifyReadiness(int boneCount, int missingRequired, int requiredAmbiguous)
         {
             if (boneCount == 0)
             {
                 return MmdHumanoidSetupAsset.NoBonesReadiness;
             }
 
-            if (ambiguous > 0)
-            {
-                return MmdHumanoidSetupAsset.AmbiguousReadiness;
-            }
-
             if (missingRequired > 0)
             {
                 return MmdHumanoidSetupAsset.MissingRequiredReadiness;
+            }
+
+            if (requiredAmbiguous > 0)
+            {
+                return MmdHumanoidSetupAsset.AmbiguousReadiness;
             }
 
             return MmdHumanoidSetupAsset.ReadyReadiness;

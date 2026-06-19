@@ -806,7 +806,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void AliasDuplicateCandidatesReportAmbiguousButProxyUsesFirstMatch()
+        public void OptionalAliasDuplicateCandidatesReportDiagnosticsButRemainReady()
         {
             MmdModelDefinition model = CreateHumanoidMappingModel(
                 "下半身",
@@ -829,7 +829,7 @@ namespace Mmd.Tests
                 "胸");
 
             MmdHumanoidBoneMappingReport report = MmdHumanoidBoneMappingEvaluator.Evaluate(model);
-            Assert.That(report.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.AmbiguousReadiness));
+            Assert.That(report.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
             Assert.That(report.AmbiguousMappingCount, Is.EqualTo(1));
             Assert.That(string.Join("\n", report.Diagnostics),
                 Does.Contain("ambiguous: Chest <- 上半身2#16, 胸#17"));
@@ -837,7 +837,7 @@ namespace Mmd.Tests
             MmdHumanoidProxyRigResult result = MmdHumanoidProxyRigFactory.CreateProxyRig(model);
             try
             {
-                Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.AmbiguousReadiness));
+                Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
                 MmdHumanoidBoneMappingMatch chest = result.Matches.Single(match => match.HumanBone == HumanBodyBones.Chest);
                 Assert.That(chest.MmdBoneName, Is.EqualTo("上半身2"));
                 Assert.That(chest.MmdBoneIndex, Is.EqualTo(16));
@@ -847,6 +847,85 @@ namespace Mmd.Tests
                 if (result.ProxyRoot != null)
                 {
                     Object.DestroyImmediate(result.ProxyRoot);
+                }
+            }
+        }
+
+        [Test]
+        public void RequiredDuplicateCandidatesRemainAmbiguousAndSkipAvatarBuild()
+        {
+            MmdModelDefinition model = CreateHumanoidMappingModelWithOrigins();
+            AddBoneWithOrigin(model, model.bones.Count, "左膝", 4, new[] { 8f, 44f, 0f });
+
+            MmdHumanoidBoneMappingReport report = MmdHumanoidBoneMappingEvaluator.Evaluate(model);
+
+            Assert.That(report.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.AmbiguousReadiness));
+            Assert.That(report.AmbiguousMappingCount, Is.EqualTo(1));
+            Assert.That(string.Join("\n", report.Diagnostics), Does.Contain("ambiguous: LeftLowerLeg"));
+
+            MmdHumanoidProxyRigResult proxyResult = MmdHumanoidProxyRigFactory.CreateProxyRig(model);
+            try
+            {
+                Assert.That(proxyResult.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.AmbiguousReadiness));
+
+                MmdHumanoidAvatarBuildResult avatarResult =
+                    MmdHumanoidProxyRigFactory.BuildAvatar(proxyResult);
+
+                Assert.That(avatarResult.Avatar, Is.Null);
+                Assert.That(string.Join("\n", avatarResult.Diagnostics),
+                    Does.Contain("skipped because proxy rig readiness is Ambiguous"));
+            }
+            finally
+            {
+                if (proxyResult.ProxyRoot != null)
+                {
+                    Object.DestroyImmediate(proxyResult.ProxyRoot);
+                }
+            }
+        }
+
+        [Test]
+        public void FingerDistalDuplicateCandidatesRemainReadyAndBuildAvatar()
+        {
+            MmdModelDefinition model = CreateHumanoidMappingModelWithOrigins();
+            AddTdaStyleFingerDistalDuplicates(model);
+
+            MmdHumanoidBoneMappingReport report = MmdHumanoidBoneMappingEvaluator.Evaluate(model);
+
+            Assert.That(report.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
+            Assert.That(report.RequiredMappedBoneCount, Is.EqualTo(16));
+            Assert.That(report.MissingRequiredBoneCount, Is.EqualTo(0));
+            Assert.That(report.AmbiguousMappingCount, Is.EqualTo(8));
+            Assert.That(string.Join("\n", report.Diagnostics),
+                Does.Contain("ambiguous: LeftIndexDistal")
+                    .And.Contain("ambiguous: RightLittleDistal"));
+
+            MmdHumanoidProxyRigResult proxyResult = MmdHumanoidProxyRigFactory.CreateProxyRig(model);
+            MmdHumanoidAvatarBuildResult? avatarResult = null;
+            try
+            {
+                Assert.That(proxyResult.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
+                MmdHumanoidBoneMappingMatch leftIndexDistal =
+                    proxyResult.Matches.Single(match => match.HumanBone == HumanBodyBones.LeftIndexDistal);
+                Assert.That(leftIndexDistal.MmdBoneName, Is.EqualTo("左人指３"));
+
+                avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(proxyResult);
+
+                Assert.That(avatarResult.Avatar, Is.Not.Null);
+                Assert.That(avatarResult.Avatar!.isValid, Is.True);
+                Assert.That(avatarResult.Avatar.isHuman, Is.True);
+                Assert.That(avatarResult.IsValidHumanAvatar, Is.True);
+            }
+            finally
+            {
+                if (avatarResult?.Avatar != null)
+                {
+                    Object.DestroyImmediate(avatarResult.Avatar, allowDestroyingAssets: true);
+                }
+
+                if (proxyResult.ProxyRoot != null)
+                {
+                    Object.DestroyImmediate(proxyResult.ProxyRoot);
                 }
             }
         }
@@ -1152,7 +1231,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void FingerDuplicateCandidatesReportAmbiguousDiagnostics()
+        public void FingerDuplicateCandidatesKeepAmbiguousDiagnosticsWithoutOverridingMissingRequired()
         {
             var model = new MmdModelDefinition();
             AddBone(model, 0, "左人指３", -1);
@@ -1160,7 +1239,7 @@ namespace Mmd.Tests
 
             MmdHumanoidBoneMappingReport report = MmdHumanoidBoneMappingEvaluator.Evaluate(model);
 
-            Assert.That(report.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.AmbiguousReadiness));
+            Assert.That(report.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.MissingRequiredReadiness));
             Assert.That(report.AmbiguousMappingCount, Is.EqualTo(1));
             Assert.That(string.Join("\n", report.Diagnostics), Does.Contain("ambiguous: LeftIndexDistal"));
         }
@@ -1506,6 +1585,58 @@ namespace Mmd.Tests
             AddBoneWithOrigin(model, 18, "右肩", 1, new[] { -15f, 135f, 0f });
 
             return model;
+        }
+
+        private static void AddTdaStyleFingerDistalDuplicates(MmdModelDefinition model)
+        {
+            AddFingerChain(model, "左人指", 12, new[] { 78f, 137f, 2f }, duplicateDistalTip: true);
+            AddFingerChain(model, "右人指", 15, new[] { -78f, 137f, 2f }, duplicateDistalTip: true);
+            AddFingerChain(model, "左中指", 12, new[] { 80f, 135f, 0f }, duplicateDistalTip: true);
+            AddFingerChain(model, "右中指", 15, new[] { -80f, 135f, 0f }, duplicateDistalTip: true);
+            AddFingerChain(model, "左薬指", 12, new[] { 78f, 133f, -2f }, duplicateDistalTip: true);
+            AddFingerChain(model, "右薬指", 15, new[] { -78f, 133f, -2f }, duplicateDistalTip: true);
+            AddFingerChain(model, "左小指", 12, new[] { 76f, 131f, -4f }, duplicateDistalTip: true);
+            AddFingerChain(model, "右小指", 15, new[] { -76f, 131f, -4f }, duplicateDistalTip: true);
+        }
+
+        private static void AddFingerChain(
+            MmdModelDefinition model,
+            string prefix,
+            int handParentIndex,
+            float[] baseOrigin,
+            bool duplicateDistalTip)
+        {
+            int proximalIndex = model.bones.Count;
+            AddBoneWithOrigin(model, proximalIndex, prefix + "１", handParentIndex, baseOrigin);
+            int intermediateIndex = model.bones.Count;
+            AddBoneWithOrigin(
+                model,
+                intermediateIndex,
+                prefix + "２",
+                proximalIndex,
+                new[] { baseOrigin[0] + FingerDirection(baseOrigin[0]) * 4f, baseOrigin[1], baseOrigin[2] });
+            int distalIndex = model.bones.Count;
+            AddBoneWithOrigin(
+                model,
+                distalIndex,
+                prefix + "３",
+                intermediateIndex,
+                new[] { baseOrigin[0] + FingerDirection(baseOrigin[0]) * 8f, baseOrigin[1], baseOrigin[2] });
+
+            if (duplicateDistalTip)
+            {
+                AddBoneWithOrigin(
+                    model,
+                    model.bones.Count,
+                    prefix + "先",
+                    distalIndex,
+                    new[] { baseOrigin[0] + FingerDirection(baseOrigin[0]) * 11f, baseOrigin[1], baseOrigin[2] });
+            }
+        }
+
+        private static float FingerDirection(float x)
+        {
+            return x < 0f ? -1f : 1f;
         }
 
         private static MmdModelDefinition CreateStandardMmdSiblingTorsoModel()
