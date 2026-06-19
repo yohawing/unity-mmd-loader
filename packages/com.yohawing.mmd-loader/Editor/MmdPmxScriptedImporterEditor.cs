@@ -154,11 +154,11 @@ namespace Mmd.Editor
                 currentType = (MmdPmxAnimationType)animationTypeProperty.enumValueIndex;
             }
 
-            // When Humanoid, show bone mapping readiness.
+            // When Humanoid, show read-only Avatar import status.
             if (currentType == MmdPmxAnimationType.Humanoid && asset != null)
             {
                 EditorGUILayout.Space();
-                EditorGUILayout.LabelField("Humanoid Bone Mapping", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("Humanoid Avatar", EditorStyles.boldLabel);
                 using (new EditorGUI.DisabledScope(true))
                 {
                     EditorGUILayout.TextField("Avatar Readiness", asset.HumanoidAvatarReadiness);
