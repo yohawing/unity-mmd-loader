@@ -106,6 +106,64 @@ namespace Mmd.Tests
             }
         }
 
+        [Test]
+        public void ApplyRetargetNowAppliesAppendAfterRetargetGateIsReady()
+        {
+            RetargetFixture fixture = CreateFixture(controllerAssigned: true);
+            GameObject? appendTargetObject = null;
+            try
+            {
+                HumanBodyBones parentHumanBone = HumanBodyBones.LeftHand;
+                Transform parentNative = fixture.NativeBones[fixture.IndexByHumanBone[parentHumanBone]];
+                appendTargetObject = new GameObject("left-hand-D");
+                Transform appendTarget = appendTargetObject.transform;
+                appendTarget.SetParent(fixture.Root.transform, worldPositionStays: false);
+                Quaternion targetBind = Quaternion.Euler(7f, 8f, 9f);
+                appendTarget.localRotation = targetBind;
+
+                var appendEntries = new[]
+                {
+                    new MmdHumanoidAppendTransformBinding(
+                        appendTarget,
+                        targetMmdBoneIndex: 100,
+                        parentNative,
+                        appendParentMmdBoneIndex: fixture.IndexByHumanBone[parentHumanBone],
+                        appendRatio: 1.0f,
+                        appendRotation: true,
+                        appendTranslation: false,
+                        appendLocal: true,
+                        targetBind,
+                        appendTarget.localPosition,
+                        parentNative.localRotation,
+                        parentNative.localPosition,
+                        evaluationOrder: 100)
+                };
+                fixture.Retargeter.Configure(
+                    fixture.ProxyRig.ProxyRoot!.transform,
+                    fixture.Retargeter.Entries,
+                    appendEntries);
+
+                SetProxyRotations(fixture.ProxyRig);
+                Quaternion expectedParentRotation = fixture.ProxyRig.BoneMap[parentHumanBone].localRotation;
+
+                MmdHumanoidRetargeterResult result = fixture.Retargeter.ApplyRetargetNow();
+
+                Assert.That(fixture.Retargeter.LastGate, Is.EqualTo(MmdHumanoidRuntimeRetargetGate.Ready));
+                Assert.That(result.CopiedBoneCount, Is.EqualTo(TestedBones.Length));
+                Assert.That(Quaternion.Angle(parentNative.localRotation, expectedParentRotation), Is.LessThan(0.001f));
+                Assert.That(Quaternion.Angle(appendTarget.localRotation, targetBind * expectedParentRotation), Is.LessThan(0.001f));
+            }
+            finally
+            {
+                if (appendTargetObject != null)
+                {
+                    Object.DestroyImmediate(appendTargetObject);
+                }
+
+                fixture.Destroy();
+            }
+        }
+
         private static RetargetFixture CreateFixture(bool controllerAssigned)
         {
             MmdModelDefinition model = CreateHumanoidMappingModelWithOrigins();
@@ -146,7 +204,7 @@ namespace Mmd.Tests
             }
 
             MmdHumanoidRuntimeRetargeter retargeter = root.AddComponent<MmdHumanoidRuntimeRetargeter>();
-            retargeter.Configure(proxyRig.ProxyRoot.transform, entries);
+            retargeter.Configure(proxyRig.ProxyRoot.transform, entries, System.Array.Empty<MmdHumanoidAppendTransformBinding>());
 
             return new RetargetFixture(
                 root,

@@ -21,10 +21,13 @@ namespace Mmd.UnityIntegration
     {
         [SerializeField] private Transform? proxyRoot;
         [SerializeField] private List<MmdHumanoidRetargetBinding> entries = new();
+        [SerializeField] private List<MmdHumanoidAppendTransformBinding> appendEntries = new();
 
         public Transform? ProxyRoot => proxyRoot;
 
         public IReadOnlyList<MmdHumanoidRetargetBinding> Entries => entries;
+
+        public IReadOnlyList<MmdHumanoidAppendTransformBinding> AppendEntries => appendEntries;
 
         public MmdHumanoidRuntimeRetargetGate LastGate { get; private set; } =
             MmdHumanoidRuntimeRetargetGate.MissingBindings;
@@ -35,12 +38,16 @@ namespace Mmd.UnityIntegration
 
         public void Configure(
             Transform? proxyRoot,
-            IReadOnlyList<MmdHumanoidRetargetBinding>? bindings)
+            IReadOnlyList<MmdHumanoidRetargetBinding>? bindings,
+            IReadOnlyList<MmdHumanoidAppendTransformBinding>? appendBindings)
         {
             this.proxyRoot = proxyRoot;
             entries = bindings != null
                 ? new List<MmdHumanoidRetargetBinding>(bindings)
                 : new List<MmdHumanoidRetargetBinding>();
+            appendEntries = appendBindings != null
+                ? new List<MmdHumanoidAppendTransformBinding>(appendBindings)
+                : new List<MmdHumanoidAppendTransformBinding>();
             LastGate = EvaluateRetargetGate(requireAnimatorDriver: true);
             LastResult = null;
         }
@@ -59,6 +66,7 @@ namespace Mmd.UnityIntegration
             // MmdHumanoidRetargetBinding with cached proxy rest/native bind rotations and apply:
             // native.localRotation = nativeBind * inverse(proxyRest) * proxyCurrent.
             LastResult = MmdHumanoidRetargeter.RetargetPose(entries);
+            MmdHumanoidAppendTransformApplier.Apply(appendEntries);
             return LastResult;
         }
 
@@ -74,6 +82,7 @@ namespace Mmd.UnityIntegration
             }
 
             LastResult = MmdHumanoidRetargeter.RetargetPose(entries);
+            MmdHumanoidAppendTransformApplier.Apply(appendEntries);
             return LastResult;
         }
 

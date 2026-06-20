@@ -74,7 +74,10 @@ namespace Mmd.Tests
                         fixture.ProxyRig.BoneMap[HumanBodyBones.LeftHand],
                         null)
                 };
-                fixture.Retargeter.Configure(fixture.ProxyRig.ProxyRoot!.transform, nativeWithNullEntry);
+                fixture.Retargeter.Configure(
+                    fixture.ProxyRig.ProxyRoot!.transform,
+                    nativeWithNullEntry,
+                    System.Array.Empty<MmdHumanoidAppendTransformBinding>());
 
                 timelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
                 MmdHumanoidRetargetTrack track =
@@ -171,7 +174,10 @@ namespace Mmd.Tests
                     }
                 }
 
-                fixture.Retargeter.Configure(fixture.ProxyRig.ProxyRoot!.transform, entries);
+                fixture.Retargeter.Configure(
+                    fixture.ProxyRig.ProxyRoot!.transform,
+                    entries,
+                    System.Array.Empty<MmdHumanoidAppendTransformBinding>());
 
                 timelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
                 MmdHumanoidRetargetTrack track =
@@ -231,6 +237,103 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void GatherPropertiesRegistersAppendTargetLocalRotationAndPosition()
+        {
+            RetargetFixture fixture = CreateFixture();
+            TimelineAsset? timelineAsset = null;
+            GameObject? directorObject = null;
+            GameObject? appendParentObject = null;
+            GameObject? appendTargetObject = null;
+            try
+            {
+                appendParentObject = new GameObject("append-parent");
+                appendTargetObject = new GameObject("append-target");
+                Transform appendParent = appendParentObject.transform;
+                Transform appendTarget = appendTargetObject.transform;
+
+                var appendEntries = new[]
+                {
+                    new MmdHumanoidAppendTransformBinding(
+                        appendTarget,
+                        targetMmdBoneIndex: 101,
+                        appendParent,
+                        appendParentMmdBoneIndex: 100,
+                        appendRatio: 0.75f,
+                        appendRotation: true,
+                        appendTranslation: true,
+                        appendLocal: false,
+                        appendTarget.localRotation,
+                        appendTarget.localPosition,
+                        appendParent.localRotation,
+                        appendParent.localPosition,
+                        evaluationOrder: 101)
+                };
+                fixture.Retargeter.Configure(
+                    fixture.ProxyRig.ProxyRoot!.transform,
+                    fixture.Retargeter.Entries,
+                    appendEntries);
+
+                timelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
+                MmdHumanoidRetargetTrack track =
+                    timelineAsset.CreateTrack<MmdHumanoidRetargetTrack>(null, "MMD Humanoid Retarget");
+                track.CreateClip<MmdHumanoidRetargetClip>();
+
+                directorObject = new GameObject("humanoid-retarget-gather-append-director");
+                PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
+                director.playableAsset = timelineAsset;
+                director.SetGenericBinding(track, fixture.Retargeter);
+
+                var collector = new SpyPropertyCollector();
+                track.GatherProperties(director, collector);
+
+                string[] expectedProperties =
+                {
+                    "m_LocalRotation.x",
+                    "m_LocalRotation.y",
+                    "m_LocalRotation.z",
+                    "m_LocalRotation.w",
+                    "m_LocalPosition.x",
+                    "m_LocalPosition.y",
+                    "m_LocalPosition.z"
+                };
+
+                foreach (string propertyName in expectedProperties)
+                {
+                    Assert.That(collector.Entries.Count(entry =>
+                            entry.GameObject == appendTarget.gameObject &&
+                            entry.ComponentType == typeof(Transform) &&
+                            entry.PropertyName == propertyName),
+                        Is.EqualTo(1),
+                        "append target should register " + propertyName);
+                }
+            }
+            finally
+            {
+                if (directorObject != null)
+                {
+                    UnityObject.DestroyImmediate(directorObject);
+                }
+
+                if (timelineAsset != null)
+                {
+                    UnityObject.DestroyImmediate(timelineAsset);
+                }
+
+                if (appendParentObject != null)
+                {
+                    UnityObject.DestroyImmediate(appendParentObject);
+                }
+
+                if (appendTargetObject != null)
+                {
+                    UnityObject.DestroyImmediate(appendTargetObject);
+                }
+
+                fixture.Destroy();
+            }
+        }
+
+        [Test]
         public void ShouldSuppressLateUpdateAfterTimelineDriveMatchesPlaybackControllerWindow()
         {
             Assert.That(MmdHumanoidRuntimeRetargeter.ShouldSuppressLateUpdateAfterTimelineDrive(10, 10),
@@ -275,7 +378,7 @@ namespace Mmd.Tests
             }
 
             MmdHumanoidRuntimeRetargeter retargeter = root.AddComponent<MmdHumanoidRuntimeRetargeter>();
-            retargeter.Configure(proxyRig.ProxyRoot.transform, entries);
+            retargeter.Configure(proxyRig.ProxyRoot.transform, entries, System.Array.Empty<MmdHumanoidAppendTransformBinding>());
 
             return new RetargetFixture(
                 root,

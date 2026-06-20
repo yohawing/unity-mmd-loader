@@ -40,7 +40,7 @@ namespace Mmd.Editor
         MmdBasicUrpToon = 0
     }
 
-    [ScriptedImporter(18, "pmx")]
+    [ScriptedImporter(19, "pmx")]
     public sealed class MmdPmxScriptedImporter : ScriptedImporter
     {
         [SerializeField] private float importScale = 1.0f;
@@ -107,7 +107,8 @@ namespace Mmd.Editor
                         model.name,
                         shouldBuildHumanoid: animationType == MmdPmxAnimationType.Humanoid,
                         animationTypeLabel: animationType.ToString(),
-                        mappingOverrides: humanoidBoneMappingOverrides);
+                        mappingOverrides: humanoidBoneMappingOverrides,
+                        model: model);
                 Avatar? importedAvatar = avatarImport.Avatar;
                 GameObject? importedHumanoidProxyRoot = avatarImport.ProxyRoot;
                 string avatarReadiness = avatarImport.Readiness;
@@ -148,7 +149,8 @@ namespace Mmd.Editor
                     importedAvatar,
                     importedHumanoidProxyRoot,
                     avatarReadiness,
-                    avatarImport.RetargetBindings);
+                    avatarImport.RetargetBindings,
+                    avatarImport.AppendBindings);
 
                 if (animationType == MmdPmxAnimationType.Generic && genericAvatar == null)
                 {
@@ -221,7 +223,8 @@ namespace Mmd.Editor
             Avatar? humanoidAvatar,
             GameObject? proxyRoot,
             string avatarReadiness,
-            System.Collections.Generic.IReadOnlyList<MmdHumanoidRetargetBinding> retargetBindings)
+            System.Collections.Generic.IReadOnlyList<MmdHumanoidRetargetBinding> retargetBindings,
+            System.Collections.Generic.IReadOnlyList<MmdHumanoidAppendTransformBinding> appendBindings)
         {
             if (importedAnimationType != MmdPmxAnimationType.Humanoid
                 || humanoidAvatar == null
@@ -238,7 +241,7 @@ namespace Mmd.Editor
                 retargeter = root.AddComponent<MmdHumanoidRuntimeRetargeter>();
             }
 
-            retargeter.Configure(proxyRoot.transform, retargetBindings);
+            retargeter.Configure(proxyRoot.transform, retargetBindings, appendBindings);
             return retargeter;
         }
 

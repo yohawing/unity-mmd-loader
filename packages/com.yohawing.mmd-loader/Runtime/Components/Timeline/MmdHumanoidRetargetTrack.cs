@@ -43,6 +43,31 @@ namespace Mmd.Timeline
                 driver.AddFromName<Transform>(translationTargetObject, "m_LocalPosition.y");
                 driver.AddFromName<Transform>(translationTargetObject, "m_LocalPosition.z");
             }
+
+            foreach (MmdHumanoidAppendTransformBinding entry in retargeter.AppendEntries)
+            {
+                Transform? targetTransform = entry.TargetTransform;
+                if (targetTransform == null)
+                {
+                    continue;
+                }
+
+                GameObject targetObject = targetTransform.gameObject;
+                if (entry.AppendRotation)
+                {
+                    driver.AddFromName<Transform>(targetObject, "m_LocalRotation.x");
+                    driver.AddFromName<Transform>(targetObject, "m_LocalRotation.y");
+                    driver.AddFromName<Transform>(targetObject, "m_LocalRotation.z");
+                    driver.AddFromName<Transform>(targetObject, "m_LocalRotation.w");
+                }
+
+                if (entry.AppendTranslation)
+                {
+                    driver.AddFromName<Transform>(targetObject, "m_LocalPosition.x");
+                    driver.AddFromName<Transform>(targetObject, "m_LocalPosition.y");
+                    driver.AddFromName<Transform>(targetObject, "m_LocalPosition.z");
+                }
+            }
         }
     }
 }
