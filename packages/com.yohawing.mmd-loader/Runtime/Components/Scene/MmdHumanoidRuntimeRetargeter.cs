@@ -31,6 +31,8 @@ namespace Mmd.UnityIntegration
 
         public MmdHumanoidRetargeterResult? LastResult { get; private set; }
 
+        private int lastTimelineDriveFrameCount = int.MinValue / 2;
+
         public void Configure(
             Transform? proxyRoot,
             IReadOnlyList<MmdHumanoidRetargetBinding>? bindings)
@@ -39,13 +41,13 @@ namespace Mmd.UnityIntegration
             entries = bindings != null
                 ? new List<MmdHumanoidRetargetBinding>(bindings)
                 : new List<MmdHumanoidRetargetBinding>();
-            LastGate = EvaluateRetargetGate();
+            LastGate = EvaluateRetargetGate(requireAnimatorDriver: true);
             LastResult = null;
         }
 
         public MmdHumanoidRetargeterResult ApplyRetargetNow()
         {
-            MmdHumanoidRuntimeRetargetGate gate = EvaluateRetargetGate();
+            MmdHumanoidRuntimeRetargetGate gate = EvaluateRetargetGate(requireAnimatorDriver: true);
             LastGate = gate;
             if (gate != MmdHumanoidRuntimeRetargetGate.Ready)
             {
@@ -60,7 +62,22 @@ namespace Mmd.UnityIntegration
             return LastResult;
         }
 
-        internal MmdHumanoidRuntimeRetargetGate EvaluateRetargetGate()
+        internal MmdHumanoidRetargeterResult ApplyRetargetFromTimeline()
+        {
+            lastTimelineDriveFrameCount = Time.frameCount;
+            MmdHumanoidRuntimeRetargetGate gate = EvaluateRetargetGate(requireAnimatorDriver: false);
+            LastGate = gate;
+            if (gate != MmdHumanoidRuntimeRetargetGate.Ready)
+            {
+                LastResult = CreateNoOpResult(gate);
+                return LastResult;
+            }
+
+            LastResult = MmdHumanoidRetargeter.RetargetPose(entries);
+            return LastResult;
+        }
+
+        internal MmdHumanoidRuntimeRetargetGate EvaluateRetargetGate(bool requireAnimatorDriver)
         {
             if (!isActiveAndEnabled)
             {
@@ -73,7 +90,9 @@ namespace Mmd.UnityIntegration
                 return MmdHumanoidRuntimeRetargetGate.MissingHumanAnimator;
             }
 
-            if (animator.runtimeAnimatorController == null && !animator.hasBoundPlayables)
+            if (requireAnimatorDriver &&
+                animator.runtimeAnimatorController == null &&
+                !animator.hasBoundPlayables)
             {
                 return MmdHumanoidRuntimeRetargetGate.AnimatorNotDriven;
             }
@@ -94,7 +113,21 @@ namespace Mmd.UnityIntegration
 
         private void LateUpdate()
         {
+            if (ShouldSuppressLateUpdateAfterTimelineDrive(lastTimelineDriveFrameCount, Time.frameCount))
+            {
+                return;
+            }
+
             ApplyRetargetNow();
+        }
+
+        internal static bool ShouldSuppressLateUpdateAfterTimelineDrive(
+            int lastTimelineDriveFrameCount,
+            int currentFrameCount)
+        {
+            return MmdUnityPlaybackController.ShouldSuppressSelfTick(
+                lastTimelineDriveFrameCount,
+                currentFrameCount);
         }
 
         private static bool IsPlaybackControllerDriving(MmdUnityPlaybackController? playbackController)
