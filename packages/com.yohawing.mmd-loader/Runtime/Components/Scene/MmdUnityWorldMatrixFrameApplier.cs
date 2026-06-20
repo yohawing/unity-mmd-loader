@@ -27,6 +27,7 @@ namespace Mmd.UnityIntegration
             }
 
             Transform root = instance.Root.transform;
+            float importScale = NormalizeImportScale(instance.ImportScale);
             for (int boneIndex = 0; boneIndex < boneCount; boneIndex++)
             {
                 Transform bone = instance.BoneTransforms[boneIndex];
@@ -36,7 +37,7 @@ namespace Mmd.UnityIntegration
                     worldMatrices[offset + 13],
                     worldMatrices[offset + 14]);
                 Quaternion mmdRotation = ExtractColumnMajorRotation(worldMatrices, offset);
-                bone.position = root.TransformPoint(ToUnityModelPosition(mmdPosition));
+                bone.position = root.TransformPoint(ToUnityModelPosition(mmdPosition) * importScale);
                 bone.rotation = root.rotation * ToUnityModelRotation(mmdRotation);
                 bone.localScale = Vector3.one;
             }
@@ -62,6 +63,11 @@ namespace Mmd.UnityIntegration
         private static Quaternion ToUnityModelRotation(Quaternion rotation)
         {
             return new Quaternion(-rotation.x, rotation.y, -rotation.z, rotation.w);
+        }
+
+        private static float NormalizeImportScale(float importScale)
+        {
+            return float.IsFinite(importScale) && importScale > 0.0f ? importScale : 1.0f;
         }
     }
 }
