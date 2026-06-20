@@ -393,6 +393,59 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void RetargetAppliesBindRotationDeltaAndReturnsNativeBindAtProxyBind()
+        {
+            var proxyObject = new GameObject("proxy-arm");
+            var nativeObject = new GameObject("native-arm");
+            try
+            {
+                Transform proxy = proxyObject.transform;
+                Transform native = nativeObject.transform;
+                Quaternion proxyBind = Quaternion.Euler(10f, 20f, 30f);
+                Quaternion nativeBind = Quaternion.Euler(-15f, 35f, 5f);
+
+                proxy.localRotation = proxyBind;
+                native.localRotation = Quaternion.identity;
+
+                var entries = new[]
+                {
+                    new MmdHumanoidRetargetBinding(
+                        HumanBodyBones.LeftUpperArm,
+                        mmdBoneIndex: 10,
+                        proxyTransform: proxy,
+                        nativeTransform: native,
+                        proxyBindLocalRotation: proxyBind,
+                        nativeBindLocalRotation: nativeBind)
+                };
+
+                MmdHumanoidRetargeterResult result = MmdHumanoidRetargeter.RetargetPose(entries);
+
+                Assert.That(result.CopiedBoneCount, Is.EqualTo(1));
+                Assert.That(result.SkippedBoneCount, Is.EqualTo(0));
+                Assert.That(Quaternion.Angle(native.localRotation, nativeBind), Is.LessThan(0.001f),
+                    "proxy current at proxy bind must retarget back to native bind.");
+
+                Quaternion proxyCurrent = Quaternion.Euler(40f, -25f, 15f);
+                proxy.localRotation = proxyCurrent;
+
+                result = MmdHumanoidRetargeter.RetargetPose(entries);
+
+                Quaternion expected = nativeBind * Quaternion.Inverse(proxyBind) * proxyCurrent;
+                Quaternion wrongOrder = proxyCurrent * Quaternion.Inverse(proxyBind) * nativeBind;
+                Assert.That(result.CopiedBoneCount, Is.EqualTo(1));
+                Assert.That(Quaternion.Angle(native.localRotation, expected), Is.LessThan(0.001f),
+                    "retarget order must be nativeBind * inverse(proxyBind) * proxyCurrent.");
+                Assert.That(Quaternion.Angle(native.localRotation, wrongOrder), Is.GreaterThan(0.01f),
+                    "test rotations must distinguish the incorrect multiplication order.");
+            }
+            finally
+            {
+                Object.DestroyImmediate(proxyObject);
+                Object.DestroyImmediate(nativeObject);
+            }
+        }
+
+        [Test]
         public void RetargetRejectsOutOfRangeMmdBoneIndex()
         {
             // Arrange: create a model where the last bone has an index beyond native array.

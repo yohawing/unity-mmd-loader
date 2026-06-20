@@ -14,6 +14,8 @@ namespace Mmd
         [SerializeField] private int mmdBoneIndex = -1;
         [SerializeField] private Transform? proxyTransform;
         [SerializeField] private Transform? nativeTransform;
+        [SerializeField] private Quaternion proxyBindLocalRotation = Quaternion.identity;
+        [SerializeField] private Quaternion nativeBindLocalRotation = Quaternion.identity;
         [SerializeField] private bool copyLocalPosition;
         [SerializeField] private Transform? translationTargetTransform;
         [SerializeField] private int translationTargetMmdBoneIndex = -1;
@@ -41,12 +43,58 @@ namespace Mmd
             int mmdBoneIndex,
             Transform? proxyTransform,
             Transform? nativeTransform,
+            Quaternion proxyBindLocalRotation,
+            Quaternion nativeBindLocalRotation)
+            : this(humanBone, mmdBoneIndex, proxyTransform, nativeTransform)
+        {
+            this.proxyBindLocalRotation = proxyBindLocalRotation;
+            this.nativeBindLocalRotation = nativeBindLocalRotation;
+        }
+
+        public MmdHumanoidRetargetBinding(
+            HumanBodyBones humanBone,
+            int mmdBoneIndex,
+            Transform? proxyTransform,
+            Transform? nativeTransform,
             bool copyLocalPosition,
             Transform? translationTargetTransform,
             int translationTargetMmdBoneIndex,
             Vector3 proxyBindLocalPosition,
             Vector3 translationTargetBindLocalPosition)
-            : this(humanBone, mmdBoneIndex, proxyTransform, nativeTransform)
+            : this(
+                humanBone,
+                mmdBoneIndex,
+                proxyTransform,
+                nativeTransform,
+                Quaternion.identity,
+                Quaternion.identity,
+                copyLocalPosition,
+                translationTargetTransform,
+                translationTargetMmdBoneIndex,
+                proxyBindLocalPosition,
+                translationTargetBindLocalPosition)
+        {
+        }
+
+        public MmdHumanoidRetargetBinding(
+            HumanBodyBones humanBone,
+            int mmdBoneIndex,
+            Transform? proxyTransform,
+            Transform? nativeTransform,
+            Quaternion proxyBindLocalRotation,
+            Quaternion nativeBindLocalRotation,
+            bool copyLocalPosition,
+            Transform? translationTargetTransform,
+            int translationTargetMmdBoneIndex,
+            Vector3 proxyBindLocalPosition,
+            Vector3 translationTargetBindLocalPosition)
+            : this(
+                humanBone,
+                mmdBoneIndex,
+                proxyTransform,
+                nativeTransform,
+                proxyBindLocalRotation,
+                nativeBindLocalRotation)
         {
             this.copyLocalPosition = copyLocalPosition;
             this.translationTargetTransform = translationTargetTransform;
@@ -62,6 +110,10 @@ namespace Mmd
         public Transform? ProxyTransform => proxyTransform;
 
         public Transform? NativeTransform => nativeTransform;
+
+        public Quaternion ProxyBindLocalRotation => proxyBindLocalRotation;
+
+        public Quaternion NativeBindLocalRotation => nativeBindLocalRotation;
 
         public bool CopyLocalPosition => copyLocalPosition;
 
@@ -304,7 +356,10 @@ namespace Mmd
                         }
                         else
                         {
-                            nativeTransform.localRotation = proxyRot;
+                            nativeTransform.localRotation =
+                                entry.NativeBindLocalRotation *
+                                Quaternion.Inverse(entry.ProxyBindLocalRotation) *
+                                proxyRot;
                             copiedCount++;
                         }
                     }

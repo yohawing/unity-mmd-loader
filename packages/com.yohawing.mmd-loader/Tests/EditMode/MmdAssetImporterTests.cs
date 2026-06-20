@@ -306,6 +306,12 @@ namespace Mmd.Tests
                 Assert.That(entry.ProxyTransform, Is.Not.Null, entry.HumanBone + " proxy transform");
                 Assert.That(entry.NativeTransform, Is.Not.Null, entry.HumanBone + " native transform");
                 Assert.That(entry.MmdBoneIndex, Is.GreaterThanOrEqualTo(0), entry.HumanBone + " MMD bone index");
+                Assert.That(Quaternion.Angle(entry.ProxyBindLocalRotation, entry.ProxyTransform!.localRotation),
+                    Is.LessThan(0.001f),
+                    entry.HumanBone + " proxy bind rotation must be captured after Avatar T-pose.");
+                Assert.That(Quaternion.Angle(entry.NativeBindLocalRotation, entry.NativeTransform!.localRotation),
+                    Is.LessThan(0.001f),
+                    entry.HumanBone + " native bind rotation must be captured from the imported hierarchy.");
             }
 
             MmdHumanoidRetargetBinding hipsEntry = default!;
@@ -338,6 +344,19 @@ namespace Mmd.Tests
                 Assert.That(IsAcceptedHipsTranslationTargetName(hipsEntry.TranslationTargetTransform!.name), Is.True,
                     "Hips translation target must follow the configured move-bone priority or fallback.");
             }
+        }
+
+        [Test]
+        public void PmxScriptedImporterVersionIsTwentyOneForHumanoidBindRestChange()
+        {
+            object[] attributes = typeof(MmdPmxScriptedImporter).GetCustomAttributes(
+                typeof(ScriptedImporterAttribute),
+                inherit: false);
+
+            Assert.That(attributes, Has.Length.EqualTo(1));
+            var attribute = (ScriptedImporterAttribute)attributes[0];
+            Assert.That(attribute.version, Is.EqualTo(21),
+                "PMX importer version must force reimport for serialized retarget bind rotations and T-pose Avatar rest.");
         }
 
         [Test]

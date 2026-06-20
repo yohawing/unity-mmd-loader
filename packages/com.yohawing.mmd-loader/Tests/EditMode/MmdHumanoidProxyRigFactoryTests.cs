@@ -584,6 +584,79 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void BuildAvatarAppliesGeometricTPoseToUpperArmsOnly()
+        {
+            MmdModelDefinition model = CreateStandardMmdSiblingTorsoAPoseModel();
+
+            MmdHumanoidProxyRigResult proxyResult = MmdHumanoidProxyRigFactory.CreateProxyRig(model);
+            Assert.That(proxyResult.ProxyRoot, Is.Not.Null);
+            Assert.That(proxyResult.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
+
+            Transform hips = proxyResult.BoneMap[HumanBodyBones.Hips];
+            Transform spine = proxyResult.BoneMap[HumanBodyBones.Spine];
+            Transform chest = proxyResult.BoneMap[HumanBodyBones.Chest];
+            Transform head = proxyResult.BoneMap[HumanBodyBones.Head];
+            Transform leftUpperLeg = proxyResult.BoneMap[HumanBodyBones.LeftUpperLeg];
+            Transform rightUpperLeg = proxyResult.BoneMap[HumanBodyBones.RightUpperLeg];
+            Transform leftUpperArm = proxyResult.BoneMap[HumanBodyBones.LeftUpperArm];
+            Transform leftLowerArm = proxyResult.BoneMap[HumanBodyBones.LeftLowerArm];
+            Transform rightUpperArm = proxyResult.BoneMap[HumanBodyBones.RightUpperArm];
+            Transform rightLowerArm = proxyResult.BoneMap[HumanBodyBones.RightLowerArm];
+
+            Vector3 hipsLocalPosition = hips.localPosition;
+            Quaternion hipsLocalRotation = hips.localRotation;
+            Vector3 spineLocalPosition = spine.localPosition;
+            Quaternion spineLocalRotation = spine.localRotation;
+            Vector3 chestLocalPosition = chest.localPosition;
+            Quaternion chestLocalRotation = chest.localRotation;
+            Vector3 headLocalPosition = head.localPosition;
+            Quaternion headLocalRotation = head.localRotation;
+            Vector3 leftUpperLegLocalPosition = leftUpperLeg.localPosition;
+            Quaternion leftUpperLegLocalRotation = leftUpperLeg.localRotation;
+            Vector3 rightUpperLegLocalPosition = rightUpperLeg.localPosition;
+            Quaternion rightUpperLegLocalRotation = rightUpperLeg.localRotation;
+
+            Vector3 leftBefore = (leftLowerArm.position - leftUpperArm.position).normalized;
+            Vector3 rightBefore = (rightLowerArm.position - rightUpperArm.position).normalized;
+            Assert.That(Vector3.Dot(leftBefore, Vector3.left), Is.LessThan(0.999f),
+                "fixture must start as an A-pose, not already a perfect left T-pose.");
+            Assert.That(Vector3.Dot(rightBefore, Vector3.right), Is.LessThan(0.999f),
+                "fixture must start as an A-pose, not already a perfect right T-pose.");
+
+            MmdHumanoidAvatarBuildResult avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(proxyResult);
+
+            Assert.That(avatarResult.IsValidHumanAvatar, Is.True, string.Join("\n", avatarResult.Diagnostics));
+            Assert.That(Vector3.Dot((leftLowerArm.position - leftUpperArm.position).normalized, Vector3.left),
+                Is.GreaterThan(0.999f),
+                "LeftUpperArm must point toward Unity -X after BuildAvatar T-pose capture.");
+            Assert.That(Vector3.Dot((rightLowerArm.position - rightUpperArm.position).normalized, Vector3.right),
+                Is.GreaterThan(0.999f),
+                "RightUpperArm must point toward Unity +X after BuildAvatar T-pose capture.");
+
+            Assert.That(hips.localPosition, Is.EqualTo(hipsLocalPosition).Within(1e-5f));
+            Assert.That(Quaternion.Angle(hips.localRotation, hipsLocalRotation), Is.LessThan(0.001f));
+            Assert.That(spine.localPosition, Is.EqualTo(spineLocalPosition).Within(1e-5f));
+            Assert.That(Quaternion.Angle(spine.localRotation, spineLocalRotation), Is.LessThan(0.001f));
+            Assert.That(chest.localPosition, Is.EqualTo(chestLocalPosition).Within(1e-5f));
+            Assert.That(Quaternion.Angle(chest.localRotation, chestLocalRotation), Is.LessThan(0.001f));
+            Assert.That(head.localPosition, Is.EqualTo(headLocalPosition).Within(1e-5f));
+            Assert.That(Quaternion.Angle(head.localRotation, headLocalRotation), Is.LessThan(0.001f));
+            Assert.That(leftUpperLeg.localPosition, Is.EqualTo(leftUpperLegLocalPosition).Within(1e-5f));
+            Assert.That(Quaternion.Angle(leftUpperLeg.localRotation, leftUpperLegLocalRotation), Is.LessThan(0.001f));
+            Assert.That(rightUpperLeg.localPosition, Is.EqualTo(rightUpperLegLocalPosition).Within(1e-5f));
+            Assert.That(Quaternion.Angle(rightUpperLeg.localRotation, rightUpperLegLocalRotation), Is.LessThan(0.001f));
+            Assert.That(avatarResult.Diagnostics, Has.Some.Contains("avatar-build-tpose: applied LeftUpperArm"));
+            Assert.That(avatarResult.Diagnostics, Has.Some.Contains("avatar-build-tpose: applied RightUpperArm"));
+
+            if (avatarResult.Avatar != null)
+            {
+                Object.DestroyImmediate(avatarResult.Avatar, allowDestroyingAssets: true);
+            }
+
+            Object.DestroyImmediate(proxyResult.ProxyRoot);
+        }
+
+        [Test]
         public void BuildAvatarWithMissingBonesStillReportsDiagnosticsAndNoAnimator()
         {
             // Arrange: only 3 required bones with origins.
@@ -1666,6 +1739,18 @@ namespace Mmd.Tests
             AddBoneWithOrigin(model, 20, "右腕", 19, new[] { -25f, 138f, 0f });
             AddBoneWithOrigin(model, 21, "右ひじ", 20, new[] { -50f, 138f, 0f });
             AddBoneWithOrigin(model, 22, "右手首", 21, new[] { -70f, 138f, 0f });
+
+            return model;
+        }
+
+        private static MmdModelDefinition CreateStandardMmdSiblingTorsoAPoseModel()
+        {
+            var model = CreateStandardMmdSiblingTorsoModel();
+
+            model.bones[17].origin = new[] { 50f, 128f, 0f };
+            model.bones[18].origin = new[] { 70f, 118f, 0f };
+            model.bones[21].origin = new[] { -50f, 128f, 0f };
+            model.bones[22].origin = new[] { -70f, 118f, 0f };
 
             return model;
         }

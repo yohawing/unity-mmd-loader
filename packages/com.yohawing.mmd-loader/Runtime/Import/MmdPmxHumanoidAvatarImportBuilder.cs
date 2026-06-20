@@ -161,6 +161,8 @@ namespace Mmd.UnityIntegration
                         match.MmdBoneIndex,
                         proxyTransform,
                         nativeTransform,
+                        proxyTransform.localRotation,
+                        nativeTransform != null ? nativeTransform.localRotation : Quaternion.identity,
                         copyLocalPosition: true,
                         translationTargetTransform: translationTarget!,
                         translationTargetMmdBoneIndex: translationTargetIndex,
@@ -173,7 +175,9 @@ namespace Mmd.UnityIntegration
                     match.HumanBone,
                     match.MmdBoneIndex,
                     proxyTransform,
-                    nativeTransform));
+                    nativeTransform,
+                    proxyTransform != null ? proxyTransform.localRotation : Quaternion.identity,
+                    nativeTransform != null ? nativeTransform.localRotation : Quaternion.identity));
             }
 
             return bindings;

@@ -62,9 +62,8 @@ namespace Mmd.UnityIntegration
                 return LastResult;
             }
 
-            // Slice 2 intentionally performs direct rotation copy. Future slices can extend
-            // MmdHumanoidRetargetBinding with cached proxy rest/native bind rotations and apply:
-            // native.localRotation = nativeBind * inverse(proxyRest) * proxyCurrent.
+            // RetargetPose applies cached bind-rotation deltas while preserving the
+            // identity-bind direct-copy behavior used by older bindings and tests.
             LastResult = MmdHumanoidRetargeter.RetargetPose(entries);
             MmdHumanoidAppendTransformApplier.Apply(appendEntries);
             return LastResult;

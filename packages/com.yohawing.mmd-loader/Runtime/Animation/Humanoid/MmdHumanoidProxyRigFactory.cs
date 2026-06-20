@@ -746,6 +746,7 @@ namespace Mmd
             // Build HumanDescription.
             int boneCount = proxyRig.BoneMap.Count;
             var humanDescription = new HumanDescription();
+            ApplyGeometricTPose(proxyRig, diagnostics);
 
             // --- skeleton ---
             var skeletonList = new List<SkeletonBone>(boneCount + 1);
@@ -846,6 +847,73 @@ namespace Mmd
             return new MmdHumanoidAvatarBuildResult(avatar, diagnostics.ToArray());
         }
 
+        internal static void ApplyGeometricTPose(
+            MmdHumanoidProxyRigResult proxyRig,
+            List<string> diagnostics)
+        {
+            if (proxyRig == null)
+                throw new ArgumentNullException(nameof(proxyRig));
+
+            if (diagnostics == null)
+                throw new ArgumentNullException(nameof(diagnostics));
+
+            ApplyGeometricArmTPose(
+                proxyRig,
+                diagnostics,
+                HumanBodyBones.LeftUpperArm,
+                HumanBodyBones.LeftLowerArm,
+                Vector3.left);
+            ApplyGeometricArmTPose(
+                proxyRig,
+                diagnostics,
+                HumanBodyBones.RightUpperArm,
+                HumanBodyBones.RightLowerArm,
+                Vector3.right);
+        }
+
+        private static void ApplyGeometricArmTPose(
+            MmdHumanoidProxyRigResult proxyRig,
+            List<string> diagnostics,
+            HumanBodyBones bone,
+            HumanBodyBones childBone,
+            Vector3 targetWorldDirection)
+        {
+            if (!proxyRig.BoneMap.TryGetValue(bone, out Transform boneTransform))
+            {
+                diagnostics.Add("avatar-build-tpose: skipped " + bone + " because bone is missing");
+                return;
+            }
+
+            if (!proxyRig.BoneMap.TryGetValue(childBone, out Transform childTransform))
+            {
+                diagnostics.Add("avatar-build-tpose: skipped " + bone + " because child " + childBone + " is missing");
+                return;
+            }
+
+            Vector3 currentDirection = childTransform.position - boneTransform.position;
+            if (!IsFiniteVector3(currentDirection) || currentDirection.sqrMagnitude < 1e-8f)
+            {
+                diagnostics.Add("avatar-build-tpose: skipped " + bone + " because direction is invalid");
+                return;
+            }
+
+            if (!IsFiniteVector3(targetWorldDirection) || targetWorldDirection.sqrMagnitude < 1e-8f)
+            {
+                diagnostics.Add("avatar-build-tpose: skipped " + bone + " because target direction is invalid");
+                return;
+            }
+
+            Quaternion deltaWorld = Quaternion.FromToRotation(
+                currentDirection.normalized,
+                targetWorldDirection.normalized);
+            Quaternion targetWorldRotation = deltaWorld * boneTransform.rotation;
+            Transform? parent = boneTransform.parent;
+            boneTransform.localRotation = parent != null
+                ? Quaternion.Inverse(parent.rotation) * targetWorldRotation
+                : targetWorldRotation;
+            diagnostics.Add("avatar-build-tpose: applied " + bone + " toward " + targetWorldDirection);
+        }
+
         private static void AddSkeletonBonesPreOrder(
             Transform parent,
             IReadOnlyDictionary<Transform, HumanBodyBones> humanBoneByTransform,
@@ -880,6 +948,13 @@ namespace Mmd
             if (origin == null || origin.Length < 3)
                 return Vector3.zero;
             return new Vector3(-origin[0], origin[1], -origin[2]);
+        }
+
+        private static bool IsFiniteVector3(Vector3 value)
+        {
+            return float.IsFinite(value.x) &&
+                   float.IsFinite(value.y) &&
+                   float.IsFinite(value.z);
         }
 
         /// <summary>
