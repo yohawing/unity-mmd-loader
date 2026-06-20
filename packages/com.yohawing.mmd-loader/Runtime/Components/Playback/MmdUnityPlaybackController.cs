@@ -20,6 +20,13 @@ namespace Mmd.UnityIntegration
         MissingBindings = 5
     }
 
+    internal enum LivePhysicsDriveSource
+    {
+        None = 0,
+        VmdForward = 1,
+        HumanoidRetarget = 2
+    }
+
     public sealed class MmdUnityPlaybackController : MonoBehaviour
     {
         private MmdUnityPlaybackBinding? binding;
@@ -43,6 +50,10 @@ namespace Mmd.UnityIntegration
         private int lastTimelineDriveFrameCount = int.MinValue / 2;
 
         private int lastHumanoidRetargetTimelineDriveFrameCount = int.MinValue / 2;
+        private int lastVmdLivePhysicsFrameCount = int.MinValue / 2;
+        private int humanoidLivePhysicsStepIndex = -1;
+        private int lastHumanoidLivePhysicsFrameCount = int.MinValue / 2;
+        private LivePhysicsDriveSource livePhysicsDriveSource = LivePhysicsDriveSource.None;
         private bool isApplyingPlaybackPose;
 
         private bool _userExplicitLive;
@@ -227,6 +238,7 @@ namespace Mmd.UnityIntegration
             IsPlaying = false;
             this.playOnStart = playOnStart;
             binding.SetPhysicsMode(physicsMode);
+            ResetLivePhysicsDriveSource();
             ConfigurationRevision++;
         }
 
@@ -804,7 +816,8 @@ namespace Mmd.UnityIntegration
                 return;
             }
 
-            ApplyHumanoidRetargetNow();
+            MmdHumanoidRetargeterResult result = ApplyHumanoidRetargetNow();
+            StepHumanoidRetargetLivePhysicsIfNeeded(result);
         }
 
         private bool HasHumanoidRetargetInputsForLateUpdate()
@@ -1140,13 +1153,16 @@ namespace Mmd.UnityIntegration
             }
 
             binding.SetPhysicsMode(mode);
+            ResetLivePhysicsDriveSource();
             if (mode == MmdPhysicsMode.Live)
             {
                 playbackFrame = 0.0f;
                 CurrentFrame = 0;
                 ApplyPlaybackPose(() =>
                 {
+                    PrepareLivePhysicsDriveSource(LivePhysicsDriveSource.VmdForward);
                     LastSnapshot = binding.ApplyFrame(0, frameRate);
+                    lastVmdLivePhysicsFrameCount = Time.frameCount;
                     ApplyEditableRigLayer("post-physics-live-frame");
                     return LastSnapshot;
                 });
@@ -1201,6 +1217,8 @@ namespace Mmd.UnityIntegration
                 {
                     binding.SetPhysicsMode(MmdPhysicsMode.Live);
                 }
+
+                ResetLivePhysicsDriveSource();
                 // controller.physicsMode is intentionally NOT modified — preserves serialized/Inspector value.
             }
         }
@@ -1235,7 +1253,9 @@ namespace Mmd.UnityIntegration
             CurrentFrame = frame;
             return ApplyPlaybackPose(() =>
             {
+                PrepareLivePhysicsDriveSource(LivePhysicsDriveSource.VmdForward);
                 LastSnapshot = binding.ApplyLivePhysicsForwardFrame(frame, frameRate);
+                lastVmdLivePhysicsFrameCount = Time.frameCount;
                 ApplyEditableRigLayer("post-physics-live-frame");
                 return LastSnapshot;
             });
@@ -1248,9 +1268,80 @@ namespace Mmd.UnityIntegration
                 throw new InvalidOperationException("Playback controller must be configured before applying frames.");
             }
 
+            if (binding.PhysicsMode == MmdPhysicsMode.Live)
+            {
+                PrepareLivePhysicsDriveSource(LivePhysicsDriveSource.VmdForward);
+            }
+
             LastSnapshot = binding.ApplyFrame(CurrentFrame, frameRate);
+            if (binding.PhysicsMode == MmdPhysicsMode.Live)
+            {
+                lastVmdLivePhysicsFrameCount = Time.frameCount;
+            }
+
             ApplyEditableRigLayer(binding.PhysicsMode == MmdPhysicsMode.Live ? "post-physics-live-frame" : "post-native-apply-frame");
             return LastSnapshot;
+        }
+
+        private void StepHumanoidRetargetLivePhysicsIfNeeded(MmdHumanoidRetargeterResult result)
+        {
+            if (binding == null ||
+                physicsMode != MmdPhysicsMode.Live ||
+                !Application.isPlaying ||
+                result.CopiedBoneCount <= 0 ||
+                LastHumanoidRetargetGate != MmdHumanoidRetargetGate.Ready ||
+                IsVmdDriving ||
+                isApplyingPlaybackPose ||
+                ShouldSuppressSelfTick(lastTimelineDriveFrameCount, Time.frameCount) ||
+                lastVmdLivePhysicsFrameCount == Time.frameCount ||
+                lastHumanoidLivePhysicsFrameCount == Time.frameCount)
+            {
+                return;
+            }
+
+            if (binding.PhysicsMode != MmdPhysicsMode.Live)
+            {
+                binding.SetPhysicsMode(MmdPhysicsMode.Live);
+                ResetLivePhysicsDriveSource();
+            }
+
+            bool resetOnFirstStep = PrepareLivePhysicsDriveSource(LivePhysicsDriveSource.HumanoidRetarget);
+            humanoidLivePhysicsStepIndex++;
+            binding.StepLivePhysicsFromCurrentPose(
+                humanoidLivePhysicsStepIndex,
+                resetOnFirstStep ? 0.0f : Time.deltaTime,
+                resetOnFirstStep);
+            lastHumanoidLivePhysicsFrameCount = Time.frameCount;
+        }
+
+        private bool PrepareLivePhysicsDriveSource(LivePhysicsDriveSource source)
+        {
+            if (binding == null)
+            {
+                return false;
+            }
+
+            if (livePhysicsDriveSource == source)
+            {
+                return false;
+            }
+
+            binding.ResetLivePhysics();
+            livePhysicsDriveSource = source;
+            if (source == LivePhysicsDriveSource.HumanoidRetarget)
+            {
+                humanoidLivePhysicsStepIndex = -1;
+            }
+
+            return true;
+        }
+
+        private void ResetLivePhysicsDriveSource()
+        {
+            livePhysicsDriveSource = LivePhysicsDriveSource.None;
+            humanoidLivePhysicsStepIndex = -1;
+            lastHumanoidLivePhysicsFrameCount = int.MinValue / 2;
+            lastVmdLivePhysicsFrameCount = int.MinValue / 2;
         }
 
         private MmdPlaybackSnapshot ApplyPlaybackPose(Func<MmdPlaybackSnapshot> apply)

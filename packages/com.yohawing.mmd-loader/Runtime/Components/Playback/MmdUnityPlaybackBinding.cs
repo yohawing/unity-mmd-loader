@@ -370,6 +370,46 @@ namespace Mmd.UnityIntegration
             return ApplyLivePhysicsFrame(frame, frameRate, allowArbitraryStart: true);
         }
 
+        internal void StepLivePhysicsFromCurrentPose(int sequenceFrame, float deltaTime, bool resetOnFirstStep)
+        {
+            MmdPlaybackTime.ValidateFrame(sequenceFrame);
+            if (deltaTime < 0.0f || float.IsNaN(deltaTime) || float.IsInfinity(deltaTime))
+            {
+                throw new ArgumentOutOfRangeException(nameof(deltaTime), "Delta time must be a non-negative finite value.");
+            }
+
+            if (physicsMode != MmdPhysicsMode.Live)
+            {
+                throw new InvalidOperationException(
+                    "StepLivePhysicsFromCurrentPose requires Live physics mode. Set the binding physics mode to Live first.");
+            }
+
+            if (resetOnFirstStep)
+            {
+                SoftResetLivePhysicsSimulation();
+            }
+
+            var totalWatch = Stopwatch.StartNew();
+            var stageWatch = Stopwatch.StartNew();
+            BulletMmdPhysicsBackend backend = EnsureLivePhysicsBackend();
+            double ensureBackendMs = stageWatch.Elapsed.TotalMilliseconds;
+            stageWatch.Restart();
+            MmdLivePhysicsFrameDiagnostics diagnostics = StepLivePhysicsCore(
+                backend,
+                sequenceFrame,
+                resetOnFirstStep,
+                resetOnFirstStep ? 0.0f : deltaTime,
+                totalWatch,
+                ensureBackendMs,
+                evaluateFrameMs: 0.0,
+                applyAnimationFrameMs: 0.0,
+                evaluatedFrame: null,
+                out _);
+            totalWatch.Stop();
+            diagnostics.totalMs = totalWatch.Elapsed.TotalMilliseconds;
+            lastLivePhysicsDiagnostics = diagnostics;
+        }
+
         public void ResetLivePhysics()
         {
             livePhysicsBackend?.Dispose();
@@ -730,31 +770,58 @@ namespace Mmd.UnityIntegration
             double applyAnimationFrameMs = stageWatch.Elapsed.TotalMilliseconds;
             stageWatch.Restart();
             bool initializeDynamicBodies = lastLiveFrame < 0;
-            float deltaTime;
+            float deltaTime = initializeDynamicBodies ? 0.0f : (frame - lastLiveFrame) / frameRate;
+            MmdLivePhysicsFrameDiagnostics diagnostics = StepLivePhysicsCore(
+                backend,
+                frame,
+                initializeDynamicBodies,
+                deltaTime,
+                totalWatch,
+                ensureBackendMs,
+                evaluateFrameMs,
+                applyAnimationFrameMs,
+                evaluatedFrame,
+                out double refreshSnapshotFrameMs);
+            lastLiveFrame = frame;
+            lastLiveSnapshot = session.BuildSnapshotFromEvaluatedFrame(evaluatedFrame!, Instance.RenderingDescriptor);
+            totalWatch.Stop();
+            diagnostics.refreshSnapshotFrameMs = refreshSnapshotFrameMs;
+            diagnostics.totalMs = totalWatch.Elapsed.TotalMilliseconds;
+            lastLivePhysicsDiagnostics = diagnostics;
+            return lastLiveSnapshot;
+        }
+
+        private MmdLivePhysicsFrameDiagnostics StepLivePhysicsCore(
+            BulletMmdPhysicsBackend backend,
+            int sequenceFrame,
+            bool resetSeed,
+            float deltaTime,
+            Stopwatch totalWatch,
+            double ensureBackendMs,
+            double evaluateFrameMs,
+            double applyAnimationFrameMs,
+            MmdEvaluatedFrame? evaluatedFrame,
+            out double refreshSnapshotFrameMs)
+        {
+            var stageWatch = Stopwatch.StartNew();
             MmdLivePhysicsPinnedBodyDiagnostics pinnedBodyDiagnostics;
             double syncBoneDrivenBodiesMs;
             double stepPhysicsMs;
-            if (initializeDynamicBodies)
+            if (resetSeed)
             {
-                // saba PMXModel::ResetPhysics-style seed, UNIFIED for both the fast (native FFI) and the
-                // managed evaluation paths. The bones are already at the CURRENT motion pose (ApplyFastFrame
-                // for the fast path, MmdUnityFrameApplier.ApplyFrame for the managed path). The first live
-                // frame after a reset places every body (including the pure-dynamic mode-1 揺れもの) at that
-                // CURRENT bone-derived pose, re-aligns the native interpolation transform with it, and zeroes
-                // velocity so the first forward Step computes NO spurious kinematic velocity. This is a settle
-                // (deltaTime 0), not a forward integration, so it cannot explode the chain.
-                deltaTime = 0.0f;
-                pinnedBodyDiagnostics = SeedLivePhysics(backend, frame);
+                // saba PMXModel::ResetPhysics-style seed. The bones are already at the CURRENT driving pose
+                // (VMD animation or Humanoid retarget), so seed from those Unity transforms without replaying VMD.
+                pinnedBodyDiagnostics = SeedLivePhysics(backend, sequenceFrame);
                 syncBoneDrivenBodiesMs = stageWatch.Elapsed.TotalMilliseconds;
                 stepPhysicsMs = 0.0;
+                deltaTime = 0.0f;
             }
             else
             {
-                deltaTime = (frame - lastLiveFrame) / frameRate;
                 pinnedBodyDiagnostics = SyncBoneDrivenPhysicsBodies(backend, includeDynamicBodies: false);
                 syncBoneDrivenBodiesMs = stageWatch.Elapsed.TotalMilliseconds;
                 stageWatch.Restart();
-                backend.Step(frame, deltaTime);
+                backend.Step(sequenceFrame, deltaTime);
                 stepPhysicsMs = stageWatch.Elapsed.TotalMilliseconds;
             }
 
@@ -769,13 +836,10 @@ namespace Mmd.UnityIntegration
                 RefreshEvaluatedFrameFromUnityTransforms(evaluatedFrame);
             }
 
-            double refreshSnapshotFrameMs = stageWatch.Elapsed.TotalMilliseconds;
-            lastLiveFrame = frame;
-            lastLiveSnapshot = session.BuildSnapshotFromEvaluatedFrame(evaluatedFrame!, Instance.RenderingDescriptor);
-            totalWatch.Stop();
+            refreshSnapshotFrameMs = stageWatch.Elapsed.TotalMilliseconds;
             lastLivePhysicsDiagnostics = new MmdLivePhysicsFrameDiagnostics
             {
-                frame = frame,
+                frame = sequenceFrame,
                 deltaTime = deltaTime,
                 totalMs = totalWatch.Elapsed.TotalMilliseconds,
                 ensureBackendMs = ensureBackendMs,
@@ -791,7 +855,7 @@ namespace Mmd.UnityIntegration
                 importScale = Instance.ImportScale,
                 bodyDiagnostics = bodyDiagnostics
             };
-            return lastLiveSnapshot;
+            return lastLivePhysicsDiagnostics;
         }
 
         private BulletMmdPhysicsBackend EnsureLivePhysicsBackend()
