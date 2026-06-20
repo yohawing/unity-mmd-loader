@@ -16,13 +16,13 @@ namespace Mmd.Timeline
                 return;
             }
 
-            MmdHumanoidRuntimeRetargeter? retargeter = playerData as MmdHumanoidRuntimeRetargeter;
-            if (retargeter == null)
+            MmdUnityPlaybackController? controller = playerData as MmdUnityPlaybackController;
+            if (controller == null)
             {
                 return;
             }
 
-            retargeter.ApplyRetargetFromTimeline();
+            controller.ApplyHumanoidRetargetFromTimeline();
         }
     }
 }

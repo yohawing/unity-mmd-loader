@@ -9,19 +9,19 @@ using Mmd.UnityIntegration;
 namespace Mmd.Timeline
 {
     [TrackClipType(typeof(MmdHumanoidRetargetClip))]
-    [TrackBindingType(typeof(MmdHumanoidRuntimeRetargeter))]
+    [TrackBindingType(typeof(MmdUnityPlaybackController))]
     public sealed class MmdHumanoidRetargetTrack : TrackAsset
     {
         public override void GatherProperties(PlayableDirector director, IPropertyCollector driver)
         {
-            MmdHumanoidRuntimeRetargeter? retargeter =
-                director.GetGenericBinding(this) as MmdHumanoidRuntimeRetargeter;
-            if (retargeter == null)
+            MmdUnityPlaybackController? controller =
+                director.GetGenericBinding(this) as MmdUnityPlaybackController;
+            if (controller == null)
             {
                 return;
             }
 
-            foreach (MmdHumanoidRetargetBinding entry in retargeter.Entries)
+            foreach (MmdHumanoidRetargetBinding entry in controller.HumanoidRetargetEntries)
             {
                 Transform? nativeTransform = entry.NativeTransform;
                 if (nativeTransform != null)
@@ -44,7 +44,7 @@ namespace Mmd.Timeline
                 driver.AddFromName<Transform>(translationTargetObject, "m_LocalPosition.z");
             }
 
-            foreach (MmdHumanoidAppendTransformBinding entry in retargeter.AppendEntries)
+            foreach (MmdHumanoidAppendTransformBinding entry in controller.HumanoidAppendEntries)
             {
                 Transform? targetTransform = entry.TargetTransform;
                 if (targetTransform == null)

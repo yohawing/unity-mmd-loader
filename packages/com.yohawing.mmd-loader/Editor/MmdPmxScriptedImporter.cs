@@ -40,7 +40,7 @@ namespace Mmd.Editor
         MmdBasicUrpToon = 0
     }
 
-    [ScriptedImporter(21, "pmx")]
+    [ScriptedImporter(22, "pmx")]
     public sealed class MmdPmxScriptedImporter : ScriptedImporter
     {
         [SerializeField] private float importScale = MmdPmxAsset.DefaultImportScale;
@@ -143,8 +143,9 @@ namespace Mmd.Editor
                     animationType,
                     importedAvatar,
                     genericAvatar);
-                ConfigureHumanoidRuntimeRetargeter(
+                ConfigureImportedPlaybackController(
                     generatedAssets.Root,
+                    asset,
                     animationType,
                     importedAvatar,
                     importedHumanoidProxyRoot,
@@ -217,8 +218,9 @@ namespace Mmd.Editor
             return animator;
         }
 
-        private static MmdHumanoidRuntimeRetargeter? ConfigureHumanoidRuntimeRetargeter(
+        private static MmdUnityPlaybackController ConfigureImportedPlaybackController(
             GameObject root,
+            MmdPmxAsset pmxAsset,
             MmdPmxAnimationType importedAnimationType,
             Avatar? humanoidAvatar,
             GameObject? proxyRoot,
@@ -226,23 +228,25 @@ namespace Mmd.Editor
             System.Collections.Generic.IReadOnlyList<MmdHumanoidRetargetBinding> retargetBindings,
             System.Collections.Generic.IReadOnlyList<MmdHumanoidAppendTransformBinding> appendBindings)
         {
+            MmdUnityPlaybackController controller = root.GetComponent<MmdUnityPlaybackController>();
+            if (controller == null)
+            {
+                controller = root.AddComponent<MmdUnityPlaybackController>();
+            }
+
+            controller.ConfigureModelAsset(pmxAsset);
+
             if (importedAnimationType != MmdPmxAnimationType.Humanoid
                 || humanoidAvatar == null
                 || !humanoidAvatar.isHuman
                 || proxyRoot == null
                 || !string.Equals(avatarReadiness, MmdHumanoidSetupAsset.ReadyReadiness, System.StringComparison.Ordinal))
             {
-                return null;
+                return controller;
             }
 
-            MmdHumanoidRuntimeRetargeter retargeter = root.GetComponent<MmdHumanoidRuntimeRetargeter>();
-            if (retargeter == null)
-            {
-                retargeter = root.AddComponent<MmdHumanoidRuntimeRetargeter>();
-            }
-
-            retargeter.Configure(proxyRoot.transform, retargetBindings, appendBindings);
-            return retargeter;
+            controller.ConfigureHumanoidRetarget(proxyRoot.transform, retargetBindings, appendBindings);
+            return controller;
         }
 
         private static void ClearImportHierarchyHideFlags(Transform root)

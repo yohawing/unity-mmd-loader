@@ -1,6 +1,7 @@
 #nullable enable
 
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEditor.Animations;
@@ -10,7 +11,7 @@ using Mmd.UnityIntegration;
 
 namespace Mmd.Tests
 {
-    public sealed class MmdHumanoidRuntimeRetargeterTests
+    public sealed class MmdUnityPlaybackControllerHumanoidRetargetTests
     {
         private static readonly HumanBodyBones[] TestedBones =
         {
@@ -30,9 +31,9 @@ namespace Mmd.Tests
                 Vector3[] nativeBeforePositions = CapturePositions(fixture.NativeBones);
                 SetProxyRotations(fixture.ProxyRig);
 
-                MmdHumanoidRetargeterResult result = fixture.Retargeter.ApplyRetargetNow();
+                MmdHumanoidRetargeterResult result = fixture.Controller.ApplyHumanoidRetargetNow();
 
-                Assert.That(fixture.Retargeter.LastGate, Is.EqualTo(MmdHumanoidRuntimeRetargetGate.Ready));
+                Assert.That(fixture.Controller.LastHumanoidRetargetGate, Is.EqualTo(MmdHumanoidRetargetGate.Ready));
                 Assert.That(result.CopiedBoneCount, Is.EqualTo(TestedBones.Length));
                 Assert.That(result.SkippedBoneCount, Is.EqualTo(0));
 
@@ -66,9 +67,9 @@ namespace Mmd.Tests
                 Quaternion[] before = CaptureRotations(fixture.NativeBones);
                 SetProxyRotations(fixture.ProxyRig);
 
-                MmdHumanoidRetargeterResult result = fixture.Retargeter.ApplyRetargetNow();
+                MmdHumanoidRetargeterResult result = fixture.Controller.ApplyHumanoidRetargetNow();
 
-                Assert.That(fixture.Retargeter.LastGate, Is.EqualTo(MmdHumanoidRuntimeRetargetGate.AnimatorNotDriven));
+                Assert.That(fixture.Controller.LastHumanoidRetargetGate, Is.EqualTo(MmdHumanoidRetargetGate.AnimatorNotDriven));
                 Assert.That(result.CopiedBoneCount, Is.EqualTo(0));
                 AssertNativeRotationsUnchanged(fixture.NativeBones, before);
             }
@@ -82,26 +83,78 @@ namespace Mmd.Tests
         public void ApplyRetargetNowSkipsWhenPlaybackControllerIsTimelineDriven()
         {
             RetargetFixture fixture = CreateFixture(controllerAssigned: true);
+            MmdUnityPlaybackBinding? playbackBinding = null;
+            MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
             try
             {
-                fixture.Root.AddComponent<MmdUnityPlaybackController>();
+                playbackBinding = CreateSyntheticPlaybackBinding(out pmxAsset, out vmdAsset);
+                playbackBinding.Instance.Root.transform.SetParent(fixture.Root.transform, worldPositionStays: false);
+                fixture.Controller.Configure(playbackBinding, playbackFrameRate: 30.0f, playOnStart: false);
+                fixture.Controller.ConfigureHumanoidRetarget(
+                    fixture.ProxyRig.ProxyRoot!.transform,
+                    fixture.Controller.HumanoidRetargetEntries,
+                    fixture.Controller.HumanoidAppendEntries);
+
                 FieldInfo? field = typeof(MmdUnityPlaybackController).GetField(
                     "lastTimelineDriveFrameCount",
                     BindingFlags.Instance | BindingFlags.NonPublic);
                 Assert.That(field, Is.Not.Null);
-                field!.SetValue(fixture.Root.GetComponent<MmdUnityPlaybackController>(), Time.frameCount);
+                field!.SetValue(fixture.Controller, Time.frameCount);
 
                 Quaternion[] before = CaptureRotations(fixture.NativeBones);
                 SetProxyRotations(fixture.ProxyRig);
 
-                MmdHumanoidRetargeterResult result = fixture.Retargeter.ApplyRetargetNow();
+                MmdHumanoidRetargeterResult result = fixture.Controller.ApplyHumanoidRetargetNow();
 
-                Assert.That(fixture.Retargeter.LastGate, Is.EqualTo(MmdHumanoidRuntimeRetargetGate.PlaybackControllerDriving));
+                Assert.That(fixture.Controller.LastHumanoidRetargetGate, Is.EqualTo(MmdHumanoidRetargetGate.PlaybackControllerDriving));
                 Assert.That(result.CopiedBoneCount, Is.EqualTo(0));
                 AssertNativeRotationsUnchanged(fixture.NativeBones, before);
             }
             finally
             {
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+                fixture.Destroy();
+            }
+        }
+
+        [Test]
+        public void ApplyRetargetNowDoesNotSkipJustBecauseModelSourceOrPausedBindingExists()
+        {
+            RetargetFixture fixture = CreateFixture(controllerAssigned: true);
+            MmdUnityPlaybackBinding? playbackBinding = null;
+            MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
+            try
+            {
+                playbackBinding = CreateSyntheticPlaybackBinding(out pmxAsset, out vmdAsset);
+                playbackBinding.Instance.Root.transform.SetParent(fixture.Root.transform, worldPositionStays: false);
+                fixture.Controller.ConfigureModelAsset(pmxAsset);
+                fixture.Controller.Configure(playbackBinding, playbackFrameRate: 30.0f, playOnStart: false);
+                fixture.Controller.ConfigureHumanoidRetarget(
+                    fixture.ProxyRig.ProxyRoot!.transform,
+                    fixture.Controller.HumanoidRetargetEntries,
+                    fixture.Controller.HumanoidAppendEntries);
+
+                Quaternion[] nativeBeforeRotations = CaptureRotations(fixture.NativeBones);
+                SetProxyRotations(fixture.ProxyRig);
+
+                MmdHumanoidRetargeterResult result = fixture.Controller.ApplyHumanoidRetargetNow();
+
+                Assert.That(fixture.Controller.IsConfigured, Is.True);
+                Assert.That(fixture.Controller.IsPlaying, Is.False);
+                Assert.That(fixture.Controller.LastHumanoidRetargetGate, Is.EqualTo(MmdHumanoidRetargetGate.Ready));
+                Assert.That(result.CopiedBoneCount, Is.EqualTo(TestedBones.Length));
+                Assert.That(Quaternion.Angle(
+                        fixture.NativeBones[fixture.IndexByHumanBone[TestedBones[0]]].localRotation,
+                        nativeBeforeRotations[fixture.IndexByHumanBone[TestedBones[0]]]),
+                    Is.GreaterThan(0.1f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
                 fixture.Destroy();
             }
         }
@@ -138,17 +191,17 @@ namespace Mmd.Tests
                         parentNative.localPosition,
                         evaluationOrder: 100)
                 };
-                fixture.Retargeter.Configure(
+                fixture.Controller.ConfigureHumanoidRetarget(
                     fixture.ProxyRig.ProxyRoot!.transform,
-                    fixture.Retargeter.Entries,
+                    fixture.Controller.HumanoidRetargetEntries,
                     appendEntries);
 
                 SetProxyRotations(fixture.ProxyRig);
                 Quaternion expectedParentRotation = fixture.ProxyRig.BoneMap[parentHumanBone].localRotation;
 
-                MmdHumanoidRetargeterResult result = fixture.Retargeter.ApplyRetargetNow();
+                MmdHumanoidRetargeterResult result = fixture.Controller.ApplyHumanoidRetargetNow();
 
-                Assert.That(fixture.Retargeter.LastGate, Is.EqualTo(MmdHumanoidRuntimeRetargetGate.Ready));
+                Assert.That(fixture.Controller.LastHumanoidRetargetGate, Is.EqualTo(MmdHumanoidRetargetGate.Ready));
                 Assert.That(result.CopiedBoneCount, Is.EqualTo(TestedBones.Length));
                 Assert.That(Quaternion.Angle(parentNative.localRotation, expectedParentRotation), Is.LessThan(0.001f));
                 Assert.That(Quaternion.Angle(appendTarget.localRotation, targetBind * expectedParentRotation), Is.LessThan(0.001f));
@@ -172,7 +225,7 @@ namespace Mmd.Tests
             MmdHumanoidAvatarBuildResult avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(proxyRig);
             Assert.That(avatarResult.IsValidHumanAvatar, Is.True, string.Join("\n", avatarResult.Diagnostics));
 
-            var root = new GameObject("RuntimeRetargeterRoot");
+            var root = new GameObject("PlaybackControllerHumanoidRetargetRoot");
             proxyRig.ProxyRoot!.transform.SetParent(root.transform, worldPositionStays: false);
             proxyRig.ProxyRoot.SetActive(true);
 
@@ -203,17 +256,43 @@ namespace Mmd.Tests
                 indexByHumanBone[humanBone] = match.MmdBoneIndex;
             }
 
-            MmdHumanoidRuntimeRetargeter retargeter = root.AddComponent<MmdHumanoidRuntimeRetargeter>();
-            retargeter.Configure(proxyRig.ProxyRoot.transform, entries, System.Array.Empty<MmdHumanoidAppendTransformBinding>());
+            MmdUnityPlaybackController controllerComponent = root.AddComponent<MmdUnityPlaybackController>();
+            controllerComponent.ConfigureHumanoidRetarget(
+                proxyRig.ProxyRoot.transform,
+                entries,
+                System.Array.Empty<MmdHumanoidAppendTransformBinding>());
 
             return new RetargetFixture(
                 root,
                 proxyRig,
                 nativeBones,
                 indexByHumanBone,
-                retargeter,
+                controllerComponent,
                 avatarResult.Avatar,
                 controller);
+        }
+
+        private static MmdUnityPlaybackBinding CreateSyntheticPlaybackBinding(
+            out MmdPmxAsset pmxAsset,
+            out MmdVmdAsset vmdAsset)
+        {
+            string projectRoot = Path.GetDirectoryName(Application.dataPath);
+            string fixtureRoot = Path.GetFullPath(Path.Combine(
+                projectRoot,
+                "..",
+                "packages",
+                "com.yohawing.mmd-loader",
+                "Tests",
+                "Fixtures",
+                "Assets"));
+            string pmxPath = Path.Combine(fixtureRoot, "test_1bone_cube.pmx");
+            string vmdPath = Path.Combine(fixtureRoot, "test_1bone_cube_motion.vmd");
+
+            pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+            pmxAsset.Initialize(File.ReadAllBytes(pmxPath), "test_1bone_cube.pmx", pmxPath, assetImportScale: 1.0f);
+            vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+            vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
+            return MmdUnityPlaybackBinding.CreateSkinned(pmxAsset, vmdAsset);
         }
 
         private static Transform[] CreateNativeBones(GameObject root, int count)
@@ -326,7 +405,7 @@ namespace Mmd.Tests
                 MmdHumanoidProxyRigResult proxyRig,
                 Transform[] nativeBones,
                 IReadOnlyDictionary<HumanBodyBones, int> indexByHumanBone,
-                MmdHumanoidRuntimeRetargeter retargeter,
+                MmdUnityPlaybackController controllerComponent,
                 Avatar? avatar,
                 RuntimeAnimatorController? controller)
             {
@@ -334,18 +413,18 @@ namespace Mmd.Tests
                 ProxyRig = proxyRig;
                 NativeBones = nativeBones;
                 IndexByHumanBone = indexByHumanBone;
-                Retargeter = retargeter;
+                Controller = controllerComponent;
                 Avatar = avatar;
-                Controller = controller;
+                AnimatorController = controller;
             }
 
             public GameObject Root { get; }
             public MmdHumanoidProxyRigResult ProxyRig { get; }
             public Transform[] NativeBones { get; }
             public IReadOnlyDictionary<HumanBodyBones, int> IndexByHumanBone { get; }
-            public MmdHumanoidRuntimeRetargeter Retargeter { get; }
+            public MmdUnityPlaybackController Controller { get; }
             public Avatar? Avatar { get; }
-            public RuntimeAnimatorController? Controller { get; }
+            public RuntimeAnimatorController? AnimatorController { get; }
 
             public void Destroy()
             {
@@ -359,9 +438,9 @@ namespace Mmd.Tests
                     Object.DestroyImmediate(Avatar);
                 }
 
-                if (Controller != null)
+                if (AnimatorController != null)
                 {
-                    Object.DestroyImmediate(Controller);
+                    Object.DestroyImmediate(AnimatorController);
                 }
             }
         }

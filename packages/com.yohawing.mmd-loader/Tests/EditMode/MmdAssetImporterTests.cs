@@ -137,7 +137,12 @@ namespace Mmd.Tests
             Assert.That(root, Is.Not.Null);
             Assert.That(pmxAsset.AnimationType, Is.EqualTo(nameof(MmdPmxAnimationType.None)));
             Assert.That(root.GetComponent<Animator>(), Is.Null);
-            Assert.That(root.GetComponent<MmdHumanoidRuntimeRetargeter>(), Is.Null);
+            MmdUnityPlaybackController noneController = root.GetComponent<MmdUnityPlaybackController>();
+            Assert.That(noneController, Is.Not.Null);
+            Assert.That(noneController.ModelAssetSource, Is.SameAs(pmxAsset));
+            Assert.That(noneController.HasModelSource, Is.True);
+            Assert.That(noneController.IsConfigured, Is.False);
+            Assert.That(noneController.HumanoidRetargetEntries, Is.Empty);
             Assert.That(GetAvatarSubAssets(TempPmxPath), Is.Empty);
         }
 
@@ -161,7 +166,12 @@ namespace Mmd.Tests
             Assert.That(animator.avatar, Is.Not.Null);
             Assert.That(animator.avatar.isValid, Is.True);
             Assert.That(animator.avatar.isHuman, Is.False);
-            Assert.That(root.GetComponent<MmdHumanoidRuntimeRetargeter>(), Is.Null);
+            MmdUnityPlaybackController genericController = root.GetComponent<MmdUnityPlaybackController>();
+            Assert.That(genericController, Is.Not.Null);
+            Assert.That(genericController.ModelAssetSource, Is.SameAs(pmxAsset));
+            Assert.That(genericController.HasModelSource, Is.True);
+            Assert.That(genericController.IsConfigured, Is.False);
+            Assert.That(genericController.HumanoidRetargetEntries, Is.Empty);
 
             System.Collections.Generic.List<Avatar> avatarSubAssets = GetAvatarSubAssets(TempPmxPath);
             Assert.That(avatarSubAssets, Has.Count.EqualTo(1));
@@ -296,12 +306,16 @@ namespace Mmd.Tests
             Assert.That(proxyRoot.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true), Is.Null,
                 "Slice 1 proxy rig must not add a second skinning renderer.");
 
-            MmdHumanoidRuntimeRetargeter retargeter = root.GetComponent<MmdHumanoidRuntimeRetargeter>();
-            Assert.That(retargeter, Is.Not.Null,
-                "Humanoid import must add the runtime retargeter bridge on the imported root.");
-            Assert.That(retargeter.ProxyRoot, Is.SameAs(proxyRoot));
-            Assert.That(retargeter.Entries, Is.Not.Empty);
-            foreach (MmdHumanoidRetargetBinding entry in retargeter.Entries)
+            MmdUnityPlaybackController controller = root.GetComponent<MmdUnityPlaybackController>();
+            Assert.That(controller, Is.Not.Null,
+                "Humanoid import must add the playback controller on the imported root.");
+            Assert.That(controller.ModelAssetSource, Is.SameAs(pmxAsset));
+            Assert.That(controller.HasModelSource, Is.True);
+            Assert.That(controller.IsConfigured, Is.False);
+            Assert.That(controller.HumanoidProxyRoot, Is.SameAs(proxyRoot));
+            Assert.That(controller.HumanoidRetargetEntries, Is.Not.Empty);
+            Assert.That(controller.HumanoidAppendEntries, Is.Not.Null);
+            foreach (MmdHumanoidRetargetBinding entry in controller.HumanoidRetargetEntries)
             {
                 Assert.That(entry.ProxyTransform, Is.Not.Null, entry.HumanBone + " proxy transform");
                 Assert.That(entry.NativeTransform, Is.Not.Null, entry.HumanBone + " native transform");
@@ -314,9 +328,15 @@ namespace Mmd.Tests
                     entry.HumanBone + " native bind rotation must be captured from the imported hierarchy.");
             }
 
+            foreach (MmdHumanoidAppendTransformBinding entry in controller.HumanoidAppendEntries)
+            {
+                Assert.That(entry.TargetTransform, Is.Not.Null, "append target transform");
+                Assert.That(entry.AppendParentTransform, Is.Not.Null, "append parent transform");
+            }
+
             MmdHumanoidRetargetBinding hipsEntry = default!;
             bool foundHipsEntry = false;
-            foreach (MmdHumanoidRetargetBinding entry in retargeter.Entries)
+            foreach (MmdHumanoidRetargetBinding entry in controller.HumanoidRetargetEntries)
             {
                 if (entry.HumanBone == HumanBodyBones.Hips)
                 {
@@ -347,7 +367,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void PmxScriptedImporterVersionIsTwentyOneForHumanoidBindRestChange()
+        public void PmxScriptedImporterVersionIsTwentyTwoForPlaybackControllerRetargetMerge()
         {
             object[] attributes = typeof(MmdPmxScriptedImporter).GetCustomAttributes(
                 typeof(ScriptedImporterAttribute),
@@ -355,8 +375,8 @@ namespace Mmd.Tests
 
             Assert.That(attributes, Has.Length.EqualTo(1));
             var attribute = (ScriptedImporterAttribute)attributes[0];
-            Assert.That(attribute.version, Is.EqualTo(21),
-                "PMX importer version must force reimport for serialized retarget bind rotations and T-pose Avatar rest.");
+            Assert.That(attribute.version, Is.EqualTo(22),
+                "PMX importer version must force reimport for playback-controller-owned PMX source and humanoid retarget bindings.");
         }
 
         [Test]

@@ -2,7 +2,9 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.Playables;
@@ -33,9 +35,9 @@ namespace Mmd.Tests
                 Vector3[] nativePositionsBefore = CapturePositions(fixture.NativeBones);
                 SetProxyRotations(fixture.ProxyRig);
 
-                MmdHumanoidRetargeterResult result = fixture.Retargeter.ApplyRetargetFromTimeline();
+                MmdHumanoidRetargeterResult result = fixture.Controller.ApplyHumanoidRetargetFromTimeline();
 
-                Assert.That(fixture.Retargeter.LastGate, Is.EqualTo(MmdHumanoidRuntimeRetargetGate.Ready));
+                Assert.That(fixture.Controller.LastHumanoidRetargetGate, Is.EqualTo(MmdHumanoidRetargetGate.Ready));
                 Assert.That(result.CopiedBoneCount, Is.EqualTo(TestedBones.Length));
                 Assert.That(result.SkippedBoneCount, Is.EqualTo(0));
 
@@ -59,6 +61,48 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void ApplyRetargetFromTimelineSkipsWhenVmdTimelineDroveSameControllerThisFrame()
+        {
+            RetargetFixture fixture = CreateFixture();
+            MmdUnityPlaybackBinding? playbackBinding = null;
+            MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
+            try
+            {
+                playbackBinding = CreateSyntheticPlaybackBinding(out pmxAsset, out vmdAsset);
+                playbackBinding.Instance.Root.transform.SetParent(fixture.Root.transform, worldPositionStays: false);
+                fixture.Controller.Configure(playbackBinding, playbackFrameRate: 30.0f, playOnStart: false);
+
+                FieldInfo? field = typeof(MmdUnityPlaybackController).GetField(
+                    "lastTimelineDriveFrameCount",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(field, Is.Not.Null);
+                field!.SetValue(fixture.Controller, Time.frameCount);
+
+                Quaternion[] before = CaptureRotations(fixture.NativeBones);
+                SetProxyRotations(fixture.ProxyRig);
+
+                MmdHumanoidRetargeterResult result = fixture.Controller.ApplyHumanoidRetargetFromTimeline();
+
+                Assert.That(fixture.Controller.LastHumanoidRetargetGate,
+                    Is.EqualTo(MmdHumanoidRetargetGate.PlaybackControllerDriving));
+                Assert.That(result.CopiedBoneCount, Is.EqualTo(0));
+                for (int i = 0; i < fixture.NativeBones.Length; i++)
+                {
+                    Assert.That(Quaternion.Angle(fixture.NativeBones[i].localRotation, before[i]),
+                        Is.LessThan(0.001f),
+                        "native bone " + i + " must not be written while VMD timeline owns the controller");
+                }
+            }
+            finally
+            {
+                UnityObject.DestroyImmediate(pmxAsset);
+                UnityObject.DestroyImmediate(vmdAsset);
+                fixture.Destroy();
+            }
+        }
+
+        [Test]
         public void GatherPropertiesRegistersNativeLocalRotationsOnly()
         {
             RetargetFixture fixture = CreateFixture();
@@ -66,7 +110,7 @@ namespace Mmd.Tests
             GameObject? directorObject = null;
             try
             {
-                var nativeWithNullEntry = new List<MmdHumanoidRetargetBinding>(fixture.Retargeter.Entries)
+                var nativeWithNullEntry = new List<MmdHumanoidRetargetBinding>(fixture.Controller.HumanoidRetargetEntries)
                 {
                     new MmdHumanoidRetargetBinding(
                         HumanBodyBones.RightHand,
@@ -74,7 +118,7 @@ namespace Mmd.Tests
                         fixture.ProxyRig.BoneMap[HumanBodyBones.LeftHand],
                         null)
                 };
-                fixture.Retargeter.Configure(
+                fixture.Controller.ConfigureHumanoidRetarget(
                     fixture.ProxyRig.ProxyRoot!.transform,
                     nativeWithNullEntry,
                     System.Array.Empty<MmdHumanoidAppendTransformBinding>());
@@ -87,7 +131,7 @@ namespace Mmd.Tests
                 directorObject = new GameObject("humanoid-retarget-gather-director");
                 PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
                 director.playableAsset = timelineAsset;
-                director.SetGenericBinding(track, fixture.Retargeter);
+                director.SetGenericBinding(track, fixture.Controller);
 
                 var collector = new SpyPropertyCollector();
                 track.GatherProperties(director, collector);
@@ -153,7 +197,7 @@ namespace Mmd.Tests
                 center.SetParent(fixture.Root.transform, worldPositionStays: false);
 
                 var entries = new List<MmdHumanoidRetargetBinding>();
-                foreach (MmdHumanoidRetargetBinding entry in fixture.Retargeter.Entries)
+                foreach (MmdHumanoidRetargetBinding entry in fixture.Controller.HumanoidRetargetEntries)
                 {
                     if (entry.HumanBone == hipsBone)
                     {
@@ -174,7 +218,7 @@ namespace Mmd.Tests
                     }
                 }
 
-                fixture.Retargeter.Configure(
+                fixture.Controller.ConfigureHumanoidRetarget(
                     fixture.ProxyRig.ProxyRoot!.transform,
                     entries,
                     System.Array.Empty<MmdHumanoidAppendTransformBinding>());
@@ -187,7 +231,7 @@ namespace Mmd.Tests
                 directorObject = new GameObject("humanoid-retarget-gather-translation-director");
                 PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
                 director.playableAsset = timelineAsset;
-                director.SetGenericBinding(track, fixture.Retargeter);
+                director.SetGenericBinding(track, fixture.Controller);
 
                 var collector = new SpyPropertyCollector();
                 track.GatherProperties(director, collector);
@@ -268,9 +312,9 @@ namespace Mmd.Tests
                         appendParent.localPosition,
                         evaluationOrder: 101)
                 };
-                fixture.Retargeter.Configure(
+                fixture.Controller.ConfigureHumanoidRetarget(
                     fixture.ProxyRig.ProxyRoot!.transform,
-                    fixture.Retargeter.Entries,
+                    fixture.Controller.HumanoidRetargetEntries,
                     appendEntries);
 
                 timelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
@@ -281,7 +325,7 @@ namespace Mmd.Tests
                 directorObject = new GameObject("humanoid-retarget-gather-append-director");
                 PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
                 director.playableAsset = timelineAsset;
-                director.SetGenericBinding(track, fixture.Retargeter);
+                director.SetGenericBinding(track, fixture.Controller);
 
                 var collector = new SpyPropertyCollector();
                 track.GatherProperties(director, collector);
@@ -334,15 +378,15 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void ShouldSuppressLateUpdateAfterTimelineDriveMatchesPlaybackControllerWindow()
+        public void ShouldSuppressHumanoidRetargetLateUpdateAfterTimelineDriveMatchesPlaybackControllerWindow()
         {
-            Assert.That(MmdHumanoidRuntimeRetargeter.ShouldSuppressLateUpdateAfterTimelineDrive(10, 10),
+            Assert.That(MmdUnityPlaybackController.ShouldSuppressHumanoidRetargetLateUpdateAfterTimelineDrive(10, 10),
                 Is.True);
-            Assert.That(MmdHumanoidRuntimeRetargeter.ShouldSuppressLateUpdateAfterTimelineDrive(10, 11),
+            Assert.That(MmdUnityPlaybackController.ShouldSuppressHumanoidRetargetLateUpdateAfterTimelineDrive(10, 11),
                 Is.True);
-            Assert.That(MmdHumanoidRuntimeRetargeter.ShouldSuppressLateUpdateAfterTimelineDrive(10, 12),
+            Assert.That(MmdUnityPlaybackController.ShouldSuppressHumanoidRetargetLateUpdateAfterTimelineDrive(10, 12),
                 Is.False);
-            Assert.That(MmdHumanoidRuntimeRetargeter.ShouldSuppressLateUpdateAfterTimelineDrive(10, 9),
+            Assert.That(MmdUnityPlaybackController.ShouldSuppressHumanoidRetargetLateUpdateAfterTimelineDrive(10, 9),
                 Is.False);
         }
 
@@ -354,7 +398,7 @@ namespace Mmd.Tests
             MmdHumanoidAvatarBuildResult avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(proxyRig);
             Assert.That(avatarResult.IsValidHumanAvatar, Is.True, string.Join("\n", avatarResult.Diagnostics));
 
-            var root = new GameObject("TimelineRetargeterRoot");
+            var root = new GameObject("TimelinePlaybackControllerRetargetRoot");
             proxyRig.ProxyRoot!.transform.SetParent(root.transform, worldPositionStays: false);
             proxyRig.ProxyRoot.SetActive(true);
 
@@ -377,15 +421,18 @@ namespace Mmd.Tests
                 indexByHumanBone[humanBone] = match.MmdBoneIndex;
             }
 
-            MmdHumanoidRuntimeRetargeter retargeter = root.AddComponent<MmdHumanoidRuntimeRetargeter>();
-            retargeter.Configure(proxyRig.ProxyRoot.transform, entries, System.Array.Empty<MmdHumanoidAppendTransformBinding>());
+            MmdUnityPlaybackController controller = root.AddComponent<MmdUnityPlaybackController>();
+            controller.ConfigureHumanoidRetarget(
+                proxyRig.ProxyRoot.transform,
+                entries,
+                System.Array.Empty<MmdHumanoidAppendTransformBinding>());
 
             return new RetargetFixture(
                 root,
                 proxyRig,
                 nativeBones,
                 indexByHumanBone,
-                retargeter,
+                controller,
                 avatarResult.Avatar);
         }
 
@@ -419,6 +466,40 @@ namespace Mmd.Tests
             for (int i = 0; i < bones.Count; i++)
             {
                 values[i] = bones[i].localPosition;
+            }
+
+            return values;
+        }
+
+        private static MmdUnityPlaybackBinding CreateSyntheticPlaybackBinding(
+            out MmdPmxAsset pmxAsset,
+            out MmdVmdAsset vmdAsset)
+        {
+            string projectRoot = Path.GetDirectoryName(Application.dataPath);
+            string fixtureRoot = Path.GetFullPath(Path.Combine(
+                projectRoot,
+                "..",
+                "packages",
+                "com.yohawing.mmd-loader",
+                "Tests",
+                "Fixtures",
+                "Assets"));
+            string pmxPath = Path.Combine(fixtureRoot, "test_1bone_cube.pmx");
+            string vmdPath = Path.Combine(fixtureRoot, "test_1bone_cube_motion.vmd");
+
+            pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+            pmxAsset.Initialize(File.ReadAllBytes(pmxPath), "test_1bone_cube.pmx", pmxPath, assetImportScale: 1.0f);
+            vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+            vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
+            return MmdUnityPlaybackBinding.CreateSkinned(pmxAsset, vmdAsset);
+        }
+
+        private static Quaternion[] CaptureRotations(IReadOnlyList<Transform> bones)
+        {
+            var values = new Quaternion[bones.Count];
+            for (int i = 0; i < bones.Count; i++)
+            {
+                values[i] = bones[i].localRotation;
             }
 
             return values;
@@ -479,14 +560,14 @@ namespace Mmd.Tests
                 MmdHumanoidProxyRigResult proxyRig,
                 Transform[] nativeBones,
                 IReadOnlyDictionary<HumanBodyBones, int> indexByHumanBone,
-                MmdHumanoidRuntimeRetargeter retargeter,
+                MmdUnityPlaybackController controller,
                 Avatar? avatar)
             {
                 Root = root;
                 ProxyRig = proxyRig;
                 NativeBones = nativeBones;
                 IndexByHumanBone = indexByHumanBone;
-                Retargeter = retargeter;
+                Controller = controller;
                 Avatar = avatar;
             }
 
@@ -494,7 +575,7 @@ namespace Mmd.Tests
             public MmdHumanoidProxyRigResult ProxyRig { get; }
             public Transform[] NativeBones { get; }
             public IReadOnlyDictionary<HumanBodyBones, int> IndexByHumanBone { get; }
-            public MmdHumanoidRuntimeRetargeter Retargeter { get; }
+            public MmdUnityPlaybackController Controller { get; }
             public Avatar? Avatar { get; }
 
             public void Destroy()
