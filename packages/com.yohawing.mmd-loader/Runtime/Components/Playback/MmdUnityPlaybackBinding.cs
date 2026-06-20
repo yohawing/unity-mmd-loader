@@ -233,6 +233,44 @@ namespace Mmd.UnityIntegration
                 string.IsNullOrWhiteSpace(motionAsset.SourceId) ? motionAsset.name : motionAsset.SourceId);
         }
 
+        internal static MmdUnityPlaybackBinding CreateSkinnedForModelOnlyPhysicsFromExistingSceneModel(
+            GameObject root,
+            MmdPmxAsset modelAsset,
+            string motionId)
+        {
+            if (root == null)
+            {
+                throw new ArgumentNullException(nameof(root));
+            }
+
+            if (modelAsset == null)
+            {
+                throw new ArgumentNullException(nameof(modelAsset));
+            }
+
+            var parser = new NativeMmdParser();
+            MmdModelDefinition model = modelAsset.LoadModel(parser);
+            MmdModelValidator.ThrowIfInvalid(model);
+            RemoveModelOnlyUnsupportedPureWorldAnchorJoints(model);
+            MmdMotionDefinition restMotion = CreateModelOnlyRestMotion(model);
+            MmdMotionValidator.ThrowIfInvalid(restMotion);
+            float importScale = modelAsset.ImportScale;
+            MmdUnityModelInstance instance = MmdUnityModelFactory.CreateExistingSkinnedModelInstance(
+                root,
+                model,
+                string.IsNullOrWhiteSpace(modelAsset.SourcePath) ? null : modelAsset.SourcePath,
+                importScale);
+            string resolvedModelId = string.IsNullOrWhiteSpace(modelAsset.SourceId) ? modelAsset.name : modelAsset.SourceId;
+            string resolvedMotionId = string.IsNullOrWhiteSpace(motionId) ? "humanoid-physics" : motionId;
+            var session = new MmdRuntimeSession(model, restMotion, resolvedModelId, resolvedMotionId);
+            return new MmdUnityPlaybackBinding(instance, session, model, resolvedModelId, resolvedMotionId);
+        }
+
+        private static void RemoveModelOnlyUnsupportedPureWorldAnchorJoints(MmdModelDefinition model)
+        {
+            model.physics?.joints?.RemoveAll(joint => joint.rigidbodyAIndex < 0 && joint.rigidbodyBIndex < 0);
+        }
+
         public static MmdUnityPlaybackBinding CreateSkinned(
             MmdModelDefinition model,
             MmdMotionDefinition motion,
@@ -253,6 +291,18 @@ namespace Mmd.UnityIntegration
             MmdUnityModelInstance instance = MmdUnityModelFactory.CreateSkinnedModel(model, sourcePath);
             var session = new MmdRuntimeSession(model, motion, modelId, motionId);
             return new MmdUnityPlaybackBinding(instance, session, model, modelId, motionId);
+        }
+
+        private static MmdMotionDefinition CreateModelOnlyRestMotion(MmdModelDefinition model)
+        {
+            return new MmdMotionDefinition
+            {
+                targetModelName = model.name ?? string.Empty,
+                maxFrame = 0,
+                boneKeyframes = new List<MmdBoneKeyframeDefinition>(),
+                morphKeyframes = new List<MmdMorphKeyframeDefinition>(),
+                modelKeyframes = new List<MmdModelKeyframeDefinition>()
+            };
         }
 
         public static MmdUnityPlaybackBinding CreateSkinned(

@@ -1285,6 +1285,8 @@ namespace Mmd.UnityIntegration
 
         private void StepHumanoidRetargetLivePhysicsIfNeeded(MmdHumanoidRetargeterResult result)
         {
+            EnsureHumanoidPhysicsBinding();
+
             if (binding == null ||
                 physicsMode != MmdPhysicsMode.Live ||
                 !Application.isPlaying ||
@@ -1312,6 +1314,39 @@ namespace Mmd.UnityIntegration
                 resetOnFirstStep ? 0.0f : Time.deltaTime,
                 resetOnFirstStep);
             lastHumanoidLivePhysicsFrameCount = Time.frameCount;
+        }
+
+        private void EnsureHumanoidPhysicsBinding()
+        {
+            if (binding != null ||
+                physicsMode != MmdPhysicsMode.Live ||
+                proxyRoot == null ||
+                humanoidRetargetEntries == null ||
+                humanoidRetargetEntries.Count == 0 ||
+                modelAsset == null ||
+                LastHumanoidRetargetGate != MmdHumanoidRetargetGate.Ready ||
+                IsVmdDriving ||
+                isApplyingPlaybackPose)
+            {
+                return;
+            }
+
+            try
+            {
+                binding = MmdUnityPlaybackBinding.CreateSkinnedForModelOnlyPhysicsFromExistingSceneModel(
+                    gameObject,
+                    modelAsset,
+                    "humanoid-physics");
+                binding.SetPhysicsMode(MmdPhysicsMode.Live);
+                ResetLivePhysicsDriveSource();
+                ConfigurationRevision++;
+            }
+            catch (MissingComponentException)
+            {
+            }
+            catch (InvalidOperationException)
+            {
+            }
         }
 
         private bool PrepareLivePhysicsDriveSource(LivePhysicsDriveSource source)
