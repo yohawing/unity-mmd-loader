@@ -71,7 +71,8 @@ namespace Mmd.Tests
                 var behaviour = new MmdVmdCameraBehaviour
                 {
                     CameraKeyframes = keyframes,
-                    FrameRate = 30f
+                    FrameRate = 30f,
+                    ImportScale = 1.0f
                 };
 
                 // localTime 0.5s at 30fps -> frame 15 (midway between keyframes 0 and 30).
@@ -84,6 +85,46 @@ namespace Mmd.Tests
                 Assert.That(Vector3.Distance(camera.transform.position, expectedPose.Position), Is.LessThan(0.001f));
                 Assert.That(Quaternion.Angle(camera.transform.rotation, expectedPose.Rotation), Is.LessThan(0.05f));
                 Assert.That(camera.fieldOfView, Is.EqualTo(expectedPose.FieldOfView).Within(0.001f));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(cameraGo);
+                UnityEngine.Object.DestroyImmediate(bindingGo);
+            }
+        }
+
+        [Test]
+        public void EvaluateAtLocalTimeScalesCameraPositionWithoutChangingRotationOrFov()
+        {
+            var bindingGo = new GameObject("binding");
+            var cameraGo = new GameObject("camera");
+            try
+            {
+                Camera camera = cameraGo.AddComponent<Camera>();
+                MmdSceneEnvironmentBinding binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
+                binding.TargetCamera = camera;
+
+                List<MmdCameraKeyframeDefinition> keyframes = TwoKeyframeTrack();
+                var behaviour = new MmdVmdCameraBehaviour
+                {
+                    CameraKeyframes = keyframes,
+                    FrameRate = 30f,
+                    ImportScale = 0.1f
+                };
+
+                MmdSceneCameraApplyStatus status = behaviour.EvaluateAtLocalTime(binding, 0.5);
+
+                MmdCameraState expectedState = VmdCameraSampler.Sample(keyframes, 15f);
+                MmdUnityCameraPose scaleOnePose = MmdCameraStateToUnity.Convert(expectedState, importScale: 1.0f);
+                MmdUnityCameraPose expectedPose = MmdCameraStateToUnity.Convert(expectedState, importScale: 0.1f);
+
+                Assert.That(status, Is.EqualTo(MmdSceneCameraApplyStatus.Applied));
+                Assert.That(Vector3.Distance(camera.transform.position, expectedPose.Position), Is.LessThan(0.001f));
+                Assert.That(camera.transform.position.x, Is.EqualTo(scaleOnePose.Position.x * 0.1f).Within(0.001f));
+                Assert.That(camera.transform.position.y, Is.EqualTo(scaleOnePose.Position.y * 0.1f).Within(0.001f));
+                Assert.That(camera.transform.position.z, Is.EqualTo(scaleOnePose.Position.z * 0.1f).Within(0.001f));
+                Assert.That(Quaternion.Angle(camera.transform.rotation, scaleOnePose.Rotation), Is.LessThan(0.05f));
+                Assert.That(camera.fieldOfView, Is.EqualTo(scaleOnePose.FieldOfView).Within(0.001f));
             }
             finally
             {
@@ -113,7 +154,8 @@ namespace Mmd.Tests
                 {
                     CameraKeyframes = cameraKeyframes,
                     LightKeyframes = lightKeyframes,
-                    FrameRate = 30f
+                    FrameRate = 30f,
+                    ImportScale = 1.0f
                 };
 
                 MmdSceneCameraApplyStatus status = behaviour.EvaluateAtLocalTime(binding, 0.5);
@@ -156,7 +198,8 @@ namespace Mmd.Tests
                 {
                     CameraKeyframes = Array.Empty<MmdCameraKeyframeDefinition>(),
                     LightKeyframes = lightKeyframes,
-                    FrameRate = 30f
+                    FrameRate = 30f,
+                    ImportScale = 1.0f
                 };
 
                 MmdSceneCameraApplyStatus status = behaviour.EvaluateAtLocalTime(binding, 0.5);
@@ -197,7 +240,8 @@ namespace Mmd.Tests
                 {
                     CameraKeyframes = cameraKeyframes,
                     LightKeyframes = Array.Empty<MmdLightKeyframeDefinition>(),
-                    FrameRate = 30f
+                    FrameRate = 30f,
+                    ImportScale = 1.0f
                 };
 
                 behaviour.EvaluateAtLocalTime(binding, 0.5);
@@ -229,7 +273,8 @@ namespace Mmd.Tests
                 {
                     CameraKeyframes = keyframes,
                     FrameRate = 30f,
-                    StartOffsetSeconds = 0.5f // +15 frames
+                    StartOffsetSeconds = 0.5f, // +15 frames
+                    ImportScale = 1.0f
                 };
 
                 // localTime 0 + 0.5s offset = frame 15, same as the midpoint above.
@@ -260,7 +305,8 @@ namespace Mmd.Tests
                 var behaviour = new MmdVmdCameraBehaviour
                 {
                     CameraKeyframes = Array.Empty<MmdCameraKeyframeDefinition>(),
-                    FrameRate = 30f
+                    FrameRate = 30f,
+                    ImportScale = 1.0f
                 };
 
                 MmdSceneCameraApplyStatus status = behaviour.EvaluateAtLocalTime(binding, 1.0);
@@ -310,6 +356,7 @@ namespace Mmd.Tests
                 clip.FrameRate = 24f;
                 clip.StartOffsetSeconds = 0.1f;
                 clip.MinFieldOfView = 5f;
+                clip.ImportScale = 0.25f;
                 clip.MotionSourceId = "cam-src";
                 clip.LoopPolicy = MmdVmdTimelineLoopPolicy.None;
                 clip.MotionAsset = null; // no camera source -> empty (no-op) track
@@ -322,6 +369,7 @@ namespace Mmd.Tests
                 Assert.That(behaviour.FrameRate, Is.EqualTo(24f).Within(0.001f));
                 Assert.That(behaviour.StartOffsetSeconds, Is.EqualTo(0.1f).Within(0.001f));
                 Assert.That(behaviour.MinFieldOfView, Is.EqualTo(5f).Within(0.001f));
+                Assert.That(behaviour.ImportScale, Is.EqualTo(0.25f).Within(0.001f));
                 Assert.That(behaviour.MotionSourceId, Is.EqualTo("cam-src"));
                 Assert.That(behaviour.LoopPolicy, Is.EqualTo(MmdVmdTimelineLoopPolicy.None));
                 Assert.That(behaviour.CameraKeyframes, Is.Empty);
@@ -337,6 +385,20 @@ namespace Mmd.Tests
 
                 UnityEngine.Object.DestroyImmediate(clip);
                 UnityEngine.Object.DestroyImmediate(ownerGo);
+            }
+        }
+
+        [Test]
+        public void CameraClipDefaultImportScaleMatchesPmxImportDefault()
+        {
+            MmdVmdCameraClip clip = ScriptableObject.CreateInstance<MmdVmdCameraClip>();
+            try
+            {
+                Assert.That(clip.ImportScale, Is.EqualTo(MmdPmxAsset.DefaultImportScale).Within(0.0001f));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(clip);
             }
         }
     }

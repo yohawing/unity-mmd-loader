@@ -91,7 +91,8 @@ namespace Mmd.UnityIntegration
         /// </summary>
         public MmdSceneCameraApplyStatus ApplyCameraState(
             MmdCameraState state,
-            float minFieldOfView = MmdCameraStateToUnity.DefaultMinFieldOfView)
+            float minFieldOfView = MmdCameraStateToUnity.DefaultMinFieldOfView,
+            float importScale = 1.0f)
         {
             if (targetCamera == null)
             {
@@ -99,7 +100,7 @@ namespace Mmd.UnityIntegration
                 return LastCameraApplyStatus;
             }
 
-            MmdUnityCameraPose pose = MmdCameraStateToUnity.Convert(state, minFieldOfView);
+            MmdUnityCameraPose pose = MmdCameraStateToUnity.Convert(state, minFieldOfView, importScale);
             targetCamera.transform.SetPositionAndRotation(pose.Position, pose.Rotation);
 
             // v1 is perspective-only. An orthographic (perspective-off) key keeps the camera in

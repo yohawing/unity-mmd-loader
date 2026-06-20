@@ -21,6 +21,7 @@ namespace Mmd.Timeline
         [SerializeField] private float startOffsetSeconds;
         [SerializeField] private MmdVmdTimelineLoopPolicy loopPolicy = MmdVmdTimelineLoopPolicy.None;
         [SerializeField] private float minFieldOfView = MmdCameraStateToUnity.DefaultMinFieldOfView;
+        [SerializeField] private float importScale = MmdPmxAsset.DefaultImportScale;
 
         public ClipCaps clipCaps => ClipCaps.None;
 
@@ -76,6 +77,12 @@ namespace Mmd.Timeline
             set => minFieldOfView = value;
         }
 
+        public float ImportScale
+        {
+            get => NormalizeImportScale(importScale);
+            set => importScale = value;
+        }
+
         public override Playable CreatePlayable(PlayableGraph graph, GameObject owner)
         {
             MmdPlaybackTime.ValidateFrameRate(frameRate);
@@ -90,10 +97,16 @@ namespace Mmd.Timeline
             behaviour.StartOffsetSeconds = startOffsetSeconds;
             behaviour.LoopPolicy = loopPolicy;
             behaviour.MinFieldOfView = minFieldOfView;
+            behaviour.ImportScale = ImportScale;
             (IReadOnlyList<MmdCameraKeyframeDefinition> cam, IReadOnlyList<MmdLightKeyframeDefinition> lit) = LoadSceneKeyframes(motionAsset);
             behaviour.CameraKeyframes = cam;
             behaviour.LightKeyframes = lit;
             return playable;
+        }
+
+        private static float NormalizeImportScale(float value)
+        {
+            return float.IsFinite(value) && value > 0.0f ? value : MmdPmxAsset.DefaultImportScale;
         }
 
         private static (IReadOnlyList<MmdCameraKeyframeDefinition> camera, IReadOnlyList<MmdLightKeyframeDefinition> light) LoadSceneKeyframes(

@@ -60,10 +60,14 @@ namespace Mmd.UnityIntegration
         // of the target). See the golden tests for the pinned per-channel behavior.
         private static readonly Quaternion ViewDirectionFlip = new Quaternion(0.0f, 1.0f, 0.0f, 0.0f);
 
-        public static MmdUnityCameraPose Convert(MmdCameraState state, float minFieldOfView = DefaultMinFieldOfView)
+        public static MmdUnityCameraPose Convert(
+            MmdCameraState state,
+            float minFieldOfView = DefaultMinFieldOfView,
+            float importScale = 1.0f)
         {
             float[] position = state.Position ?? Array.Empty<float>();
             float[] rotation = state.Rotation ?? Array.Empty<float>();
+            float scale = NormalizeImportScale(importScale);
 
             // Guard the scalar inputs the same way Component() guards the array inputs, so a
             // non-finite upstream value never produces a non-finite Unity pose.
@@ -92,7 +96,7 @@ namespace Mmd.UnityIntegration
                 cameraOrientationMmd *= ViewDirectionFlip;
             }
 
-            Vector3 positionUnity = MmdCoordinateSpace.MmdToUnityPosition(eyeMmd);
+            Vector3 positionUnity = MmdCoordinateSpace.MmdToUnityPosition(eyeMmd) * scale;
             Quaternion rotationUnity = MmdCoordinateSpace.MmdToUnityRotation(cameraOrientationMmd);
 
             float fieldOfView = float.IsFinite(state.ViewAngle)
@@ -104,6 +108,11 @@ namespace Mmd.UnityIntegration
         private static float Component(float[] values, int index)
         {
             return values != null && values.Length > index && float.IsFinite(values[index]) ? values[index] : 0.0f;
+        }
+
+        private static float NormalizeImportScale(float importScale)
+        {
+            return float.IsFinite(importScale) && importScale > 0.0f ? importScale : 1.0f;
         }
     }
 }
