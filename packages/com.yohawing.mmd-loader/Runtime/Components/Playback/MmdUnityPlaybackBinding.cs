@@ -858,6 +858,7 @@ namespace Mmd.UnityIntegration
             bool includeDynamicBodies)
         {
             Transform root = Instance.Root.transform;
+            float importScale = NormalizeImportScale(Instance.ImportScale);
             var diagnostics = new MmdLivePhysicsPinnedBodyDiagnostics();
             for (int i = 0; i < model.physics.rigidbodies.Count; i++)
             {
@@ -890,7 +891,7 @@ namespace Mmd.UnityIntegration
                 }
 
                 Transform bone = Instance.BoneTransforms[body.boneIndex];
-                Vector3 boneModelPosition = ToMmdModelPosition(root.InverseTransformPoint(bone.position));
+                Vector3 boneModelPosition = ToMmdModelPosition(root.InverseTransformPoint(bone.position), importScale);
                 Vector3 bodyOffset = ToMmdVector3(body.position) - GetBoneOrigin(body.boneIndex);
                 Quaternion boneModelRotation = ToMmdModelRotation(Quaternion.Inverse(root.rotation) * bone.rotation);
                 Quaternion bodyLocalRotation = ToMmdEulerRotation(body.rotation);
@@ -939,6 +940,7 @@ namespace Mmd.UnityIntegration
 
         private void ApplyPhysicsBodyTransforms(BulletMmdPhysicsBackend backend)
         {
+            float importScale = NormalizeImportScale(Instance.ImportScale);
             for (int i = 0; i < model.physics.rigidbodies.Count; i++)
             {
                 MmdRigidbodyDefinition body = model.physics.rigidbodies[i];
@@ -962,7 +964,7 @@ namespace Mmd.UnityIntegration
                 if (!IsDynamicWithBonePhysicsKind(body.physicsKind))
                 {
                     Vector3 boneModelPosition = ToMmdVector3(bodyTransform.position) - (boneModelRotation * bodyOffset);
-                    bone.position = root.TransformPoint(ToUnityModelPosition(boneModelPosition));
+                    bone.position = root.TransformPoint(ToUnityModelPosition(boneModelPosition, importScale));
                 }
 
                 bone.rotation = root.rotation * ToUnityModelRotation(boneModelRotation);
@@ -978,6 +980,7 @@ namespace Mmd.UnityIntegration
             }
 
             Transform root = Instance.Root.transform;
+            float importScale = NormalizeImportScale(Instance.ImportScale);
             for (int i = 0; i < model.physics.rigidbodies.Count; i++)
             {
                 MmdRigidbodyDefinition body = model.physics.rigidbodies[i];
@@ -988,7 +991,7 @@ namespace Mmd.UnityIntegration
                 }
 
                 MmdPhysicsBodyTransform bodyTransform = backend.GetRigidbodyTransform(i);
-                physicsBody.transform.position = root.TransformPoint(ToUnityModelPosition(bodyTransform.position));
+                physicsBody.transform.position = root.TransformPoint(ToUnityModelPosition(bodyTransform.position, importScale));
                 physicsBody.transform.rotation = root.rotation * ToUnityModelRotation(bodyTransform.rotation);
                 physicsBody.RecordNativeTransform(bodyTransform.position, bodyTransform.rotation);
             }
@@ -997,6 +1000,7 @@ namespace Mmd.UnityIntegration
         private MmdLivePhysicsBodyDiagnostics[] BuildBodyDiagnostics(BulletMmdPhysicsBackend backend)
         {
             Transform root = Instance.Root.transform;
+            float importScale = NormalizeImportScale(Instance.ImportScale);
             Dictionary<int, MmdUnityPhysicsBody> physicsBodiesByIndex = BuildPhysicsBodyIndexMap();
             int count = model.physics.rigidbodies.Count;
             var result = new MmdLivePhysicsBodyDiagnostics[count];
@@ -1009,11 +1013,11 @@ namespace Mmd.UnityIntegration
                 Transform? bone = hasBone ? Instance.BoneTransforms[body.boneIndex] : null;
                 Vector3 boneWorldPos = bone != null ? bone.position : Vector3.zero;
                 Vector3 boneModelPos = bone != null
-                    ? ToMmdModelPosition(root.InverseTransformPoint(bone.position))
+                    ? ToMmdModelPosition(root.InverseTransformPoint(bone.position), importScale)
                     : Vector3.zero;
                 Vector3 readbackMmdPos = ToMmdVector3(bodyTransform.position);
                 Quaternion readbackMmdRot = ToMmdQuaternion(bodyTransform.rotation);
-                Vector3 readbackWorldPos = root.TransformPoint(ToUnityModelPosition(bodyTransform.position));
+                Vector3 readbackWorldPos = root.TransformPoint(ToUnityModelPosition(bodyTransform.position, importScale));
                 Quaternion readbackWorldRot = root.rotation * ToUnityModelRotation(bodyTransform.rotation);
                 Vector3 debugWorldPos = physicsBody != null ? physicsBody.transform.position : Vector3.zero;
                 Quaternion debugWorldRot = physicsBody != null ? physicsBody.transform.rotation : Quaternion.identity;
@@ -1131,6 +1135,7 @@ namespace Mmd.UnityIntegration
         private void RefreshEvaluatedFrameFromUnityTransforms(MmdEvaluatedFrame frame)
         {
             Transform root = Instance.Root.transform;
+            float importScale = NormalizeImportScale(Instance.ImportScale);
             foreach (MmdEvaluatedBonePose bonePose in frame.bones)
             {
                 int index = bonePose.index;
@@ -1142,10 +1147,10 @@ namespace Mmd.UnityIntegration
                 Transform bone = Instance.BoneTransforms[index];
                 Vector3 localDelta = bone.localPosition - Instance.BindLocalPositions[index];
                 Quaternion localRotation = Quaternion.Inverse(Instance.BindLocalRotations[index]) * bone.localRotation;
-                bonePose.localPosition = ToArray(ToMmdModelPosition(localDelta));
+                bonePose.localPosition = ToArray(ToMmdModelPosition(localDelta, importScale));
                 bonePose.localRotation = ToArray(ToMmdModelRotation(localRotation));
                 bonePose.localScale = ToArray(bone.localScale);
-                bonePose.worldMatrix = ToMmdModelMatrix(root, bone);
+                bonePose.worldMatrix = ToMmdModelMatrix(root, bone, importScale);
             }
         }
 
@@ -1154,9 +1159,19 @@ namespace Mmd.UnityIntegration
             return new Vector3(-position[0], position[1], -position[2]);
         }
 
+        private static Vector3 ToUnityModelPosition(float[] position, float importScale)
+        {
+            return ToUnityModelPosition(position) * NormalizeImportScale(importScale);
+        }
+
         private static Vector3 ToUnityModelPosition(Vector3 position)
         {
             return new Vector3(-position.x, position.y, -position.z);
+        }
+
+        private static Vector3 ToUnityModelPosition(Vector3 position, float importScale)
+        {
+            return ToUnityModelPosition(position) * NormalizeImportScale(importScale);
         }
 
         private static Quaternion ToUnityModelRotation(float[] rotation)
@@ -1172,6 +1187,11 @@ namespace Mmd.UnityIntegration
         private static Vector3 ToMmdModelPosition(Vector3 position)
         {
             return new Vector3(-position.x, position.y, -position.z);
+        }
+
+        private static Vector3 ToMmdModelPosition(Vector3 position, float importScale)
+        {
+            return ToMmdModelPosition(position) / NormalizeImportScale(importScale);
         }
 
         private static Quaternion ToMmdModelRotation(Quaternion rotation)
@@ -1249,7 +1269,12 @@ namespace Mmd.UnityIntegration
 
         private static float[] ToMmdModelMatrix(Transform root, Transform bone)
         {
-            Vector3 position = ToMmdModelPosition(root.InverseTransformPoint(bone.position));
+            return ToMmdModelMatrix(root, bone, importScale: 1.0f);
+        }
+
+        private static float[] ToMmdModelMatrix(Transform root, Transform bone, float importScale)
+        {
+            Vector3 position = ToMmdModelPosition(root.InverseTransformPoint(bone.position), importScale);
             Quaternion rotation = ToMmdModelRotation(Quaternion.Inverse(root.rotation) * bone.rotation);
             Matrix4x4 matrix = Matrix4x4.TRS(position, rotation, Vector3.one);
             return new[]
@@ -1259,6 +1284,11 @@ namespace Mmd.UnityIntegration
                 matrix.m20, matrix.m21, matrix.m22, matrix.m23,
                 matrix.m30, matrix.m31, matrix.m32, matrix.m33
             };
+        }
+
+        private static float NormalizeImportScale(float importScale)
+        {
+            return float.IsFinite(importScale) && importScale > 0.0f ? importScale : 1.0f;
         }
     }
 

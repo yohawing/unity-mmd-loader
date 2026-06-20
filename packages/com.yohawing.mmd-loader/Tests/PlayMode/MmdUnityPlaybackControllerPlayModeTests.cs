@@ -777,6 +777,32 @@ namespace Mmd.Tests
         }
 
         [UnityTest]
+        public IEnumerator HairPhysicsFixtureImportScaleZeroDotOneKeepsNativeReadbackInMmdSpaceAndScalesUnityObjects()
+        {
+            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            if (!availability.backendAvailable)
+            {
+                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
+                yield break;
+            }
+
+            HairPhysicsScaleSample scaleOne = RunHairPhysicsForwardPlayback(importScale: 1.0f);
+            HairPhysicsScaleSample scalePointOne = RunHairPhysicsForwardPlayback(importScale: 0.1f);
+
+            Assert.That(scalePointOne.importScale, Is.EqualTo(0.1f).Within(0.0001f));
+            Assert.That(scalePointOne.nativePosition.x, Is.EqualTo(scaleOne.nativePosition.x).Within(0.001f));
+            Assert.That(scalePointOne.nativePosition.y, Is.EqualTo(scaleOne.nativePosition.y).Within(0.001f));
+            Assert.That(scalePointOne.nativePosition.z, Is.EqualTo(scaleOne.nativePosition.z).Within(0.001f));
+            Assert.That(scalePointOne.boneWorldPosition.x, Is.EqualTo(scaleOne.boneWorldPosition.x * 0.1f).Within(0.001f));
+            Assert.That(scalePointOne.boneWorldPosition.y, Is.EqualTo(scaleOne.boneWorldPosition.y * 0.1f).Within(0.001f));
+            Assert.That(scalePointOne.boneWorldPosition.z, Is.EqualTo(scaleOne.boneWorldPosition.z * 0.1f).Within(0.001f));
+            Assert.That(scalePointOne.debugWorldPosition.x, Is.EqualTo(scaleOne.debugWorldPosition.x * 0.1f).Within(0.001f));
+            Assert.That(scalePointOne.debugWorldPosition.y, Is.EqualTo(scaleOne.debugWorldPosition.y * 0.1f).Within(0.001f));
+            Assert.That(scalePointOne.debugWorldPosition.z, Is.EqualTo(scaleOne.debugWorldPosition.z * 0.1f).Within(0.001f));
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator ControllerForwardPlaybackInPlayModeRunsLivePhysics()
         {
             MmdUnityPlaybackBinding? binding = null;
@@ -1207,6 +1233,93 @@ namespace Mmd.Tests
 
             string packageRoot = Path.GetFullPath(Path.Combine(projectRoot, "..", "packages", "com.yohawing.mmd-loader"));
             return Path.Combine(packageRoot, "Tests", "Fixtures", "Assets", fileName);
+        }
+
+        private static HairPhysicsScaleSample RunHairPhysicsForwardPlayback(float importScale)
+        {
+            MmdUnityPlaybackBinding? binding = null;
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_hair_physics.pmx");
+                MmdModelDefinition model = LoadHairPhysicsModelForLive(pmxPath);
+                MmdMotionDefinition motion = CreateRestPoseMotion(model);
+                binding = MmdUnityPlaybackBinding.CreateSkinned(
+                    model, motion, "test_hair_physics.pmx", "rest-pose", pmxPath, importScale);
+                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.Configure(binding, 30.0f, playOnStart: false);
+                controller.SetPhysicsMode(MmdPhysicsMode.Live);
+
+                controller.ApplyFrame(0);
+                controller.ApplyFrame(1);
+                controller.ApplyFrame(5);
+                Assert.That(binding.LastLivePhysicsDiagnostics, Is.Not.Null);
+                Assert.That(binding.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(5));
+
+                MmdUnityPhysicsBody body = binding.Instance.PhysicsBodies.First(physicsBody =>
+                    physicsBody != null &&
+                    physicsBody.HasNativeTransform &&
+                    !string.Equals(physicsBody.PhysicsKind, "static", StringComparison.Ordinal) &&
+                    physicsBody.BoneIndex >= 0 &&
+                    physicsBody.BoneIndex < binding.Instance.BoneTransforms.Length);
+                return new HairPhysicsScaleSample(
+                    binding.Instance.ImportScale,
+                    body.NativePosition,
+                    binding.Instance.BoneTransforms[body.BoneIndex].position,
+                    body.transform.position);
+            }
+            finally
+            {
+                if (binding?.Instance?.Root != null)
+                {
+                    DestroyInstance(binding.Instance);
+                }
+                else
+                {
+                    binding?.Dispose();
+                }
+            }
+        }
+
+        private static MmdModelDefinition LoadHairPhysicsModelForLive(string pmxPath)
+        {
+            var parser = new NativeMmdParser();
+            MmdModelDefinition model = parser.LoadModel(File.ReadAllBytes(pmxPath));
+            Assert.That(model.physics.rigidbodies.Count, Is.GreaterThan(0),
+                "test_hair_physics.pmx must contain rigidbody definitions");
+            model.physics.joints.RemoveAll(j => j.rigidbodyAIndex < 0 && j.rigidbodyBIndex < 0);
+            return model;
+        }
+
+        private static MmdMotionDefinition CreateRestPoseMotion(MmdModelDefinition model)
+        {
+            return new MmdMotionDefinition
+            {
+                targetModelName = model.name,
+                maxFrame = 0,
+                boneKeyframes = new List<MmdBoneKeyframeDefinition>(),
+                morphKeyframes = new List<MmdMorphKeyframeDefinition>(),
+                modelKeyframes = new List<MmdModelKeyframeDefinition>()
+            };
+        }
+
+        private readonly struct HairPhysicsScaleSample
+        {
+            public readonly float importScale;
+            public readonly Vector3 nativePosition;
+            public readonly Vector3 boneWorldPosition;
+            public readonly Vector3 debugWorldPosition;
+
+            public HairPhysicsScaleSample(
+                float importScale,
+                Vector3 nativePosition,
+                Vector3 boneWorldPosition,
+                Vector3 debugWorldPosition)
+            {
+                this.importScale = importScale;
+                this.nativePosition = nativePosition;
+                this.boneWorldPosition = boneWorldPosition;
+                this.debugWorldPosition = debugWorldPosition;
+            }
         }
     }
 }
