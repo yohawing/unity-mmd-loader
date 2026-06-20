@@ -1004,6 +1004,48 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void BuildAvatarWithFullFingerBonesUsesUnityHumanTraitNames()
+        {
+            MmdModelDefinition model = CreateHumanoidMappingModelWithOrigins();
+            AddFullFingerChains(model);
+
+            MmdHumanoidProxyRigResult proxyResult = MmdHumanoidProxyRigFactory.CreateProxyRig(model);
+            MmdHumanoidAvatarBuildResult? avatarResult = null;
+            try
+            {
+                Assert.That(proxyResult.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
+                Assert.That(proxyResult.BoneMap.Keys.Count(IsFingerHumanBone), Is.EqualTo(30));
+
+                avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(proxyResult);
+
+                Assert.That(avatarResult.Avatar, Is.Not.Null, string.Join("\n", avatarResult.Diagnostics));
+                Assert.That(avatarResult.IsValidHumanAvatar, Is.True, string.Join("\n", avatarResult.Diagnostics));
+
+                var expectedFingerHumanNames = new HashSet<string>(
+                    EnumerateFingerHumanBones().Select(bone => HumanTrait.BoneName[(int)bone]));
+                var actualHumanNames = new HashSet<string>(
+                    avatarResult.Avatar!.humanDescription.human.Select(human => human.humanName));
+
+                Assert.That(actualHumanNames.Intersect(expectedFingerHumanNames).Count(), Is.EqualTo(30));
+                Assert.That(actualHumanNames, Does.Contain("Left Thumb Proximal"));
+                Assert.That(actualHumanNames, Does.Contain("Right Little Distal"));
+                Assert.That(actualHumanNames, Does.Not.Contain(HumanBodyBones.LeftThumbProximal.ToString()));
+            }
+            finally
+            {
+                if (avatarResult?.Avatar != null)
+                {
+                    Object.DestroyImmediate(avatarResult.Avatar, allowDestroyingAssets: true);
+                }
+
+                if (proxyResult.ProxyRoot != null)
+                {
+                    Object.DestroyImmediate(proxyResult.ProxyRoot);
+                }
+            }
+        }
+
+        [Test]
         public void StandardJapaneseMappingKeepsCanonicalMatches()
         {
             MmdHumanoidProxyRigResult result = MmdHumanoidProxyRigFactory.CreateProxyRig(
@@ -1672,6 +1714,49 @@ namespace Mmd.Tests
             AddFingerChain(model, "右小指", 15, new[] { -76f, 131f, -4f }, duplicateDistalTip: true);
         }
 
+        private static void AddFullFingerChains(MmdModelDefinition model)
+        {
+            AddThumbChain(model, "左親指", 12, new[] { 74f, 133f, 5f });
+            AddThumbChain(model, "右親指", 15, new[] { -74f, 133f, 5f });
+            AddFingerChain(model, "左人指", 12, new[] { 78f, 137f, 2f }, duplicateDistalTip: true);
+            AddFingerChain(model, "右人指", 15, new[] { -78f, 137f, 2f }, duplicateDistalTip: true);
+            AddFingerChain(model, "左中指", 12, new[] { 80f, 135f, 0f }, duplicateDistalTip: true);
+            AddFingerChain(model, "右中指", 15, new[] { -80f, 135f, 0f }, duplicateDistalTip: true);
+            AddFingerChain(model, "左薬指", 12, new[] { 78f, 133f, -2f }, duplicateDistalTip: true);
+            AddFingerChain(model, "右薬指", 15, new[] { -78f, 133f, -2f }, duplicateDistalTip: true);
+            AddFingerChain(model, "左小指", 12, new[] { 76f, 131f, -4f }, duplicateDistalTip: true);
+            AddFingerChain(model, "右小指", 15, new[] { -76f, 131f, -4f }, duplicateDistalTip: true);
+        }
+
+        private static void AddThumbChain(
+            MmdModelDefinition model,
+            string prefix,
+            int handParentIndex,
+            float[] baseOrigin)
+        {
+            AddBoneWithOrigin(
+                model,
+                model.bones.Count,
+                prefix + "０",
+                handParentIndex,
+                new[] { baseOrigin[0] - FingerDirection(baseOrigin[0]) * 3f, baseOrigin[1], baseOrigin[2] });
+            int proximalIndex = model.bones.Count;
+            AddBoneWithOrigin(model, proximalIndex, prefix + "１", handParentIndex, baseOrigin);
+            int intermediateIndex = model.bones.Count;
+            AddBoneWithOrigin(
+                model,
+                intermediateIndex,
+                prefix + "２",
+                proximalIndex,
+                new[] { baseOrigin[0] + FingerDirection(baseOrigin[0]) * 4f, baseOrigin[1] + 1f, baseOrigin[2] });
+            AddBoneWithOrigin(
+                model,
+                model.bones.Count,
+                prefix + "先",
+                intermediateIndex,
+                new[] { baseOrigin[0] + FingerDirection(baseOrigin[0]) * 8f, baseOrigin[1] + 2f, baseOrigin[2] });
+        }
+
         private static void AddFingerChain(
             MmdModelDefinition model,
             string prefix,
@@ -1710,6 +1795,45 @@ namespace Mmd.Tests
         private static float FingerDirection(float x)
         {
             return x < 0f ? -1f : 1f;
+        }
+
+        private static IEnumerable<HumanBodyBones> EnumerateFingerHumanBones()
+        {
+            yield return HumanBodyBones.LeftThumbProximal;
+            yield return HumanBodyBones.LeftThumbIntermediate;
+            yield return HumanBodyBones.LeftThumbDistal;
+            yield return HumanBodyBones.LeftIndexProximal;
+            yield return HumanBodyBones.LeftIndexIntermediate;
+            yield return HumanBodyBones.LeftIndexDistal;
+            yield return HumanBodyBones.LeftMiddleProximal;
+            yield return HumanBodyBones.LeftMiddleIntermediate;
+            yield return HumanBodyBones.LeftMiddleDistal;
+            yield return HumanBodyBones.LeftRingProximal;
+            yield return HumanBodyBones.LeftRingIntermediate;
+            yield return HumanBodyBones.LeftRingDistal;
+            yield return HumanBodyBones.LeftLittleProximal;
+            yield return HumanBodyBones.LeftLittleIntermediate;
+            yield return HumanBodyBones.LeftLittleDistal;
+            yield return HumanBodyBones.RightThumbProximal;
+            yield return HumanBodyBones.RightThumbIntermediate;
+            yield return HumanBodyBones.RightThumbDistal;
+            yield return HumanBodyBones.RightIndexProximal;
+            yield return HumanBodyBones.RightIndexIntermediate;
+            yield return HumanBodyBones.RightIndexDistal;
+            yield return HumanBodyBones.RightMiddleProximal;
+            yield return HumanBodyBones.RightMiddleIntermediate;
+            yield return HumanBodyBones.RightMiddleDistal;
+            yield return HumanBodyBones.RightRingProximal;
+            yield return HumanBodyBones.RightRingIntermediate;
+            yield return HumanBodyBones.RightRingDistal;
+            yield return HumanBodyBones.RightLittleProximal;
+            yield return HumanBodyBones.RightLittleIntermediate;
+            yield return HumanBodyBones.RightLittleDistal;
+        }
+
+        private static bool IsFingerHumanBone(HumanBodyBones bone)
+        {
+            return EnumerateFingerHumanBones().Contains(bone);
         }
 
         private static MmdModelDefinition CreateStandardMmdSiblingTorsoModel()

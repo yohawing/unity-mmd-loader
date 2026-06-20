@@ -774,7 +774,7 @@ namespace Mmd
                 humanBoneByTransform[t] = match.HumanBone;
                 humanBoneList.Add(new HumanBone
                 {
-                    humanName = match.HumanBone.ToString(),
+                    humanName = HumanTrait.BoneName[(int)match.HumanBone],
                     boneName = t.name,
                     limit = { useDefaultValues = true }
                 });
@@ -790,7 +790,7 @@ namespace Mmd
                 humanBoneByTransform[kvp.Value] = kvp.Key;
                 humanBoneList.Add(new HumanBone
                 {
-                    humanName = kvp.Key.ToString(),
+                    humanName = HumanTrait.BoneName[(int)kvp.Key],
                     boneName = kvp.Value.name,
                     limit = { useDefaultValues = true }
                 });
