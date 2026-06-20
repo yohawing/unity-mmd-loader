@@ -257,10 +257,12 @@ namespace Mmd
 
     public sealed class MmdPmxAsset : ScriptableObject
     {
+        public const float DefaultImportScale = 0.1f;
+
         [SerializeField] private byte[] data = Array.Empty<byte>();
         [SerializeField] private string sourceId = string.Empty;
         [SerializeField] private string sourcePath = string.Empty;
-        [SerializeField] private float importScale = 1.0f;
+        [SerializeField] private float importScale = DefaultImportScale;
         [SerializeField] private string modelPreset = "Custom";
         [SerializeField] private string meshGenerationMode = "SingleMesh";
         [SerializeField] private string materialTexturePolicy = "ResolveReferencesOnly";
@@ -385,7 +387,7 @@ namespace Mmd
             byte[] bytes,
             string assetSourceId,
             string assetSourcePath,
-            float assetImportScale = 1.0f,
+            float assetImportScale = DefaultImportScale,
             string assetModelPreset = "Custom",
             string assetMeshGenerationMode = "SingleMesh",
             string assetMaterialTexturePolicy = "ResolveReferencesOnly",
@@ -474,7 +476,7 @@ namespace Mmd
 
         private static float NormalizeImportScale(float value)
         {
-            return float.IsFinite(value) && value > 0.0f ? value : 1.0f;
+            return float.IsFinite(value) && value > 0.0f ? value : DefaultImportScale;
         }
 
         private static string NormalizeSummaryValue(string value, string fallback)

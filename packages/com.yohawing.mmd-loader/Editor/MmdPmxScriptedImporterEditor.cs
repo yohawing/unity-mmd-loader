@@ -83,7 +83,7 @@ namespace Mmd.Editor
             {
                 EditorGUILayout.PropertyField(importScaleProperty,
                     new GUIContent("Import Scale",
-                        "Scale applied to the imported PMX model. Stored as an import setting and asset summary. Scale-aware runtime instantiation is not applied yet."));
+                        "Scale applied to the imported PMX model. Stored as an import setting and asset summary. Runtime playback and live physics are scale-aware."));
             }
 
             if (meshGenerationModeProperty != null)

@@ -40,10 +40,10 @@ namespace Mmd.Editor
         MmdBasicUrpToon = 0
     }
 
-    [ScriptedImporter(19, "pmx")]
+    [ScriptedImporter(20, "pmx")]
     public sealed class MmdPmxScriptedImporter : ScriptedImporter
     {
-        [SerializeField] private float importScale = 1.0f;
+        [SerializeField] private float importScale = MmdPmxAsset.DefaultImportScale;
         [SerializeField] private MmdPmxModelPreset modelPreset = MmdPmxModelPreset.Custom;
         [SerializeField] private MmdPmxMeshGenerationMode meshGenerationMode = MmdPmxMeshGenerationMode.SingleMesh;
         [SerializeField] private MmdPmxMaterialTexturePolicy materialTexturePolicy = MmdPmxMaterialTexturePolicy.ResolveReferencesOnly;
@@ -190,7 +190,7 @@ namespace Mmd.Editor
 
         private static float NormalizeImportScale(float value)
         {
-            return float.IsFinite(value) && value > 0.0f ? value : 1.0f;
+            return float.IsFinite(value) && value > 0.0f ? value : MmdPmxAsset.DefaultImportScale;
         }
 
         private static Animator? ConfigureImportedAnimator(

@@ -97,15 +97,16 @@ namespace Mmd.Tests
 
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
 
-            Assert.That(pmxAsset.ImportScale, Is.EqualTo(1.0f).Within(0.0001f));
+            Assert.That(pmxAsset.ImportScale, Is.EqualTo(0.1f).Within(0.0001f));
 
-            // Strengthened: pin the current (non-Bullet-complete) readiness boundary for normalized legacy importScale=1.0 + no-physics-descriptors path.
+            // Default PMX import scale is 0.1, and runtime playback/live physics are scale-aware.
             MmdScaleAwarePhysicsReadiness readiness = MmdAssetInspectorUtility.GetScaleAwarePhysicsReadiness(pmxAsset);
+            Assert.That(readiness.ImportScale, Is.EqualTo(0.1f).Within(0.0001f));
             Assert.That(readiness.HasPhysicsDescriptors, Is.False);
-            Assert.That(readiness.GravityPolicy, Is.EqualTo("legacy-mmd-gravity-98"));
-            Assert.That(readiness.BackendReadbackSpace, Is.EqualTo(MmdScaleAwarePhysicsReadiness.LegacyReadbackSpace));
-            Assert.That(readiness.ScaleAwareHandoffReadiness, Is.EqualTo("not-needed-no-physics-descriptors"));
-            Assert.That(readiness.RequiredSmoke, Is.EqualTo(MmdScaleAwarePhysicsReadiness.ScaleAwareSmokeRequired));
+            Assert.That(readiness.GravityPolicy, Is.EqualTo("scale-aware-mmd-gravity-98"));
+            Assert.That(readiness.BackendReadbackSpace, Is.EqualTo(MmdScaleAwarePhysicsReadiness.MmdSpaceReadback));
+            Assert.That(readiness.ScaleAwareHandoffReadiness, Is.EqualTo(MmdScaleAwarePhysicsReadiness.ScaleAwareHandoffReady));
+            Assert.That(readiness.RequiredSmoke, Is.EqualTo(MmdScaleAwarePhysicsReadiness.ScaleAwareSmokeCovered));
         }
 
         [Test]
@@ -203,10 +204,10 @@ namespace Mmd.Tests
             Assert.That(pmxAsset.RigidbodyCount, Is.EqualTo(0));
             Assert.That(pmxAsset.JointCount, Is.EqualTo(0));
             Assert.That(readiness.HasPhysicsDescriptors, Is.False);
-            Assert.That(readiness.GravityPolicy, Is.EqualTo("scale-aware-gravity-requires-smoke"));
-            Assert.That(readiness.BackendReadbackSpace, Is.EqualTo(MmdScaleAwarePhysicsReadiness.LegacyReadbackSpace));
-            Assert.That(readiness.ScaleAwareHandoffReadiness, Is.EqualTo(MmdScaleAwarePhysicsReadiness.BlockedHandoff));
-            Assert.That(readiness.RequiredSmoke, Is.EqualTo(MmdScaleAwarePhysicsReadiness.ScaleAwareSmokeRequired));
+            Assert.That(readiness.GravityPolicy, Is.EqualTo("scale-aware-mmd-gravity-98"));
+            Assert.That(readiness.BackendReadbackSpace, Is.EqualTo(MmdScaleAwarePhysicsReadiness.MmdSpaceReadback));
+            Assert.That(readiness.ScaleAwareHandoffReadiness, Is.EqualTo(MmdScaleAwarePhysicsReadiness.ScaleAwareHandoffReady));
+            Assert.That(readiness.RequiredSmoke, Is.EqualTo(MmdScaleAwarePhysicsReadiness.ScaleAwareSmokeCovered));
 
             // Prove imported asset ImportScale flows to scene instantiation (transient bones/physics) and cached mesh.
             MmdUnityModelInstance? loadInstance = null;
@@ -239,16 +240,16 @@ namespace Mmd.Tests
 
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
 
-            Assert.That(importer.ImportScale, Is.EqualTo(1.0f).Within(0.0001f));
-            Assert.That(pmxAsset.ImportScale, Is.EqualTo(1.0f).Within(0.0001f));
+            Assert.That(importer.ImportScale, Is.EqualTo(0.1f).Within(0.0001f));
+            Assert.That(pmxAsset.ImportScale, Is.EqualTo(0.1f).Within(0.0001f));
 
             MmdScaleAwarePhysicsReadiness readiness = MmdAssetInspectorUtility.GetScaleAwarePhysicsReadiness(pmxAsset);
-            Assert.That(readiness.ImportScale, Is.EqualTo(1.0f).Within(0.0001f));
+            Assert.That(readiness.ImportScale, Is.EqualTo(0.1f).Within(0.0001f));
             Assert.That(readiness.HasPhysicsDescriptors, Is.False);
-            Assert.That(readiness.GravityPolicy, Is.EqualTo("legacy-mmd-gravity-98"));
-            Assert.That(readiness.BackendReadbackSpace, Is.EqualTo(MmdScaleAwarePhysicsReadiness.LegacyReadbackSpace));
-            Assert.That(readiness.ScaleAwareHandoffReadiness, Is.EqualTo("not-needed-no-physics-descriptors"));
-            Assert.That(readiness.RequiredSmoke, Is.EqualTo(MmdScaleAwarePhysicsReadiness.ScaleAwareSmokeRequired));
+            Assert.That(readiness.GravityPolicy, Is.EqualTo("scale-aware-mmd-gravity-98"));
+            Assert.That(readiness.BackendReadbackSpace, Is.EqualTo(MmdScaleAwarePhysicsReadiness.MmdSpaceReadback));
+            Assert.That(readiness.ScaleAwareHandoffReadiness, Is.EqualTo(MmdScaleAwarePhysicsReadiness.ScaleAwareHandoffReady));
+            Assert.That(readiness.RequiredSmoke, Is.EqualTo(MmdScaleAwarePhysicsReadiness.ScaleAwareSmokeCovered));
         }
 
         [Test]
