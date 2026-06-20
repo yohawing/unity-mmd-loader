@@ -144,6 +144,23 @@ namespace Mmd.UnityIntegration
                 Transform? nativeTransform = match.MmdBoneIndex >= 0 && match.MmdBoneIndex < nativeBones.Length
                     ? nativeBones[match.MmdBoneIndex]
                     : null;
+                if (match.HumanBone == HumanBodyBones.Hips &&
+                    proxyTransform != null &&
+                    TryFindHipsTranslationTarget(nativeBones, match.MmdBoneIndex, out Transform? translationTarget, out int translationTargetIndex))
+                {
+                    bindings.Add(new MmdHumanoidRetargetBinding(
+                        match.HumanBone,
+                        match.MmdBoneIndex,
+                        proxyTransform,
+                        nativeTransform,
+                        copyLocalPosition: true,
+                        translationTargetTransform: translationTarget!,
+                        translationTargetMmdBoneIndex: translationTargetIndex,
+                        proxyBindLocalPosition: proxyTransform.localPosition,
+                        translationTargetBindLocalPosition: translationTarget!.localPosition));
+                    continue;
+                }
+
                 bindings.Add(new MmdHumanoidRetargetBinding(
                     match.HumanBone,
                     match.MmdBoneIndex,
@@ -152,6 +169,46 @@ namespace Mmd.UnityIntegration
             }
 
             return bindings;
+        }
+
+        private static bool TryFindHipsTranslationTarget(
+            IReadOnlyList<Transform> nativeBones,
+            int fallbackMmdBoneIndex,
+            out Transform? target,
+            out int targetMmdBoneIndex)
+        {
+            string[] preferredNames =
+            {
+                "センター",
+                "グルーブ",
+                "全ての親",
+                "腰"
+            };
+
+            foreach (string preferredName in preferredNames)
+            {
+                for (int i = 0; i < nativeBones.Count; i++)
+                {
+                    Transform bone = nativeBones[i];
+                    if (bone != null && string.Equals(bone.name, preferredName, System.StringComparison.Ordinal))
+                    {
+                        target = bone;
+                        targetMmdBoneIndex = i;
+                        return true;
+                    }
+                }
+            }
+
+            if (fallbackMmdBoneIndex >= 0 && fallbackMmdBoneIndex < nativeBones.Count)
+            {
+                target = nativeBones[fallbackMmdBoneIndex];
+                targetMmdBoneIndex = fallbackMmdBoneIndex;
+                return target != null;
+            }
+
+            target = null;
+            targetMmdBoneIndex = -1;
+            return false;
         }
 
         private static void PrepareProxyRootForImportAsset(GameObject proxyRoot)

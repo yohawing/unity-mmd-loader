@@ -24,16 +24,24 @@ namespace Mmd.Timeline
             foreach (MmdHumanoidRetargetBinding entry in retargeter.Entries)
             {
                 Transform? nativeTransform = entry.NativeTransform;
-                if (nativeTransform == null)
+                if (nativeTransform != null)
+                {
+                    GameObject nativeObject = nativeTransform.gameObject;
+                    driver.AddFromName<Transform>(nativeObject, "m_LocalRotation.x");
+                    driver.AddFromName<Transform>(nativeObject, "m_LocalRotation.y");
+                    driver.AddFromName<Transform>(nativeObject, "m_LocalRotation.z");
+                    driver.AddFromName<Transform>(nativeObject, "m_LocalRotation.w");
+                }
+
+                if (!entry.CopyLocalPosition || entry.TranslationTargetTransform == null)
                 {
                     continue;
                 }
 
-                GameObject nativeObject = nativeTransform.gameObject;
-                driver.AddFromName<Transform>(nativeObject, "m_LocalRotation.x");
-                driver.AddFromName<Transform>(nativeObject, "m_LocalRotation.y");
-                driver.AddFromName<Transform>(nativeObject, "m_LocalRotation.z");
-                driver.AddFromName<Transform>(nativeObject, "m_LocalRotation.w");
+                GameObject translationTargetObject = entry.TranslationTargetTransform.gameObject;
+                driver.AddFromName<Transform>(translationTargetObject, "m_LocalPosition.x");
+                driver.AddFromName<Transform>(translationTargetObject, "m_LocalPosition.y");
+                driver.AddFromName<Transform>(translationTargetObject, "m_LocalPosition.z");
             }
         }
     }

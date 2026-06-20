@@ -336,6 +336,63 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void RetargetCopiesHipsLocalPositionDeltaToTranslationTargetWhenEnabled()
+        {
+            var proxyObject = new GameObject("proxy-hips");
+            var rotationTargetObject = new GameObject("native-lower-body");
+            var translationTargetObject = new GameObject("native-center");
+            try
+            {
+                Transform proxyHips = proxyObject.transform;
+                Transform rotationTarget = rotationTargetObject.transform;
+                Transform translationTarget = translationTargetObject.transform;
+                Vector3 proxyBind = new Vector3(0f, 12.7f, 0f);
+                Vector3 targetBind = new Vector3(0f, 8f, 0f);
+                Vector3 rotationTargetPosition = new Vector3(10f, 20f, 30f);
+                proxyHips.localPosition = proxyBind + new Vector3(1.25f, -0.5f, 2.75f);
+                proxyHips.localRotation = Quaternion.Euler(10f, 20f, 30f);
+                rotationTarget.localPosition = rotationTargetPosition;
+                translationTarget.localPosition = targetBind;
+
+                var entries = new[]
+                {
+                    new MmdHumanoidRetargetBinding(
+                        HumanBodyBones.Hips,
+                        mmdBoneIndex: 4,
+                        proxyTransform: proxyHips,
+                        nativeTransform: rotationTarget,
+                        copyLocalPosition: true,
+                        translationTargetTransform: translationTarget,
+                        translationTargetMmdBoneIndex: 1,
+                        proxyBindLocalPosition: proxyBind,
+                        translationTargetBindLocalPosition: targetBind),
+                    new MmdHumanoidRetargetBinding(
+                        HumanBodyBones.Spine,
+                        mmdBoneIndex: 1,
+                        proxyTransform: proxyHips,
+                        nativeTransform: rotationTarget)
+                };
+
+                MmdHumanoidRetargeterResult result = MmdHumanoidRetargeter.RetargetPose(entries);
+
+                Assert.That(result.CopiedBoneCount, Is.EqualTo(2));
+                Assert.That(result.SkippedBoneCount, Is.EqualTo(0));
+                Assert.That(result.CopiedTranslationCount, Is.EqualTo(1));
+                Assert.That(result.SkippedTranslationCount, Is.EqualTo(0));
+                Assert.That(Quaternion.Angle(rotationTarget.localRotation, proxyHips.localRotation), Is.LessThan(0.001f));
+                Assert.That(translationTarget.localPosition, Is.EqualTo(targetBind + (proxyHips.localPosition - proxyBind)));
+                Assert.That(rotationTarget.localPosition, Is.EqualTo(rotationTargetPosition),
+                    "translation copy must not mutate the rotation target when it is a different MMD bone");
+            }
+            finally
+            {
+                Object.DestroyImmediate(proxyObject);
+                Object.DestroyImmediate(rotationTargetObject);
+                Object.DestroyImmediate(translationTargetObject);
+            }
+        }
+
+        [Test]
         public void RetargetRejectsOutOfRangeMmdBoneIndex()
         {
             // Arrange: create a model where the last bone has an index beyond native array.

@@ -306,6 +306,37 @@ namespace Mmd.Tests
                 Assert.That(entry.NativeTransform, Is.Not.Null, entry.HumanBone + " native transform");
                 Assert.That(entry.MmdBoneIndex, Is.GreaterThanOrEqualTo(0), entry.HumanBone + " MMD bone index");
             }
+
+            MmdHumanoidRetargetBinding hipsEntry = default!;
+            bool foundHipsEntry = false;
+            foreach (MmdHumanoidRetargetBinding entry in retargeter.Entries)
+            {
+                if (entry.HumanBone == HumanBodyBones.Hips)
+                {
+                    hipsEntry = entry;
+                    foundHipsEntry = true;
+                    break;
+                }
+            }
+
+            Assert.That(foundHipsEntry, Is.True, "Humanoid import must include a Hips retarget binding.");
+            Assert.That(hipsEntry.CopyLocalPosition, Is.True,
+                "Hips binding must copy humanoid body translation to the native MMD move bone.");
+            Assert.That(hipsEntry.TranslationTargetTransform, Is.Not.Null);
+            Assert.That(hipsEntry.TranslationTargetMmdBoneIndex, Is.GreaterThanOrEqualTo(0));
+            SkinnedMeshRenderer? smr = root.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true);
+            Assert.That(smr, Is.Not.Null);
+            Transform? centerBone = FindBoneByName(smr!.bones, "センター");
+            if (centerBone != null)
+            {
+                Assert.That(hipsEntry.TranslationTargetTransform, Is.SameAs(centerBone),
+                    "センター exists and must be the first Hips translation target choice.");
+            }
+            else
+            {
+                Assert.That(IsAcceptedHipsTranslationTargetName(hipsEntry.TranslationTargetTransform!.name), Is.True,
+                    "Hips translation target must follow the configured move-bone priority or fallback.");
+            }
         }
 
         [Test]
@@ -2667,6 +2698,28 @@ namespace Mmd.Tests
             }
 
             return avatarSubAssets;
+        }
+
+        private static Transform? FindBoneByName(Transform[] bones, string name)
+        {
+            foreach (Transform bone in bones)
+            {
+                if (bone != null && string.Equals(bone.name, name, StringComparison.Ordinal))
+                {
+                    return bone;
+                }
+            }
+
+            return null;
+        }
+
+        private static bool IsAcceptedHipsTranslationTargetName(string name)
+        {
+            return string.Equals(name, "センター", StringComparison.Ordinal)
+                   || string.Equals(name, "グルーブ", StringComparison.Ordinal)
+                   || string.Equals(name, "全ての親", StringComparison.Ordinal)
+                   || string.Equals(name, "腰", StringComparison.Ordinal)
+                   || string.Equals(name, "下半身", StringComparison.Ordinal);
         }
 
         private static string ProjectRoot => Path.GetFullPath(Path.Combine(Application.dataPath, ".."));

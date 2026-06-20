@@ -134,6 +134,103 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void GatherPropertiesRegistersTranslationTargetLocalPositionWhenBindingRequestsIt()
+        {
+            RetargetFixture fixture = CreateFixture();
+            TimelineAsset? timelineAsset = null;
+            GameObject? directorObject = null;
+            GameObject? centerObject = null;
+            try
+            {
+                HumanBodyBones hipsBone = HumanBodyBones.Hips;
+                Transform proxyHips = fixture.ProxyRig.BoneMap[hipsBone];
+                Transform nativeHips = fixture.NativeBones[fixture.IndexByHumanBone[hipsBone]];
+                centerObject = new GameObject("native-center");
+                Transform center = centerObject.transform;
+                center.SetParent(fixture.Root.transform, worldPositionStays: false);
+
+                var entries = new List<MmdHumanoidRetargetBinding>();
+                foreach (MmdHumanoidRetargetBinding entry in fixture.Retargeter.Entries)
+                {
+                    if (entry.HumanBone == hipsBone)
+                    {
+                        entries.Add(new MmdHumanoidRetargetBinding(
+                            hipsBone,
+                            entry.MmdBoneIndex,
+                            proxyHips,
+                            nativeHips,
+                            copyLocalPosition: true,
+                            translationTargetTransform: center,
+                            translationTargetMmdBoneIndex: 100,
+                            proxyBindLocalPosition: proxyHips.localPosition,
+                            translationTargetBindLocalPosition: center.localPosition));
+                    }
+                    else
+                    {
+                        entries.Add(entry);
+                    }
+                }
+
+                fixture.Retargeter.Configure(fixture.ProxyRig.ProxyRoot!.transform, entries);
+
+                timelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
+                MmdHumanoidRetargetTrack track =
+                    timelineAsset.CreateTrack<MmdHumanoidRetargetTrack>(null, "MMD Humanoid Retarget");
+                track.CreateClip<MmdHumanoidRetargetClip>();
+
+                directorObject = new GameObject("humanoid-retarget-gather-translation-director");
+                PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
+                director.playableAsset = timelineAsset;
+                director.SetGenericBinding(track, fixture.Retargeter);
+
+                var collector = new SpyPropertyCollector();
+                track.GatherProperties(director, collector);
+
+                string[] expectedPositionProperties =
+                {
+                    "m_LocalPosition.x",
+                    "m_LocalPosition.y",
+                    "m_LocalPosition.z"
+                };
+
+                foreach (string propertyName in expectedPositionProperties)
+                {
+                    Assert.That(collector.Entries.Count(entry =>
+                            entry.GameObject == center.gameObject &&
+                            entry.ComponentType == typeof(Transform) &&
+                            entry.PropertyName == propertyName),
+                        Is.EqualTo(1),
+                        "translation target should register " + propertyName);
+                }
+
+                Assert.That(collector.Entries.Any(entry =>
+                        entry.GameObject == nativeHips.gameObject &&
+                        entry.PropertyName.Contains("m_LocalPosition")),
+                    Is.False,
+                    "rotation target should not receive localPosition registration unless it is the translation target");
+            }
+            finally
+            {
+                if (directorObject != null)
+                {
+                    UnityObject.DestroyImmediate(directorObject);
+                }
+
+                if (timelineAsset != null)
+                {
+                    UnityObject.DestroyImmediate(timelineAsset);
+                }
+
+                if (centerObject != null)
+                {
+                    UnityObject.DestroyImmediate(centerObject);
+                }
+
+                fixture.Destroy();
+            }
+        }
+
+        [Test]
         public void ShouldSuppressLateUpdateAfterTimelineDriveMatchesPlaybackControllerWindow()
         {
             Assert.That(MmdHumanoidRuntimeRetargeter.ShouldSuppressLateUpdateAfterTimelineDrive(10, 10),
