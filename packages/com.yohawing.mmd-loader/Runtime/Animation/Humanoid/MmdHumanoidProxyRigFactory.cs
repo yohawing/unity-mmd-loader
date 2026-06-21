@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using UnityEngine;
 using Mmd.Parser;
 
@@ -572,7 +573,7 @@ namespace Mmd
         private static bool TryResolveHumanoidParent(
             HumanBodyBones humanBone,
             IReadOnlyDictionary<HumanBodyBones, Transform> boneMap,
-            out Transform? parent)
+            [NotNullWhen(true)] out Transform? parent)
         {
             parent = null;
             switch (humanBone)
@@ -681,7 +682,7 @@ namespace Mmd
 
         private static bool TryResolveTorsoParent(
             IReadOnlyDictionary<HumanBodyBones, Transform> boneMap,
-            out Transform? parent)
+            [NotNullWhen(true)] out Transform? parent)
         {
             return boneMap.TryGetValue(HumanBodyBones.Chest, out parent)
                    || boneMap.TryGetValue(HumanBodyBones.Spine, out parent);
