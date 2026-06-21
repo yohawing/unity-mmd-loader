@@ -211,8 +211,17 @@ namespace Mmd.Tests
 
             yield return null;
 
-            MmdUnityPlaybackController? foundController = UnityEngine.Object.FindAnyObjectByType<MmdUnityPlaybackController>();
-            Assert.That(foundController, Is.Not.Null);
+            // The NativePlayback scene contains the configured "Native Playback" holder controller
+            // AND a second controller on the instantiated imported model hierarchy, because the
+            // importer attaches a MmdUnityPlaybackController to every imported model (Slice 7) and the
+            // scene builder Instantiates that hierarchy as a child. FindAnyObjectByType returns an
+            // arbitrary one of the two, so the holder must be selected deterministically by name.
+            MmdUnityPlaybackController[] sceneControllers =
+                UnityEngine.Object.FindObjectsByType<MmdUnityPlaybackController>(FindObjectsSortMode.None);
+            MmdUnityPlaybackController? foundController = sceneControllers
+                .FirstOrDefault(c => string.Equals(c.gameObject.name, "Native Playback", StringComparison.Ordinal));
+            Assert.That(foundController, Is.Not.Null,
+                $"scene must contain the 'Native Playback' holder controller (found {sceneControllers.Length} controller(s))");
             MmdUnityPlaybackController controller = foundController!;
             MmdPmxAsset modelAsset = controller.ModelAssetSource!;
             MmdVmdAsset motionAsset = controller.MotionAssetSource!;
