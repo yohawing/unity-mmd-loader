@@ -30,6 +30,7 @@ namespace Mmd.UnityIntegration
     public sealed class MmdUnityPlaybackController : MonoBehaviour
     {
         private MmdUnityPlaybackBinding? binding;
+        private MmdUnityPlaybackBinding? humanoidPhysicsBinding;
         [SerializeField] private bool playOnStart = true;
         [SerializeField] private int initialFrame;
         [SerializeField] private float frameRate = 30.0f;
@@ -96,7 +97,10 @@ namespace Mmd.UnityIntegration
 
         public MmdEditableRigLayerDiagnostics? LastEditableRigDiagnostics { get; private set; }
 
-        public MmdLivePhysicsFrameDiagnostics? LastLivePhysicsDiagnostics => binding?.LastLivePhysicsDiagnostics;
+        public MmdLivePhysicsFrameDiagnostics? LastLivePhysicsDiagnostics =>
+            binding?.LastLivePhysicsDiagnostics ?? humanoidPhysicsBinding?.LastLivePhysicsDiagnostics;
+
+        internal bool HasHumanoidPhysicsBinding => humanoidPhysicsBinding != null;
 
         public Transform? HumanoidProxyRoot => proxyRoot;
 
@@ -116,6 +120,11 @@ namespace Mmd.UnityIntegration
                 throw new ArgumentNullException(nameof(pmxAsset));
             }
 
+            if (!ReferenceEquals(modelAsset, pmxAsset))
+            {
+                DisposeHumanoidPhysicsBinding();
+            }
+
             modelAsset = pmxAsset;
         }
 
@@ -133,6 +142,7 @@ namespace Mmd.UnityIntegration
                 : new List<MmdHumanoidAppendTransformBinding>();
             LastHumanoidRetargetGate = EvaluateHumanoidRetargetGate(requireAnimatorDriver: true);
             LastHumanoidRetargetResult = null;
+            DisposeHumanoidPhysicsBinding();
         }
 
         public MmdHumanoidRetargeterResult ApplyHumanoidRetargetNow()
@@ -163,6 +173,7 @@ namespace Mmd.UnityIntegration
 
             LastHumanoidRetargetResult = MmdHumanoidRetargeter.RetargetPose(humanoidRetargetEntries);
             MmdHumanoidAppendTransformApplier.Apply(humanoidAppendEntries);
+            StepHumanoidRetargetLivePhysicsIfNeeded(LastHumanoidRetargetResult);
             return LastHumanoidRetargetResult;
         }
 
@@ -229,6 +240,7 @@ namespace Mmd.UnityIntegration
                 binding.Dispose();
             }
 
+            DisposeHumanoidPhysicsBinding();
             binding = playbackBinding;
             frameRate = playbackFrameRate;
             playbackFrame = 0.0f;
@@ -273,6 +285,18 @@ namespace Mmd.UnityIntegration
             else
             {
                 _userExplicitLive = false;
+            }
+
+            if (humanoidPhysicsBinding != null)
+            {
+                if (mode == MmdPhysicsMode.Live)
+                {
+                    humanoidPhysicsBinding.SetPhysicsMode(MmdPhysicsMode.Live);
+                }
+                else
+                {
+                    DisposeHumanoidPhysicsBinding();
+                }
             }
         }
 
@@ -860,6 +884,18 @@ namespace Mmd.UnityIntegration
             if (binding == null)
             {
                 ValidatePhysicsModeForSerialization();
+                if (humanoidPhysicsBinding != null)
+                {
+                    if (physicsMode == MmdPhysicsMode.Live)
+                    {
+                        humanoidPhysicsBinding.SetPhysicsMode(MmdPhysicsMode.Live);
+                    }
+                    else
+                    {
+                        DisposeHumanoidPhysicsBinding();
+                    }
+                }
+
                 return;
             }
 
@@ -923,11 +959,17 @@ namespace Mmd.UnityIntegration
 
         private void OnDestroy()
         {
+            DisposeHumanoidPhysicsBinding();
             binding?.Dispose();
             binding = null;
             LastSnapshot = null;
             LastEditableRigDiagnostics = null;
             IsPlaying = false;
+        }
+
+        private void OnDisable()
+        {
+            DisposeHumanoidPhysicsBinding();
         }
 
         private void AttachRestoredRuntimeInstance(MmdUnityModelInstance instance)
@@ -1285,10 +1327,7 @@ namespace Mmd.UnityIntegration
 
         private void StepHumanoidRetargetLivePhysicsIfNeeded(MmdHumanoidRetargeterResult result)
         {
-            EnsureHumanoidPhysicsBinding();
-
-            if (binding == null ||
-                physicsMode != MmdPhysicsMode.Live ||
+            if (physicsMode != MmdPhysicsMode.Live ||
                 !Application.isPlaying ||
                 result.CopiedBoneCount <= 0 ||
                 LastHumanoidRetargetGate != MmdHumanoidRetargetGate.Ready ||
@@ -1301,15 +1340,25 @@ namespace Mmd.UnityIntegration
                 return;
             }
 
-            if (binding.PhysicsMode != MmdPhysicsMode.Live)
+            EnsureHumanoidPhysicsBinding();
+
+            MmdUnityPlaybackBinding? physicsBinding = humanoidPhysicsBinding;
+            if (physicsBinding == null)
             {
-                binding.SetPhysicsMode(MmdPhysicsMode.Live);
+                return;
+            }
+
+            if (physicsBinding.PhysicsMode != MmdPhysicsMode.Live)
+            {
+                physicsBinding.SetPhysicsMode(MmdPhysicsMode.Live);
                 ResetLivePhysicsDriveSource();
             }
 
-            bool resetOnFirstStep = PrepareLivePhysicsDriveSource(LivePhysicsDriveSource.HumanoidRetarget);
+            bool resetOnFirstStep = PrepareLivePhysicsDriveSource(
+                LivePhysicsDriveSource.HumanoidRetarget,
+                physicsBinding);
             humanoidLivePhysicsStepIndex++;
-            binding.StepLivePhysicsFromCurrentPose(
+            physicsBinding.StepLivePhysicsFromCurrentPose(
                 humanoidLivePhysicsStepIndex,
                 resetOnFirstStep ? 0.0f : Time.deltaTime,
                 resetOnFirstStep);
@@ -1319,7 +1368,9 @@ namespace Mmd.UnityIntegration
         private void EnsureHumanoidPhysicsBinding()
         {
             if (binding != null ||
+                humanoidPhysicsBinding != null ||
                 physicsMode != MmdPhysicsMode.Live ||
+                !Application.isPlaying ||
                 proxyRoot == null ||
                 humanoidRetargetEntries == null ||
                 humanoidRetargetEntries.Count == 0 ||
@@ -1333,11 +1384,11 @@ namespace Mmd.UnityIntegration
 
             try
             {
-                binding = MmdUnityPlaybackBinding.CreateSkinnedForModelOnlyPhysicsFromExistingSceneModel(
+                humanoidPhysicsBinding = MmdUnityPlaybackBinding.CreateSkinnedForModelOnlyPhysicsFromExistingSceneModel(
                     gameObject,
                     modelAsset,
                     "humanoid-physics");
-                binding.SetPhysicsMode(MmdPhysicsMode.Live);
+                humanoidPhysicsBinding.SetPhysicsMode(MmdPhysicsMode.Live);
                 ResetLivePhysicsDriveSource();
                 ConfigurationRevision++;
             }
@@ -1356,12 +1407,24 @@ namespace Mmd.UnityIntegration
                 return false;
             }
 
+            return PrepareLivePhysicsDriveSource(source, binding);
+        }
+
+        private bool PrepareLivePhysicsDriveSource(
+            LivePhysicsDriveSource source,
+            MmdUnityPlaybackBinding physicsBinding)
+        {
+            if (physicsBinding == null)
+            {
+                return false;
+            }
+
             if (livePhysicsDriveSource == source)
             {
                 return false;
             }
 
-            binding.ResetLivePhysics();
+            physicsBinding.ResetLivePhysics();
             livePhysicsDriveSource = source;
             if (source == LivePhysicsDriveSource.HumanoidRetarget)
             {
@@ -1377,6 +1440,18 @@ namespace Mmd.UnityIntegration
             humanoidLivePhysicsStepIndex = -1;
             lastHumanoidLivePhysicsFrameCount = int.MinValue / 2;
             lastVmdLivePhysicsFrameCount = int.MinValue / 2;
+        }
+
+        private void DisposeHumanoidPhysicsBinding()
+        {
+            if (humanoidPhysicsBinding == null)
+            {
+                return;
+            }
+
+            humanoidPhysicsBinding.Dispose();
+            humanoidPhysicsBinding = null;
+            ResetLivePhysicsDriveSource();
         }
 
         private MmdPlaybackSnapshot ApplyPlaybackPose(Func<MmdPlaybackSnapshot> apply)
