@@ -82,7 +82,7 @@ namespace Mmd.UnityIntegration
         private static void ApplyMorphsCore(
             MmdUnityModelInstance instance,
             MmdEvaluatedFrame frame,
-            MmdUnityMorphApplyTimingSummary timing,
+            MmdUnityMorphApplyTimingSummary? timing,
             bool groupMorphsResolvedExternally)
         {
             MmdRenderingDescriptor descriptor = instance.RenderingDescriptor;
