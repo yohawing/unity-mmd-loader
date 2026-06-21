@@ -2,7 +2,7 @@
 
 All notable changes to `com.yohawing.mmd-loader` are documented here.
 
-## [0.1.0] - 2026-06-19
+## [0.1.0] - 2026-06-21
 
 ### Added
 
@@ -12,6 +12,8 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 - Play Mode forward playback with Live physics on Windows x86_64.
 - Edit Mode Timeline scrub as animation-only random access with physics off.
 - URP baseline toon rendering, alpha handling, texture diagnostics, and material order handoff.
+- Default PMX import scale of 0.1 for human-friendly meter-scale models, with import-scale-aware Live physics and VMD camera framing.
+- Humanoid rig setup at import (Animator plus a persistent proxy control rig) with retargeted playback that drives the real MMD bones and append (付与) transforms and steps Live physics.
 - Explicit Humanoid AnimationClip bake path when PMX, VMD, and Humanoid setup prerequisites are ready.
 - Windows x86_64 packaged native runtime binaries.
 
