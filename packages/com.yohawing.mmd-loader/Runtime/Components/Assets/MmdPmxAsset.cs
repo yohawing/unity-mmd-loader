@@ -394,15 +394,15 @@ namespace Mmd
             string assetShaderPreset = "MmdBasicUrpToon",
             MmdPmxParseSummary? parseSummary = null,
             Mesh importedMeshAsset = null,
-            Material[] importedMaterialAssets = null,
-            Material[] materialRemapAssets = null,
+            Material[]? importedMaterialAssets = null,
+            Material[]? materialRemapAssets = null,
             GameObject importedRootAsset = null,
             MmdImportReadiness hierarchyReadinessValue = MmdImportReadiness.NotEvaluated,
             MmdImportReadiness rendererReadinessValue = MmdImportReadiness.NotEvaluated,
             MmdImportReadiness boneBindingReadinessValue = MmdImportReadiness.NotEvaluated,
-            string hierarchyReadinessDiagnosticValue = null,
-            string rendererReadinessDiagnosticValue = null,
-            string boneBindingReadinessDiagnosticValue = null,
+            string? hierarchyReadinessDiagnosticValue = null,
+            string? rendererReadinessDiagnosticValue = null,
+            string? boneBindingReadinessDiagnosticValue = null,
             string assetAnimationType = "Generic")
         {
             if (bytes == null || bytes.Length == 0)
