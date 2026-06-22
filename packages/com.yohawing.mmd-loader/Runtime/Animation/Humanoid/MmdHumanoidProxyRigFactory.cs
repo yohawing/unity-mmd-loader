@@ -91,6 +91,82 @@ namespace Mmd
             Avatar != null && Avatar.isValid && Avatar.isHuman;
     }
 
+    public readonly struct MmdHumanoidRetargetQualitySettings
+    {
+        public const float DefaultUpperArmTwist = 0.5f;
+        public const float DefaultLowerArmTwist = 0.5f;
+        public const float DefaultUpperLegTwist = 0.5f;
+        public const float DefaultLowerLegTwist = 0.5f;
+        public const float DefaultArmStretch = 0.05f;
+        public const float DefaultLegStretch = 0.05f;
+        public const float DefaultFeetSpacing = 0.0f;
+        public const bool DefaultHasTranslationDoF = false;
+
+        public static MmdHumanoidRetargetQualitySettings Default =>
+            new MmdHumanoidRetargetQualitySettings(
+                DefaultUpperArmTwist,
+                DefaultLowerArmTwist,
+                DefaultUpperLegTwist,
+                DefaultLowerLegTwist,
+                DefaultArmStretch,
+                DefaultLegStretch,
+                DefaultFeetSpacing,
+                DefaultHasTranslationDoF);
+
+        public MmdHumanoidRetargetQualitySettings(
+            float upperArmTwist,
+            float lowerArmTwist,
+            float upperLegTwist,
+            float lowerLegTwist,
+            float armStretch,
+            float legStretch,
+            float feetSpacing,
+            bool hasTranslationDoF)
+        {
+            UpperArmTwist = Normalize01(upperArmTwist, DefaultUpperArmTwist);
+            LowerArmTwist = Normalize01(lowerArmTwist, DefaultLowerArmTwist);
+            UpperLegTwist = Normalize01(upperLegTwist, DefaultUpperLegTwist);
+            LowerLegTwist = Normalize01(lowerLegTwist, DefaultLowerLegTwist);
+            ArmStretch = Normalize01(armStretch, DefaultArmStretch);
+            LegStretch = Normalize01(legStretch, DefaultLegStretch);
+            FeetSpacing = Normalize01(feetSpacing, DefaultFeetSpacing);
+            HasTranslationDoF = hasTranslationDoF;
+        }
+
+        public float UpperArmTwist { get; }
+
+        public float LowerArmTwist { get; }
+
+        public float UpperLegTwist { get; }
+
+        public float LowerLegTwist { get; }
+
+        public float ArmStretch { get; }
+
+        public float LegStretch { get; }
+
+        public float FeetSpacing { get; }
+
+        public bool HasTranslationDoF { get; }
+
+        internal void ApplyTo(ref HumanDescription humanDescription)
+        {
+            humanDescription.upperArmTwist = UpperArmTwist;
+            humanDescription.lowerArmTwist = LowerArmTwist;
+            humanDescription.upperLegTwist = UpperLegTwist;
+            humanDescription.lowerLegTwist = LowerLegTwist;
+            humanDescription.armStretch = ArmStretch;
+            humanDescription.legStretch = LegStretch;
+            humanDescription.feetSpacing = FeetSpacing;
+            humanDescription.hasTranslationDoF = HasTranslationDoF;
+        }
+
+        private static float Normalize01(float value, float fallback)
+        {
+            return float.IsFinite(value) ? Mathf.Clamp01(value) : fallback;
+        }
+    }
+
     /// <summary>
     /// Creates a hidden Unity Transform hierarchy using Unity Humanoid parent
     /// relationships for the HumanBodyBones detected from an MMD model's bone
@@ -726,7 +802,8 @@ namespace Mmd
         /// Thrown when ProxyRoot is null (e.g., NoBones readiness).
         /// </exception>
         public static MmdHumanoidAvatarBuildResult BuildAvatar(
-            MmdHumanoidProxyRigResult proxyRig)
+            MmdHumanoidProxyRigResult proxyRig,
+            MmdHumanoidRetargetQualitySettings? retargetQualitySettings = null)
         {
             if (proxyRig == null)
                 throw new ArgumentNullException(nameof(proxyRig));
@@ -807,16 +884,9 @@ namespace Mmd
             bool hasHips = proxyRig.BoneMap.ContainsKey(HumanBodyBones.Hips);
             humanDescription.rootMotionBoneName = hasHips ? "Hips" : root.name;
 
-            // Twist/stretch: use Unity documentation's default-safe values.
-            // These are reasonable defaults for standard humanoid rigs.
-            humanDescription.upperArmTwist = 0.5f;
-            humanDescription.lowerArmTwist = 0.5f;
-            humanDescription.upperLegTwist = 0.5f;
-            humanDescription.lowerLegTwist = 0.5f;
-            humanDescription.armStretch = 0.05f;
-            humanDescription.legStretch = 0.05f;
-            humanDescription.feetSpacing = 0.0f;
-            humanDescription.hasTranslationDoF = false;
+            MmdHumanoidRetargetQualitySettings settings =
+                retargetQualitySettings ?? MmdHumanoidRetargetQualitySettings.Default;
+            settings.ApplyTo(ref humanDescription);
 
             diagnostics.Add("avatar-build: skeleton bones=" + skeletonList.Count +
                             " human bones=" + humanBoneList.Count +

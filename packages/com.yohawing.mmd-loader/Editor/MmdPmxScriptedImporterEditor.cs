@@ -18,12 +18,21 @@ namespace Mmd.Editor
         private SerializedProperty? materialRemapsProperty;
         private SerializedProperty? animationTypeProperty;
         private SerializedProperty? humanoidBoneMappingOverridesProperty;
+        private SerializedProperty? upperArmTwistProperty;
+        private SerializedProperty? lowerArmTwistProperty;
+        private SerializedProperty? upperLegTwistProperty;
+        private SerializedProperty? lowerLegTwistProperty;
+        private SerializedProperty? armStretchProperty;
+        private SerializedProperty? legStretchProperty;
+        private SerializedProperty? feetSpacingProperty;
+        private SerializedProperty? hasTranslationDoFProperty;
         private MmdPmxAsset? cachedAsset;
         private bool onDemandRemapExpanded = true;
 
         private bool toonShaderSettingsExpanded = true;
         private bool humanoidMappingOverridesExpanded;
         private bool humanoidMappingDiagnosticsExpanded = true;
+        private bool retargetQualitySettingsExpanded;
 
         private int selectedTab;
         private static readonly string[] TabNames = { "Model", "Rig", "Materials" };
@@ -39,6 +48,14 @@ namespace Mmd.Editor
             materialRemapsProperty = serializedObject.FindProperty("materialRemaps");
             animationTypeProperty = serializedObject.FindProperty("animationType");
             humanoidBoneMappingOverridesProperty = serializedObject.FindProperty("humanoidBoneMappingOverrides");
+            upperArmTwistProperty = serializedObject.FindProperty("upperArmTwist");
+            lowerArmTwistProperty = serializedObject.FindProperty("lowerArmTwist");
+            upperLegTwistProperty = serializedObject.FindProperty("upperLegTwist");
+            lowerLegTwistProperty = serializedObject.FindProperty("lowerLegTwist");
+            armStretchProperty = serializedObject.FindProperty("armStretch");
+            legStretchProperty = serializedObject.FindProperty("legStretch");
+            feetSpacingProperty = serializedObject.FindProperty("feetSpacing");
+            hasTranslationDoFProperty = serializedObject.FindProperty("hasTranslationDoF");
             ResolveImportedAsset();
         }
 
@@ -163,6 +180,7 @@ namespace Mmd.Editor
             if (currentType == MmdPmxAnimationType.Humanoid)
             {
                 DrawHumanoidMappingOverrides(asset);
+                DrawRetargetQualitySettings();
                 EditorGUILayout.Space();
                 if (asset != null)
                 {
@@ -203,6 +221,132 @@ namespace Mmd.Editor
             }
 
             DrawPendingImportSettingsWarning(HasModified());
+        }
+
+        private void DrawRetargetQualitySettings()
+        {
+            if (upperArmTwistProperty == null
+                || lowerArmTwistProperty == null
+                || upperLegTwistProperty == null
+                || lowerLegTwistProperty == null
+                || armStretchProperty == null
+                || legStretchProperty == null
+                || feetSpacingProperty == null
+                || hasTranslationDoFProperty == null)
+            {
+                return;
+            }
+
+            EditorGUILayout.Space();
+            retargetQualitySettingsExpanded = EditorGUILayout.Foldout(
+                retargetQualitySettingsExpanded,
+                "Retarget Quality Settings",
+                toggleOnLabelClick: true);
+            if (!retargetQualitySettingsExpanded)
+            {
+                return;
+            }
+
+            Draw01Slider(
+                upperArmTwistProperty,
+                new GUIContent(
+                    "Upper Arm Twist",
+                    "Controls how Unity distributes upper arm twist during Humanoid retargeting."));
+            Draw01Slider(
+                lowerArmTwistProperty,
+                new GUIContent(
+                    "Lower Arm Twist",
+                    "Controls how Unity distributes lower arm twist during Humanoid retargeting."));
+            Draw01Slider(
+                upperLegTwistProperty,
+                new GUIContent(
+                    "Upper Leg Twist",
+                    "Controls how Unity distributes upper leg twist during Humanoid retargeting."));
+            Draw01Slider(
+                lowerLegTwistProperty,
+                new GUIContent(
+                    "Lower Leg Twist",
+                    "Controls how Unity distributes lower leg twist during Humanoid retargeting."));
+            Draw01Slider(
+                armStretchProperty,
+                new GUIContent(
+                    "Arm Stretch",
+                    "Controls Unity's Humanoid arm stretch limit used by IK retargeting."));
+            Draw01Slider(
+                legStretchProperty,
+                new GUIContent(
+                    "Leg Stretch",
+                    "Controls Unity's Humanoid leg stretch limit used by IK retargeting."));
+            Draw01Slider(
+                feetSpacingProperty,
+                new GUIContent(
+                    "Feet Spacing",
+                    "Controls Unity's Humanoid feet spacing value used by AvatarBuilder."));
+
+            EditorGUILayout.PropertyField(
+                hasTranslationDoFProperty,
+                new GUIContent(
+                    "Has Translation DoF",
+                    "Enables translation degrees of freedom on the generated Humanoid Avatar."));
+
+            if (GUILayout.Button("Reset to Defaults"))
+            {
+                Undo.RecordObject(target, "Reset Retarget Quality Settings");
+                ResetRetargetQualitySettings();
+                EditorUtility.SetDirty(target);
+            }
+        }
+
+        private static void Draw01Slider(SerializedProperty property, GUIContent content)
+        {
+            property.floatValue = EditorGUILayout.Slider(
+                content,
+                Mathf.Clamp01(property.floatValue),
+                0.0f,
+                1.0f);
+        }
+
+        private void ResetRetargetQualitySettings()
+        {
+            if (upperArmTwistProperty != null)
+            {
+                upperArmTwistProperty.floatValue = MmdHumanoidRetargetQualitySettings.DefaultUpperArmTwist;
+            }
+
+            if (lowerArmTwistProperty != null)
+            {
+                lowerArmTwistProperty.floatValue = MmdHumanoidRetargetQualitySettings.DefaultLowerArmTwist;
+            }
+
+            if (upperLegTwistProperty != null)
+            {
+                upperLegTwistProperty.floatValue = MmdHumanoidRetargetQualitySettings.DefaultUpperLegTwist;
+            }
+
+            if (lowerLegTwistProperty != null)
+            {
+                lowerLegTwistProperty.floatValue = MmdHumanoidRetargetQualitySettings.DefaultLowerLegTwist;
+            }
+
+            if (armStretchProperty != null)
+            {
+                armStretchProperty.floatValue = MmdHumanoidRetargetQualitySettings.DefaultArmStretch;
+            }
+
+            if (legStretchProperty != null)
+            {
+                legStretchProperty.floatValue = MmdHumanoidRetargetQualitySettings.DefaultLegStretch;
+            }
+
+            if (feetSpacingProperty != null)
+            {
+                feetSpacingProperty.floatValue = MmdHumanoidRetargetQualitySettings.DefaultFeetSpacing;
+            }
+
+            if (hasTranslationDoFProperty != null)
+            {
+                hasTranslationDoFProperty.boolValue = MmdHumanoidRetargetQualitySettings.DefaultHasTranslationDoF;
+            }
         }
 
         private void DrawHumanoidMappingDiagnostics(MmdPmxAsset asset)
