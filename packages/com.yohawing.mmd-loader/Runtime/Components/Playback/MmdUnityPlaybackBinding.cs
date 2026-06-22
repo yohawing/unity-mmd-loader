@@ -810,7 +810,7 @@ namespace Mmd.UnityIntegration
             MmdEvaluatedFrame? evaluatedFrame = null;
             if (fastSession == null)
             {
-                evaluatedFrame = session.EvaluateFrame(frame, time);
+                evaluatedFrame = session.EvaluateBeforePhysicsFrame(frame, time);
             }
 
             double evaluateFrameMs = stageWatch.Elapsed.TotalMilliseconds;

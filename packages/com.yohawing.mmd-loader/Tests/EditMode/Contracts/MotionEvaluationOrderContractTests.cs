@@ -86,6 +86,27 @@ namespace Mmd.Tests.Contracts
         }
 
         [Test]
+        public void BeforePhysicsPlaybackFrameUsesIkMotionBeforeFinalAfterPhysicsMerge()
+        {
+            MmdModelDefinition model = CreateAppendChildModel(deformAfterPhysics: true);
+            MmdMotionDefinition motion = CreateTranslatedRootMotion();
+
+            MmdEvaluatedFrame beforePhysics = MmdRuntimeFrameEvaluator.EvaluateValidatedBeforePhysicsPlaybackFrame(
+                model,
+                motion,
+                frame: 0,
+                time: 0.0f);
+            MmdEvaluatedFrame final = MmdRuntimeFrameEvaluator.EvaluateValidatedPhaseOnePlaybackFrame(
+                model,
+                motion,
+                frame: 0,
+                time: 0.0f);
+
+            Assert.That(FindBone(beforePhysics, "append").localPosition[0], Is.EqualTo(0.0f).Within(0.00001f));
+            Assert.That(FindBone(final, "append").localPosition[0], Is.EqualTo(1.0f).Within(0.00001f));
+        }
+
+        [Test]
         public void BeforePhysicsBoneKeepsExistingAppendCheckpointBehavior()
         {
             MmdTrace trace = MmdRuntimeTraceEvaluator.EvaluatePhaseOneTrace(
@@ -160,6 +181,11 @@ namespace Mmd.Tests.Contracts
         }
 
         private static MmdTraceBone FindBone(MmdTraceFrame frame, string name)
+        {
+            return frame.bones.Single(bone => bone.name == name);
+        }
+
+        private static MmdEvaluatedBonePose FindBone(MmdEvaluatedFrame frame, string name)
         {
             return frame.bones.Single(bone => bone.name == name);
         }
