@@ -28,7 +28,7 @@ It is designed to deliver a natural import experience that takes advantage of mo
 | Morph | Vertex (blend shape) / UV / material / bone / group morphs supported |
 | Physics | Real-time physics during Play Mode forward playback |
 | Rendering | URP-based toon, alpha, texture diagnostics, material order handoff |
-| Humanoid | Metadata and setup foundation. Full Humanoid integration is future work |
+| Humanoid | Animator and proxy rig auto-setup at import. A unified Timeline track drives both the Humanoid avatar and the native MMD model, with Live physics during retargeted playback |
 
 ## Roadmap
 
