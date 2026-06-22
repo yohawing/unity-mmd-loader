@@ -1,10 +1,12 @@
+#nullable enable
+
 using System;
 
 namespace Mmd.Pose
 {
     public static class MmdQuaternionMath
     {
-        public static float[] Multiply(float[] left, float[] right)
+        public static float[] Multiply(float[]? left, float[]? right)
         {
             float lx = Component(left, 0, 0.0f);
             float ly = Component(left, 1, 0.0f);
@@ -22,7 +24,7 @@ namespace Mmd.Pose
                 lw * rw - lx * rx - ly * ry - lz * rz);
         }
 
-        public static float[] Slerp(float[] from, float[] to, float t)
+        public static float[] Slerp(float[]? from, float[]? to, float t)
         {
             if (float.IsNaN(t) || float.IsInfinity(t))
             {
@@ -63,7 +65,7 @@ namespace Mmd.Pose
                 scaleFrom * a[3] + scaleTo * b[3]);
         }
 
-        private static float[] Normalize(float[] values)
+        private static float[] Normalize(float[]? values)
         {
             return Normalize(
                 Component(values, 0, 0.0f),
@@ -84,7 +86,7 @@ namespace Mmd.Pose
             return new[] { x * inverse, y * inverse, z * inverse, w * inverse };
         }
 
-        private static float Component(float[] values, int index, float fallback)
+        private static float Component(float[]? values, int index, float fallback)
         {
             if (values == null || values.Length <= index)
             {

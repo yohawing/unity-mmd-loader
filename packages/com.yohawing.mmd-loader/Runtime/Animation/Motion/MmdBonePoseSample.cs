@@ -1,10 +1,12 @@
+#nullable enable
+
 using System;
 
 namespace Mmd.Motion
 {
     public readonly struct MmdBonePoseSample
     {
-        public MmdBonePoseSample(float[] translation, float[] rotation)
+        public MmdBonePoseSample(float[]? translation, float[]? rotation)
         {
             if (translation == null || translation.Length != 3)
             {

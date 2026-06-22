@@ -13,7 +13,7 @@ namespace Mmd.Tests
         public void StaticModelWithMeshRendererReportsReadyRendererAndNotEvaluatedBoneBinding()
         {
             var root = new GameObject("StaticRoot");
-            Mesh mesh = null;
+            Mesh? mesh = null;
             try
             {
                 var modelObject = new GameObject("Model");

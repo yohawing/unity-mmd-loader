@@ -1,3 +1,5 @@
+#nullable enable
+
 namespace Mmd.Tracing
 {
     public static class MmdTraceCheckpoints

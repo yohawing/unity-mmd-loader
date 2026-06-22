@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using System.Collections.Generic;
 using NUnit.Framework;
@@ -162,7 +164,7 @@ namespace Mmd.Tests
                     frame = 0,
                     distance = -40.0f,
                     position = Array.Empty<float>(),
-                    rotation = null,
+                    rotation = null!,
                     viewAngle = 30,
                     perspective = true,
                     interpolation = Array.Empty<byte>()

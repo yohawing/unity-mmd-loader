@@ -51,7 +51,7 @@ namespace Mmd.Motion
     /// </summary>
     public static class VmdCameraSampler
     {
-        public static MmdCameraState Sample(IReadOnlyList<MmdCameraKeyframeDefinition> keyframes, float frame)
+        public static MmdCameraState Sample(IReadOnlyList<MmdCameraKeyframeDefinition>? keyframes, float frame)
         {
             if (keyframes == null)
             {
@@ -141,7 +141,7 @@ namespace Mmd.Motion
                 keyframe.perspective);
         }
 
-        private static float Component(float[] values, int index)
+        private static float Component(float[]? values, int index)
         {
             return values != null && values.Length > index ? values[index] : 0.0f;
         }

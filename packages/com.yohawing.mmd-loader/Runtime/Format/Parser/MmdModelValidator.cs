@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using System.Collections.Generic;
 
@@ -5,7 +7,7 @@ namespace Mmd.Parser
 {
     public static class MmdModelValidator
     {
-        public static IReadOnlyList<string> ValidateStructuralModel(MmdModelDefinition model)
+        public static IReadOnlyList<string> ValidateStructuralModel(MmdModelDefinition? model)
         {
             var errors = new List<string>();
             if (model == null)

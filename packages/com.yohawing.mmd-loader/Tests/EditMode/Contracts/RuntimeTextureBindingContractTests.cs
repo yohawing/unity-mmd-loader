@@ -16,7 +16,7 @@ namespace Mmd.Tests
         [Test]
         public void RelativeDiffuseTextureLoadsFromPmxSourceDirectoryAndBindsMaterialSlots()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             string tempRoot = CreateTempDirectory();
             try
             {
@@ -170,7 +170,7 @@ namespace Mmd.Tests
             return material.HasProperty("_MainTex") ? material.GetTexture("_MainTex") : null;
         }
 
-        private static void DestroyInstance(MmdUnityModelInstance instance)
+        private static void DestroyInstance(MmdUnityModelInstance? instance)
         {
             if (instance == null)
             {

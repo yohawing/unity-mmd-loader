@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 
 namespace Mmd.Motion
@@ -32,7 +34,7 @@ namespace Mmd.Motion
             return CubicBezier(cy1, cy2, t);
         }
 
-        public static float Evaluate(byte[] controlPoints, float progress)
+        public static float Evaluate(byte[]? controlPoints, float progress)
         {
             if (controlPoints == null)
             {

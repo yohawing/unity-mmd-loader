@@ -1,3 +1,5 @@
+#nullable enable
+
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
@@ -31,7 +33,7 @@ namespace Mmd.Tests
         [TestCaseSource(nameof(RenderablePackageModelFixtures))]
         public void RenderablePmxFixtureInstantiatesStaticUnityModel(ModelFixtureEntry fixture)
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = MmdTestFixtures.ParseModel(fixture);
@@ -59,7 +61,7 @@ namespace Mmd.Tests
         [TestCaseSource(nameof(RenderablePackageModelFixtures))]
         public void RenderablePmxFixtureInstantiatesSkinnedUnityModel(ModelFixtureEntry fixture)
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = MmdTestFixtures.ParseModel(fixture);
@@ -78,7 +80,7 @@ namespace Mmd.Tests
             }
         }
 
-        private static void DestroyUnityModelInstance(MmdUnityModelInstance instance)
+        private static void DestroyUnityModelInstance(MmdUnityModelInstance? instance)
         {
             if (instance == null)
             {

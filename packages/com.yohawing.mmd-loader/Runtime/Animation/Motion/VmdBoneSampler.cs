@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using System.Collections.Generic;
 using Mmd.Parser;
@@ -8,7 +10,7 @@ namespace Mmd.Motion
     {
         private static readonly byte[] LinearInterpolation = { 20, 20, 107, 107 };
 
-        public static MmdBonePoseSample SamplePose(IReadOnlyList<MmdBoneKeyframeDefinition> keyframes, string boneName, float frame)
+        public static MmdBonePoseSample SamplePose(IReadOnlyList<MmdBoneKeyframeDefinition>? keyframes, string boneName, float frame)
         {
             if (keyframes == null)
             {
@@ -78,7 +80,7 @@ namespace Mmd.Motion
                     Interpolate(next.interpolation.rotation, normalizedFrame)));
         }
 
-        public static MmdBonePoseSample SampleSortedPose(IReadOnlyList<MmdBoneKeyframeDefinition> keyframes, string boneName, float frame)
+        public static MmdBonePoseSample SampleSortedPose(IReadOnlyList<MmdBoneKeyframeDefinition>? keyframes, string boneName, float frame)
         {
             if (keyframes == null)
             {
@@ -169,18 +171,18 @@ namespace Mmd.Motion
                 QuaternionOrIdentity(keyframe.rotation));
         }
 
-        private static float Interpolate(byte[] controlPoints, float progress)
+        private static float Interpolate(byte[]? controlPoints, float progress)
         {
             byte[] points = controlPoints is { Length: 4 } ? controlPoints : LinearInterpolation;
             return VmdBezier.Evaluate(points, progress);
         }
 
-        private static float Component(float[] values, int index)
+        private static float Component(float[]? values, int index)
         {
             return values != null && values.Length > index ? values[index] : 0.0f;
         }
 
-        private static float[] QuaternionOrIdentity(float[] values)
+        private static float[] QuaternionOrIdentity(float[]? values)
         {
             if (values == null || values.Length != 4)
             {

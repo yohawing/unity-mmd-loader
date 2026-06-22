@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using NUnit.Framework;
 using Mmd.Parser;
@@ -297,8 +299,8 @@ namespace Mmd.Tests
         public void LoadModelUsesJsonAndGeometryDelegatesWithoutPmxSummaryAccessor()
         {
             byte[] expectedBytes = { 9, 8, 7 };
-            byte[] observedJsonBytes = null;
-            byte[] observedGeometryBytes = null;
+            byte[]? observedJsonBytes = null;
+            byte[]? observedGeometryBytes = null;
 
             var parser = new NativeMmdParser(
                 _ => throw new AssertionException("VMD JSON parser must not be used when loading PMX."),

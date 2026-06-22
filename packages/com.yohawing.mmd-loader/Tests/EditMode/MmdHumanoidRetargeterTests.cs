@@ -556,7 +556,7 @@ namespace Mmd.Tests
             MmdUnityModelInstance native = CreateNativeInstance(4);
 
             // Act & Assert: no crash
-            MmdHumanoidRetargeterResult result = null;
+            MmdHumanoidRetargeterResult? result = null;
             Assert.DoesNotThrow(() =>
             {
                 result = MmdHumanoidRetargeter.RetargetPose(rig, native);

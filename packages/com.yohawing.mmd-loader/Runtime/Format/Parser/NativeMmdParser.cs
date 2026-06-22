@@ -1,4 +1,4 @@
-#nullable disable
+#nullable enable
 #pragma warning disable CS0649
 
 using System;
@@ -59,11 +59,11 @@ namespace Mmd.Parser
                 throw new InvalidOperationException("mmd-runtime VMD JSON parser returned empty JSON.");
             }
 
-            VmdParsedAnimationJson parsed = UnityEngine.JsonUtility.FromJson<VmdParsedAnimationJson>(json);
+            VmdParsedAnimationJson? parsed = UnityEngine.JsonUtility.FromJson<VmdParsedAnimationJson>(json);
             return BuildMotionDefinition(CreateMotionSnapshot(parsed));
         }
 
-        internal static MmdModelDefinition BuildModelDefinition(PmxModelSourceSnapshot source)
+        internal static MmdModelDefinition BuildModelDefinition(PmxModelSourceSnapshot? source)
         {
             source ??= new PmxModelSourceSnapshot();
             var model = new MmdModelDefinition
@@ -123,6 +123,7 @@ namespace Mmd.Parser
             {
                 PmxModelSourceBone bone = bones[i] ?? new PmxModelSourceBone();
                 bool hasAppendTransform = HasAppendTransform(bone);
+                PmxModelSourceAppendTransform? appendTransform = hasAppendTransform ? bone.appendTransform : null;
                 model.bones.Add(new MmdBoneDefinition
                 {
                     index = i,
@@ -132,8 +133,8 @@ namespace Mmd.Parser
                     origin = CopyVec3(bone.position),
                     isMovable = bone.flags?.translatable ?? false,
                     isRotatable = bone.flags?.rotatable ?? false,
-                    appendParentIndex = hasAppendTransform ? bone.appendTransform.parentIndex : -1,
-                    appendRatio = hasAppendTransform ? bone.appendTransform.weight : 1.0f,
+                    appendParentIndex = appendTransform != null ? appendTransform.parentIndex : -1,
+                    appendRatio = appendTransform != null ? appendTransform.weight : 1.0f,
                     appendRotation = bone.flags?.appendRotate ?? false,
                     appendTranslation = bone.flags?.appendTranslate ?? false,
                     appendLocal = bone.flags?.appendLocal ?? false,
@@ -149,20 +150,21 @@ namespace Mmd.Parser
 
             for (int i = 0; i < bones.Length; i++)
             {
-                PmxModelSourceIk ikJson = bones[i]?.ik;
+                PmxModelSourceIk? ikJson = bones[i]?.ik;
                 if (!HasIk(ikJson))
                 {
                     continue;
                 }
 
+                PmxModelSourceIk sourceIk = ikJson!;
                 var ik = new MmdIkDefinition
                 {
                     boneIndex = i,
-                    targetBoneIndex = ikJson.targetIndex,
-                    iterationCount = ikJson.loopCount,
-                    angleLimit = ikJson.limitAngle
+                    targetBoneIndex = sourceIk.targetIndex,
+                    iterationCount = sourceIk.loopCount,
+                    angleLimit = sourceIk.limitAngle
                 };
-                PmxModelSourceIkLink[] links = ikJson.links ?? Array.Empty<PmxModelSourceIkLink>();
+                PmxModelSourceIkLink[] links = sourceIk.links ?? Array.Empty<PmxModelSourceIkLink>();
                 for (int j = 0; j < links.Length; j++)
                 {
                     PmxModelSourceIkLink link = links[j] ?? new PmxModelSourceIkLink();
@@ -350,7 +352,7 @@ namespace Mmd.Parser
             return model;
         }
 
-        internal static MmdMotionDefinition BuildMotionDefinition(VmdMotionSourceSnapshot source)
+        internal static MmdMotionDefinition BuildMotionDefinition(VmdMotionSourceSnapshot? source)
         {
             source ??= new VmdMotionSourceSnapshot();
             var motion = new MmdMotionDefinition
@@ -438,7 +440,7 @@ namespace Mmd.Parser
             return motion;
         }
 
-        internal static VmdMotionSourceSnapshot CreateMotionSnapshot(VmdParsedAnimationJson parsed)
+        internal static VmdMotionSourceSnapshot CreateMotionSnapshot(VmdParsedAnimationJson? parsed)
         {
             if (parsed == null)
             {
@@ -602,7 +604,7 @@ namespace Mmd.Parser
             return firstLinkIndex;
         }
 
-        private static int SkinningBoneCount(string skinningMode)
+        private static int SkinningBoneCount(string? skinningMode)
         {
             return skinningMode switch
             {
@@ -624,7 +626,7 @@ namespace Mmd.Parser
             };
         }
 
-        private static byte JsonByteAt(int[] values, int index)
+        private static byte JsonByteAt(int[]? values, int index)
         {
             if (values == null || index < 0 || index >= values.Length)
             {
@@ -635,7 +637,7 @@ namespace Mmd.Parser
             return value < 0 ? (byte)0 : value > byte.MaxValue ? byte.MaxValue : (byte)value;
         }
 
-        private static byte[] CopyByteArray(int[] values)
+        private static byte[] CopyByteArray(int[]? values)
         {
             if (values == null || values.Length == 0)
             {
@@ -666,19 +668,19 @@ namespace Mmd.Parser
             return value < 0 ? 0u : (uint)value;
         }
 
-        private static string GetString(string[] values, int index, string fallback)
+        private static string GetString(string[]? values, int index, string fallback)
         {
             return values != null && index >= 0 && index < values.Length && !string.IsNullOrEmpty(values[index])
                 ? values[index]
                 : fallback;
         }
 
-        private static bool GetBool(bool[] values, int index)
+        private static bool GetBool(bool[]? values, int index)
         {
             return values != null && index >= 0 && index < values.Length && values[index];
         }
 
-        private static int GetUIntAsInt(uint[] values, int index, int fallback)
+        private static int GetUIntAsInt(uint[]? values, int index, int fallback)
         {
             return values != null && index >= 0 && index < values.Length
                 ? CheckedUIntToInt(values[index], "PMX skin index")
@@ -700,58 +702,59 @@ namespace Mmd.Parser
             return value > int.MaxValue ? int.MaxValue : (int)value;
         }
 
-        private static float GetFloat(float[] values, int index, float fallback)
+        private static float GetFloat(float[]? values, int index, float fallback)
         {
             return values != null && index >= 0 && index < values.Length ? values[index] : fallback;
         }
 
-        private static float[] Vec2(float[] values, int offset)
+        private static float[] Vec2(float[]? values, int offset)
         {
             return new[] { GetFloat(values, offset, 0.0f), GetFloat(values, offset + 1, 0.0f) };
         }
 
-        private static float[] Vec3(float[] values, int offset)
+        private static float[] Vec3(float[]? values, int offset)
         {
             return new[] { GetFloat(values, offset, 0.0f), GetFloat(values, offset + 1, 0.0f), GetFloat(values, offset + 2, 0.0f) };
         }
 
-        private static float[] CopyVec3(float[] values)
+        private static float[] CopyVec3(float[]? values)
         {
             return new[] { GetFloat(values, 0, 0.0f), GetFloat(values, 1, 0.0f), GetFloat(values, 2, 0.0f) };
         }
 
-        private static bool HasVec3(float[] values)
+        private static bool HasVec3(float[]? values)
         {
             return values != null && values.Length >= 3;
         }
 
-        private static bool HasLocalAxis(PmxModelSourceLocalAxis axis)
+        private static bool HasLocalAxis(PmxModelSourceLocalAxis? axis)
         {
             return axis != null && HasVec3(axis.x) && HasVec3(axis.z);
         }
 
-        private static bool HasAppendTransform(PmxModelSourceBone bone)
+        private static bool HasAppendTransform(PmxModelSourceBone? bone)
         {
-            return bone.appendTransform != null &&
+            return bone != null &&
+                bone.appendTransform != null &&
                 ((bone.flags?.appendRotate ?? false) || (bone.flags?.appendTranslate ?? false));
         }
 
-        private static bool HasIk(PmxModelSourceIk ik)
+        private static bool HasIk(PmxModelSourceIk? ik)
         {
             return ik != null && ik.links != null && ik.links.Length > 0;
         }
 
-        private static bool HasIkLimit(PmxModelSourceIkLimit limit)
+        private static bool HasIkLimit(PmxModelSourceIkLimit? limit)
         {
             return limit != null && HasVec3(limit.lower) && HasVec3(limit.upper);
         }
 
-        private static float[] CopyVec4(float[] values)
+        private static float[] CopyVec4(float[]? values)
         {
             return new[] { GetFloat(values, 0, 0.0f), GetFloat(values, 1, 0.0f), GetFloat(values, 2, 0.0f), GetFloat(values, 3, 0.0f) };
         }
 
-        private static byte[] CopyInterpolation(byte[] values)
+        private static byte[] CopyInterpolation(byte[]? values)
         {
             return new[]
             {
@@ -764,7 +767,7 @@ namespace Mmd.Parser
 
         // MMD camera interpolation is a flat 24-byte block (6 curves x 4 control points:
         // X, Y, Z, rotation, distance, view-angle). Pad/truncate defensively to a fixed 24.
-        private static byte[] CopyCameraInterpolation(byte[] values)
+        private static byte[] CopyCameraInterpolation(byte[]? values)
         {
             var result = new byte[24];
             if (values != null)
@@ -779,7 +782,7 @@ namespace Mmd.Parser
             return result;
         }
 
-        private static float[] Vec3From4(float[] values)
+        private static float[] Vec3From4(float[]? values)
         {
             return CopyVec3(values);
         }
@@ -794,12 +797,12 @@ namespace Mmd.Parser
             return new[] { 0.0f, 1.0f, 0.0f };
         }
 
-        private static string NonEmptyMaterialName(string value, int index)
+        private static string NonEmptyMaterialName(string? value, int index)
         {
             return string.IsNullOrWhiteSpace(value) ? $"material_{index}" : value;
         }
 
-        private static string NonEmptyPhysicsName(string value, string prefix, int index)
+        private static string NonEmptyPhysicsName(string? value, string prefix, int index)
         {
             return string.IsNullOrWhiteSpace(value) ? $"{prefix}_{index}" : value;
         }
@@ -829,7 +832,7 @@ namespace Mmd.Parser
             return IsFinite(value) && value >= 0.0f ? value : 0.0f;
         }
 
-        private static float[] ClampColor3(float[] values, float[] fallback)
+        private static float[] ClampColor3(float[]? values, float[] fallback)
         {
             return new[]
             {
@@ -839,7 +842,7 @@ namespace Mmd.Parser
             };
         }
 
-        private static float[] ClampColor4(float[] values, float[] fallback)
+        private static float[] ClampColor4(float[]? values, float[] fallback)
         {
             return new[]
             {
@@ -850,7 +853,7 @@ namespace Mmd.Parser
             };
         }
 
-        private static float ClampColorComponent(float[] values, int index, float fallback)
+        private static float ClampColorComponent(float[]? values, int index, float fallback)
         {
             float value = GetFloat(values, index, fallback);
             if (!IsFinite(value))
@@ -861,7 +864,7 @@ namespace Mmd.Parser
             return value < 0.0f ? 0.0f : value > 1.0f ? 1.0f : value;
         }
 
-        private static string SphereTextureModeName(string value)
+        private static string SphereTextureModeName(string? value)
         {
             return value switch
             {
@@ -880,7 +883,7 @@ namespace Mmd.Parser
 
         internal sealed class VmdMotionSourceSnapshot
         {
-            public string TargetModelName = string.Empty;
+            public string? TargetModelName = string.Empty;
             public uint MaxFrame;
             public uint CameraKeyframeCount;
             public uint LightKeyframeCount;
@@ -1079,11 +1082,11 @@ namespace Mmd.Parser
             public int layer;
             public float[] position = Array.Empty<float>();
             public PmxModelSourceBoneFlags flags = new();
-            public PmxModelSourceAppendTransform appendTransform;
-            public float[] fixedAxis;
-            public PmxModelSourceLocalAxis localAxis;
+            public PmxModelSourceAppendTransform? appendTransform;
+            public float[]? fixedAxis;
+            public PmxModelSourceLocalAxis? localAxis;
             public int externalParentKey = -1;
-            public PmxModelSourceIk ik;
+            public PmxModelSourceIk? ik;
         }
 
         [Serializable]
@@ -1105,7 +1108,7 @@ namespace Mmd.Parser
         [Serializable]
         internal sealed class PmxModelSourceIk { public int targetIndex; public int loopCount; public float limitAngle; public PmxModelSourceIkLink[] links = Array.Empty<PmxModelSourceIkLink>(); }
         [Serializable]
-        internal sealed class PmxModelSourceIkLink { public int boneIndex; public PmxModelSourceIkLimit limits; }
+        internal sealed class PmxModelSourceIkLink { public int boneIndex; public PmxModelSourceIkLimit? limits; }
         [Serializable]
         internal sealed class PmxModelSourceIkLimit { public float[] lower = Array.Empty<float>(); public float[] upper = Array.Empty<float>(); }
 

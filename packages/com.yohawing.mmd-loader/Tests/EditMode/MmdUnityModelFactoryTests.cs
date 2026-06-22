@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -16,7 +18,7 @@ namespace Mmd.Tests
         [Test]
         public void CreateStaticModelFromModelCreatesMeshObjectAndMaterials()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
@@ -55,7 +57,7 @@ namespace Mmd.Tests
         [Test]
         public void CreateStaticModelConvertsMeshPositionsAndNormalsAtUnityBoundary()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
@@ -80,7 +82,7 @@ namespace Mmd.Tests
         [Test]
         public void CreateStaticModelFromDescriptorReportsDescriptorCounts()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
@@ -111,7 +113,7 @@ namespace Mmd.Tests
         [Test]
         public void CreateStaticModelCountsSkippedTextureSphereAndToonReferences()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: true);
@@ -138,7 +140,7 @@ namespace Mmd.Tests
         [Test]
         public void CreateStaticModelWithSourcePathLoadsGrayscalePngDiffuseTexture()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             string tempRoot = CreateTempDirectory();
             try
             {
@@ -167,7 +169,7 @@ namespace Mmd.Tests
         [Test]
         public void CreateStaticModelWithSourcePathLoadsRgbPngDiffuseTexture()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             string tempRoot = CreateTempDirectory();
             try
             {
@@ -196,7 +198,7 @@ namespace Mmd.Tests
         [Test]
         public void CreateStaticModelClassifiesPngCutoutTextureAsAlphaTest()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             string tempRoot = CreateTempDirectory();
             try
             {
@@ -237,7 +239,7 @@ namespace Mmd.Tests
             // fully opaque (Sour_Miku_Black's hair.png strand edges fall to ~213/255) must therefore
             // alpha-blend, not snap to opaque. Regression: the old 195 opaque threshold absorbed the
             // 195-254 soft band and rendered such hair fully opaque, diverging from the GoldenOracle.
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             string tempRoot = CreateTempDirectory();
             try
             {
@@ -272,7 +274,7 @@ namespace Mmd.Tests
         [Test]
         public void CreateStaticModelIgnoresTransparentAtlasPaddingOutsideUsedUvs()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             string tempRoot = CreateTempDirectory();
             try
             {
@@ -313,8 +315,8 @@ namespace Mmd.Tests
             // while a fully-opaque TGA stays opaque. The texture alpha content — not the ".tga"
             // extension or an overlay-looking name — drives the mode. (Earlier behavior wrongly forced
             // every non-overlay TGA to opaque, painting masked TGAs as solid blocks vs the GoldenOracle.)
-            MmdUnityModelInstance maskedInstance = null;
-            MmdUnityModelInstance opaqueInstance = null;
+            MmdUnityModelInstance? maskedInstance = null;
+            MmdUnityModelInstance? opaqueInstance = null;
             string tempRoot = CreateTempDirectory();
             try
             {
@@ -356,7 +358,7 @@ namespace Mmd.Tests
         [Test]
         public void CreateStaticModelWithSourcePathLoadsRelativeTgaDiffuseTexture()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             string tempRoot = CreateTempDirectory();
             try
             {
@@ -388,7 +390,7 @@ namespace Mmd.Tests
         [Test]
         public void CreateStaticModelWithSourcePathLoadsRelativeDdsDiffuseTexture()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             string tempRoot = CreateTempDirectory();
             try
             {
@@ -420,7 +422,7 @@ namespace Mmd.Tests
         [Test]
         public void CreateStaticModelWithSourcePathLoadsSphereAndToonTexturesForDiagnostics()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             string tempRoot = CreateTempDirectory();
             try
             {
@@ -467,7 +469,7 @@ namespace Mmd.Tests
         [Test]
         public void CreateStaticModelWithSharedToonResolvesBuiltInToonRamp()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             string tempRoot = CreateTempDirectory();
             try
             {
@@ -537,7 +539,7 @@ namespace Mmd.Tests
         [Test]
         public void CreateStaticModelAppliesTransparentMaterialAlpha()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
@@ -606,7 +608,7 @@ namespace Mmd.Tests
         [Test]
         public void CreateStaticModelOffsetsTransparentQueuesByMaterialOrder()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateTwoTransparentTriangleModel();
@@ -639,7 +641,7 @@ namespace Mmd.Tests
         [Test]
         public void CreateStaticModelAppliesDescriptorCullingPolicy()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateTwoTransparentTriangleModel();
@@ -667,7 +669,7 @@ namespace Mmd.Tests
         [Test]
         public void CreateStaticModelFallsBackWhenRequestedShaderIsMissing()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
@@ -692,7 +694,7 @@ namespace Mmd.Tests
         [Test]
         public void CreateStaticModelPreservesRawSnapshotUvAndFlipsViewportUv()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
@@ -719,7 +721,7 @@ namespace Mmd.Tests
         [Test]
         public void CreateStaticModelViewportUvSamplesRawTextureWithFlippedV()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             string tempRoot = CreateTempDirectory();
             try
             {
@@ -753,7 +755,7 @@ namespace Mmd.Tests
         [Test]
         public void CreateStaticModelWithSourcePathLoadsIndexedBmpSphereTextureForDiagnostics()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             string tempRoot = CreateTempDirectory();
             try
             {
@@ -784,8 +786,8 @@ namespace Mmd.Tests
         [Test]
         public void CreateStaticModelReportsMissingAndUnsupportedTexturesWithoutFailing()
         {
-            MmdUnityModelInstance missingInstance = null;
-            MmdUnityModelInstance unsupportedInstance = null;
+            MmdUnityModelInstance? missingInstance = null;
+            MmdUnityModelInstance? unsupportedInstance = null;
             string tempRoot = CreateTempDirectory();
             try
             {
@@ -821,7 +823,7 @@ namespace Mmd.Tests
         [Test]
         public void CreateSkinnedModelCreatesSkinnedRendererBindposesAndBoneWeights()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
@@ -856,7 +858,7 @@ namespace Mmd.Tests
         [Test]
         public void CreateSkinnedModelCreatesPhysicsCollidersAndInspectableParameters()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
@@ -964,7 +966,7 @@ namespace Mmd.Tests
         [Test]
         public void CreateSkinnedModelParentsPhysicsBodiesByPmxBoneIndex()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
@@ -1012,7 +1014,7 @@ namespace Mmd.Tests
         [Test]
         public void CreateStaticModelFromModelCreatesBoneTransformHierarchy()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
@@ -1038,7 +1040,7 @@ namespace Mmd.Tests
         [Test]
         public void ApplyFrameUpdatesBoneTransformsFromBindPose()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
@@ -1067,7 +1069,7 @@ namespace Mmd.Tests
         [Test]
         public void ApplyFrameConvertsRotationAtUnityBoundary()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
@@ -1106,7 +1108,7 @@ namespace Mmd.Tests
         [Test]
         public void ApplyColumnMajorWorldMatricesConvertsHierarchyWorldPoseAtUnityBoundary()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
@@ -1134,8 +1136,8 @@ namespace Mmd.Tests
         [Test]
         public void ApplyColumnMajorWorldMatricesScalesPositionOnlyWithImportScale()
         {
-            MmdUnityModelInstance scaleOneInstance = null;
-            MmdUnityModelInstance scalePointOneInstance = null;
+            MmdUnityModelInstance? scaleOneInstance = null;
+            MmdUnityModelInstance? scalePointOneInstance = null;
             try
             {
                 MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
@@ -1169,7 +1171,7 @@ namespace Mmd.Tests
         [Test]
         public void ApplyFrameRejectsBoneIndexWithoutUnityTransform()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
@@ -1189,7 +1191,7 @@ namespace Mmd.Tests
         [Test]
         public void PlaybackBindingBuildsSnapshotAndAppliesFrameToSkinnedModel()
         {
-            MmdUnityPlaybackBinding binding = null;
+            MmdUnityPlaybackBinding? binding = null;
             try
             {
                 MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
@@ -1215,7 +1217,7 @@ namespace Mmd.Tests
         [Test]
         public void PlaybackBindingAppliesVertexMorphWeightsToSkinnedMeshWithoutAccumulation()
         {
-            MmdUnityPlaybackBinding binding = null;
+            MmdUnityPlaybackBinding? binding = null;
             try
             {
                 MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
@@ -1267,7 +1269,7 @@ namespace Mmd.Tests
         [Test]
         public void CreateSkinnedModelSplitsSharedVerticesPerSubmeshAndDuplicatesMorphOffsets()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateSharedVertexTwoSubmeshMorphModel();
@@ -1313,7 +1315,7 @@ namespace Mmd.Tests
         [Test]
         public void VertexOnlyBlendShapeMorphFrameDoesNotUploadMeshVertices()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateSharedVertexTwoSubmeshMorphModel();
@@ -1344,7 +1346,7 @@ namespace Mmd.Tests
         [Test]
         public void BlendShapeVertexMorphWithTextureUvMorphReportsUvMeshUpload()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateTextureUvMorphTriangleModel();
@@ -1385,7 +1387,7 @@ namespace Mmd.Tests
         [Test]
         public void BlendShapeBoundsUseLocalBoundsWithoutRecalculateForResolvedWeightsAboveOne()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateGroupMorphTriangleModel();
@@ -1412,7 +1414,7 @@ namespace Mmd.Tests
         [Test]
         public void BlendShapeLocalBoundsSkipWhenResolvedWeightsAreUnchanged()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateGroupMorphTriangleModel();
@@ -1444,7 +1446,7 @@ namespace Mmd.Tests
         [Test]
         public void BlendShapeLocalBoundsRecalculateWhenResolvedWeightsChangeAfterSkip()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateGroupMorphTriangleModel();
@@ -1476,7 +1478,7 @@ namespace Mmd.Tests
         [Test]
         public void DuplicateNameVertexMorphsBakeDistinctBlendShapesAndShareResolvedWeight()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateDuplicateNameVertexMorphModel();
@@ -1502,7 +1504,7 @@ namespace Mmd.Tests
         [Test]
         public void DuplicateVertexMorphOffsetsAggregateIntoBakedBlendShapeDelta()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateDuplicateOffsetVertexMorphModel();
@@ -1527,7 +1529,7 @@ namespace Mmd.Tests
         [Test]
         public void ApplyFrameAppliesTextureUvMorphToMeshUv()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateTextureUvMorphTriangleModel();
@@ -1580,7 +1582,7 @@ namespace Mmd.Tests
         [Test]
         public void ApplyTextureUvMorphToSplitSkinnedModelMovesBothCopies()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateSharedVertexTwoSubmeshTextureUvMorphModel();
@@ -1614,10 +1616,10 @@ namespace Mmd.Tests
         [Test]
         public void ExistingSkinnedModelRebindAssignsRuntimeOwnedMeshBeforeVertexMorphApplication()
         {
-            MmdUnityModelInstance sceneInstance = null;
-            MmdUnityModelInstance reboundInstance = null;
-            Mesh originalMesh = null;
-            Mesh reboundMesh = null;
+            MmdUnityModelInstance? sceneInstance = null;
+            MmdUnityModelInstance? reboundInstance = null;
+            Mesh? originalMesh = null;
+            Mesh? reboundMesh = null;
             try
             {
                 MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
@@ -1666,10 +1668,10 @@ namespace Mmd.Tests
         [Test]
         public void ExistingSkinnedModelRebindAllowsRendererWithoutSharedMesh()
         {
-            MmdUnityModelInstance sceneInstance = null;
-            MmdUnityModelInstance reboundInstance = null;
-            Mesh originalMesh = null;
-            Mesh reboundMesh = null;
+            MmdUnityModelInstance? sceneInstance = null;
+            MmdUnityModelInstance? reboundInstance = null;
+            Mesh? originalMesh = null;
+            Mesh? reboundMesh = null;
             try
             {
                 MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
@@ -1700,8 +1702,8 @@ namespace Mmd.Tests
         [Test]
         public void ExistingSkinnedModelRebindCollectsPhysicsBodiesFromControllerRoot()
         {
-            MmdUnityModelInstance sceneInstance = null;
-            MmdUnityModelInstance reboundInstance = null;
+            MmdUnityModelInstance? sceneInstance = null;
+            MmdUnityModelInstance? reboundInstance = null;
             try
             {
                 MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
@@ -1751,7 +1753,7 @@ namespace Mmd.Tests
         [Test]
         public void CreateStaticModelScalesMeshPositionsButNotNormalsOrRootScale()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
@@ -1781,7 +1783,7 @@ namespace Mmd.Tests
         [Test]
         public void CreateSkinnedModelBoneBindPositionsAndFrameTranslationDeltasUseSameImportScaleWithoutAccumulation()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
@@ -1815,7 +1817,7 @@ namespace Mmd.Tests
         [Test]
         public void CreateSkinnedModelVertexMorphAndBlendShapePositionDeltasScaleWithImportScale()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
@@ -1866,7 +1868,7 @@ namespace Mmd.Tests
         [Test]
         public void CreateSkinnedModelPhysicsDebugBodyAndColliderScaleWhileDescriptorMetadataUnscaled()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
@@ -2822,7 +2824,7 @@ namespace Mmd.Tests
         [Test]
         public void ApplyFrameExpandsGroupMorphWeightToTargetVertexMorph()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateGroupMorphTriangleModel();
@@ -2848,7 +2850,7 @@ namespace Mmd.Tests
         [Test]
         public void FastRuntimeMorphFrameDoesNotReExpandNativeResolvedGroupMorphWeights()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateGroupMorphTriangleModel();
@@ -2891,7 +2893,7 @@ namespace Mmd.Tests
         [Test]
         public void ApplyFrameSumsDirectVertexWeightAndGroupContribution()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateGroupMorphTriangleModel();
@@ -2920,7 +2922,7 @@ namespace Mmd.Tests
         [Test]
         public void RepeatedApplyFrameDoesNotAccumulateGroupMorphDeltas()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateGroupMorphTriangleModel();
@@ -2953,7 +2955,7 @@ namespace Mmd.Tests
         [Test]
         public void ZeroGroupMorphWeightRestoresBaseShape()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateGroupMorphTriangleModel();
@@ -2984,7 +2986,7 @@ namespace Mmd.Tests
         [Test]
         public void ApplyFrameWithGroupMorphOnSplitSkinnedModelMovesBothCopies()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateSplitGroupMorphModel();
@@ -3013,7 +3015,7 @@ namespace Mmd.Tests
         [Test]
         public void GroupMorphCycleDetectionThrows()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateCycleGroupMorphModel();
@@ -3036,7 +3038,7 @@ namespace Mmd.Tests
         [Test]
         public void ApplyFrameWithMaterialMorphMutatesMaterialProperties()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateMaterialMorphTriangleModel();
@@ -3097,7 +3099,7 @@ namespace Mmd.Tests
         [Test]
         public void ApplyMaterialMorphTwiceDoesNotAccumulate()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateMaterialMorphTriangleModel();
@@ -3131,7 +3133,7 @@ namespace Mmd.Tests
         [Test]
         public void ApplyMaterialMorphWithZeroWeightRestoresBaseMaterialValues()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateMaterialMorphTriangleModel();
@@ -3174,7 +3176,7 @@ namespace Mmd.Tests
         [Test]
         public void GroupMorphWeightExpansionDrivesMaterialMorph()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateGroupMaterialMorphModel();
@@ -3209,7 +3211,7 @@ namespace Mmd.Tests
         [Test]
         public void ApplyMaterialMorphMultiplyMutatesMaterialProperties()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateMaterialMorphMultiplyModel();
@@ -3262,7 +3264,7 @@ namespace Mmd.Tests
         [Test]
         public void ApplyMaterialMorphAllMaterialAddTargetMutatesAllMaterials()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateMaterialMorphAllMaterialAddModel();
@@ -3305,7 +3307,7 @@ namespace Mmd.Tests
         [Test]
         public void ApplyMaterialMorphMultiplyAllMaterialTargetMutatesAllMaterials()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateMaterialMorphMultiplyAllMaterialModel();
@@ -3365,7 +3367,7 @@ namespace Mmd.Tests
         [Test]
         public void MultiplyAllMaterialMorphDoesNotAccumulateAndRestoresOnZeroWeight()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateMaterialMorphMultiplyAllMaterialModel();
@@ -3850,7 +3852,7 @@ namespace Mmd.Tests
         [Test]
         public void ApplyFrameExpandsFlipMorphWeightToTargetVertexMorph()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateFlipMorphTriangleModel();
@@ -3876,7 +3878,7 @@ namespace Mmd.Tests
         [Test]
         public void ApplyFrameExpandsFlipMorphToMaterialMorph()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateFlipMaterialMorphModel();
@@ -3907,7 +3909,7 @@ namespace Mmd.Tests
         [Test]
         public void ApplyFrameWithGroupToFlipRecursiveExpansion()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateGroupFlipRecursiveModel();
@@ -3933,7 +3935,7 @@ namespace Mmd.Tests
         [Test]
         public void FlipMorphCycleDetectionThrows()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateCycleFlipMorphModel();
@@ -4118,7 +4120,7 @@ namespace Mmd.Tests
         [Test]
         public void CreateSkinnedModelBakesBlendShapeFramesForVertexMorphs()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
@@ -4154,7 +4156,7 @@ namespace Mmd.Tests
         [Test]
         public void SkinnedModelZeroBlendShapeWeightReturnsToBaseThroughSetBlendShapeWeightPath()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
@@ -4197,7 +4199,7 @@ namespace Mmd.Tests
         [Test]
         public void SplitVertexCopyReceivesMorphOffsetInBakedBlendShapeFrame()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateSharedVertexTwoSubmeshMorphModel();
@@ -4224,7 +4226,7 @@ namespace Mmd.Tests
         [Test]
         public void GroupOrFlipResolvedWeightReachesBlendShapeWeight()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateGroupMorphTriangleModel();
@@ -4249,7 +4251,7 @@ namespace Mmd.Tests
         [Test]
         public void VertexOnlyApplyMorphsWithTimingReportsNoMeshUpload()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
@@ -4304,8 +4306,8 @@ namespace Mmd.Tests
                 ?? throw new InvalidOperationException("No fallback shader found.");
 
             Material material = new Material(shader);
-            Texture2D alphaTex = null;
-            Texture2D opaqueTex = null;
+            Texture2D? alphaTex = null;
+            Texture2D? opaqueTex = null;
             try
             {
                 // --- alphaBlend case: all pixels at alpha 128 (middle alpha) ---
@@ -4360,7 +4362,7 @@ namespace Mmd.Tests
             }
         }
 
-        private static void DestroyInstance(MmdUnityModelInstance instance)
+        private static void DestroyInstance(MmdUnityModelInstance? instance)
         {
             if (instance == null)
             {

@@ -1,3 +1,5 @@
+#nullable enable
+
 using System.IO;
 using NUnit.Framework;
 using UnityEditor;
@@ -63,7 +65,7 @@ namespace Mmd.Tests
         [Test]
         public void LoadPmxIntoSceneCreatesSkinnedSceneObjectFromFixture()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
@@ -115,7 +117,7 @@ namespace Mmd.Tests
                 Path.GetTempPath(),
                 "yohawing-mmd-unity-tests",
                 Path.GetRandomFileName());
-            MmdRuntimeTextureResolution resolution = null;
+            MmdRuntimeTextureResolution? resolution = null;
             try
             {
                 Directory.CreateDirectory(directory);
@@ -186,7 +188,7 @@ namespace Mmd.Tests
             };
         }
 
-        private static void DestroyInstance(MmdUnityModelInstance instance)
+        private static void DestroyInstance(MmdUnityModelInstance? instance)
         {
             if (instance == null)
             {

@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -47,7 +49,7 @@ namespace Mmd.Tests
                 interpolation = new MmdBoneInterpolationDefinition
                 {
                     translationX = new byte[] { 0, 0, 0 },
-                    translationY = null,
+                    translationY = null!,
                     translationZ = Array.Empty<byte>(),
                     rotation = new byte[] { 0, 0, 0, 0, 0 }
                 }
@@ -61,7 +63,7 @@ namespace Mmd.Tests
                     new MmdModelConstraintStateDefinition { boneName = "   " }
                 }
             });
-            motion.modelKeyframes.Add(new MmdModelKeyframeDefinition { frame = 0, constraintStates = null });
+            motion.modelKeyframes.Add(new MmdModelKeyframeDefinition { frame = 0, constraintStates = null! });
 
             IReadOnlyList<string> errors = MmdMotionValidator.ValidateStructuralMotion(motion);
 
@@ -87,9 +89,9 @@ namespace Mmd.Tests
         {
             var motion = new MmdMotionDefinition
             {
-                boneKeyframes = null,
-                morphKeyframes = null,
-                modelKeyframes = null
+                boneKeyframes = null!,
+                morphKeyframes = null!,
+                modelKeyframes = null!
             };
 
             IReadOnlyList<string> errors = MmdMotionValidator.ValidateStructuralMotion(motion);

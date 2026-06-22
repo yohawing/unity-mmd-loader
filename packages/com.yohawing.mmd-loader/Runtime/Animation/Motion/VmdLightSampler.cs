@@ -33,7 +33,7 @@ namespace Mmd.Motion
     /// </summary>
     public static class VmdLightSampler
     {
-        public static MmdLightState Sample(IReadOnlyList<MmdLightKeyframeDefinition> keyframes, float frame)
+        public static MmdLightState Sample(IReadOnlyList<MmdLightKeyframeDefinition>? keyframes, float frame)
         {
             if (keyframes == null)
             {
@@ -117,7 +117,7 @@ namespace Mmd.Motion
                 });
         }
 
-        private static float Component(float[] values, int index)
+        private static float Component(float[]? values, int index)
         {
             return values != null && values.Length > index ? values[index] : 0.0f;
         }

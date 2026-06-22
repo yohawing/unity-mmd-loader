@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -57,12 +59,12 @@ namespace Mmd.Tests
         {
             var model = new MmdModelDefinition
             {
-                vertices = null,
-                indices = null,
-                bones = null,
-                morphs = null,
-                materials = null,
-                ik = null
+                vertices = null!,
+                indices = null!,
+                bones = null!,
+                morphs = null!,
+                materials = null!,
+                ik = null!
             };
 
             IReadOnlyList<string> errors = MmdModelValidator.ValidateStructuralModel(model);

@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using NUnit.Framework;
 using Mmd.Parser;
@@ -190,7 +192,7 @@ namespace Mmd.Tests
         [Test]
         public void LoadMotionUsesVmdJsonParserWithoutSummaryAccessor()
         {
-            byte[] observedBytes = null;
+            byte[]? observedBytes = null;
             var parser = new NativeMmdParser(
                 bytes =>
                 {

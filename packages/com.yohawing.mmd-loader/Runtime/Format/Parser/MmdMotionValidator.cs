@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using System.Collections.Generic;
 
@@ -5,7 +7,7 @@ namespace Mmd.Parser
 {
     public static class MmdMotionValidator
     {
-        public static IReadOnlyList<string> ValidateStructuralMotion(MmdMotionDefinition motion)
+        public static IReadOnlyList<string> ValidateStructuralMotion(MmdMotionDefinition? motion)
         {
             var errors = new List<string>();
             if (motion == null)
