@@ -228,25 +228,43 @@ namespace Mmd.Editor
             DrawConflictDiagnostics(summary);
         }
 
-        private static void DrawMissingRequiredBones(MmdHumanoidBoneMappingDiagnosticSummary summary)
+        private void DrawMissingRequiredBones(MmdHumanoidBoneMappingDiagnosticSummary summary)
         {
-            if (summary.MissingRequiredBones.Count == 0)
+            List<MmdHumanoidMissingRequiredBone> visibleMissing = GetVisibleMissingRequiredBones(summary);
+            if (visibleMissing.Count == 0)
             {
-                EditorGUILayout.HelpBox("All required Humanoid bones are mapped.", MessageType.Info);
+                string message = summary.MissingRequiredBones.Count == 0
+                    ? "All required Humanoid bones are mapped."
+                    : "All missing required Humanoid bones have pending overrides. Fill the MMD bone names, then Apply/Reimport.";
+                EditorGUILayout.HelpBox(message, MessageType.Info);
                 return;
             }
 
             EditorGUILayout.HelpBox(
                 "Missing required Humanoid bones prevent a valid Avatar. Add manual overrides for these targets.",
                 MessageType.Warning);
-            foreach (MmdHumanoidMissingRequiredBone missing in summary.MissingRequiredBones)
+            foreach (MmdHumanoidMissingRequiredBone missing in visibleMissing)
             {
-                EditorGUILayout.LabelField(
-                    missing.HumanBone.ToString(),
-                    string.IsNullOrWhiteSpace(missing.ExpectedMmdBoneName)
-                        ? "(expected MMD bone unknown)"
-                        : "Expected MMD bone: " + missing.ExpectedMmdBoneName,
-                    EditorStyles.boldLabel);
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField(
+                        GetHumanBoneDisplayName(missing.HumanBone),
+                        string.IsNullOrWhiteSpace(missing.ExpectedMmdBoneName)
+                            ? "(expected MMD bone unknown)"
+                            : "Expected MMD bone: " + missing.ExpectedMmdBoneName,
+                        EditorStyles.boldLabel);
+
+                    using (new EditorGUI.DisabledScope(humanoidBoneMappingOverridesProperty == null))
+                    {
+                        if (GUILayout.Button("Override", GUILayout.Width(80)))
+                        {
+                            AddHumanoidMappingOverride(
+                                missing.HumanBone,
+                                missing.ExpectedMmdBoneName,
+                                "Add Humanoid Bone Mapping Override");
+                        }
+                    }
+                }
             }
         }
 
@@ -342,20 +360,10 @@ namespace Mmd.Editor
             {
                 if (GUILayout.Button("Add Override"))
                 {
-                    int index = humanoidBoneMappingOverridesProperty.arraySize;
-                    humanoidBoneMappingOverridesProperty.InsertArrayElementAtIndex(index);
-                    SerializedProperty entry = humanoidBoneMappingOverridesProperty.GetArrayElementAtIndex(index);
-                    SerializedProperty? mmdBoneNameProperty = entry.FindPropertyRelative("mmdBoneName");
-                    SerializedProperty? humanBoneProperty = entry.FindPropertyRelative("humanBone");
-                    if (mmdBoneNameProperty != null)
-                    {
-                        mmdBoneNameProperty.stringValue = boneNames.Length > 0 ? boneNames[0] : string.Empty;
-                    }
-
-                    if (humanBoneProperty != null)
-                    {
-                        humanBoneProperty.intValue = (int)HumanBodyBones.LastBone;
-                    }
+                    AddHumanoidMappingOverride(
+                        HumanBodyBones.LastBone,
+                        boneNames.Length > 0 ? boneNames[0] : string.Empty,
+                        "Add Humanoid Bone Mapping Override");
                 }
 
                 using (new EditorGUI.DisabledScope(humanoidBoneMappingOverridesProperty.arraySize == 0))
@@ -366,6 +374,91 @@ namespace Mmd.Editor
                     }
                 }
             }
+        }
+
+        private List<MmdHumanoidMissingRequiredBone> GetVisibleMissingRequiredBones(
+            MmdHumanoidBoneMappingDiagnosticSummary summary)
+        {
+            var visibleMissing = new List<MmdHumanoidMissingRequiredBone>();
+            foreach (MmdHumanoidMissingRequiredBone missing in summary.MissingRequiredBones)
+            {
+                if (HasPendingOverride(missing.HumanBone))
+                {
+                    continue;
+                }
+
+                visibleMissing.Add(missing);
+            }
+
+            return visibleMissing;
+        }
+
+        private bool HasPendingOverride(HumanBodyBones humanBone)
+        {
+            if (humanoidBoneMappingOverridesProperty == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < humanoidBoneMappingOverridesProperty.arraySize; i++)
+            {
+                SerializedProperty entry = humanoidBoneMappingOverridesProperty.GetArrayElementAtIndex(i);
+                SerializedProperty? humanBoneProperty = entry.FindPropertyRelative("humanBone");
+                if (humanBoneProperty != null && humanBoneProperty.intValue == (int)humanBone)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private void AddHumanoidMappingOverride(
+            HumanBodyBones humanBone,
+            string mmdBoneName,
+            string undoName)
+        {
+            if (humanoidBoneMappingOverridesProperty == null)
+            {
+                return;
+            }
+
+            Undo.RecordObject(target, undoName);
+
+            int index = humanoidBoneMappingOverridesProperty.arraySize;
+            humanoidBoneMappingOverridesProperty.InsertArrayElementAtIndex(index);
+            SerializedProperty entry = humanoidBoneMappingOverridesProperty.GetArrayElementAtIndex(index);
+            SerializedProperty? mmdBoneNameProperty = entry.FindPropertyRelative("mmdBoneName");
+            SerializedProperty? humanBoneProperty = entry.FindPropertyRelative("humanBone");
+
+            if (mmdBoneNameProperty != null)
+            {
+                mmdBoneNameProperty.stringValue = mmdBoneName ?? string.Empty;
+            }
+
+            if (humanBoneProperty != null)
+            {
+                humanBoneProperty.intValue = (int)humanBone;
+            }
+
+            humanoidMappingOverridesExpanded = true;
+            EditorUtility.SetDirty(target);
+            Repaint();
+        }
+
+        private static string GetHumanBoneDisplayName(HumanBodyBones humanBone)
+        {
+            int index = (int)humanBone;
+            if (index >= 0 && index < HumanTrait.BoneName.Length)
+            {
+                string traitName = HumanTrait.BoneName[index];
+                if (!string.IsNullOrWhiteSpace(traitName))
+                {
+                    return traitName;
+                }
+            }
+
+            return humanBone.ToString();
         }
 
         private static void DrawMmdBoneNameField(SerializedProperty? mmdBoneNameProperty, string[] boneNames)
