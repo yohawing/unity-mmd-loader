@@ -16,7 +16,7 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 - Humanoid rig setup at import (Animator plus a persistent proxy control rig) with retargeted playback that drives the real MMD bones and append (付与) transforms and steps Live physics.
 - Unified MmdHumanoidAnimationTrack: a single Timeline track poses the Humanoid avatar and drives the native MMD model via retarget side-effect, replacing the former two-track setup.
 - Explicit Humanoid AnimationClip bake path when PMX, VMD, and Humanoid setup prerequisites are ready.
-- Windows x86_64 packaged native runtime binaries.
+- Windows x86_64 packaged native runtime binaries (mmd-anim v0.1.5).
 
 ### Known Limitations
 
