@@ -1,7 +1,7 @@
 #include "mmd_bullet_api.h"
 
 #include <btBulletDynamicsCommon.h>
-#include <BulletDynamics/ConstraintSolver/btGeneric6DofSpring2Constraint.h>
+#include <BulletDynamics/ConstraintSolver/btGeneric6DofSpringConstraint.h>
 
 #include <algorithm>
 #include <array>
@@ -210,7 +210,7 @@ bool validate_joint_body_indices(ymu_bullet_world_t* world, int body_a_index, in
     return true;
 }
 
-void configure_spring(btGeneric6DofSpring2Constraint& constraint, int dof_index, float stiffness)
+void configure_spring(btGeneric6DofSpringConstraint& constraint, int dof_index, float stiffness)
 {
     if (stiffness <= 0.0f) {
         return;
@@ -218,7 +218,6 @@ void configure_spring(btGeneric6DofSpring2Constraint& constraint, int dof_index,
 
     constraint.enableSpring(dof_index, true);
     constraint.setStiffness(dof_index, stiffness);
-    constraint.setDamping(dof_index, 0.5f);
 }
 
 std::unique_ptr<btCollisionShape> create_shape(const char* shape_type, float size_x, float size_y, float size_z)
@@ -636,12 +635,12 @@ YMU_BULLET_API ymu_bullet_status_t ymu_bullet_world_add_6dof_spring_joint(
         btTransform joint_world = make_transform(position_xyz, rotation_xyz);
         btTransform frame_a = world->initial_transforms[body_a_index].inverse() * joint_world;
         btTransform frame_b = world->initial_transforms[body_b_index].inverse() * joint_world;
-        auto constraint = std::make_unique<btGeneric6DofSpring2Constraint>(
+        auto constraint = std::make_unique<btGeneric6DofSpringConstraint>(
             *world->rigid_bodies[body_a_index],
             *world->rigid_bodies[body_b_index],
             frame_a,
             frame_b,
-            RO_XYZ);
+            true);
 
         constraint->setLinearLowerLimit(to_vector3(linear_lower_xyz));
         constraint->setLinearUpperLimit(to_vector3(linear_upper_xyz));
