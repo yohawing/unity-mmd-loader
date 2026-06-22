@@ -276,6 +276,7 @@ namespace Mmd.Tests
             Assert.That(actual.appendRatio, Is.EqualTo(golden.appendRatio), fixture.Context(field + ".appendRatio"));
             Assert.That(actual.appendRotation, Is.EqualTo(golden.appendRotation), fixture.Context(field + ".appendRotation"));
             Assert.That(actual.appendTranslation, Is.EqualTo(golden.appendTranslation), fixture.Context(field + ".appendTranslation"));
+            Assert.That(actual.deformAfterPhysics, Is.EqualTo(golden.deformAfterPhysics), fixture.Context(field + ".deformAfterPhysics"));
         }
 
         private static void AssertMaterialMatches(ModelFixtureEntry fixture, string field, MmdMaterialDefinition actual, MmdMaterialDefinition golden)

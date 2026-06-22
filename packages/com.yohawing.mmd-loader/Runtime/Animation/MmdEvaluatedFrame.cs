@@ -280,7 +280,7 @@ namespace Mmd
             var bones = new List<MmdEvaluatedBonePose>(orderedBones.Count);
             foreach (MmdBoneDefinition bone in orderedBones)
             {
-                MmdBonePoseSample pose = evaluation.IkMotion.Bones.TryGetValue(bone.name, out MmdBonePoseSample sample)
+                MmdBonePoseSample pose = evaluation.FinalMotion.Bones.TryGetValue(bone.name, out MmdBonePoseSample sample)
                     ? sample
                     : MmdBonePoseSample.Identity;
                 bones.Add(new MmdEvaluatedBonePose
@@ -294,7 +294,7 @@ namespace Mmd
                 });
             }
 
-            var orderedMorphs = new List<KeyValuePair<string, float>>(evaluation.IkMotion.Morphs);
+            var orderedMorphs = new List<KeyValuePair<string, float>>(evaluation.FinalMotion.Morphs);
             orderedMorphs.Sort((left, right) => StringComparer.Ordinal.Compare(left.Key, right.Key));
 
             var morphs = new List<MmdEvaluatedMorphWeight>(orderedMorphs.Count);

@@ -33,7 +33,31 @@ namespace Mmd.Motion
             return MmdAppendTransformEvaluator.ApplyAppendTransforms(model, sampledMotion);
         }
 
+        public MmdSampledMotion ApplyAppendTransforms(
+            MmdModelDefinition model,
+            MmdSampledMotion sampledMotion,
+            MmdBoneEvaluationPass pass)
+        {
+            return MmdAppendTransformEvaluator.ApplyAppendTransforms(model, sampledMotion, pass);
+        }
+
         public MmdSampledMotion Solve(MmdModelDefinition model, MmdSampledMotion? sampledMotion)
+        {
+            return SolveCore(model, sampledMotion, pass: null);
+        }
+
+        public MmdSampledMotion Solve(
+            MmdModelDefinition model,
+            MmdSampledMotion? sampledMotion,
+            MmdBoneEvaluationPass pass)
+        {
+            return SolveCore(model, sampledMotion, pass);
+        }
+
+        private MmdSampledMotion SolveCore(
+            MmdModelDefinition model,
+            MmdSampledMotion? sampledMotion,
+            MmdBoneEvaluationPass? pass)
         {
             if (model == null)
             {
@@ -57,6 +81,11 @@ namespace Mmd.Motion
             var chainChangedBoneIndices = new HashSet<int>(indexedBones.Length);
             foreach (MmdIkDefinition ik in model.ik)
             {
+                if (pass.HasValue && !ShouldEvaluateIkInPass(model, ik, pass.Value))
+                {
+                    continue;
+                }
+
                 chainChangedBoneIndices.Clear();
                 SolveChain(model, result, indexedBones, indexedChildren, translations, baseRotations, ikRotations, rotations, worldMatrices, ik, chainChangedBoneIndices);
             }
@@ -69,6 +98,24 @@ namespace Mmd.Motion
             MmdSampledMotion preAppendMotion,
             MmdSampledMotion appendedMotion)
         {
+            return SolveCore(model, preAppendMotion, appendedMotion, pass: null);
+        }
+
+        public MmdSampledMotion Solve(
+            MmdModelDefinition model,
+            MmdSampledMotion preAppendMotion,
+            MmdSampledMotion appendedMotion,
+            MmdBoneEvaluationPass pass)
+        {
+            return SolveCore(model, preAppendMotion, appendedMotion, pass);
+        }
+
+        private MmdSampledMotion SolveCore(
+            MmdModelDefinition model,
+            MmdSampledMotion preAppendMotion,
+            MmdSampledMotion appendedMotion,
+            MmdBoneEvaluationPass? pass)
+        {
             if (model == null)
             {
                 throw new ArgumentNullException(nameof(model));
@@ -76,8 +123,10 @@ namespace Mmd.Motion
 
             MmdModelValidator.ThrowIfInvalid(model);
             MmdSampledMotion result = CopySampledMotion(appendedMotion);
-            HashSet<int> sourceBoneIndices = SolveChains(model, result, model.ik);
-            return MmdAppendTransformEvaluator.ReapplyAppendTransformsForSources(model, preAppendMotion, result, sourceBoneIndices);
+            HashSet<int> sourceBoneIndices = SolveChains(model, result, model.ik, pass);
+            return pass.HasValue
+                ? MmdAppendTransformEvaluator.ReapplyAppendTransformsForSources(model, preAppendMotion, result, sourceBoneIndices, pass.Value)
+                : MmdAppendTransformEvaluator.ReapplyAppendTransformsForSources(model, preAppendMotion, result, sourceBoneIndices);
         }
 
         public MmdSampledMotion SolveWithBreakdown(
@@ -107,13 +156,32 @@ namespace Mmd.Motion
             MmdSampledMotion result,
             IReadOnlyList<MmdIkDefinition> chains)
         {
-            return SolveChains(model, result, chains, breakdown: null);
+            return SolveChains(model, result, chains, pass: null, breakdown: null);
         }
 
         private static HashSet<int> SolveChains(
             MmdModelDefinition model,
             MmdSampledMotion result,
             IReadOnlyList<MmdIkDefinition> chains,
+            MmdBoneEvaluationPass? pass)
+        {
+            return SolveChains(model, result, chains, pass, breakdown: null);
+        }
+
+        private static HashSet<int> SolveChains(
+            MmdModelDefinition model,
+            MmdSampledMotion result,
+            IReadOnlyList<MmdIkDefinition> chains,
+            MmdIkSolveBreakdownAccumulator? breakdown)
+        {
+            return SolveChains(model, result, chains, pass: null, breakdown);
+        }
+
+        private static HashSet<int> SolveChains(
+            MmdModelDefinition model,
+            MmdSampledMotion result,
+            IReadOnlyList<MmdIkDefinition> chains,
+            MmdBoneEvaluationPass? pass,
             MmdIkSolveBreakdownAccumulator? breakdown)
         {
             long setupStarted = breakdown != null ? Stopwatch.GetTimestamp() : 0;
@@ -138,6 +206,11 @@ namespace Mmd.Motion
 
             foreach (MmdIkDefinition ik in chains)
             {
+                if (pass.HasValue && !ShouldEvaluateIkInPass(model, ik, pass.Value))
+                {
+                    continue;
+                }
+
                 chainChangedBoneIndices.Clear();
                 changedBoneIndices.UnionWith(SolveChain(
                     model,
@@ -155,6 +228,19 @@ namespace Mmd.Motion
             }
 
             return changedBoneIndices;
+        }
+
+        private static bool ShouldEvaluateIkInPass(MmdModelDefinition model, MmdIkDefinition ik, MmdBoneEvaluationPass pass)
+        {
+            MmdBoneDefinition? bone = FindBone(model, ik.boneIndex);
+            if (bone == null)
+            {
+                return false;
+            }
+
+            return pass == MmdBoneEvaluationPass.AfterPhysics
+                ? bone.deformAfterPhysics
+                : !bone.deformAfterPhysics;
         }
 
         private static HashSet<int> SolveChain(

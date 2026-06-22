@@ -53,7 +53,8 @@ namespace Mmd.Tests
                             {
                                 appendRotate = true,
                                 appendLocal = true,
-                                externalParentTransform = true
+                                externalParentTransform = true,
+                                transformAfterPhysics = true
                             },
                             appendTransform = new NativeMmdParser.PmxModelSourceAppendTransform
                             {
@@ -247,6 +248,8 @@ namespace Mmd.Tests
             Assert.That(model.bones[1].fixedAxis, Is.True);
             Assert.That(model.bones[1].localAxes, Is.True);
             Assert.That(model.bones[1].externalParentTransform, Is.True);
+            Assert.That(model.bones[1].deformAfterPhysics, Is.True);
+            Assert.That(model.HasDeformAfterPhysicsBones, Is.True);
             Assert.That(model.ik, Has.Count.EqualTo(1));
             Assert.That(model.ik[0].boneIndex, Is.EqualTo(2));
             Assert.That(model.ik[0].targetBoneIndex, Is.EqualTo(1));

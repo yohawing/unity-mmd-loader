@@ -14,6 +14,27 @@ namespace Mmd.Parser
         public List<MmdMaterialDefinition> materials = new();
         public List<MmdIkDefinition> ik = new();
         public MmdPhysicsDefinition physics = new();
+
+        public bool HasDeformAfterPhysicsBones
+        {
+            get
+            {
+                if (bones == null)
+                {
+                    return false;
+                }
+
+                for (int i = 0; i < bones.Count; i++)
+                {
+                    if (bones[i]?.deformAfterPhysics == true)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
     }
 
     [Serializable]
@@ -53,6 +74,7 @@ namespace Mmd.Parser
         public float[] localXAxis = Array.Empty<float>();
         public float[] localZAxis = Array.Empty<float>();
         public bool externalParentTransform;
+        public bool deformAfterPhysics;
     }
 
     [Serializable]

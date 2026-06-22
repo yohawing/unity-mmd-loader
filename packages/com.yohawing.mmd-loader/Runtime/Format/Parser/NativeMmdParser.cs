@@ -142,7 +142,8 @@ namespace Mmd.Parser
                     localAxes = HasLocalAxis(bone.localAxis),
                     localXAxis = CopyVec3(bone.localAxis?.x),
                     localZAxis = CopyVec3(bone.localAxis?.z),
-                    externalParentTransform = bone.externalParentKey >= 0 || (bone.flags?.externalParentTransform ?? false)
+                    externalParentTransform = bone.externalParentKey >= 0 || (bone.flags?.externalParentTransform ?? false),
+                    deformAfterPhysics = bone.flags?.transformAfterPhysics ?? false
                 });
             }
 
@@ -1094,6 +1095,7 @@ namespace Mmd.Parser
             public bool appendRotate;
             public bool appendTranslate;
             public bool externalParentTransform;
+            public bool transformAfterPhysics;
         }
 
         [Serializable]

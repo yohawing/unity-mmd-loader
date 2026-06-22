@@ -4,9 +4,11 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using Mmd;
+using Mmd.Motion;
 using Mmd.Native;
 using Mmd.Parser;
 using Mmd.Physics;
+using Mmd.Pose;
 using UnityEngine;
 
 namespace Mmd.UnityIntegration
@@ -511,6 +513,12 @@ namespace Mmd.UnityIntegration
             }
 
             DisposeFastRuntime();
+            if (model.HasDeformAfterPhysicsBones)
+            {
+                reason = "mmd-runtime fast playback does not support PMX deformAfterPhysics two-pass bone evaluation; managed playback remains active.";
+                return false;
+            }
+
             try
             {
                 MmdRuntimeFfiPlaybackSession candidate = MmdRuntimeFfiPlaybackSession.Create(pmxBytes, vmdBytes);
@@ -879,6 +887,7 @@ namespace Mmd.UnityIntegration
             ApplyPhysicsBodyTransforms(backend);
             double applyPhysicsBodiesMs = stageWatch.Elapsed.TotalMilliseconds;
             stageWatch.Restart();
+            ApplyAfterPhysicsBoneEvaluationFromUnityTransforms();
             ApplyPhysicsBodyDebugTransforms(backend);
             MmdLivePhysicsBodyDiagnostics[] bodyDiagnostics = BuildBodyDiagnostics(backend);
             if (evaluatedFrame != null)
@@ -906,6 +915,77 @@ namespace Mmd.UnityIntegration
                 bodyDiagnostics = bodyDiagnostics
             };
             return lastLivePhysicsDiagnostics;
+        }
+
+        private void ApplyAfterPhysicsBoneEvaluationFromUnityTransforms()
+        {
+            if (!model.HasDeformAfterPhysicsBones)
+            {
+                return;
+            }
+
+            MmdSampledMotion postPhysicsPose = CaptureCurrentBonePoseFromUnityTransforms();
+            MmdSampledMotion afterAppend = MmdAppendTransformEvaluator.ApplyAppendTransforms(
+                model,
+                postPhysicsPose,
+                MmdBoneEvaluationPass.AfterPhysics);
+            MmdSampledMotion afterIk = new MmdIkSolver().Solve(
+                model,
+                postPhysicsPose,
+                afterAppend,
+                MmdBoneEvaluationPass.AfterPhysics);
+            ApplyBoneTransformsOnly(afterIk, bone => bone.deformAfterPhysics);
+        }
+
+        private MmdSampledMotion CaptureCurrentBonePoseFromUnityTransforms()
+        {
+            var motion = new MmdSampledMotion();
+            float importScale = NormalizeImportScale(Instance.ImportScale);
+            for (int i = 0; i < model.bones.Count; i++)
+            {
+                MmdBoneDefinition bone = model.bones[i];
+                int index = bone.index;
+                if (index < 0 || index >= Instance.BoneTransforms.Length)
+                {
+                    continue;
+                }
+
+                Transform boneTransform = Instance.BoneTransforms[index];
+                Vector3 localDelta = boneTransform.localPosition - Instance.BindLocalPositions[index];
+                Quaternion localRotation = Quaternion.Inverse(Instance.BindLocalRotations[index]) * boneTransform.localRotation;
+                motion.Bones[bone.name] = new MmdBonePoseSample(
+                    ToArray(ToMmdModelPosition(localDelta, importScale)),
+                    ToArray(ToMmdModelRotation(localRotation)));
+            }
+
+            return motion;
+        }
+
+        private void ApplyBoneTransformsOnly(MmdSampledMotion motion, Func<MmdBoneDefinition, bool> predicate)
+        {
+            for (int i = 0; i < model.bones.Count; i++)
+            {
+                MmdBoneDefinition bone = model.bones[i];
+                if (!predicate(bone))
+                {
+                    continue;
+                }
+
+                int index = bone.index;
+                if (index < 0 || index >= Instance.BoneTransforms.Length)
+                {
+                    continue;
+                }
+
+                if (!motion.Bones.TryGetValue(bone.name, out MmdBonePoseSample pose))
+                {
+                    continue;
+                }
+
+                Transform boneTransform = Instance.BoneTransforms[index];
+                boneTransform.localPosition = Instance.BindLocalPositions[index] + ToUnityModelPosition(pose.Translation, Instance.ImportScale);
+                boneTransform.localRotation = Instance.BindLocalRotations[index] * ToUnityModelRotation(pose.Rotation);
+            }
         }
 
         private BulletMmdPhysicsBackend EnsureLivePhysicsBackend()

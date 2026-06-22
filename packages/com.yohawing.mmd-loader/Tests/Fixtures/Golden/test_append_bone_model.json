@@ -37,7 +37,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 1,
@@ -73,7 +74,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 2,
@@ -109,7 +111,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 3,
@@ -145,7 +148,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 4,
@@ -181,7 +185,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 5,
@@ -217,7 +222,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 6,
@@ -253,7 +259,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 7,
@@ -289,7 +296,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 8,
@@ -325,7 +333,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         }
     ],
     "morphs": [],

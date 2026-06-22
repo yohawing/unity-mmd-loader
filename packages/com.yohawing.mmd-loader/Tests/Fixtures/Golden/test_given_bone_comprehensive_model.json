@@ -37,7 +37,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 1,
@@ -73,7 +74,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 2,
@@ -109,7 +111,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 3,
@@ -145,7 +148,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 4,
@@ -181,7 +185,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 5,
@@ -217,7 +222,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 6,
@@ -253,7 +259,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 7,
@@ -289,7 +296,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 8,
@@ -325,7 +333,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 9,
@@ -361,7 +370,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 10,
@@ -397,7 +407,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 11,
@@ -433,7 +444,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 12,
@@ -469,7 +481,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 13,
@@ -505,7 +518,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 14,
@@ -541,7 +555,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 15,
@@ -577,7 +592,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 16,
@@ -613,7 +629,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 17,
@@ -649,7 +666,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 18,
@@ -685,7 +703,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 19,
@@ -721,7 +740,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 20,
@@ -757,7 +777,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 21,
@@ -793,7 +814,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 22,
@@ -829,7 +851,8 @@
                 0.0,
                 1.0
             ],
-            "externalParentTransform": false
+            "externalParentTransform": false,
+            "deformAfterPhysics": false
         }
     ],
     "morphs": [],
