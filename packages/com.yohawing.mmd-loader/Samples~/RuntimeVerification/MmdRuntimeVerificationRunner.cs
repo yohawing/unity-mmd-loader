@@ -187,22 +187,54 @@ namespace Mmd.Samples.RuntimeVerification
             MmdRuntimeVerificationCaseResult result)
         {
             GameObject? holder = null;
+            MmdUnityPlaybackController? controller = null;
+            IEnumerator? playback = null;
+            Exception? failure = null;
             try
             {
-                holder = CreatePlaybackRoot(verificationCase, out MmdUnityPlaybackController controller);
-                controller.Play();
-                yield return SamplePlayback(controller, result, arguments.DurationSeconds);
-                controller.Pause();
-                result.playback = SummarizePlayback(controller, "controller", arguments.DurationSeconds);
-                result.physics = SummarizePhysics(controller);
-                result.playbackStatus = "passed";
-                result.status = "passed";
-            }
-            catch (Exception ex)
-            {
-                result.playbackStatus = "failed";
-                result.status = "failed";
-                AppendException(result, "Controller drive failed: " + FormatException(ex));
+                try
+                {
+                    holder = CreatePlaybackRoot(verificationCase, out controller);
+                    controller.Play();
+                    playback = SamplePlayback(controller, result, arguments.DurationSeconds);
+                }
+                catch (Exception ex)
+                {
+                    failure = ex;
+                }
+
+                while (failure == null && playback != null)
+                {
+                    if (!TryMoveNext(playback, out object? current, out failure))
+                    {
+                        break;
+                    }
+
+                    yield return current;
+                }
+
+                if (failure == null && controller != null)
+                {
+                    try
+                    {
+                        controller.Pause();
+                        result.playback = SummarizePlayback(controller, "controller", arguments.DurationSeconds);
+                        result.physics = SummarizePhysics(controller);
+                        result.playbackStatus = "passed";
+                        result.status = "passed";
+                    }
+                    catch (Exception ex)
+                    {
+                        failure = ex;
+                    }
+                }
+
+                if (failure != null)
+                {
+                    result.playbackStatus = "failed";
+                    result.status = "failed";
+                    AppendException(result, "Controller drive failed: " + FormatException(failure));
+                }
             }
             finally
             {
@@ -219,33 +251,61 @@ namespace Mmd.Samples.RuntimeVerification
         {
             GameObject? holder = null;
             MmdRuntimeVerificationTimelineDriver? timelineDriver = null;
+            MmdUnityPlaybackController? controller = null;
+            IEnumerator? timeline = null;
+            float start = 0.0f;
+            Exception? failure = null;
             try
             {
-                holder = CreatePlaybackRoot(verificationCase, out MmdUnityPlaybackController controller);
-                PlayableDirector director = holder.AddComponent<PlayableDirector>();
-                timelineDriver = new MmdRuntimeVerificationTimelineDriver();
-                IEnumerator timeline = timelineDriver.Play(
-                    director,
-                    controller,
-                    arguments.DurationSeconds,
-                    arguments.FrameRate);
-                float start = Time.realtimeSinceStartup;
-                while (timeline.MoveNext())
+                try
                 {
-                    AddSample(result, controller, start);
-                    yield return timeline.Current;
+                    holder = CreatePlaybackRoot(verificationCase, out controller);
+                    PlayableDirector director = holder.AddComponent<PlayableDirector>();
+                    timelineDriver = new MmdRuntimeVerificationTimelineDriver();
+                    timeline = timelineDriver.Play(
+                        director,
+                        controller,
+                        arguments.DurationSeconds,
+                        arguments.FrameRate);
+                    start = Time.realtimeSinceStartup;
+                }
+                catch (Exception ex)
+                {
+                    failure = ex;
                 }
 
-                result.playback = SummarizePlayback(controller, "timeline", arguments.DurationSeconds);
-                result.physics = SummarizePhysics(controller);
-                result.playbackStatus = "passed";
-                result.status = "passed";
-            }
-            catch (Exception ex)
-            {
-                result.playbackStatus = "failed";
-                result.status = "failed";
-                AppendException(result, "Timeline drive failed: " + FormatException(ex));
+                while (failure == null && timeline != null && controller != null)
+                {
+                    if (!TryMoveNext(timeline, out object? current, out failure))
+                    {
+                        break;
+                    }
+
+                    AddSample(result, controller, start);
+                    yield return current;
+                }
+
+                if (failure == null && controller != null)
+                {
+                    try
+                    {
+                        result.playback = SummarizePlayback(controller, "timeline", arguments.DurationSeconds);
+                        result.physics = SummarizePhysics(controller);
+                        result.playbackStatus = "passed";
+                        result.status = "passed";
+                    }
+                    catch (Exception ex)
+                    {
+                        failure = ex;
+                    }
+                }
+
+                if (failure != null)
+                {
+                    result.playbackStatus = "failed";
+                    result.status = "failed";
+                    AppendException(result, "Timeline drive failed: " + FormatException(failure));
+                }
             }
             finally
             {
@@ -286,6 +346,30 @@ namespace Mmd.Samples.RuntimeVerification
             }
 
             return holder;
+        }
+
+        private static bool TryMoveNext(
+            IEnumerator enumerator,
+            out object? current,
+            out Exception? failure)
+        {
+            current = null;
+            failure = null;
+            try
+            {
+                bool hasNext = enumerator.MoveNext();
+                if (hasNext)
+                {
+                    current = enumerator.Current;
+                }
+
+                return hasNext;
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+                return false;
+            }
         }
 
         private IEnumerator SamplePlayback(
