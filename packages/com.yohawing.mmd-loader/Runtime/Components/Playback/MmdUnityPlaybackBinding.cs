@@ -1021,7 +1021,8 @@ namespace Mmd.UnityIntegration
         ///      interpolation transform at the ORIGIN-bind, so the first forward Step would compute a kinematic
         ///      velocity of (currentPose - originBind)/dt and fling the jointed dynamic chain apart.
         ///   3. ONE short settle step at the current pose so the joints relax (saba physics->Update(1/60)).
-        ///   4. Re-pin the bone-driven (kinematic / dynamic-orientation) bodies at the current pose.
+        ///   4. Re-pin static kinematic bodies at the current pose. Mode-2 dynamic-orientation bodies remain
+        ///      active dynamic bodies after the reset seed.
         /// This is a settle, not a sweep from bind, so a pure-dynamic body never snaps toward the origin-space
         /// bind while the model is animated far away (the reported "揺れ骨が BindPose の場所に戻る" bug).
         /// </summary>
@@ -1030,7 +1031,7 @@ namespace Mmd.UnityIntegration
         {
             // 1. saba MMDRigidBody::ResetTransform: place EVERY body (including pure-dynamic mode-1) at its
             //    current bone-derived model-space pose, overriding the origin-bind that native Reset() set.
-            MmdLivePhysicsPinnedBodyDiagnostics diagnostics =
+            MmdLivePhysicsPinnedBodyDiagnostics seedDiagnostics =
                 SyncBoneDrivenPhysicsBodies(backend, includeDynamicBodies: true);
 
             // 2. Re-align the native interpolation transform with the just-placed world transform and zero
@@ -1043,8 +1044,10 @@ namespace Mmd.UnityIntegration
             //    the dynamics settle in place instead of being dragged toward the origin.
             backend.Step(frame, LivePhysicsSeedSettleSeconds);
 
-            // 4. Re-pin the bone-driven (kinematic / dynamic-orientation) bodies at the current pose.
-            return SyncBoneDrivenPhysicsBodies(backend, includeDynamicBodies: false);
+            // 4. Re-pin only static bodies at the current pose. Return the seed diagnostics so reset-frame
+            //    reports still show that mode-1 and mode-2 dynamic bodies were initialized and zeroed.
+            SyncBoneDrivenPhysicsBodies(backend, includeDynamicBodies: false);
+            return seedDiagnostics;
         }
 
         private MmdLivePhysicsPinnedBodyDiagnostics SyncBoneDrivenPhysicsBodies(
@@ -1060,7 +1063,8 @@ namespace Mmd.UnityIntegration
                 bool isStatic = IsStaticPhysicsKind(body.physicsKind);
                 bool isDynamicOrientation = IsDynamicWithBonePhysicsKind(body.physicsKind);
                 bool isDynamic = IsDynamicPhysicsKind(body.physicsKind);
-                if (!isStatic && !isDynamicOrientation && !(includeDynamicBodies && isDynamic))
+                bool shouldSyncBody = isStatic || (includeDynamicBodies && (isDynamicOrientation || isDynamic));
+                if (!shouldSyncBody)
                 {
                     continue;
                 }
@@ -1090,10 +1094,6 @@ namespace Mmd.UnityIntegration
                 Quaternion boneModelRotation = ToMmdModelRotation(Quaternion.Inverse(root.rotation) * bone.rotation);
                 Quaternion bodyLocalRotation = ToMmdEulerRotation(body.rotation);
                 Quaternion bodyModelRotation = boneModelRotation * bodyLocalRotation;
-                if (isDynamicOrientation && !includeDynamicBodies)
-                {
-                    bodyModelRotation = ToMmdQuaternion(backend.GetRigidbodyTransform(i).rotation);
-                }
 
                 Vector3 rotatedBodyOffset = boneModelRotation * bodyOffset;
                 backend.SetRigidbodyTransform(
