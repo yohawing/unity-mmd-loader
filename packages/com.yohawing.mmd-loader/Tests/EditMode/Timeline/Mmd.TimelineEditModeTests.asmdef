@@ -22,7 +22,8 @@
   ],
   "autoReferenced": false,
   "defineConstraints": [
-    "ENABLE_TIMELINE"
+    "ENABLE_TIMELINE",
+    "UNITY_INCLUDE_TESTS"
   ],
   "versionDefines": [
     {
