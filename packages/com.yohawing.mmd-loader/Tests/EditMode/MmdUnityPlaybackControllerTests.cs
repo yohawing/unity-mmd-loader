@@ -107,7 +107,7 @@ namespace Mmd.Tests
                 MmdModelDefinition model = parser.LoadModel(pmxBytes);
                 previewInstance = MmdUnityModelFactory.CreateSkinnedModel(model, pmxPath);
                 pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
-                pmxAsset.Initialize(pmxBytes, "test_1bone_cube.pmx", pmxPath);
+                pmxAsset.Initialize(pmxBytes, "test_1bone_cube.pmx", pmxPath, assetImportScale: 1.0f);
                 vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
                 vmdAsset.Initialize(vmdBytes, "test_1bone_cube_motion.vmd", vmdPath);
                 MmdUnityPlaybackController controller = previewInstance.Root.AddComponent<MmdUnityPlaybackController>();
@@ -1154,7 +1154,7 @@ namespace Mmd.Tests
                 string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
                 string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
                 pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
-                pmxAsset.Initialize(File.ReadAllBytes(pmxPath), "test_1bone_cube.pmx", pmxPath);
+                pmxAsset.Initialize(File.ReadAllBytes(pmxPath), "test_1bone_cube.pmx", pmxPath, assetImportScale: 1.0f);
                 vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
                 vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
                 var holder = new GameObject("mmd-configure-assets-default-fast-runtime");
@@ -1251,7 +1251,7 @@ namespace Mmd.Tests
                 vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
                 MmdUnityPlaybackController controller = previewInstance.Root.AddComponent<MmdUnityPlaybackController>();
                 pmxAssetForSource = ScriptableObject.CreateInstance<MmdPmxAsset>();
-                pmxAssetForSource.Initialize(File.ReadAllBytes(pmxPath), "test_1bone_cube.pmx", pmxPath);
+                pmxAssetForSource.Initialize(File.ReadAllBytes(pmxPath), "test_1bone_cube.pmx", pmxPath, assetImportScale: 1.0f);
                 controller.ConfigureModelAsset(pmxAssetForSource);
                 Assert.That(controller.HasModelSource, Is.True);
                 Assert.That(controller.IsConfigured, Is.False);
@@ -1303,7 +1303,7 @@ namespace Mmd.Tests
                 vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
                 MmdUnityPlaybackController controller = previewInstance.Root.AddComponent<MmdUnityPlaybackController>();
                 pmxAssetForSource = ScriptableObject.CreateInstance<MmdPmxAsset>();
-                pmxAssetForSource.Initialize(File.ReadAllBytes(pmxPath), "test_1bone_cube.pmx", pmxPath);
+                pmxAssetForSource.Initialize(File.ReadAllBytes(pmxPath), "test_1bone_cube.pmx", pmxPath, assetImportScale: 1.0f);
                 controller.ConfigureModelAsset(pmxAssetForSource);
                 controller.ConfigureMotionAsset(vmdAsset);
                 Assert.That(controller.HasModelSource, Is.True);
@@ -1476,7 +1476,7 @@ namespace Mmd.Tests
                 string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
                 string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
                 pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
-                pmxAsset.Initialize(File.ReadAllBytes(pmxPath), "test_1bone_cube.pmx", pmxPath);
+                pmxAsset.Initialize(File.ReadAllBytes(pmxPath), "test_1bone_cube.pmx", pmxPath, assetImportScale: 1.0f);
                 vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
                 vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
                 var holder = new GameObject("mmd-apply-time-fast-runtime");

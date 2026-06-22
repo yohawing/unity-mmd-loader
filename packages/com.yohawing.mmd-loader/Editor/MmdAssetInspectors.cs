@@ -533,7 +533,7 @@ namespace Mmd.Editor
             }
 
             EditorGUILayout.HelpBox(
-                "Import Scale is stored as import metadata; scale-aware physics handoff remains a separate contract boundary.",
+                "Import Scale is stored as import metadata. Runtime playback and live physics apply scale at Unity/MMD boundaries while cached PMX summaries stay in MMD space.",
                 MessageType.Info);
         }
 
@@ -542,30 +542,23 @@ namespace Mmd.Editor
             if (asset == null)
             {
                 return new MmdScaleAwarePhysicsReadiness(
-                    importScale: 1.0f,
+                    importScale: MmdPmxAsset.DefaultImportScale,
                     hasPhysicsDescriptors: false,
                     gravityPolicy: "unavailable-no-pmx-asset",
-                    backendReadbackSpace: MmdScaleAwarePhysicsReadiness.LegacyReadbackSpace,
-                    scaleAwareHandoffReadiness: MmdScaleAwarePhysicsReadiness.BlockedHandoff,
-                    requiredSmoke: MmdScaleAwarePhysicsReadiness.ScaleAwareSmokeRequired);
+                    backendReadbackSpace: MmdScaleAwarePhysicsReadiness.MmdSpaceReadback,
+                    scaleAwareHandoffReadiness: MmdScaleAwarePhysicsReadiness.ScaleAwareHandoffReady,
+                    requiredSmoke: MmdScaleAwarePhysicsReadiness.ScaleAwareSmokeCovered);
             }
 
             bool hasPhysicsDescriptors = asset.RigidbodyCount > 0 || asset.JointCount > 0;
-            bool legacyScale = Mathf.Approximately(asset.ImportScale, 1.0f);
-            string gravityPolicy = legacyScale
-                ? "legacy-mmd-gravity-98"
-                : "scale-aware-gravity-requires-smoke";
-            string handoffReadiness = legacyScale && !hasPhysicsDescriptors
-                ? "not-needed-no-physics-descriptors"
-                : MmdScaleAwarePhysicsReadiness.BlockedHandoff;
 
             return new MmdScaleAwarePhysicsReadiness(
                 asset.ImportScale,
                 hasPhysicsDescriptors,
-                gravityPolicy,
-                MmdScaleAwarePhysicsReadiness.LegacyReadbackSpace,
-                handoffReadiness,
-                MmdScaleAwarePhysicsReadiness.ScaleAwareSmokeRequired);
+                "scale-aware-mmd-gravity-98",
+                MmdScaleAwarePhysicsReadiness.MmdSpaceReadback,
+                MmdScaleAwarePhysicsReadiness.ScaleAwareHandoffReady,
+                MmdScaleAwarePhysicsReadiness.ScaleAwareSmokeCovered);
         }
 
         public static void DrawHumanoidSummary(MmdPmxAsset asset)
@@ -898,9 +891,9 @@ namespace Mmd.Editor
 
     internal readonly struct MmdScaleAwarePhysicsReadiness
     {
-        public const string LegacyReadbackSpace = "mmd-space-legacy";
-        public const string BlockedHandoff = "blocked-scale-aware-backend-descriptor-missing";
-        public const string ScaleAwareSmokeRequired = "scale-aware-live-physics-smoke-required";
+        public const string MmdSpaceReadback = "mmd-space-scale-aware";
+        public const string ScaleAwareHandoffReady = "scale-aware-runtime-handoff-ready";
+        public const string ScaleAwareSmokeCovered = "scale-aware-live-physics-smoke-covered";
 
         public MmdScaleAwarePhysicsReadiness(
             float importScale,

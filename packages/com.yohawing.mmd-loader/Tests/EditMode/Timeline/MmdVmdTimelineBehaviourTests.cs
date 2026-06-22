@@ -260,7 +260,7 @@ namespace Mmd.Tests
                 string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
                 string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
                 pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
-                pmxAsset.Initialize(File.ReadAllBytes(pmxPath), "test_1bone_cube.pmx", pmxPath);
+                pmxAsset.Initialize(File.ReadAllBytes(pmxPath), "test_1bone_cube.pmx", pmxPath, assetImportScale: 1.0f);
                 vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
                 vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
                 var holder = new GameObject("timeline-fast-runtime-apply-time");
@@ -918,7 +918,7 @@ namespace Mmd.Tests
         private static MmdPmxAsset CreatePmxAsset(string pmxPath)
         {
             var asset = ScriptableObject.CreateInstance<MmdPmxAsset>();
-            asset.Initialize(File.ReadAllBytes(pmxPath), Path.GetFileName(pmxPath), pmxPath);
+            asset.Initialize(File.ReadAllBytes(pmxPath), Path.GetFileName(pmxPath), pmxPath, assetImportScale: 1.0f);
             return asset;
         }
 

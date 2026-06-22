@@ -257,10 +257,12 @@ namespace Mmd
 
     public sealed class MmdPmxAsset : ScriptableObject
     {
+        public const float DefaultImportScale = 0.1f;
+
         [SerializeField] private byte[] data = Array.Empty<byte>();
         [SerializeField] private string sourceId = string.Empty;
         [SerializeField] private string sourcePath = string.Empty;
-        [SerializeField] private float importScale = 1.0f;
+        [SerializeField] private float importScale = DefaultImportScale;
         [SerializeField] private string modelPreset = "Custom";
         [SerializeField] private string meshGenerationMode = "SingleMesh";
         [SerializeField] private string materialTexturePolicy = "ResolveReferencesOnly";
@@ -269,6 +271,8 @@ namespace Mmd
         [SerializeField] private Avatar? importedAvatar;
         [SerializeField] private string humanoidAvatarReadiness = MmdHumanoidSetupAsset.NotEvaluatedReadiness;
         [SerializeField] private string humanoidAvatarDiagnostic = string.Empty;
+        [SerializeField] private MmdHumanoidBoneMappingDiagnosticSummary humanoidBoneMappingDiagnostics =
+            MmdHumanoidBoneMappingDiagnosticSummary.Empty;
         [SerializeField] private MmdPmxImportSummaryStatus importSummaryStatus = MmdPmxImportSummaryStatus.NotParsed;
         [SerializeField] private string modelName = string.Empty;
         [SerializeField] private int vertexCount;
@@ -320,6 +324,9 @@ namespace Mmd
         public string HumanoidAvatarReadiness => humanoidAvatarReadiness;
 
         public string HumanoidAvatarDiagnostic => humanoidAvatarDiagnostic;
+
+        public MmdHumanoidBoneMappingDiagnosticSummary HumanoidBoneMappingDiagnostics =>
+            humanoidBoneMappingDiagnostics ?? MmdHumanoidBoneMappingDiagnosticSummary.Empty;
 
         public MmdPmxImportSummaryStatus ImportSummaryStatus => importSummaryStatus;
 
@@ -380,22 +387,22 @@ namespace Mmd
             byte[] bytes,
             string assetSourceId,
             string assetSourcePath,
-            float assetImportScale = 1.0f,
+            float assetImportScale = DefaultImportScale,
             string assetModelPreset = "Custom",
             string assetMeshGenerationMode = "SingleMesh",
             string assetMaterialTexturePolicy = "ResolveReferencesOnly",
             string assetShaderPreset = "MmdBasicUrpToon",
             MmdPmxParseSummary? parseSummary = null,
             Mesh importedMeshAsset = null,
-            Material[] importedMaterialAssets = null,
-            Material[] materialRemapAssets = null,
+            Material[]? importedMaterialAssets = null,
+            Material[]? materialRemapAssets = null,
             GameObject importedRootAsset = null,
             MmdImportReadiness hierarchyReadinessValue = MmdImportReadiness.NotEvaluated,
             MmdImportReadiness rendererReadinessValue = MmdImportReadiness.NotEvaluated,
             MmdImportReadiness boneBindingReadinessValue = MmdImportReadiness.NotEvaluated,
-            string hierarchyReadinessDiagnosticValue = null,
-            string rendererReadinessDiagnosticValue = null,
-            string boneBindingReadinessDiagnosticValue = null,
+            string? hierarchyReadinessDiagnosticValue = null,
+            string? rendererReadinessDiagnosticValue = null,
+            string? boneBindingReadinessDiagnosticValue = null,
             string assetAnimationType = "Generic")
         {
             if (bytes == null || bytes.Length == 0)
@@ -419,6 +426,7 @@ namespace Mmd
             humanoidAvatarDiagnostic = string.Equals(animationType, "Humanoid", StringComparison.Ordinal)
                 ? "humanoid-avatar: not evaluated"
                 : "humanoid-avatar: animation type is " + animationType;
+            humanoidBoneMappingDiagnostics = MmdHumanoidBoneMappingDiagnosticSummary.Empty;
             importedMesh = importedMeshAsset;
             importedMaterials = importedMaterialAssets != null
                 ? (Material[])importedMaterialAssets.Clone()
@@ -440,12 +448,14 @@ namespace Mmd
             string assetAnimationType,
             Avatar? avatar,
             string readiness,
-            string diagnostic)
+            string diagnostic,
+            MmdHumanoidBoneMappingDiagnosticSummary? mappingDiagnostics = null)
         {
             animationType = NormalizeSummaryValue(assetAnimationType, "Generic");
             importedAvatar = avatar;
             humanoidAvatarReadiness = NormalizeSummaryValue(readiness, MmdHumanoidSetupAsset.NotEvaluatedReadiness);
             humanoidAvatarDiagnostic = diagnostic ?? string.Empty;
+            humanoidBoneMappingDiagnostics = mappingDiagnostics ?? MmdHumanoidBoneMappingDiagnosticSummary.Empty;
         }
 
         public byte[] GetBytesCopy()
@@ -466,7 +476,7 @@ namespace Mmd
 
         private static float NormalizeImportScale(float value)
         {
-            return float.IsFinite(value) && value > 0.0f ? value : 1.0f;
+            return float.IsFinite(value) && value > 0.0f ? value : DefaultImportScale;
         }
 
         private static string NormalizeSummaryValue(string value, string fallback)

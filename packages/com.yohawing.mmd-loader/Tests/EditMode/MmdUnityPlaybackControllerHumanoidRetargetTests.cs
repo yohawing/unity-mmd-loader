@@ -1,0 +1,448 @@
+#nullable enable
+
+using System.Collections.Generic;
+using System.IO;
+using System.Reflection;
+using NUnit.Framework;
+using UnityEditor.Animations;
+using UnityEngine;
+using Mmd.Parser;
+using Mmd.UnityIntegration;
+
+namespace Mmd.Tests
+{
+    public sealed class MmdUnityPlaybackControllerHumanoidRetargetTests
+    {
+        private static readonly HumanBodyBones[] TestedBones =
+        {
+            HumanBodyBones.Hips,
+            HumanBodyBones.Spine,
+            HumanBodyBones.Head,
+            HumanBodyBones.LeftHand
+        };
+
+        [Test]
+        public void ApplyRetargetNowCopiesProxyRotationsAndPreservesNativePositionsWhenAnimatorIsDriven()
+        {
+            RetargetFixture fixture = CreateFixture(controllerAssigned: true);
+            try
+            {
+                Quaternion[] nativeBeforeRotations = CaptureRotations(fixture.NativeBones);
+                Vector3[] nativeBeforePositions = CapturePositions(fixture.NativeBones);
+                SetProxyRotations(fixture.ProxyRig);
+
+                MmdHumanoidRetargeterResult result = fixture.Controller.ApplyHumanoidRetargetNow();
+
+                Assert.That(fixture.Controller.LastHumanoidRetargetGate, Is.EqualTo(MmdHumanoidRetargetGate.Ready));
+                Assert.That(result.CopiedBoneCount, Is.EqualTo(TestedBones.Length));
+                Assert.That(result.SkippedBoneCount, Is.EqualTo(0));
+
+                for (int i = 0; i < TestedBones.Length; i++)
+                {
+                    HumanBodyBones humanBone = TestedBones[i];
+                    int nativeIndex = fixture.IndexByHumanBone[humanBone];
+                    Transform proxy = fixture.ProxyRig.BoneMap[humanBone];
+                    Transform native = fixture.NativeBones[nativeIndex];
+
+                    Assert.That(Quaternion.Angle(native.localRotation, nativeBeforeRotations[nativeIndex]),
+                        Is.GreaterThan(0.1f), humanBone + " native rotation should change");
+                    Assert.That(Quaternion.Angle(native.localRotation, proxy.localRotation),
+                        Is.LessThan(0.001f), humanBone + " native rotation should match proxy");
+                    Assert.That(native.localPosition, Is.EqualTo(nativeBeforePositions[nativeIndex]),
+                        humanBone + " native localPosition must remain unchanged");
+                }
+            }
+            finally
+            {
+                fixture.Destroy();
+            }
+        }
+
+        [Test]
+        public void ApplyRetargetNowSkipsWithoutAnimatorControllerOrPlayableDriver()
+        {
+            RetargetFixture fixture = CreateFixture(controllerAssigned: false);
+            try
+            {
+                Quaternion[] before = CaptureRotations(fixture.NativeBones);
+                SetProxyRotations(fixture.ProxyRig);
+
+                MmdHumanoidRetargeterResult result = fixture.Controller.ApplyHumanoidRetargetNow();
+
+                Assert.That(fixture.Controller.LastHumanoidRetargetGate, Is.EqualTo(MmdHumanoidRetargetGate.AnimatorNotDriven));
+                Assert.That(result.CopiedBoneCount, Is.EqualTo(0));
+                AssertNativeRotationsUnchanged(fixture.NativeBones, before);
+            }
+            finally
+            {
+                fixture.Destroy();
+            }
+        }
+
+        [Test]
+        public void ApplyRetargetNowSkipsWhenPlaybackControllerIsTimelineDriven()
+        {
+            RetargetFixture fixture = CreateFixture(controllerAssigned: true);
+            MmdUnityPlaybackBinding? playbackBinding = null;
+            MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
+            try
+            {
+                playbackBinding = CreateSyntheticPlaybackBinding(out pmxAsset, out vmdAsset);
+                playbackBinding.Instance.Root.transform.SetParent(fixture.Root.transform, worldPositionStays: false);
+                fixture.Controller.Configure(playbackBinding, playbackFrameRate: 30.0f, playOnStart: false);
+                fixture.Controller.ConfigureHumanoidRetarget(
+                    fixture.ProxyRig.ProxyRoot!.transform,
+                    fixture.Controller.HumanoidRetargetEntries,
+                    fixture.Controller.HumanoidAppendEntries);
+
+                FieldInfo? field = typeof(MmdUnityPlaybackController).GetField(
+                    "lastTimelineDriveFrameCount",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(field, Is.Not.Null);
+                field!.SetValue(fixture.Controller, Time.frameCount);
+
+                Quaternion[] before = CaptureRotations(fixture.NativeBones);
+                SetProxyRotations(fixture.ProxyRig);
+
+                MmdHumanoidRetargeterResult result = fixture.Controller.ApplyHumanoidRetargetNow();
+
+                Assert.That(fixture.Controller.LastHumanoidRetargetGate, Is.EqualTo(MmdHumanoidRetargetGate.PlaybackControllerDriving));
+                Assert.That(result.CopiedBoneCount, Is.EqualTo(0));
+                AssertNativeRotationsUnchanged(fixture.NativeBones, before);
+            }
+            finally
+            {
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+                fixture.Destroy();
+            }
+        }
+
+        [Test]
+        public void ApplyRetargetNowDoesNotSkipJustBecauseModelSourceOrPausedBindingExists()
+        {
+            RetargetFixture fixture = CreateFixture(controllerAssigned: true);
+            MmdUnityPlaybackBinding? playbackBinding = null;
+            MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
+            try
+            {
+                playbackBinding = CreateSyntheticPlaybackBinding(out pmxAsset, out vmdAsset);
+                playbackBinding.Instance.Root.transform.SetParent(fixture.Root.transform, worldPositionStays: false);
+                fixture.Controller.ConfigureModelAsset(pmxAsset);
+                fixture.Controller.Configure(playbackBinding, playbackFrameRate: 30.0f, playOnStart: false);
+                fixture.Controller.ConfigureHumanoidRetarget(
+                    fixture.ProxyRig.ProxyRoot!.transform,
+                    fixture.Controller.HumanoidRetargetEntries,
+                    fixture.Controller.HumanoidAppendEntries);
+
+                Quaternion[] nativeBeforeRotations = CaptureRotations(fixture.NativeBones);
+                SetProxyRotations(fixture.ProxyRig);
+
+                MmdHumanoidRetargeterResult result = fixture.Controller.ApplyHumanoidRetargetNow();
+
+                Assert.That(fixture.Controller.IsConfigured, Is.True);
+                Assert.That(fixture.Controller.IsPlaying, Is.False);
+                Assert.That(fixture.Controller.LastHumanoidRetargetGate, Is.EqualTo(MmdHumanoidRetargetGate.Ready));
+                Assert.That(result.CopiedBoneCount, Is.EqualTo(TestedBones.Length));
+                Assert.That(Quaternion.Angle(
+                        fixture.NativeBones[fixture.IndexByHumanBone[TestedBones[0]]].localRotation,
+                        nativeBeforeRotations[fixture.IndexByHumanBone[TestedBones[0]]]),
+                    Is.GreaterThan(0.1f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+                fixture.Destroy();
+            }
+        }
+
+        [Test]
+        public void ApplyRetargetNowAppliesAppendAfterRetargetGateIsReady()
+        {
+            RetargetFixture fixture = CreateFixture(controllerAssigned: true);
+            GameObject? appendTargetObject = null;
+            try
+            {
+                HumanBodyBones parentHumanBone = HumanBodyBones.LeftHand;
+                Transform parentNative = fixture.NativeBones[fixture.IndexByHumanBone[parentHumanBone]];
+                appendTargetObject = new GameObject("left-hand-D");
+                Transform appendTarget = appendTargetObject.transform;
+                appendTarget.SetParent(fixture.Root.transform, worldPositionStays: false);
+                Quaternion targetBind = Quaternion.Euler(7f, 8f, 9f);
+                appendTarget.localRotation = targetBind;
+
+                var appendEntries = new[]
+                {
+                    new MmdHumanoidAppendTransformBinding(
+                        appendTarget,
+                        targetMmdBoneIndex: 100,
+                        parentNative,
+                        appendParentMmdBoneIndex: fixture.IndexByHumanBone[parentHumanBone],
+                        appendRatio: 1.0f,
+                        appendRotation: true,
+                        appendTranslation: false,
+                        appendLocal: true,
+                        targetBind,
+                        appendTarget.localPosition,
+                        parentNative.localRotation,
+                        parentNative.localPosition,
+                        evaluationOrder: 100)
+                };
+                fixture.Controller.ConfigureHumanoidRetarget(
+                    fixture.ProxyRig.ProxyRoot!.transform,
+                    fixture.Controller.HumanoidRetargetEntries,
+                    appendEntries);
+
+                SetProxyRotations(fixture.ProxyRig);
+                Quaternion expectedParentRotation = fixture.ProxyRig.BoneMap[parentHumanBone].localRotation;
+
+                MmdHumanoidRetargeterResult result = fixture.Controller.ApplyHumanoidRetargetNow();
+
+                Assert.That(fixture.Controller.LastHumanoidRetargetGate, Is.EqualTo(MmdHumanoidRetargetGate.Ready));
+                Assert.That(result.CopiedBoneCount, Is.EqualTo(TestedBones.Length));
+                Assert.That(Quaternion.Angle(parentNative.localRotation, expectedParentRotation), Is.LessThan(0.001f));
+                Assert.That(Quaternion.Angle(appendTarget.localRotation, targetBind * expectedParentRotation), Is.LessThan(0.001f));
+            }
+            finally
+            {
+                if (appendTargetObject != null)
+                {
+                    Object.DestroyImmediate(appendTargetObject);
+                }
+
+                fixture.Destroy();
+            }
+        }
+
+        private static RetargetFixture CreateFixture(bool controllerAssigned)
+        {
+            MmdModelDefinition model = CreateHumanoidMappingModelWithOrigins();
+            MmdHumanoidProxyRigResult proxyRig = MmdHumanoidProxyRigFactory.CreateProxyRig(model);
+            Assert.That(proxyRig.ProxyRoot, Is.Not.Null);
+            MmdHumanoidAvatarBuildResult avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(proxyRig);
+            Assert.That(avatarResult.IsValidHumanAvatar, Is.True, string.Join("\n", avatarResult.Diagnostics));
+
+            var root = new GameObject("PlaybackControllerHumanoidRetargetRoot");
+            proxyRig.ProxyRoot!.transform.SetParent(root.transform, worldPositionStays: false);
+            proxyRig.ProxyRoot.SetActive(true);
+
+            var animator = root.AddComponent<Animator>();
+            animator.avatar = avatarResult.Avatar;
+            RuntimeAnimatorController? controller = null;
+            if (controllerAssigned)
+            {
+                var animatorController = new AnimatorController();
+                animatorController.AddLayer("Base");
+                controller = animatorController;
+                animator.runtimeAnimatorController = controller;
+                Assert.That(animator.runtimeAnimatorController, Is.Not.Null,
+                    "Driven retarget fixture must install a valid RuntimeAnimatorController.");
+            }
+
+            Transform[] nativeBones = CreateNativeBones(root, model.bones.Count);
+            var entries = new List<MmdHumanoidRetargetBinding>();
+            var indexByHumanBone = new Dictionary<HumanBodyBones, int>();
+            foreach (HumanBodyBones humanBone in TestedBones)
+            {
+                MmdHumanoidBoneMappingMatch match = FindMatch(proxyRig, humanBone);
+                entries.Add(new MmdHumanoidRetargetBinding(
+                    humanBone,
+                    match.MmdBoneIndex,
+                    proxyRig.BoneMap[humanBone],
+                    nativeBones[match.MmdBoneIndex]));
+                indexByHumanBone[humanBone] = match.MmdBoneIndex;
+            }
+
+            MmdUnityPlaybackController controllerComponent = root.AddComponent<MmdUnityPlaybackController>();
+            controllerComponent.ConfigureHumanoidRetarget(
+                proxyRig.ProxyRoot.transform,
+                entries,
+                System.Array.Empty<MmdHumanoidAppendTransformBinding>());
+
+            return new RetargetFixture(
+                root,
+                proxyRig,
+                nativeBones,
+                indexByHumanBone,
+                controllerComponent,
+                avatarResult.Avatar,
+                controller);
+        }
+
+        private static MmdUnityPlaybackBinding CreateSyntheticPlaybackBinding(
+            out MmdPmxAsset pmxAsset,
+            out MmdVmdAsset vmdAsset)
+        {
+            string projectRoot = Path.GetDirectoryName(Application.dataPath);
+            string fixtureRoot = Path.GetFullPath(Path.Combine(
+                projectRoot,
+                "..",
+                "packages",
+                "com.yohawing.mmd-loader",
+                "Tests",
+                "Fixtures",
+                "Assets"));
+            string pmxPath = Path.Combine(fixtureRoot, "test_1bone_cube.pmx");
+            string vmdPath = Path.Combine(fixtureRoot, "test_1bone_cube_motion.vmd");
+
+            pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+            pmxAsset.Initialize(File.ReadAllBytes(pmxPath), "test_1bone_cube.pmx", pmxPath, assetImportScale: 1.0f);
+            vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+            vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
+            return MmdUnityPlaybackBinding.CreateSkinned(pmxAsset, vmdAsset);
+        }
+
+        private static Transform[] CreateNativeBones(GameObject root, int count)
+        {
+            var bones = new Transform[count];
+            for (int i = 0; i < count; i++)
+            {
+                var bone = new GameObject("native-" + i);
+                bone.transform.SetParent(root.transform, worldPositionStays: false);
+                bone.transform.localPosition = new Vector3(10f + i, 20f + i, 30f + i);
+                bone.transform.localRotation = Quaternion.identity;
+                bones[i] = bone.transform;
+            }
+
+            return bones;
+        }
+
+        private static void SetProxyRotations(MmdHumanoidProxyRigResult proxyRig)
+        {
+            for (int i = 0; i < TestedBones.Length; i++)
+            {
+                proxyRig.BoneMap[TestedBones[i]].localRotation =
+                    Quaternion.Euler(8f + i * 7f, 12f + i * 5f, 16f + i * 3f);
+            }
+        }
+
+        private static Quaternion[] CaptureRotations(IReadOnlyList<Transform> bones)
+        {
+            var values = new Quaternion[bones.Count];
+            for (int i = 0; i < bones.Count; i++)
+            {
+                values[i] = bones[i].localRotation;
+            }
+
+            return values;
+        }
+
+        private static Vector3[] CapturePositions(IReadOnlyList<Transform> bones)
+        {
+            var values = new Vector3[bones.Count];
+            for (int i = 0; i < bones.Count; i++)
+            {
+                values[i] = bones[i].localPosition;
+            }
+
+            return values;
+        }
+
+        private static void AssertNativeRotationsUnchanged(IReadOnlyList<Transform> nativeBones, IReadOnlyList<Quaternion> before)
+        {
+            for (int i = 0; i < nativeBones.Count; i++)
+            {
+                Assert.That(Quaternion.Angle(nativeBones[i].localRotation, before[i]), Is.LessThan(0.001f),
+                    "native bone " + i + " must not be written when retarget gate is closed");
+            }
+        }
+
+        private static MmdHumanoidBoneMappingMatch FindMatch(
+            MmdHumanoidProxyRigResult proxyRig,
+            HumanBodyBones humanBone)
+        {
+            foreach (MmdHumanoidBoneMappingMatch match in proxyRig.Matches)
+            {
+                if (match.HumanBone == humanBone)
+                {
+                    return match;
+                }
+            }
+
+            throw new AssertionException("Missing proxy match for " + humanBone);
+        }
+
+        private static MmdModelDefinition CreateHumanoidMappingModelWithOrigins()
+        {
+            var model = new MmdModelDefinition();
+            AddBone(model, 0, "下半身", -1, new[] { 0f, 90f, 0f });
+            AddBone(model, 1, "上半身", 0, new[] { 0f, 115f, 0f });
+            AddBone(model, 2, "首", 1, new[] { 0f, 150f, 0f });
+            AddBone(model, 3, "頭", 2, new[] { 0f, 165f, 0f });
+            AddBone(model, 4, "左足", 0, new[] { 8f, 85f, 0f });
+            AddBone(model, 5, "左ひざ", 4, new[] { 8f, 45f, 0f });
+            AddBone(model, 6, "左足首", 5, new[] { 8f, 5f, 3f });
+            AddBone(model, 7, "右足", 0, new[] { -8f, 85f, 0f });
+            AddBone(model, 8, "右ひざ", 7, new[] { -8f, 45f, 0f });
+            AddBone(model, 9, "右足首", 8, new[] { -8f, 5f, 3f });
+            AddBone(model, 10, "左腕", 1, new[] { 25f, 135f, 0f });
+            AddBone(model, 11, "左ひじ", 10, new[] { 50f, 135f, 0f });
+            AddBone(model, 12, "左手首", 11, new[] { 70f, 135f, 0f });
+            AddBone(model, 13, "右腕", 1, new[] { -25f, 135f, 0f });
+            AddBone(model, 14, "右ひじ", 13, new[] { -50f, 135f, 0f });
+            AddBone(model, 15, "右手首", 14, new[] { -70f, 135f, 0f });
+            return model;
+        }
+
+        private static void AddBone(MmdModelDefinition model, int index, string name, int parentIndex, float[] origin)
+        {
+            model.bones.Add(new MmdBoneDefinition
+            {
+                index = index,
+                name = name,
+                parentIndex = parentIndex,
+                origin = origin
+            });
+        }
+
+        private sealed class RetargetFixture
+        {
+            public RetargetFixture(
+                GameObject root,
+                MmdHumanoidProxyRigResult proxyRig,
+                Transform[] nativeBones,
+                IReadOnlyDictionary<HumanBodyBones, int> indexByHumanBone,
+                MmdUnityPlaybackController controllerComponent,
+                Avatar? avatar,
+                RuntimeAnimatorController? controller)
+            {
+                Root = root;
+                ProxyRig = proxyRig;
+                NativeBones = nativeBones;
+                IndexByHumanBone = indexByHumanBone;
+                Controller = controllerComponent;
+                Avatar = avatar;
+                AnimatorController = controller;
+            }
+
+            public GameObject Root { get; }
+            public MmdHumanoidProxyRigResult ProxyRig { get; }
+            public Transform[] NativeBones { get; }
+            public IReadOnlyDictionary<HumanBodyBones, int> IndexByHumanBone { get; }
+            public MmdUnityPlaybackController Controller { get; }
+            public Avatar? Avatar { get; }
+            public RuntimeAnimatorController? AnimatorController { get; }
+
+            public void Destroy()
+            {
+                if (Root != null)
+                {
+                    Object.DestroyImmediate(Root);
+                }
+
+                if (Avatar != null)
+                {
+                    Object.DestroyImmediate(Avatar);
+                }
+
+                if (AnimatorController != null)
+                {
+                    Object.DestroyImmediate(AnimatorController);
+                }
+            }
+        }
+    }
+}

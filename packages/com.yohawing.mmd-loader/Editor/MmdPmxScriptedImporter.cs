@@ -40,16 +40,18 @@ namespace Mmd.Editor
         MmdBasicUrpToon = 0
     }
 
-    [ScriptedImporter(11, "pmx")]
+    [ScriptedImporter(22, "pmx")]
     public sealed class MmdPmxScriptedImporter : ScriptedImporter
     {
-        [SerializeField] private float importScale = 1.0f;
+        [SerializeField] private float importScale = MmdPmxAsset.DefaultImportScale;
         [SerializeField] private MmdPmxModelPreset modelPreset = MmdPmxModelPreset.Custom;
         [SerializeField] private MmdPmxMeshGenerationMode meshGenerationMode = MmdPmxMeshGenerationMode.SingleMesh;
         [SerializeField] private MmdPmxMaterialTexturePolicy materialTexturePolicy = MmdPmxMaterialTexturePolicy.ResolveReferencesOnly;
         [SerializeField] private MmdPmxAnimationType animationType = MmdPmxAnimationType.Generic;
         [SerializeField] private MmdPmxShaderPreset shaderPreset = MmdPmxShaderPreset.MmdBasicUrpToon;
         [SerializeField] private Material[] materialRemaps = System.Array.Empty<Material>();
+        [SerializeField] private MmdHumanoidBoneMappingOverride[] humanoidBoneMappingOverrides =
+            System.Array.Empty<MmdHumanoidBoneMappingOverride>();
 
         public float ImportScale => NormalizeImportScale(importScale);
 
@@ -64,6 +66,8 @@ namespace Mmd.Editor
         public MmdPmxShaderPreset ShaderPreset => shaderPreset;
 
         public Material[] MaterialRemaps => materialRemaps;
+
+        public MmdHumanoidBoneMappingOverride[] HumanoidBoneMappingOverrides => humanoidBoneMappingOverrides;
 
         public override void OnImportAsset(AssetImportContext ctx)
         {
@@ -102,16 +106,57 @@ namespace Mmd.Editor
                         asset,
                         model.name,
                         shouldBuildHumanoid: animationType == MmdPmxAnimationType.Humanoid,
-                        animationTypeLabel: animationType.ToString());
+                        animationTypeLabel: animationType.ToString(),
+                        mappingOverrides: humanoidBoneMappingOverrides,
+                        model: model);
                 Avatar? importedAvatar = avatarImport.Avatar;
+                GameObject? importedHumanoidProxyRoot = avatarImport.ProxyRoot;
                 string avatarReadiness = avatarImport.Readiness;
                 string avatarDiagnostic = avatarImport.Diagnostic;
+
+                if (animationType == MmdPmxAnimationType.Humanoid && importedHumanoidProxyRoot != null)
+                {
+                    importedHumanoidProxyRoot.transform.SetParent(
+                        generatedAssets.Root.transform,
+                        worldPositionStays: false);
+                    ClearImportHierarchyHideFlags(importedHumanoidProxyRoot.transform);
+                }
 
                 asset.ApplyHumanoidAvatarImportSummary(
                     animationType.ToString(),
                     importedAvatar,
                     avatarReadiness,
-                    avatarDiagnostic);
+                    avatarDiagnostic,
+                    avatarImport.MappingDiagnostics);
+
+                MmdPmxGenericAvatarImportBuilder.MmdPmxGenericAvatarImportResult genericAvatarImport =
+                    MmdPmxGenericAvatarImportBuilder.TryBuildGenericAvatar(
+                        generatedAssets.Root,
+                        model.name,
+                        shouldBuildGeneric: animationType == MmdPmxAnimationType.Generic,
+                        animationTypeLabel: animationType.ToString(),
+                        rootMotionTransformName: string.Empty);
+                Avatar? genericAvatar = genericAvatarImport.Avatar;
+
+                ConfigureImportedAnimator(
+                    generatedAssets.Root,
+                    animationType,
+                    importedAvatar,
+                    genericAvatar);
+                ConfigureImportedPlaybackController(
+                    generatedAssets.Root,
+                    asset,
+                    animationType,
+                    importedAvatar,
+                    importedHumanoidProxyRoot,
+                    avatarReadiness,
+                    avatarImport.RetargetBindings,
+                    avatarImport.AppendBindings);
+
+                if (animationType == MmdPmxAnimationType.Generic && genericAvatar == null)
+                {
+                    ctx.LogImportWarning(genericAvatarImport.Diagnostic);
+                }
 
                 ctx.AddObjectToAsset("PMX", asset);
                 ctx.AddObjectToAsset("Mesh", importedMesh);
@@ -124,6 +169,11 @@ namespace Mmd.Editor
                 if (importedAvatar != null)
                 {
                     ctx.AddObjectToAsset("Avatar", importedAvatar);
+                }
+
+                if (genericAvatar != null)
+                {
+                    ctx.AddObjectToAsset("GenericAvatar", genericAvatar);
                 }
 
                 ctx.SetMainObject(generatedAssets.Root);
@@ -141,7 +191,72 @@ namespace Mmd.Editor
 
         private static float NormalizeImportScale(float value)
         {
-            return float.IsFinite(value) && value > 0.0f ? value : 1.0f;
+            return float.IsFinite(value) && value > 0.0f ? value : MmdPmxAsset.DefaultImportScale;
+        }
+
+        private static Animator? ConfigureImportedAnimator(
+            GameObject root,
+            MmdPmxAnimationType importedAnimationType,
+            Avatar? humanoidAvatar,
+            Avatar? genericAvatar)
+        {
+            if (importedAnimationType == MmdPmxAnimationType.None)
+            {
+                return null;
+            }
+
+            Animator? animator = root.GetComponent<Animator>();
+            if (animator == null)
+            {
+                animator = root.AddComponent<Animator>();
+            }
+
+            animator.runtimeAnimatorController = null;
+            animator.avatar = importedAnimationType == MmdPmxAnimationType.Humanoid
+                ? humanoidAvatar
+                : genericAvatar;
+            return animator;
+        }
+
+        private static MmdUnityPlaybackController ConfigureImportedPlaybackController(
+            GameObject root,
+            MmdPmxAsset pmxAsset,
+            MmdPmxAnimationType importedAnimationType,
+            Avatar? humanoidAvatar,
+            GameObject? proxyRoot,
+            string avatarReadiness,
+            System.Collections.Generic.IReadOnlyList<MmdHumanoidRetargetBinding> retargetBindings,
+            System.Collections.Generic.IReadOnlyList<MmdHumanoidAppendTransformBinding> appendBindings)
+        {
+            MmdUnityPlaybackController controller = root.GetComponent<MmdUnityPlaybackController>();
+            if (controller == null)
+            {
+                controller = root.AddComponent<MmdUnityPlaybackController>();
+            }
+
+            controller.ConfigureModelAsset(pmxAsset);
+
+            if (importedAnimationType != MmdPmxAnimationType.Humanoid
+                || humanoidAvatar == null
+                || !humanoidAvatar.isHuman
+                || proxyRoot == null
+                || !string.Equals(avatarReadiness, MmdHumanoidSetupAsset.ReadyReadiness, System.StringComparison.Ordinal))
+            {
+                return controller;
+            }
+
+            controller.ConfigureHumanoidRetarget(proxyRoot.transform, retargetBindings, appendBindings);
+            return controller;
+        }
+
+        private static void ClearImportHierarchyHideFlags(Transform root)
+        {
+            root.gameObject.hideFlags = HideFlags.None;
+            root.hideFlags = HideFlags.None;
+            foreach (Transform child in root)
+            {
+                ClearImportHierarchyHideFlags(child);
+            }
         }
     }
 }

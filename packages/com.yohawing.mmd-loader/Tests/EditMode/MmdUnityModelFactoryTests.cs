@@ -1132,6 +1132,41 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void ApplyColumnMajorWorldMatricesScalesPositionOnlyWithImportScale()
+        {
+            MmdUnityModelInstance scaleOneInstance = null;
+            MmdUnityModelInstance scalePointOneInstance = null;
+            try
+            {
+                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+                scaleOneInstance = MmdUnityModelFactory.CreateSkinnedModel(model, sourcePath: null, importScale: 1.0f);
+                scalePointOneInstance = MmdUnityModelFactory.CreateSkinnedModel(model, sourcePath: null, importScale: 0.1f);
+                Quaternion rootMmdRotation = Quaternion.Euler(0.0f, 45.0f, 0.0f);
+                Quaternion childMmdRotation = Quaternion.Euler(15.0f, 30.0f, 10.0f);
+                float[] worldMatrices = Concatenate(
+                    CreateColumnMajorWorldMatrix(new Vector3(1.0f, 2.0f, 3.0f), rootMmdRotation),
+                    CreateColumnMajorWorldMatrix(new Vector3(-2.0f, 4.0f, 5.0f), childMmdRotation));
+
+                MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(scaleOneInstance, worldMatrices);
+                MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(scalePointOneInstance, worldMatrices);
+
+                Assert.That(Vector3.Distance(scaleOneInstance.BoneTransforms[0].position, new Vector3(-1.0f, 2.0f, -3.0f)), Is.LessThan(0.0001f));
+                Assert.That(Vector3.Distance(scaleOneInstance.BoneTransforms[1].position, new Vector3(2.0f, 4.0f, -5.0f)), Is.LessThan(0.0001f));
+                Assert.That(Vector3.Distance(scalePointOneInstance.BoneTransforms[0].position, scaleOneInstance.BoneTransforms[0].position * 0.1f), Is.LessThan(0.0001f));
+                Assert.That(Vector3.Distance(scalePointOneInstance.BoneTransforms[1].position, scaleOneInstance.BoneTransforms[1].position * 0.1f), Is.LessThan(0.0001f));
+                Assert.That(Quaternion.Angle(scalePointOneInstance.BoneTransforms[0].rotation, scaleOneInstance.BoneTransforms[0].rotation), Is.LessThan(0.0001f));
+                Assert.That(Quaternion.Angle(scalePointOneInstance.BoneTransforms[1].rotation, scaleOneInstance.BoneTransforms[1].rotation), Is.LessThan(0.0001f));
+                Assert.That(scalePointOneInstance.BoneTransforms[0].localScale, Is.EqualTo(Vector3.one));
+                Assert.That(scalePointOneInstance.BoneTransforms[1].localScale, Is.EqualTo(Vector3.one));
+            }
+            finally
+            {
+                DestroyInstance(scaleOneInstance);
+                DestroyInstance(scalePointOneInstance);
+            }
+        }
+
+        [Test]
         public void ApplyFrameRejectsBoneIndexWithoutUnityTransform()
         {
             MmdUnityModelInstance instance = null;

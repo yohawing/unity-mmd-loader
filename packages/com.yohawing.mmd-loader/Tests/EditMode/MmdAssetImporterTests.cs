@@ -97,15 +97,16 @@ namespace Mmd.Tests
 
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
 
-            Assert.That(pmxAsset.ImportScale, Is.EqualTo(1.0f).Within(0.0001f));
+            Assert.That(pmxAsset.ImportScale, Is.EqualTo(0.1f).Within(0.0001f));
 
-            // Strengthened: pin the current (non-Bullet-complete) readiness boundary for normalized legacy importScale=1.0 + no-physics-descriptors path.
+            // Default PMX import scale is 0.1, and runtime playback/live physics are scale-aware.
             MmdScaleAwarePhysicsReadiness readiness = MmdAssetInspectorUtility.GetScaleAwarePhysicsReadiness(pmxAsset);
+            Assert.That(readiness.ImportScale, Is.EqualTo(0.1f).Within(0.0001f));
             Assert.That(readiness.HasPhysicsDescriptors, Is.False);
-            Assert.That(readiness.GravityPolicy, Is.EqualTo("legacy-mmd-gravity-98"));
-            Assert.That(readiness.BackendReadbackSpace, Is.EqualTo(MmdScaleAwarePhysicsReadiness.LegacyReadbackSpace));
-            Assert.That(readiness.ScaleAwareHandoffReadiness, Is.EqualTo("not-needed-no-physics-descriptors"));
-            Assert.That(readiness.RequiredSmoke, Is.EqualTo(MmdScaleAwarePhysicsReadiness.ScaleAwareSmokeRequired));
+            Assert.That(readiness.GravityPolicy, Is.EqualTo("scale-aware-mmd-gravity-98"));
+            Assert.That(readiness.BackendReadbackSpace, Is.EqualTo(MmdScaleAwarePhysicsReadiness.MmdSpaceReadback));
+            Assert.That(readiness.ScaleAwareHandoffReadiness, Is.EqualTo(MmdScaleAwarePhysicsReadiness.ScaleAwareHandoffReady));
+            Assert.That(readiness.RequiredSmoke, Is.EqualTo(MmdScaleAwarePhysicsReadiness.ScaleAwareSmokeCovered));
         }
 
         [Test]
@@ -122,6 +123,59 @@ namespace Mmd.Tests
             Assert.That(pmxAsset.ShaderPreset, Is.EqualTo(nameof(MmdPmxShaderPreset.MmdBasicUrpToon)));
             Assert.That(pmxAsset.ImportedAvatar, Is.Null);
             Assert.That(pmxAsset.HumanoidAvatarReadiness, Is.EqualTo("NotRequested"));
+        }
+
+        [Test]
+        public void NoneAnimationTypeImportsWithoutAnimator()
+        {
+            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            SetPmxImporterAnimationType(TempPmxPath, MmdPmxAnimationType.None);
+
+            GameObject root = AssetDatabase.LoadAssetAtPath<GameObject>(TempPmxPath);
+            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+
+            Assert.That(root, Is.Not.Null);
+            Assert.That(pmxAsset.AnimationType, Is.EqualTo(nameof(MmdPmxAnimationType.None)));
+            Assert.That(root.GetComponent<Animator>(), Is.Null);
+            MmdUnityPlaybackController noneController = root.GetComponent<MmdUnityPlaybackController>();
+            Assert.That(noneController, Is.Not.Null);
+            Assert.That(noneController.ModelAssetSource, Is.SameAs(pmxAsset));
+            Assert.That(noneController.HasModelSource, Is.True);
+            Assert.That(noneController.IsConfigured, Is.False);
+            Assert.That(noneController.HumanoidRetargetEntries, Is.Empty);
+            Assert.That(GetAvatarSubAssets(TempPmxPath), Is.Empty);
+        }
+
+        [Test]
+        public void GenericAnimationTypeImportsRootAnimatorWithGenericAvatar()
+        {
+            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            SetPmxImporterAnimationType(TempPmxPath, MmdPmxAnimationType.Generic);
+
+            GameObject root = AssetDatabase.LoadAssetAtPath<GameObject>(TempPmxPath);
+            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+
+            Assert.That(root, Is.Not.Null);
+            Assert.That(pmxAsset.AnimationType, Is.EqualTo(nameof(MmdPmxAnimationType.Generic)));
+            Assert.That(pmxAsset.ImportedAvatar, Is.Null,
+                "Generic Avatar belongs to the imported root Animator, not MmdPmxAsset.ImportedAvatar.");
+
+            Animator animator = root.GetComponent<Animator>();
+            Assert.That(animator, Is.Not.Null);
+            Assert.That(animator.runtimeAnimatorController, Is.Null);
+            Assert.That(animator.avatar, Is.Not.Null);
+            Assert.That(animator.avatar.isValid, Is.True);
+            Assert.That(animator.avatar.isHuman, Is.False);
+            MmdUnityPlaybackController genericController = root.GetComponent<MmdUnityPlaybackController>();
+            Assert.That(genericController, Is.Not.Null);
+            Assert.That(genericController.ModelAssetSource, Is.SameAs(pmxAsset));
+            Assert.That(genericController.HasModelSource, Is.True);
+            Assert.That(genericController.IsConfigured, Is.False);
+            Assert.That(genericController.HumanoidRetargetEntries, Is.Empty);
+
+            System.Collections.Generic.List<Avatar> avatarSubAssets = GetAvatarSubAssets(TempPmxPath);
+            Assert.That(avatarSubAssets, Has.Count.EqualTo(1));
+            Assert.That(avatarSubAssets[0], Is.SameAs(animator.avatar));
         }
 
         [Test]
@@ -160,10 +214,10 @@ namespace Mmd.Tests
             Assert.That(pmxAsset.RigidbodyCount, Is.EqualTo(0));
             Assert.That(pmxAsset.JointCount, Is.EqualTo(0));
             Assert.That(readiness.HasPhysicsDescriptors, Is.False);
-            Assert.That(readiness.GravityPolicy, Is.EqualTo("scale-aware-gravity-requires-smoke"));
-            Assert.That(readiness.BackendReadbackSpace, Is.EqualTo(MmdScaleAwarePhysicsReadiness.LegacyReadbackSpace));
-            Assert.That(readiness.ScaleAwareHandoffReadiness, Is.EqualTo(MmdScaleAwarePhysicsReadiness.BlockedHandoff));
-            Assert.That(readiness.RequiredSmoke, Is.EqualTo(MmdScaleAwarePhysicsReadiness.ScaleAwareSmokeRequired));
+            Assert.That(readiness.GravityPolicy, Is.EqualTo("scale-aware-mmd-gravity-98"));
+            Assert.That(readiness.BackendReadbackSpace, Is.EqualTo(MmdScaleAwarePhysicsReadiness.MmdSpaceReadback));
+            Assert.That(readiness.ScaleAwareHandoffReadiness, Is.EqualTo(MmdScaleAwarePhysicsReadiness.ScaleAwareHandoffReady));
+            Assert.That(readiness.RequiredSmoke, Is.EqualTo(MmdScaleAwarePhysicsReadiness.ScaleAwareSmokeCovered));
 
             // Prove imported asset ImportScale flows to scene instantiation (transient bones/physics) and cached mesh.
             MmdUnityModelInstance? loadInstance = null;
@@ -196,20 +250,20 @@ namespace Mmd.Tests
 
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
 
-            Assert.That(importer.ImportScale, Is.EqualTo(1.0f).Within(0.0001f));
-            Assert.That(pmxAsset.ImportScale, Is.EqualTo(1.0f).Within(0.0001f));
+            Assert.That(importer.ImportScale, Is.EqualTo(0.1f).Within(0.0001f));
+            Assert.That(pmxAsset.ImportScale, Is.EqualTo(0.1f).Within(0.0001f));
 
             MmdScaleAwarePhysicsReadiness readiness = MmdAssetInspectorUtility.GetScaleAwarePhysicsReadiness(pmxAsset);
-            Assert.That(readiness.ImportScale, Is.EqualTo(1.0f).Within(0.0001f));
+            Assert.That(readiness.ImportScale, Is.EqualTo(0.1f).Within(0.0001f));
             Assert.That(readiness.HasPhysicsDescriptors, Is.False);
-            Assert.That(readiness.GravityPolicy, Is.EqualTo("legacy-mmd-gravity-98"));
-            Assert.That(readiness.BackendReadbackSpace, Is.EqualTo(MmdScaleAwarePhysicsReadiness.LegacyReadbackSpace));
-            Assert.That(readiness.ScaleAwareHandoffReadiness, Is.EqualTo("not-needed-no-physics-descriptors"));
-            Assert.That(readiness.RequiredSmoke, Is.EqualTo(MmdScaleAwarePhysicsReadiness.ScaleAwareSmokeRequired));
+            Assert.That(readiness.GravityPolicy, Is.EqualTo("scale-aware-mmd-gravity-98"));
+            Assert.That(readiness.BackendReadbackSpace, Is.EqualTo(MmdScaleAwarePhysicsReadiness.MmdSpaceReadback));
+            Assert.That(readiness.ScaleAwareHandoffReadiness, Is.EqualTo(MmdScaleAwarePhysicsReadiness.ScaleAwareHandoffReady));
+            Assert.That(readiness.RequiredSmoke, Is.EqualTo(MmdScaleAwarePhysicsReadiness.ScaleAwareSmokeCovered));
         }
 
         [Test]
-        public void HumanoidAnimationTypeCreatesAvatarSubAssetOnlyWhenAvatarBuilderSucceeds()
+        public void HumanoidAnimationTypeImportsRootAnimatorWithReadyAvatar()
         {
             CopyFixtureToAssetDatabase("test_semi_basic_bone.pmx", TempHumanoidPmxPath);
 
@@ -224,33 +278,105 @@ namespace Mmd.Tests
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempHumanoidPmxPath);
             Assert.That(pmxAsset, Is.Not.Null);
             Assert.That(pmxAsset.AnimationType, Is.EqualTo(nameof(MmdPmxAnimationType.Humanoid)));
-            Assert.That(pmxAsset.HumanoidAvatarReadiness, Is.Not.EqualTo("NotRequested"));
+            Assert.That(pmxAsset.HumanoidAvatarReadiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
             Assert.That(pmxAsset.HumanoidAvatarDiagnostic, Is.Not.Empty);
 
-            var avatarSubAssets = new System.Collections.Generic.List<Avatar>();
-            foreach (Object subAsset in AssetDatabase.LoadAllAssetsAtPath(TempHumanoidPmxPath))
+            GameObject root = AssetDatabase.LoadAssetAtPath<GameObject>(TempHumanoidPmxPath);
+            Assert.That(root, Is.Not.Null);
+            Animator animator = root.GetComponent<Animator>();
+            Assert.That(animator, Is.Not.Null);
+            Assert.That(animator.runtimeAnimatorController, Is.Null);
+
+            System.Collections.Generic.List<Avatar> avatarSubAssets = GetAvatarSubAssets(TempHumanoidPmxPath);
+
+            Assert.That(pmxAsset.ImportedAvatar, Is.Not.Null,
+                "Ready Humanoid import must expose the Avatar sub-asset from MmdPmxAsset.");
+            Assert.That(avatarSubAssets, Has.Count.EqualTo(1));
+            Assert.That(avatarSubAssets[0], Is.SameAs(pmxAsset.ImportedAvatar));
+            Assert.That(pmxAsset.ImportedAvatar!.isValid, Is.True);
+            Assert.That(pmxAsset.ImportedAvatar.isHuman, Is.True);
+            Assert.That(animator.avatar, Is.SameAs(pmxAsset.ImportedAvatar));
+
+            Transform? proxyRoot = root.transform.Find("MmdHumanoidProxyRig");
+            Assert.That(proxyRoot, Is.Not.Null,
+                "Humanoid import must persist the proxy rig under the imported hierarchy root for Animator binding.");
+            Assert.That(proxyRoot!.parent, Is.SameAs(root.transform));
+            Assert.That(proxyRoot.gameObject.hideFlags & HideFlags.HideInHierarchy, Is.EqualTo(HideFlags.None),
+                "persisted proxy must be visible in hierarchy (not HideInHierarchy)");
+            Assert.That(proxyRoot.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true), Is.Null,
+                "Slice 1 proxy rig must not add a second skinning renderer.");
+
+            MmdUnityPlaybackController controller = root.GetComponent<MmdUnityPlaybackController>();
+            Assert.That(controller, Is.Not.Null,
+                "Humanoid import must add the playback controller on the imported root.");
+            Assert.That(controller.ModelAssetSource, Is.SameAs(pmxAsset));
+            Assert.That(controller.HasModelSource, Is.True);
+            Assert.That(controller.IsConfigured, Is.False);
+            Assert.That(controller.HumanoidProxyRoot, Is.SameAs(proxyRoot));
+            Assert.That(controller.HumanoidRetargetEntries, Is.Not.Empty);
+            Assert.That(controller.HumanoidAppendEntries, Is.Not.Null);
+            foreach (MmdHumanoidRetargetBinding entry in controller.HumanoidRetargetEntries)
             {
-                if (subAsset is Avatar avatar)
+                Assert.That(entry.ProxyTransform, Is.Not.Null, entry.HumanBone + " proxy transform");
+                Assert.That(entry.NativeTransform, Is.Not.Null, entry.HumanBone + " native transform");
+                Assert.That(entry.MmdBoneIndex, Is.GreaterThanOrEqualTo(0), entry.HumanBone + " MMD bone index");
+                Assert.That(Quaternion.Angle(entry.ProxyBindLocalRotation, entry.ProxyTransform!.localRotation),
+                    Is.LessThan(0.001f),
+                    entry.HumanBone + " proxy bind rotation must be captured after Avatar T-pose.");
+                Assert.That(Quaternion.Angle(entry.NativeBindLocalRotation, entry.NativeTransform!.localRotation),
+                    Is.LessThan(0.001f),
+                    entry.HumanBone + " native bind rotation must be captured from the imported hierarchy.");
+            }
+
+            foreach (MmdHumanoidAppendTransformBinding entry in controller.HumanoidAppendEntries)
+            {
+                Assert.That(entry.TargetTransform, Is.Not.Null, "append target transform");
+                Assert.That(entry.AppendParentTransform, Is.Not.Null, "append parent transform");
+            }
+
+            MmdHumanoidRetargetBinding hipsEntry = default!;
+            bool foundHipsEntry = false;
+            foreach (MmdHumanoidRetargetBinding entry in controller.HumanoidRetargetEntries)
+            {
+                if (entry.HumanBone == HumanBodyBones.Hips)
                 {
-                    avatarSubAssets.Add(avatar);
+                    hipsEntry = entry;
+                    foundHipsEntry = true;
+                    break;
                 }
             }
 
-            if (pmxAsset.HumanoidAvatarReadiness == MmdHumanoidSetupAsset.ReadyReadiness)
+            Assert.That(foundHipsEntry, Is.True, "Humanoid import must include a Hips retarget binding.");
+            Assert.That(hipsEntry.CopyLocalPosition, Is.True,
+                "Hips binding must copy humanoid body translation to the native MMD move bone.");
+            Assert.That(hipsEntry.TranslationTargetTransform, Is.Not.Null);
+            Assert.That(hipsEntry.TranslationTargetMmdBoneIndex, Is.GreaterThanOrEqualTo(0));
+            SkinnedMeshRenderer? smr = root.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true);
+            Assert.That(smr, Is.Not.Null);
+            Transform? centerBone = FindBoneByName(smr!.bones, "センター");
+            if (centerBone != null)
             {
-                Assert.That(pmxAsset.ImportedAvatar, Is.Not.Null,
-                    "Ready Humanoid import must expose the Avatar sub-asset from MmdPmxAsset.");
-                Assert.That(avatarSubAssets, Has.Count.EqualTo(1));
-                Assert.That(avatarSubAssets[0], Is.SameAs(pmxAsset.ImportedAvatar));
-                Assert.That(pmxAsset.ImportedAvatar!.isValid, Is.True);
-                Assert.That(pmxAsset.ImportedAvatar.isHuman, Is.True);
+                Assert.That(hipsEntry.TranslationTargetTransform, Is.SameAs(centerBone),
+                    "センター exists and must be the first Hips translation target choice.");
             }
             else
             {
-                Assert.That(pmxAsset.ImportedAvatar, Is.Null,
-                    "Importer must not expose an Avatar when mapping or AvatarBuilder did not produce a valid human Avatar.");
-                Assert.That(avatarSubAssets, Is.Empty);
+                Assert.That(IsAcceptedHipsTranslationTargetName(hipsEntry.TranslationTargetTransform!.name), Is.True,
+                    "Hips translation target must follow the configured move-bone priority or fallback.");
             }
+        }
+
+        [Test]
+        public void PmxScriptedImporterVersionIsTwentyTwoForPlaybackControllerRetargetMerge()
+        {
+            object[] attributes = typeof(MmdPmxScriptedImporter).GetCustomAttributes(
+                typeof(ScriptedImporterAttribute),
+                inherit: false);
+
+            Assert.That(attributes, Has.Length.EqualTo(1));
+            var attribute = (ScriptedImporterAttribute)attributes[0];
+            Assert.That(attribute.version, Is.EqualTo(22),
+                "PMX importer version must force reimport for playback-controller-owned PMX source and humanoid retarget bindings.");
         }
 
         [Test]
@@ -2587,6 +2713,53 @@ namespace Mmd.Tests
             Directory.CreateDirectory(Path.Combine(ProjectRoot, TempDirectory));
             File.Copy(source, Path.Combine(ProjectRoot, destinationAssetPath), overwrite: true);
             AssetDatabase.ImportAsset(destinationAssetPath, ImportAssetOptions.ForceUpdate);
+        }
+
+        private static void SetPmxImporterAnimationType(string assetPath, MmdPmxAnimationType value)
+        {
+            var importer = AssetImporter.GetAtPath(assetPath) as MmdPmxScriptedImporter;
+            Assert.That(importer, Is.Not.Null);
+
+            var serializedImporter = new SerializedObject(importer!);
+            serializedImporter.FindProperty("animationType").enumValueIndex = (int)value;
+            serializedImporter.ApplyModifiedPropertiesWithoutUndo();
+            importer!.SaveAndReimport();
+        }
+
+        private static System.Collections.Generic.List<Avatar> GetAvatarSubAssets(string assetPath)
+        {
+            var avatarSubAssets = new System.Collections.Generic.List<Avatar>();
+            foreach (Object subAsset in AssetDatabase.LoadAllAssetsAtPath(assetPath))
+            {
+                if (subAsset is Avatar avatar)
+                {
+                    avatarSubAssets.Add(avatar);
+                }
+            }
+
+            return avatarSubAssets;
+        }
+
+        private static Transform? FindBoneByName(Transform[] bones, string name)
+        {
+            foreach (Transform bone in bones)
+            {
+                if (bone != null && string.Equals(bone.name, name, StringComparison.Ordinal))
+                {
+                    return bone;
+                }
+            }
+
+            return null;
+        }
+
+        private static bool IsAcceptedHipsTranslationTargetName(string name)
+        {
+            return string.Equals(name, "センター", StringComparison.Ordinal)
+                   || string.Equals(name, "グルーブ", StringComparison.Ordinal)
+                   || string.Equals(name, "全ての親", StringComparison.Ordinal)
+                   || string.Equals(name, "腰", StringComparison.Ordinal)
+                   || string.Equals(name, "下半身", StringComparison.Ordinal);
         }
 
         private static string ProjectRoot => Path.GetFullPath(Path.Combine(Application.dataPath, ".."));

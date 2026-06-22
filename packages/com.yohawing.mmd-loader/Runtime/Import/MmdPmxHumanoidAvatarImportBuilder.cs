@@ -2,13 +2,15 @@
 
 using UnityEngine;
 using Mmd;
+using System.Collections.Generic;
+using Mmd.Parser;
 
 namespace Mmd.UnityIntegration
 {
     /// <summary>
     /// Editor-independent helper for the Humanoid Avatar sub-asset build step during PMX import.
     /// Owns only the readiness/diagnostic selection for non-Humanoid, the proxy rig creation,
-    /// Avatar build, diagnostics combination, naming/hideFlags adjustment, and proxy root cleanup.
+    /// Avatar build, diagnostics combination, naming/hideFlags adjustment, and proxy root ownership.
     /// </summary>
     /// <remarks>
     /// This type lives in Runtime/Import under Mmd.UnityIntegration for API compat
@@ -19,19 +21,34 @@ namespace Mmd.UnityIntegration
     {
         /// <summary>
         /// Result of the (optional) Humanoid Avatar import build.
-        /// Avatar is non-null only on successful Ready case (with hideFlags=None and name applied).
+        /// Avatar and ProxyRoot are non-null only on successful Ready case.
         /// </summary>
         public readonly struct MmdPmxHumanoidAvatarImportResult
         {
             public Avatar? Avatar { get; }
+            public GameObject? ProxyRoot { get; }
+            public IReadOnlyList<MmdHumanoidRetargetBinding> RetargetBindings { get; }
+            public IReadOnlyList<MmdHumanoidAppendTransformBinding> AppendBindings { get; }
             public string Readiness { get; }
             public string Diagnostic { get; }
+            public MmdHumanoidBoneMappingDiagnosticSummary MappingDiagnostics { get; }
 
-            public MmdPmxHumanoidAvatarImportResult(Avatar? avatar, string readiness, string diagnostic)
+            public MmdPmxHumanoidAvatarImportResult(
+                Avatar? avatar,
+                string readiness,
+                string diagnostic,
+                MmdHumanoidBoneMappingDiagnosticSummary? mappingDiagnostics = null,
+                GameObject? proxyRoot = null,
+                IReadOnlyList<MmdHumanoidRetargetBinding>? retargetBindings = null,
+                IReadOnlyList<MmdHumanoidAppendTransformBinding>? appendBindings = null)
             {
                 Avatar = avatar;
+                ProxyRoot = proxyRoot;
+                RetargetBindings = retargetBindings ?? System.Array.Empty<MmdHumanoidRetargetBinding>();
+                AppendBindings = appendBindings ?? System.Array.Empty<MmdHumanoidAppendTransformBinding>();
                 Readiness = readiness ?? string.Empty;
                 Diagnostic = diagnostic ?? string.Empty;
+                MappingDiagnostics = mappingDiagnostics ?? MmdHumanoidBoneMappingDiagnosticSummary.Empty;
             }
         }
 
@@ -44,7 +61,9 @@ namespace Mmd.UnityIntegration
             MmdPmxAsset asset,
             string modelName,
             bool shouldBuildHumanoid,
-            string animationTypeLabel)
+            string animationTypeLabel,
+            System.Collections.Generic.IReadOnlyList<MmdHumanoidBoneMappingOverride>? mappingOverrides = null,
+            MmdModelDefinition? model = null)
         {
             if (!shouldBuildHumanoid)
             {
@@ -54,15 +73,20 @@ namespace Mmd.UnityIntegration
                     "humanoid-avatar: animation type is " + animationTypeLabel);
             }
 
-            MmdHumanoidProxyRigResult proxyRig = MmdHumanoidProxyRigFactory.CreateProxyRig(asset);
+            MmdHumanoidProxyRigResult proxyRig = MmdHumanoidProxyRigFactory.CreateProxyRig(
+                asset,
+                mappingOverrides: mappingOverrides);
+            MmdHumanoidBoneMappingDiagnosticSummary mappingDiagnostics =
+                MmdHumanoidBoneMappingDiagnosticsBuilder.Build(proxyRig, mappingOverrides);
             string readiness = proxyRig.Readiness;
             string diagnostic = string.Join("; ", proxyRig.Diagnostics);
 
             if (proxyRig.ProxyRoot == null)
             {
-                return new MmdPmxHumanoidAvatarImportResult(null, readiness, diagnostic);
+                return new MmdPmxHumanoidAvatarImportResult(null, readiness, diagnostic, mappingDiagnostics);
             }
 
+            bool keepProxyRoot = false;
             try
             {
                 MmdHumanoidAvatarBuildResult avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(proxyRig);
@@ -73,7 +97,7 @@ namespace Mmd.UnityIntegration
                     readiness = string.Equals(proxyRig.Readiness, MmdHumanoidSetupAsset.ReadyReadiness, System.StringComparison.Ordinal)
                         ? "AvatarInvalid"
                         : proxyRig.Readiness;
-                    return new MmdPmxHumanoidAvatarImportResult(null, readiness, diagnostic);
+                    return new MmdPmxHumanoidAvatarImportResult(null, readiness, diagnostic, mappingDiagnostics);
                 }
 
                 Avatar avatar = avatarResult.Avatar;
@@ -81,12 +105,191 @@ namespace Mmd.UnityIntegration
                 avatar.name = string.IsNullOrWhiteSpace(modelName)
                     ? "Avatar"
                     : modelName + " Avatar";
+                PrepareProxyRootForImportAsset(proxyRig.ProxyRoot);
+                IReadOnlyList<MmdHumanoidRetargetBinding> retargetBindings =
+                    BuildRuntimeRetargetBindings(asset, proxyRig);
+                IReadOnlyList<MmdHumanoidAppendTransformBinding> appendBindings =
+                    BuildRuntimeAppendTransformBindings(model ?? asset.LoadModel(), asset.ImportedRoot);
                 readiness = MmdHumanoidSetupAsset.ReadyReadiness;
-                return new MmdPmxHumanoidAvatarImportResult(avatar, readiness, diagnostic);
+                keepProxyRoot = true;
+                return new MmdPmxHumanoidAvatarImportResult(
+                    avatar,
+                    readiness,
+                    diagnostic,
+                    mappingDiagnostics,
+                    proxyRig.ProxyRoot,
+                    retargetBindings,
+                    appendBindings);
             }
             finally
             {
-                Object.DestroyImmediate(proxyRig.ProxyRoot);
+                if (!keepProxyRoot)
+                {
+                    Object.DestroyImmediate(proxyRig.ProxyRoot);
+                }
+            }
+        }
+
+        private static IReadOnlyList<MmdHumanoidRetargetBinding> BuildRuntimeRetargetBindings(
+            MmdPmxAsset asset,
+            MmdHumanoidProxyRigResult proxyRig)
+        {
+            if (asset.ImportedRoot == null || proxyRig.ProxyRoot == null || proxyRig.Matches.Count == 0)
+            {
+                return System.Array.Empty<MmdHumanoidRetargetBinding>();
+            }
+
+            SkinnedMeshRenderer? smr = asset.ImportedRoot.GetComponentInChildren<SkinnedMeshRenderer>(
+                includeInactive: true);
+            Transform[] nativeBones = smr != null && smr.bones != null
+                ? smr.bones
+                : System.Array.Empty<Transform>();
+
+            var bindings = new List<MmdHumanoidRetargetBinding>(proxyRig.Matches.Count);
+            foreach (MmdHumanoidBoneMappingMatch match in proxyRig.Matches)
+            {
+                proxyRig.BoneMap.TryGetValue(match.HumanBone, out Transform proxyTransform);
+                Transform? nativeTransform = match.MmdBoneIndex >= 0 && match.MmdBoneIndex < nativeBones.Length
+                    ? nativeBones[match.MmdBoneIndex]
+                    : null;
+                if (match.HumanBone == HumanBodyBones.Hips &&
+                    proxyTransform != null &&
+                    TryFindHipsTranslationTarget(nativeBones, match.MmdBoneIndex, out Transform? translationTarget, out int translationTargetIndex))
+                {
+                    bindings.Add(new MmdHumanoidRetargetBinding(
+                        match.HumanBone,
+                        match.MmdBoneIndex,
+                        proxyTransform,
+                        nativeTransform,
+                        proxyTransform.localRotation,
+                        nativeTransform != null ? nativeTransform.localRotation : Quaternion.identity,
+                        copyLocalPosition: true,
+                        translationTargetTransform: translationTarget!,
+                        translationTargetMmdBoneIndex: translationTargetIndex,
+                        proxyBindLocalPosition: proxyTransform.localPosition,
+                        translationTargetBindLocalPosition: translationTarget!.localPosition));
+                    continue;
+                }
+
+                bindings.Add(new MmdHumanoidRetargetBinding(
+                    match.HumanBone,
+                    match.MmdBoneIndex,
+                    proxyTransform,
+                    nativeTransform,
+                    proxyTransform != null ? proxyTransform.localRotation : Quaternion.identity,
+                    nativeTransform != null ? nativeTransform.localRotation : Quaternion.identity));
+            }
+
+            return bindings;
+        }
+
+        internal static IReadOnlyList<MmdHumanoidAppendTransformBinding> BuildRuntimeAppendTransformBindings(
+            MmdModelDefinition model,
+            GameObject? importedRoot)
+        {
+            if (model == null || importedRoot == null || model.bones == null || model.bones.Count == 0)
+            {
+                return System.Array.Empty<MmdHumanoidAppendTransformBinding>();
+            }
+
+            SkinnedMeshRenderer? smr = importedRoot.GetComponentInChildren<SkinnedMeshRenderer>(
+                includeInactive: true);
+            Transform[] nativeBones = smr != null && smr.bones != null
+                ? smr.bones
+                : System.Array.Empty<Transform>();
+            if (nativeBones.Length == 0)
+            {
+                return System.Array.Empty<MmdHumanoidAppendTransformBinding>();
+            }
+
+            var bindings = new List<MmdHumanoidAppendTransformBinding>();
+            foreach (MmdBoneDefinition bone in model.bones)
+            {
+                if (bone == null
+                    || bone.appendParentIndex < 0
+                    || (!bone.appendRotation && !bone.appendTranslation))
+                {
+                    continue;
+                }
+
+                Transform? target = bone.index >= 0 && bone.index < nativeBones.Length
+                    ? nativeBones[bone.index]
+                    : null;
+                Transform? appendParent = bone.appendParentIndex >= 0 && bone.appendParentIndex < nativeBones.Length
+                    ? nativeBones[bone.appendParentIndex]
+                    : null;
+                if (target == null || appendParent == null)
+                {
+                    continue;
+                }
+
+                bindings.Add(new MmdHumanoidAppendTransformBinding(
+                    target,
+                    bone.index,
+                    appendParent,
+                    bone.appendParentIndex,
+                    bone.appendRatio,
+                    bone.appendRotation,
+                    bone.appendTranslation,
+                    bone.appendLocal,
+                    target.localRotation,
+                    target.localPosition,
+                    appendParent.localRotation,
+                    appendParent.localPosition,
+                    bone.index));
+            }
+
+            return bindings;
+        }
+
+        private static bool TryFindHipsTranslationTarget(
+            IReadOnlyList<Transform> nativeBones,
+            int fallbackMmdBoneIndex,
+            out Transform? target,
+            out int targetMmdBoneIndex)
+        {
+            string[] preferredNames =
+            {
+                "センター",
+                "グルーブ",
+                "全ての親",
+                "腰"
+            };
+
+            foreach (string preferredName in preferredNames)
+            {
+                for (int i = 0; i < nativeBones.Count; i++)
+                {
+                    Transform bone = nativeBones[i];
+                    if (bone != null && string.Equals(bone.name, preferredName, System.StringComparison.Ordinal))
+                    {
+                        target = bone;
+                        targetMmdBoneIndex = i;
+                        return true;
+                    }
+                }
+            }
+
+            if (fallbackMmdBoneIndex >= 0 && fallbackMmdBoneIndex < nativeBones.Count)
+            {
+                target = nativeBones[fallbackMmdBoneIndex];
+                targetMmdBoneIndex = fallbackMmdBoneIndex;
+                return target != null;
+            }
+
+            target = null;
+            targetMmdBoneIndex = -1;
+            return false;
+        }
+
+        private static void PrepareProxyRootForImportAsset(GameObject proxyRoot)
+        {
+            proxyRoot.hideFlags = HideFlags.None;
+            proxyRoot.SetActive(true);
+            foreach (Transform child in proxyRoot.GetComponentsInChildren<Transform>(includeInactive: true))
+            {
+                child.hideFlags = HideFlags.None;
+                child.gameObject.hideFlags = HideFlags.None;
             }
         }
 

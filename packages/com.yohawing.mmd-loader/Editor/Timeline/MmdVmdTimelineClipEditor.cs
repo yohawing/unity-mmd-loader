@@ -5,7 +5,6 @@ using UnityEditor;
 using UnityEditor.Timeline;
 using UnityEngine;
 using UnityEngine.Timeline;
-using Mmd.Parser;
 using Mmd.Timeline;
 
 namespace Mmd.Editor.Timeline
@@ -30,8 +29,9 @@ namespace Mmd.Editor.Timeline
                 return false;
             }
 
-            MmdMotionDefinition motion = mmdClip.MotionAsset.LoadMotion();
-            clip.duration = MmdTimelineAssetWorkflow.CalculateClipDurationSeconds(motion, mmdClip.FrameRate);
+            clip.duration = MmdTimelineAssetWorkflow.CalculateClipDurationSeconds(
+                mmdClip.MotionAsset.MaxFrame,
+                mmdClip.FrameRate);
             return true;
         }
     }
@@ -80,23 +80,22 @@ namespace Mmd.Editor.Timeline
                 return;
             }
 
-            try
+            if (motionAsset.ImportSummaryStatus != MmdVmdImportSummaryStatus.Passed)
             {
-                MmdMotionDefinition motion = motionAsset.LoadMotion();
-                float frameRate = frameRateProperty?.floatValue ?? 30.0f;
-                double duration = MmdTimelineAssetWorkflow.CalculateClipDurationSeconds(motion, frameRate);
-                string sourceId = string.IsNullOrWhiteSpace(motionAsset.SourceId) ? motionAsset.name : motionAsset.SourceId;
-
-                using (new EditorGUI.DisabledScope(true))
-                {
-                    EditorGUILayout.TextField(SourceIdLabel, sourceId);
-                    EditorGUILayout.IntField(MaxFrameLabel, motion.maxFrame);
-                    EditorGUILayout.TextField(DurationLabel, $"{duration:0.###} s @ {frameRate:0.###} fps");
-                }
+                EditorGUILayout.HelpBox(
+                    $"VMD import summary is {motionAsset.ImportSummaryStatus}; reimport the asset to refresh cached Timeline diagnostics.",
+                    MessageType.Warning);
             }
-            catch (Exception ex)
+
+            float frameRate = frameRateProperty?.floatValue ?? 30.0f;
+            double duration = MmdTimelineAssetWorkflow.CalculateClipDurationSeconds(motionAsset.MaxFrame, frameRate);
+            string sourceId = string.IsNullOrWhiteSpace(motionAsset.SourceId) ? motionAsset.name : motionAsset.SourceId;
+
+            using (new EditorGUI.DisabledScope(true))
             {
-                EditorGUILayout.HelpBox($"Motion diagnostics unavailable: {ex.Message}", MessageType.Warning);
+                EditorGUILayout.TextField(SourceIdLabel, sourceId);
+                EditorGUILayout.IntField(MaxFrameLabel, motionAsset.MaxFrame);
+                EditorGUILayout.TextField(DurationLabel, $"{duration:0.###} s @ {frameRate:0.###} fps");
             }
         }
     }

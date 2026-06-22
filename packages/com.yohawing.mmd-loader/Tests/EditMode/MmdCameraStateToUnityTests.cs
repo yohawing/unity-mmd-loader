@@ -86,6 +86,37 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void ImportScaleScalesPositionOnly()
+        {
+            MmdCameraState state = State(-10f, 3, 5, 7, 0.1f, 0.2f, 0.3f, 35f, false);
+
+            MmdUnityCameraPose scaleOne = MmdCameraStateToUnity.Convert(state, importScale: 1.0f);
+            MmdUnityCameraPose scalePointOne = MmdCameraStateToUnity.Convert(state, importScale: 0.1f);
+
+            Assert.That(scalePointOne.Position.x, Is.EqualTo(scaleOne.Position.x * 0.1f).Within(0.001f));
+            Assert.That(scalePointOne.Position.y, Is.EqualTo(scaleOne.Position.y * 0.1f).Within(0.001f));
+            Assert.That(scalePointOne.Position.z, Is.EqualTo(scaleOne.Position.z * 0.1f).Within(0.001f));
+            Assert.That(Quaternion.Angle(scalePointOne.Rotation, scaleOne.Rotation), Is.LessThan(0.001f));
+            Assert.That(scalePointOne.FieldOfView, Is.EqualTo(scaleOne.FieldOfView).Within(0.001f));
+            Assert.That(scalePointOne.Perspective, Is.EqualTo(scaleOne.Perspective));
+        }
+
+        [TestCase(0.0f)]
+        [TestCase(-1.0f)]
+        [TestCase(float.NaN)]
+        public void InvalidImportScaleFallsBackToScaleOne(float importScale)
+        {
+            MmdCameraState state = State(-10f, 3, 5, 7, 0.1f, 0.2f, 0.3f, 35f, true);
+
+            MmdUnityCameraPose expected = MmdCameraStateToUnity.Convert(state, importScale: 1.0f);
+            MmdUnityCameraPose actual = MmdCameraStateToUnity.Convert(state, importScale: importScale);
+
+            AssertPose(actual, expected.Position, expected.Rotation);
+            Assert.That(actual.FieldOfView, Is.EqualTo(expected.FieldOfView).Within(0.001f));
+            Assert.That(actual.Perspective, Is.EqualTo(expected.Perspective));
+        }
+
+        [Test]
         public void NonFiniteDistanceAndFovDoNotProduceNonFinitePose()
         {
             MmdUnityCameraPose pose = MmdCameraStateToUnity.Convert(

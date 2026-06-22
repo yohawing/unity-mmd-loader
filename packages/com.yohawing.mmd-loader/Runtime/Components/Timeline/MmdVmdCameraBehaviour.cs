@@ -37,6 +37,8 @@ namespace Mmd.Timeline
 
         public float MinFieldOfView { get; set; } = MmdCameraStateToUnity.DefaultMinFieldOfView;
 
+        public float ImportScale { get; set; } = MmdPmxAsset.DefaultImportScale;
+
         public MmdSceneCameraApplyStatus LastApplyStatus { get; private set; }
 
         public override void ProcessFrame(Playable playable, FrameData info, object playerData)
@@ -85,7 +87,7 @@ namespace Mmd.Timeline
             if (CameraKeyframes != null && CameraKeyframes.Count > 0)
             {
                 MmdCameraState cs = VmdCameraSampler.Sample(CameraKeyframes, frame);
-                LastApplyStatus = target.ApplyCameraState(cs, MinFieldOfView);
+                LastApplyStatus = target.ApplyCameraState(cs, MinFieldOfView, ImportScale);
             }
             else
             {

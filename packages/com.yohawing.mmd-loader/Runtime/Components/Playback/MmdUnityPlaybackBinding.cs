@@ -233,6 +233,44 @@ namespace Mmd.UnityIntegration
                 string.IsNullOrWhiteSpace(motionAsset.SourceId) ? motionAsset.name : motionAsset.SourceId);
         }
 
+        internal static MmdUnityPlaybackBinding CreateSkinnedForModelOnlyPhysicsFromExistingSceneModel(
+            GameObject root,
+            MmdPmxAsset modelAsset,
+            string motionId)
+        {
+            if (root == null)
+            {
+                throw new ArgumentNullException(nameof(root));
+            }
+
+            if (modelAsset == null)
+            {
+                throw new ArgumentNullException(nameof(modelAsset));
+            }
+
+            var parser = new NativeMmdParser();
+            MmdModelDefinition model = modelAsset.LoadModel(parser);
+            MmdModelValidator.ThrowIfInvalid(model);
+            RemoveModelOnlyUnsupportedPureWorldAnchorJoints(model);
+            MmdMotionDefinition restMotion = CreateModelOnlyRestMotion(model);
+            MmdMotionValidator.ThrowIfInvalid(restMotion);
+            float importScale = modelAsset.ImportScale;
+            MmdUnityModelInstance instance = MmdUnityModelFactory.CreateExistingSkinnedModelInstance(
+                root,
+                model,
+                string.IsNullOrWhiteSpace(modelAsset.SourcePath) ? null : modelAsset.SourcePath,
+                importScale);
+            string resolvedModelId = string.IsNullOrWhiteSpace(modelAsset.SourceId) ? modelAsset.name : modelAsset.SourceId;
+            string resolvedMotionId = string.IsNullOrWhiteSpace(motionId) ? "humanoid-physics" : motionId;
+            var session = new MmdRuntimeSession(model, restMotion, resolvedModelId, resolvedMotionId);
+            return new MmdUnityPlaybackBinding(instance, session, model, resolvedModelId, resolvedMotionId);
+        }
+
+        private static void RemoveModelOnlyUnsupportedPureWorldAnchorJoints(MmdModelDefinition model)
+        {
+            model.physics?.joints?.RemoveAll(joint => joint.rigidbodyAIndex < 0 && joint.rigidbodyBIndex < 0);
+        }
+
         public static MmdUnityPlaybackBinding CreateSkinned(
             MmdModelDefinition model,
             MmdMotionDefinition motion,
@@ -253,6 +291,18 @@ namespace Mmd.UnityIntegration
             MmdUnityModelInstance instance = MmdUnityModelFactory.CreateSkinnedModel(model, sourcePath);
             var session = new MmdRuntimeSession(model, motion, modelId, motionId);
             return new MmdUnityPlaybackBinding(instance, session, model, modelId, motionId);
+        }
+
+        private static MmdMotionDefinition CreateModelOnlyRestMotion(MmdModelDefinition model)
+        {
+            return new MmdMotionDefinition
+            {
+                targetModelName = model.name ?? string.Empty,
+                maxFrame = 0,
+                boneKeyframes = new List<MmdBoneKeyframeDefinition>(),
+                morphKeyframes = new List<MmdMorphKeyframeDefinition>(),
+                modelKeyframes = new List<MmdModelKeyframeDefinition>()
+            };
         }
 
         public static MmdUnityPlaybackBinding CreateSkinned(
@@ -368,6 +418,46 @@ namespace Mmd.UnityIntegration
 
             lastForwardPlaybackFrame = frame;
             return ApplyLivePhysicsFrame(frame, frameRate, allowArbitraryStart: true);
+        }
+
+        internal void StepLivePhysicsFromCurrentPose(int sequenceFrame, float deltaTime, bool resetOnFirstStep)
+        {
+            MmdPlaybackTime.ValidateFrame(sequenceFrame);
+            if (deltaTime < 0.0f || float.IsNaN(deltaTime) || float.IsInfinity(deltaTime))
+            {
+                throw new ArgumentOutOfRangeException(nameof(deltaTime), "Delta time must be a non-negative finite value.");
+            }
+
+            if (physicsMode != MmdPhysicsMode.Live)
+            {
+                throw new InvalidOperationException(
+                    "StepLivePhysicsFromCurrentPose requires Live physics mode. Set the binding physics mode to Live first.");
+            }
+
+            if (resetOnFirstStep)
+            {
+                SoftResetLivePhysicsSimulation();
+            }
+
+            var totalWatch = Stopwatch.StartNew();
+            var stageWatch = Stopwatch.StartNew();
+            BulletMmdPhysicsBackend backend = EnsureLivePhysicsBackend();
+            double ensureBackendMs = stageWatch.Elapsed.TotalMilliseconds;
+            stageWatch.Restart();
+            MmdLivePhysicsFrameDiagnostics diagnostics = StepLivePhysicsCore(
+                backend,
+                sequenceFrame,
+                resetOnFirstStep,
+                resetOnFirstStep ? 0.0f : deltaTime,
+                totalWatch,
+                ensureBackendMs,
+                evaluateFrameMs: 0.0,
+                applyAnimationFrameMs: 0.0,
+                evaluatedFrame: null,
+                out _);
+            totalWatch.Stop();
+            diagnostics.totalMs = totalWatch.Elapsed.TotalMilliseconds;
+            lastLivePhysicsDiagnostics = diagnostics;
         }
 
         public void ResetLivePhysics()
@@ -730,31 +820,58 @@ namespace Mmd.UnityIntegration
             double applyAnimationFrameMs = stageWatch.Elapsed.TotalMilliseconds;
             stageWatch.Restart();
             bool initializeDynamicBodies = lastLiveFrame < 0;
-            float deltaTime;
+            float deltaTime = initializeDynamicBodies ? 0.0f : (frame - lastLiveFrame) / frameRate;
+            MmdLivePhysicsFrameDiagnostics diagnostics = StepLivePhysicsCore(
+                backend,
+                frame,
+                initializeDynamicBodies,
+                deltaTime,
+                totalWatch,
+                ensureBackendMs,
+                evaluateFrameMs,
+                applyAnimationFrameMs,
+                evaluatedFrame,
+                out double refreshSnapshotFrameMs);
+            lastLiveFrame = frame;
+            lastLiveSnapshot = session.BuildSnapshotFromEvaluatedFrame(evaluatedFrame!, Instance.RenderingDescriptor);
+            totalWatch.Stop();
+            diagnostics.refreshSnapshotFrameMs = refreshSnapshotFrameMs;
+            diagnostics.totalMs = totalWatch.Elapsed.TotalMilliseconds;
+            lastLivePhysicsDiagnostics = diagnostics;
+            return lastLiveSnapshot;
+        }
+
+        private MmdLivePhysicsFrameDiagnostics StepLivePhysicsCore(
+            BulletMmdPhysicsBackend backend,
+            int sequenceFrame,
+            bool resetSeed,
+            float deltaTime,
+            Stopwatch totalWatch,
+            double ensureBackendMs,
+            double evaluateFrameMs,
+            double applyAnimationFrameMs,
+            MmdEvaluatedFrame? evaluatedFrame,
+            out double refreshSnapshotFrameMs)
+        {
+            var stageWatch = Stopwatch.StartNew();
             MmdLivePhysicsPinnedBodyDiagnostics pinnedBodyDiagnostics;
             double syncBoneDrivenBodiesMs;
             double stepPhysicsMs;
-            if (initializeDynamicBodies)
+            if (resetSeed)
             {
-                // saba PMXModel::ResetPhysics-style seed, UNIFIED for both the fast (native FFI) and the
-                // managed evaluation paths. The bones are already at the CURRENT motion pose (ApplyFastFrame
-                // for the fast path, MmdUnityFrameApplier.ApplyFrame for the managed path). The first live
-                // frame after a reset places every body (including the pure-dynamic mode-1 揺れもの) at that
-                // CURRENT bone-derived pose, re-aligns the native interpolation transform with it, and zeroes
-                // velocity so the first forward Step computes NO spurious kinematic velocity. This is a settle
-                // (deltaTime 0), not a forward integration, so it cannot explode the chain.
-                deltaTime = 0.0f;
-                pinnedBodyDiagnostics = SeedLivePhysics(backend, frame);
+                // saba PMXModel::ResetPhysics-style seed. The bones are already at the CURRENT driving pose
+                // (VMD animation or Humanoid retarget), so seed from those Unity transforms without replaying VMD.
+                pinnedBodyDiagnostics = SeedLivePhysics(backend, sequenceFrame);
                 syncBoneDrivenBodiesMs = stageWatch.Elapsed.TotalMilliseconds;
                 stepPhysicsMs = 0.0;
+                deltaTime = 0.0f;
             }
             else
             {
-                deltaTime = (frame - lastLiveFrame) / frameRate;
                 pinnedBodyDiagnostics = SyncBoneDrivenPhysicsBodies(backend, includeDynamicBodies: false);
                 syncBoneDrivenBodiesMs = stageWatch.Elapsed.TotalMilliseconds;
                 stageWatch.Restart();
-                backend.Step(frame, deltaTime);
+                backend.Step(sequenceFrame, deltaTime);
                 stepPhysicsMs = stageWatch.Elapsed.TotalMilliseconds;
             }
 
@@ -769,13 +886,10 @@ namespace Mmd.UnityIntegration
                 RefreshEvaluatedFrameFromUnityTransforms(evaluatedFrame);
             }
 
-            double refreshSnapshotFrameMs = stageWatch.Elapsed.TotalMilliseconds;
-            lastLiveFrame = frame;
-            lastLiveSnapshot = session.BuildSnapshotFromEvaluatedFrame(evaluatedFrame!, Instance.RenderingDescriptor);
-            totalWatch.Stop();
+            refreshSnapshotFrameMs = stageWatch.Elapsed.TotalMilliseconds;
             lastLivePhysicsDiagnostics = new MmdLivePhysicsFrameDiagnostics
             {
-                frame = frame,
+                frame = sequenceFrame,
                 deltaTime = deltaTime,
                 totalMs = totalWatch.Elapsed.TotalMilliseconds,
                 ensureBackendMs = ensureBackendMs,
@@ -791,7 +905,7 @@ namespace Mmd.UnityIntegration
                 importScale = Instance.ImportScale,
                 bodyDiagnostics = bodyDiagnostics
             };
-            return lastLiveSnapshot;
+            return lastLivePhysicsDiagnostics;
         }
 
         private BulletMmdPhysicsBackend EnsureLivePhysicsBackend()
@@ -858,6 +972,7 @@ namespace Mmd.UnityIntegration
             bool includeDynamicBodies)
         {
             Transform root = Instance.Root.transform;
+            float importScale = NormalizeImportScale(Instance.ImportScale);
             var diagnostics = new MmdLivePhysicsPinnedBodyDiagnostics();
             for (int i = 0; i < model.physics.rigidbodies.Count; i++)
             {
@@ -890,7 +1005,7 @@ namespace Mmd.UnityIntegration
                 }
 
                 Transform bone = Instance.BoneTransforms[body.boneIndex];
-                Vector3 boneModelPosition = ToMmdModelPosition(root.InverseTransformPoint(bone.position));
+                Vector3 boneModelPosition = ToMmdModelPosition(root.InverseTransformPoint(bone.position), importScale);
                 Vector3 bodyOffset = ToMmdVector3(body.position) - GetBoneOrigin(body.boneIndex);
                 Quaternion boneModelRotation = ToMmdModelRotation(Quaternion.Inverse(root.rotation) * bone.rotation);
                 Quaternion bodyLocalRotation = ToMmdEulerRotation(body.rotation);
@@ -939,6 +1054,7 @@ namespace Mmd.UnityIntegration
 
         private void ApplyPhysicsBodyTransforms(BulletMmdPhysicsBackend backend)
         {
+            float importScale = NormalizeImportScale(Instance.ImportScale);
             for (int i = 0; i < model.physics.rigidbodies.Count; i++)
             {
                 MmdRigidbodyDefinition body = model.physics.rigidbodies[i];
@@ -962,7 +1078,7 @@ namespace Mmd.UnityIntegration
                 if (!IsDynamicWithBonePhysicsKind(body.physicsKind))
                 {
                     Vector3 boneModelPosition = ToMmdVector3(bodyTransform.position) - (boneModelRotation * bodyOffset);
-                    bone.position = root.TransformPoint(ToUnityModelPosition(boneModelPosition));
+                    bone.position = root.TransformPoint(ToUnityModelPosition(boneModelPosition, importScale));
                 }
 
                 bone.rotation = root.rotation * ToUnityModelRotation(boneModelRotation);
@@ -978,6 +1094,7 @@ namespace Mmd.UnityIntegration
             }
 
             Transform root = Instance.Root.transform;
+            float importScale = NormalizeImportScale(Instance.ImportScale);
             for (int i = 0; i < model.physics.rigidbodies.Count; i++)
             {
                 MmdRigidbodyDefinition body = model.physics.rigidbodies[i];
@@ -988,7 +1105,7 @@ namespace Mmd.UnityIntegration
                 }
 
                 MmdPhysicsBodyTransform bodyTransform = backend.GetRigidbodyTransform(i);
-                physicsBody.transform.position = root.TransformPoint(ToUnityModelPosition(bodyTransform.position));
+                physicsBody.transform.position = root.TransformPoint(ToUnityModelPosition(bodyTransform.position, importScale));
                 physicsBody.transform.rotation = root.rotation * ToUnityModelRotation(bodyTransform.rotation);
                 physicsBody.RecordNativeTransform(bodyTransform.position, bodyTransform.rotation);
             }
@@ -997,6 +1114,7 @@ namespace Mmd.UnityIntegration
         private MmdLivePhysicsBodyDiagnostics[] BuildBodyDiagnostics(BulletMmdPhysicsBackend backend)
         {
             Transform root = Instance.Root.transform;
+            float importScale = NormalizeImportScale(Instance.ImportScale);
             Dictionary<int, MmdUnityPhysicsBody> physicsBodiesByIndex = BuildPhysicsBodyIndexMap();
             int count = model.physics.rigidbodies.Count;
             var result = new MmdLivePhysicsBodyDiagnostics[count];
@@ -1009,11 +1127,11 @@ namespace Mmd.UnityIntegration
                 Transform? bone = hasBone ? Instance.BoneTransforms[body.boneIndex] : null;
                 Vector3 boneWorldPos = bone != null ? bone.position : Vector3.zero;
                 Vector3 boneModelPos = bone != null
-                    ? ToMmdModelPosition(root.InverseTransformPoint(bone.position))
+                    ? ToMmdModelPosition(root.InverseTransformPoint(bone.position), importScale)
                     : Vector3.zero;
                 Vector3 readbackMmdPos = ToMmdVector3(bodyTransform.position);
                 Quaternion readbackMmdRot = ToMmdQuaternion(bodyTransform.rotation);
-                Vector3 readbackWorldPos = root.TransformPoint(ToUnityModelPosition(bodyTransform.position));
+                Vector3 readbackWorldPos = root.TransformPoint(ToUnityModelPosition(bodyTransform.position, importScale));
                 Quaternion readbackWorldRot = root.rotation * ToUnityModelRotation(bodyTransform.rotation);
                 Vector3 debugWorldPos = physicsBody != null ? physicsBody.transform.position : Vector3.zero;
                 Quaternion debugWorldRot = physicsBody != null ? physicsBody.transform.rotation : Quaternion.identity;
@@ -1131,6 +1249,7 @@ namespace Mmd.UnityIntegration
         private void RefreshEvaluatedFrameFromUnityTransforms(MmdEvaluatedFrame frame)
         {
             Transform root = Instance.Root.transform;
+            float importScale = NormalizeImportScale(Instance.ImportScale);
             foreach (MmdEvaluatedBonePose bonePose in frame.bones)
             {
                 int index = bonePose.index;
@@ -1142,10 +1261,10 @@ namespace Mmd.UnityIntegration
                 Transform bone = Instance.BoneTransforms[index];
                 Vector3 localDelta = bone.localPosition - Instance.BindLocalPositions[index];
                 Quaternion localRotation = Quaternion.Inverse(Instance.BindLocalRotations[index]) * bone.localRotation;
-                bonePose.localPosition = ToArray(ToMmdModelPosition(localDelta));
+                bonePose.localPosition = ToArray(ToMmdModelPosition(localDelta, importScale));
                 bonePose.localRotation = ToArray(ToMmdModelRotation(localRotation));
                 bonePose.localScale = ToArray(bone.localScale);
-                bonePose.worldMatrix = ToMmdModelMatrix(root, bone);
+                bonePose.worldMatrix = ToMmdModelMatrix(root, bone, importScale);
             }
         }
 
@@ -1154,9 +1273,19 @@ namespace Mmd.UnityIntegration
             return new Vector3(-position[0], position[1], -position[2]);
         }
 
+        private static Vector3 ToUnityModelPosition(float[] position, float importScale)
+        {
+            return ToUnityModelPosition(position) * NormalizeImportScale(importScale);
+        }
+
         private static Vector3 ToUnityModelPosition(Vector3 position)
         {
             return new Vector3(-position.x, position.y, -position.z);
+        }
+
+        private static Vector3 ToUnityModelPosition(Vector3 position, float importScale)
+        {
+            return ToUnityModelPosition(position) * NormalizeImportScale(importScale);
         }
 
         private static Quaternion ToUnityModelRotation(float[] rotation)
@@ -1172,6 +1301,11 @@ namespace Mmd.UnityIntegration
         private static Vector3 ToMmdModelPosition(Vector3 position)
         {
             return new Vector3(-position.x, position.y, -position.z);
+        }
+
+        private static Vector3 ToMmdModelPosition(Vector3 position, float importScale)
+        {
+            return ToMmdModelPosition(position) / NormalizeImportScale(importScale);
         }
 
         private static Quaternion ToMmdModelRotation(Quaternion rotation)
@@ -1249,7 +1383,12 @@ namespace Mmd.UnityIntegration
 
         private static float[] ToMmdModelMatrix(Transform root, Transform bone)
         {
-            Vector3 position = ToMmdModelPosition(root.InverseTransformPoint(bone.position));
+            return ToMmdModelMatrix(root, bone, importScale: 1.0f);
+        }
+
+        private static float[] ToMmdModelMatrix(Transform root, Transform bone, float importScale)
+        {
+            Vector3 position = ToMmdModelPosition(root.InverseTransformPoint(bone.position), importScale);
             Quaternion rotation = ToMmdModelRotation(Quaternion.Inverse(root.rotation) * bone.rotation);
             Matrix4x4 matrix = Matrix4x4.TRS(position, rotation, Vector3.one);
             return new[]
@@ -1259,6 +1398,11 @@ namespace Mmd.UnityIntegration
                 matrix.m20, matrix.m21, matrix.m22, matrix.m23,
                 matrix.m30, matrix.m31, matrix.m32, matrix.m33
             };
+        }
+
+        private static float NormalizeImportScale(float importScale)
+        {
+            return float.IsFinite(importScale) && importScale > 0.0f ? importScale : 1.0f;
         }
     }
 

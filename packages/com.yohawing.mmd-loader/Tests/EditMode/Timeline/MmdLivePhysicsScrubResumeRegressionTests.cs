@@ -452,6 +452,27 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void ForwardPlaybackImportScaleZeroDotOneKeepsNativeReadbackInMmdSpaceAndScalesUnityBones()
+        {
+            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            if (!availability.backendAvailable)
+            {
+                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
+            }
+
+            Mode1ChainScaleSample scaleOne = RunMode1ChainForwardPlayback(importScale: 1.0f);
+            Mode1ChainScaleSample scalePointOne = RunMode1ChainForwardPlayback(importScale: 0.1f);
+
+            Assert.That(scalePointOne.importScale, Is.EqualTo(0.1f).Within(0.0001f));
+            Assert.That(scalePointOne.nativeHairBodyPosition.x, Is.EqualTo(scaleOne.nativeHairBodyPosition.x).Within(0.001f));
+            Assert.That(scalePointOne.nativeHairBodyPosition.y, Is.EqualTo(scaleOne.nativeHairBodyPosition.y).Within(0.001f));
+            Assert.That(scalePointOne.nativeHairBodyPosition.z, Is.EqualTo(scaleOne.nativeHairBodyPosition.z).Within(0.001f));
+            Assert.That(scalePointOne.hairBoneLocalPosition.x, Is.EqualTo(scaleOne.hairBoneLocalPosition.x * 0.1f).Within(0.001f));
+            Assert.That(scalePointOne.hairBoneLocalPosition.y, Is.EqualTo(scaleOne.hairBoneLocalPosition.y * 0.1f).Within(0.001f));
+            Assert.That(scalePointOne.hairBoneLocalPosition.z, Is.EqualTo(scaleOne.hairBoneLocalPosition.z * 0.1f).Within(0.001f));
+        }
+
+        [Test]
         public void ForwardPlaybackWithMovingModelKeepsHairAttachedToBody()
         {
             MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
@@ -637,6 +658,56 @@ namespace Mmd.Tests
             return model;
         }
 
+        private static MmdModelDefinition CreateMode1ChainModel(float importScale)
+        {
+            Assert.That(float.IsFinite(importScale) && importScale > 0.0f, Is.True);
+            return CreateMode1ChainModel();
+        }
+
+        private static Mode1ChainScaleSample RunMode1ChainForwardPlayback(float importScale)
+        {
+            MmdUnityPlaybackBinding? binding = null;
+            try
+            {
+                MmdModelDefinition model = CreateMode1ChainModel(importScale);
+                MmdMotionDefinition motion = CreateBoneTranslationMotion(model, "root", frames: 30, endTranslationX: 40.0f);
+                binding = CreateMode1ChainBinding(model, motion, importScale);
+                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.Configure(binding, 30.0f, playOnStart: false);
+                controller.SetPhysicsMode(MmdPhysicsMode.Live);
+
+                for (int frame = 0; frame <= 5; frame++)
+                {
+                    controller.ApplyFrame(frame);
+                }
+
+                MmdUnityPhysicsBody hairBody = binding.Instance.PhysicsBodies.Single(body => body.BodyIndex == 1);
+                Assert.That(hairBody.HasNativeTransform, Is.True, "The mode-1 hair body must record Bullet readback.");
+                return new Mode1ChainScaleSample(
+                    binding.Instance.ImportScale,
+                    hairBody.NativePosition,
+                    binding.Instance.BoneTransforms[1].localPosition);
+            }
+            finally
+            {
+                DestroyBinding(binding);
+            }
+        }
+
+        private static MmdUnityPlaybackBinding CreateMode1ChainBinding(
+            MmdModelDefinition model,
+            MmdMotionDefinition motion,
+            float importScale)
+        {
+            return MmdUnityPlaybackBinding.CreateSkinned(
+                model,
+                motion,
+                "mode1-chain.pmx",
+                "translate-root",
+                sourcePath: null,
+                importScale);
+        }
+
         // CreateMode1ChainModel with the joint's linear DOFs FREED (lower > upper => unlimited in
         // btGeneric6DofSpring2Constraint). The pure-dynamic hair body is then NOT linearly dragged toward
         // the anchor by the joint, so its horizontal position reflects only where the reset PLACED it —
@@ -702,6 +773,23 @@ namespace Mmd.Tests
             string projectRoot = Path.GetDirectoryName(Application.dataPath);
             string packageRoot = Path.GetFullPath(Path.Combine(projectRoot, "..", "packages", "com.yohawing.mmd-loader"));
             return Path.Combine(packageRoot, "Tests", "Fixtures", "Assets", fileName);
+        }
+
+        private readonly struct Mode1ChainScaleSample
+        {
+            public readonly float importScale;
+            public readonly Vector3 nativeHairBodyPosition;
+            public readonly Vector3 hairBoneLocalPosition;
+
+            public Mode1ChainScaleSample(
+                float importScale,
+                Vector3 nativeHairBodyPosition,
+                Vector3 hairBoneLocalPosition)
+            {
+                this.importScale = importScale;
+                this.nativeHairBodyPosition = nativeHairBodyPosition;
+                this.hairBoneLocalPosition = hairBoneLocalPosition;
+            }
         }
     }
 }

@@ -1,8 +1,14 @@
 # unity-mmd-loader
 
+![unity-mmd-loader](./docs/assets/main-image.png)
+
+> Credits — Model: [Sour](https://bowlroll.net/file/146103) / Motion: [mobiusP](https://www.nicovideo.jp/watch/sm42576784) / Camera motion: [koko](https://bowlroll.net/file/305434)
+
 unity-mmd-loader is a plugin for bringing PMX / VMD into Unity.
 
 It is designed to deliver a natural import experience that takes advantage of modern Unity, letting you work with PMX models and VMD motions directly in Unity's Project / Scene / Timeline / Runtime.
+
+[日本語](./docs/README.ja.md) / [How to use](./docs/HOW_TO_USE.md)
 
 ## Features
 
@@ -22,7 +28,7 @@ It is designed to deliver a natural import experience that takes advantage of mo
 | Morph | Vertex (blend shape) / UV / material / bone / group morphs supported |
 | Physics | Real-time physics during Play Mode forward playback |
 | Rendering | URP-based toon, alpha, texture diagnostics, material order handoff |
-| Humanoid | Metadata and setup foundation. Full Humanoid integration is future work |
+| Humanoid | Animator and proxy rig auto-setup at import. A unified Timeline track drives both the Humanoid avatar and the native MMD model, with Live physics during retargeted playback |
 
 ## Roadmap
 
@@ -68,7 +74,7 @@ Adjust the relative path for your Unity project layout.
 5. In Play Mode, check forward playback and real-time physics.
 6. In Edit Mode, Timeline scrub is treated as physics-off animation preview.
 
-For detailed steps, see [HOW_TO_USE.md](https://github.com/yohawing/unity-mmd-loader/blob/main/docs/HOW_TO_USE.md).
+For detailed steps, see [HOW_TO_USE.md](./docs/HOW_TO_USE.md).
 
 ## License Boundary
 
@@ -83,4 +89,4 @@ The public `main` branch is kept package-first.
 - The distributable package is centered on `packages/com.yohawing.mmd-loader/`.
 - `native/` remains as native source / rebuild reference.
 - Local scripts, the Unity consumer project, validation artifacts, and AI work notes are not public package surfaces.
-- Release preparation and branch policy are centralized in [RELEASE.md](https://github.com/yohawing/unity-mmd-loader/blob/main/docs/RELEASE.md).
+- Release preparation and branch policy are centralized in [RELEASE.md](./docs/RELEASE.md).

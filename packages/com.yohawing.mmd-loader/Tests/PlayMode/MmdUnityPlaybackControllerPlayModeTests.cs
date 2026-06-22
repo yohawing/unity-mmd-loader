@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.Animations;
 using UnityEngine.Playables;
 using UnityEngine.SceneManagement;
 using UnityEngine.Timeline;
@@ -210,8 +211,17 @@ namespace Mmd.Tests
 
             yield return null;
 
-            MmdUnityPlaybackController? foundController = UnityEngine.Object.FindAnyObjectByType<MmdUnityPlaybackController>();
-            Assert.That(foundController, Is.Not.Null);
+            // The NativePlayback scene contains the configured "Native Playback" holder controller
+            // AND a second controller on the instantiated imported model hierarchy, because the
+            // importer attaches a MmdUnityPlaybackController to every imported model (Slice 7) and the
+            // scene builder Instantiates that hierarchy as a child. FindAnyObjectByType returns an
+            // arbitrary one of the two, so the holder must be selected deterministically by name.
+            MmdUnityPlaybackController[] sceneControllers =
+                UnityEngine.Object.FindObjectsByType<MmdUnityPlaybackController>(FindObjectsSortMode.None);
+            MmdUnityPlaybackController? foundController = sceneControllers
+                .FirstOrDefault(c => string.Equals(c.gameObject.name, "Native Playback", StringComparison.Ordinal));
+            Assert.That(foundController, Is.Not.Null,
+                $"scene must contain the 'Native Playback' holder controller (found {sceneControllers.Length} controller(s))");
             MmdUnityPlaybackController controller = foundController!;
             MmdPmxAsset modelAsset = controller.ModelAssetSource!;
             MmdVmdAsset motionAsset = controller.MotionAssetSource!;
@@ -777,6 +787,948 @@ namespace Mmd.Tests
         }
 
         [UnityTest]
+        public IEnumerator HairPhysicsFixtureImportScaleZeroDotOneKeepsNativeReadbackInMmdSpaceAndScalesUnityObjects()
+        {
+            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            if (!availability.backendAvailable)
+            {
+                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
+                yield break;
+            }
+
+            HairPhysicsScaleSample scaleOne = RunHairPhysicsForwardPlayback(importScale: 1.0f);
+            HairPhysicsScaleSample scalePointOne = RunHairPhysicsForwardPlayback(importScale: 0.1f);
+
+            Assert.That(scalePointOne.importScale, Is.EqualTo(0.1f).Within(0.0001f));
+            Assert.That(scalePointOne.nativePosition.x, Is.EqualTo(scaleOne.nativePosition.x).Within(0.001f));
+            Assert.That(scalePointOne.nativePosition.y, Is.EqualTo(scaleOne.nativePosition.y).Within(0.001f));
+            Assert.That(scalePointOne.nativePosition.z, Is.EqualTo(scaleOne.nativePosition.z).Within(0.001f));
+            Assert.That(scalePointOne.boneWorldPosition.x, Is.EqualTo(scaleOne.boneWorldPosition.x * 0.1f).Within(0.001f));
+            Assert.That(scalePointOne.boneWorldPosition.y, Is.EqualTo(scaleOne.boneWorldPosition.y * 0.1f).Within(0.001f));
+            Assert.That(scalePointOne.boneWorldPosition.z, Is.EqualTo(scaleOne.boneWorldPosition.z * 0.1f).Within(0.001f));
+            Assert.That(scalePointOne.debugWorldPosition.x, Is.EqualTo(scaleOne.debugWorldPosition.x * 0.1f).Within(0.001f));
+            Assert.That(scalePointOne.debugWorldPosition.y, Is.EqualTo(scaleOne.debugWorldPosition.y * 0.1f).Within(0.001f));
+            Assert.That(scalePointOne.debugWorldPosition.z, Is.EqualTo(scaleOne.debugWorldPosition.z * 0.1f).Within(0.001f));
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator HumanoidRetargetLateUpdateStepsLivePhysicsFromCurrentPose()
+        {
+            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            if (!availability.backendAvailable)
+            {
+                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
+                yield break;
+            }
+
+            MmdUnityModelInstance? instance = null;
+            MmdPmxAsset? pmxAsset = null;
+            MmdHumanoidProxyRigResult? proxyRig = null;
+            Avatar? avatar = null;
+            PlayableGraph graph = default;
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_hair_physics.pmx");
+                byte[] pmxBytes = File.ReadAllBytes(pmxPath);
+                MmdModelDefinition model = LoadHairPhysicsModelForLive(pmxPath);
+                instance = MmdUnityModelFactory.CreateSkinnedModel(
+                    model,
+                    pmxPath,
+                    MmdPmxAsset.DefaultImportScale);
+                pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                pmxAsset.Initialize(
+                    pmxBytes,
+                    "test_hair_physics.pmx",
+                    pmxPath,
+                    MmdPmxAsset.DefaultImportScale,
+                    parseSummary: MmdPmxParseSummary.FromModel(model));
+
+                MmdUnityPlaybackController controller = instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.ConfigureModelAsset(pmxAsset);
+                controller.SetPhysicsMode(MmdPhysicsMode.Live);
+
+                int drivenBoneIndex = FindFirstValidStaticPhysicsBone(model, instance);
+                Assert.That(drivenBoneIndex, Is.GreaterThanOrEqualTo(0),
+                    "test_hair_physics.pmx must expose a valid static/bone-driven body for humanoid physics seeding");
+
+                proxyRig = MmdHumanoidProxyRigFactory.CreateProxyRig(CreateHumanoidMappingModelWithOriginsForLivePhysics());
+                Assert.That(proxyRig.ProxyRoot, Is.Not.Null);
+                proxyRig.ProxyRoot!.transform.SetParent(instance.Root.transform, worldPositionStays: false);
+                proxyRig.ProxyRoot.SetActive(true);
+                MmdHumanoidAvatarBuildResult avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(proxyRig);
+                Assert.That(avatarResult.IsValidHumanAvatar, Is.True, string.Join("\n", avatarResult.Diagnostics));
+                avatar = avatarResult.Avatar;
+
+                Animator animator = instance.Root.AddComponent<Animator>();
+                animator.avatar = avatar;
+                graph = CreateBoundAnimatorGraph(animator);
+
+                Transform proxyHips = proxyRig.BoneMap[HumanBodyBones.Hips];
+                Transform drivenBone = instance.BoneTransforms[drivenBoneIndex];
+                Vector3 proxyBindPosition = proxyHips.localPosition;
+                Vector3 drivenBindPosition = drivenBone.localPosition;
+                controller.ConfigureHumanoidRetarget(
+                    proxyRig.ProxyRoot.transform,
+                    new[]
+                    {
+                        new MmdHumanoidRetargetBinding(
+                            HumanBodyBones.Hips,
+                            drivenBoneIndex,
+                            proxyHips,
+                            drivenBone,
+                            proxyHips.localRotation,
+                            drivenBone.localRotation,
+                            copyLocalPosition: true,
+                            translationTargetTransform: drivenBone,
+                            translationTargetMmdBoneIndex: drivenBoneIndex,
+                            proxyBindLocalPosition: proxyBindPosition,
+                            translationTargetBindLocalPosition: drivenBindPosition)
+                    },
+                    Array.Empty<MmdHumanoidAppendTransformBinding>());
+
+                proxyHips.localPosition = proxyBindPosition + new Vector3(0.05f, 0.0f, 0.0f);
+                proxyHips.localRotation = Quaternion.Euler(0.0f, 4.0f, 0.0f);
+                yield return null;
+
+                Assert.That(controller.LastHumanoidRetargetGate, Is.EqualTo(MmdHumanoidRetargetGate.Ready));
+                Assert.That(controller.IsConfigured, Is.False,
+                    "Self-tick humanoid Live physics must not configure the VMD playback binding.");
+                Assert.That(controller.HasHumanoidPhysicsBinding, Is.True,
+                    "Self-tick humanoid Live physics should lazily create a model-only physics binding from ModelAssetSource.");
+                Assert.That(controller.LastLivePhysicsDiagnostics, Is.Not.Null);
+                Assert.That(controller.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(0));
+                Assert.That(controller.LastLivePhysicsDiagnostics.deltaTime, Is.EqualTo(0.0f));
+                Assert.That(controller.LastSnapshot, Is.Null,
+                    "Humanoid-driven live physics must not overwrite the VMD playback snapshot surface.");
+
+                HashSet<int> hairBoneSlots = CollectNonStaticPhysicsBoneSlots(model, instance);
+                Assert.That(hairBoneSlots.Count, Is.GreaterThan(0),
+                    "Expected at least one non-static rigidbody linked to a hair bone");
+                var frameZeroPositions = new Dictionary<int, Vector3>();
+                var frameZeroRotations = new Dictionary<int, Quaternion>();
+                foreach (int slot in hairBoneSlots)
+                {
+                    frameZeroPositions[slot] = instance.BoneTransforms[slot].localPosition;
+                    frameZeroRotations[slot] = instance.BoneTransforms[slot].localRotation;
+                }
+
+                for (int i = 1; i <= 5; i++)
+                {
+                    proxyHips.localPosition = proxyBindPosition + new Vector3(0.05f + 0.01f * i, 0.0f, 0.0f);
+                    proxyHips.localRotation = Quaternion.Euler(0.0f, 4.0f + i, 0.0f);
+                    yield return null;
+                }
+
+                Assert.That(controller.LastLivePhysicsDiagnostics, Is.Not.Null);
+                Assert.That(controller.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(5));
+                Assert.That(controller.LastLivePhysicsDiagnostics.deltaTime, Is.GreaterThan(0.0f));
+                Assert.That(controller.LastLivePhysicsDiagnostics.stepPhysicsMs, Is.GreaterThan(0.0));
+
+                bool anyHairBoneChanged = false;
+                foreach (int slot in hairBoneSlots)
+                {
+                    Transform bone = instance.BoneTransforms[slot];
+                    if ((bone.localPosition - frameZeroPositions[slot]).sqrMagnitude > 0.0001f ||
+                        Quaternion.Angle(frameZeroRotations[slot], bone.localRotation) > 0.01f)
+                    {
+                        anyHairBoneChanged = true;
+                    }
+
+                    Assert.That(
+                        Vector3.Distance(instance.Root.transform.position, bone.position),
+                        Is.LessThan(1000.0f),
+                        "Humanoid-driven live physics hair bone must remain near the model root");
+                }
+
+                Assert.That(anyHairBoneChanged, Is.True,
+                    "Expected humanoid-retargeted body motion to drive live physics feedback into at least one non-static hair bone");
+            }
+            finally
+            {
+                if (graph.IsValid())
+                {
+                    graph.Destroy();
+                }
+
+                if (avatar != null)
+                {
+                    UnityEngine.Object.Destroy(avatar);
+                }
+
+                if (proxyRig?.ProxyRoot != null)
+                {
+                    UnityEngine.Object.Destroy(proxyRig.ProxyRoot);
+                }
+
+                if (pmxAsset != null)
+                {
+                    UnityEngine.Object.Destroy(pmxAsset);
+                }
+
+                DestroyInstance(instance);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator HumanoidRetargetLateUpdateCreatesModelOnlyPhysicsBindingFromModelAsset()
+        {
+            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            if (!availability.backendAvailable)
+            {
+                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
+                yield break;
+            }
+
+            MmdUnityModelInstance? instance = null;
+            MmdPmxAsset? pmxAsset = null;
+            MmdHumanoidProxyRigResult? proxyRig = null;
+            Avatar? avatar = null;
+            PlayableGraph graph = default;
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_hair_physics.pmx");
+                byte[] pmxBytes = File.ReadAllBytes(pmxPath);
+                MmdModelDefinition model = LoadHairPhysicsModelForLive(pmxPath);
+                instance = MmdUnityModelFactory.CreateSkinnedModel(
+                    model,
+                    pmxPath,
+                    MmdPmxAsset.DefaultImportScale);
+                pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                pmxAsset.Initialize(
+                    pmxBytes,
+                    "test_hair_physics.pmx",
+                    pmxPath,
+                    MmdPmxAsset.DefaultImportScale,
+                    parseSummary: MmdPmxParseSummary.FromModel(model));
+
+                MmdUnityPlaybackController controller = instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.ConfigureModelAsset(pmxAsset);
+                controller.SetPhysicsMode(MmdPhysicsMode.Live);
+
+                int drivenBoneIndex = FindFirstValidStaticPhysicsBone(model, instance);
+                Assert.That(drivenBoneIndex, Is.GreaterThanOrEqualTo(0),
+                    "test_hair_physics.pmx must expose a valid static/bone-driven body for humanoid physics seeding");
+
+                proxyRig = MmdHumanoidProxyRigFactory.CreateProxyRig(CreateHumanoidMappingModelWithOriginsForLivePhysics());
+                Assert.That(proxyRig.ProxyRoot, Is.Not.Null);
+                proxyRig.ProxyRoot!.transform.SetParent(instance.Root.transform, worldPositionStays: false);
+                proxyRig.ProxyRoot.SetActive(true);
+                MmdHumanoidAvatarBuildResult avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(proxyRig);
+                Assert.That(avatarResult.IsValidHumanAvatar, Is.True, string.Join("\n", avatarResult.Diagnostics));
+                avatar = avatarResult.Avatar;
+
+                Animator animator = instance.Root.AddComponent<Animator>();
+                animator.avatar = avatar;
+                graph = CreateBoundAnimatorGraph(animator);
+
+                Transform proxyHips = proxyRig.BoneMap[HumanBodyBones.Hips];
+                Transform drivenBone = instance.BoneTransforms[drivenBoneIndex];
+                Vector3 proxyBindPosition = proxyHips.localPosition;
+                Vector3 drivenBindPosition = drivenBone.localPosition;
+                controller.ConfigureHumanoidRetarget(
+                    proxyRig.ProxyRoot.transform,
+                    new[]
+                    {
+                        new MmdHumanoidRetargetBinding(
+                            HumanBodyBones.Hips,
+                            drivenBoneIndex,
+                            proxyHips,
+                            drivenBone,
+                            proxyHips.localRotation,
+                            drivenBone.localRotation,
+                            copyLocalPosition: true,
+                            translationTargetTransform: drivenBone,
+                            translationTargetMmdBoneIndex: drivenBoneIndex,
+                            proxyBindLocalPosition: proxyBindPosition,
+                            translationTargetBindLocalPosition: drivenBindPosition)
+                    },
+                    Array.Empty<MmdHumanoidAppendTransformBinding>());
+
+                Assert.That(controller.IsConfigured, Is.False,
+                    "The regression must start with no manually injected playback binding.");
+
+                proxyHips.localPosition = proxyBindPosition + new Vector3(0.05f, 0.0f, 0.0f);
+                proxyHips.localRotation = Quaternion.Euler(0.0f, 4.0f, 0.0f);
+                yield return null;
+
+                Assert.That(controller.LastHumanoidRetargetGate, Is.EqualTo(MmdHumanoidRetargetGate.Ready));
+                Assert.That(controller.IsConfigured, Is.False,
+                    "Model-only humanoid physics binding must stay separate from the VMD playback binding.");
+                Assert.That(controller.HasHumanoidPhysicsBinding, Is.True,
+                    "Humanoid Live physics should lazily create its own model-only binding from ModelAssetSource.");
+                Assert.That(controller.LastLivePhysicsDiagnostics, Is.Not.Null);
+                Assert.That(controller.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(0));
+                Assert.That(controller.LastSnapshot, Is.Null,
+                    "Model-only humanoid physics binding must not create a VMD playback snapshot.");
+
+                HashSet<int> hairBoneSlots = CollectNonStaticPhysicsBoneSlots(model, instance);
+                Assert.That(hairBoneSlots.Count, Is.GreaterThan(0),
+                    "Expected at least one non-static rigidbody linked to a hair bone");
+                var frameZeroPositions = new Dictionary<int, Vector3>();
+                var frameZeroRotations = new Dictionary<int, Quaternion>();
+                foreach (int slot in hairBoneSlots)
+                {
+                    frameZeroPositions[slot] = instance.BoneTransforms[slot].localPosition;
+                    frameZeroRotations[slot] = instance.BoneTransforms[slot].localRotation;
+                }
+
+                for (int i = 1; i <= 5; i++)
+                {
+                    proxyHips.localPosition = proxyBindPosition + new Vector3(0.05f + 0.01f * i, 0.0f, 0.0f);
+                    proxyHips.localRotation = Quaternion.Euler(0.0f, 4.0f + i, 0.0f);
+                    yield return null;
+                }
+
+                Assert.That(controller.LastLivePhysicsDiagnostics, Is.Not.Null);
+                Assert.That(controller.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(5));
+                Assert.That(controller.LastLivePhysicsDiagnostics.deltaTime, Is.GreaterThan(0.0f));
+
+                bool anyHairBoneChanged = false;
+                foreach (int slot in hairBoneSlots)
+                {
+                    Transform bone = instance.BoneTransforms[slot];
+                    if ((bone.localPosition - frameZeroPositions[slot]).sqrMagnitude > 0.0001f ||
+                        Quaternion.Angle(frameZeroRotations[slot], bone.localRotation) > 0.01f)
+                    {
+                        anyHairBoneChanged = true;
+                    }
+                }
+
+                Assert.That(anyHairBoneChanged, Is.True,
+                    "Expected model-only humanoid live physics to feed Bullet readback into at least one non-static hair bone");
+            }
+            finally
+            {
+                if (graph.IsValid())
+                {
+                    graph.Destroy();
+                }
+
+                if (avatar != null)
+                {
+                    UnityEngine.Object.Destroy(avatar);
+                }
+
+                if (proxyRig?.ProxyRoot != null)
+                {
+                    UnityEngine.Object.Destroy(proxyRig.ProxyRoot);
+                }
+
+                if (pmxAsset != null)
+                {
+                    UnityEngine.Object.Destroy(pmxAsset);
+                }
+
+                DestroyInstance(instance);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator HumanoidRetargetTimelineTrackCreatesModelOnlyPhysicsBindingAndStepsLivePhysics()
+        {
+            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            if (!availability.backendAvailable)
+            {
+                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
+                yield break;
+            }
+
+            MmdUnityModelInstance? instance = null;
+            MmdPmxAsset? pmxAsset = null;
+            MmdHumanoidProxyRigResult? proxyRig = null;
+            Avatar? avatar = null;
+            TimelineAsset? timelineAsset = null;
+            AnimationClip? proxyAnimationClip = null;
+            GameObject? directorObject = null;
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_hair_physics.pmx");
+                byte[] pmxBytes = File.ReadAllBytes(pmxPath);
+                MmdModelDefinition model = LoadHairPhysicsModelForLive(pmxPath);
+                instance = MmdUnityModelFactory.CreateSkinnedModel(
+                    model,
+                    pmxPath,
+                    MmdPmxAsset.DefaultImportScale);
+                pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                pmxAsset.Initialize(
+                    pmxBytes,
+                    "test_hair_physics.pmx",
+                    pmxPath,
+                    MmdPmxAsset.DefaultImportScale,
+                    parseSummary: MmdPmxParseSummary.FromModel(model));
+
+                MmdUnityPlaybackController controller = instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.ConfigureModelAsset(pmxAsset);
+                controller.SetPhysicsMode(MmdPhysicsMode.Live);
+
+                int drivenBoneIndex = FindFirstValidStaticPhysicsBone(model, instance);
+                Assert.That(drivenBoneIndex, Is.GreaterThanOrEqualTo(0),
+                    "test_hair_physics.pmx must expose a valid static/bone-driven body for humanoid physics seeding");
+
+                proxyRig = MmdHumanoidProxyRigFactory.CreateProxyRig(CreateHumanoidMappingModelWithOriginsForLivePhysics());
+                Assert.That(proxyRig.ProxyRoot, Is.Not.Null);
+                proxyRig.ProxyRoot!.transform.SetParent(instance.Root.transform, worldPositionStays: false);
+                proxyRig.ProxyRoot.SetActive(true);
+                MmdHumanoidAvatarBuildResult avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(proxyRig);
+                Assert.That(avatarResult.IsValidHumanAvatar, Is.True, string.Join("\n", avatarResult.Diagnostics));
+                avatar = avatarResult.Avatar;
+
+                Animator animator = instance.Root.AddComponent<Animator>();
+                animator.avatar = avatar;
+
+                Transform proxyHips = proxyRig.BoneMap[HumanBodyBones.Hips];
+                Transform drivenBone = instance.BoneTransforms[drivenBoneIndex];
+                Vector3 proxyBindPosition = proxyHips.localPosition;
+                Vector3 drivenBindPosition = drivenBone.localPosition;
+                controller.ConfigureHumanoidRetarget(
+                    proxyRig.ProxyRoot.transform,
+                    new[]
+                    {
+                        new MmdHumanoidRetargetBinding(
+                            HumanBodyBones.Hips,
+                            drivenBoneIndex,
+                            proxyHips,
+                            drivenBone,
+                            proxyHips.localRotation,
+                            drivenBone.localRotation,
+                            copyLocalPosition: true,
+                            translationTargetTransform: drivenBone,
+                            translationTargetMmdBoneIndex: drivenBoneIndex,
+                            proxyBindLocalPosition: proxyBindPosition,
+                            translationTargetBindLocalPosition: drivenBindPosition)
+                    },
+                    Array.Empty<MmdHumanoidAppendTransformBinding>());
+
+                timelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
+                AnimationTrack animationTrack = timelineAsset.CreateTrack<AnimationTrack>(null, "Proxy Animator");
+                TimelineClip animationClip = animationTrack.CreateClip<AnimationPlayableAsset>();
+                animationClip.start = 0.0;
+                animationClip.duration = 1.0;
+                proxyAnimationClip = new AnimationClip();
+                ((AnimationPlayableAsset)animationClip.asset).clip = proxyAnimationClip;
+
+                // Intentionally exercises the deprecated dual-track path (regression coverage until removal).
+#pragma warning disable 618
+                MmdHumanoidRetargetTrack retargetTrack =
+                    timelineAsset.CreateTrack<MmdHumanoidRetargetTrack>(null, "MMD Humanoid Retarget");
+                TimelineClip retargetClip = retargetTrack.CreateClip<MmdHumanoidRetargetClip>();
+#pragma warning restore 618
+                retargetClip.start = 0.0;
+                retargetClip.duration = 1.0;
+
+                directorObject = new GameObject("humanoid-retarget-timeline-live-director");
+                PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
+                director.playOnAwake = false;
+                director.playableAsset = timelineAsset;
+                director.SetGenericBinding(animationTrack, animator);
+                director.SetGenericBinding(retargetTrack, controller);
+
+                Assert.That(controller.IsConfigured, Is.False,
+                    "The regression must start with no VMD playback binding; the Timeline retarget track may only create a physics-only binding.");
+                Assert.That(controller.HasHumanoidPhysicsBinding, Is.False);
+
+                proxyHips.localPosition = proxyBindPosition + new Vector3(0.05f, 0.0f, 0.0f);
+                proxyHips.localRotation = Quaternion.Euler(0.0f, 4.0f, 0.0f);
+                director.time = 0.0;
+                director.Evaluate();
+                yield return null;
+
+                Assert.That(controller.LastHumanoidRetargetGate, Is.EqualTo(MmdHumanoidRetargetGate.Ready));
+                Assert.That(controller.LastHumanoidRetargetResult, Is.Not.Null);
+                Assert.That(controller.LastHumanoidRetargetResult!.CopiedBoneCount, Is.EqualTo(1));
+                Assert.That(controller.IsConfigured, Is.False,
+                    "Timeline retarget Live physics must not configure the VMD playback binding; otherwise Update/Tick would call ApplyFrame on a physics-only binding.");
+                Assert.That(controller.HasHumanoidPhysicsBinding, Is.True,
+                    "Timeline retarget Live physics should lazily create a model-only physics binding from ModelAssetSource.");
+                Assert.That(controller.LastLivePhysicsDiagnostics, Is.Not.Null,
+                    "Timeline retarget track ProcessFrame must step Live physics in Play Mode.");
+                Assert.That(controller.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(0));
+                Assert.That(controller.LastLivePhysicsDiagnostics.deltaTime, Is.EqualTo(0.0f));
+                Assert.That(controller.LastSnapshot, Is.Null,
+                    "Model-only humanoid Timeline physics must not create a VMD playback snapshot.");
+
+                HashSet<int> hairBoneSlots = CollectNonStaticPhysicsBoneSlots(model, instance);
+                Assert.That(hairBoneSlots.Count, Is.GreaterThan(0),
+                    "Expected at least one non-static rigidbody linked to a hair bone");
+                var frameZeroPositions = new Dictionary<int, Vector3>();
+                var frameZeroRotations = new Dictionary<int, Quaternion>();
+                foreach (int slot in hairBoneSlots)
+                {
+                    frameZeroPositions[slot] = instance.BoneTransforms[slot].localPosition;
+                    frameZeroRotations[slot] = instance.BoneTransforms[slot].localRotation;
+                }
+
+                for (int i = 1; i <= 5; i++)
+                {
+                    proxyHips.localPosition = proxyBindPosition + new Vector3(0.05f + 0.01f * i, 0.0f, 0.0f);
+                    proxyHips.localRotation = Quaternion.Euler(0.0f, 4.0f + i, 0.0f);
+                    director.time = i / 30.0;
+                    director.Evaluate();
+                    yield return null;
+                }
+
+                Assert.That(controller.LastLivePhysicsDiagnostics, Is.Not.Null);
+                Assert.That(controller.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(5));
+                Assert.That(controller.LastLivePhysicsDiagnostics.deltaTime, Is.GreaterThan(0.0f));
+                Assert.That(controller.LastLivePhysicsDiagnostics.stepPhysicsMs, Is.GreaterThan(0.0));
+
+                bool anyHairBoneChanged = false;
+                foreach (int slot in hairBoneSlots)
+                {
+                    Transform bone = instance.BoneTransforms[slot];
+                    if ((bone.localPosition - frameZeroPositions[slot]).sqrMagnitude > 0.0001f ||
+                        Quaternion.Angle(frameZeroRotations[slot], bone.localRotation) > 0.01f)
+                    {
+                        anyHairBoneChanged = true;
+                    }
+                }
+
+                Assert.That(anyHairBoneChanged, Is.True,
+                    "Expected the MmdHumanoidRetargetTrack path to feed Live physics readback into at least one non-static hair bone");
+            }
+            finally
+            {
+                if (directorObject != null)
+                {
+                    UnityEngine.Object.Destroy(directorObject);
+                }
+
+                if (timelineAsset != null)
+                {
+                    UnityEngine.Object.Destroy(timelineAsset);
+                }
+
+                if (proxyAnimationClip != null)
+                {
+                    UnityEngine.Object.Destroy(proxyAnimationClip);
+                }
+
+                if (avatar != null)
+                {
+                    UnityEngine.Object.Destroy(avatar);
+                }
+
+                if (proxyRig?.ProxyRoot != null)
+                {
+                    UnityEngine.Object.Destroy(proxyRig.ProxyRoot);
+                }
+
+                if (pmxAsset != null)
+                {
+                    UnityEngine.Object.Destroy(pmxAsset);
+                }
+
+                DestroyInstance(instance);
+            }
+        }
+
+        // Alternative C regression: a SINGLE MmdHumanoidAnimationTrack (bound only to the
+        // controller, no separate AnimationTrack/Animator binding) carrying a real Humanoid
+        // muscle clip must (a) pose the proxy avatar via the track's manually-created
+        // AnimationPlayableOutput, (b) run the controller retarget side-effect so the native MMD
+        // bone tracks the proxy, and (c) step Live physics — all from one track.
+        [UnityTest]
+        public IEnumerator HumanoidAnimationTrackSingleTrackMuscleClipDrivesProxyAndRetargetsAndStepsPhysics()
+        {
+            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            if (!availability.backendAvailable)
+            {
+                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
+                yield break;
+            }
+
+            MmdUnityModelInstance? instance = null;
+            MmdPmxAsset? pmxAsset = null;
+            MmdHumanoidProxyRigResult? proxyRig = null;
+            Avatar? avatar = null;
+            TimelineAsset? timelineAsset = null;
+            AnimationClip? muscleClip = null;
+            GameObject? directorObject = null;
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_hair_physics.pmx");
+                byte[] pmxBytes = File.ReadAllBytes(pmxPath);
+                MmdModelDefinition model = LoadHairPhysicsModelForLive(pmxPath);
+                instance = MmdUnityModelFactory.CreateSkinnedModel(
+                    model,
+                    pmxPath,
+                    MmdPmxAsset.DefaultImportScale);
+                pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                pmxAsset.Initialize(
+                    pmxBytes,
+                    "test_hair_physics.pmx",
+                    pmxPath,
+                    MmdPmxAsset.DefaultImportScale,
+                    parseSummary: MmdPmxParseSummary.FromModel(model));
+
+                MmdUnityPlaybackController controller = instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.ConfigureModelAsset(pmxAsset);
+                controller.SetPhysicsMode(MmdPhysicsMode.Live);
+
+                int drivenBoneIndex = FindFirstValidStaticPhysicsBone(model, instance);
+                Assert.That(drivenBoneIndex, Is.GreaterThanOrEqualTo(0),
+                    "test_hair_physics.pmx must expose a valid static/bone-driven body for humanoid physics seeding");
+
+                proxyRig = MmdHumanoidProxyRigFactory.CreateProxyRig(CreateHumanoidMappingModelWithOriginsForLivePhysics());
+                Assert.That(proxyRig.ProxyRoot, Is.Not.Null);
+                proxyRig.ProxyRoot!.transform.SetParent(instance.Root.transform, worldPositionStays: false);
+                proxyRig.ProxyRoot.SetActive(true);
+                MmdHumanoidAvatarBuildResult avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(proxyRig);
+                Assert.That(avatarResult.IsValidHumanAvatar, Is.True, string.Join("\n", avatarResult.Diagnostics));
+                avatar = avatarResult.Avatar;
+
+                Animator animator = instance.Root.AddComponent<Animator>();
+                animator.avatar = avatar;
+
+                Transform proxySpine = proxyRig.BoneMap[HumanBodyBones.Spine];
+                Transform drivenBone = instance.BoneTransforms[drivenBoneIndex];
+                Quaternion proxySpineBind = proxySpine.localRotation;
+                Quaternion drivenBoneBind = drivenBone.localRotation;
+                Vector3 proxySpineBindPosition = proxySpine.localPosition;
+                Vector3 drivenBindPosition = drivenBone.localPosition;
+                controller.ConfigureHumanoidRetarget(
+                    proxyRig.ProxyRoot.transform,
+                    new[]
+                    {
+                        new MmdHumanoidRetargetBinding(
+                            HumanBodyBones.Spine,
+                            drivenBoneIndex,
+                            proxySpine,
+                            drivenBone,
+                            proxySpineBind,
+                            drivenBoneBind,
+                            copyLocalPosition: true,
+                            translationTargetTransform: drivenBone,
+                            translationTargetMmdBoneIndex: drivenBoneIndex,
+                            proxyBindLocalPosition: proxySpineBindPosition,
+                            translationTargetBindLocalPosition: drivenBindPosition)
+                    },
+                    Array.Empty<MmdHumanoidAppendTransformBinding>());
+
+                // Build a real Humanoid muscle clip: a spine muscle that ramps up so the proxy
+                // avatar bends progressively as the timeline advances. This exercises the actual
+                // muscle-space retarget path (not a direct transform poke), which is the user's
+                // hard condition: a standard Humanoid AnimationClip must drive the MMD model.
+                string spineMuscleName = ResolveSpineMuscleName();
+                Assert.That(spineMuscleName, Is.Not.Null.And.Not.Empty,
+                    "could not resolve a Spine muscle name from HumanTrait");
+                muscleClip = new AnimationClip { frameRate = 30.0f };
+                muscleClip.SetCurve(
+                    string.Empty,
+                    typeof(Animator),
+                    spineMuscleName,
+                    AnimationCurve.Linear(0.0f, 0.0f, 0.5f, 0.9f));
+
+                timelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
+                MmdHumanoidAnimationTrack humanoidTrack =
+                    timelineAsset.CreateTrack<MmdHumanoidAnimationTrack>(null, "MMD Humanoid");
+                TimelineClip humanoidClip = humanoidTrack.CreateClip<MmdHumanoidAnimationClip>();
+                humanoidClip.start = 0.0;
+                humanoidClip.duration = 0.5;
+                var humanoidClipAsset = (MmdHumanoidAnimationClip)humanoidClip.asset;
+                humanoidClipAsset.clip = muscleClip;
+                humanoidClipAsset.proxyAnimator.exposedName =
+                    "mmdHumanoidProxyAnimator_" + Guid.NewGuid().ToString("N");
+
+                directorObject = new GameObject("humanoid-animation-track-single-director");
+                PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
+                director.playOnAwake = false;
+                director.playableAsset = timelineAsset;
+                // SINGLE generic binding (controller, for the retarget ProcessFrame). The proxy
+                // Animator that the clip poses is supplied via an ExposedReference; setup/authoring
+                // sets this automatically since the Animator is on the controller's GameObject.
+                director.SetGenericBinding(humanoidTrack, controller);
+                director.SetReferenceValue(humanoidClipAsset.proxyAnimator.exposedName, animator);
+
+                Assert.That(controller.IsConfigured, Is.False,
+                    "The single humanoid track may only create a physics-only binding, never a VMD playback binding.");
+                Assert.That(controller.HasHumanoidPhysicsBinding, Is.False);
+
+                for (int i = 0; i <= 5; i++)
+                {
+                    director.time = i / 30.0;
+                    director.Evaluate();
+                    yield return null;
+                }
+
+                // Re-evaluate at the same final time to settle the accepted 1-evaluation lag
+                // (ProcessFrame reads the proxy the animation output posed on the prior pass).
+                director.time = 5 / 30.0;
+                director.Evaluate();
+                yield return null;
+
+                // (a) the single track's AnimationPlayableOutput posed the proxy from the muscle clip
+                float proxyAngle = Quaternion.Angle(proxySpineBind, proxySpine.localRotation);
+                Assert.That(proxyAngle, Is.GreaterThan(2.0f),
+                    "the muscle clip should pose the proxy spine via the single track's AnimationPlayableOutput " +
+                    "(got angle " + proxyAngle + ", muscle=" + spineMuscleName + ")");
+
+                // (b) the same track's ScriptPlayable ran the controller retarget
+                Assert.That(controller.LastHumanoidRetargetGate, Is.EqualTo(MmdHumanoidRetargetGate.Ready));
+                Assert.That(controller.LastHumanoidRetargetResult, Is.Not.Null);
+                Assert.That(controller.LastHumanoidRetargetResult!.CopiedBoneCount, Is.EqualTo(1));
+
+                // (c) the native MMD bone tracks the proxy rotation delta (retarget side-effect)
+                float nativeAngle = Quaternion.Angle(drivenBoneBind, drivenBone.localRotation);
+                Assert.That(nativeAngle, Is.EqualTo(proxyAngle).Within(0.5f),
+                    "the native bone should track the proxy spine rotation delta via the retarget side-effect " +
+                    "(proxy " + proxyAngle + " vs native " + nativeAngle + ")");
+
+                // (d) Live physics stepped from the single track, with no VMD playback binding
+                Assert.That(controller.IsConfigured, Is.False);
+                Assert.That(controller.HasHumanoidPhysicsBinding, Is.True,
+                    "the single humanoid track should lazily create a model-only physics binding from ModelAssetSource.");
+                Assert.That(controller.LastLivePhysicsDiagnostics, Is.Not.Null,
+                    "the single humanoid track ProcessFrame must step Live physics in Play Mode.");
+                Assert.That(controller.LastLivePhysicsDiagnostics!.deltaTime, Is.GreaterThan(0.0f));
+                Assert.That(controller.LastSnapshot, Is.Null,
+                    "model-only humanoid Timeline physics must not create a VMD playback snapshot.");
+            }
+            finally
+            {
+                if (directorObject != null)
+                {
+                    UnityEngine.Object.Destroy(directorObject);
+                }
+
+                if (timelineAsset != null)
+                {
+                    UnityEngine.Object.Destroy(timelineAsset);
+                }
+
+                if (muscleClip != null)
+                {
+                    UnityEngine.Object.Destroy(muscleClip);
+                }
+
+                if (avatar != null)
+                {
+                    UnityEngine.Object.Destroy(avatar);
+                }
+
+                if (proxyRig?.ProxyRoot != null)
+                {
+                    UnityEngine.Object.Destroy(proxyRig.ProxyRoot);
+                }
+
+                if (pmxAsset != null)
+                {
+                    UnityEngine.Object.Destroy(pmxAsset);
+                }
+
+                DestroyInstance(instance);
+            }
+        }
+
+        private static string ResolveSpineMuscleName()
+        {
+            for (int dof = 0; dof < 3; dof++)
+            {
+                int muscle = HumanTrait.MuscleFromBone((int)HumanBodyBones.Spine, dof);
+                if (muscle >= 0)
+                {
+                    return HumanTrait.MuscleName[muscle];
+                }
+            }
+
+            return string.Empty;
+        }
+
+        // Regression: the single MmdHumanoidAnimationTrack must enable applyRootMotion on the proxy
+        // Animator so a Humanoid clip's root motion (RootT/RootQ) travels the model the way a standard
+        // AnimationTrack did. Without it the model only does in-place body sway (the "腰の移動" /
+        // center travel is dropped). We assert the track flips applyRootMotion on at graph build; that
+        // the resulting root curves actually translate the model is Unity's AnimationPlayableOutput
+        // behavior (verified on the real dance clip in-editor).
+        [UnityTest]
+        public IEnumerator HumanoidAnimationTrackEnablesRootMotionOnProxyAnimator()
+        {
+            GameObject? root = null;
+            Avatar? avatar = null;
+            TimelineAsset? timelineAsset = null;
+            AnimationClip? muscleClip = null;
+            GameObject? directorObject = null;
+            MmdHumanoidProxyRigResult? proxyRig = null;
+            try
+            {
+                root = new GameObject("humanoid-rootmotion-root");
+                var nativeBoneObject = new GameObject("NativeSpine");
+                nativeBoneObject.transform.SetParent(root.transform, worldPositionStays: false);
+
+                proxyRig = MmdHumanoidProxyRigFactory.CreateProxyRig(CreateHumanoidMappingModelWithOriginsForLivePhysics());
+                Assert.That(proxyRig.ProxyRoot, Is.Not.Null);
+                proxyRig.ProxyRoot!.transform.SetParent(root.transform, worldPositionStays: false);
+                proxyRig.ProxyRoot.SetActive(true);
+                MmdHumanoidAvatarBuildResult avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(proxyRig);
+                Assert.That(avatarResult.IsValidHumanAvatar, Is.True, string.Join("\n", avatarResult.Diagnostics));
+                avatar = avatarResult.Avatar;
+
+                Animator animator = root.AddComponent<Animator>();
+                animator.avatar = avatar;
+                animator.applyRootMotion = false;
+
+                MmdUnityPlaybackController controller = root.AddComponent<MmdUnityPlaybackController>();
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+
+                Transform proxySpine = proxyRig.BoneMap[HumanBodyBones.Spine];
+                controller.ConfigureHumanoidRetarget(
+                    proxyRig.ProxyRoot.transform,
+                    new[]
+                    {
+                        new MmdHumanoidRetargetBinding(
+                            HumanBodyBones.Spine,
+                            0,
+                            proxySpine,
+                            nativeBoneObject.transform,
+                            proxySpine.localRotation,
+                            nativeBoneObject.transform.localRotation)
+                    },
+                    Array.Empty<MmdHumanoidAppendTransformBinding>());
+
+                muscleClip = new AnimationClip { frameRate = 30.0f };
+                muscleClip.SetCurve(
+                    string.Empty,
+                    typeof(Animator),
+                    ResolveSpineMuscleName(),
+                    AnimationCurve.Linear(0.0f, 0.0f, 1.0f, 0.5f));
+
+                timelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
+                MmdHumanoidAnimationTrack humanoidTrack =
+                    timelineAsset.CreateTrack<MmdHumanoidAnimationTrack>(null, "MMD Humanoid");
+                TimelineClip humanoidClip = humanoidTrack.CreateClip<MmdHumanoidAnimationClip>();
+                humanoidClip.start = 0.0;
+                humanoidClip.duration = 1.0;
+                var humanoidClipAsset = (MmdHumanoidAnimationClip)humanoidClip.asset;
+                humanoidClipAsset.clip = muscleClip;
+                humanoidClipAsset.proxyAnimator.exposedName =
+                    "mmdHumanoidRootMotionAnimator_" + Guid.NewGuid().ToString("N");
+
+                directorObject = new GameObject("humanoid-rootmotion-director");
+                PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
+                director.playOnAwake = false;
+                director.playableAsset = timelineAsset;
+                director.SetGenericBinding(humanoidTrack, controller);
+                director.SetReferenceValue(humanoidClipAsset.proxyAnimator.exposedName, animator);
+
+                Assert.That(animator.applyRootMotion, Is.False, "precondition: root motion starts disabled");
+
+                director.time = 0.0;
+                director.Evaluate();
+                yield return null;
+
+                Assert.That(animator.applyRootMotion, Is.True,
+                    "the single humanoid track must enable applyRootMotion so the clip's root motion travels the model");
+            }
+            finally
+            {
+                if (directorObject != null)
+                {
+                    UnityEngine.Object.Destroy(directorObject);
+                }
+
+                if (timelineAsset != null)
+                {
+                    UnityEngine.Object.Destroy(timelineAsset);
+                }
+
+                if (muscleClip != null)
+                {
+                    UnityEngine.Object.Destroy(muscleClip);
+                }
+
+                if (avatar != null)
+                {
+                    UnityEngine.Object.Destroy(avatar);
+                }
+
+                if (proxyRig?.ProxyRoot != null)
+                {
+                    UnityEngine.Object.Destroy(proxyRig.ProxyRoot);
+                }
+
+                if (root != null)
+                {
+                    UnityEngine.Object.Destroy(root);
+                }
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator HumanoidRetargetLateUpdateWithPhysicsOffDoesNotUpdateLiveDiagnostics()
+        {
+            MmdUnityPlaybackBinding? binding = null;
+            MmdHumanoidProxyRigResult? proxyRig = null;
+            Avatar? avatar = null;
+            PlayableGraph graph = default;
+            try
+            {
+                binding = MmdUnityPlaybackBinding.CreateSkinned(
+                    CreateMinimalTriangleModel(),
+                    CreateRootTranslationMotion(),
+                    "humanoid-retarget-physics-off.pmx",
+                    "humanoid-retarget-physics-off.vmd");
+                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.Configure(binding, 30.0f, playOnStart: false);
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+
+                proxyRig = MmdHumanoidProxyRigFactory.CreateProxyRig(CreateHumanoidMappingModelWithOriginsForLivePhysics());
+                Assert.That(proxyRig.ProxyRoot, Is.Not.Null);
+                proxyRig.ProxyRoot!.transform.SetParent(binding.Instance.Root.transform, worldPositionStays: false);
+                proxyRig.ProxyRoot.SetActive(true);
+                MmdHumanoidAvatarBuildResult avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(proxyRig);
+                Assert.That(avatarResult.IsValidHumanAvatar, Is.True, string.Join("\n", avatarResult.Diagnostics));
+                avatar = avatarResult.Avatar;
+
+                Animator animator = binding.Instance.Root.AddComponent<Animator>();
+                animator.avatar = avatar;
+                graph = CreateBoundAnimatorGraph(animator);
+
+                Transform proxyHips = proxyRig.BoneMap[HumanBodyBones.Hips];
+                Transform nativeRoot = binding.Instance.BoneTransforms[0];
+                controller.ConfigureHumanoidRetarget(
+                    proxyRig.ProxyRoot.transform,
+                    new[]
+                    {
+                        new MmdHumanoidRetargetBinding(
+                            HumanBodyBones.Hips,
+                            0,
+                            proxyHips,
+                            nativeRoot)
+                    },
+                    Array.Empty<MmdHumanoidAppendTransformBinding>());
+
+                proxyHips.localRotation = Quaternion.Euler(0.0f, 9.0f, 0.0f);
+                yield return null;
+
+                Assert.That(controller.PhysicsMode, Is.EqualTo(MmdPhysicsMode.Off));
+                Assert.That(controller.LastHumanoidRetargetGate, Is.EqualTo(MmdHumanoidRetargetGate.Ready));
+                Assert.That(controller.LastHumanoidRetargetResult, Is.Not.Null);
+                Assert.That(controller.LastHumanoidRetargetResult!.CopiedBoneCount, Is.EqualTo(1));
+                Assert.That(controller.LastLivePhysicsDiagnostics, Is.Null);
+            }
+            finally
+            {
+                if (graph.IsValid())
+                {
+                    graph.Destroy();
+                }
+
+                if (avatar != null)
+                {
+                    UnityEngine.Object.Destroy(avatar);
+                }
+
+                if (proxyRig?.ProxyRoot != null)
+                {
+                    UnityEngine.Object.Destroy(proxyRig.ProxyRoot);
+                }
+
+                DestroyInstance(binding?.Instance);
+            }
+        }
+
+        [UnityTest]
         public IEnumerator ControllerForwardPlaybackInPlayModeRunsLivePhysics()
         {
             MmdUnityPlaybackBinding? binding = null;
@@ -1207,6 +2159,203 @@ namespace Mmd.Tests
 
             string packageRoot = Path.GetFullPath(Path.Combine(projectRoot, "..", "packages", "com.yohawing.mmd-loader"));
             return Path.Combine(packageRoot, "Tests", "Fixtures", "Assets", fileName);
+        }
+
+        private static HairPhysicsScaleSample RunHairPhysicsForwardPlayback(float importScale)
+        {
+            MmdUnityPlaybackBinding? binding = null;
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_hair_physics.pmx");
+                MmdModelDefinition model = LoadHairPhysicsModelForLive(pmxPath);
+                MmdMotionDefinition motion = CreateRestPoseMotion(model);
+                binding = MmdUnityPlaybackBinding.CreateSkinned(
+                    model, motion, "test_hair_physics.pmx", "rest-pose", pmxPath, importScale);
+                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.Configure(binding, 30.0f, playOnStart: false);
+                controller.SetPhysicsMode(MmdPhysicsMode.Live);
+
+                controller.ApplyFrame(0);
+                controller.ApplyFrame(1);
+                controller.ApplyFrame(5);
+                Assert.That(binding.LastLivePhysicsDiagnostics, Is.Not.Null);
+                Assert.That(binding.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(5));
+
+                MmdUnityPhysicsBody body = binding.Instance.PhysicsBodies.First(physicsBody =>
+                    physicsBody != null &&
+                    physicsBody.HasNativeTransform &&
+                    !string.Equals(physicsBody.PhysicsKind, "static", StringComparison.Ordinal) &&
+                    physicsBody.BoneIndex >= 0 &&
+                    physicsBody.BoneIndex < binding.Instance.BoneTransforms.Length);
+                return new HairPhysicsScaleSample(
+                    binding.Instance.ImportScale,
+                    body.NativePosition,
+                    binding.Instance.BoneTransforms[body.BoneIndex].position,
+                    body.transform.position);
+            }
+            finally
+            {
+                if (binding?.Instance?.Root != null)
+                {
+                    DestroyInstance(binding.Instance);
+                }
+                else
+                {
+                    binding?.Dispose();
+                }
+            }
+        }
+
+        private static MmdModelDefinition LoadHairPhysicsModelForLive(string pmxPath)
+        {
+            var parser = new NativeMmdParser();
+            MmdModelDefinition model = parser.LoadModel(File.ReadAllBytes(pmxPath));
+            Assert.That(model.physics.rigidbodies.Count, Is.GreaterThan(0),
+                "test_hair_physics.pmx must contain rigidbody definitions");
+            model.physics.joints.RemoveAll(j => j.rigidbodyAIndex < 0 && j.rigidbodyBIndex < 0);
+            return model;
+        }
+
+        private static int FindFirstValidStaticPhysicsBone(MmdModelDefinition model, MmdUnityPlaybackBinding binding)
+        {
+            foreach (MmdRigidbodyDefinition body in model.physics.rigidbodies)
+            {
+                if (string.Equals(body.physicsKind, "static", StringComparison.Ordinal) &&
+                    body.boneIndex >= 0 &&
+                    body.boneIndex < binding.Instance.BoneTransforms.Length)
+                {
+                    return body.boneIndex;
+                }
+            }
+
+            return -1;
+        }
+
+        private static int FindFirstValidStaticPhysicsBone(MmdModelDefinition model, MmdUnityModelInstance instance)
+        {
+            foreach (MmdRigidbodyDefinition body in model.physics.rigidbodies)
+            {
+                if (string.Equals(body.physicsKind, "static", StringComparison.Ordinal) &&
+                    body.boneIndex >= 0 &&
+                    body.boneIndex < instance.BoneTransforms.Length)
+                {
+                    return body.boneIndex;
+                }
+            }
+
+            return -1;
+        }
+
+        private static HashSet<int> CollectNonStaticPhysicsBoneSlots(
+            MmdModelDefinition model,
+            MmdUnityPlaybackBinding binding)
+        {
+            var slots = new HashSet<int>();
+            foreach (MmdRigidbodyDefinition body in model.physics.rigidbodies)
+            {
+                if (!string.Equals(body.physicsKind, "static", StringComparison.Ordinal) &&
+                    body.boneIndex >= 0 &&
+                    body.boneIndex < binding.Instance.BoneTransforms.Length)
+                {
+                    slots.Add(body.boneIndex);
+                }
+            }
+
+            return slots;
+        }
+
+        private static HashSet<int> CollectNonStaticPhysicsBoneSlots(
+            MmdModelDefinition model,
+            MmdUnityModelInstance instance)
+        {
+            var slots = new HashSet<int>();
+            foreach (MmdRigidbodyDefinition body in model.physics.rigidbodies)
+            {
+                if (!string.Equals(body.physicsKind, "static", StringComparison.Ordinal) &&
+                    body.boneIndex >= 0 &&
+                    body.boneIndex < instance.BoneTransforms.Length)
+                {
+                    slots.Add(body.boneIndex);
+                }
+            }
+
+            return slots;
+        }
+
+        private static PlayableGraph CreateBoundAnimatorGraph(Animator animator)
+        {
+            PlayableGraph graph = PlayableGraph.Create("HumanoidRetargetLivePhysicsTestGraph");
+            graph.SetTimeUpdateMode(DirectorUpdateMode.GameTime);
+            AnimationClipPlayable clipPlayable = AnimationClipPlayable.Create(graph, new AnimationClip());
+            AnimationPlayableOutput output = AnimationPlayableOutput.Create(graph, "HumanoidRetargetOutput", animator);
+            output.SetSourcePlayable(clipPlayable);
+            graph.Play();
+            return graph;
+        }
+
+        private static MmdModelDefinition CreateHumanoidMappingModelWithOriginsForLivePhysics()
+        {
+            var model = new MmdModelDefinition();
+            AddHumanoidBone(model, 0, "下半身", -1, new[] { 0f, 90f, 0f });
+            AddHumanoidBone(model, 1, "上半身", 0, new[] { 0f, 115f, 0f });
+            AddHumanoidBone(model, 2, "首", 1, new[] { 0f, 150f, 0f });
+            AddHumanoidBone(model, 3, "頭", 2, new[] { 0f, 165f, 0f });
+            AddHumanoidBone(model, 4, "左足", 0, new[] { 8f, 85f, 0f });
+            AddHumanoidBone(model, 5, "左ひざ", 4, new[] { 8f, 45f, 0f });
+            AddHumanoidBone(model, 6, "左足首", 5, new[] { 8f, 5f, 3f });
+            AddHumanoidBone(model, 7, "右足", 0, new[] { -8f, 85f, 0f });
+            AddHumanoidBone(model, 8, "右ひざ", 7, new[] { -8f, 45f, 0f });
+            AddHumanoidBone(model, 9, "右足首", 8, new[] { -8f, 5f, 3f });
+            AddHumanoidBone(model, 10, "左腕", 1, new[] { 25f, 135f, 0f });
+            AddHumanoidBone(model, 11, "左ひじ", 10, new[] { 50f, 135f, 0f });
+            AddHumanoidBone(model, 12, "左手首", 11, new[] { 70f, 135f, 0f });
+            AddHumanoidBone(model, 13, "右腕", 1, new[] { -25f, 135f, 0f });
+            AddHumanoidBone(model, 14, "右ひじ", 13, new[] { -50f, 135f, 0f });
+            AddHumanoidBone(model, 15, "右手首", 14, new[] { -70f, 135f, 0f });
+            return model;
+        }
+
+        private static void AddHumanoidBone(MmdModelDefinition model, int index, string name, int parentIndex, float[] origin)
+        {
+            model.bones.Add(new MmdBoneDefinition
+            {
+                index = index,
+                name = name,
+                parentIndex = parentIndex,
+                origin = origin
+            });
+        }
+
+        private static MmdMotionDefinition CreateRestPoseMotion(MmdModelDefinition model)
+        {
+            return new MmdMotionDefinition
+            {
+                targetModelName = model.name,
+                maxFrame = 0,
+                boneKeyframes = new List<MmdBoneKeyframeDefinition>(),
+                morphKeyframes = new List<MmdMorphKeyframeDefinition>(),
+                modelKeyframes = new List<MmdModelKeyframeDefinition>()
+            };
+        }
+
+        private readonly struct HairPhysicsScaleSample
+        {
+            public readonly float importScale;
+            public readonly Vector3 nativePosition;
+            public readonly Vector3 boneWorldPosition;
+            public readonly Vector3 debugWorldPosition;
+
+            public HairPhysicsScaleSample(
+                float importScale,
+                Vector3 nativePosition,
+                Vector3 boneWorldPosition,
+                Vector3 debugWorldPosition)
+            {
+                this.importScale = importScale;
+                this.nativePosition = nativePosition;
+                this.boneWorldPosition = boneWorldPosition;
+                this.debugWorldPosition = debugWorldPosition;
+            }
         }
     }
 }
