@@ -73,4 +73,22 @@ if ($exitCode -ne 0) {
     throw "Runtime verification player build failed with exit code $exitCode. log=$logFile"
 }
 
+$packagePluginPath = Resolve-AbsolutePath (Join-Path $PSScriptRoot "..\packages\com.yohawing.mmd-loader\Runtime\Plugins\x86_64")
+$playerDataPath = Join-Path (Split-Path -Parent $OutputPath) ("{0}_Data" -f [System.IO.Path]::GetFileNameWithoutExtension($OutputPath))
+$playerPluginPath = Join-Path $playerDataPath "Plugins\x86_64"
+$nativePluginNames = @(
+    "mmd_runtime_ffi.dll",
+    "mmd_bullet.dll"
+)
+
+New-Item -ItemType Directory -Force -Path $playerPluginPath | Out-Null
+foreach ($nativePluginName in $nativePluginNames) {
+    $sourcePath = Join-Path $packagePluginPath $nativePluginName
+    if (-not (Test-Path -LiteralPath $sourcePath)) {
+        throw "Native plugin was not found: $sourcePath"
+    }
+
+    Copy-Item -LiteralPath $sourcePath -Destination (Join-Path $playerPluginPath $nativePluginName) -Force
+}
+
 Write-Host ("Runtime verification player built. output={0}; log={1}" -f $OutputPath, $logFile)
