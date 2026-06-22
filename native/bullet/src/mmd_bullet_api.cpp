@@ -414,7 +414,7 @@ YMU_BULLET_API ymu_bullet_status_t ymu_bullet_world_step(ymu_bullet_world_t* wor
     }
 
     clear_last_error();
-    world->world->stepSimulation(delta_time, max_sub_steps);
+    world->world->stepSimulation(delta_time, max_sub_steps, 1.0f / 120.0f);
     return YMU_BULLET_STATUS_SUCCESS;
 }
 
