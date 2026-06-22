@@ -407,12 +407,13 @@ namespace Mmd.Editor
 
         private static string[] GetImportedBoneNames(MmdPmxAsset? asset)
         {
-            if (asset == null || asset.ImportedRoot == null)
+            GameObject? importedRoot = asset?.ImportedRoot;
+            if (importedRoot == null)
             {
                 return System.Array.Empty<string>();
             }
 
-            SkinnedMeshRenderer? smr = asset.ImportedRoot.GetComponentInChildren<SkinnedMeshRenderer>(
+            SkinnedMeshRenderer? smr = importedRoot.GetComponentInChildren<SkinnedMeshRenderer>(
                 includeInactive: true);
             if (smr == null || smr.bones == null || smr.bones.Length == 0)
             {

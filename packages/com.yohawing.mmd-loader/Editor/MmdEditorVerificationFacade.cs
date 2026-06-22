@@ -55,13 +55,14 @@ namespace Mmd.Editor
             string? sourcePath = string.IsNullOrWhiteSpace(pmxAsset.SourcePath) ? null : pmxAsset.SourcePath;
 
             MmdUnityModelInstance instance;
-            if (pmxAsset.ImportedRoot != null)
+            GameObject? importedRoot = pmxAsset.ImportedRoot;
+            if (importedRoot != null)
             {
                 // Slice B: wrap the imported hierarchy directly without rebuilding Mesh or Materials.
                 instance = RunStage(
                     UnityInstantiationStage,
                     () => MmdUnityModelFactory.CreateFromImportedHierarchy(
-                        pmxAsset.ImportedRoot,
+                        importedRoot,
                         model,
                         sourcePath,
                         importScale));
@@ -353,7 +354,7 @@ namespace Mmd.Editor
             MmdUnityModelInstance instance,
             MmdPmxAsset pmxAsset)
         {
-            Mesh importedMesh = pmxAsset.ImportedMesh;
+            Mesh? importedMesh = pmxAsset.ImportedMesh;
             if (importedMesh == null)
             {
                 return instance;

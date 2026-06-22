@@ -266,7 +266,8 @@ namespace Mmd
                 throw new ArgumentNullException(nameof(pmxAsset));
             }
 
-            if (pmxAsset.ImportedRoot == null)
+            GameObject? importedRoot = pmxAsset.ImportedRoot;
+            if (importedRoot == null)
             {
                 return new MmdHumanoidProxyRigResult(
                     null,
@@ -278,7 +279,7 @@ namespace Mmd
 
             if (pmxAsset.BoneCount > 0)
             {
-                SkinnedMeshRenderer? smr = pmxAsset.ImportedRoot.GetComponentInChildren<SkinnedMeshRenderer>(
+                SkinnedMeshRenderer? smr = importedRoot.GetComponentInChildren<SkinnedMeshRenderer>(
                     includeInactive: true);
 
                 if (smr == null)
@@ -329,7 +330,7 @@ namespace Mmd
 
                 return CreateProxyRigFromBoneTransforms(
                     smr.bones!,
-                    pmxAsset.ImportedRoot.transform,
+                    importedRoot.transform,
                     proxyRootName,
                     mappingOverrides);
             }

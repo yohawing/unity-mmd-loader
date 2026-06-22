@@ -188,7 +188,8 @@ namespace Mmd.Editor
 
         private static void ValidatePmxImportReadiness(MmdPmxAsset pmxAsset, List<string> diagnostics)
         {
-            if (pmxAsset.ImportedRoot == null)
+            GameObject? importedRoot = pmxAsset.ImportedRoot;
+            if (importedRoot == null)
             {
                 diagnostics.Add("pmx validation failed: ImportedRoot is null.");
                 return;
@@ -222,7 +223,7 @@ namespace Mmd.Editor
             }
 
             SkinnedMeshRenderer? smr =
-                pmxAsset.ImportedRoot.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true);
+                importedRoot.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true);
             if (smr == null)
             {
                 diagnostics.Add("pmx validation failed: no SkinnedMeshRenderer under ImportedRoot.");

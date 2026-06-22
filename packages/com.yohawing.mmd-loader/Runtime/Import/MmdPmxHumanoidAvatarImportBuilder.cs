@@ -134,12 +134,13 @@ namespace Mmd.UnityIntegration
             MmdPmxAsset asset,
             MmdHumanoidProxyRigResult proxyRig)
         {
-            if (asset.ImportedRoot == null || proxyRig.ProxyRoot == null || proxyRig.Matches.Count == 0)
+            GameObject? importedRoot = asset.ImportedRoot;
+            if (importedRoot == null || proxyRig.ProxyRoot == null || proxyRig.Matches.Count == 0)
             {
                 return System.Array.Empty<MmdHumanoidRetargetBinding>();
             }
 
-            SkinnedMeshRenderer? smr = asset.ImportedRoot.GetComponentInChildren<SkinnedMeshRenderer>(
+            SkinnedMeshRenderer? smr = importedRoot.GetComponentInChildren<SkinnedMeshRenderer>(
                 includeInactive: true);
             Transform[] nativeBones = smr != null && smr.bones != null
                 ? smr.bones

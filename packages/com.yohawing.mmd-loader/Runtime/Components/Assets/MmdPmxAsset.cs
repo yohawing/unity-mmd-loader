@@ -292,10 +292,10 @@ namespace Mmd
         [SerializeField] private Vector3 boundsMax;
         [SerializeField] private Vector3 boundsSize;
         [SerializeField] private MmdPmxMaterialSummary[] materialSummaries = Array.Empty<MmdPmxMaterialSummary>();
-        [SerializeField] private Mesh importedMesh;
+        [SerializeField] private Mesh? importedMesh;
         [SerializeField] private Material[] importedMaterials = Array.Empty<Material>();
         [SerializeField] private Material[] materialRemaps = Array.Empty<Material>();
-        [SerializeField] private GameObject importedRoot;
+        [SerializeField] private GameObject? importedRoot;
         [SerializeField] private MmdImportReadiness hierarchyReadiness = MmdImportReadiness.NotEvaluated;
         [SerializeField] private MmdImportReadiness rendererReadiness = MmdImportReadiness.NotEvaluated;
         [SerializeField] private MmdImportReadiness boneBindingReadiness = MmdImportReadiness.NotEvaluated;
@@ -368,7 +368,7 @@ namespace Mmd
 
         public int ByteLength => data.Length;
 
-        public Mesh ImportedMesh => importedMesh;
+        public Mesh? ImportedMesh => importedMesh;
 
         public Material[] ImportedMaterials => importedMaterials;
 
@@ -381,7 +381,7 @@ namespace Mmd
         public string RendererReadinessDiagnostic => rendererReadinessDiagnostic;
         public string BoneBindingReadinessDiagnostic => boneBindingReadinessDiagnostic;
 
-        public GameObject ImportedRoot => importedRoot;
+        public GameObject? ImportedRoot => importedRoot;
 
         public void Initialize(
             byte[] bytes,
@@ -393,10 +393,10 @@ namespace Mmd
             string assetMaterialTexturePolicy = "ResolveReferencesOnly",
             string assetShaderPreset = "MmdBasicUrpToon",
             MmdPmxParseSummary? parseSummary = null,
-            Mesh importedMeshAsset = null,
+            Mesh? importedMeshAsset = null,
             Material[]? importedMaterialAssets = null,
             Material[]? materialRemapAssets = null,
-            GameObject importedRootAsset = null,
+            GameObject? importedRootAsset = null,
             MmdImportReadiness hierarchyReadinessValue = MmdImportReadiness.NotEvaluated,
             MmdImportReadiness rendererReadinessValue = MmdImportReadiness.NotEvaluated,
             MmdImportReadiness boneBindingReadinessValue = MmdImportReadiness.NotEvaluated,

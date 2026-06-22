@@ -86,13 +86,14 @@ namespace Mmd
 
             try
             {
-                if (sourceAsset.ImportedRoot == null)
+                GameObject? importedRoot = sourceAsset.ImportedRoot;
+                if (importedRoot == null)
                 {
                     ApplyHierarchyNotReadyReport("hierarchy-not-ready: ImportedRoot is null. Reimport the .pmx asset.");
                     return;
                 }
 
-                SkinnedMeshRenderer? smr = sourceAsset.ImportedRoot.GetComponentInChildren<SkinnedMeshRenderer>(
+                SkinnedMeshRenderer? smr = importedRoot.GetComponentInChildren<SkinnedMeshRenderer>(
                     includeInactive: true);
 
                 if (sourceAsset.BoneCount > 0)
