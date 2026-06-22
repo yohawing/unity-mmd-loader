@@ -21,6 +21,11 @@
       "displayName": "Basic Playback",
       "description": "PMX/VMD golden path sample (PMX drag -> Scene placement -> VMD to Timeline -> optional Humanoid Clip bake) using local assets.",
       "path": "Samples~/BasicPlayback"
+    },
+    {
+      "displayName": "Runtime Verification",
+      "description": "Standalone runtime verification player for direct PMX/VMD parse, playback, Timeline drive, and JSON diagnostics using local assets.",
+      "path": "Samples~/RuntimeVerification"
     }
   ]
 }

@@ -1,0 +1,114 @@
+#nullable enable
+
+using System;
+using UnityEngine;
+
+namespace Mmd.Samples.RuntimeVerification
+{
+    [Serializable]
+    public sealed class MmdRuntimeVerificationReport
+    {
+        public int schemaVersion = 1;
+        public string unityVersion = Application.unityVersion;
+        public string drive = string.Empty;
+        public bool fastRuntimeRequested = true;
+        public float requestedDurationSeconds;
+        public float requestedFrameRate;
+        public string startedAtUtc = string.Empty;
+        public string finishedAtUtc = string.Empty;
+        public float durationSeconds;
+        public string status = "not-run";
+        public int exitCode;
+        public MmdRuntimeVerificationCaseResult[] caseResults = Array.Empty<MmdRuntimeVerificationCaseResult>();
+    }
+
+    [Serializable]
+    public sealed class MmdRuntimeVerificationCaseResult
+    {
+        public string name = string.Empty;
+        public string pmxPath = string.Empty;
+        public string vmdPath = string.Empty;
+        public bool parseOnly;
+        public string parseStatus = "not-run";
+        public string playbackStatus = "not-run";
+        public string status = "not-run";
+        public float durationSeconds;
+        public MmdRuntimeVerificationModelSummary model = new();
+        public MmdRuntimeVerificationMotionSummary motion = new();
+        public MmdRuntimeVerificationPlaybackSummary playback = new();
+        public MmdRuntimeVerificationPhysicsSummary physics = new();
+        public MmdRuntimeVerificationSampledFrame[] sampledFrames =
+            Array.Empty<MmdRuntimeVerificationSampledFrame>();
+        public string exception = string.Empty;
+    }
+
+    [Serializable]
+    public sealed class MmdRuntimeVerificationModelSummary
+    {
+        public bool parsed;
+        public string name = string.Empty;
+        public int vertexCount;
+        public int indexCount;
+        public int boneCount;
+        public int morphCount;
+        public int materialCount;
+        public int ikCount;
+        public int rigidbodyCount;
+        public int jointCount;
+    }
+
+    [Serializable]
+    public sealed class MmdRuntimeVerificationMotionSummary
+    {
+        public bool parsed;
+        public string targetModelName = string.Empty;
+        public int maxFrame;
+        public int boneKeyframeCount;
+        public int morphKeyframeCount;
+        public int modelKeyframeCount;
+        public int cameraKeyframeCount;
+        public int lightKeyframeCount;
+        public int selfShadowKeyframeCount;
+    }
+
+    [Serializable]
+    public sealed class MmdRuntimeVerificationPlaybackSummary
+    {
+        public bool configured;
+        public bool fastRuntimeEnabled;
+        public string fastRuntimeReason = string.Empty;
+        public string driver = string.Empty;
+        public int finalFrame;
+        public float finalTimeSeconds;
+        public string controllerSourceId = string.Empty;
+        public string motionSourceId = string.Empty;
+    }
+
+    [Serializable]
+    public sealed class MmdRuntimeVerificationPhysicsSummary
+    {
+        public bool available;
+        public int frame;
+        public float deltaTime;
+        public double totalMs;
+        public int unsupportedWorldAnchorJointCount;
+        public int bodyDiagnosticCount;
+        public int pinnedBodyCount;
+        public int staticPinnedBodyCount;
+        public int dynamicOrientationPinnedBodyCount;
+        public int dynamicInitialPinnedBodyCount;
+        public float maxPinnedBodySyncDistance;
+        public float maxPinnedBodyRotationAngle;
+        public string comparisonSpace = string.Empty;
+    }
+
+    [Serializable]
+    public sealed class MmdRuntimeVerificationSampledFrame
+    {
+        public float timeSeconds;
+        public int frame;
+        public bool configured;
+        public bool fastRuntimeEnabled;
+        public bool physicsDiagnosticsAvailable;
+    }
+}

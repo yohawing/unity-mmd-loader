@@ -1,0 +1,18 @@
+{
+  "name": "Mmd.RuntimeVerification.Editor",
+  "rootNamespace": "Mmd.Samples.RuntimeVerification.Editor",
+  "references": [
+    "Mmd.RuntimeVerification"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

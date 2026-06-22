@@ -1,0 +1,317 @@
+#nullable enable
+
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+
+namespace Mmd.Samples.RuntimeVerification
+{
+    public enum MmdRuntimeVerificationDrive
+    {
+        Controller = 0,
+        Timeline = 1
+    }
+
+    public sealed class MmdRuntimeVerificationArguments
+    {
+        public string PmxPath { get; private set; } = string.Empty;
+        public string VmdPath { get; private set; } = string.Empty;
+        public string DirectoryPath { get; private set; } = string.Empty;
+        public string OutputPath { get; private set; } = string.Empty;
+        public float DurationSeconds { get; private set; } = 3.0f;
+        public float FrameRate { get; private set; } = 30.0f;
+        public MmdRuntimeVerificationDrive Drive { get; private set; } =
+            MmdRuntimeVerificationDrive.Timeline;
+        public bool FastRuntimeEnabled { get; private set; } = true;
+        public bool HelpRequested { get; private set; }
+        public List<string> Errors { get; } = new();
+
+        public static MmdRuntimeVerificationArguments Parse(string[] commandLineArgs)
+        {
+            var parsed = new MmdRuntimeVerificationArguments();
+            string[] args = commandLineArgs ?? Array.Empty<string>();
+            for (int i = 0; i < args.Length; i++)
+            {
+                string arg = args[i] ?? string.Empty;
+                if (!arg.StartsWith("--", StringComparison.Ordinal) &&
+                    !string.Equals(arg, "-h", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                string name = arg;
+                string? inlineValue = null;
+                int equals = arg.IndexOf('=');
+                if (equals >= 0)
+                {
+                    name = arg.Substring(0, equals);
+                    inlineValue = arg.Substring(equals + 1);
+                }
+
+                string? value = inlineValue;
+                bool requiresValue = name is "--pmx" or "--vmd" or "--dir" or "--out" or
+                    "--duration" or "--frame-rate" or "--drive" or "--fast-runtime";
+                if (requiresValue && value == null)
+                {
+                    if (i + 1 >= args.Length)
+                    {
+                        parsed.Errors.Add("Missing value for " + name + ".");
+                        continue;
+                    }
+
+                    value = args[++i];
+                }
+
+                parsed.Apply(name, value ?? string.Empty);
+            }
+
+            parsed.NormalizeAndValidate();
+            return parsed;
+        }
+
+        public MmdRuntimeVerificationCase[] CreateCases()
+        {
+            var cases = new List<MmdRuntimeVerificationCase>();
+            bool hasPmx = !string.IsNullOrWhiteSpace(PmxPath);
+            bool hasVmd = !string.IsNullOrWhiteSpace(VmdPath);
+            bool hasDir = !string.IsNullOrWhiteSpace(DirectoryPath);
+
+            if (!hasDir)
+            {
+                cases.Add(new MmdRuntimeVerificationCase(
+                    CaseName(PmxPath, VmdPath, "single"),
+                    PmxPath,
+                    VmdPath,
+                    parseOnly: !(hasPmx && hasVmd)));
+                return cases.ToArray();
+            }
+
+            if (hasVmd && !hasPmx)
+            {
+                foreach (string pmx in EnumerateFiles(DirectoryPath, "*.pmx"))
+                {
+                    cases.Add(new MmdRuntimeVerificationCase(
+                        CaseName(pmx, VmdPath, Path.GetFileNameWithoutExtension(pmx)),
+                        pmx,
+                        VmdPath,
+                        parseOnly: false));
+                }
+
+                return cases.ToArray();
+            }
+
+            if (hasPmx && !hasVmd)
+            {
+                foreach (string vmd in EnumerateFiles(DirectoryPath, "*.vmd"))
+                {
+                    cases.Add(new MmdRuntimeVerificationCase(
+                        CaseName(PmxPath, vmd, Path.GetFileNameWithoutExtension(vmd)),
+                        PmxPath,
+                        vmd,
+                        parseOnly: false));
+                }
+
+                return cases.ToArray();
+            }
+
+            if (hasPmx && hasVmd)
+            {
+                cases.Add(new MmdRuntimeVerificationCase(
+                    CaseName(PmxPath, VmdPath, "single"),
+                    PmxPath,
+                    VmdPath,
+                    parseOnly: false));
+                return cases.ToArray();
+            }
+
+            foreach (string pmx in EnumerateFiles(DirectoryPath, "*.pmx"))
+            {
+                cases.Add(new MmdRuntimeVerificationCase(
+                    "parse-pmx:" + Path.GetFileName(pmx),
+                    pmx,
+                    string.Empty,
+                    parseOnly: true));
+            }
+
+            foreach (string vmd in EnumerateFiles(DirectoryPath, "*.vmd"))
+            {
+                cases.Add(new MmdRuntimeVerificationCase(
+                    "parse-vmd:" + Path.GetFileName(vmd),
+                    string.Empty,
+                    vmd,
+                    parseOnly: true));
+            }
+
+            return cases.ToArray();
+        }
+
+        private void Apply(string name, string value)
+        {
+            switch (name)
+            {
+                case "--pmx":
+                    PmxPath = value;
+                    break;
+                case "--vmd":
+                    VmdPath = value;
+                    break;
+                case "--dir":
+                    DirectoryPath = value;
+                    break;
+                case "--out":
+                    OutputPath = value;
+                    break;
+                case "--duration":
+                    if (float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out float duration))
+                    {
+                        DurationSeconds = duration;
+                    }
+                    else
+                    {
+                        Errors.Add("Invalid --duration value: " + value);
+                    }
+                    break;
+                case "--frame-rate":
+                    if (float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out float frameRate))
+                    {
+                        FrameRate = frameRate;
+                    }
+                    else
+                    {
+                        Errors.Add("Invalid --frame-rate value: " + value);
+                    }
+                    break;
+                case "--drive":
+                    if (string.Equals(value, "timeline", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Drive = MmdRuntimeVerificationDrive.Timeline;
+                    }
+                    else if (string.Equals(value, "controller", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Drive = MmdRuntimeVerificationDrive.Controller;
+                    }
+                    else
+                    {
+                        Errors.Add("Invalid --drive value: " + value + ". Expected timeline or controller.");
+                    }
+                    break;
+                case "--fast-runtime":
+                    if (string.Equals(value, "off", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(value, "false", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(value, "0", StringComparison.Ordinal))
+                    {
+                        FastRuntimeEnabled = false;
+                    }
+                    else if (string.Equals(value, "on", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(value, "true", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(value, "1", StringComparison.Ordinal))
+                    {
+                        FastRuntimeEnabled = true;
+                    }
+                    else
+                    {
+                        Errors.Add("Invalid --fast-runtime value: " + value + ". Expected on or off.");
+                    }
+                    break;
+                case "--help":
+                case "-h":
+                    HelpRequested = true;
+                    break;
+                default:
+                    Errors.Add("Unknown argument: " + name);
+                    break;
+            }
+        }
+
+        private void NormalizeAndValidate()
+        {
+            PmxPath = ResolveInputPath(PmxPath);
+            VmdPath = ResolveInputPath(VmdPath);
+            DirectoryPath = ResolveInputPath(DirectoryPath);
+            OutputPath = ResolveInputPath(OutputPath);
+
+            if (DurationSeconds < 0.0f || float.IsNaN(DurationSeconds) || float.IsInfinity(DurationSeconds))
+            {
+                Errors.Add("--duration must be a non-negative finite number.");
+            }
+
+            if (FrameRate <= 0.0f || float.IsNaN(FrameRate) || float.IsInfinity(FrameRate))
+            {
+                Errors.Add("--frame-rate must be a positive finite number.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(DirectoryPath) && !Directory.Exists(DirectoryPath))
+            {
+                Errors.Add("--dir does not exist: " + DirectoryPath);
+            }
+
+            if (string.IsNullOrWhiteSpace(DirectoryPath) &&
+                string.IsNullOrWhiteSpace(PmxPath) &&
+                string.IsNullOrWhiteSpace(VmdPath) &&
+                !HelpRequested)
+            {
+                Errors.Add("Provide --pmx/--vmd, or --dir for a parse-only sweep.");
+            }
+        }
+
+        private static string ResolveInputPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return string.Empty;
+            }
+
+            return Path.GetFullPath(path);
+        }
+
+        private static IEnumerable<string> EnumerateFiles(string directory, string pattern)
+        {
+            if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
+            {
+                yield break;
+            }
+
+            foreach (string file in Directory.EnumerateFiles(directory, pattern, SearchOption.TopDirectoryOnly))
+            {
+                yield return Path.GetFullPath(file);
+            }
+        }
+
+        private static string CaseName(string pmxPath, string vmdPath, string fallback)
+        {
+            string pmxName = string.IsNullOrWhiteSpace(pmxPath)
+                ? string.Empty
+                : Path.GetFileNameWithoutExtension(pmxPath);
+            string vmdName = string.IsNullOrWhiteSpace(vmdPath)
+                ? string.Empty
+                : Path.GetFileNameWithoutExtension(vmdPath);
+            if (!string.IsNullOrWhiteSpace(pmxName) && !string.IsNullOrWhiteSpace(vmdName))
+            {
+                return pmxName + "__" + vmdName;
+            }
+
+            return string.IsNullOrWhiteSpace(fallback) ? "case" : fallback;
+        }
+    }
+
+    public readonly struct MmdRuntimeVerificationCase
+    {
+        public MmdRuntimeVerificationCase(
+            string name,
+            string pmxPath,
+            string vmdPath,
+            bool parseOnly)
+        {
+            Name = name ?? string.Empty;
+            PmxPath = pmxPath ?? string.Empty;
+            VmdPath = vmdPath ?? string.Empty;
+            ParseOnly = parseOnly;
+        }
+
+        public string Name { get; }
+        public string PmxPath { get; }
+        public string VmdPath { get; }
+        public bool ParseOnly { get; }
+    }
+}
