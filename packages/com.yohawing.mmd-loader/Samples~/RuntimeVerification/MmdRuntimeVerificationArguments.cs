@@ -21,6 +21,8 @@ namespace Mmd.Samples.RuntimeVerification
         public string OutputPath { get; private set; } = string.Empty;
         public float DurationSeconds { get; private set; } = 3.0f;
         public float FrameRate { get; private set; } = 30.0f;
+        public int[] SampleFrames { get; private set; } = Array.Empty<int>();
+        public bool DumpBones { get; private set; }
         public MmdRuntimeVerificationDrive Drive { get; private set; } =
             MmdRuntimeVerificationDrive.Timeline;
         public bool FastRuntimeEnabled { get; private set; } = true;
@@ -51,7 +53,8 @@ namespace Mmd.Samples.RuntimeVerification
 
                 string? value = inlineValue;
                 bool requiresValue = name is "--pmx" or "--vmd" or "--dir" or "--out" or
-                    "--duration" or "--frame-rate" or "--drive" or "--fast-runtime";
+                    "--duration" or "--frame-rate" or "--drive" or "--fast-runtime" or
+                    "--sample-frames";
                 if (requiresValue && value == null)
                 {
                     if (i + 1 >= args.Length)
@@ -182,6 +185,12 @@ namespace Mmd.Samples.RuntimeVerification
                         Errors.Add("Invalid --frame-rate value: " + value);
                     }
                     break;
+                case "--sample-frames":
+                    SampleFrames = ParseSampleFrames(value, Errors);
+                    break;
+                case "--dump-bones":
+                    DumpBones = true;
+                    break;
                 case "--drive":
                     if (string.Equals(value, "timeline", StringComparison.OrdinalIgnoreCase))
                     {
@@ -263,6 +272,47 @@ namespace Mmd.Samples.RuntimeVerification
             }
 
             return Path.GetFullPath(path);
+        }
+
+        private static int[] ParseSampleFrames(string value, List<string> errors)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                errors.Add("--sample-frames must contain at least one frame index.");
+                return Array.Empty<int>();
+            }
+
+            var frames = new List<int>();
+            string[] parts = value.Split(',');
+            for (int i = 0; i < parts.Length; i++)
+            {
+                string part = parts[i].Trim();
+                if (string.IsNullOrWhiteSpace(part))
+                {
+                    errors.Add("Invalid --sample-frames value: empty frame entry.");
+                    continue;
+                }
+
+                if (!int.TryParse(part, NumberStyles.Integer, CultureInfo.InvariantCulture, out int frame))
+                {
+                    errors.Add("Invalid --sample-frames frame: " + part);
+                    continue;
+                }
+
+                if (frame < 0)
+                {
+                    errors.Add("--sample-frames entries must be non-negative: " + part);
+                    continue;
+                }
+
+                if (!frames.Contains(frame))
+                {
+                    frames.Add(frame);
+                }
+            }
+
+            frames.Sort();
+            return frames.ToArray();
         }
 
         private static IEnumerable<string> EnumerateFiles(string directory, string pattern)

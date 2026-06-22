@@ -5,6 +5,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using Mmd;
 using Mmd.Parser;
 using Mmd.Physics;
@@ -16,6 +17,16 @@ namespace Mmd.Samples.RuntimeVerification
 {
     public sealed class MmdRuntimeVerificationRunner
     {
+        private static readonly MethodInfo? ApplyTimelineLivePhysicsForwardMethod =
+            typeof(MmdUnityPlaybackController).GetMethod(
+                "ApplyTimelineLivePhysicsForward",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+
+        private static readonly FieldInfo? PlaybackBindingField =
+            typeof(MmdUnityPlaybackController).GetField(
+                "binding",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+
         private readonly MmdRuntimeVerificationArguments arguments;
 
         public MmdRuntimeVerificationRunner(MmdRuntimeVerificationArguments arguments)
@@ -195,7 +206,11 @@ namespace Mmd.Samples.RuntimeVerification
                 try
                 {
                     holder = CreatePlaybackRoot(verificationCase, out controller);
-                    controller.Play();
+                    if (arguments.SampleFrames.Length == 0)
+                    {
+                        controller.Play();
+                    }
+
                     playback = SamplePlayback(controller, result, arguments.DurationSeconds);
                 }
                 catch (Exception ex)
@@ -377,6 +392,27 @@ namespace Mmd.Samples.RuntimeVerification
             MmdRuntimeVerificationCaseResult result,
             float durationSeconds)
         {
+            if (arguments.SampleFrames.Length > 0)
+            {
+                int sampleIndex = 0;
+                int maxFrame = arguments.SampleFrames[arguments.SampleFrames.Length - 1];
+                for (int frame = 0; frame <= maxFrame; frame++)
+                {
+                    ApplyLivePhysicsForwardFrame(controller, frame, arguments.FrameRate);
+                    if (sampleIndex < arguments.SampleFrames.Length &&
+                        frame == arguments.SampleFrames[sampleIndex])
+                    {
+                        float sampleTime = frame / arguments.FrameRate;
+                        AddSample(result, controller, Time.realtimeSinceStartup - sampleTime);
+                        sampleIndex++;
+                    }
+
+                    yield return null;
+                }
+
+                yield break;
+            }
+
             float start = Time.realtimeSinceStartup;
             AddSample(result, controller, start);
             while (Time.realtimeSinceStartup - start < durationSeconds)
@@ -388,16 +424,11 @@ namespace Mmd.Samples.RuntimeVerification
             AddSample(result, controller, start);
         }
 
-        private static void AddSample(
+        private void AddSample(
             MmdRuntimeVerificationCaseResult result,
             MmdUnityPlaybackController controller,
             float startTime)
         {
-            if (result.sampledFrames.Length >= 8)
-            {
-                return;
-            }
-
             var frames = new List<MmdRuntimeVerificationSampledFrame>(result.sampledFrames);
             frames.Add(new MmdRuntimeVerificationSampledFrame
             {
@@ -405,9 +436,82 @@ namespace Mmd.Samples.RuntimeVerification
                 frame = controller.CurrentFrame,
                 configured = controller.IsConfigured,
                 fastRuntimeEnabled = controller.IsFastRuntimeEnabled,
-                physicsDiagnosticsAvailable = controller.LastLivePhysicsDiagnostics != null
+                physicsDiagnosticsAvailable = controller.LastLivePhysicsDiagnostics != null,
+                bones = arguments.DumpBones ? BuildBoneSamples(controller) : null,
+                matrixSpace = "mmd-model",
+                matrixLayout = "row-major",
+                importScale = ResolveImportScale(controller)
             });
             result.sampledFrames = frames.ToArray();
+        }
+
+        private static void ApplyLivePhysicsForwardFrame(
+            MmdUnityPlaybackController controller,
+            int frame,
+            float frameRate)
+        {
+            if (ApplyTimelineLivePhysicsForwardMethod == null)
+            {
+                controller.ApplyFrame(frame);
+                return;
+            }
+
+            try
+            {
+                ApplyTimelineLivePhysicsForwardMethod.Invoke(
+                    controller,
+                    new object[] { frame / frameRate, frameRate });
+            }
+            catch (TargetInvocationException ex) when (ex.InnerException != null)
+            {
+                throw ex.InnerException;
+            }
+        }
+
+        private static MmdRuntimeVerificationBoneSample[] BuildBoneSamples(
+            MmdUnityPlaybackController controller)
+        {
+            MmdPlaybackSnapshot? snapshot = controller.LastSnapshot;
+            if (snapshot?.frame?.bones == null || snapshot.frame.bones.Count == 0)
+            {
+                return Array.Empty<MmdRuntimeVerificationBoneSample>();
+            }
+
+            var bones = new MmdRuntimeVerificationBoneSample[snapshot.frame.bones.Count];
+            for (int i = 0; i < snapshot.frame.bones.Count; i++)
+            {
+                MmdEvaluatedBonePose bone = snapshot.frame.bones[i];
+                bones[i] = new MmdRuntimeVerificationBoneSample
+                {
+                    index = bone.index,
+                    name = bone.name ?? string.Empty,
+                    worldMatrix = CopyWorldMatrix(bone.worldMatrix)
+                };
+            }
+
+            return bones;
+        }
+
+        private static float[] CopyWorldMatrix(float[]? worldMatrix)
+        {
+            if (worldMatrix == null || worldMatrix.Length != 16)
+            {
+                return Array.Empty<float>();
+            }
+
+            var copy = new float[16];
+            Array.Copy(worldMatrix, copy, copy.Length);
+            return copy;
+        }
+
+        private static float ResolveImportScale(MmdUnityPlaybackController controller)
+        {
+            if (PlaybackBindingField?.GetValue(controller) is MmdUnityPlaybackBinding binding)
+            {
+                return binding.Instance.ImportScale;
+            }
+
+            return 1.0f;
         }
 
         private static MmdRuntimeVerificationCaseResult CreateInitialResult(

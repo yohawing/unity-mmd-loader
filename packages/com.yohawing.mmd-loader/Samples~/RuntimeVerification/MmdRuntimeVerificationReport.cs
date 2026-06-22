@@ -110,5 +110,17 @@ namespace Mmd.Samples.RuntimeVerification
         public bool configured;
         public bool fastRuntimeEnabled;
         public bool physicsDiagnosticsAvailable;
+        public MmdRuntimeVerificationBoneSample[]? bones;
+        public string matrixSpace = "mmd-model";
+        public string matrixLayout = "row-major";
+        public float importScale;
+    }
+
+    [Serializable]
+    public sealed class MmdRuntimeVerificationBoneSample
+    {
+        public int index;
+        public string name = string.Empty;
+        public float[] worldMatrix = Array.Empty<float>();
     }
 }
