@@ -1208,9 +1208,12 @@ namespace Mmd.Tests
                 proxyAnimationClip = new AnimationClip();
                 ((AnimationPlayableAsset)animationClip.asset).clip = proxyAnimationClip;
 
+                // Intentionally exercises the deprecated dual-track path (regression coverage until removal).
+#pragma warning disable 618
                 MmdHumanoidRetargetTrack retargetTrack =
                     timelineAsset.CreateTrack<MmdHumanoidRetargetTrack>(null, "MMD Humanoid Retarget");
                 TimelineClip retargetClip = retargetTrack.CreateClip<MmdHumanoidRetargetClip>();
+#pragma warning restore 618
                 retargetClip.start = 0.0;
                 retargetClip.duration = 1.0;
 
@@ -1317,6 +1320,337 @@ namespace Mmd.Tests
                 }
 
                 DestroyInstance(instance);
+            }
+        }
+
+        // Alternative C regression: a SINGLE MmdHumanoidAnimationTrack (bound only to the
+        // controller, no separate AnimationTrack/Animator binding) carrying a real Humanoid
+        // muscle clip must (a) pose the proxy avatar via the track's manually-created
+        // AnimationPlayableOutput, (b) run the controller retarget side-effect so the native MMD
+        // bone tracks the proxy, and (c) step Live physics — all from one track.
+        [UnityTest]
+        public IEnumerator HumanoidAnimationTrackSingleTrackMuscleClipDrivesProxyAndRetargetsAndStepsPhysics()
+        {
+            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            if (!availability.backendAvailable)
+            {
+                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
+                yield break;
+            }
+
+            MmdUnityModelInstance? instance = null;
+            MmdPmxAsset? pmxAsset = null;
+            MmdHumanoidProxyRigResult? proxyRig = null;
+            Avatar? avatar = null;
+            TimelineAsset? timelineAsset = null;
+            AnimationClip? muscleClip = null;
+            GameObject? directorObject = null;
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_hair_physics.pmx");
+                byte[] pmxBytes = File.ReadAllBytes(pmxPath);
+                MmdModelDefinition model = LoadHairPhysicsModelForLive(pmxPath);
+                instance = MmdUnityModelFactory.CreateSkinnedModel(
+                    model,
+                    pmxPath,
+                    MmdPmxAsset.DefaultImportScale);
+                pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                pmxAsset.Initialize(
+                    pmxBytes,
+                    "test_hair_physics.pmx",
+                    pmxPath,
+                    MmdPmxAsset.DefaultImportScale,
+                    parseSummary: MmdPmxParseSummary.FromModel(model));
+
+                MmdUnityPlaybackController controller = instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.ConfigureModelAsset(pmxAsset);
+                controller.SetPhysicsMode(MmdPhysicsMode.Live);
+
+                int drivenBoneIndex = FindFirstValidStaticPhysicsBone(model, instance);
+                Assert.That(drivenBoneIndex, Is.GreaterThanOrEqualTo(0),
+                    "test_hair_physics.pmx must expose a valid static/bone-driven body for humanoid physics seeding");
+
+                proxyRig = MmdHumanoidProxyRigFactory.CreateProxyRig(CreateHumanoidMappingModelWithOriginsForLivePhysics());
+                Assert.That(proxyRig.ProxyRoot, Is.Not.Null);
+                proxyRig.ProxyRoot!.transform.SetParent(instance.Root.transform, worldPositionStays: false);
+                proxyRig.ProxyRoot.SetActive(true);
+                MmdHumanoidAvatarBuildResult avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(proxyRig);
+                Assert.That(avatarResult.IsValidHumanAvatar, Is.True, string.Join("\n", avatarResult.Diagnostics));
+                avatar = avatarResult.Avatar;
+
+                Animator animator = instance.Root.AddComponent<Animator>();
+                animator.avatar = avatar;
+
+                Transform proxySpine = proxyRig.BoneMap[HumanBodyBones.Spine];
+                Transform drivenBone = instance.BoneTransforms[drivenBoneIndex];
+                Quaternion proxySpineBind = proxySpine.localRotation;
+                Quaternion drivenBoneBind = drivenBone.localRotation;
+                Vector3 proxySpineBindPosition = proxySpine.localPosition;
+                Vector3 drivenBindPosition = drivenBone.localPosition;
+                controller.ConfigureHumanoidRetarget(
+                    proxyRig.ProxyRoot.transform,
+                    new[]
+                    {
+                        new MmdHumanoidRetargetBinding(
+                            HumanBodyBones.Spine,
+                            drivenBoneIndex,
+                            proxySpine,
+                            drivenBone,
+                            proxySpineBind,
+                            drivenBoneBind,
+                            copyLocalPosition: true,
+                            translationTargetTransform: drivenBone,
+                            translationTargetMmdBoneIndex: drivenBoneIndex,
+                            proxyBindLocalPosition: proxySpineBindPosition,
+                            translationTargetBindLocalPosition: drivenBindPosition)
+                    },
+                    Array.Empty<MmdHumanoidAppendTransformBinding>());
+
+                // Build a real Humanoid muscle clip: a spine muscle that ramps up so the proxy
+                // avatar bends progressively as the timeline advances. This exercises the actual
+                // muscle-space retarget path (not a direct transform poke), which is the user's
+                // hard condition: a standard Humanoid AnimationClip must drive the MMD model.
+                string spineMuscleName = ResolveSpineMuscleName();
+                Assert.That(spineMuscleName, Is.Not.Null.And.Not.Empty,
+                    "could not resolve a Spine muscle name from HumanTrait");
+                muscleClip = new AnimationClip { frameRate = 30.0f };
+                muscleClip.SetCurve(
+                    string.Empty,
+                    typeof(Animator),
+                    spineMuscleName,
+                    AnimationCurve.Linear(0.0f, 0.0f, 0.5f, 0.9f));
+
+                timelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
+                MmdHumanoidAnimationTrack humanoidTrack =
+                    timelineAsset.CreateTrack<MmdHumanoidAnimationTrack>(null, "MMD Humanoid");
+                TimelineClip humanoidClip = humanoidTrack.CreateClip<MmdHumanoidAnimationClip>();
+                humanoidClip.start = 0.0;
+                humanoidClip.duration = 0.5;
+                var humanoidClipAsset = (MmdHumanoidAnimationClip)humanoidClip.asset;
+                humanoidClipAsset.clip = muscleClip;
+                humanoidClipAsset.proxyAnimator.exposedName =
+                    "mmdHumanoidProxyAnimator_" + Guid.NewGuid().ToString("N");
+
+                directorObject = new GameObject("humanoid-animation-track-single-director");
+                PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
+                director.playOnAwake = false;
+                director.playableAsset = timelineAsset;
+                // SINGLE generic binding (controller, for the retarget ProcessFrame). The proxy
+                // Animator that the clip poses is supplied via an ExposedReference; setup/authoring
+                // sets this automatically since the Animator is on the controller's GameObject.
+                director.SetGenericBinding(humanoidTrack, controller);
+                director.SetReferenceValue(humanoidClipAsset.proxyAnimator.exposedName, animator);
+
+                Assert.That(controller.IsConfigured, Is.False,
+                    "The single humanoid track may only create a physics-only binding, never a VMD playback binding.");
+                Assert.That(controller.HasHumanoidPhysicsBinding, Is.False);
+
+                for (int i = 0; i <= 5; i++)
+                {
+                    director.time = i / 30.0;
+                    director.Evaluate();
+                    yield return null;
+                }
+
+                // Re-evaluate at the same final time to settle the accepted 1-evaluation lag
+                // (ProcessFrame reads the proxy the animation output posed on the prior pass).
+                director.time = 5 / 30.0;
+                director.Evaluate();
+                yield return null;
+
+                // (a) the single track's AnimationPlayableOutput posed the proxy from the muscle clip
+                float proxyAngle = Quaternion.Angle(proxySpineBind, proxySpine.localRotation);
+                Assert.That(proxyAngle, Is.GreaterThan(2.0f),
+                    "the muscle clip should pose the proxy spine via the single track's AnimationPlayableOutput " +
+                    "(got angle " + proxyAngle + ", muscle=" + spineMuscleName + ")");
+
+                // (b) the same track's ScriptPlayable ran the controller retarget
+                Assert.That(controller.LastHumanoidRetargetGate, Is.EqualTo(MmdHumanoidRetargetGate.Ready));
+                Assert.That(controller.LastHumanoidRetargetResult, Is.Not.Null);
+                Assert.That(controller.LastHumanoidRetargetResult!.CopiedBoneCount, Is.EqualTo(1));
+
+                // (c) the native MMD bone tracks the proxy rotation delta (retarget side-effect)
+                float nativeAngle = Quaternion.Angle(drivenBoneBind, drivenBone.localRotation);
+                Assert.That(nativeAngle, Is.EqualTo(proxyAngle).Within(0.5f),
+                    "the native bone should track the proxy spine rotation delta via the retarget side-effect " +
+                    "(proxy " + proxyAngle + " vs native " + nativeAngle + ")");
+
+                // (d) Live physics stepped from the single track, with no VMD playback binding
+                Assert.That(controller.IsConfigured, Is.False);
+                Assert.That(controller.HasHumanoidPhysicsBinding, Is.True,
+                    "the single humanoid track should lazily create a model-only physics binding from ModelAssetSource.");
+                Assert.That(controller.LastLivePhysicsDiagnostics, Is.Not.Null,
+                    "the single humanoid track ProcessFrame must step Live physics in Play Mode.");
+                Assert.That(controller.LastLivePhysicsDiagnostics!.deltaTime, Is.GreaterThan(0.0f));
+                Assert.That(controller.LastSnapshot, Is.Null,
+                    "model-only humanoid Timeline physics must not create a VMD playback snapshot.");
+            }
+            finally
+            {
+                if (directorObject != null)
+                {
+                    UnityEngine.Object.Destroy(directorObject);
+                }
+
+                if (timelineAsset != null)
+                {
+                    UnityEngine.Object.Destroy(timelineAsset);
+                }
+
+                if (muscleClip != null)
+                {
+                    UnityEngine.Object.Destroy(muscleClip);
+                }
+
+                if (avatar != null)
+                {
+                    UnityEngine.Object.Destroy(avatar);
+                }
+
+                if (proxyRig?.ProxyRoot != null)
+                {
+                    UnityEngine.Object.Destroy(proxyRig.ProxyRoot);
+                }
+
+                if (pmxAsset != null)
+                {
+                    UnityEngine.Object.Destroy(pmxAsset);
+                }
+
+                DestroyInstance(instance);
+            }
+        }
+
+        private static string ResolveSpineMuscleName()
+        {
+            for (int dof = 0; dof < 3; dof++)
+            {
+                int muscle = HumanTrait.MuscleFromBone((int)HumanBodyBones.Spine, dof);
+                if (muscle >= 0)
+                {
+                    return HumanTrait.MuscleName[muscle];
+                }
+            }
+
+            return string.Empty;
+        }
+
+        // Regression: the single MmdHumanoidAnimationTrack must enable applyRootMotion on the proxy
+        // Animator so a Humanoid clip's root motion (RootT/RootQ) travels the model the way a standard
+        // AnimationTrack did. Without it the model only does in-place body sway (the "腰の移動" /
+        // center travel is dropped). We assert the track flips applyRootMotion on at graph build; that
+        // the resulting root curves actually translate the model is Unity's AnimationPlayableOutput
+        // behavior (verified on the real dance clip in-editor).
+        [UnityTest]
+        public IEnumerator HumanoidAnimationTrackEnablesRootMotionOnProxyAnimator()
+        {
+            GameObject? root = null;
+            Avatar? avatar = null;
+            TimelineAsset? timelineAsset = null;
+            AnimationClip? muscleClip = null;
+            GameObject? directorObject = null;
+            MmdHumanoidProxyRigResult? proxyRig = null;
+            try
+            {
+                root = new GameObject("humanoid-rootmotion-root");
+                var nativeBoneObject = new GameObject("NativeSpine");
+                nativeBoneObject.transform.SetParent(root.transform, worldPositionStays: false);
+
+                proxyRig = MmdHumanoidProxyRigFactory.CreateProxyRig(CreateHumanoidMappingModelWithOriginsForLivePhysics());
+                Assert.That(proxyRig.ProxyRoot, Is.Not.Null);
+                proxyRig.ProxyRoot!.transform.SetParent(root.transform, worldPositionStays: false);
+                proxyRig.ProxyRoot.SetActive(true);
+                MmdHumanoidAvatarBuildResult avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(proxyRig);
+                Assert.That(avatarResult.IsValidHumanAvatar, Is.True, string.Join("\n", avatarResult.Diagnostics));
+                avatar = avatarResult.Avatar;
+
+                Animator animator = root.AddComponent<Animator>();
+                animator.avatar = avatar;
+                animator.applyRootMotion = false;
+
+                MmdUnityPlaybackController controller = root.AddComponent<MmdUnityPlaybackController>();
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+
+                Transform proxySpine = proxyRig.BoneMap[HumanBodyBones.Spine];
+                controller.ConfigureHumanoidRetarget(
+                    proxyRig.ProxyRoot.transform,
+                    new[]
+                    {
+                        new MmdHumanoidRetargetBinding(
+                            HumanBodyBones.Spine,
+                            0,
+                            proxySpine,
+                            nativeBoneObject.transform,
+                            proxySpine.localRotation,
+                            nativeBoneObject.transform.localRotation)
+                    },
+                    Array.Empty<MmdHumanoidAppendTransformBinding>());
+
+                muscleClip = new AnimationClip { frameRate = 30.0f };
+                muscleClip.SetCurve(
+                    string.Empty,
+                    typeof(Animator),
+                    ResolveSpineMuscleName(),
+                    AnimationCurve.Linear(0.0f, 0.0f, 1.0f, 0.5f));
+
+                timelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
+                MmdHumanoidAnimationTrack humanoidTrack =
+                    timelineAsset.CreateTrack<MmdHumanoidAnimationTrack>(null, "MMD Humanoid");
+                TimelineClip humanoidClip = humanoidTrack.CreateClip<MmdHumanoidAnimationClip>();
+                humanoidClip.start = 0.0;
+                humanoidClip.duration = 1.0;
+                var humanoidClipAsset = (MmdHumanoidAnimationClip)humanoidClip.asset;
+                humanoidClipAsset.clip = muscleClip;
+                humanoidClipAsset.proxyAnimator.exposedName =
+                    "mmdHumanoidRootMotionAnimator_" + Guid.NewGuid().ToString("N");
+
+                directorObject = new GameObject("humanoid-rootmotion-director");
+                PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
+                director.playOnAwake = false;
+                director.playableAsset = timelineAsset;
+                director.SetGenericBinding(humanoidTrack, controller);
+                director.SetReferenceValue(humanoidClipAsset.proxyAnimator.exposedName, animator);
+
+                Assert.That(animator.applyRootMotion, Is.False, "precondition: root motion starts disabled");
+
+                director.time = 0.0;
+                director.Evaluate();
+                yield return null;
+
+                Assert.That(animator.applyRootMotion, Is.True,
+                    "the single humanoid track must enable applyRootMotion so the clip's root motion travels the model");
+            }
+            finally
+            {
+                if (directorObject != null)
+                {
+                    UnityEngine.Object.Destroy(directorObject);
+                }
+
+                if (timelineAsset != null)
+                {
+                    UnityEngine.Object.Destroy(timelineAsset);
+                }
+
+                if (muscleClip != null)
+                {
+                    UnityEngine.Object.Destroy(muscleClip);
+                }
+
+                if (avatar != null)
+                {
+                    UnityEngine.Object.Destroy(avatar);
+                }
+
+                if (proxyRig?.ProxyRoot != null)
+                {
+                    UnityEngine.Object.Destroy(proxyRig.ProxyRoot);
+                }
+
+                if (root != null)
+                {
+                    UnityEngine.Object.Destroy(root);
+                }
             }
         }
 

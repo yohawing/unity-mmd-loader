@@ -14,6 +14,10 @@ using Mmd.Timeline;
 using Mmd.UnityIntegration;
 using UnityObject = UnityEngine.Object;
 
+// This whole file is regression coverage for the deprecated MmdHumanoidRetargetTrack/Clip path
+// (superseded by MmdHumanoidAnimationTrack); suppress the obsolete-usage warning for the file.
+#pragma warning disable 618
+
 namespace Mmd.Tests
 {
     public sealed class MmdHumanoidRetargetTimelineTests

@@ -6,6 +6,9 @@ using Mmd.UnityIntegration;
 
 namespace Mmd.Timeline
 {
+    [Obsolete(
+        "Deprecated: superseded by MmdHumanoidAnimationMixerBehaviour (MmdHumanoidAnimationTrack). " +
+        "Kept functional for existing timelines; see docs/design/humanoid-retarget-ux-alternatives.md.")]
     [Serializable]
     public sealed class MmdHumanoidRetargetBehaviour : PlayableBehaviour
     {

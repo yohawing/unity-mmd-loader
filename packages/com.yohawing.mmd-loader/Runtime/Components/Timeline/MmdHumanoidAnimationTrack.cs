@@ -1,22 +1,25 @@
 #nullable enable
 
-using System;
 using UnityEngine;
 using UnityEngine.Playables;
 using UnityEngine.Timeline;
-using Mmd;
 using Mmd.UnityIntegration;
 
 namespace Mmd.Timeline
 {
-    [Obsolete(
-        "Deprecated: use MmdHumanoidAnimationTrack (a single track carrying a standard Humanoid " +
-        "AnimationClip) instead of pairing a standard AnimationTrack with MmdHumanoidRetargetTrack. " +
-        "Kept functional for existing timelines; see docs/design/humanoid-retarget-ux-alternatives.md.")]
-    [TrackClipType(typeof(MmdHumanoidRetargetClip))]
+    // A single Timeline track that both animates the proxy avatar (standard Humanoid
+    // AnimationClip) and drives the native MMD model (humanoid retarget side-effect).
+    // Each clip's CreatePlayable returns an AnimationClipPlayable connected to the mixer
+    // tree, so the graph auto-advances clip time during both scrub and continuous play.
+    [TrackClipType(typeof(MmdHumanoidAnimationClip))]
     [TrackBindingType(typeof(MmdUnityPlaybackController))]
-    public sealed class MmdHumanoidRetargetTrack : TrackAsset
+    public sealed class MmdHumanoidAnimationTrack : TrackAsset
     {
+        public override Playable CreateTrackMixer(PlayableGraph graph, GameObject go, int inputCount)
+        {
+            return ScriptPlayable<MmdHumanoidAnimationMixerBehaviour>.Create(graph, inputCount);
+        }
+
         public override void GatherProperties(PlayableDirector director, IPropertyCollector driver)
         {
             MmdUnityPlaybackController? controller =
