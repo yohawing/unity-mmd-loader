@@ -13,16 +13,17 @@ namespace Mmd.Editor
     /// <summary>Bind existing project Texture2D assets to importer-generated Material sub-assets.</summary>
     internal static class MmdPmxProjectTextureBinder
     {
-        internal static void BindProjectTextureAssetsToMaterials(MmdModelDefinition model, string pmxAssetPath, Material[] materials, MmdRenderingDescriptor? descriptor = null, AssetImportContext? ctx = null)
+        internal static MmdPmxProjectTextureBindingSummary BindProjectTextureAssetsToMaterials(MmdModelDefinition model, string pmxAssetPath, Material[] materials, MmdRenderingDescriptor? descriptor = null, AssetImportContext? ctx = null)
         {
             if (model?.materials == null || materials == null)
             {
-                return;
+                return MmdPmxProjectTextureBindingSummary.Empty;
             }
 
             // Shared toon ramps are reused across materials; cache the decoded sub-asset per index
             // so a model with many shared-toon materials adds at most one texture per ramp.
             var sharedToonSubAssets = new Dictionary<int, Texture2D>();
+            var summary = new MmdPmxProjectTextureBindingSummaryBuilder();
 
             int count = System.Math.Min(model.materials.Count, materials.Length);
             for (int i = 0; i < count; i++)
@@ -34,12 +35,13 @@ namespace Mmd.Editor
                     continue;
                 }
 
-                BindOneTextureReference(matDef.texture, pmxAssetPath, mat, ctx, "_BaseMap", "_MainTex");
+                summary.Record(i, "diffuse", matDef.texture, BindOneTextureReference(matDef.texture, pmxAssetPath, mat, ctx, "_BaseMap", "_MainTex"));
                 MmdUnityMaterialBuilder.ApplyDiffuseBoundSideEffects(mat);
 
-                BindOneTextureReference(matDef.sphereTexture, pmxAssetPath, mat, ctx, "_SphereMap");
+                summary.Record(i, "sphere", matDef.sphereTexture, BindOneTextureReference(matDef.sphereTexture, pmxAssetPath, mat, ctx, "_SphereMap"));
 
-                bool toonBound = BindOneTextureReference(matDef.toonTexture, pmxAssetPath, mat, ctx, "_ToonMap");
+                TextureReferenceBindStatus toonStatus = BindOneTextureReference(matDef.toonTexture, pmxAssetPath, mat, ctx, "_ToonMap");
+                bool toonBound = toonStatus == TextureReferenceBindStatus.Resolved;
                 if (!toonBound &&
                     ctx != null &&
                     matDef.toonShared &&
@@ -56,6 +58,8 @@ namespace Mmd.Editor
                         toonBound = true;
                     }
                 }
+
+                summary.Record(i, "toon", matDef.toonTexture, toonBound ? TextureReferenceBindStatus.Resolved : toonStatus);
 
                 if (toonBound && mat.HasProperty("_ToonMapBound"))
                 {
@@ -101,6 +105,8 @@ namespace Mmd.Editor
                     }
                 }
             }
+
+            return summary.Build();
         }
 
         private static Texture2D? GetOrCreateSharedToonSubAsset(
@@ -128,17 +134,17 @@ namespace Mmd.Editor
             return texture;
         }
 
-        private static bool BindOneTextureReference(string? reference, string pmxAssetPath, Material material, AssetImportContext? ctx, params string[] propertyNames)
+        private static TextureReferenceBindStatus BindOneTextureReference(string? reference, string pmxAssetPath, Material material, AssetImportContext? ctx, params string[] propertyNames)
         {
             if (string.IsNullOrWhiteSpace(reference) || material == null)
             {
-                return false;
+                return TextureReferenceBindStatus.NoReference;
             }
 
             string resolvedReference = reference!;
             if (!MmdAssetPathUtility.TryResolveProjectRelativeAssetPathCandidate(pmxAssetPath, resolvedReference, out string assetPath))
             {
-                return false;
+                return TextureReferenceBindStatus.Missing;
             }
 
             if (ctx != null)
@@ -149,20 +155,72 @@ namespace Mmd.Editor
             Texture2D? tex = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
             if (tex == null)
             {
-                return false;
+                return TextureReferenceBindStatus.Missing;
             }
 
-            bool bound = false;
             foreach (string prop in propertyNames)
             {
                 if (material.HasProperty(prop))
                 {
                     material.SetTexture(prop, tex);
-                    bound = true;
                 }
             }
 
-            return bound;
+            return TextureReferenceBindStatus.Resolved;
         }
+
+        private enum TextureReferenceBindStatus
+        {
+            NoReference,
+            Resolved,
+            Missing
+        }
+
+        private sealed class MmdPmxProjectTextureBindingSummaryBuilder
+        {
+            private int resolvedCount;
+            private int missingCount;
+            private string missingSample = string.Empty;
+
+            public void Record(int materialIndex, string slot, string? reference, TextureReferenceBindStatus status)
+            {
+                switch (status)
+                {
+                    case TextureReferenceBindStatus.Resolved:
+                        resolvedCount++;
+                        break;
+                    case TextureReferenceBindStatus.Missing:
+                        missingCount++;
+                        if (string.IsNullOrEmpty(missingSample))
+                        {
+                            missingSample = $"material {materialIndex} {slot}: {reference ?? string.Empty}";
+                        }
+                        break;
+                }
+            }
+
+            public MmdPmxProjectTextureBindingSummary Build()
+            {
+                return new MmdPmxProjectTextureBindingSummary(resolvedCount, missingCount, missingSample);
+            }
+        }
+    }
+
+    internal readonly struct MmdPmxProjectTextureBindingSummary
+    {
+        public static readonly MmdPmxProjectTextureBindingSummary Empty = new MmdPmxProjectTextureBindingSummary(0, 0, string.Empty);
+
+        public MmdPmxProjectTextureBindingSummary(int resolvedReferenceCount, int missingReferenceCount, string? missingReferenceSample)
+        {
+            ResolvedReferenceCount = System.Math.Max(0, resolvedReferenceCount);
+            MissingReferenceCount = System.Math.Max(0, missingReferenceCount);
+            MissingReferenceSample = missingReferenceSample ?? string.Empty;
+        }
+
+        public int ResolvedReferenceCount { get; }
+
+        public int MissingReferenceCount { get; }
+
+        public string MissingReferenceSample { get; }
     }
 }

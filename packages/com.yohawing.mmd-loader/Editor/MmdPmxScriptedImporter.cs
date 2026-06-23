@@ -104,7 +104,13 @@ namespace Mmd.Editor
                 Mesh importedMesh = generatedAssets.Mesh;
                 Material[] importedMaterials = generatedAssets.Materials;
 
-                MmdPmxProjectTextureBinder.BindProjectTextureAssetsToMaterials(model, ctx.assetPath, importedMaterials, generatedAssets.RenderingDescriptor, ctx);
+                MmdPmxProjectTextureBindingSummary textureBindingSummary =
+                    MmdPmxProjectTextureBinder.BindProjectTextureAssetsToMaterials(
+                        model,
+                        ctx.assetPath,
+                        importedMaterials,
+                        generatedAssets.RenderingDescriptor,
+                        ctx);
 
                 MmdPmxAsset asset = MmdPmxImportedAssetBuilder.CreateAndInitializeImportedAsset(
                     bytes,
@@ -119,6 +125,10 @@ namespace Mmd.Editor
                     generatedAssets,
                     materialRemaps,
                     animationType.ToString());
+                asset.ApplyProjectTextureBindingSummary(
+                    textureBindingSummary.ResolvedReferenceCount,
+                    textureBindingSummary.MissingReferenceCount,
+                    textureBindingSummary.MissingReferenceSample);
 
                 MmdPmxHumanoidAvatarImportBuilder.MmdPmxHumanoidAvatarImportResult avatarImport =
                     MmdPmxHumanoidAvatarImportBuilder.TryBuildHumanoidAvatar(
@@ -176,6 +186,12 @@ namespace Mmd.Editor
                 if (animationType == MmdPmxAnimationType.Generic && genericAvatar == null)
                 {
                     ctx.LogImportWarning(genericAvatarImport.Diagnostic);
+                }
+
+                if (textureBindingSummary.MissingReferenceCount > 0)
+                {
+                    ctx.LogImportWarning(
+                        $"PMX import has {textureBindingSummary.MissingReferenceCount} unresolved texture reference(s). See the PMX asset Material Reference Summary for the first sample.");
                 }
 
                 ctx.AddObjectToAsset("PMX", asset);

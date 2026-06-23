@@ -1051,6 +1051,53 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void ImportedPmxMaterialRecordsMissingProjectTextureSummary()
+        {
+            MmdUnityModelInstance? instance = null;
+            string pmxAssetPath = TempDirectory + "/missing_texture_summary/model.pmx";
+            string textureReference = "textures/missing_diffuse.png";
+
+            try
+            {
+                MmdModelDefinition model = CreateTexturedTriangleModel(textureReference);
+                instance = MmdPmxImportAssetCacheBuilder.CreateImportedAssetCache(model, importScale: 1.0f);
+
+                MmdPmxProjectTextureBindingSummary summary =
+                    MmdPmxProjectTextureBinder.BindProjectTextureAssetsToMaterials(model, pmxAssetPath, instance.Materials);
+
+                Assert.That(summary.ResolvedReferenceCount, Is.EqualTo(0));
+                Assert.That(summary.MissingReferenceCount, Is.EqualTo(1));
+                Assert.That(summary.MissingReferenceSample, Is.EqualTo("material 0 diffuse: " + textureReference));
+
+                MmdPmxAsset asset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                try
+                {
+                    asset.Initialize(
+                        new byte[] { 1 },
+                        pmxAssetPath,
+                        pmxAssetPath,
+                        parseSummary: MmdPmxParseSummary.FromModel(model));
+                    asset.ApplyProjectTextureBindingSummary(
+                        summary.ResolvedReferenceCount,
+                        summary.MissingReferenceCount,
+                        summary.MissingReferenceSample);
+
+                    Assert.That(asset.ResolvedProjectTextureReferenceCount, Is.EqualTo(0));
+                    Assert.That(asset.MissingProjectTextureReferenceCount, Is.EqualTo(1));
+                    Assert.That(asset.MissingProjectTextureReferenceSample, Is.EqualTo("material 0 diffuse: " + textureReference));
+                }
+                finally
+                {
+                    Object.DestroyImmediate(asset);
+                }
+            }
+            finally
+            {
+                DestroyInstance(instance);
+            }
+        }
+
+        [Test]
         public void PmxTextureCandidatePathResolvesBeforeTextureFileExists()
         {
             string pmxAssetPath = TempDirectory + "/texture_candidate_test/model.pmx";

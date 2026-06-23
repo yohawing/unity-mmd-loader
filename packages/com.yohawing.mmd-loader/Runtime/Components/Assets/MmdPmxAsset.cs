@@ -301,6 +301,9 @@ namespace Mmd
         [SerializeField] private int diffuseTextureReferenceCount;
         [SerializeField] private int sphereTextureReferenceCount;
         [SerializeField] private int toonTextureReferenceCount;
+        [SerializeField] private int resolvedProjectTextureReferenceCount;
+        [SerializeField] private int missingProjectTextureReferenceCount;
+        [SerializeField] private string missingProjectTextureReferenceSample = string.Empty;
         [SerializeField] private int transparentMaterialCount;
         [SerializeField] private int edgeMaterialCount;
         [SerializeField] private int ikCount;
@@ -371,6 +374,12 @@ namespace Mmd
         public int SphereTextureReferenceCount => sphereTextureReferenceCount;
 
         public int ToonTextureReferenceCount => toonTextureReferenceCount;
+
+        public int ResolvedProjectTextureReferenceCount => resolvedProjectTextureReferenceCount;
+
+        public int MissingProjectTextureReferenceCount => missingProjectTextureReferenceCount;
+
+        public string MissingProjectTextureReferenceSample => missingProjectTextureReferenceSample;
 
         public int TransparentMaterialCount => transparentMaterialCount;
 
@@ -465,6 +474,7 @@ namespace Mmd
             hierarchyReadinessDiagnostic = hierarchyReadinessDiagnosticValue ?? string.Empty;
             rendererReadinessDiagnostic = rendererReadinessDiagnosticValue ?? string.Empty;
             boneBindingReadinessDiagnostic = boneBindingReadinessDiagnosticValue ?? string.Empty;
+            ApplyProjectTextureBindingSummary(0, 0, string.Empty);
             ApplyParseSummary(parseSummary);
         }
 
@@ -480,6 +490,16 @@ namespace Mmd
             humanoidAvatarReadiness = NormalizeSummaryValue(readiness, MmdHumanoidSetupAsset.NotEvaluatedReadiness);
             humanoidAvatarDiagnostic = diagnostic ?? string.Empty;
             humanoidBoneMappingDiagnostics = mappingDiagnostics ?? MmdHumanoidBoneMappingDiagnosticSummary.Empty;
+        }
+
+        public void ApplyProjectTextureBindingSummary(
+            int resolvedReferenceCount,
+            int missingReferenceCount,
+            string? missingReferenceSample)
+        {
+            resolvedProjectTextureReferenceCount = Math.Max(0, resolvedReferenceCount);
+            missingProjectTextureReferenceCount = Math.Max(0, missingReferenceCount);
+            missingProjectTextureReferenceSample = missingReferenceSample ?? string.Empty;
         }
 
         public byte[] GetBytesCopy()

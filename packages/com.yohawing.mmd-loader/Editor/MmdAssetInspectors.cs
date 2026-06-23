@@ -473,6 +473,13 @@ namespace Mmd.Editor
                 EditorGUILayout.IntField("Diffuse Texture Refs", asset.DiffuseTextureReferenceCount);
                 EditorGUILayout.IntField("Sphere Texture Refs", asset.SphereTextureReferenceCount);
                 EditorGUILayout.IntField("Toon Texture Refs", asset.ToonTextureReferenceCount);
+                EditorGUILayout.IntField("Resolved Project Texture Refs", asset.ResolvedProjectTextureReferenceCount);
+                EditorGUILayout.IntField("Missing Project Texture Refs", asset.MissingProjectTextureReferenceCount);
+                if (asset.MissingProjectTextureReferenceCount > 0)
+                {
+                    EditorGUILayout.TextField("First Missing Texture", asset.MissingProjectTextureReferenceSample);
+                }
+
                 EditorGUILayout.IntField("Transparent Materials", asset.TransparentMaterialCount);
                 EditorGUILayout.IntField("Edge Materials", asset.EdgeMaterialCount);
             }
