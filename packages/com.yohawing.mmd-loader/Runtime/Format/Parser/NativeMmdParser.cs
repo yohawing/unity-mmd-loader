@@ -440,6 +440,16 @@ namespace Mmd.Parser
                 });
             }
 
+            foreach (VmdMotionSourceSelfShadowFrame frame in source.SelfShadowFrames ?? Array.Empty<VmdMotionSourceSelfShadowFrame>())
+            {
+                motion.selfShadowKeyframes.Add(new MmdSelfShadowKeyframeDefinition
+                {
+                    frame = CheckedUIntToInt(frame?.Frame ?? 0u, "VMD self-shadow frame"),
+                    mode = frame?.Mode ?? 0,
+                    distance = frame?.Distance ?? 0.0f
+                });
+            }
+
             return motion;
         }
 
@@ -469,7 +479,8 @@ namespace Mmd.Parser
                 MorphFrames = new VmdMotionSourceMorphFrame[morphFrames.Length],
                 PropertyFrames = new VmdMotionSourcePropertyFrame[propertyFrames.Length],
                 CameraFrames = new VmdMotionSourceCameraFrame[cameraFrames.Length],
-                LightFrames = new VmdMotionSourceLightFrame[lightFrames.Length]
+                LightFrames = new VmdMotionSourceLightFrame[lightFrames.Length],
+                SelfShadowFrames = new VmdMotionSourceSelfShadowFrame[selfShadowFrames.Length]
             };
 
             for (int i = 0; i < source.BoneFrames.Length; i++)
@@ -546,6 +557,17 @@ namespace Mmd.Parser
                     Frame = frame.frame,
                     Color = CopyVec3(frame.color),
                     Direction = CopyVec3(frame.direction)
+                };
+            }
+
+            for (int i = 0; i < source.SelfShadowFrames.Length; i++)
+            {
+                VmdParsedSelfShadowFrameJson frame = selfShadowFrames[i] ?? new VmdParsedSelfShadowFrameJson();
+                source.SelfShadowFrames[i] = new VmdMotionSourceSelfShadowFrame
+                {
+                    Frame = frame.frame,
+                    Mode = frame.mode,
+                    Distance = frame.distance
                 };
             }
 
@@ -896,6 +918,7 @@ namespace Mmd.Parser
             public VmdMotionSourcePropertyFrame[] PropertyFrames = Array.Empty<VmdMotionSourcePropertyFrame>();
             public VmdMotionSourceCameraFrame[] CameraFrames = Array.Empty<VmdMotionSourceCameraFrame>();
             public VmdMotionSourceLightFrame[] LightFrames = Array.Empty<VmdMotionSourceLightFrame>();
+            public VmdMotionSourceSelfShadowFrame[] SelfShadowFrames = Array.Empty<VmdMotionSourceSelfShadowFrame>();
         }
 
         internal sealed class VmdMotionSourceCameraFrame
@@ -914,6 +937,13 @@ namespace Mmd.Parser
             public uint Frame;
             public float[] Color = Array.Empty<float>();
             public float[] Direction = Array.Empty<float>();
+        }
+
+        internal sealed class VmdMotionSourceSelfShadowFrame
+        {
+            public uint Frame;
+            public byte Mode;
+            public float Distance;
         }
 
         internal sealed class VmdMotionSourceBoneFrame
