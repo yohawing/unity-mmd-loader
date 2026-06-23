@@ -191,9 +191,9 @@ namespace Mmd.Tests
         {
             var keyframes = new List<MmdCameraKeyframeDefinition>
             {
-                null,
+                null!,
                 Keyframe(0, -40.0f, new[] { 0.0f, 10.0f, 0.0f }, new[] { 0.0f, 0.0f, 0.0f }, 20, true),
-                null,
+                null!,
                 Keyframe(10, -20.0f, new[] { 2.0f, 20.0f, -4.0f }, new[] { 0.1f, 0.1f, 0.1f }, 40, true)
             };
 
