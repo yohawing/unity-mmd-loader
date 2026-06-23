@@ -23,6 +23,7 @@ namespace Mmd.Samples.RuntimeVerification
         public float FrameRate { get; private set; } = 30.0f;
         public int[] SampleFrames { get; private set; } = Array.Empty<int>();
         public bool DumpBones { get; private set; }
+        public float PhysicsMaxSubStepFixedStepSeconds { get; private set; }
         public MmdRuntimeVerificationDrive Drive { get; private set; } =
             MmdRuntimeVerificationDrive.Timeline;
         public bool FastRuntimeEnabled { get; private set; } = true;
@@ -54,7 +55,7 @@ namespace Mmd.Samples.RuntimeVerification
                 string? value = inlineValue;
                 bool requiresValue = name is "--pmx" or "--vmd" or "--dir" or "--out" or
                     "--duration" or "--frame-rate" or "--drive" or "--fast-runtime" or
-                    "--sample-frames";
+                    "--sample-frames" or "--physics-max-substep-fixed-step";
                 if (requiresValue && value == null)
                 {
                     if (i + 1 >= args.Length)
@@ -188,6 +189,16 @@ namespace Mmd.Samples.RuntimeVerification
                 case "--sample-frames":
                     SampleFrames = ParseSampleFrames(value, Errors);
                     break;
+                case "--physics-max-substep-fixed-step":
+                    if (TryParsePositiveFloatOrFraction(value, out float fixedStepSeconds))
+                    {
+                        PhysicsMaxSubStepFixedStepSeconds = fixedStepSeconds;
+                    }
+                    else
+                    {
+                        Errors.Add("Invalid --physics-max-substep-fixed-step value: " + value + ". Expected positive seconds or a fraction such as 1/120.");
+                    }
+                    break;
                 case "--dump-bones":
                     DumpBones = true;
                     break;
@@ -313,6 +324,36 @@ namespace Mmd.Samples.RuntimeVerification
 
             frames.Sort();
             return frames.ToArray();
+        }
+
+        private static bool TryParsePositiveFloatOrFraction(string value, out float result)
+        {
+            result = 0.0f;
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return false;
+            }
+
+            string trimmed = value.Trim();
+            int slash = trimmed.IndexOf('/');
+            if (slash > 0 && slash < trimmed.Length - 1)
+            {
+                string numeratorText = trimmed.Substring(0, slash);
+                string denominatorText = trimmed.Substring(slash + 1);
+                if (float.TryParse(numeratorText, NumberStyles.Float, CultureInfo.InvariantCulture, out float numerator) &&
+                    float.TryParse(denominatorText, NumberStyles.Float, CultureInfo.InvariantCulture, out float denominator) &&
+                    denominator > 0.0f)
+                {
+                    result = numerator / denominator;
+                    return float.IsFinite(result) && result > 0.0f;
+                }
+
+                return false;
+            }
+
+            return float.TryParse(trimmed, NumberStyles.Float, CultureInfo.InvariantCulture, out result) &&
+                float.IsFinite(result) &&
+                result > 0.0f;
         }
 
         private static IEnumerable<string> EnumerateFiles(string directory, string pattern)

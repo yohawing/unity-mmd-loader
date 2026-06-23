@@ -403,7 +403,7 @@ namespace Mmd.Samples.RuntimeVerification
                         frame == arguments.SampleFrames[sampleIndex])
                     {
                         float sampleTime = frame / arguments.FrameRate;
-                        AddSample(result, controller, Time.realtimeSinceStartup - sampleTime);
+                        AddSample(result, controller, Time.realtimeSinceStartup - sampleTime, frame);
                         sampleIndex++;
                     }
 
@@ -427,13 +427,14 @@ namespace Mmd.Samples.RuntimeVerification
         private void AddSample(
             MmdRuntimeVerificationCaseResult result,
             MmdUnityPlaybackController controller,
-            float startTime)
+            float startTime,
+            int? frameOverride = null)
         {
             var frames = new List<MmdRuntimeVerificationSampledFrame>(result.sampledFrames);
             frames.Add(new MmdRuntimeVerificationSampledFrame
             {
                 timeSeconds = Math.Max(0.0f, Time.realtimeSinceStartup - startTime),
-                frame = controller.CurrentFrame,
+                frame = frameOverride ?? controller.CurrentFrame,
                 configured = controller.IsConfigured,
                 fastRuntimeEnabled = controller.IsFastRuntimeEnabled,
                 physicsDiagnosticsAvailable = controller.LastLivePhysicsDiagnostics != null,

@@ -46,6 +46,19 @@ Controller-driven check with the managed path forced after configuration:
   --fast-runtime off
 ```
 
+Physics max-substep A/B diagnostic:
+
+```powershell
+.\artifacts\runtime-verification\MmdRuntimeVerification.exe `
+  --pmx F:\MMD\model.pmx `
+  --vmd F:\MMD\motion.vmd `
+  --out F:\Develop\MMDDev\unity-mmd-loader\artifacts\runtime-verification\physics-candidate.json `
+  --sample-frames 0,30,60,90 `
+  --dump-bones `
+  --drive controller `
+  --physics-max-substep-fixed-step 1/120
+```
+
 Directory sweep:
 
 ```powershell
