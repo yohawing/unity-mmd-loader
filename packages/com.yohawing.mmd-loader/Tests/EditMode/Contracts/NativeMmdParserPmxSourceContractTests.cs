@@ -14,7 +14,13 @@ namespace Mmd.Tests
         {
             var snapshot = new NativeMmdParser.PmxModelSourceSnapshot
             {
-                metadata = new NativeMmdParser.PmxModelSourceMetadata { name = "pmx-source" },
+                metadata = new NativeMmdParser.PmxModelSourceMetadata
+                {
+                    name = "pmx-source",
+                    englishName = "pmx-source-en",
+                    comment = "日本語コメント",
+                    englishComment = "English comment"
+                },
                 geometry = new NativeMmdParser.PmxModelSourceGeometry
                 {
                     positions = new[] { 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f },
@@ -231,6 +237,9 @@ namespace Mmd.Tests
             MmdModelDefinition model = NativeMmdParser.BuildModelDefinition(snapshot);
 
             Assert.That(model.name, Is.EqualTo("pmx-source"));
+            Assert.That(model.englishName, Is.EqualTo("pmx-source-en"));
+            Assert.That(model.comment, Is.EqualTo("日本語コメント"));
+            Assert.That(model.englishComment, Is.EqualTo("English comment"));
             Assert.That(model.vertices, Has.Count.EqualTo(2));
             CollectionAssert.AreEqual(new[] { 1.0f, 2.0f, 3.0f }, model.vertices[0].position);
             CollectionAssert.AreEqual(new[] { 0.0f, 1.0f, 0.0f }, model.vertices[1].normal);

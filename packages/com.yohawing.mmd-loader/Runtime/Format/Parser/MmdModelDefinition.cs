@@ -9,6 +9,9 @@ namespace Mmd.Parser
     public sealed class MmdModelDefinition
     {
         public string name = string.Empty;
+        public string englishName = string.Empty;
+        public string comment = string.Empty;
+        public string englishComment = string.Empty;
         public List<MmdVertexDefinition> vertices = new();
         public List<int> indices = new();
         public List<MmdBoneDefinition> bones = new();

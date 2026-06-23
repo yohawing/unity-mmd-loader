@@ -418,6 +418,23 @@ namespace Mmd.Editor
             using (new EditorGUI.DisabledScope(true))
             {
                 EditorGUILayout.TextField("Model Name", asset.ModelName);
+                if (!string.IsNullOrWhiteSpace(asset.ModelEnglishName))
+                {
+                    EditorGUILayout.TextField("English Name", asset.ModelEnglishName);
+                }
+
+                if (!string.IsNullOrWhiteSpace(asset.ModelComment))
+                {
+                    EditorGUILayout.LabelField("Comment");
+                    EditorGUILayout.TextArea(asset.ModelComment, GUILayout.MinHeight(40));
+                }
+
+                if (!string.IsNullOrWhiteSpace(asset.ModelEnglishComment))
+                {
+                    EditorGUILayout.LabelField("English Comment");
+                    EditorGUILayout.TextArea(asset.ModelEnglishComment, GUILayout.MinHeight(40));
+                }
+
                 EditorGUILayout.Vector3Field("MMD Bounds Min", asset.BoundsMin);
                 EditorGUILayout.Vector3Field("MMD Bounds Max", asset.BoundsMax);
                 EditorGUILayout.Vector3Field("MMD Bounds Size", asset.BoundsSize);

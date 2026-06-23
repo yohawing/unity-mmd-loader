@@ -68,7 +68,10 @@ namespace Mmd.Parser
             source ??= new PmxModelSourceSnapshot();
             var model = new MmdModelDefinition
             {
-                name = source.metadata?.name ?? string.Empty
+                name = source.metadata?.name ?? string.Empty,
+                englishName = source.metadata?.englishName ?? string.Empty,
+                comment = source.metadata?.comment ?? string.Empty,
+                englishComment = source.metadata?.englishComment ?? string.Empty
             };
 
             PmxModelSourceGeometry geometry = source.geometry ?? new PmxModelSourceGeometry();
@@ -1053,7 +1056,13 @@ namespace Mmd.Parser
         }
 
         [Serializable]
-        internal sealed class PmxModelSourceMetadata { public string name = string.Empty; }
+        internal sealed class PmxModelSourceMetadata
+        {
+            public string name = string.Empty;
+            public string englishName = string.Empty;
+            public string comment = string.Empty;
+            public string englishComment = string.Empty;
+        }
 
         [Serializable]
         internal sealed class PmxModelSourceGeometry

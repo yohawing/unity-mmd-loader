@@ -1385,6 +1385,40 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void PmxParseSummaryCarriesModelCredits()
+        {
+            var model = new MmdModelDefinition
+            {
+                name = "credit-model",
+                englishName = "credit-model-en",
+                comment = "日本語コメント",
+                englishComment = "English comment"
+            };
+
+            MmdPmxParseSummary summary = MmdPmxParseSummary.FromModel(model);
+            MmdPmxAsset pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+            try
+            {
+                pmxAsset.Initialize(
+                    new byte[] { 1, 2, 3 },
+                    "credit.pmx",
+                    "External/Model/credit.pmx",
+                    parseSummary: summary);
+
+                Assert.That(summary.ModelEnglishName, Is.EqualTo("credit-model-en"));
+                Assert.That(summary.ModelComment, Is.EqualTo("日本語コメント"));
+                Assert.That(summary.ModelEnglishComment, Is.EqualTo("English comment"));
+                Assert.That(pmxAsset.ModelEnglishName, Is.EqualTo("credit-model-en"));
+                Assert.That(pmxAsset.ModelComment, Is.EqualTo("日本語コメント"));
+                Assert.That(pmxAsset.ModelEnglishComment, Is.EqualTo("English comment"));
+            }
+            finally
+            {
+                Object.DestroyImmediate(pmxAsset);
+            }
+        }
+
+        [Test]
         public void PmxParseSummaryCalculatesBoundsFromFiniteVertexPositions()
         {
             var model = new MmdModelDefinition();

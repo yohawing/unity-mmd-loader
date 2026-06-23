@@ -55,9 +55,15 @@ namespace Mmd
             int jointCount,
             Vector3 boundsMin,
             Vector3 boundsMax,
-            MmdPmxMaterialSummary[]? materialSummaries = null)
+            MmdPmxMaterialSummary[]? materialSummaries = null,
+            string? modelEnglishName = null,
+            string? modelComment = null,
+            string? modelEnglishComment = null)
         {
             ModelName = modelName ?? string.Empty;
+            ModelEnglishName = modelEnglishName ?? string.Empty;
+            ModelComment = modelComment ?? string.Empty;
+            ModelEnglishComment = modelEnglishComment ?? string.Empty;
             VertexCount = Math.Max(vertexCount, 0);
             IndexCount = Math.Max(indexCount, 0);
             BoneCount = Math.Max(boneCount, 0);
@@ -83,6 +89,12 @@ namespace Mmd
         }
 
         public string ModelName { get; }
+
+        public string ModelEnglishName { get; }
+
+        public string ModelComment { get; }
+
+        public string ModelEnglishComment { get; }
 
         public int VertexCount { get; }
 
@@ -179,7 +191,10 @@ namespace Mmd
                 model.physics?.joints?.Count ?? 0,
                 bounds.min,
                 bounds.max,
-                BuildMaterialSummaries(model));
+                BuildMaterialSummaries(model),
+                model.englishName,
+                model.comment,
+                model.englishComment);
         }
 
         private static MmdPmxMaterialSummary[] BuildMaterialSummaries(MmdModelDefinition model)
@@ -275,6 +290,9 @@ namespace Mmd
             MmdHumanoidBoneMappingDiagnosticSummary.Empty;
         [SerializeField] private MmdPmxImportSummaryStatus importSummaryStatus = MmdPmxImportSummaryStatus.NotParsed;
         [SerializeField] private string modelName = string.Empty;
+        [SerializeField] private string modelEnglishName = string.Empty;
+        [SerializeField] private string modelComment = string.Empty;
+        [SerializeField] private string modelEnglishComment = string.Empty;
         [SerializeField] private int vertexCount;
         [SerializeField] private int indexCount;
         [SerializeField] private int boneCount;
@@ -331,6 +349,12 @@ namespace Mmd
         public MmdPmxImportSummaryStatus ImportSummaryStatus => importSummaryStatus;
 
         public string ModelName => modelName;
+
+        public string ModelEnglishName => modelEnglishName;
+
+        public string ModelComment => modelComment;
+
+        public string ModelEnglishComment => modelEnglishComment;
 
         public int VertexCount => vertexCount;
 
@@ -490,6 +514,9 @@ namespace Mmd
             {
                 importSummaryStatus = MmdPmxImportSummaryStatus.NotParsed;
                 modelName = string.Empty;
+                modelEnglishName = string.Empty;
+                modelComment = string.Empty;
+                modelEnglishComment = string.Empty;
                 vertexCount = 0;
                 indexCount = 0;
                 boneCount = 0;
@@ -513,6 +540,9 @@ namespace Mmd
             MmdPmxParseSummary summary = parseSummary.Value;
             importSummaryStatus = MmdPmxImportSummaryStatus.Passed;
             modelName = summary.ModelName;
+            modelEnglishName = summary.ModelEnglishName;
+            modelComment = summary.ModelComment;
+            modelEnglishComment = summary.ModelEnglishComment;
             vertexCount = summary.VertexCount;
             indexCount = summary.IndexCount;
             boneCount = summary.BoneCount;
