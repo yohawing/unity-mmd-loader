@@ -226,7 +226,8 @@ namespace Mmd.Tests
             {
                 loadInstance = MmdEditorPmxLoader.LoadPmxIntoScene(pmxAsset);
                 Assert.That(loadInstance.ImportScale, Is.EqualTo(2.5f).Within(0.0001f));
-                Assert.That(loadInstance.SkinnedMeshRenderer.sharedMesh, Is.SameAs(pmxAsset.ImportedMesh));
+                SkinnedMeshRenderer renderer = loadInstance.SkinnedMeshRenderer!;
+                Assert.That(renderer.sharedMesh, Is.SameAs(pmxAsset.ImportedMesh));
             }
             finally
             {
@@ -392,23 +393,24 @@ namespace Mmd.Tests
             serializedImporter.ApplyModifiedPropertiesWithoutUndo();
             importer!.SaveAndReimport();
 
-            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+            MmdPmxAsset? pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             Assert.That(pmxAsset, Is.Not.Null);
-            Assert.That(pmxAsset.ImportScale, Is.EqualTo(0.1f).Within(0.0001f));
+            MmdPmxAsset loadedPmxAsset = pmxAsset!;
+            Assert.That(loadedPmxAsset.ImportScale, Is.EqualTo(0.1f).Within(0.0001f));
 
             // Load the model to compute unscaled MMD bounds.
-            MmdModelDefinition model = pmxAsset.LoadModel();
+            MmdModelDefinition model = loadedPmxAsset.LoadModel();
             Bounds mmdBounds = CalculateMmdBounds(model);
 
             // Load into scene through the editor PMX loader.
             MmdUnityModelInstance? loadInstance = null;
             try
             {
-                loadInstance = MmdEditorPmxLoader.LoadPmxIntoScene(pmxAsset);
+                loadInstance = MmdEditorPmxLoader.LoadPmxIntoScene(loadedPmxAsset);
                 Assert.That(loadInstance.ImportScale, Is.EqualTo(0.1f).Within(0.0001f));
 
                 // Importer-cached Mesh sub-asset carries the scale in its bounds.
-                Mesh importedMesh = pmxAsset.ImportedMesh;
+                Mesh importedMesh = loadedPmxAsset.ImportedMesh;
                 Assert.That(importedMesh, Is.Not.Null);
 
                 // MMD bounds -> Unity bounds transform:
@@ -430,7 +432,8 @@ namespace Mmd.Tests
                 Assert.That(importedBounds.center.z, Is.EqualTo(expectedCenter.z).Within(0.001f));
 
                 // Scene instance references the same importer-owned mesh sub-asset.
-                Assert.That(loadInstance.SkinnedMeshRenderer.sharedMesh, Is.SameAs(importedMesh));
+                SkinnedMeshRenderer renderer = loadInstance.SkinnedMeshRenderer!;
+                Assert.That(renderer.sharedMesh, Is.SameAs(importedMesh));
             }
             finally
             {
@@ -494,10 +497,11 @@ namespace Mmd.Tests
             Assert.That(textureSubCount, Is.EqualTo(0), "no Texture sub-assets under .pmx");
 
             Assert.That(pmxAsset.ImportedMesh, Is.Not.Null);
-            Assert.That(AssetDatabase.Contains(pmxAsset.ImportedMesh), Is.True);
-            Assert.That(AssetDatabase.GetAssetPath(pmxAsset.ImportedMesh), Is.EqualTo(TempPmxPath));
-            Assert.That(pmxAsset.ImportedMesh.vertexCount, Is.EqualTo(pmxAsset.VertexCount));
-            Assert.That(pmxAsset.ImportedMesh.subMeshCount, Is.GreaterThanOrEqualTo(1));
+            Mesh importedMesh = pmxAsset.ImportedMesh!;
+            Assert.That(AssetDatabase.Contains(importedMesh), Is.True);
+            Assert.That(AssetDatabase.GetAssetPath(importedMesh), Is.EqualTo(TempPmxPath));
+            Assert.That(importedMesh.vertexCount, Is.EqualTo(pmxAsset.VertexCount));
+            Assert.That(importedMesh.subMeshCount, Is.GreaterThanOrEqualTo(1));
             Assert.That(pmxAsset.ImportedMaterials, Has.Length.EqualTo(pmxAsset.MaterialCount));
             Assert.That(pmxAsset.ImportedMaterials[0], Is.Not.Null);
             Assert.That(AssetDatabase.Contains(pmxAsset.ImportedMaterials[0]), Is.True);
