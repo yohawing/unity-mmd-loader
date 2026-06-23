@@ -487,8 +487,9 @@ namespace Mmd.Tests
                 instance = MmdUnityModelFactory.CreateStaticModel(model, pmxPath);
 
                 Assert.That(instance.LoadedToonTextureCount, Is.EqualTo(1));
-                Texture toonMap = ReadMaterialTexture(instance.Materials[0], "_ToonMap");
-                Assert.That(toonMap, Is.Not.Null, "shared toon ramp should be bound to _ToonMap");
+                Texture? nullableToonMap = ReadMaterialTexture(instance.Materials[0], "_ToonMap");
+                Assert.That(nullableToonMap, Is.Not.Null, "shared toon ramp should be bound to _ToonMap");
+                Texture toonMap = nullableToonMap!;
                 // 1x32 vertical ramp (toon carries no horizontal detail; shader samples U=0.5).
                 Assert.That(toonMap.width, Is.EqualTo(1));
                 Assert.That(toonMap.height, Is.EqualTo(32));
@@ -736,7 +737,9 @@ namespace Mmd.Tests
                 MmdModelDefinition model = CreateTexturedQuadModel("orientation.png");
                 instance = MmdUnityModelFactory.CreateStaticModel(model, pmxPath);
 
-                var texture = (Texture2D)ReadBoundDiffuseTexture(instance.Materials[0]);
+                Texture? nullableTexture = ReadBoundDiffuseTexture(instance.Materials[0]);
+                Assert.That(nullableTexture, Is.Not.Null);
+                var texture = (Texture2D)nullableTexture!;
                 texture.filterMode = FilterMode.Point;
                 texture.wrapMode = TextureWrapMode.Clamp;
                 Vector2[] viewportUv = instance.Mesh.uv;
@@ -1301,13 +1304,15 @@ namespace Mmd.Tests
 
                 int sharedUpIndex = instance.Mesh.GetBlendShapeIndex("shared-up");
                 Assert.That(sharedUpIndex, Is.GreaterThanOrEqualTo(0));
+                Assert.That(instance.SkinnedMeshRenderer, Is.Not.Null);
+                SkinnedMeshRenderer renderer = instance.SkinnedMeshRenderer!;
                 Vector3[] deltaVertices = new Vector3[instance.Mesh.vertexCount];
                 Vector3[] deltaNormals = new Vector3[instance.Mesh.vertexCount];
                 Vector3[] deltaTangents = new Vector3[instance.Mesh.vertexCount];
                 instance.Mesh.GetBlendShapeFrameVertices(sharedUpIndex, 0, deltaVertices, deltaNormals, deltaTangents);
                 Assert.That(deltaVertices[0], Is.EqualTo(new Vector3(0.0f, 1.0f, 0.0f)));
                 Assert.That(deltaVertices[3], Is.EqualTo(new Vector3(0.0f, 1.0f, 0.0f)));
-                Assert.That(instance.SkinnedMeshRenderer.GetBlendShapeWeight(sharedUpIndex), Is.EqualTo(100f).Within(0.001f));
+                Assert.That(renderer.GetBlendShapeWeight(sharedUpIndex), Is.EqualTo(100f).Within(0.001f));
                 Assert.That(instance.Mesh.vertices[0], Is.EqualTo(new Vector3(0.0f, 0.0f, 0.0f)));
                 Assert.That(instance.Mesh.vertices[3], Is.EqualTo(new Vector3(0.0f, 0.0f, 0.0f)));
             }
@@ -1328,6 +1333,8 @@ namespace Mmd.Tests
 
                 int sharedUpIndex = instance.Mesh.GetBlendShapeIndex("shared-up");
                 Assert.That(sharedUpIndex, Is.GreaterThanOrEqualTo(0));
+                Assert.That(instance.SkinnedMeshRenderer, Is.Not.Null);
+                SkinnedMeshRenderer renderer = instance.SkinnedMeshRenderer!;
 
                 MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
                 frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "shared-up", weight = 1.0f });
@@ -1339,7 +1346,7 @@ namespace Mmd.Tests
                 Assert.That(timing.setVerticesMs, Is.EqualTo(0.0));
                 Assert.That(timing.setUvsMs, Is.EqualTo(0.0));
                 Assert.That(timing.recalculateBoundsMs, Is.EqualTo(0.0));
-                Assert.That(instance.SkinnedMeshRenderer.GetBlendShapeWeight(sharedUpIndex), Is.EqualTo(100f).Within(0.001f));
+                Assert.That(renderer.GetBlendShapeWeight(sharedUpIndex), Is.EqualTo(100f).Within(0.001f));
                 Assert.That(instance.Mesh.vertices[0], Is.EqualTo(new Vector3(0.0f, 0.0f, 0.0f)));
             }
             finally
@@ -1381,7 +1388,8 @@ namespace Mmd.Tests
                 Assert.That(timing.blendShapePathUsed, Is.True);
                 Assert.That(timing.meshUploadRequired, Is.True);
                 Assert.That(timing.setVerticesMs, Is.EqualTo(0.0));
-                Assert.That(instance.SkinnedMeshRenderer.GetBlendShapeWeight(instance.BlendShapeIndexMap["blink"]), Is.EqualTo(100f).Within(0.001f));
+                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+                Assert.That(renderer.GetBlendShapeWeight(instance.BlendShapeIndexMap["blink"]), Is.EqualTo(100f).Within(0.001f));
             }
             finally
             {
@@ -1408,7 +1416,8 @@ namespace Mmd.Tests
                 Assert.That(timing.localBoundsAssigned, Is.True);
                 Assert.That(timing.localBoundsSkipped, Is.False);
                 Assert.That(timing.recalculateBoundsMs, Is.EqualTo(0.0));
-                Assert.That(instance.SkinnedMeshRenderer.localBounds.Contains(new Vector3(-1.0f, 2.5f, 0.0f)), Is.True);
+                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+                Assert.That(renderer.localBounds.Contains(new Vector3(-1.0f, 2.5f, 0.0f)), Is.True);
             }
             finally
             {
@@ -1430,9 +1439,10 @@ namespace Mmd.Tests
                 frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 0.5f });
 
                 MmdUnityMorphApplyTimingSummary first = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame);
-                Bounds firstBounds = instance.SkinnedMeshRenderer.localBounds;
+                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+                Bounds firstBounds = renderer.localBounds;
                 MmdUnityMorphApplyTimingSummary second = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame);
-                Bounds secondBounds = instance.SkinnedMeshRenderer.localBounds;
+                Bounds secondBounds = renderer.localBounds;
 
                 Assert.That(first.localBoundsAssigned, Is.True);
                 Assert.That(first.localBoundsSkipped, Is.False);
@@ -1472,7 +1482,8 @@ namespace Mmd.Tests
                 Assert.That(timing.localBoundsAssigned, Is.True);
                 Assert.That(timing.localBoundsSkipped, Is.False);
                 Assert.That(timing.recalculateBoundsMs, Is.EqualTo(0.0));
-                Assert.That(instance.SkinnedMeshRenderer.localBounds.Contains(new Vector3(-1.0f, 3.0f, 0.0f)), Is.True);
+                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+                Assert.That(renderer.localBounds.Contains(new Vector3(-1.0f, 3.0f, 0.0f)), Is.True);
             }
             finally
             {
@@ -1497,8 +1508,9 @@ namespace Mmd.Tests
 
                 MmdUnityFrameApplier.ApplyFrame(instance, frame);
 
-                Assert.That(instance.SkinnedMeshRenderer.GetBlendShapeWeight(instance.VertexMorphBlendShapes[0].BlendShapeIndex), Is.EqualTo(50f).Within(0.001f));
-                Assert.That(instance.SkinnedMeshRenderer.GetBlendShapeWeight(instance.VertexMorphBlendShapes[1].BlendShapeIndex), Is.EqualTo(50f).Within(0.001f));
+                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+                Assert.That(renderer.GetBlendShapeWeight(instance.VertexMorphBlendShapes[0].BlendShapeIndex), Is.EqualTo(50f).Within(0.001f));
+                Assert.That(renderer.GetBlendShapeWeight(instance.VertexMorphBlendShapes[1].BlendShapeIndex), Is.EqualTo(50f).Within(0.001f));
             }
             finally
             {
@@ -1657,10 +1669,12 @@ namespace Mmd.Tests
                 // Existing mesh is preserved (not rebuilt) when it is already valid.
                 Assert.That(reboundMesh, Is.SameAs(originalMesh),
                     "existing valid mesh must be preserved, not rebuilt with a new mesh");
-                Assert.That(sceneInstance.SkinnedMeshRenderer.sharedMesh, Is.SameAs(reboundMesh));
+                SkinnedMeshRenderer sceneRenderer = RequireSkinnedRenderer(sceneInstance);
+                Assert.That(sceneRenderer.sharedMesh, Is.SameAs(reboundMesh));
                 int blinkIndex = reboundMesh.GetBlendShapeIndex("blink");
                 Assert.That(blinkIndex, Is.GreaterThanOrEqualTo(0));
-                Assert.That(reboundInstance.SkinnedMeshRenderer.GetBlendShapeWeight(blinkIndex), Is.EqualTo(100f).Within(0.001f));
+                SkinnedMeshRenderer reboundRenderer = RequireSkinnedRenderer(reboundInstance);
+                Assert.That(reboundRenderer.GetBlendShapeWeight(blinkIndex), Is.EqualTo(100f).Within(0.001f));
                 Assert.That(originalMesh.vertices[1], Is.EqualTo(originalVertex));
             }
             finally
@@ -1682,7 +1696,7 @@ namespace Mmd.Tests
                 MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
                 sceneInstance = MmdUnityModelFactory.CreateSkinnedModel(model);
                 originalMesh = sceneInstance.Mesh;
-                SkinnedMeshRenderer renderer = sceneInstance.SkinnedMeshRenderer;
+                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(sceneInstance);
                 renderer.sharedMesh = null;
 
                 reboundInstance = MmdUnityModelFactory.CreateExistingSkinnedModelInstance(sceneInstance.Root, model, sourcePath: null);
@@ -1733,7 +1747,7 @@ namespace Mmd.Tests
                 });
 
                 sceneInstance = MmdUnityModelFactory.CreateSkinnedModel(model);
-                SkinnedMeshRenderer originalRenderer = sceneInstance.SkinnedMeshRenderer;
+                SkinnedMeshRenderer originalRenderer = RequireSkinnedRenderer(sceneInstance);
                 GameObject rendererObject = new GameObject("Renderer");
                 rendererObject.transform.SetParent(originalRenderer.transform, worldPositionStays: false);
                 SkinnedMeshRenderer movedRenderer = rendererObject.AddComponent<SkinnedMeshRenderer>();
@@ -1860,7 +1874,8 @@ namespace Mmd.Tests
                 frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "up", weight = 1.0f });
                 MmdUnityFrameApplier.ApplyFrame(instance, frame);
 
-                Assert.That(instance.SkinnedMeshRenderer.GetBlendShapeWeight(upIndex), Is.EqualTo(100f).Within(0.001f));
+                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+                Assert.That(renderer.GetBlendShapeWeight(upIndex), Is.EqualTo(100f).Within(0.001f));
                 // descriptor remains unscaled
                 Assert.That(instance.RenderingDescriptor.vertices[1].position[1], Is.EqualTo(0.0f).Within(0.00001f));
             }
@@ -2758,7 +2773,7 @@ namespace Mmd.Tests
             bytes[offset + 1] = (byte)((value >> 8) & 0xff);
         }
 
-        private static Texture ReadBoundDiffuseTexture(Material material)
+        private static Texture? ReadBoundDiffuseTexture(Material material)
         {
             if (material.HasProperty("_BaseMap"))
             {
@@ -2774,7 +2789,7 @@ namespace Mmd.Tests
                 : null;
         }
 
-        private static Texture ReadMaterialTexture(Material material, string propertyName)
+        private static Texture? ReadMaterialTexture(Material material, string propertyName)
         {
             return material.HasProperty(propertyName)
                 ? material.GetTexture(propertyName)
@@ -2844,7 +2859,8 @@ namespace Mmd.Tests
                 // groupWeight(1.0) * offsetWeight(0.5) = resolved smile weight 0.5 -> BlendShape 50f
                 int smileIndex = instance.Mesh.GetBlendShapeIndex("smile");
                 Assert.That(smileIndex, Is.GreaterThanOrEqualTo(0));
-                Assert.That(instance.SkinnedMeshRenderer.GetBlendShapeWeight(smileIndex), Is.EqualTo(50f).Within(0.001f));
+                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+                Assert.That(renderer.GetBlendShapeWeight(smileIndex), Is.EqualTo(50f).Within(0.001f));
             }
             finally
             {
@@ -2875,8 +2891,9 @@ namespace Mmd.Tests
                 // Fast path: group morphs are already resolved by the native runtime, so the applier
                 // must NOT expand them again. The native-resolved smile weight stays 0.5 -> BlendShape 50f.
                 MmdUnityFrameApplier.ApplyMorphs(instance, fastFrame, groupMorphsResolvedExternally: true);
+                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
                 Assert.That(
-                    instance.SkinnedMeshRenderer.GetBlendShapeWeight(smileIndex),
+                    renderer.GetBlendShapeWeight(smileIndex),
                     Is.EqualTo(50f).Within(0.001f),
                     "Fast path must apply the native-resolved member weight as-is, not re-expand the group.");
 
@@ -2885,7 +2902,7 @@ namespace Mmd.Tests
                 // exactly the bug the fast path must avoid.
                 MmdUnityFrameApplier.ApplyMorphs(instance, fastFrame);
                 Assert.That(
-                    instance.SkinnedMeshRenderer.GetBlendShapeWeight(smileIndex),
+                    renderer.GetBlendShapeWeight(smileIndex),
                     Is.EqualTo(100f).Within(0.001f),
                     "Managed group resolution double-applies an already-resolved group weight (documents the bug).");
             }
@@ -2915,8 +2932,9 @@ namespace Mmd.Tests
 
                 // smile(1.0) + happy-face(0.5) * 0.5 = resolved smile 1.25 -> BlendShape 125f
                 int smileIndex = instance.Mesh.GetBlendShapeIndex("smile");
-                Assert.That(instance.SkinnedMeshRenderer.GetBlendShapeWeight(smileIndex), Is.EqualTo(125f).Within(0.001f));
-                Assert.That(instance.SkinnedMeshRenderer.localBounds.Contains(new Vector3(-1.0f, 2.5f, 0.0f)), Is.True);
+                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+                Assert.That(renderer.GetBlendShapeWeight(smileIndex), Is.EqualTo(125f).Within(0.001f));
+                Assert.That(renderer.localBounds.Contains(new Vector3(-1.0f, 2.5f, 0.0f)), Is.True);
             }
             finally
             {
@@ -2941,11 +2959,12 @@ namespace Mmd.Tests
 
                 // First apply.
                 MmdUnityFrameApplier.ApplyFrame(instance, frame);
-                float firstWeight = instance.SkinnedMeshRenderer.GetBlendShapeWeight(smileIndex);
+                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+                float firstWeight = renderer.GetBlendShapeWeight(smileIndex);
 
                 // Second apply of the same frame.
                 MmdUnityFrameApplier.ApplyFrame(instance, frame);
-                float secondWeight = instance.SkinnedMeshRenderer.GetBlendShapeWeight(smileIndex);
+                float secondWeight = renderer.GetBlendShapeWeight(smileIndex);
 
                 // groupWeight(1.0) * offsetWeight(0.5) = 0.5 -> BlendShape 50f; must not accumulate
                 Assert.That(firstWeight, Is.EqualTo(50f).Within(0.001f));
@@ -2973,14 +2992,15 @@ namespace Mmd.Tests
                 MmdEvaluatedFrame frame1 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
                 frame1.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 1.0f });
                 MmdUnityFrameApplier.ApplyFrame(instance, frame1);
-                Assert.That(instance.SkinnedMeshRenderer.GetBlendShapeWeight(smileIndex), Is.EqualTo(50f).Within(0.001f));
+                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+                Assert.That(renderer.GetBlendShapeWeight(smileIndex), Is.EqualTo(50f).Within(0.001f));
 
                 // Apply with zero group morph weight.
                 MmdEvaluatedFrame frame0 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
                 frame0.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 0.0f });
                 MmdUnityFrameApplier.ApplyFrame(instance, frame0);
 
-                Assert.That(instance.SkinnedMeshRenderer.GetBlendShapeWeight(smileIndex), Is.EqualTo(0f).Within(0.001f));
+                Assert.That(renderer.GetBlendShapeWeight(smileIndex), Is.EqualTo(0f).Within(0.001f));
             }
             finally
             {
@@ -3009,7 +3029,8 @@ namespace Mmd.Tests
                 // group "happy-face"(1.0) targets "shared-up"(1.0) -> resolved weight 1.0 -> BlendShape 100f
                 int sharedUpIndex = instance.Mesh.GetBlendShapeIndex("shared-up");
                 Assert.That(sharedUpIndex, Is.GreaterThanOrEqualTo(0));
-                Assert.That(instance.SkinnedMeshRenderer.GetBlendShapeWeight(sharedUpIndex), Is.EqualTo(100f).Within(0.001f));
+                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+                Assert.That(renderer.GetBlendShapeWeight(sharedUpIndex), Is.EqualTo(100f).Within(0.001f));
             }
             finally
             {
@@ -3872,7 +3893,8 @@ namespace Mmd.Tests
                 // flipWeight(1.0) * offsetWeight(0.5) = resolved smile 0.5 -> BlendShape 50f
                 int smileIndex = instance.Mesh.GetBlendShapeIndex("smile");
                 Assert.That(smileIndex, Is.GreaterThanOrEqualTo(0));
-                Assert.That(instance.SkinnedMeshRenderer.GetBlendShapeWeight(smileIndex), Is.EqualTo(50f).Within(0.001f));
+                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+                Assert.That(renderer.GetBlendShapeWeight(smileIndex), Is.EqualTo(50f).Within(0.001f));
             }
             finally
             {
@@ -3929,7 +3951,8 @@ namespace Mmd.Tests
                 // mood-group(1.0) -> flip-smile(1.0) -> smile(0.5) = resolved smile 0.5 -> BlendShape 50f
                 int smileIndex = instance.Mesh.GetBlendShapeIndex("smile");
                 Assert.That(smileIndex, Is.GreaterThanOrEqualTo(0));
-                Assert.That(instance.SkinnedMeshRenderer.GetBlendShapeWeight(smileIndex), Is.EqualTo(50f).Within(0.001f));
+                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+                Assert.That(renderer.GetBlendShapeWeight(smileIndex), Is.EqualTo(50f).Within(0.001f));
             }
             finally
             {
@@ -4186,12 +4209,13 @@ namespace Mmd.Tests
                 MmdEvaluatedFrame frame1 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
                 frame1.morphs.Add(new MmdEvaluatedMorphWeight { name = "blink", weight = 1.0f });
                 MmdUnityFrameApplier.ApplyFrame(instance, frame1);
-                Assert.That(instance.SkinnedMeshRenderer.GetBlendShapeWeight(blinkIndex), Is.EqualTo(100f).Within(0.001f));
+                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+                Assert.That(renderer.GetBlendShapeWeight(blinkIndex), Is.EqualTo(100f).Within(0.001f));
 
                 MmdEvaluatedFrame frame0 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
                 frame0.morphs.Add(new MmdEvaluatedMorphWeight { name = "blink", weight = 0.0f });
                 MmdUnityFrameApplier.ApplyFrame(instance, frame0);
-                Assert.That(instance.SkinnedMeshRenderer.GetBlendShapeWeight(blinkIndex), Is.EqualTo(0f).Within(0.001f));
+                Assert.That(renderer.GetBlendShapeWeight(blinkIndex), Is.EqualTo(0f).Within(0.001f));
 
                 Assert.That(instance.RenderingDescriptor.vertices[1].position[1], Is.EqualTo(0.0f).Within(0.00001f));
             }
@@ -4245,7 +4269,8 @@ namespace Mmd.Tests
                 frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 0.75f });
                 MmdUnityFrameApplier.ApplyFrame(instance, frame);
 
-                Assert.That(instance.SkinnedMeshRenderer.GetBlendShapeWeight(smileIndex), Is.EqualTo(37.5f).Within(0.001f));
+                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+                Assert.That(renderer.GetBlendShapeWeight(smileIndex), Is.EqualTo(37.5f).Within(0.001f));
             }
             finally
             {
@@ -4365,6 +4390,12 @@ namespace Mmd.Tests
                 if (alphaTex != null) UnityEngine.Object.DestroyImmediate(alphaTex);
                 if (opaqueTex != null) UnityEngine.Object.DestroyImmediate(opaqueTex);
             }
+        }
+
+        private static SkinnedMeshRenderer RequireSkinnedRenderer(MmdUnityModelInstance instance)
+        {
+            Assert.That(instance.SkinnedMeshRenderer, Is.Not.Null);
+            return instance.SkinnedMeshRenderer!;
         }
 
         private static void DestroyInstance(MmdUnityModelInstance? instance)

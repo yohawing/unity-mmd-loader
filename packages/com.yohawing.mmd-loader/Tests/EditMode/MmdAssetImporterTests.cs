@@ -410,8 +410,9 @@ namespace Mmd.Tests
                 Assert.That(loadInstance.ImportScale, Is.EqualTo(0.1f).Within(0.0001f));
 
                 // Importer-cached Mesh sub-asset carries the scale in its bounds.
-                Mesh importedMesh = loadedPmxAsset.ImportedMesh;
+                Mesh? importedMesh = loadedPmxAsset.ImportedMesh;
                 Assert.That(importedMesh, Is.Not.Null);
+                Mesh mesh = importedMesh!;
 
                 // MMD bounds -> Unity bounds transform:
                 //   Unity center = (-MMD_center.x * scale, MMD_center.y * scale, -MMD_center.z * scale)
@@ -423,7 +424,7 @@ namespace Mmd.Tests
                     -mmdBounds.center.z * scale);
                 Vector3 expectedSize = mmdBounds.size * scale;
 
-                Bounds importedBounds = importedMesh.bounds;
+                Bounds importedBounds = mesh.bounds;
                 Assert.That(importedBounds.size.x, Is.EqualTo(expectedSize.x).Within(0.001f));
                 Assert.That(importedBounds.size.y, Is.EqualTo(expectedSize.y).Within(0.001f));
                 Assert.That(importedBounds.size.z, Is.EqualTo(expectedSize.z).Within(0.001f));
@@ -433,7 +434,7 @@ namespace Mmd.Tests
 
                 // Scene instance references the same importer-owned mesh sub-asset.
                 SkinnedMeshRenderer renderer = loadInstance.SkinnedMeshRenderer!;
-                Assert.That(renderer.sharedMesh, Is.SameAs(importedMesh));
+                Assert.That(renderer.sharedMesh, Is.SameAs(mesh));
             }
             finally
             {
@@ -713,11 +714,15 @@ namespace Mmd.Tests
         {
             CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
 
-            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+            MmdPmxAsset? loadedPmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+            Assert.That(loadedPmxAsset, Is.Not.Null);
+            MmdPmxAsset pmxAsset = loadedPmxAsset!;
             Assert.That(pmxAsset.ImportedRoot, Is.Not.Null);
 
-            SkinnedMeshRenderer smr = pmxAsset.ImportedRoot.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true);
-            Assert.That(smr, Is.Not.Null, "imported hierarchy must contain a SkinnedMeshRenderer");
+            GameObject importedRoot = pmxAsset.ImportedRoot!;
+            SkinnedMeshRenderer? nullableSmr = importedRoot.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true);
+            Assert.That(nullableSmr, Is.Not.Null, "imported hierarchy must contain a SkinnedMeshRenderer");
+            SkinnedMeshRenderer smr = nullableSmr!;
 
             // sharedMesh must match the importer-owned Mesh sub-asset
             Assert.That(smr.sharedMesh, Is.Not.Null);
@@ -751,10 +756,12 @@ namespace Mmd.Tests
             CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
 
             // Get initial state
-            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+            MmdPmxAsset? loadedPmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+            Assert.That(loadedPmxAsset, Is.Not.Null);
+            MmdPmxAsset pmxAsset = loadedPmxAsset!;
             Assert.That(pmxAsset.ImportedRoot, Is.Not.Null);
-            SkinnedMeshRenderer smrBefore = pmxAsset.ImportedRoot.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true);
-            Assert.That(smrBefore, Is.Not.Null);
+            SkinnedMeshRenderer? nullableSmrBefore = pmxAsset.ImportedRoot!.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true);
+            Assert.That(nullableSmrBefore, Is.Not.Null);
             int boneCountBefore = pmxAsset.BoneCount;
 
             // Trigger reimport
@@ -763,14 +770,16 @@ namespace Mmd.Tests
             importer!.SaveAndReimport();
 
             // Load fresh after reimport
-            MmdPmxAsset pmxAssetAfter = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
-            Assert.That(pmxAssetAfter, Is.Not.Null);
+            MmdPmxAsset? loadedPmxAssetAfter = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+            Assert.That(loadedPmxAssetAfter, Is.Not.Null);
+            MmdPmxAsset pmxAssetAfter = loadedPmxAssetAfter!;
             Assert.That(pmxAssetAfter.ImportedRoot, Is.Not.Null,
                 "ImportedRoot must survive SaveAndReimport");
 
-            SkinnedMeshRenderer smrAfter = pmxAssetAfter.ImportedRoot.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true);
-            Assert.That(smrAfter, Is.Not.Null,
+            SkinnedMeshRenderer? nullableSmrAfter = pmxAssetAfter.ImportedRoot!.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true);
+            Assert.That(nullableSmrAfter, Is.Not.Null,
                 "SkinnedMeshRenderer must survive SaveAndReimport");
+            SkinnedMeshRenderer smrAfter = nullableSmrAfter!;
 
             // Bone count preserved
             Assert.That(pmxAssetAfter.BoneCount, Is.EqualTo(boneCountBefore),
@@ -868,24 +877,30 @@ namespace Mmd.Tests
             // Mesh and Material sub-assets, produce no 'Split Runtime' mesh, and keep
             // Controller model source behavior through MmdEditorPmxLoader.
             CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
-            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+            MmdPmxAsset? loadedPmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+            Assert.That(loadedPmxAsset, Is.Not.Null);
+            MmdPmxAsset pmxAsset = loadedPmxAsset!;
             Assert.That(pmxAsset.ImportedRoot, Is.Not.Null,
                 "test fixture must have an ImportedRoot hierarchy sub-asset");
 
-            GameObject originalRoot = pmxAsset.ImportedRoot;
+            GameObject originalRoot = pmxAsset.ImportedRoot!;
             MmdUnityModelInstance? instance = null;
             try
             {
                 instance = MmdEditorPmxLoader.LoadPmxIntoScene(pmxAsset);
+                GameObject root = instance.Root!;
 
                 // Instantiated (not same object).
-                Assert.That(instance.Root, Is.Not.SameAs(originalRoot),
+                Assert.That(root, Is.Not.SameAs(originalRoot),
                     "scene root must be an instantiated copy, not the original imported sub-asset");
-                Assert.That(instance.Root.name, Is.EqualTo(originalRoot.name),
+                Assert.That(root.name, Is.EqualTo(originalRoot.name),
                     "scene root name must match the imported root name");
 
                 // Same hierarchy shape: same bone count, SMR exists.
-                SkinnedMeshRenderer smr = instance.SkinnedMeshRenderer;
+                SkinnedMeshRenderer? nullableSmr = instance.SkinnedMeshRenderer;
+                Assert.That(nullableSmr, Is.Not.Null,
+                    "instantiated hierarchy must contain a SkinnedMeshRenderer");
+                SkinnedMeshRenderer smr = nullableSmr!;
                 Assert.That(smr, Is.Not.Null,
                     "instantiated hierarchy must contain a SkinnedMeshRenderer");
                 Assert.That(smr.bones, Is.Not.Null);
@@ -895,10 +910,11 @@ namespace Mmd.Tests
                 // Uses pmxAsset.ImportedMesh (not a newly built mesh).
                 Assert.That(smr.sharedMesh, Is.SameAs(pmxAsset.ImportedMesh),
                     "scene SkinnedMeshRenderer must reference the importer-owned Mesh sub-asset");
+                Mesh sharedMesh = smr.sharedMesh!;
                 Assert.That(instance.Mesh, Is.SameAs(pmxAsset.ImportedMesh));
 
                 // No 'Split Runtime' marker in mesh name.
-                Assert.That(smr.sharedMesh.name, Does.Not.Contain("Split Runtime"),
+                Assert.That(sharedMesh.name, Does.Not.Contain("Split Runtime"),
                     "imported hierarchy wrapping must not rebuild the mesh");
 
                 // Uses pmxAsset.ImportedMaterials.
@@ -909,8 +925,9 @@ namespace Mmd.Tests
                 Assert.That(instance.Materials[0], Is.SameAs(pmxAsset.ImportedMaterials[0]));
 
                 // Controller source behavior through MmdEditorPmxLoader.
-                MmdUnityPlaybackController controller = instance.Root.GetComponent<MmdUnityPlaybackController>();
-                Assert.That(controller, Is.Not.Null);
+                MmdUnityPlaybackController? nullableController = root.GetComponent<MmdUnityPlaybackController>();
+                Assert.That(nullableController, Is.Not.Null);
+                MmdUnityPlaybackController controller = nullableController!;
                 Assert.That(controller.IsConfigured, Is.False);
                 Assert.That(controller.HasModelSource, Is.True);
                 Assert.That(controller.ModelSourceId, Is.EqualTo(pmxAsset.SourceId));
@@ -935,25 +952,30 @@ namespace Mmd.Tests
             // Focused name check: verify the mesh name is the importer's (not "Split Runtime")
             // and that no BuildMesh/ApplySkinning/BakeVertexMorphBlendShapes runs via this path.
             CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
-            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+            MmdPmxAsset? loadedPmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+            Assert.That(loadedPmxAsset, Is.Not.Null);
+            MmdPmxAsset pmxAsset = loadedPmxAsset!;
             Assert.That(pmxAsset.ImportedRoot, Is.Not.Null);
 
             MmdUnityModelInstance? instance = null;
             try
             {
                 instance = MmdEditorPmxLoader.LoadPmxIntoScene(pmxAsset);
-                SkinnedMeshRenderer smr = instance.SkinnedMeshRenderer;
-                Assert.That(smr, Is.Not.Null);
+                SkinnedMeshRenderer? nullableSmr = instance.SkinnedMeshRenderer;
+                Assert.That(nullableSmr, Is.Not.Null);
+                SkinnedMeshRenderer smr = nullableSmr!;
+                Mesh sharedMesh = smr.sharedMesh!;
+                Mesh importedMesh = pmxAsset.ImportedMesh!;
 
                 // The mesh must be the same object as the importer sub-asset, not a clone.
-                Assert.That(smr.sharedMesh, Is.SameAs(pmxAsset.ImportedMesh));
-                Assert.That(smr.sharedMesh.name, Is.EqualTo(pmxAsset.ImportedMesh.name));
-                Assert.That(smr.sharedMesh.name, Does.Not.Contain("Split Runtime"),
+                Assert.That(sharedMesh, Is.SameAs(importedMesh));
+                Assert.That(sharedMesh.name, Is.EqualTo(importedMesh.name));
+                Assert.That(sharedMesh.name, Does.Not.Contain("Split Runtime"),
                     "wrapping path must not run BuildMesh which sets 'Split Runtime' name");
 
                 // No blend shapes from BakeVertexMorphBlendShapes on this path.
                 // (1-bone cube fixture has no morphs, but the check is structural.)
-                Assert.That(smr.sharedMesh.blendShapeCount, Is.EqualTo(pmxAsset.ImportedMesh.blendShapeCount),
+                Assert.That(sharedMesh.blendShapeCount, Is.EqualTo(importedMesh.blendShapeCount),
                     "blend shape count must match the importer mesh exactly; no rebuild");
             }
             finally
@@ -1339,54 +1361,60 @@ namespace Mmd.Tests
         public void LoadPmxAssetIntoScenePersistsModelSourceAcrossSceneReload()
         {
             CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
-            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
-            Assert.That(pmxAsset, Is.Not.Null);
+            MmdPmxAsset? initialPmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+            Assert.That(initialPmxAsset, Is.Not.Null);
 
             try
             {
                 Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-                pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
-                Assert.That(pmxAsset == null, Is.False);
+                MmdPmxAsset? loadedPmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+                Assert.That(loadedPmxAsset, Is.Not.Null);
+                MmdPmxAsset pmxAsset = loadedPmxAsset!;
                 string expectedSourceId = pmxAsset.SourceId;
                 Material expectedImportedMaterial = pmxAsset.ImportedMaterials[0];
                 MmdUnityModelInstance instance = MmdEditorPmxLoader.LoadPmxIntoScene(pmxAsset);
-                Assert.That(instance.Root.GetComponent<MmdUnityPlaybackController>().ModelAssetSource, Is.SameAs(pmxAsset));
+                GameObject root = instance.Root!;
+                MmdUnityPlaybackController controller = root.GetComponent<MmdUnityPlaybackController>()!;
+                Assert.That(controller.ModelAssetSource, Is.SameAs(pmxAsset));
 
                 Assert.That(EditorSceneManager.SaveScene(scene, TempScenePath), Is.True);
                 EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
                 EditorSceneManager.OpenScene(TempScenePath, OpenSceneMode.Single);
 
                 MmdUnityPlaybackController[] controllers =
-                    Object.FindObjectsByType<MmdUnityPlaybackController>(FindObjectsSortMode.None);
+                    Object.FindObjectsByType<MmdUnityPlaybackController>();
                 Assert.That(controllers, Has.Length.EqualTo(1));
                 Assert.That(controllers[0].IsConfigured, Is.False);
                 Assert.That(controllers[0].HasModelSource, Is.True);
                 Assert.That(controllers[0].ModelSourceId, Is.EqualTo(expectedSourceId));
 
                 Assert.That(controllers[0].ModelAssetSource, Is.Not.Null);
-                Assert.That(controllers[0].ModelAssetSource.SourceId, Is.EqualTo(expectedSourceId));
+                MmdPmxAsset sourceAsset = controllers[0].ModelAssetSource!;
+                Assert.That(sourceAsset.SourceId, Is.EqualTo(expectedSourceId));
 
-                pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
-                Assert.That(pmxAsset, Is.Not.Null);
+                MmdPmxAsset? reloadedPmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+                Assert.That(reloadedPmxAsset, Is.Not.Null);
+                MmdPmxAsset reopenedPmxAsset = reloadedPmxAsset!;
 
                 SkinnedMeshRenderer[] renderers =
-                    Object.FindObjectsByType<SkinnedMeshRenderer>(FindObjectsSortMode.None);
+                    Object.FindObjectsByType<SkinnedMeshRenderer>();
                 Assert.That(renderers, Has.Length.GreaterThanOrEqualTo(1));
                 SkinnedMeshRenderer smr = renderers[0];
 
                 // Must still reference the importer-owned mesh sub-asset (not a transient clone).
                 Assert.That(smr.sharedMesh, Is.Not.Null);
-                Assert.That(smr.sharedMesh, Is.SameAs(pmxAsset.ImportedMesh),
+                Mesh sharedMesh = smr.sharedMesh!;
+                Assert.That(sharedMesh, Is.SameAs(reopenedPmxAsset.ImportedMesh),
                     "scene SMR must reference the importer-owned Mesh sub-asset after save/reopen");
 
                 // Mesh name must not indicate a Split Runtime rebuild.
-                Assert.That(smr.sharedMesh.name, Does.Not.Contain("Split Runtime"),
+                Assert.That(sharedMesh.name, Does.Not.Contain("Split Runtime"),
                     "scene mesh must not carry a Split Runtime name; hierarchy reuse path must be used");
 
                 // Bones must match PMX descriptor.
                 Assert.That(smr.bones, Is.Not.Null.And.Not.Empty,
                     "scene SMR must have non-empty bones after save/reopen");
-                Assert.That(smr.bones, Has.Length.EqualTo(pmxAsset.BoneCount),
+                Assert.That(smr.bones, Has.Length.EqualTo(reopenedPmxAsset.BoneCount),
                     "scene SMR bone count must match pmxAsset.BoneCount after save/reopen");
                 Assert.That(smr.bones[0], Is.Not.Null);
 
@@ -2162,7 +2190,9 @@ namespace Mmd.Tests
             var parent = new GameObject("mmd-drop-parent");
             try
             {
+#pragma warning disable CS0618 // Legacy InstanceID input remains supported by Hierarchy drop callbacks.
                 GameObject? resolved = MmdSceneDragAndDrop.GetHierarchyDropParent(parent.GetInstanceID());
+#pragma warning restore CS0618
                 GameObject? resolvedByEntityId = MmdSceneDragAndDrop.GetHierarchyDropParent(parent.GetEntityId());
 
                 Assert.That(resolved, Is.SameAs(parent));
@@ -2191,6 +2221,7 @@ namespace Mmd.Tests
                     0,
                     HierarchyDropFlags.None,
                     forcedParent.transform);
+#pragma warning disable CS0618 // Legacy InstanceID input remains supported by Hierarchy drop callbacks.
                 GameObject? uponDrop = MmdSceneDragAndDrop.GetHierarchyDropParent(
                     parent.GetInstanceID(),
                     HierarchyDropFlags.DropUpon,
@@ -2199,6 +2230,7 @@ namespace Mmd.Tests
                     sibling.GetInstanceID(),
                     HierarchyDropFlags.DropBetween,
                     forcedParent: null);
+#pragma warning restore CS0618
                 GameObject? entityIdUponDrop = MmdSceneDragAndDrop.GetHierarchyDropParent(
                     parent.GetEntityId(),
                     HierarchyDropFlags.DropUpon,
@@ -3332,7 +3364,7 @@ namespace Mmd.Tests
                 mesh.bindposes = new Matrix4x4[2];
                 smr.sharedMesh = mesh;
                 // Set bones with one null
-                smr.bones = new Transform[] { new GameObject("BoneA").transform, null };
+                smr.bones = new Transform?[] { new GameObject("BoneA").transform, null };
 
                 MmdPmxAsset.ComputeHierarchyReadiness(
                     root,
@@ -3397,12 +3429,15 @@ namespace Mmd.Tests
         {
             CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
 
-            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
-            Assert.That(pmxAsset, Is.Not.Null);
+            MmdPmxAsset? loadedPmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+            Assert.That(loadedPmxAsset, Is.Not.Null);
+            MmdPmxAsset pmxAsset = loadedPmxAsset!;
             Assert.That(pmxAsset.ImportedRoot, Is.Not.Null);
 
-            SkinnedMeshRenderer smr = pmxAsset.ImportedRoot.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true);
-            Assert.That(smr, Is.Not.Null);
+            GameObject importedRoot = pmxAsset.ImportedRoot!;
+            SkinnedMeshRenderer? nullableSmr = importedRoot.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true);
+            Assert.That(nullableSmr, Is.Not.Null);
+            SkinnedMeshRenderer smr = nullableSmr!;
 
             var setup = ScriptableObject.CreateInstance<MmdHumanoidSetupAsset>();
             try
@@ -3482,9 +3517,10 @@ namespace Mmd.Tests
             Assert.That(setupAfter.PmxAsset, Is.Not.Null,
                 "HumanoidSetupAsset.PmxAsset serialized reference must resolve after PMX SaveAndReimport " +
                 "(D1 compatibility pin — will break if main object change alters MmdPmxAsset fileID)");
+            MmdPmxAsset setupPmxAsset = setupAfter.PmxAsset!;
 
             // Pin: referenced asset's SourceId is stable
-            Assert.That(setupAfter.PmxAsset.SourceId, Is.EqualTo(pmxAsset.SourceId),
+            Assert.That(setupPmxAsset.SourceId, Is.EqualTo(pmxAsset.SourceId),
                 "PmxAsset.SourceId must be stable across reimport");
 
             // Pin: setup's PmxAsset matches a fresh LoadAssetAtPath
@@ -3501,22 +3537,26 @@ namespace Mmd.Tests
             // object references when the .pmx main object later changes from MmdPmxAsset to GameObject.
             CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
 
-            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
-            Assert.That(pmxAsset, Is.Not.Null);
+            MmdPmxAsset? initialPmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+            Assert.That(initialPmxAsset, Is.Not.Null);
 
             try
             {
                 Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-                pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
-                Assert.That(pmxAsset == null, Is.False);
+                MmdPmxAsset? loadedPmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+                Assert.That(loadedPmxAsset, Is.Not.Null);
+                MmdPmxAsset pmxAsset = loadedPmxAsset!;
                 MmdUnityModelInstance instance = MmdEditorPmxLoader.LoadPmxIntoScene(pmxAsset);
 
-                MmdUnityPlaybackController sceneController = instance.Root.GetComponent<MmdUnityPlaybackController>();
+                GameObject root = instance.Root!;
+                MmdUnityPlaybackController? nullableSceneController = root.GetComponent<MmdUnityPlaybackController>();
+                Assert.That(nullableSceneController, Is.Not.Null);
+                MmdUnityPlaybackController sceneController = nullableSceneController!;
                 Assert.That(sceneController, Is.Not.Null);
                 Assert.That(sceneController.ModelAssetSource, Is.SameAs(pmxAsset));
-                AssertNoMissingScripts(instance.Root);
+                AssertNoMissingScripts(root);
 
-                GameObject prefab = PrefabUtility.SaveAsPrefabAsset(instance.Root, TempPrefabPath);
+                GameObject prefab = PrefabUtility.SaveAsPrefabAsset(root, TempPrefabPath);
                 Assert.That(prefab, Is.Not.Null);
                 Assert.That(EditorSceneManager.SaveScene(scene, TempScenePath), Is.True);
 
@@ -3524,14 +3564,17 @@ namespace Mmd.Tests
                 Assert.That(importer, Is.Not.Null);
                 importer!.SaveAndReimport();
 
-                MmdPmxAsset reloadedPmx = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
-                Assert.That(reloadedPmx, Is.Not.Null,
+                MmdPmxAsset? nullableReloadedPmx = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+                Assert.That(nullableReloadedPmx, Is.Not.Null,
                     "D1 pin: LoadAssetAtPath<MmdPmxAsset> must still resolve the metadata asset after reimport");
+                MmdPmxAsset reloadedPmx = nullableReloadedPmx!;
 
-                GameObject reloadedPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(TempPrefabPath);
-                Assert.That(reloadedPrefab, Is.Not.Null);
-                MmdUnityPlaybackController prefabController = reloadedPrefab.GetComponent<MmdUnityPlaybackController>();
-                Assert.That(prefabController, Is.Not.Null);
+                GameObject? nullableReloadedPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(TempPrefabPath);
+                Assert.That(nullableReloadedPrefab, Is.Not.Null);
+                GameObject reloadedPrefab = nullableReloadedPrefab!;
+                MmdUnityPlaybackController? nullablePrefabController = reloadedPrefab.GetComponent<MmdUnityPlaybackController>();
+                Assert.That(nullablePrefabController, Is.Not.Null);
+                MmdUnityPlaybackController prefabController = nullablePrefabController!;
                 Assert.That(prefabController.ModelAssetSource, Is.Not.Null,
                     "prefab controller ModelAssetSource must not become Missing after PMX SaveAndReimport");
                 Assert.That(prefabController.ModelAssetSource, Is.SameAs(reloadedPmx),
@@ -3540,19 +3583,20 @@ namespace Mmd.Tests
 
                 EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
                 EditorSceneManager.OpenScene(TempScenePath, OpenSceneMode.Single);
-                MmdPmxAsset sceneReloadedPmx = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
-                Assert.That(sceneReloadedPmx == null, Is.False);
+                MmdPmxAsset? nullableSceneReloadedPmx = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+                Assert.That(nullableSceneReloadedPmx, Is.Not.Null);
+                MmdPmxAsset sceneReloadedPmx = nullableSceneReloadedPmx!;
 
                 MmdUnityPlaybackController[] sceneControllers =
-                    Object.FindObjectsByType<MmdUnityPlaybackController>(FindObjectsSortMode.None);
+                    Object.FindObjectsByType<MmdUnityPlaybackController>();
                 Assert.That(sceneControllers, Has.Length.EqualTo(1));
                 Assert.That(sceneControllers[0].ModelAssetSource, Is.Not.Null,
                     "scene controller ModelAssetSource must not become Missing after PMX SaveAndReimport");
                 Assert.That(sceneControllers[0].ModelAssetSource, Is.SameAs(sceneReloadedPmx),
                     "scene controller ModelAssetSource must resolve to the freshly loaded PMX metadata asset");
-                foreach (GameObject root in sceneControllers[0].gameObject.scene.GetRootGameObjects())
+                foreach (GameObject sceneRoot in sceneControllers[0].gameObject.scene.GetRootGameObjects())
                 {
-                    AssertNoMissingScripts(root);
+                    AssertNoMissingScripts(sceneRoot);
                 }
             }
             finally
