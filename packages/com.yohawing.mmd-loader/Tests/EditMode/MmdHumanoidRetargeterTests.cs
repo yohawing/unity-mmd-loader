@@ -563,13 +563,14 @@ namespace Mmd.Tests
             });
 
             Assert.That(result, Is.Not.Null);
+            MmdHumanoidRetargeterResult retargetResult = result!;
             // Either 3 copied (Head skipped) or the destroyed transform
             // may still be in the dictionary. TryGetValue returns the field
             // value even after DestroyImmediate, so Transform will be null
             // after destruction. The retargeter should detect that.
             // Total matches: 4, Head's proxyTransform is null -> skip.
-            Assert.That(result.CopiedBoneCount + result.SkippedBoneCount, Is.EqualTo(4));
-            Assert.That(result.SkippedBoneCount, Is.GreaterThanOrEqualTo(1));
+            Assert.That(retargetResult.CopiedBoneCount + retargetResult.SkippedBoneCount, Is.EqualTo(4));
+            Assert.That(retargetResult.SkippedBoneCount, Is.GreaterThanOrEqualTo(1));
 
             DestroyProxyRig(rig);
             DestroyInstance(native);

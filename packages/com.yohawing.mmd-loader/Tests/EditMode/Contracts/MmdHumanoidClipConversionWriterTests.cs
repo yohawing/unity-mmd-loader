@@ -524,11 +524,11 @@ namespace Mmd.Tests
         {
             if (!AssetDatabase.IsValidFolder(folderPath))
             {
-                string parent = Path.GetDirectoryName(folderPath.Replace('/', '\\'))?.Replace('\\', '/');
+                string? parent = Path.GetDirectoryName(folderPath.Replace('/', '\\'))?.Replace('\\', '/');
                 string folderName = Path.GetFileName(folderPath);
                 if (!string.IsNullOrWhiteSpace(parent) && !AssetDatabase.IsValidFolder(parent))
                 {
-                    CreateFolderIfMissing(parent);
+                    CreateFolderIfMissing(parent!);
                 }
 
                 AssetDatabase.CreateFolder(

@@ -428,6 +428,7 @@ namespace Mmd.Tests
 
             // Assert: hierarchy mirrors parent relationships
             Assert.That(result.ProxyRoot, Is.Not.Null);
+            GameObject proxyRoot = result.ProxyRoot!;
             Transform hips = result.BoneMap[HumanBodyBones.Hips];
             Transform spine = result.BoneMap[HumanBodyBones.Spine];
             Transform neck = result.BoneMap[HumanBodyBones.Neck];
@@ -437,7 +438,7 @@ namespace Mmd.Tests
             Transform leftFoot = result.BoneMap[HumanBodyBones.LeftFoot];
 
             // All bones should be children of the proxy root
-            Assert.That(hips.parent, Is.EqualTo(result.ProxyRoot.transform),
+            Assert.That(hips.parent, Is.EqualTo(proxyRoot.transform),
                 "Hips should be direct child of proxy root");
 
             // spine should be child of hips (上半身 parent is 下半身)
