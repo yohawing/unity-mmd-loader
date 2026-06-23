@@ -521,12 +521,13 @@ namespace Mmd.Tests
 
             for (int index = 0; index < MmdSharedToonTextures.SharedToonCount; index++)
             {
-                Texture2D toon = MmdSharedToonTextures.TryCreateSharedToonTexture(index);
+                Texture2D? toon = MmdSharedToonTextures.TryCreateSharedToonTexture(index);
                 try
                 {
                     Assert.That(toon, Is.Not.Null, $"shared toon {index} should decode");
-                    Assert.That(toon.width, Is.EqualTo(1));
-                    Assert.That(toon.height, Is.EqualTo(32));
+                    Texture2D decodedToon = toon!;
+                    Assert.That(decodedToon.width, Is.EqualTo(1));
+                    Assert.That(decodedToon.height, Is.EqualTo(32));
                 }
                 finally
                 {
@@ -834,16 +835,18 @@ namespace Mmd.Tests
 
                 instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                Assert.That(instance.Root.GetComponent<MeshFilter>(), Is.Null);
-                Assert.That(instance.Root.GetComponent<MeshRenderer>(), Is.Null);
-                Assert.That(instance.Root.transform.Find("Model"), Is.Not.Null);
+                GameObject root = instance.Root!;
+                Assert.That(root.GetComponent<MeshFilter>(), Is.Null);
+                Assert.That(root.GetComponent<MeshRenderer>(), Is.Null);
+                Assert.That(root.transform.Find("Model"), Is.Not.Null);
                 Assert.That(instance.MeshRenderer, Is.Null);
                 Assert.That(instance.SkinnedMeshRenderer, Is.Not.Null);
-                Assert.That(instance.SkinnedMeshRenderer.transform.parent, Is.EqualTo(instance.Root.transform));
-                Assert.That(instance.SkinnedMeshRenderer.sharedMesh, Is.EqualTo(instance.Mesh));
-                Assert.That(instance.SkinnedMeshRenderer.sharedMaterials, Has.Length.EqualTo(1));
-                Assert.That(instance.SkinnedMeshRenderer.bones, Has.Length.EqualTo(2));
-                Assert.That(instance.SkinnedMeshRenderer.bones[0], Is.EqualTo(instance.BoneTransforms[0]));
+                SkinnedMeshRenderer renderer = instance.SkinnedMeshRenderer!;
+                Assert.That(renderer.transform.parent, Is.EqualTo(root.transform));
+                Assert.That(renderer.sharedMesh, Is.EqualTo(instance.Mesh));
+                Assert.That(renderer.sharedMaterials, Has.Length.EqualTo(1));
+                Assert.That(renderer.bones, Has.Length.EqualTo(2));
+                Assert.That(renderer.bones[0], Is.EqualTo(instance.BoneTransforms[0]));
                 Assert.That(instance.Mesh.bindposes, Has.Length.EqualTo(2));
                 Assert.That(instance.Mesh.boneWeights, Has.Length.EqualTo(3));
                 Assert.That(instance.Mesh.boneWeights[1].boneIndex0, Is.EqualTo(0));
@@ -1241,8 +1244,8 @@ namespace Mmd.Tests
 
                 binding = MmdUnityPlaybackBinding.CreateSkinned(model, CreateBlinkMorphMotion(), "morph-model.pmx", "blink.vmd");
 
-                SkinnedMeshRenderer renderer = binding.Instance.SkinnedMeshRenderer;
-                Assert.That(renderer, Is.Not.Null);
+                Assert.That(binding.Instance.SkinnedMeshRenderer, Is.Not.Null);
+                SkinnedMeshRenderer renderer = binding.Instance.SkinnedMeshRenderer!;
                 int blinkShapeIndex = binding.Instance.Mesh.GetBlendShapeIndex("blink");
                 Assert.That(blinkShapeIndex, Is.GreaterThanOrEqualTo(0));
 
