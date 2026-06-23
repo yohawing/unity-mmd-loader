@@ -604,14 +604,14 @@ namespace Mmd.Editor
 
             if (!string.IsNullOrWhiteSpace(pmxPath))
             {
-                string resolvedPmxPath = pmxPath;
+                string resolvedPmxPath = pmxPath!;
                 // Same split for raw paths: model-only provider vs full playback provider.
                 if (string.IsNullOrWhiteSpace(vmdPath))
                 {
                     return LoadPmxPathForDragAndDrop(resolvedPmxPath, position, parent).Root;
                 }
 
-                string resolvedVmdPath = vmdPath;
+                string resolvedVmdPath = vmdPath!;
                 return LoadPlaybackPathForDragAndDrop(resolvedPmxPath, resolvedVmdPath, position, parent).Instance.Root;
             }
 

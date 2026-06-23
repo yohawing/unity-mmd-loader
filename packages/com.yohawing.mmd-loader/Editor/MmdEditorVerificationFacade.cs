@@ -439,8 +439,12 @@ namespace Mmd.Editor
 
         private static Material[] ApplyMaterialRemaps(Material[] sceneMaterials, Material[] materialRemaps)
         {
-            if (sceneMaterials == null || sceneMaterials.Length == 0 ||
-                materialRemaps == null || materialRemaps.Length == 0)
+            if (sceneMaterials == null || sceneMaterials.Length == 0)
+            {
+                return Array.Empty<Material>();
+            }
+
+            if (materialRemaps == null || materialRemaps.Length == 0)
             {
                 return sceneMaterials;
             }
