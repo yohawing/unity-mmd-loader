@@ -39,6 +39,7 @@ namespace Mmd.Timeline
             guardPlayable.GetBehaviour().Initialize(animator, Application.isPlaying, director);
             graph.Connect(clipPlayable, 0, guardPlayable, 0);
             guardPlayable.SetInputWeight(0, 1.0f);
+            guardPlayable.SetPropagateSetTime(true);
             ScriptPlayableOutput guardOutput =
                 ScriptPlayableOutput.Create(graph, "MmdHumanoidRootMotionGuard");
             guardOutput.SetSourcePlayable(guardPlayable);
@@ -46,6 +47,7 @@ namespace Mmd.Timeline
             AnimationPlayableOutput output =
                 AnimationPlayableOutput.Create(graph, "MmdHumanoidProxyAnim", animator);
             output.SetSourcePlayable(clipPlayable);
+            output.SetWeight(1.0f);
 
             return guardPlayable;
         }
