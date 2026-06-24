@@ -113,8 +113,7 @@ Shader "MMD Basic URP Toon"
                 Varyings output;
                 float3 normalOS = normalize(input.normalOS);
                 half edgeScale = input.uv1.y > 0.5h ? input.uv1.x : 1.0h;
-                float outlineScale = max(_ScreenParams.y, 1.0) / 720.0;
-                float scaledWidth = _OutlineWidth * edgeScale * outlineScale;
+                float scaledWidth = _OutlineWidth * edgeScale * 2.0; // HighDPI fix 2.0
                 float4 meshNormalPositionCS = TransformObjectToHClip(input.positionOS.xyz + normalOS * scaledWidth);
                 float4 basePositionCS = TransformObjectToHClip(input.positionOS.xyz);
                 float3 normalWS = TransformObjectToWorldNormal(normalOS);
@@ -124,12 +123,7 @@ Shader "MMD Basic URP Toon"
                 float screenNormalLength = length(screenNormal);
                 screenNormal = screenNormalLength > 0.0 ? screenNormal / screenNormalLength : float2(0.0, 0.0);
                 float4 screenPositionCS = basePositionCS;
-                // saba/babylon-mmd faithful screen-space edge: the *.w cancels the perspective
-                // divide so the expansion is a constant pixel width regardless of camera distance
-                // (MMD's edge does not thin with depth). Dividing by (_ScreenParams * 0.5) makes the
-                // visible silhouette ring scale with PMX edgeSize, per-vertex edge scale, and the
-                // 720p reference render height.
-                screenPositionCS.xy += screenNormal / (_ScreenParams.xy * 0.5) * scaledWidth * basePositionCS.w;
+                screenPositionCS.xy += screenNormal / (_ScreenParams.xy * 0.25) * scaledWidth * basePositionCS.w;
                 output.positionCS = lerp(meshNormalPositionCS, screenPositionCS, saturate(_OutlineScreenSpaceWeight));
                 output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
                 return output;
