@@ -49,6 +49,7 @@ namespace Mmd.Parser
         public float[] position = Array.Empty<float>();
         public float[] normal = Array.Empty<float>();
         public float[] uv = Array.Empty<float>();
+        public float edgeScale = float.NaN;
         public string skinningMode = "unknown";
         public int[] boneIndices = Array.Empty<int>();
         public float[] boneWeights = Array.Empty<float>();

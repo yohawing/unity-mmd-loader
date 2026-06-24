@@ -29,8 +29,10 @@ namespace Mmd.UnityIntegration
             var vertices = new List<Vector3>(descriptor.vertices.Count);
             var normals = new List<Vector3>(descriptor.vertices.Count);
             var uvs = new List<Vector2>(descriptor.vertices.Count);
+            var edgeScales = new List<Vector2>(descriptor.vertices.Count);
             bool hasCompleteNormals = true;
             bool hasCompleteUvs = true;
+            bool hasCompleteEdgeScale = true;
 
             foreach (MmdMeshVertexDescriptor vertex in descriptor.vertices)
             {
@@ -54,6 +56,15 @@ namespace Mmd.UnityIntegration
                     float[] viewportUv = MmdTextureOrientationDescriptorBuilder.ToViewportUv(vertex.uv);
                     uvs.Add(new Vector2(viewportUv[0], viewportUv[1]));
                 }
+
+                if (!IsFinite(vertex.edgeScale))
+                {
+                    hasCompleteEdgeScale = false;
+                }
+                else
+                {
+                    edgeScales.Add(new Vector2(vertex.edgeScale, 1.0f));
+                }
             }
 
             mesh.SetVertices(vertices);
@@ -65,6 +76,11 @@ namespace Mmd.UnityIntegration
             if (hasCompleteUvs && uvs.Count == vertices.Count)
             {
                 mesh.SetUVs(0, uvs);
+            }
+
+            if (hasCompleteEdgeScale && edgeScales.Count == vertices.Count)
+            {
+                mesh.SetUVs(1, edgeScales);
             }
 
             mesh.subMeshCount = descriptor.submeshes.Count;

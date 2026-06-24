@@ -14,6 +14,7 @@ namespace Mmd.Rendering
         public float[] position = Array.Empty<float>();
         public float[] normal = Array.Empty<float>();
         public float[] uv = Array.Empty<float>();
+        public float edgeScale = float.NaN;
     }
 
     public static class MmdMeshDescriptorBuilder
@@ -34,7 +35,8 @@ namespace Mmd.Rendering
                     vertexIndex = vertex.index,
                     position = vertex.position.ToArray(),
                     normal = vertex.normal.ToArray(),
-                    uv = vertex.uv.ToArray()
+                    uv = vertex.uv.ToArray(),
+                    edgeScale = vertex.edgeScale
                 });
             }
 

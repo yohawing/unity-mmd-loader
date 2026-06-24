@@ -103,6 +103,7 @@ namespace Mmd.Parser
                     position = Vec3(geometry.positions, i * 3),
                     normal = SanitizedNormal(Vec3(geometry.normals, i * 3)),
                     uv = Vec2(geometry.uvs, i * 2),
+                    edgeScale = GetOptionalEdgeScale(geometry.edgeScale, i),
                     skinningMode = skinningMode,
                     boneIndices = boneIndices,
                     boneWeights = boneWeights,
@@ -586,6 +587,7 @@ namespace Mmd.Parser
                 positions = MmdParserFfiMethods.ParsePmxPositions(data),
                 normals = MmdParserFfiMethods.ParsePmxNormals(data),
                 uvs = MmdParserFfiMethods.ParsePmxUvs(data),
+                edgeScale = MmdParserFfiMethods.ParsePmxEdgeScale(data),
                 indices = MmdParserFfiMethods.ParsePmxIndices(data),
                 skinningModes = modesWrapper.skinningModes,
                 skinIndices = MmdParserFfiMethods.ParsePmxSkinIndices(data),
@@ -730,6 +732,11 @@ namespace Mmd.Parser
         private static float GetFloat(float[]? values, int index, float fallback)
         {
             return values != null && index >= 0 && index < values.Length ? values[index] : fallback;
+        }
+
+        private static float GetOptionalEdgeScale(float[]? values, int index)
+        {
+            return values != null && index >= 0 && index < values.Length ? values[index] : float.NaN;
         }
 
         private static float[] Vec2(float[]? values, int offset)
@@ -1100,6 +1107,7 @@ namespace Mmd.Parser
             public float[] positions = Array.Empty<float>();
             public float[] normals = Array.Empty<float>();
             public float[] uvs = Array.Empty<float>();
+            public float[] edgeScale = Array.Empty<float>();
             public uint[] indices = Array.Empty<uint>();
             public string[] skinningModes = Array.Empty<string>();
             public uint[] skinIndices = Array.Empty<uint>();

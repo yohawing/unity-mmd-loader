@@ -99,6 +99,7 @@ Shader "MMD Basic URP Toon"
                 float4 positionOS : POSITION;
                 float3 normalOS : NORMAL;
                 float2 uv : TEXCOORD0;
+                float2 uv1 : TEXCOORD1;
             };
 
             struct Varyings
@@ -111,7 +112,10 @@ Shader "MMD Basic URP Toon"
             {
                 Varyings output;
                 float3 normalOS = normalize(input.normalOS);
-                float4 meshNormalPositionCS = TransformObjectToHClip(input.positionOS.xyz + normalOS * _OutlineWidth);
+                half edgeScale = input.uv1.y > 0.5h ? input.uv1.x : 1.0h;
+                float outlineScale = max(_ScreenParams.y, 1.0) / 720.0;
+                float scaledWidth = _OutlineWidth * edgeScale * outlineScale;
+                float4 meshNormalPositionCS = TransformObjectToHClip(input.positionOS.xyz + normalOS * scaledWidth);
                 float4 basePositionCS = TransformObjectToHClip(input.positionOS.xyz);
                 float3 normalWS = TransformObjectToWorldNormal(normalOS);
                 float3 normalVS = mul((float3x3)UNITY_MATRIX_V, normalWS);
@@ -123,9 +127,9 @@ Shader "MMD Basic URP Toon"
                 // saba/babylon-mmd faithful screen-space edge: the *.w cancels the perspective
                 // divide so the expansion is a constant pixel width regardless of camera distance
                 // (MMD's edge does not thin with depth). Dividing by (_ScreenParams * 0.5) makes the
-                // visible silhouette ring ~_OutlineWidth pixels wide, where _OutlineWidth == PMX
-                // edgeSize (saba: screenNor/(screenSize*0.5)*edgeSize*w).
-                screenPositionCS.xy += screenNormal / (_ScreenParams.xy * 0.5) * _OutlineWidth * basePositionCS.w;
+                // visible silhouette ring scale with PMX edgeSize, per-vertex edge scale, and the
+                // 720p reference render height.
+                screenPositionCS.xy += screenNormal / (_ScreenParams.xy * 0.5) * scaledWidth * basePositionCS.w;
                 output.positionCS = lerp(meshNormalPositionCS, screenPositionCS, saturate(_OutlineScreenSpaceWeight));
                 output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
                 return output;
