@@ -25,7 +25,8 @@ namespace Mmd.Timeline
                 return Playable.Null;
             }
 
-            var resolver = owner.GetComponent<PlayableDirector>() as IExposedPropertyTable;
+            PlayableDirector? director = owner.GetComponent<PlayableDirector>();
+            var resolver = director as IExposedPropertyTable;
             Animator? animator = resolver != null ? proxyAnimator.Resolve(resolver) : null;
             if (animator == null)
             {
@@ -35,9 +36,12 @@ namespace Mmd.Timeline
             AnimationClipPlayable clipPlayable = AnimationClipPlayable.Create(graph, clip);
             ScriptPlayable<MmdHumanoidAnimationRootMotionGuardBehaviour> guardPlayable =
                 ScriptPlayable<MmdHumanoidAnimationRootMotionGuardBehaviour>.Create(graph, 1);
-            guardPlayable.GetBehaviour().Initialize(animator, Application.isPlaying);
+            guardPlayable.GetBehaviour().Initialize(animator, Application.isPlaying, director);
             graph.Connect(clipPlayable, 0, guardPlayable, 0);
             guardPlayable.SetInputWeight(0, 1.0f);
+            ScriptPlayableOutput guardOutput =
+                ScriptPlayableOutput.Create(graph, "MmdHumanoidRootMotionGuard");
+            guardOutput.SetSourcePlayable(guardPlayable);
 
             AnimationPlayableOutput output =
                 AnimationPlayableOutput.Create(graph, "MmdHumanoidProxyAnim", animator);
@@ -67,12 +71,21 @@ namespace Mmd.Timeline
         private static readonly Dictionary<Animator, GuardState> GuardStates = new Dictionary<Animator, GuardState>();
 
         private Animator? guardedAnimator;
+        private PlayableDirector? guardedDirector;
         private bool initialized;
 
-        public void Initialize(Animator animator, bool applyRootMotionDuringEvaluation)
+        public void Initialize(
+            Animator animator,
+            bool applyRootMotionDuringEvaluation,
+            PlayableDirector? director)
         {
             guardedAnimator = animator;
+            guardedDirector = director;
             initialized = true;
+            if (guardedDirector != null)
+            {
+                guardedDirector.stopped += OnDirectorStopped;
+            }
 
             if (!GuardStates.TryGetValue(animator, out GuardState state))
             {
@@ -94,8 +107,22 @@ namespace Mmd.Timeline
             Restore();
         }
 
+        private void OnDirectorStopped(PlayableDirector stoppedDirector)
+        {
+            if (stoppedDirector == guardedDirector)
+            {
+                Restore();
+            }
+        }
+
         private void Restore()
         {
+            if (guardedDirector != null)
+            {
+                guardedDirector.stopped -= OnDirectorStopped;
+                guardedDirector = null;
+            }
+
             if (!initialized)
             {
                 return;
