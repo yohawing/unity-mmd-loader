@@ -227,11 +227,11 @@ namespace Mmd.Tests
                 Assert.That(controller.LastSnapshot, Is.Not.Null);
                 Assert.That(controller.LastSnapshot!.frame.frame, Is.EqualTo(11));
 
-                Transform parent = instance.Root.transform.parent;
+                Transform? parent = instance.Root.transform.parent;
                 if (parent != null)
                 {
                     int siblingCountAfter = parent.childCount;
-                    Transform runtimeChild = parent.Find(instance.Root.name + " Runtime");
+                    Transform? runtimeChild = parent.Find(instance.Root.name + " Runtime");
                     Assert.That(runtimeChild, Is.Null);
                     Assert.That(siblingCountAfter, Is.EqualTo(siblingCountBefore));
                 }
@@ -679,10 +679,11 @@ namespace Mmd.Tests
                 owner = new GameObject("timeline-clip-owner");
                 Playable playable = clip.CreatePlayable(graph, owner);
                 var scriptPlayable = (ScriptPlayable<MmdVmdTimelineBehaviour>)playable;
-                MmdVmdTimelineBehaviour behaviour = scriptPlayable.GetBehaviour();
+                MmdVmdTimelineBehaviour? behaviour = scriptPlayable.GetBehaviour();
 
-                Assert.That(behaviour.MotionAsset, Is.SameAs(motionAsset));
-                Assert.That(behaviour.MotionSourceId, Is.EqualTo("Assets/Motion/test.vmd"));
+                Assert.That(behaviour, Is.Not.Null);
+                Assert.That(behaviour!.MotionAsset, Is.SameAs(motionAsset));
+                Assert.That(behaviour!.MotionSourceId, Is.EqualTo("Assets/Motion/test.vmd"));
             }
             finally
             {
@@ -733,15 +734,16 @@ namespace Mmd.Tests
 
                 var ex = Assert.Throws<InvalidOperationException>(() =>
                     behaviour.EvaluateAtLocalTime(controller, 10.0 / 30.0));
-                Assert.That(ex.Message, Does.Contain("Timeline").Or.Contain("timeline").Or.Contain("existing scene").Or.Contain("SkinnedMeshRenderer"));
+                Assert.That(ex, Is.Not.Null);
+                Assert.That(ex!.Message, Does.Contain("Timeline").Or.Contain("timeline").Or.Contain("existing scene").Or.Contain("SkinnedMeshRenderer"));
 
                 // Verify no '<controller> Runtime' fallback root was created.
                 Assert.That(controller.IsConfigured, Is.False);
                 // The holder should not have spawned a new child with " Runtime" suffix.
-                Transform parentTransform = holder.transform.parent;
+                Transform? parentTransform = holder.transform.parent;
                 if (parentTransform != null)
                 {
-                    Transform runtimeChild = parentTransform.Find(holder.name + " Runtime");
+                    Transform? runtimeChild = parentTransform.Find(holder.name + " Runtime");
                     Assert.That(runtimeChild, Is.Null);
 
                     int siblingCountAfter = parentTransform.childCount;
@@ -801,13 +803,14 @@ namespace Mmd.Tests
 
                 var ex = Assert.Throws<InvalidOperationException>(() =>
                     behaviour.EvaluateAtLocalTime(controller, 10.0 / 30.0));
-                Assert.That(ex.Message, Does.Contain("Timeline").Or.Contain("timeline").Or.Contain("existing scene").Or.Contain("SkinnedMeshRenderer"));
+                Assert.That(ex, Is.Not.Null);
+                Assert.That(ex!.Message, Does.Contain("Timeline").Or.Contain("timeline").Or.Contain("existing scene").Or.Contain("SkinnedMeshRenderer"));
 
                 Assert.That(controller.IsConfigured, Is.False);
-                Transform parentTransform = holder.transform.parent;
+                Transform? parentTransform = holder.transform.parent;
                 if (parentTransform != null)
                 {
-                    Transform runtimeChild = parentTransform.Find(holder.name + " Runtime");
+                    Transform? runtimeChild = parentTransform.Find(holder.name + " Runtime");
                     Assert.That(runtimeChild, Is.Null);
 
                     int siblingCountAfter = parentTransform.childCount;
@@ -961,8 +964,9 @@ namespace Mmd.Tests
 
         private static string ResolvePackageFixture(string fileName)
         {
-            string projectRoot = Path.GetDirectoryName(Application.dataPath);
-            string packageRoot = Path.GetFullPath(Path.Combine(projectRoot, "..", "packages", "com.yohawing.mmd-loader"));
+            string? projectRoot = Path.GetDirectoryName(Application.dataPath);
+            Assert.That(projectRoot, Is.Not.Null);
+            string packageRoot = Path.GetFullPath(Path.Combine(projectRoot!, "..", "packages", "com.yohawing.mmd-loader"));
             return Path.Combine(packageRoot, "Tests", "Fixtures", "Assets", fileName);
         }
     }
