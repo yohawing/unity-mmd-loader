@@ -25,9 +25,9 @@ namespace Mmd.Rendering.Universal
             RendererListDesc rendererListDesc = CreateRendererListDesc(cameraData, renderingData);
             RendererListHandle rendererList = renderGraph.CreateRendererList(rendererListDesc);
 
-            using RasterRenderGraphBuilder builder = renderGraph.AddRasterRenderPass<PassData>(
+            using var builder = renderGraph.AddRasterRenderPass<PassData>(
                 "MMD Outline Pass",
-                out PassData passData);
+                out var passData);
 
             passData.RendererList = rendererList;
             builder.UseRendererList(rendererList);
