@@ -16,6 +16,7 @@ namespace Mmd.UnityIntegration
         private const int OpaqueRenderQueue = (int)RenderQueue.Geometry;
         private const int TransparentRenderQueueBase = (int)RenderQueue.Transparent;
         private const float AlphaClipThreshold = 0.01f;
+        private const int OutlineZTest = (int)CompareFunction.LessEqual;
         // MMD's edge is a screen-space, constant-pixel silhouette (saba and babylon-mmd both expand
         // the hull by edgeSize pixels with a *w term that cancels the perspective divide). So the
         // outline shader runs in screen-space mode (_OutlineScreenSpaceWeight = 1) with the raw PMX
@@ -704,6 +705,11 @@ namespace Mmd.UnityIntegration
             if (material.HasProperty("_OutlineScreenSpaceWeight"))
             {
                 material.SetFloat("_OutlineScreenSpaceWeight", PmxOutlineScreenSpaceWeight);
+            }
+
+            if (material.HasProperty("_OutlineZTest"))
+            {
+                material.SetFloat("_OutlineZTest", OutlineZTest);
             }
         }
 

@@ -29,6 +29,7 @@ Shader "MMD Basic URP Toon"
         _Cull ("Cull", Float) = 2
         _ZWrite ("ZWrite", Float) = 1
         _ZTest ("ZTest", Float) = 4
+        _OutlineZTest ("Outline Z Test", Float) = 4
         _OutlineZWrite ("Outline ZWrite", Float) = 0
         _SrcBlend ("Src Blend", Float) = 1
         _DstBlend ("Dst Blend", Float) = 0
@@ -53,9 +54,9 @@ Shader "MMD Basic URP Toon"
             ZWrite [_OutlineZWrite]
             // saba draws the edge with depth-test against the body (mmd_edge): the body writes depth
             // and the screen-space-expanded edge is depth-rejected over the body, leaving only the
-            // silhouette ring. Read [_ZTest] so a transparent material (set to Less by the loader)
-            // rejects the coplanar body-region edge instead of bleeding the hull through the body.
-            ZTest [_ZTest]
+            // silhouette ring. Read [_OutlineZTest] so outline depth policy stays independent
+            // from the body pass policy.
+            ZTest [_OutlineZTest]
             Blend [_SrcBlend] [_DstBlend]
 
             HLSLPROGRAM
