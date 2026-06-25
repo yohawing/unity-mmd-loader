@@ -574,7 +574,7 @@ namespace Mmd.Tests
                 // MMD's edge is a screen-space, constant-pixel silhouette: the loader runs the outline
                 // shader in screen-space mode (weight 1) with edgeSize as the raw pixel width.
                 Assert.That(ReadMaterialFloat(instance.Materials[0], "_OutlineScreenSpaceWeight"), Is.EqualTo(1.0f).Within(0.00001f));
-                Assert.That(ReadMaterialFloat(instance.Materials[0], "_OutlineZTest"), Is.EqualTo((float)UnityEngine.Rendering.CompareFunction.LessEqual).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_OutlineZTest"), Is.EqualTo((float)UnityEngine.Rendering.CompareFunction.Less).Within(0.00001f));
                 Assert.That(ReadMaterialFloat(instance.Materials[0], "_Alpha"), Is.EqualTo(0.25f).Within(0.00001f));
                 Assert.That(ReadMaterialFloat(instance.Materials[0], "_ZWrite"), Is.EqualTo(1.0f).Within(0.00001f));
                 Assert.That(ReadMaterialFloat(instance.Materials[0], "_SrcBlend"), Is.EqualTo((float)UnityEngine.Rendering.BlendMode.SrcAlpha).Within(0.00001f));
