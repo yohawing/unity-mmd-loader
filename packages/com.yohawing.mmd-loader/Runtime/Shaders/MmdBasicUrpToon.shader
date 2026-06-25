@@ -47,7 +47,7 @@ Shader "MMD Basic URP Toon"
         Pass
         {
             Name "Outline"
-            Tags { "LightMode" = "SRPDefaultUnlit" }
+            Tags { "LightMode" = "MmdOutline" }
 
             Cull Front
             ZWrite [_OutlineZWrite]
