@@ -1,6 +1,5 @@
 #nullable enable
 
-using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.RendererUtils;
@@ -15,13 +14,6 @@ namespace Mmd.Rendering.Universal
         private sealed class PassData
         {
             public RendererListHandle RendererList;
-        }
-
-        public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
-        {
-            DrawingSettings drawingSettings = CreateDrawingSettings(renderingData.cameraData.camera);
-            FilteringSettings filteringSettings = CreateFilteringSettings(renderingData.cameraData.camera.cullingMask);
-            context.DrawRenderers(renderingData.cullResults, ref drawingSettings, ref filteringSettings);
         }
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
@@ -45,21 +37,6 @@ namespace Mmd.Rendering.Universal
             {
                 context.cmd.DrawRendererList(data.RendererList);
             });
-        }
-
-        private static DrawingSettings CreateDrawingSettings(Camera camera)
-        {
-            SortingSettings sortingSettings = new(camera)
-            {
-                criteria = SortingCriteria.CommonTransparent
-            };
-
-            return new DrawingSettings(MmdOutlineShaderTagId, sortingSettings);
-        }
-
-        private static FilteringSettings CreateFilteringSettings(int cullingMask)
-        {
-            return new FilteringSettings(RenderQueueRange.all, cullingMask);
         }
 
         private static RendererListDesc CreateRendererListDesc(
