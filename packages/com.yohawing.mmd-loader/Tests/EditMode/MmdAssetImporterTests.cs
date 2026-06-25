@@ -1596,7 +1596,7 @@ namespace Mmd.Tests
                 MmdOutlineReadiness readiness = MmdAssetInspectorUtility.GetOutlineReadiness(pmxAsset);
 
                 Assert.That(readiness.OutlineEligibleMaterialCount, Is.EqualTo(2));
-                Assert.That(readiness.RuntimePath, Is.EqualTo("MmdBasicUrpToon outline pass"));
+                Assert.That(readiness.RuntimePath, Is.EqualTo("MmdOutlineRendererFeature (LightMode=MmdOutline)"));
                 Assert.That(readiness.ReleaseMode, Is.EqualTo("Back-face mesh-normal extrusion"));
                 Assert.That(readiness.FinalVisualParity, Is.EqualTo(MmdOutlineReadiness.NotClaimed));
             }

@@ -3,9 +3,12 @@
   "rootNamespace": "Mmd.Editor",
   "references": [
     "Mmd.Runtime",
+    "Mmd.Rendering.Universal",
     "Mmd.Timeline",
     "Mmd.Editor.Timeline",
-    "Unity.Timeline"
+    "Unity.Timeline",
+    "Unity.RenderPipelines.Core.Runtime",
+    "Unity.RenderPipelines.Universal.Runtime"
   ],
   "includePlatforms": [
     "Editor"

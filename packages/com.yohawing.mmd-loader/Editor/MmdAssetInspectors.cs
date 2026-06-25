@@ -5,7 +5,10 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 using Mmd.Parser;
+using Mmd.Rendering.Universal;
 using Mmd.UnityIntegration;
 
 namespace Mmd.Editor
@@ -537,9 +540,14 @@ namespace Mmd.Editor
                 EditorGUILayout.TextField("Final Visual Parity", readiness.FinalVisualParity);
             }
 
-            EditorGUILayout.HelpBox(
-                "Outline readiness is a cached PMX material summary. It does not generate outline proxy meshes, update visual baselines, or claim rayMMD-compatible parity.",
-                MessageType.Info);
+            if (readiness.OutlineEligibleMaterialCount > 0 && !IsMmdOutlineFeaturePresent())
+            {
+                EditorGUILayout.HelpBox(
+                    "MmdOutlineRendererFeature が URP Renderer Data に追加されていません。" +
+                    "アウトラインは描画されません。\n" +
+                    "追加方法: URP Renderer Data アセット → Add Renderer Feature → Mmd Outline Renderer Feature",
+                    MessageType.Warning);
+            }
         }
 
         internal static MmdOutlineReadiness GetOutlineReadiness(MmdPmxAsset? asset)
@@ -554,13 +562,45 @@ namespace Mmd.Editor
             }
 
             string runtimePath = string.Equals(asset.ShaderPreset, "MmdBasicUrpToon", System.StringComparison.Ordinal)
-                ? "MmdBasicUrpToon outline pass"
+                ? "MmdOutlineRendererFeature (LightMode=MmdOutline)"
                 : "Shader preset summary only";
             return new MmdOutlineReadiness(
                 asset.EdgeMaterialCount,
                 runtimePath,
                 "Back-face mesh-normal extrusion",
                 MmdOutlineReadiness.NotClaimed);
+        }
+
+        internal static bool IsMmdOutlineFeaturePresent()
+        {
+            var pipeline = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
+            if (pipeline == null)
+                return false;
+
+            var pipelineSo = new SerializedObject(pipeline);
+            var rendererDataList = pipelineSo.FindProperty("m_RendererDataList");
+            if (rendererDataList == null)
+                return false;
+
+            for (int i = 0; i < rendererDataList.arraySize; i++)
+            {
+                var rendererDataRef = rendererDataList.GetArrayElementAtIndex(i);
+                if (rendererDataRef.objectReferenceValue == null)
+                    continue;
+
+                var rendererDataSo = new SerializedObject(rendererDataRef.objectReferenceValue);
+                var features = rendererDataSo.FindProperty("m_RendererFeatures");
+                if (features == null)
+                    continue;
+
+                for (int j = 0; j < features.arraySize; j++)
+                {
+                    if (features.GetArrayElementAtIndex(j).objectReferenceValue is MmdOutlineRendererFeature)
+                        return true;
+                }
+            }
+
+            return false;
         }
 
         public static void DrawHierarchyReadinessSummary(MmdPmxAsset asset)
