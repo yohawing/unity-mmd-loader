@@ -20,7 +20,7 @@
   "samples": [
     {
       "displayName": "Basic Playback",
-      "description": "PMX/VMD golden path sample (PMX drag -> Scene placement -> VMD to Timeline -> optional Humanoid Clip bake) using local assets.",
+      "description": "PMX/VMD golden path sample (PMX drag -> Scene placement -> VMD to Timeline -> optional Humanoid Clip bake) with redistributable sample assets.",
       "path": "Samples~/BasicPlayback"
     },
     {

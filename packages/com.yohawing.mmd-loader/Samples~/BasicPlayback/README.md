@@ -1,33 +1,33 @@
 # Basic Playback sample
 
-このサンプルは、PMX/VMD golden path を最小構成で再現するための案内ページです。
-`Assets/` 配下のローカル素材を使って確認します。
+このサンプルは、PMX/VMD golden path を最小構成で確認するためのサンプルです。
+再配布可能なテスト用 PMX/VMD を同梱しています。
 
-## 注意: 同梱資産の境界
+## Included assets
 
-- 本サンプルは PMX / VMD の実データを同梱しません。
-- ライセンス制約のある PMX/VMD はこのパッケージに含めない設計です。
-- 同梱されるのは手順のみで、検証素材はユーザー各自の `Assets/` に配置します。
+- `Assets/mmt_test_model.pmx`
+- `Assets/mmt_test_model_test_motion.vmd`
 
-## 目的
+これらは `maya_mmd_tools` のテスト用に作成された再配布可能な小型モデル/モーションです。
+一般の MMD モデル、モーション、テクスチャ、PMM は同梱していません。
+追加素材を使う場合は、各素材のライセンス条件を確認してください。
 
-PMX/VMD golden path を次の順序で再確認する:
+## Purpose
+
+PMX/VMD golden path を次の順序で確認します。
 
 1. PMX drag
 2. Scene placement
 3. VMD to Timeline
 4. optional Humanoid Clip bake
 
-## 実行手順
+## Steps
 
-1. ローカルの PMX / VMD ファイル（有効なモデル/モーション）を Unity の `Assets/` 配下にコピーします。
-   同じライセンス条件で扱えるファイルのみ使用してください。
-2. Project ウィンドウから PMX をシーンにドラッグし、配置します。
-3. VMD をインポートし、配置済み PMX の `MmdUnityPlaybackController` を Timeline の MMD VMD track に binding して、VMD clip の `Motion Asset` へインポート済み VMD を割り当てます。Scene / Hierarchy への drag-and-drop で PMX controller source が作られていることを確認してください。
-4. `Play` して PMX 拡張再生経路で再生を確認します。
-5. 必要に応じて、Humanoid 化している場合のみ `Humanoid Clip bake`（必要なら）を試します。
-   試せない環境ではこの工程はスキップし、必須要件として扱いません。
+1. Package Manager から `Basic Playback` sample を import します。
+2. Project ウィンドウで `mmt_test_model.pmx` をシーンにドラッグして配置します。
+3. `mmt_test_model_test_motion.vmd` を Timeline の MMD VMD track に配置し、配置済み PMX の `MmdUnityPlaybackController` を track binding に設定します。
+4. Play Mode で PMX/VMD playback を確認します。
+5. Humanoid 化している場合だけ、必要に応じて Humanoid Clip bake を試します。
 
-このサンプルは最小骨格です。
-実データやシーン/Prefab の完全版は同梱していません。
-必要ならパッケージの `Documentation~/README.md` を参照して拡張してください。
+このサンプルは最小の release visual baseline です。
+外部 MMD 資産の再現性や最終 shading parity を保証するものではありません。

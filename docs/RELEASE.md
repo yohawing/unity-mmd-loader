@@ -37,6 +37,7 @@ rtk git submodule status --recursive
 2. 既存の未コミット変更を分類する。
    - release 対象の変更だけを含める。
    - `artifacts/`、`data-local/`、local MMD asset、スクリーンショット、AI scratch は含めない。
+   - 例外: `Samples~/BasicPlayback/Assets/` の再配布可能 sample PMX/VMD は release 対象として含めてよい。
    - ユーザー作業由来の差分が混ざっている場合は、勝手に戻さず release scope から外す。
 
 3. package metadata を確認する。
