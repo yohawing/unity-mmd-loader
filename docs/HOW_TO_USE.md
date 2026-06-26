@@ -9,12 +9,18 @@ This guide is for users who have added `com.yohawing.mmd-loader` to a Unity proj
 Open **Window > Package Manager** in Unity, and enter the following into **Add package from git URL**.
 
 ```text
-https://github.com/yohawing/unity-mmd-loader.git?path=packages/com.yohawing.mmd-loader
+https://github.com/yohawing/unity-mmd-loader.git?path=packages/com.yohawing.mmd-loader#v0.1.1
 ```
 
 The supported Unity version is 6000.4 or newer.
 
-## 2. Import a PMX
+## 2. Optional: import the Basic Playback sample
+
+In Package Manager, open the MMD Loader package and import the **Basic Playback** sample from the **Samples** section.
+
+The sample includes a small redistributable PMX/VMD pair that is useful for checking the release golden path before using third-party MMD assets.
+
+## 3. Import a PMX
 
 ![howtouse2](./assets/howtouse2.png)
 
@@ -22,7 +28,7 @@ Add a `.pmx` file under your Unity project's `Assets/` folder.
 
 A PMX is imported as a model file, just like an FBX. You can adjust the import settings in the Inspector.
 
-## 3. Place it in the Scene
+## 4. Place it in the Scene
 
 ![howtouse3](./assets/howtouse3.png)
 
@@ -30,7 +36,7 @@ Drag the PMX asset from the Project window into the Scene or Hierarchy.
 
 This creates a playback object in the scene. Even when only a PMX is placed, the playback controller is kept, so you can add a VMD to the Timeline later.
 
-## 4. Import a VMD
+## 5. Import a VMD
 
 ![howtouse4](./assets/howtouse4.png)
 

@@ -2,6 +2,19 @@
 
 All notable changes to `com.yohawing.mmd-loader` are documented here.
 
+## [0.1.1] - 2026-06-26
+
+### Added
+
+- Basic Playback sample now includes redistributable PMX/VMD assets for the release golden path.
+- URP outline rendering is exposed through `MmdOutlineRendererFeature`, with release readiness surfaced by the PMX inspector.
+- Runtime Verification sample is listed in package metadata for direct PMX/VMD parse, playback, Timeline drive, and JSON diagnostics.
+
+### Changed
+
+- Package metadata now declares the URP dependency required by the release rendering path.
+- README roadmap now treats Humanoid AnimationClip bake and outline RendererFeature as existing release surfaces, not future work.
+
 ## [0.1.0] - 2026-06-22
 
 ### Added
