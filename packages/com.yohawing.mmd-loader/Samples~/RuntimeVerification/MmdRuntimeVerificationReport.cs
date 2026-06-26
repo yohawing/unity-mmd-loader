@@ -113,7 +113,7 @@ namespace Mmd.Samples.RuntimeVerification
         public bool physicsDiagnosticsAvailable;
         public MmdRuntimeVerificationBoneSample[]? bones;
         public string matrixSpace = "mmd-model";
-        public string matrixLayout = "row-major";
+        public string matrixLayout = "column-major";
         public float importScale;
     }
 

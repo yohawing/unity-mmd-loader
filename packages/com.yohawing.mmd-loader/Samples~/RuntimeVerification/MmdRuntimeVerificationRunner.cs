@@ -440,7 +440,7 @@ namespace Mmd.Samples.RuntimeVerification
                 physicsDiagnosticsAvailable = controller.LastLivePhysicsDiagnostics != null,
                 bones = arguments.DumpBones ? BuildBoneSamples(controller) : null,
                 matrixSpace = "mmd-model",
-                matrixLayout = "row-major",
+                matrixLayout = "column-major",
                 importScale = ResolveImportScale(controller)
             });
             result.sampledFrames = frames.ToArray();
