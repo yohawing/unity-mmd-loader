@@ -52,7 +52,7 @@ https://github.com/yohawing/unity-mmd-loader.git?path=packages/com.yohawing.mmd-
 
 ## Basic Flow
 
-1. Import a `.pmx` file into the Unity Project.
+1. Import a `.pmx` file and its textures into Unity.
 2. Drag the imported PMX asset into the Scene or Hierarchy.
 3. Import a `.vmd` file.
 4. Bind the scene playback object to Timeline and create a VMD Timeline clip.

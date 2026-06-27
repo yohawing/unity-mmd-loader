@@ -53,7 +53,7 @@ https://github.com/yohawing/unity-mmd-loader.git?path=packages/com.yohawing.mmd-
 
 ## 基本的な流れ
 
-1. `.pmx` を Unity の Project にインポートする。
+1. `.pmx` をテクスチャも含めてUnityにインポートする。
 2. インポートした PMX アセットを Scene または Hierarchy にドラッグする。
 3. `.vmd` をインポートする。
 4. シーン上の再生対象オブジェクトを Timeline に割り当て、VMD の Timeline クリップを作成する。

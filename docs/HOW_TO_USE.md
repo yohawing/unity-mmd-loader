@@ -24,7 +24,7 @@ The sample includes a small redistributable PMX/VMD pair that is useful for chec
 
 ![howtouse2](./assets/howtouse2.png)
 
-Add a `.pmx` file under your Unity project's `Assets/` folder.
+Add a `.pmx` file, along with its texture files, under your Unity project's `Assets/` folder.
 
 A PMX is imported as a model file, just like an FBX. You can adjust the import settings in the Inspector.
 
