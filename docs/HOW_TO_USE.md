@@ -9,7 +9,7 @@ This guide is for users who have added `com.yohawing.mmd-loader` to a Unity proj
 Open **Window > Package Manager** in Unity, and enter the following into **Add package from git URL**.
 
 ```text
-https://github.com/yohawing/unity-mmd-loader.git?path=packages/com.yohawing.mmd-loader#v0.1.1
+https://github.com/yohawing/unity-mmd-loader.git?path=packages/com.yohawing.mmd-loader
 ```
 
 The supported Unity version is 6000.4 or newer.
