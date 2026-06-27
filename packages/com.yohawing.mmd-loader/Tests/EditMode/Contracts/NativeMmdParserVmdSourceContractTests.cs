@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using NUnit.Framework;
 using Mmd.Parser;
@@ -65,6 +67,15 @@ namespace Mmd.Tests
                         Direction = new[] { -0.5f, -1f, 0.5f }
                     }
                 },
+                SelfShadowFrames = new[]
+                {
+                    new NativeMmdParser.VmdMotionSourceSelfShadowFrame
+                    {
+                        Frame = 12,
+                        Mode = 2,
+                        Distance = 0.75f
+                    }
+                },
                 CameraFrames = new[]
                 {
                     new NativeMmdParser.VmdMotionSourceCameraFrame
@@ -129,6 +140,11 @@ namespace Mmd.Tests
             Assert.That(motion.lightKeyframes[0].frame, Is.EqualTo(11));
             CollectionAssert.AreEqual(new[] { 0.4f, 0.5f, 0.6f }, motion.lightKeyframes[0].color);
             CollectionAssert.AreEqual(new[] { -0.5f, -1f, 0.5f }, motion.lightKeyframes[0].direction);
+
+            Assert.That(motion.selfShadowKeyframes, Has.Count.EqualTo(1));
+            Assert.That(motion.selfShadowKeyframes[0].frame, Is.EqualTo(12));
+            Assert.That(motion.selfShadowKeyframes[0].mode, Is.EqualTo(2));
+            Assert.That(motion.selfShadowKeyframes[0].distance, Is.EqualTo(0.75f));
         }
 
         [Test]
@@ -162,7 +178,7 @@ namespace Mmd.Tests
 
             Assert.That(motion.targetModelName, Is.Empty);
             // cameraKeyframeCount reflects the summary-reported count (independent of the loaded
-            // frame list, mirroring the light / self-shadow count-only surface).
+            // frame list, mirroring the light summary count surface).
             Assert.That(motion.cameraKeyframeCount, Is.EqualTo(int.MaxValue));
             Assert.That(motion.lightKeyframeCount, Is.EqualTo(int.MaxValue));
             Assert.That(motion.selfShadowKeyframeCount, Is.EqualTo(int.MaxValue));
@@ -190,7 +206,7 @@ namespace Mmd.Tests
         [Test]
         public void LoadMotionUsesVmdJsonParserWithoutSummaryAccessor()
         {
-            byte[] observedBytes = null;
+            byte[]? observedBytes = null;
             var parser = new NativeMmdParser(
                 bytes =>
                 {
@@ -266,6 +282,10 @@ namespace Mmd.Tests
             Assert.That(motion.lightKeyframes, Has.Count.EqualTo(1));
             CollectionAssert.AreEqual(new[] { 0.4f, 0.5f, 0.6f }, motion.lightKeyframes[0].direction);
             Assert.That(motion.selfShadowKeyframeCount, Is.EqualTo(1));
+            Assert.That(motion.selfShadowKeyframes, Has.Count.EqualTo(1));
+            Assert.That(motion.selfShadowKeyframes[0].frame, Is.EqualTo(50));
+            Assert.That(motion.selfShadowKeyframes[0].mode, Is.EqualTo(1));
+            Assert.That(motion.selfShadowKeyframes[0].distance, Is.EqualTo(0.5f));
         }
 
     }

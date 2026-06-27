@@ -12,18 +12,26 @@ namespace Mmd.Editor
     {
         private SerializedProperty? importScaleProperty;
         private SerializedProperty? modelPresetProperty;
-        private SerializedProperty? meshGenerationModeProperty;
         private SerializedProperty? materialTexturePolicyProperty;
         private SerializedProperty? shaderPresetProperty;
         private SerializedProperty? materialRemapsProperty;
         private SerializedProperty? animationTypeProperty;
         private SerializedProperty? humanoidBoneMappingOverridesProperty;
+        private SerializedProperty? upperArmTwistProperty;
+        private SerializedProperty? lowerArmTwistProperty;
+        private SerializedProperty? upperLegTwistProperty;
+        private SerializedProperty? lowerLegTwistProperty;
+        private SerializedProperty? armStretchProperty;
+        private SerializedProperty? legStretchProperty;
+        private SerializedProperty? feetSpacingProperty;
+        private SerializedProperty? hasTranslationDoFProperty;
         private MmdPmxAsset? cachedAsset;
         private bool onDemandRemapExpanded = true;
 
         private bool toonShaderSettingsExpanded = true;
+        private bool advancedHumanoidSettingsExpanded;
         private bool humanoidMappingOverridesExpanded;
-        private bool humanoidMappingDiagnosticsExpanded = true;
+        private bool retargetQualitySettingsExpanded;
 
         private int selectedTab;
         private static readonly string[] TabNames = { "Model", "Rig", "Materials" };
@@ -33,12 +41,19 @@ namespace Mmd.Editor
             base.OnEnable();
             importScaleProperty = serializedObject.FindProperty("importScale");
             modelPresetProperty = serializedObject.FindProperty("modelPreset");
-            meshGenerationModeProperty = serializedObject.FindProperty("meshGenerationMode");
             materialTexturePolicyProperty = serializedObject.FindProperty("materialTexturePolicy");
             shaderPresetProperty = serializedObject.FindProperty("shaderPreset");
             materialRemapsProperty = serializedObject.FindProperty("materialRemaps");
             animationTypeProperty = serializedObject.FindProperty("animationType");
             humanoidBoneMappingOverridesProperty = serializedObject.FindProperty("humanoidBoneMappingOverrides");
+            upperArmTwistProperty = serializedObject.FindProperty("upperArmTwist");
+            lowerArmTwistProperty = serializedObject.FindProperty("lowerArmTwist");
+            upperLegTwistProperty = serializedObject.FindProperty("upperLegTwist");
+            lowerLegTwistProperty = serializedObject.FindProperty("lowerLegTwist");
+            armStretchProperty = serializedObject.FindProperty("armStretch");
+            legStretchProperty = serializedObject.FindProperty("legStretch");
+            feetSpacingProperty = serializedObject.FindProperty("feetSpacing");
+            hasTranslationDoFProperty = serializedObject.FindProperty("hasTranslationDoF");
             ResolveImportedAsset();
         }
 
@@ -86,13 +101,6 @@ namespace Mmd.Editor
                         "Scale applied to the imported PMX model. Stored as an import setting and asset summary. Runtime playback and live physics are scale-aware."));
             }
 
-            if (meshGenerationModeProperty != null)
-            {
-                EditorGUILayout.PropertyField(meshGenerationModeProperty,
-                    new GUIContent("Mesh Generation",
-                        "Mesh generation mode stored as an import setting. Normal PMX import still does not write generated Mesh assets; persistent split mesh export is available only through the explicit export workflow."));
-            }
-
             if (asset != null)
             {
                 DrawReadOnlySelectableText("Model", string.IsNullOrWhiteSpace(asset.ModelName) ? asset.name : asset.ModelName);
@@ -113,9 +121,6 @@ namespace Mmd.Editor
         {
             if (asset != null)
             {
-                EditorGUILayout.HelpBox(
-                    "Materials are embedded inside the imported asset. Material assignments can be remapped below.",
-                    MessageType.Info);
                 DrawRemappedMaterials(asset);
             }
             else
@@ -159,42 +164,23 @@ namespace Mmd.Editor
                 currentType = (MmdPmxAnimationType)animationTypeProperty.enumValueIndex;
             }
 
-            // When Humanoid, show read-only Avatar import status.
+            // Normal Rig UI keeps Humanoid details implicit; only blocked Avatar creation needs a warning.
             if (currentType == MmdPmxAnimationType.Humanoid)
             {
-                DrawHumanoidMappingOverrides(asset);
-                EditorGUILayout.Space();
                 if (asset != null)
                 {
-                    EditorGUILayout.LabelField("Humanoid Avatar", EditorStyles.boldLabel);
-                    using (new EditorGUI.DisabledScope(true))
-                    {
-                        EditorGUILayout.TextField("Avatar Readiness", asset.HumanoidAvatarReadiness);
-                        EditorGUILayout.ObjectField("Avatar", asset.ImportedAvatar, typeof(Avatar), allowSceneObjects: false);
-                    }
-
-                    if (asset.ImportedAvatar != null)
-                    {
-                        EditorGUILayout.HelpBox(
-                            "Avatar sub-asset is present. Reimport to rebuild it after bone changes.",
-                            MessageType.Info);
-                    }
-                    else if (asset.BoneCount == 0)
+                    if (asset.BoneCount == 0)
                     {
                         EditorGUILayout.HelpBox(
                             "No bones found. Avatar cannot be created for this model.",
                             MessageType.Warning);
                     }
-                    else
+                    else if (asset.ImportedAvatar == null)
                     {
-                        EditorGUILayout.HelpBox(
-                            string.IsNullOrWhiteSpace(asset.HumanoidAvatarDiagnostic)
-                                ? "Avatar sub-asset is not built yet. Apply/Reimport to generate it."
-                                : asset.HumanoidAvatarDiagnostic,
-                            MessageType.Info);
+                        EditorGUILayout.HelpBox(BuildAvatarReadinessTooltip(asset), MessageType.Warning);
                     }
 
-                    DrawHumanoidMappingDiagnostics(asset);
+                    DrawAdvancedHumanoidSettings(asset);
                 }
             }
             else if (asset == null)
@@ -205,87 +191,168 @@ namespace Mmd.Editor
             DrawPendingImportSettingsWarning(HasModified());
         }
 
-        private void DrawHumanoidMappingDiagnostics(MmdPmxAsset asset)
+        private static string BuildAvatarReadinessTooltip(MmdPmxAsset asset)
         {
+            if (!string.IsNullOrWhiteSpace(asset.HumanoidAvatarDiagnostic))
+            {
+                return asset.HumanoidAvatarDiagnostic;
+            }
+
+            if (asset.ImportedAvatar != null)
+            {
+                return "Imported Avatar sub-asset is present. Reimport the PMX asset to rebuild it after changing Humanoid settings.";
+            }
+
+            return "Avatar sub-asset is not built yet. Apply/Reimport to refresh Humanoid import output.";
+        }
+
+        private void DrawAdvancedHumanoidSettings(MmdPmxAsset? asset)
+        {
+            bool hasOverrides = humanoidBoneMappingOverridesProperty != null
+                && humanoidBoneMappingOverridesProperty.arraySize > 0;
+
             EditorGUILayout.Space();
-            humanoidMappingDiagnosticsExpanded = EditorGUILayout.Foldout(
-                humanoidMappingDiagnosticsExpanded,
-                "Humanoid Bone Mapping Diagnostics",
+            advancedHumanoidSettingsExpanded = EditorGUILayout.Foldout(
+                advancedHumanoidSettingsExpanded,
+                new GUIContent(
+                    "Advanced Humanoid Settings",
+                    hasOverrides
+                        ? "Manual bone mapping overrides are applied. Expand to review or clear them."
+                        : "Advanced repair and retarget tuning settings. Leave collapsed for the normal import workflow."),
                 toggleOnLabelClick: true);
-            if (!humanoidMappingDiagnosticsExpanded)
+
+            if (!advancedHumanoidSettingsExpanded)
             {
                 return;
             }
 
-            MmdHumanoidBoneMappingDiagnosticSummary summary = asset.HumanoidBoneMappingDiagnostics;
-            using (new EditorGUI.DisabledScope(true))
-            {
-                EditorGUILayout.TextField("Readiness", summary.Readiness);
-            }
-
-            DrawMissingRequiredBones(summary);
-            DrawMappedHumanoidBones(summary);
-            DrawConflictDiagnostics(summary);
+            DrawHumanoidMappingOverrides(asset);
+            DrawRetargetQualitySettings();
         }
 
-        private static void DrawMissingRequiredBones(MmdHumanoidBoneMappingDiagnosticSummary summary)
+        private void DrawRetargetQualitySettings()
         {
-            if (summary.MissingRequiredBones.Count == 0)
+            if (upperArmTwistProperty == null
+                || lowerArmTwistProperty == null
+                || upperLegTwistProperty == null
+                || lowerLegTwistProperty == null
+                || armStretchProperty == null
+                || legStretchProperty == null
+                || feetSpacingProperty == null
+                || hasTranslationDoFProperty == null)
             {
-                EditorGUILayout.HelpBox("All required Humanoid bones are mapped.", MessageType.Info);
                 return;
             }
 
-            EditorGUILayout.HelpBox(
-                "Missing required Humanoid bones prevent a valid Avatar. Add manual overrides for these targets.",
-                MessageType.Warning);
-            foreach (MmdHumanoidMissingRequiredBone missing in summary.MissingRequiredBones)
-            {
-                EditorGUILayout.LabelField(
-                    missing.HumanBone.ToString(),
-                    string.IsNullOrWhiteSpace(missing.ExpectedMmdBoneName)
-                        ? "(expected MMD bone unknown)"
-                        : "Expected MMD bone: " + missing.ExpectedMmdBoneName,
-                    EditorStyles.boldLabel);
-            }
-        }
-
-        private static void DrawMappedHumanoidBones(MmdHumanoidBoneMappingDiagnosticSummary summary)
-        {
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Mapped Bones", EditorStyles.boldLabel);
-            if (summary.MappedEntries.Count == 0)
+            retargetQualitySettingsExpanded = EditorGUILayout.Foldout(
+                retargetQualitySettingsExpanded,
+                "Retarget Quality Settings",
+                toggleOnLabelClick: true);
+            if (!retargetQualitySettingsExpanded)
             {
-                EditorGUILayout.LabelField("No mapped Humanoid bones.");
                 return;
             }
 
-            foreach (MmdHumanoidBoneMappingDiagnosticEntry entry in summary.MappedEntries)
+            Draw01Slider(
+                upperArmTwistProperty,
+                new GUIContent(
+                    "Upper Arm Twist",
+                    "Controls how Unity distributes upper arm twist during Humanoid retargeting."));
+            Draw01Slider(
+                lowerArmTwistProperty,
+                new GUIContent(
+                    "Lower Arm Twist",
+                    "Controls how Unity distributes lower arm twist during Humanoid retargeting."));
+            Draw01Slider(
+                upperLegTwistProperty,
+                new GUIContent(
+                    "Upper Leg Twist",
+                    "Controls how Unity distributes upper leg twist during Humanoid retargeting."));
+            Draw01Slider(
+                lowerLegTwistProperty,
+                new GUIContent(
+                    "Lower Leg Twist",
+                    "Controls how Unity distributes lower leg twist during Humanoid retargeting."));
+            Draw01Slider(
+                armStretchProperty,
+                new GUIContent(
+                    "Arm Stretch",
+                    "Controls Unity's Humanoid arm stretch limit used by IK retargeting."));
+            Draw01Slider(
+                legStretchProperty,
+                new GUIContent(
+                    "Leg Stretch",
+                    "Controls Unity's Humanoid leg stretch limit used by IK retargeting."));
+            Draw01Slider(
+                feetSpacingProperty,
+                new GUIContent(
+                    "Feet Spacing",
+                    "Controls Unity's Humanoid feet spacing value used by AvatarBuilder."));
+
+            EditorGUILayout.PropertyField(
+                hasTranslationDoFProperty,
+                new GUIContent(
+                    "Has Translation DoF",
+                    "Enables translation degrees of freedom on the generated Humanoid Avatar."));
+
+            if (GUILayout.Button("Reset to Defaults"))
             {
-                string mmdName = string.IsNullOrWhiteSpace(entry.MmdBoneName)
-                    ? "(unnamed MMD bone)"
-                    : entry.MmdBoneName + "#" + entry.MmdBoneIndex;
-                string source = string.IsNullOrWhiteSpace(entry.Source) ? "Automatic" : entry.Source;
-                string suffix = entry.Required ? "required" : "optional";
-                DrawReadOnlySelectableText(
-                    entry.HumanBone.ToString(),
-                    mmdName + "  [" + source + ", " + suffix + "]");
+                Undo.RecordObject(target, "Reset Retarget Quality Settings");
+                ResetRetargetQualitySettings();
+                EditorUtility.SetDirty(target);
             }
         }
 
-        private static void DrawConflictDiagnostics(MmdHumanoidBoneMappingDiagnosticSummary summary)
+        private static void Draw01Slider(SerializedProperty property, GUIContent content)
         {
-            EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Conflicts / Suppressed Overrides", EditorStyles.boldLabel);
-            if (summary.ConflictDiagnostics.Count == 0)
+            property.floatValue = EditorGUILayout.Slider(
+                content,
+                Mathf.Clamp01(property.floatValue),
+                0.0f,
+                1.0f);
+        }
+
+        private void ResetRetargetQualitySettings()
+        {
+            if (upperArmTwistProperty != null)
             {
-                EditorGUILayout.LabelField("No conflicts or suppressed override entries.");
-                return;
+                upperArmTwistProperty.floatValue = MmdHumanoidRetargetQualitySettings.DefaultUpperArmTwist;
             }
 
-            foreach (string diagnostic in summary.ConflictDiagnostics)
+            if (lowerArmTwistProperty != null)
             {
-                EditorGUILayout.HelpBox(diagnostic, MessageType.Warning);
+                lowerArmTwistProperty.floatValue = MmdHumanoidRetargetQualitySettings.DefaultLowerArmTwist;
+            }
+
+            if (upperLegTwistProperty != null)
+            {
+                upperLegTwistProperty.floatValue = MmdHumanoidRetargetQualitySettings.DefaultUpperLegTwist;
+            }
+
+            if (lowerLegTwistProperty != null)
+            {
+                lowerLegTwistProperty.floatValue = MmdHumanoidRetargetQualitySettings.DefaultLowerLegTwist;
+            }
+
+            if (armStretchProperty != null)
+            {
+                armStretchProperty.floatValue = MmdHumanoidRetargetQualitySettings.DefaultArmStretch;
+            }
+
+            if (legStretchProperty != null)
+            {
+                legStretchProperty.floatValue = MmdHumanoidRetargetQualitySettings.DefaultLegStretch;
+            }
+
+            if (feetSpacingProperty != null)
+            {
+                feetSpacingProperty.floatValue = MmdHumanoidRetargetQualitySettings.DefaultFeetSpacing;
+            }
+
+            if (hasTranslationDoFProperty != null)
+            {
+                hasTranslationDoFProperty.boolValue = MmdHumanoidRetargetQualitySettings.DefaultHasTranslationDoF;
             }
         }
 
@@ -342,23 +409,13 @@ namespace Mmd.Editor
             {
                 if (GUILayout.Button("Add Override"))
                 {
-                    int index = humanoidBoneMappingOverridesProperty.arraySize;
-                    humanoidBoneMappingOverridesProperty.InsertArrayElementAtIndex(index);
-                    SerializedProperty entry = humanoidBoneMappingOverridesProperty.GetArrayElementAtIndex(index);
-                    SerializedProperty? mmdBoneNameProperty = entry.FindPropertyRelative("mmdBoneName");
-                    SerializedProperty? humanBoneProperty = entry.FindPropertyRelative("humanBone");
-                    if (mmdBoneNameProperty != null)
-                    {
-                        mmdBoneNameProperty.stringValue = boneNames.Length > 0 ? boneNames[0] : string.Empty;
-                    }
-
-                    if (humanBoneProperty != null)
-                    {
-                        humanBoneProperty.intValue = (int)HumanBodyBones.LastBone;
-                    }
+                    AddHumanoidMappingOverride(
+                        HumanBodyBones.LastBone,
+                        boneNames.Length > 0 ? boneNames[0] : string.Empty,
+                        "Add Humanoid Bone Mapping Override");
                 }
 
-                using (new EditorGUI.DisabledScope(humanoidBoneMappingOverridesProperty.arraySize == 0))
+                if (humanoidBoneMappingOverridesProperty.arraySize > 0)
                 {
                     if (GUILayout.Button("Clear Overrides"))
                     {
@@ -366,6 +423,40 @@ namespace Mmd.Editor
                     }
                 }
             }
+        }
+
+        private void AddHumanoidMappingOverride(
+            HumanBodyBones humanBone,
+            string mmdBoneName,
+            string undoName)
+        {
+            if (humanoidBoneMappingOverridesProperty == null)
+            {
+                return;
+            }
+
+            Undo.RecordObject(target, undoName);
+
+            int index = humanoidBoneMappingOverridesProperty.arraySize;
+            humanoidBoneMappingOverridesProperty.InsertArrayElementAtIndex(index);
+            SerializedProperty entry = humanoidBoneMappingOverridesProperty.GetArrayElementAtIndex(index);
+            SerializedProperty? mmdBoneNameProperty = entry.FindPropertyRelative("mmdBoneName");
+            SerializedProperty? humanBoneProperty = entry.FindPropertyRelative("humanBone");
+
+            if (mmdBoneNameProperty != null)
+            {
+                mmdBoneNameProperty.stringValue = mmdBoneName ?? string.Empty;
+            }
+
+            if (humanBoneProperty != null)
+            {
+                humanBoneProperty.intValue = (int)humanBone;
+            }
+
+            humanoidMappingOverridesExpanded = true;
+            advancedHumanoidSettingsExpanded = true;
+            EditorUtility.SetDirty(target);
+            Repaint();
         }
 
         private static void DrawMmdBoneNameField(SerializedProperty? mmdBoneNameProperty, string[] boneNames)
@@ -407,12 +498,13 @@ namespace Mmd.Editor
 
         private static string[] GetImportedBoneNames(MmdPmxAsset? asset)
         {
-            if (asset == null || asset.ImportedRoot == null)
+            GameObject? importedRoot = asset?.ImportedRoot;
+            if (importedRoot == null)
             {
                 return System.Array.Empty<string>();
             }
 
-            SkinnedMeshRenderer? smr = asset.ImportedRoot.GetComponentInChildren<SkinnedMeshRenderer>(
+            SkinnedMeshRenderer? smr = importedRoot.GetComponentInChildren<SkinnedMeshRenderer>(
                 includeInactive: true);
             if (smr == null || smr.bones == null || smr.bones.Length == 0)
             {
@@ -438,7 +530,12 @@ namespace Mmd.Editor
         {
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Remapped Materials", EditorStyles.boldLabel);
-            onDemandRemapExpanded = EditorGUILayout.Foldout(onDemandRemapExpanded, "On Demand Remap", toggleOnLabelClick: true);
+            onDemandRemapExpanded = EditorGUILayout.Foldout(
+                onDemandRemapExpanded,
+                new GUIContent(
+                    "On Demand Remap",
+                    "Materials are embedded inside the imported asset. Override material slots here when a project Material should replace an imported material."),
+                toggleOnLabelClick: true);
             if (!onDemandRemapExpanded)
             {
                 return;

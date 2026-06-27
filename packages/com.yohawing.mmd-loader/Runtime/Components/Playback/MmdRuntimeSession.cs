@@ -77,6 +77,11 @@ namespace Mmd
             return MmdRuntimeFrameEvaluator.EvaluateValidatedPhaseOnePlaybackFrame(model, motion, frame, time, physicsBackend, ikSolver);
         }
 
+        internal MmdEvaluatedFrame EvaluateBeforePhysicsFrame(int frame, float time, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
+        {
+            return MmdRuntimeFrameEvaluator.EvaluateValidatedBeforePhysicsPlaybackFrame(model, motion, frame, time, physicsBackend, ikSolver);
+        }
+
         public MmdEvaluatedFrame EvaluateFrameAtTime(float time, float frameRate, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
         {
             MmdPlaybackTimeMapping mapping = DescribePlaybackTime(time, frameRate);

@@ -81,12 +81,12 @@ namespace Mmd.Editor
             string directory = "Assets";
             if (setupAsset != null && AssetDatabase.Contains(setupAsset))
             {
-                string setupAssetPath = AssetDatabase.GetAssetPath(setupAsset);
+                string? setupAssetPath = AssetDatabase.GetAssetPath(setupAsset);
                 if (!string.IsNullOrWhiteSpace(setupAssetPath)
                     && setupAssetPath.StartsWith("Assets/", StringComparison.Ordinal))
                 {
                     string? setupDirectory = Path.GetDirectoryName(setupAssetPath)?.Replace('\\', '/');
-                    if (!string.IsNullOrWhiteSpace(setupDirectory))
+                    if (setupDirectory is { Length: > 0 } && !string.IsNullOrWhiteSpace(setupDirectory))
                     {
                         directory = setupDirectory;
                     }
@@ -95,9 +95,9 @@ namespace Mmd.Editor
 
             return directory + "/"
                    + "H6_HumanoidClip_"
-                   + NormalizeIdentifier(pmxAsset?.SourceId)
+                   + NormalizeIdentifier(pmxAsset?.SourceId ?? "pmx")
                    + "_"
-                   + NormalizeIdentifier(vmdAsset?.SourceId)
+                   + NormalizeIdentifier(vmdAsset?.SourceId ?? "vmd")
                    + ".anim";
         }
 

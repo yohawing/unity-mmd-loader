@@ -13,7 +13,7 @@ namespace Mmd.Tests
         [Test]
         public void ImportScaleZeroDotOneProducesCharacterHeightMeshBoundsAndUnscaledDescriptor()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = CreateCharacterHeightTriangleModel();
@@ -148,7 +148,7 @@ namespace Mmd.Tests
             };
         }
 
-        private static void DestroyInstance(MmdUnityModelInstance instance)
+        private static void DestroyInstance(MmdUnityModelInstance? instance)
         {
             if (instance == null)
             {

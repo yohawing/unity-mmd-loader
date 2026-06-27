@@ -5,7 +5,10 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 using Mmd.Parser;
+using Mmd.Rendering.Universal;
 using Mmd.UnityIntegration;
 
 namespace Mmd.Editor
@@ -30,6 +33,7 @@ namespace Mmd.Editor
             MmdAssetInspectorUtility.DrawModelSummary(asset);
             MmdAssetInspectorUtility.DrawParseSummary(asset);
             MmdAssetInspectorUtility.DrawMaterialSummary(asset);
+            DrawMissingTextureActions(asset);
             MmdAssetInspectorUtility.DrawOutlineSummary(asset);
             MmdAssetInspectorUtility.DrawHierarchyReadinessSummary(asset);
             MmdAssetInspectorUtility.DrawPhysicsSummary(asset);
@@ -55,6 +59,44 @@ namespace Mmd.Editor
                         MmdHumanoidSetupAssetBuilder.GetDefaultSetupAssetPath(asset));
                     Selection.activeObject = setup;
                     EditorGUIUtility.PingObject(setup);
+                }
+            }
+        }
+
+        private static void DrawMissingTextureActions(MmdPmxAsset asset)
+        {
+            if (asset.MissingProjectTextureReferenceCount <= 0)
+            {
+                return;
+            }
+
+            EditorGUILayout.Space();
+            using (new EditorGUI.DisabledScope(asset.ByteLength == 0))
+            {
+                if (GUILayout.Button("Resolve First Missing Texture..."))
+                {
+                    string searchRoot = EditorUtility.OpenFolderPanel(
+                        "Search Missing PMX Texture",
+                        Application.dataPath,
+                        string.Empty);
+                    if (string.IsNullOrWhiteSpace(searchRoot))
+                    {
+                        return;
+                    }
+
+                    MmdPmxMissingTextureResolveResult result =
+                        MmdPmxMissingTextureResolver.ResolveFirstMissingTextureReference(asset, searchRoot);
+                    if (result.Success)
+                    {
+                        EditorUtility.DisplayDialog(
+                            "Missing Texture Resolved",
+                            $"Copied {result.Reference} to {result.TargetAssetPath}. PMX reimport was requested.",
+                            "OK");
+                    }
+                    else
+                    {
+                        EditorUtility.DisplayDialog("Missing Texture Not Resolved", result.Message, "OK");
+                    }
                 }
             }
         }
@@ -418,6 +460,23 @@ namespace Mmd.Editor
             using (new EditorGUI.DisabledScope(true))
             {
                 EditorGUILayout.TextField("Model Name", asset.ModelName);
+                if (!string.IsNullOrWhiteSpace(asset.ModelEnglishName))
+                {
+                    EditorGUILayout.TextField("English Name", asset.ModelEnglishName);
+                }
+
+                if (!string.IsNullOrWhiteSpace(asset.ModelComment))
+                {
+                    EditorGUILayout.LabelField("Comment");
+                    EditorGUILayout.TextArea(asset.ModelComment, GUILayout.MinHeight(40));
+                }
+
+                if (!string.IsNullOrWhiteSpace(asset.ModelEnglishComment))
+                {
+                    EditorGUILayout.LabelField("English Comment");
+                    EditorGUILayout.TextArea(asset.ModelEnglishComment, GUILayout.MinHeight(40));
+                }
+
                 EditorGUILayout.Vector3Field("MMD Bounds Min", asset.BoundsMin);
                 EditorGUILayout.Vector3Field("MMD Bounds Max", asset.BoundsMax);
                 EditorGUILayout.Vector3Field("MMD Bounds Size", asset.BoundsSize);
@@ -456,6 +515,13 @@ namespace Mmd.Editor
                 EditorGUILayout.IntField("Diffuse Texture Refs", asset.DiffuseTextureReferenceCount);
                 EditorGUILayout.IntField("Sphere Texture Refs", asset.SphereTextureReferenceCount);
                 EditorGUILayout.IntField("Toon Texture Refs", asset.ToonTextureReferenceCount);
+                EditorGUILayout.IntField("Resolved Project Texture Refs", asset.ResolvedProjectTextureReferenceCount);
+                EditorGUILayout.IntField("Missing Project Texture Refs", asset.MissingProjectTextureReferenceCount);
+                if (asset.MissingProjectTextureReferenceCount > 0)
+                {
+                    EditorGUILayout.TextField("First Missing Texture", asset.MissingProjectTextureReferenceSample);
+                }
+
                 EditorGUILayout.IntField("Transparent Materials", asset.TransparentMaterialCount);
                 EditorGUILayout.IntField("Edge Materials", asset.EdgeMaterialCount);
             }
@@ -474,9 +540,14 @@ namespace Mmd.Editor
                 EditorGUILayout.TextField("Final Visual Parity", readiness.FinalVisualParity);
             }
 
-            EditorGUILayout.HelpBox(
-                "Outline readiness is a cached PMX material summary. It does not generate outline proxy meshes, update visual baselines, or claim rayMMD-compatible parity.",
-                MessageType.Info);
+            if (readiness.OutlineEligibleMaterialCount > 0 && !IsMmdOutlineFeaturePresent())
+            {
+                EditorGUILayout.HelpBox(
+                    "MmdOutlineRendererFeature が URP Renderer Data に追加されていません。" +
+                    "アウトラインは描画されません。\n" +
+                    "追加方法: URP Renderer Data アセット → Add Renderer Feature → Mmd Outline Renderer Feature",
+                    MessageType.Warning);
+            }
         }
 
         internal static MmdOutlineReadiness GetOutlineReadiness(MmdPmxAsset? asset)
@@ -491,13 +562,45 @@ namespace Mmd.Editor
             }
 
             string runtimePath = string.Equals(asset.ShaderPreset, "MmdBasicUrpToon", System.StringComparison.Ordinal)
-                ? "MmdBasicUrpToon outline pass"
+                ? "MmdOutlineRendererFeature (LightMode=MmdOutline)"
                 : "Shader preset summary only";
             return new MmdOutlineReadiness(
                 asset.EdgeMaterialCount,
                 runtimePath,
                 "Back-face mesh-normal extrusion",
                 MmdOutlineReadiness.NotClaimed);
+        }
+
+        internal static bool IsMmdOutlineFeaturePresent()
+        {
+            var pipeline = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
+            if (pipeline == null)
+                return false;
+
+            var pipelineSo = new SerializedObject(pipeline);
+            var rendererDataList = pipelineSo.FindProperty("m_RendererDataList");
+            if (rendererDataList == null)
+                return false;
+
+            for (int i = 0; i < rendererDataList.arraySize; i++)
+            {
+                var rendererDataRef = rendererDataList.GetArrayElementAtIndex(i);
+                if (rendererDataRef.objectReferenceValue == null)
+                    continue;
+
+                var rendererDataSo = new SerializedObject(rendererDataRef.objectReferenceValue);
+                var features = rendererDataSo.FindProperty("m_RendererFeatures");
+                if (features == null)
+                    continue;
+
+                for (int j = 0; j < features.arraySize; j++)
+                {
+                    if (features.GetArrayElementAtIndex(j).objectReferenceValue is MmdOutlineRendererFeature)
+                        return true;
+                }
+            }
+
+            return false;
         }
 
         public static void DrawHierarchyReadinessSummary(MmdPmxAsset asset)

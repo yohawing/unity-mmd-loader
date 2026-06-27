@@ -1,3 +1,5 @@
+#nullable enable
+
 namespace Mmd.Physics
 {
     public sealed class NullMmdPhysicsBackend : IMmdPhysicsBackend

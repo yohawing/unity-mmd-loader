@@ -1,6 +1,9 @@
+#nullable enable
+
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Mmd.Motion;
 using Mmd.Parser;
@@ -17,6 +20,25 @@ namespace Mmd.Tests
         {
             Assert.That(MmdRuntimeInfo.PackageName, Is.EqualTo("com.yohawing.mmd-loader"));
             Assert.That(MmdRuntimeInfo.RuntimeBaseline, Is.EqualTo("Phase1"));
+        }
+
+        [Test]
+        public void BasicPlaybackSampleAssetsParse()
+        {
+            string sampleRoot = Path.Combine(MmdTestFixtures.PackageRoot, "Samples~", "BasicPlayback", "Assets");
+            string pmxPath = Path.Combine(sampleRoot, "mmt_test_model.pmx");
+            string vmdPath = Path.Combine(sampleRoot, "mmt_test_model_test_motion.vmd");
+            Assert.That(pmxPath, Does.Exist, "BasicPlayback sample PMX must be bundled.");
+            Assert.That(vmdPath, Does.Exist, "BasicPlayback sample VMD must be bundled.");
+
+            var parser = new NativeMmdParser();
+            MmdModelDefinition model = parser.LoadModel(File.ReadAllBytes(pmxPath));
+            MmdMotionDefinition motion = parser.LoadMotion(File.ReadAllBytes(vmdPath));
+
+            Assert.That(model.vertices.Count, Is.GreaterThan(0), "sample PMX vertices");
+            Assert.That(model.bones.Count, Is.GreaterThan(0), "sample PMX bones");
+            Assert.That(model.materials.Count, Is.GreaterThan(0), "sample PMX materials");
+            Assert.That(motion.boneKeyframes.Count, Is.GreaterThan(0), "sample VMD bone keyframes");
         }
 
         [Test]

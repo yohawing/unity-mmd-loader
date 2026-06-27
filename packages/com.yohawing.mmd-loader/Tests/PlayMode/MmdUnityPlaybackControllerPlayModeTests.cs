@@ -651,7 +651,7 @@ namespace Mmd.Tests
                 Assert.That(binding.LastLivePhysicsDiagnostics.stepPhysicsMs, Is.GreaterThanOrEqualTo(0.0));
                 Assert.That(binding.LastLivePhysicsDiagnostics.pinnedBodies.pinnedBodyCount, Is.GreaterThan(0));
                 Assert.That(binding.LastLivePhysicsDiagnostics.pinnedBodies.dynamicOrientationPinnedBodyCount, Is.GreaterThan(0),
-                    "Expected PMX mode 2 dynamic-with-bone rigidbodies to be pinned to the animated bone pose before Bullet stepping");
+                    "Expected PMX mode 2 dynamic-with-bone rigidbodies to be initialized from the animated bone pose during reset seed");
                 int expectedInitialDynamicBodies = model.physics.rigidbodies.Count(
                     body => string.Equals(body.physicsKind, "dynamic", StringComparison.Ordinal) &&
                             body.boneIndex >= 0 &&
@@ -716,6 +716,8 @@ namespace Mmd.Tests
                 Assert.That(binding.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(1));
                 Assert.That(binding.LastLivePhysicsDiagnostics.stepPhysicsMs, Is.GreaterThan(0.0));
                 Assert.That(binding.LastLivePhysicsDiagnostics.pinnedBodies.pinnedBodyCount, Is.GreaterThan(0));
+                Assert.That(binding.LastLivePhysicsDiagnostics.pinnedBodies.dynamicOrientationPinnedBodyCount, Is.EqualTo(0),
+                    "PMX mode 2 dynamic-with-bone rigidbodies must remain active dynamic bodies on normal forward frames");
                 Assert.That(binding.LastLivePhysicsDiagnostics.pinnedBodies.dynamicInitialPinnedBodyCount, Is.EqualTo(0),
                     "Dynamic rigidbodies must only be force-initialized on the first live physics frame");
 
@@ -726,6 +728,8 @@ namespace Mmd.Tests
                 Assert.That(binding.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(5));
                 Assert.That(binding.LastLivePhysicsDiagnostics.stepPhysicsMs, Is.GreaterThan(0.0));
                 Assert.That(binding.LastLivePhysicsDiagnostics.pinnedBodies.pinnedBodyCount, Is.GreaterThan(0));
+                Assert.That(binding.LastLivePhysicsDiagnostics.pinnedBodies.dynamicOrientationPinnedBodyCount, Is.EqualTo(0),
+                    "PMX mode 2 dynamic-with-bone rigidbodies must not be re-pinned during accumulated forward simulation");
 
                 // Bullet readback alone is not enough for the golden-path visual result:
                 // at least one attached bone must also receive the live physics feedback.

@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "kind": "numeric-compare",
+  "backend": "mmd-native",
+  "defaults": {
+    "outDir": "../../../../artifacts/physics-fidelity",
+    "timeoutMs": 60000,
+    "dump": {
+      "bones": true,
+      "morphs": false,
+      "rigidBodies": false
+    },
+    "physics": {
+      "enabled": true,
+      "warmupFrames": 0,
+      "timeStep": 0.016666667,
+      "comparison": "coarse-envelope"
+    },
+    "comparison": {
+      "primary": "trajectory-envelope",
+      "metrics": [
+        "rms-translation",
+        "max-translation",
+        "divergence",
+        "axis-flip"
+      ],
+      "initialMode": "report-only",
+      "notes": "Redistributable physics fidelity testcases using repo-local fixtures."
+    },
+    "samplePolicy": "manifest-frames"
+  },
+  "cases": [
+    {
+      "name": "hair-physics-gravity-drift",
+      "kind": "physics-fidelity",
+      "description": "Gravity-only rest-pose drift. No VMD motion, pure physics response to gravity over 120 frames at 30fps.",
+      "assets": {
+        "model": "Assets/test_hair_physics.pmx",
+        "motion": null,
+        "cameraMotion": null
+      },
+      "oracle": {
+        "path": "Oracle/hair-physics-gravity-drift.jsonl",
+        "format": "jsonl",
+        "source": "MikuMikuDance 9.32 x64",
+        "status": "pending"
+      },
+      "frames": [0, 1, 5, 10, 30, 60, 90, 120],
+      "compare": {
+        "targets": ["bones"],
+        "epsilon": 0.003
+      },
+      "metadata": {
+        "tags": ["pmx", "hair", "gravity", "redistributable"],
+        "notes": "Redistributable repo-local fixture. test_hair_physics.pmx contains hair chain rigid bodies (static + dynamic + dynamicBone) and joints. Rest-pose gravity drift isolates physics solver behavior from animation input.",
+        "focus": {
+          "bones": [
+            "左髪２", "左髪３", "左髪４", "左髪５", "左髪６", "左髪７", "左髪８",
+            "右髪２", "右髪３", "右髪４", "右髪５", "右髪６", "右髪７", "右髪８"
+          ],
+          "rigidBodies": []
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "description": "Redistributable physics fidelity testcases. Models are repo-local fixtures, not licensed assets.",
+    "producer": {
+      "preferredTool": "RuntimeVerification player or EditMode test",
+      "runtime": "MikuMikuDance 9.32 x64 (for golden oracle)",
+      "requiredDump": ["bones"],
+      "status": "schema-pinned"
+    }
+  }
+}

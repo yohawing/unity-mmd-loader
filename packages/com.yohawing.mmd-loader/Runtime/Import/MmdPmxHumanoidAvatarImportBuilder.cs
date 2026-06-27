@@ -63,7 +63,8 @@ namespace Mmd.UnityIntegration
             bool shouldBuildHumanoid,
             string animationTypeLabel,
             System.Collections.Generic.IReadOnlyList<MmdHumanoidBoneMappingOverride>? mappingOverrides = null,
-            MmdModelDefinition? model = null)
+            MmdModelDefinition? model = null,
+            MmdHumanoidRetargetQualitySettings? retargetQualitySettings = null)
         {
             if (!shouldBuildHumanoid)
             {
@@ -89,7 +90,9 @@ namespace Mmd.UnityIntegration
             bool keepProxyRoot = false;
             try
             {
-                MmdHumanoidAvatarBuildResult avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(proxyRig);
+                MmdHumanoidAvatarBuildResult avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(
+                    proxyRig,
+                    retargetQualitySettings);
                 diagnostic = CombineDiagnostics(diagnostic, avatarResult.Diagnostics);
 
                 if (!avatarResult.IsValidHumanAvatar || avatarResult.Avatar == null)
@@ -134,12 +137,13 @@ namespace Mmd.UnityIntegration
             MmdPmxAsset asset,
             MmdHumanoidProxyRigResult proxyRig)
         {
-            if (asset.ImportedRoot == null || proxyRig.ProxyRoot == null || proxyRig.Matches.Count == 0)
+            GameObject? importedRoot = asset.ImportedRoot;
+            if (importedRoot == null || proxyRig.ProxyRoot == null || proxyRig.Matches.Count == 0)
             {
                 return System.Array.Empty<MmdHumanoidRetargetBinding>();
             }
 
-            SkinnedMeshRenderer? smr = asset.ImportedRoot.GetComponentInChildren<SkinnedMeshRenderer>(
+            SkinnedMeshRenderer? smr = importedRoot.GetComponentInChildren<SkinnedMeshRenderer>(
                 includeInactive: true);
             Transform[] nativeBones = smr != null && smr.bones != null
                 ? smr.bones

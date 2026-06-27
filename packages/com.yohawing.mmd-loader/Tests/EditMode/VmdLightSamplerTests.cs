@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using System.Collections.Generic;
 using NUnit.Framework;
@@ -99,9 +101,9 @@ namespace Mmd.Tests
         {
             var keyframes = new List<MmdLightKeyframeDefinition>
             {
-                null,
+                null!,
                 Keyframe(0, new[] { 0.0f, 0.5f, 1.0f }, new[] { -0.5f, -1.0f, 0.5f }),
-                null,
+                null!,
                 Keyframe(10, new[] { 1.0f, 0.0f, 0.5f }, new[] { 0.5f, 0.0f, -0.5f })
             };
 
@@ -118,7 +120,7 @@ namespace Mmd.Tests
                 {
                     frame = 0,
                     color = Array.Empty<float>(),
-                    direction = null
+                    direction = null!
                 }
             };
 

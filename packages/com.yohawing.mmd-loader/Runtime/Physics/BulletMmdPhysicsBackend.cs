@@ -52,6 +52,7 @@ namespace Mmd.Physics
     public sealed class BulletMmdPhysicsBackend : IMmdPhysicsBackend, IDisposable
     {
         public const float FixedTimeStepSeconds = 1.0f / 60.0f;
+        private static float maxSubStepEstimateFixedTimeStepSeconds = FixedTimeStepSeconds;
 
         // Faithful to saba (MMDPhysics m_maxSubStepCount = 10): a hard, small cap on the number of
         // Bullet substeps per Step. When a frame hitch, a Timeline seek, or a backward-scrub world
@@ -474,7 +475,23 @@ namespace Mmd.Physics
                 return 0;
             }
 
-            return Math.Min(MaxSubStepsLimit, Math.Max(1, (int)Math.Ceiling(deltaTime / FixedTimeStepSeconds)));
+            return Math.Min(MaxSubStepsLimit, Math.Max(1, (int)Math.Ceiling(deltaTime / maxSubStepEstimateFixedTimeStepSeconds)));
+        }
+
+        internal static float MaxSubStepEstimateFixedTimeStepSecondsForDiagnostics =>
+            maxSubStepEstimateFixedTimeStepSeconds;
+
+        internal static void SetMaxSubStepEstimateFixedTimeStepSecondsForDiagnostics(float fixedTimeStepSeconds)
+        {
+            maxSubStepEstimateFixedTimeStepSeconds =
+                float.IsFinite(fixedTimeStepSeconds) && fixedTimeStepSeconds > 0.0f
+                    ? fixedTimeStepSeconds
+                    : FixedTimeStepSeconds;
+        }
+
+        internal static void ResetMaxSubStepEstimateFixedTimeStepSecondsForDiagnostics()
+        {
+            maxSubStepEstimateFixedTimeStepSeconds = FixedTimeStepSeconds;
         }
 
         private static void ValidateVector(float[] values, int length, string name)

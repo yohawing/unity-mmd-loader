@@ -1,3 +1,5 @@
+#nullable enable
+
 using NUnit.Framework;
 using UnityEngine;
 using Mmd.Motion;

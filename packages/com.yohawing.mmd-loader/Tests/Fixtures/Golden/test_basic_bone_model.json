@@ -18,7 +18,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 1,
@@ -35,7 +36,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 2,
@@ -52,7 +54,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 3,
@@ -69,7 +72,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 4,
@@ -86,7 +90,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 5,
@@ -103,7 +108,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 6,
@@ -120,7 +126,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 7,
@@ -137,7 +144,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 8,
@@ -154,7 +162,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 9,
@@ -171,7 +180,8 @@
             "appendParentIndex": 7,
             "appendRatio": 1.0,
             "appendRotation": true,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 10,
@@ -188,7 +198,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 11,
@@ -205,7 +216,8 @@
             "appendParentIndex": 7,
             "appendRatio": 1.0,
             "appendRotation": true,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 12,
@@ -222,7 +234,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 13,
@@ -239,7 +252,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 14,
@@ -256,7 +270,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 15,
@@ -273,7 +288,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 16,
@@ -290,7 +306,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 17,
@@ -307,7 +324,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 18,
@@ -324,7 +342,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 19,
@@ -341,7 +360,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 20,
@@ -358,7 +378,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 21,
@@ -375,7 +396,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 22,
@@ -392,7 +414,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 23,
@@ -409,7 +432,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 24,
@@ -426,7 +450,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 25,
@@ -443,7 +468,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 26,
@@ -460,7 +486,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 27,
@@ -477,7 +504,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 28,
@@ -494,7 +522,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 29,
@@ -511,7 +540,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 30,
@@ -528,7 +558,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 31,
@@ -545,7 +576,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 32,
@@ -562,7 +594,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 33,
@@ -579,7 +612,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 34,
@@ -596,7 +630,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 35,
@@ -613,7 +648,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 36,
@@ -630,7 +666,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 37,
@@ -647,7 +684,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 38,
@@ -664,7 +702,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 39,
@@ -681,7 +720,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 40,
@@ -698,7 +738,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 41,
@@ -715,7 +756,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 42,
@@ -732,7 +774,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 43,
@@ -749,7 +792,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 44,
@@ -766,7 +810,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 45,
@@ -783,7 +828,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 46,
@@ -800,7 +846,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 47,
@@ -817,7 +864,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 48,
@@ -834,7 +882,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 49,
@@ -851,7 +900,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 50,
@@ -868,7 +918,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 51,
@@ -885,7 +936,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 52,
@@ -902,7 +954,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 53,
@@ -919,7 +972,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 54,
@@ -936,7 +990,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 55,
@@ -953,7 +1008,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 56,
@@ -970,7 +1026,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 57,
@@ -987,7 +1044,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 58,
@@ -1004,7 +1062,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 59,
@@ -1021,7 +1080,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 60,
@@ -1038,7 +1098,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 61,
@@ -1055,7 +1116,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 62,
@@ -1072,7 +1134,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 63,
@@ -1089,7 +1152,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 64,
@@ -1106,7 +1170,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 65,
@@ -1123,7 +1188,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 66,
@@ -1140,7 +1206,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 67,
@@ -1157,7 +1224,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 68,
@@ -1174,7 +1242,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 69,
@@ -1191,7 +1260,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 70,
@@ -1208,7 +1278,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 71,
@@ -1225,7 +1296,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 72,
@@ -1242,7 +1314,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 73,
@@ -1259,7 +1332,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 74,
@@ -1276,7 +1350,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 75,
@@ -1293,7 +1368,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 76,
@@ -1310,7 +1386,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 77,
@@ -1327,7 +1404,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         },
         {
             "index": 78,
@@ -1344,7 +1422,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         }
     ],
     "morphs": [],

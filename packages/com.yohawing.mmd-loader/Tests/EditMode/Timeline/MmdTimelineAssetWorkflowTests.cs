@@ -52,10 +52,10 @@ namespace Mmd.Tests
                 directorObject = new GameObject("mmd-asset-workflow-timeline-director");
                 PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
                 MmdVmdTimelineTrack track = MmdTimelineAssetWorkflow.CreateVmdTrack(timelineAsset, director, controller!);
-                int gameObjectCountBeforeClip = Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None).Length;
+                int gameObjectCountBeforeClip = Object.FindObjectsByType<GameObject>().Length;
                 TimelineClip clip = MmdTimelineAssetWorkflow.CreateVmdClip(track, vmdAsset, controller!, frameRate: 30.0f);
                 var mmdClip = (MmdVmdTimelineClip)clip.asset;
-                int gameObjectCountAfterClip = Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None).Length;
+                int gameObjectCountAfterClip = Object.FindObjectsByType<GameObject>().Length;
                 Assert.That(controller!.IsConfigured, Is.False);
 
                 director.playableAsset = timelineAsset;
@@ -344,7 +344,7 @@ namespace Mmd.Tests
                 // Motion for clip/eval comes from Timeline clip / MmdVmdTimelineBehaviour.MotionAsset.
                 Assert.That(controller.HasModelSource, Is.True);
                 Assert.That(controller.IsConfigured, Is.False);
-                int gameObjectCountBeforeEvaluation = Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None).Length;
+                int gameObjectCountBeforeEvaluation = Object.FindObjectsByType<GameObject>().Length;
 
                 var behaviour = new MmdVmdTimelineBehaviour
                 {
@@ -359,7 +359,7 @@ namespace Mmd.Tests
                 Assert.That(controller.MotionSourceId, Is.EqualTo(TempVmdPath));
                 Assert.That(controller.CurrentFrame, Is.EqualTo(49));
                 Assert.That(
-                    Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None).Length,
+                    Object.FindObjectsByType<GameObject>().Length,
                     Is.EqualTo(gameObjectCountBeforeEvaluation));
             }
             finally
@@ -380,7 +380,7 @@ namespace Mmd.Tests
             {
                 instance = MmdSceneDragAndDrop.LoadPmxPathForDragAndDrop(pmxPath, Vector3.zero, parent: null);
                 MmdUnityPlaybackController controller = instance.Root.GetComponent<MmdUnityPlaybackController>();
-                int gameObjectCountBeforeEvaluation = Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None).Length;
+                int gameObjectCountBeforeEvaluation = Object.FindObjectsByType<GameObject>().Length;
 
                 var behaviour = new MmdVmdTimelineBehaviour
                 {
@@ -397,7 +397,7 @@ namespace Mmd.Tests
                 Assert.That(controller.MotionSourceId, Is.EqualTo(TempVmdPath));
                 Assert.That(controller.CurrentFrame, Is.EqualTo(49));
                 Assert.That(
-                    Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None).Length,
+                    Object.FindObjectsByType<GameObject>().Length,
                     Is.EqualTo(gameObjectCountBeforeEvaluation));
             }
             finally

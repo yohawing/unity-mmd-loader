@@ -101,6 +101,29 @@ namespace Mmd
             return BuildFrame(model, frame, time, evaluation, includeMaterials: false);
         }
 
+        internal static MmdEvaluatedFrame EvaluateValidatedBeforePhysicsPlaybackFrame(
+            MmdModelDefinition model,
+            MmdMotionDefinition motion,
+            int frame,
+            float time,
+            IMmdPhysicsBackend? physicsBackend = null,
+            IMmdIkSolver? ikSolver = null)
+        {
+            ValidateFrame(frame);
+            ValidateTime(time);
+            physicsBackend ??= new NullMmdPhysicsBackend();
+            physicsBackend.Reset();
+
+            MmdRuntimeFrameEvaluation evaluation = MmdRuntimeFramePipeline.Evaluate(model, motion, frame, physicsBackend, ikSolver);
+            return BuildFrame(
+                model,
+                frame,
+                time,
+                evaluation.IkMotion,
+                evaluation.IkWorldMatrices,
+                includeMaterials: false);
+        }
+
         private static MmdEvaluatedFrame EvaluatePhaseOneFrame(
             MmdModelDefinition model,
             MmdMotionDefinition motion,
@@ -274,13 +297,24 @@ namespace Mmd
             MmdRuntimeFrameEvaluation evaluation,
             bool includeMaterials)
         {
+            return BuildFrame(model, frame, time, evaluation.FinalMotion, evaluation.WorldMatrices, includeMaterials);
+        }
+
+        private static MmdEvaluatedFrame BuildFrame(
+            MmdModelDefinition model,
+            int frame,
+            float time,
+            MmdSampledMotion motion,
+            IReadOnlyDictionary<int, float[]> worldMatrices,
+            bool includeMaterials)
+        {
             var orderedBones = new List<MmdBoneDefinition>(model.bones);
             orderedBones.Sort((left, right) => left.index.CompareTo(right.index));
 
             var bones = new List<MmdEvaluatedBonePose>(orderedBones.Count);
             foreach (MmdBoneDefinition bone in orderedBones)
             {
-                MmdBonePoseSample pose = evaluation.IkMotion.Bones.TryGetValue(bone.name, out MmdBonePoseSample sample)
+                MmdBonePoseSample pose = motion.Bones.TryGetValue(bone.name, out MmdBonePoseSample sample)
                     ? sample
                     : MmdBonePoseSample.Identity;
                 bones.Add(new MmdEvaluatedBonePose
@@ -290,11 +324,11 @@ namespace Mmd
                     localPosition = pose.Translation,
                     localRotation = pose.Rotation,
                     localScale = new[] { 1.0f, 1.0f, 1.0f },
-                    worldMatrix = evaluation.WorldMatrices[bone.index]
+                    worldMatrix = worldMatrices[bone.index]
                 });
             }
 
-            var orderedMorphs = new List<KeyValuePair<string, float>>(evaluation.IkMotion.Morphs);
+            var orderedMorphs = new List<KeyValuePair<string, float>>(motion.Morphs);
             orderedMorphs.Sort((left, right) => StringComparer.Ordinal.Compare(left.Key, right.Key));
 
             var morphs = new List<MmdEvaluatedMorphWeight>(orderedMorphs.Count);

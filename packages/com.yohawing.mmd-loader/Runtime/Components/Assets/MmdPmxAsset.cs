@@ -55,9 +55,15 @@ namespace Mmd
             int jointCount,
             Vector3 boundsMin,
             Vector3 boundsMax,
-            MmdPmxMaterialSummary[]? materialSummaries = null)
+            MmdPmxMaterialSummary[]? materialSummaries = null,
+            string? modelEnglishName = null,
+            string? modelComment = null,
+            string? modelEnglishComment = null)
         {
             ModelName = modelName ?? string.Empty;
+            ModelEnglishName = modelEnglishName ?? string.Empty;
+            ModelComment = modelComment ?? string.Empty;
+            ModelEnglishComment = modelEnglishComment ?? string.Empty;
             VertexCount = Math.Max(vertexCount, 0);
             IndexCount = Math.Max(indexCount, 0);
             BoneCount = Math.Max(boneCount, 0);
@@ -83,6 +89,12 @@ namespace Mmd
         }
 
         public string ModelName { get; }
+
+        public string ModelEnglishName { get; }
+
+        public string ModelComment { get; }
+
+        public string ModelEnglishComment { get; }
 
         public int VertexCount { get; }
 
@@ -179,7 +191,10 @@ namespace Mmd
                 model.physics?.joints?.Count ?? 0,
                 bounds.min,
                 bounds.max,
-                BuildMaterialSummaries(model));
+                BuildMaterialSummaries(model),
+                model.englishName,
+                model.comment,
+                model.englishComment);
         }
 
         private static MmdPmxMaterialSummary[] BuildMaterialSummaries(MmdModelDefinition model)
@@ -275,6 +290,9 @@ namespace Mmd
             MmdHumanoidBoneMappingDiagnosticSummary.Empty;
         [SerializeField] private MmdPmxImportSummaryStatus importSummaryStatus = MmdPmxImportSummaryStatus.NotParsed;
         [SerializeField] private string modelName = string.Empty;
+        [SerializeField] private string modelEnglishName = string.Empty;
+        [SerializeField] private string modelComment = string.Empty;
+        [SerializeField] private string modelEnglishComment = string.Empty;
         [SerializeField] private int vertexCount;
         [SerializeField] private int indexCount;
         [SerializeField] private int boneCount;
@@ -283,6 +301,9 @@ namespace Mmd
         [SerializeField] private int diffuseTextureReferenceCount;
         [SerializeField] private int sphereTextureReferenceCount;
         [SerializeField] private int toonTextureReferenceCount;
+        [SerializeField] private int resolvedProjectTextureReferenceCount;
+        [SerializeField] private int missingProjectTextureReferenceCount;
+        [SerializeField] private string missingProjectTextureReferenceSample = string.Empty;
         [SerializeField] private int transparentMaterialCount;
         [SerializeField] private int edgeMaterialCount;
         [SerializeField] private int ikCount;
@@ -292,10 +313,10 @@ namespace Mmd
         [SerializeField] private Vector3 boundsMax;
         [SerializeField] private Vector3 boundsSize;
         [SerializeField] private MmdPmxMaterialSummary[] materialSummaries = Array.Empty<MmdPmxMaterialSummary>();
-        [SerializeField] private Mesh importedMesh;
+        [SerializeField] private Mesh? importedMesh;
         [SerializeField] private Material[] importedMaterials = Array.Empty<Material>();
         [SerializeField] private Material[] materialRemaps = Array.Empty<Material>();
-        [SerializeField] private GameObject importedRoot;
+        [SerializeField] private GameObject? importedRoot;
         [SerializeField] private MmdImportReadiness hierarchyReadiness = MmdImportReadiness.NotEvaluated;
         [SerializeField] private MmdImportReadiness rendererReadiness = MmdImportReadiness.NotEvaluated;
         [SerializeField] private MmdImportReadiness boneBindingReadiness = MmdImportReadiness.NotEvaluated;
@@ -332,6 +353,12 @@ namespace Mmd
 
         public string ModelName => modelName;
 
+        public string ModelEnglishName => modelEnglishName;
+
+        public string ModelComment => modelComment;
+
+        public string ModelEnglishComment => modelEnglishComment;
+
         public int VertexCount => vertexCount;
 
         public int IndexCount => indexCount;
@@ -347,6 +374,12 @@ namespace Mmd
         public int SphereTextureReferenceCount => sphereTextureReferenceCount;
 
         public int ToonTextureReferenceCount => toonTextureReferenceCount;
+
+        public int ResolvedProjectTextureReferenceCount => resolvedProjectTextureReferenceCount;
+
+        public int MissingProjectTextureReferenceCount => missingProjectTextureReferenceCount;
+
+        public string MissingProjectTextureReferenceSample => missingProjectTextureReferenceSample;
 
         public int TransparentMaterialCount => transparentMaterialCount;
 
@@ -368,7 +401,7 @@ namespace Mmd
 
         public int ByteLength => data.Length;
 
-        public Mesh ImportedMesh => importedMesh;
+        public Mesh? ImportedMesh => importedMesh;
 
         public Material[] ImportedMaterials => importedMaterials;
 
@@ -381,7 +414,7 @@ namespace Mmd
         public string RendererReadinessDiagnostic => rendererReadinessDiagnostic;
         public string BoneBindingReadinessDiagnostic => boneBindingReadinessDiagnostic;
 
-        public GameObject ImportedRoot => importedRoot;
+        public GameObject? ImportedRoot => importedRoot;
 
         public void Initialize(
             byte[] bytes,
@@ -393,10 +426,10 @@ namespace Mmd
             string assetMaterialTexturePolicy = "ResolveReferencesOnly",
             string assetShaderPreset = "MmdBasicUrpToon",
             MmdPmxParseSummary? parseSummary = null,
-            Mesh importedMeshAsset = null,
+            Mesh? importedMeshAsset = null,
             Material[]? importedMaterialAssets = null,
             Material[]? materialRemapAssets = null,
-            GameObject importedRootAsset = null,
+            GameObject? importedRootAsset = null,
             MmdImportReadiness hierarchyReadinessValue = MmdImportReadiness.NotEvaluated,
             MmdImportReadiness rendererReadinessValue = MmdImportReadiness.NotEvaluated,
             MmdImportReadiness boneBindingReadinessValue = MmdImportReadiness.NotEvaluated,
@@ -441,6 +474,7 @@ namespace Mmd
             hierarchyReadinessDiagnostic = hierarchyReadinessDiagnosticValue ?? string.Empty;
             rendererReadinessDiagnostic = rendererReadinessDiagnosticValue ?? string.Empty;
             boneBindingReadinessDiagnostic = boneBindingReadinessDiagnosticValue ?? string.Empty;
+            ApplyProjectTextureBindingSummary(0, 0, string.Empty);
             ApplyParseSummary(parseSummary);
         }
 
@@ -456,6 +490,16 @@ namespace Mmd
             humanoidAvatarReadiness = NormalizeSummaryValue(readiness, MmdHumanoidSetupAsset.NotEvaluatedReadiness);
             humanoidAvatarDiagnostic = diagnostic ?? string.Empty;
             humanoidBoneMappingDiagnostics = mappingDiagnostics ?? MmdHumanoidBoneMappingDiagnosticSummary.Empty;
+        }
+
+        public void ApplyProjectTextureBindingSummary(
+            int resolvedReferenceCount,
+            int missingReferenceCount,
+            string? missingReferenceSample)
+        {
+            resolvedProjectTextureReferenceCount = Math.Max(0, resolvedReferenceCount);
+            missingProjectTextureReferenceCount = Math.Max(0, missingReferenceCount);
+            missingProjectTextureReferenceSample = missingReferenceSample ?? string.Empty;
         }
 
         public byte[] GetBytesCopy()
@@ -490,6 +534,9 @@ namespace Mmd
             {
                 importSummaryStatus = MmdPmxImportSummaryStatus.NotParsed;
                 modelName = string.Empty;
+                modelEnglishName = string.Empty;
+                modelComment = string.Empty;
+                modelEnglishComment = string.Empty;
                 vertexCount = 0;
                 indexCount = 0;
                 boneCount = 0;
@@ -513,6 +560,9 @@ namespace Mmd
             MmdPmxParseSummary summary = parseSummary.Value;
             importSummaryStatus = MmdPmxImportSummaryStatus.Passed;
             modelName = summary.ModelName;
+            modelEnglishName = summary.ModelEnglishName;
+            modelComment = summary.ModelComment;
+            modelEnglishComment = summary.ModelEnglishComment;
             vertexCount = summary.VertexCount;
             indexCount = summary.IndexCount;
             boneCount = summary.BoneCount;

@@ -52,6 +52,14 @@ namespace Mmd.Editor
         [SerializeField] private Material[] materialRemaps = System.Array.Empty<Material>();
         [SerializeField] private MmdHumanoidBoneMappingOverride[] humanoidBoneMappingOverrides =
             System.Array.Empty<MmdHumanoidBoneMappingOverride>();
+        [SerializeField] private float upperArmTwist = MmdHumanoidRetargetQualitySettings.DefaultUpperArmTwist;
+        [SerializeField] private float lowerArmTwist = MmdHumanoidRetargetQualitySettings.DefaultLowerArmTwist;
+        [SerializeField] private float upperLegTwist = MmdHumanoidRetargetQualitySettings.DefaultUpperLegTwist;
+        [SerializeField] private float lowerLegTwist = MmdHumanoidRetargetQualitySettings.DefaultLowerLegTwist;
+        [SerializeField] private float armStretch = MmdHumanoidRetargetQualitySettings.DefaultArmStretch;
+        [SerializeField] private float legStretch = MmdHumanoidRetargetQualitySettings.DefaultLegStretch;
+        [SerializeField] private float feetSpacing = MmdHumanoidRetargetQualitySettings.DefaultFeetSpacing;
+        [SerializeField] private bool hasTranslationDoF = MmdHumanoidRetargetQualitySettings.DefaultHasTranslationDoF;
 
         public float ImportScale => NormalizeImportScale(importScale);
 
@@ -69,6 +77,17 @@ namespace Mmd.Editor
 
         public MmdHumanoidBoneMappingOverride[] HumanoidBoneMappingOverrides => humanoidBoneMappingOverrides;
 
+        public MmdHumanoidRetargetQualitySettings HumanoidRetargetQualitySettings =>
+            new MmdHumanoidRetargetQualitySettings(
+                upperArmTwist,
+                lowerArmTwist,
+                upperLegTwist,
+                lowerLegTwist,
+                armStretch,
+                legStretch,
+                feetSpacing,
+                hasTranslationDoF);
+
         public override void OnImportAsset(AssetImportContext ctx)
         {
             byte[] bytes = File.ReadAllBytes(ctx.assetPath);
@@ -85,7 +104,13 @@ namespace Mmd.Editor
                 Mesh importedMesh = generatedAssets.Mesh;
                 Material[] importedMaterials = generatedAssets.Materials;
 
-                MmdPmxProjectTextureBinder.BindProjectTextureAssetsToMaterials(model, ctx.assetPath, importedMaterials, generatedAssets.RenderingDescriptor, ctx);
+                MmdPmxProjectTextureBindingSummary textureBindingSummary =
+                    MmdPmxProjectTextureBinder.BindProjectTextureAssetsToMaterials(
+                        model,
+                        ctx.assetPath,
+                        importedMaterials,
+                        generatedAssets.RenderingDescriptor,
+                        ctx);
 
                 MmdPmxAsset asset = MmdPmxImportedAssetBuilder.CreateAndInitializeImportedAsset(
                     bytes,
@@ -100,6 +125,10 @@ namespace Mmd.Editor
                     generatedAssets,
                     materialRemaps,
                     animationType.ToString());
+                asset.ApplyProjectTextureBindingSummary(
+                    textureBindingSummary.ResolvedReferenceCount,
+                    textureBindingSummary.MissingReferenceCount,
+                    textureBindingSummary.MissingReferenceSample);
 
                 MmdPmxHumanoidAvatarImportBuilder.MmdPmxHumanoidAvatarImportResult avatarImport =
                     MmdPmxHumanoidAvatarImportBuilder.TryBuildHumanoidAvatar(
@@ -108,7 +137,8 @@ namespace Mmd.Editor
                         shouldBuildHumanoid: animationType == MmdPmxAnimationType.Humanoid,
                         animationTypeLabel: animationType.ToString(),
                         mappingOverrides: humanoidBoneMappingOverrides,
-                        model: model);
+                        model: model,
+                        retargetQualitySettings: HumanoidRetargetQualitySettings);
                 Avatar? importedAvatar = avatarImport.Avatar;
                 GameObject? importedHumanoidProxyRoot = avatarImport.ProxyRoot;
                 string avatarReadiness = avatarImport.Readiness;
@@ -156,6 +186,12 @@ namespace Mmd.Editor
                 if (animationType == MmdPmxAnimationType.Generic && genericAvatar == null)
                 {
                     ctx.LogImportWarning(genericAvatarImport.Diagnostic);
+                }
+
+                if (textureBindingSummary.MissingReferenceCount > 0)
+                {
+                    ctx.LogImportWarning(
+                        $"PMX import has {textureBindingSummary.MissingReferenceCount} unresolved texture reference(s). See the PMX asset Material Reference Summary for the first sample.");
                 }
 
                 ctx.AddObjectToAsset("PMX", asset);

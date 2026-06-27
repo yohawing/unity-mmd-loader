@@ -1,3 +1,5 @@
+#nullable enable
+
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
@@ -31,7 +33,7 @@ namespace Mmd.Tests
         [TestCaseSource(nameof(RenderablePackageModelFixtures))]
         public void RenderablePmxFixtureInstantiatesStaticUnityModel(ModelFixtureEntry fixture)
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = MmdTestFixtures.ParseModel(fixture);
@@ -59,7 +61,7 @@ namespace Mmd.Tests
         [TestCaseSource(nameof(RenderablePackageModelFixtures))]
         public void RenderablePmxFixtureInstantiatesSkinnedUnityModel(ModelFixtureEntry fixture)
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 MmdModelDefinition model = MmdTestFixtures.ParseModel(fixture);
@@ -67,10 +69,11 @@ namespace Mmd.Tests
                 instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
                 Assert.That(instance.SkinnedMeshRenderer, Is.Not.Null, fixture.Context("SkinnedMeshRenderer"));
+                SkinnedMeshRenderer renderer = instance.SkinnedMeshRenderer!;
                 Assert.That(instance.Mesh.bindposes, Has.Length.GreaterThanOrEqualTo(fixture.expected.minBones), fixture.Context("bindposes"));
                 Assert.That(instance.Mesh.boneWeights, Has.Length.EqualTo(instance.VertexCount), fixture.Context("boneWeights"));
                 Assert.That(instance.BoneTransforms, Has.Length.GreaterThanOrEqualTo(fixture.expected.minBones), fixture.Context("BoneTransforms"));
-                Assert.That(instance.SkinnedMeshRenderer.bones, Has.Length.EqualTo(instance.BoneTransforms.Length), fixture.Context("renderer.bones"));
+                Assert.That(renderer.bones, Has.Length.EqualTo(instance.BoneTransforms.Length), fixture.Context("renderer.bones"));
             }
             finally
             {
@@ -78,7 +81,7 @@ namespace Mmd.Tests
             }
         }
 
-        private static void DestroyUnityModelInstance(MmdUnityModelInstance instance)
+        private static void DestroyUnityModelInstance(MmdUnityModelInstance? instance)
         {
             if (instance == null)
             {

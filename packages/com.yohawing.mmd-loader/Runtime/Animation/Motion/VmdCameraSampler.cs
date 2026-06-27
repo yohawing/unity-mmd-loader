@@ -42,16 +42,23 @@ namespace Mmd.Motion
     /// <summary>
     /// Samples a VMD camera track (<see cref="MmdCameraKeyframeDefinition"/>) at an arbitrary frame.
     ///
-    /// Interpolation is LINEAR between the surrounding keyframes (and exact at keyframes). MMD's
-    /// per-channel bezier easing for the camera interpolation block is NOT applied yet: the 24-byte
-    /// camera interpolation layout differs from the bone layout, and applying it without a golden
-    /// camera fixture to verify the channel byte order risks a silently-wrong curve. Bezier easing
-    /// is a dedicated follow-up slice (verified against a real camera VMD). <see cref="MmdCameraState.Perspective"/>
+    /// Interpolation uses the next keyframe's 24-byte VMD camera block as six per-channel bezier
+    /// curves: position X/Y/Z, rotation, distance, and view angle. <see cref="MmdCameraState.Perspective"/>
     /// is a step value taken from the previous keyframe (it is a flag, not interpolated).
     /// </summary>
     public static class VmdCameraSampler
     {
-        public static MmdCameraState Sample(IReadOnlyList<MmdCameraKeyframeDefinition> keyframes, float frame)
+        private const int CameraInterpolationLength = 24;
+        private const int PositionXChannel = 0;
+        private const int PositionYChannel = 1;
+        private const int PositionZChannel = 2;
+        private const int RotationChannel = 3;
+        private const int DistanceChannel = 4;
+        private const int ViewAngleChannel = 5;
+
+        private static readonly byte[] LinearInterpolation = { 20, 20, 107, 107 };
+
+        public static MmdCameraState Sample(IReadOnlyList<MmdCameraKeyframeDefinition>? keyframes, float frame)
         {
             if (keyframes == null)
             {
@@ -102,22 +109,28 @@ namespace Mmd.Motion
 
             float span = next.frame - previous.frame;
             float t = (frame - previous.frame) / span;
+            float distanceT = Interpolate(next.interpolation, DistanceChannel, t);
+            float positionXT = Interpolate(next.interpolation, PositionXChannel, t);
+            float positionYT = Interpolate(next.interpolation, PositionYChannel, t);
+            float positionZT = Interpolate(next.interpolation, PositionZChannel, t);
+            float rotationT = Interpolate(next.interpolation, RotationChannel, t);
+            float viewAngleT = Interpolate(next.interpolation, ViewAngleChannel, t);
 
             return new MmdCameraState(
-                Lerp(previous.distance, next.distance, t),
+                Lerp(previous.distance, next.distance, distanceT),
                 new[]
                 {
-                    Lerp(Component(previous.position, 0), Component(next.position, 0), t),
-                    Lerp(Component(previous.position, 1), Component(next.position, 1), t),
-                    Lerp(Component(previous.position, 2), Component(next.position, 2), t)
+                    Lerp(Component(previous.position, 0), Component(next.position, 0), positionXT),
+                    Lerp(Component(previous.position, 1), Component(next.position, 1), positionYT),
+                    Lerp(Component(previous.position, 2), Component(next.position, 2), positionZT)
                 },
                 new[]
                 {
-                    Lerp(Component(previous.rotation, 0), Component(next.rotation, 0), t),
-                    Lerp(Component(previous.rotation, 1), Component(next.rotation, 1), t),
-                    Lerp(Component(previous.rotation, 2), Component(next.rotation, 2), t)
+                    Lerp(Component(previous.rotation, 0), Component(next.rotation, 0), rotationT),
+                    Lerp(Component(previous.rotation, 1), Component(next.rotation, 1), rotationT),
+                    Lerp(Component(previous.rotation, 2), Component(next.rotation, 2), rotationT)
                 },
-                Lerp(previous.viewAngle, next.viewAngle, t),
+                Lerp(previous.viewAngle, next.viewAngle, viewAngleT),
                 previous.perspective);
         }
 
@@ -141,7 +154,22 @@ namespace Mmd.Motion
                 keyframe.perspective);
         }
 
-        private static float Component(float[] values, int index)
+        private static float Interpolate(byte[]? interpolation, int channel, float progress)
+        {
+            if (interpolation is not { Length: >= CameraInterpolationLength })
+            {
+                return VmdBezier.Evaluate(LinearInterpolation, progress);
+            }
+
+            return VmdBezier.Evaluate(
+                interpolation[channel],
+                interpolation[channel + 6],
+                interpolation[channel + 12],
+                interpolation[channel + 18],
+                progress);
+        }
+
+        private static float Component(float[]? values, int index)
         {
             return values != null && values.Length > index ? values[index] : 0.0f;
         }

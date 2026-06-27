@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using NUnit.Framework;
 using Mmd.Parser;
@@ -12,7 +14,13 @@ namespace Mmd.Tests
         {
             var snapshot = new NativeMmdParser.PmxModelSourceSnapshot
             {
-                metadata = new NativeMmdParser.PmxModelSourceMetadata { name = "pmx-source" },
+                metadata = new NativeMmdParser.PmxModelSourceMetadata
+                {
+                    name = "pmx-source",
+                    englishName = "pmx-source-en",
+                    comment = "日本語コメント",
+                    englishComment = "English comment"
+                },
                 geometry = new NativeMmdParser.PmxModelSourceGeometry
                 {
                     positions = new[] { 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f },
@@ -53,7 +61,8 @@ namespace Mmd.Tests
                             {
                                 appendRotate = true,
                                 appendLocal = true,
-                                externalParentTransform = true
+                                externalParentTransform = true,
+                                transformAfterPhysics = true
                             },
                             appendTransform = new NativeMmdParser.PmxModelSourceAppendTransform
                             {
@@ -228,6 +237,9 @@ namespace Mmd.Tests
             MmdModelDefinition model = NativeMmdParser.BuildModelDefinition(snapshot);
 
             Assert.That(model.name, Is.EqualTo("pmx-source"));
+            Assert.That(model.englishName, Is.EqualTo("pmx-source-en"));
+            Assert.That(model.comment, Is.EqualTo("日本語コメント"));
+            Assert.That(model.englishComment, Is.EqualTo("English comment"));
             Assert.That(model.vertices, Has.Count.EqualTo(2));
             CollectionAssert.AreEqual(new[] { 1.0f, 2.0f, 3.0f }, model.vertices[0].position);
             CollectionAssert.AreEqual(new[] { 0.0f, 1.0f, 0.0f }, model.vertices[1].normal);
@@ -247,6 +259,8 @@ namespace Mmd.Tests
             Assert.That(model.bones[1].fixedAxis, Is.True);
             Assert.That(model.bones[1].localAxes, Is.True);
             Assert.That(model.bones[1].externalParentTransform, Is.True);
+            Assert.That(model.bones[1].deformAfterPhysics, Is.True);
+            Assert.That(model.HasDeformAfterPhysicsBones, Is.True);
             Assert.That(model.ik, Has.Count.EqualTo(1));
             Assert.That(model.ik[0].boneIndex, Is.EqualTo(2));
             Assert.That(model.ik[0].targetBoneIndex, Is.EqualTo(1));
@@ -294,8 +308,8 @@ namespace Mmd.Tests
         public void LoadModelUsesJsonAndGeometryDelegatesWithoutPmxSummaryAccessor()
         {
             byte[] expectedBytes = { 9, 8, 7 };
-            byte[] observedJsonBytes = null;
-            byte[] observedGeometryBytes = null;
+            byte[]? observedJsonBytes = null;
+            byte[]? observedGeometryBytes = null;
 
             var parser = new NativeMmdParser(
                 _ => throw new AssertionException("VMD JSON parser must not be used when loading PMX."),

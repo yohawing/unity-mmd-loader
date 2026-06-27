@@ -1,3 +1,5 @@
+#nullable enable
+
 using System.IO;
 using NUnit.Framework;
 using UnityEditor;
@@ -63,7 +65,7 @@ namespace Mmd.Tests
         [Test]
         public void LoadPmxIntoSceneCreatesSkinnedSceneObjectFromFixture()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
@@ -71,16 +73,19 @@ namespace Mmd.Tests
                 instance = MmdEditorPmxLoader.LoadPmxIntoScene(pmxPath);
 
                 Assert.That(instance.Root, Is.Not.Null);
-                Assert.That(instance.Root.scene.IsValid(), Is.True);
+                GameObject root = instance.Root!;
+                Assert.That(root.scene.IsValid(), Is.True);
                 Assert.That(instance.SkinnedMeshRenderer, Is.Not.Null);
-                Assert.That(instance.SkinnedMeshRenderer.sharedMesh, Is.EqualTo(instance.Mesh));
+                SkinnedMeshRenderer renderer = instance.SkinnedMeshRenderer!;
+                Assert.That(renderer.sharedMesh, Is.EqualTo(instance.Mesh));
                 Assert.That(instance.VertexCount, Is.GreaterThan(0));
                 Assert.That(instance.IndexCount, Is.GreaterThanOrEqualTo(3));
                 Assert.That(instance.BoneTransforms, Has.Length.GreaterThan(0));
                 Assert.That(instance.SourceContext, Is.Not.Null);
-                Assert.That(instance.SourceContext.SourcePath, Is.EqualTo(Path.GetFullPath(pmxPath)));
+                MmdUnityModelSourceContext sourceContext = instance.SourceContext!;
+                Assert.That(sourceContext.SourcePath, Is.EqualTo(Path.GetFullPath(pmxPath)));
 
-                MmdUnityPlaybackController controller = instance.Root.GetComponent<MmdUnityPlaybackController>();
+                MmdUnityPlaybackController controller = root.GetComponent<MmdUnityPlaybackController>();
                 Assert.That(controller, Is.Not.Null);
                 Assert.That(controller.IsConfigured, Is.False);
                 Assert.That(controller.HasModelSource, Is.True);
@@ -115,7 +120,7 @@ namespace Mmd.Tests
                 Path.GetTempPath(),
                 "yohawing-mmd-unity-tests",
                 Path.GetRandomFileName());
-            MmdRuntimeTextureResolution resolution = null;
+            MmdRuntimeTextureResolution? resolution = null;
             try
             {
                 Directory.CreateDirectory(directory);
@@ -186,7 +191,7 @@ namespace Mmd.Tests
             };
         }
 
-        private static void DestroyInstance(MmdUnityModelInstance instance)
+        private static void DestroyInstance(MmdUnityModelInstance? instance)
         {
             if (instance == null)
             {

@@ -139,6 +139,87 @@ namespace Mmd.Tests
             }
         }
 
+        [Test]
+        public void HumanoidAnimationClipDisablesRootMotionDuringEditModeTimelineEvaluation()
+        {
+            GameObject? root = null;
+            GameObject? directorObject = null;
+            TimelineAsset? timeline = null;
+            AnimationClip? muscleClip = null;
+            try
+            {
+                root = new GameObject("workflow-edit-rootmotion-root");
+                Animator animator = root.AddComponent<Animator>();
+                animator.applyRootMotion = true;
+                MmdUnityPlaybackController controller = root.AddComponent<MmdUnityPlaybackController>();
+
+                muscleClip = new AnimationClip { frameRate = 30.0f };
+                muscleClip.SetCurve(
+                    string.Empty,
+                    typeof(Animator),
+                    ResolveSpineMuscleName(),
+                    AnimationCurve.Linear(0.0f, 0.0f, 1.0f, 0.5f));
+                Assert.That(muscleClip.humanMotion, Is.True, "muscle-curve clip should be recognized as Humanoid motion");
+
+                timeline = ScriptableObject.CreateInstance<TimelineAsset>();
+                MmdHumanoidAnimationTrack track =
+                    timeline.CreateTrack<MmdHumanoidAnimationTrack>(null, "MMD Humanoid");
+                TimelineClip clip = track.CreateClip<MmdHumanoidAnimationClip>();
+                var clipAsset = (MmdHumanoidAnimationClip)clip.asset;
+                clipAsset.clip = muscleClip;
+                clipAsset.proxyAnimator.exposedName =
+                    "editModeRootMotionAnimator_" + Guid.NewGuid().ToString("N");
+                TimelineClip secondClip = track.CreateClip<MmdHumanoidAnimationClip>();
+                secondClip.start = 1.0;
+                var secondClipAsset = (MmdHumanoidAnimationClip)secondClip.asset;
+                secondClipAsset.clip = muscleClip;
+                secondClipAsset.proxyAnimator.exposedName =
+                    "editModeRootMotionAnimator_" + Guid.NewGuid().ToString("N");
+
+                directorObject = new GameObject("workflow-edit-rootmotion-director");
+                PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
+                director.playOnAwake = false;
+                director.playableAsset = timeline;
+                director.SetGenericBinding(track, controller);
+                director.SetReferenceValue(clipAsset.proxyAnimator.exposedName, animator);
+                director.SetReferenceValue(secondClipAsset.proxyAnimator.exposedName, animator);
+
+                director.time = 0.0;
+                director.Evaluate();
+
+                Assert.That(animator.applyRootMotion, Is.False,
+                    "Edit Mode Timeline evaluation must not auto-enable applyRootMotion; " +
+                    "root motion deltas would accumulate across same-time scrub/click evaluation.");
+
+                director.Stop();
+
+                Assert.That(animator.applyRootMotion, Is.True,
+                    "Edit Mode Timeline evaluation should restore the user's serialized applyRootMotion setting after the graph stops.");
+            }
+            finally
+            {
+                if (directorObject != null)
+                {
+                    Object.DestroyImmediate(directorObject);
+                }
+
+                if (timeline != null)
+                {
+                    Object.DestroyImmediate(timeline);
+                }
+
+                if (muscleClip != null)
+                {
+                    Object.DestroyImmediate(muscleClip);
+                }
+
+                if (root != null)
+                {
+                    Object.DestroyImmediate(root);
+                }
+            }
+        }
+
         private static string ResolveSpineMuscleName()
         {
             for (int dof = 0; dof < 3; dof++)

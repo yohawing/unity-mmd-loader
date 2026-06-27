@@ -16,7 +16,7 @@ namespace Mmd.Tests
         [Test]
         public void RelativeDiffuseTextureLoadsFromPmxSourceDirectoryAndBindsMaterialSlots()
         {
-            MmdUnityModelInstance instance = null;
+            MmdUnityModelInstance? instance = null;
             string tempRoot = CreateTempDirectory();
             try
             {
@@ -32,7 +32,8 @@ namespace Mmd.Tests
                 instance = MmdUnityModelFactory.CreateStaticModel(model, pmxPath);
 
                 Assert.That(instance.SourceContext, Is.Not.Null);
-                Assert.That(instance.SourceContext.SourcePath, Is.EqualTo(Path.GetFullPath(pmxPath)));
+                MmdUnityModelSourceContext sourceContext = instance.SourceContext!;
+                Assert.That(sourceContext.SourcePath, Is.EqualTo(Path.GetFullPath(pmxPath)));
                 Assert.That(instance.LoadedDiffuseTextureCount, Is.EqualTo(1));
                 Assert.That(instance.OwnedTextures, Has.Length.EqualTo(1));
                 Assert.That(instance.MissingTextureReferenceCount, Is.EqualTo(0));
@@ -156,7 +157,7 @@ namespace Mmd.Tests
             }
         }
 
-        private static Texture ReadBoundDiffuseTexture(Material material)
+        private static Texture? ReadBoundDiffuseTexture(Material material)
         {
             if (material.HasProperty("_BaseMap"))
             {
@@ -170,7 +171,7 @@ namespace Mmd.Tests
             return material.HasProperty("_MainTex") ? material.GetTexture("_MainTex") : null;
         }
 
-        private static void DestroyInstance(MmdUnityModelInstance instance)
+        private static void DestroyInstance(MmdUnityModelInstance? instance)
         {
             if (instance == null)
             {

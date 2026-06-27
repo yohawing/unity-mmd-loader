@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using System.Collections.Generic;
 using NUnit.Framework;
@@ -87,6 +89,53 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void CameraInterpolationUsesNextKeyframePerChannelBezierBlock()
+        {
+            byte[] interpolation =
+            {
+                // VMD camera layout stores six channel X1 values, then six Y1 values, X2, Y2.
+                0, 127, 20, 0, 64, 0,
+                127, 0, 20, 0, 127, 64,
+                127, 127, 107, 127, 127, 64,
+                127, 0, 107, 64, 0, 127
+            };
+            var keyframes = new List<MmdCameraKeyframeDefinition>
+            {
+                Keyframe(0, 0.0f, new[] { 0.0f, 0.0f, 0.0f }, new[] { 0.0f, 0.0f, 0.0f }, 20, true),
+                Keyframe(10, 100.0f, new[] { 10.0f, 20.0f, 30.0f }, new[] { 1.0f, 2.0f, 3.0f }, 60, true, interpolation)
+            };
+
+            MmdCameraState mid = VmdCameraSampler.Sample(keyframes, 5.0f);
+
+            Assert.That(mid.Position[0], Is.EqualTo(10.0f * VmdBezier.Evaluate(0, 127, 127, 127, 0.5f)).Within(0.0001f));
+            Assert.That(mid.Position[1], Is.EqualTo(20.0f * VmdBezier.Evaluate(127, 0, 127, 0, 0.5f)).Within(0.0001f));
+            Assert.That(mid.Position[2], Is.EqualTo(15.0f).Within(0.0001f));
+            Assert.That(mid.Rotation[0], Is.EqualTo(1.0f * VmdBezier.Evaluate(0, 0, 127, 64, 0.5f)).Within(0.0001f));
+            Assert.That(mid.Rotation[1], Is.EqualTo(2.0f * VmdBezier.Evaluate(0, 0, 127, 64, 0.5f)).Within(0.0001f));
+            Assert.That(mid.Distance, Is.EqualTo(100.0f * VmdBezier.Evaluate(64, 127, 127, 0, 0.5f)).Within(0.0001f));
+            Assert.That(mid.ViewAngle, Is.EqualTo(20.0f + (40.0f * VmdBezier.Evaluate(0, 64, 64, 127, 0.5f))).Within(0.0001f));
+            Assert.That(mid.Position[0], Is.Not.EqualTo(5.0f).Within(0.0001f));
+            Assert.That(mid.Distance, Is.Not.EqualTo(50.0f).Within(0.0001f));
+        }
+
+        [Test]
+        public void ShortCameraInterpolationFallsBackToLinear()
+        {
+            var keyframes = new List<MmdCameraKeyframeDefinition>
+            {
+                Keyframe(0, -40.0f, new[] { 0.0f, 10.0f, 0.0f }, new[] { 0.0f, 0.0f, 0.0f }, 20, true),
+                Keyframe(10, -20.0f, new[] { 2.0f, 20.0f, -4.0f }, new[] { 0.1f, 0.1f, 0.1f }, 40, true, new byte[] { 127, 0, 127 })
+            };
+
+            MmdCameraState mid = VmdCameraSampler.Sample(keyframes, 5.0f);
+
+            Assert.That(mid.Distance, Is.EqualTo(-30.0f).Within(0.0001f));
+            Assert.That(mid.ViewAngle, Is.EqualTo(30.0f).Within(0.0001f));
+            Assert.That(mid.Position[0], Is.EqualTo(1.0f).Within(0.0001f));
+            Assert.That(mid.Rotation[0], Is.EqualTo(0.05f).Within(0.0001f));
+        }
+
+        [Test]
         public void PerspectiveIsSteppedFromPreviousKeyframe()
         {
             var keyframes = new List<MmdCameraKeyframeDefinition>
@@ -142,9 +191,9 @@ namespace Mmd.Tests
         {
             var keyframes = new List<MmdCameraKeyframeDefinition>
             {
-                null,
+                null!,
                 Keyframe(0, -40.0f, new[] { 0.0f, 10.0f, 0.0f }, new[] { 0.0f, 0.0f, 0.0f }, 20, true),
-                null,
+                null!,
                 Keyframe(10, -20.0f, new[] { 2.0f, 20.0f, -4.0f }, new[] { 0.1f, 0.1f, 0.1f }, 40, true)
             };
 
@@ -162,7 +211,7 @@ namespace Mmd.Tests
                     frame = 0,
                     distance = -40.0f,
                     position = Array.Empty<float>(),
-                    rotation = null,
+                    rotation = null!,
                     viewAngle = 30,
                     perspective = true,
                     interpolation = Array.Empty<byte>()
@@ -199,6 +248,20 @@ namespace Mmd.Tests
                 Keyframe(0, -40.0f, new[] { 0.0f, 10.0f, 0.0f }, new[] { 0.0f, 0.0f, 0.0f }, 20, true),
                 Keyframe(10, -20.0f, new[] { 2.0f, 20.0f, -4.0f }, new[] { 0.1f, 0.1f, 0.1f }, 40, true)
             };
+        }
+
+        private static MmdCameraKeyframeDefinition Keyframe(
+            int frame,
+            float distance,
+            float[] position,
+            float[] rotation,
+            int viewAngle,
+            bool perspective,
+            byte[] interpolation)
+        {
+            MmdCameraKeyframeDefinition keyframe = Keyframe(frame, distance, position, rotation, viewAngle, perspective);
+            keyframe.interpolation = interpolation;
+            return keyframe;
         }
     }
 }

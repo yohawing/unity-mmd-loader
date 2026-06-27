@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using System.Collections.Generic;
 
@@ -15,6 +17,7 @@ namespace Mmd.Parser
         public int cameraKeyframeCount;
         public List<MmdLightKeyframeDefinition> lightKeyframes = new();
         public int lightKeyframeCount;
+        public List<MmdSelfShadowKeyframeDefinition> selfShadowKeyframes = new();
         public int selfShadowKeyframeCount;
     }
 
@@ -42,6 +45,18 @@ namespace Mmd.Parser
         public int frame;
         public float[] color = Array.Empty<float>();
         public float[] direction = Array.Empty<float>();
+    }
+
+    /// <summary>
+    /// A raw VMD self-shadow keyframe. Rendering application is intentionally deferred; this IR
+    /// only preserves the parsed mode and distance for diagnostics and future shader policy work.
+    /// </summary>
+    [Serializable]
+    public sealed class MmdSelfShadowKeyframeDefinition
+    {
+        public int frame;
+        public byte mode;
+        public float distance;
     }
 
     [Serializable]

@@ -774,6 +774,14 @@ namespace Mmd.Tests
                 controller.SetPhysicsMode(MmdPhysicsMode.Live);
 
                 controller.ApplyFrame(0);
+                MmdLivePhysicsFrameDiagnostics? seedDiagnostics = binding.LastLivePhysicsDiagnostics;
+                Assert.That(seedDiagnostics, Is.Not.Null);
+                Assert.That(seedDiagnostics!.frame, Is.EqualTo(0));
+                Assert.That(seedDiagnostics.pinnedBodies.pinnedBodyCount, Is.EqualTo(2));
+                Assert.That(seedDiagnostics.pinnedBodies.staticPinnedBodyCount, Is.EqualTo(1));
+                Assert.That(seedDiagnostics.pinnedBodies.dynamicOrientationPinnedBodyCount, Is.EqualTo(1),
+                    "Mode-2 dynamic-orientation bodies are still seeded from the current bone pose on reset");
+
                 controller.ApplyFrame(10);
 
                 MmdLivePhysicsFrameDiagnostics? diagnostics = binding.LastLivePhysicsDiagnostics;
@@ -781,6 +789,10 @@ namespace Mmd.Tests
                 Assert.That(diagnostics!.frame, Is.EqualTo(10));
                 Assert.That(diagnostics.comparisonSpace, Is.EqualTo("runtime-forward-playback-diagnostics"));
                 Assert.That(diagnostics.importScale, Is.EqualTo(1.0f).Within(0.0001f));
+                Assert.That(diagnostics.pinnedBodies.pinnedBodyCount, Is.EqualTo(1));
+                Assert.That(diagnostics.pinnedBodies.staticPinnedBodyCount, Is.EqualTo(1));
+                Assert.That(diagnostics.pinnedBodies.dynamicOrientationPinnedBodyCount, Is.EqualTo(0),
+                    "Mode-2 dynamic-orientation bodies must not be re-pinned on normal forward frames");
                 Assert.That(diagnostics.bodyDiagnostics, Is.Not.Null);
                 Assert.That(diagnostics.bodyDiagnostics.Length, Is.EqualTo(2));
 

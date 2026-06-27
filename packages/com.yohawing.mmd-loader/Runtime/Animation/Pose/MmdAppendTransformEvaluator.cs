@@ -10,6 +10,22 @@ namespace Mmd.Pose
     {
         public static MmdSampledMotion ApplyAppendTransforms(MmdModelDefinition model, MmdSampledMotion sampledMotion)
         {
+            return ApplyAppendTransformsCore(model, sampledMotion, pass: null);
+        }
+
+        public static MmdSampledMotion ApplyAppendTransforms(
+            MmdModelDefinition model,
+            MmdSampledMotion sampledMotion,
+            MmdBoneEvaluationPass pass)
+        {
+            return ApplyAppendTransformsCore(model, sampledMotion, pass);
+        }
+
+        private static MmdSampledMotion ApplyAppendTransformsCore(
+            MmdModelDefinition model,
+            MmdSampledMotion sampledMotion,
+            MmdBoneEvaluationPass? pass)
+        {
             var result = CopyMotion(sampledMotion);
 
             if (model == null)
@@ -23,6 +39,11 @@ namespace Mmd.Pose
             var appendRotations = new Dictionary<int, float[]>(evaluationOrder.Count, EqualityComparer<int>.Default);
             foreach (MmdBoneDefinition bone in evaluationOrder)
             {
+                if (pass.HasValue && !ShouldEvaluateInPass(bone, pass.Value))
+                {
+                    continue;
+                }
+
                 if (bone.appendParentIndex < 0)
                 {
                     continue;
@@ -74,6 +95,26 @@ namespace Mmd.Pose
             MmdSampledMotion appendedMotion,
             IReadOnlyCollection<int> sourceBoneIndices)
         {
+            return ReapplyAppendTransformsForSourcesCore(model, preAppendMotion, appendedMotion, sourceBoneIndices, pass: null);
+        }
+
+        public static MmdSampledMotion ReapplyAppendTransformsForSources(
+            MmdModelDefinition model,
+            MmdSampledMotion preAppendMotion,
+            MmdSampledMotion appendedMotion,
+            IReadOnlyCollection<int> sourceBoneIndices,
+            MmdBoneEvaluationPass pass)
+        {
+            return ReapplyAppendTransformsForSourcesCore(model, preAppendMotion, appendedMotion, sourceBoneIndices, pass);
+        }
+
+        private static MmdSampledMotion ReapplyAppendTransformsForSourcesCore(
+            MmdModelDefinition model,
+            MmdSampledMotion preAppendMotion,
+            MmdSampledMotion appendedMotion,
+            IReadOnlyCollection<int> sourceBoneIndices,
+            MmdBoneEvaluationPass? pass)
+        {
             var result = CopyMotion(appendedMotion);
             if (model == null || preAppendMotion == null || sourceBoneIndices.Count == 0)
             {
@@ -93,6 +134,11 @@ namespace Mmd.Pose
                 changed = false;
                 foreach (MmdBoneDefinition bone in evaluationOrder)
                 {
+                    if (pass.HasValue && !ShouldEvaluateInPass(bone, pass.Value))
+                    {
+                        continue;
+                    }
+
                     if (reappliedBoneIndices.Contains(bone.index)
                         || sourceBoneIndexSet.Contains(bone.index)
                         || bone.appendParentIndex < 0
@@ -153,6 +199,13 @@ namespace Mmd.Pose
             }
 
             return result;
+        }
+
+        private static bool ShouldEvaluateInPass(MmdBoneDefinition bone, MmdBoneEvaluationPass pass)
+        {
+            return pass == MmdBoneEvaluationPass.AfterPhysics
+                ? bone.deformAfterPhysics
+                : !bone.deformAfterPhysics;
         }
 
         private static MmdSampledMotion CopyMotion(MmdSampledMotion? sampledMotion)

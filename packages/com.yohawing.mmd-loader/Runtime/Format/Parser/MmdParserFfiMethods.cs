@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -15,6 +17,7 @@ namespace Mmd.Parser
         internal const string ParsePmxPositionsBufferEntryPoint = "mmd_runtime_parse_pmx_positions_buffer";
         internal const string ParsePmxNormalsBufferEntryPoint = "mmd_runtime_parse_pmx_normals_buffer";
         internal const string ParsePmxUvsBufferEntryPoint = "mmd_runtime_parse_pmx_uvs_buffer";
+        internal const string ParsePmxEdgeScaleBufferEntryPoint = "mmd_runtime_parse_pmx_edge_scale_buffer";
         internal const string ParsePmxIndicesBufferEntryPoint = "mmd_runtime_parse_pmx_indices_buffer";
         internal const string ParsePmxSkinIndicesBufferEntryPoint = "mmd_runtime_parse_pmx_skin_indices_buffer";
         internal const string ParsePmxSkinWeightsBufferEntryPoint = "mmd_runtime_parse_pmx_skin_weights_buffer";
@@ -48,6 +51,9 @@ namespace Mmd.Parser
 
         [DllImport(LibraryName, EntryPoint = ParsePmxUvsBufferEntryPoint, CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer ParsePmxUvsBuffer(byte[] data, IntPtr len);
+
+        [DllImport(LibraryName, EntryPoint = ParsePmxEdgeScaleBufferEntryPoint, CallingConvention = CallingConvention.Cdecl)]
+        private static extern ByteBuffer ParsePmxEdgeScaleBuffer(byte[] data, IntPtr len);
 
         [DllImport(LibraryName, EntryPoint = ParsePmxIndicesBufferEntryPoint, CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer ParsePmxIndicesBuffer(byte[] data, IntPtr len);
@@ -101,6 +107,9 @@ namespace Mmd.Parser
 
         internal static float[] ParsePmxUvs(byte[] data)
             => ByteBufferToFloatArray(ParsePmxUvsBuffer(data, new IntPtr(data.Length)), "PMX uvs buffer");
+
+        internal static float[] ParsePmxEdgeScale(byte[] data)
+            => ByteBufferToFloatArray(ParsePmxEdgeScaleBuffer(data, new IntPtr(data.Length)), "PMX edge scale buffer");
 
         internal static uint[] ParsePmxIndices(byte[] data)
             => ByteBufferToUintArray(ParsePmxIndicesBuffer(data, new IntPtr(data.Length)), "PMX indices buffer");

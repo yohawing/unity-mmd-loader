@@ -52,3 +52,5 @@ docs/*
 !docs/README.ja.md
 !docs/HOW_TO_USE.md
 !docs/RELEASE.md
+!docs/assets/
+!docs/assets/**

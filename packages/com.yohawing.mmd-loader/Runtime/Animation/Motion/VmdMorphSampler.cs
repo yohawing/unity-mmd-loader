@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using System.Collections.Generic;
 using Mmd.Parser;
@@ -6,7 +8,7 @@ namespace Mmd.Motion
 {
     public static class VmdMorphSampler
     {
-        public static float SampleWeight(IReadOnlyList<MmdMorphKeyframeDefinition> keyframes, string morphName, float frame)
+        public static float SampleWeight(IReadOnlyList<MmdMorphKeyframeDefinition>? keyframes, string morphName, float frame)
         {
             if (keyframes == null)
             {
@@ -65,7 +67,7 @@ namespace Mmd.Motion
             return previous.weight + (next.weight - previous.weight) * t;
         }
 
-        public static float SampleSortedWeight(IReadOnlyList<MmdMorphKeyframeDefinition> keyframes, string morphName, float frame)
+        public static float SampleSortedWeight(IReadOnlyList<MmdMorphKeyframeDefinition>? keyframes, string morphName, float frame)
         {
             if (keyframes == null)
             {

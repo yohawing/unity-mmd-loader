@@ -4,9 +4,11 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using Mmd;
+using Mmd.Motion;
 using Mmd.Native;
 using Mmd.Parser;
 using Mmd.Physics;
+using Mmd.Pose;
 using UnityEngine;
 
 namespace Mmd.UnityIntegration
@@ -511,6 +513,12 @@ namespace Mmd.UnityIntegration
             }
 
             DisposeFastRuntime();
+            if (model.HasDeformAfterPhysicsBones)
+            {
+                reason = "mmd-runtime fast playback does not support PMX deformAfterPhysics two-pass bone evaluation; managed playback remains active.";
+                return false;
+            }
+
             try
             {
                 MmdRuntimeFfiPlaybackSession candidate = MmdRuntimeFfiPlaybackSession.Create(pmxBytes, vmdBytes);
@@ -802,7 +810,7 @@ namespace Mmd.UnityIntegration
             MmdEvaluatedFrame? evaluatedFrame = null;
             if (fastSession == null)
             {
-                evaluatedFrame = session.EvaluateFrame(frame, time);
+                evaluatedFrame = session.EvaluateBeforePhysicsFrame(frame, time);
             }
 
             double evaluateFrameMs = stageWatch.Elapsed.TotalMilliseconds;
@@ -879,6 +887,7 @@ namespace Mmd.UnityIntegration
             ApplyPhysicsBodyTransforms(backend);
             double applyPhysicsBodiesMs = stageWatch.Elapsed.TotalMilliseconds;
             stageWatch.Restart();
+            ApplyAfterPhysicsBoneEvaluationFromUnityTransforms();
             ApplyPhysicsBodyDebugTransforms(backend);
             MmdLivePhysicsBodyDiagnostics[] bodyDiagnostics = BuildBodyDiagnostics(backend);
             if (evaluatedFrame != null)
@@ -906,6 +915,77 @@ namespace Mmd.UnityIntegration
                 bodyDiagnostics = bodyDiagnostics
             };
             return lastLivePhysicsDiagnostics;
+        }
+
+        private void ApplyAfterPhysicsBoneEvaluationFromUnityTransforms()
+        {
+            if (!model.HasDeformAfterPhysicsBones)
+            {
+                return;
+            }
+
+            MmdSampledMotion postPhysicsPose = CaptureCurrentBonePoseFromUnityTransforms();
+            MmdSampledMotion afterAppend = MmdAppendTransformEvaluator.ApplyAppendTransforms(
+                model,
+                postPhysicsPose,
+                MmdBoneEvaluationPass.AfterPhysics);
+            MmdSampledMotion afterIk = new MmdIkSolver().Solve(
+                model,
+                postPhysicsPose,
+                afterAppend,
+                MmdBoneEvaluationPass.AfterPhysics);
+            ApplyBoneTransformsOnly(afterIk, bone => bone.deformAfterPhysics);
+        }
+
+        private MmdSampledMotion CaptureCurrentBonePoseFromUnityTransforms()
+        {
+            var motion = new MmdSampledMotion();
+            float importScale = NormalizeImportScale(Instance.ImportScale);
+            for (int i = 0; i < model.bones.Count; i++)
+            {
+                MmdBoneDefinition bone = model.bones[i];
+                int index = bone.index;
+                if (index < 0 || index >= Instance.BoneTransforms.Length)
+                {
+                    continue;
+                }
+
+                Transform boneTransform = Instance.BoneTransforms[index];
+                Vector3 localDelta = boneTransform.localPosition - Instance.BindLocalPositions[index];
+                Quaternion localRotation = Quaternion.Inverse(Instance.BindLocalRotations[index]) * boneTransform.localRotation;
+                motion.Bones[bone.name] = new MmdBonePoseSample(
+                    ToArray(ToMmdModelPosition(localDelta, importScale)),
+                    ToArray(ToMmdModelRotation(localRotation)));
+            }
+
+            return motion;
+        }
+
+        private void ApplyBoneTransformsOnly(MmdSampledMotion motion, Func<MmdBoneDefinition, bool> predicate)
+        {
+            for (int i = 0; i < model.bones.Count; i++)
+            {
+                MmdBoneDefinition bone = model.bones[i];
+                if (!predicate(bone))
+                {
+                    continue;
+                }
+
+                int index = bone.index;
+                if (index < 0 || index >= Instance.BoneTransforms.Length)
+                {
+                    continue;
+                }
+
+                if (!motion.Bones.TryGetValue(bone.name, out MmdBonePoseSample pose))
+                {
+                    continue;
+                }
+
+                Transform boneTransform = Instance.BoneTransforms[index];
+                boneTransform.localPosition = Instance.BindLocalPositions[index] + ToUnityModelPosition(pose.Translation, Instance.ImportScale);
+                boneTransform.localRotation = Instance.BindLocalRotations[index] * ToUnityModelRotation(pose.Rotation);
+            }
         }
 
         private BulletMmdPhysicsBackend EnsureLivePhysicsBackend()
@@ -941,7 +1021,8 @@ namespace Mmd.UnityIntegration
         ///      interpolation transform at the ORIGIN-bind, so the first forward Step would compute a kinematic
         ///      velocity of (currentPose - originBind)/dt and fling the jointed dynamic chain apart.
         ///   3. ONE short settle step at the current pose so the joints relax (saba physics->Update(1/60)).
-        ///   4. Re-pin the bone-driven (kinematic / dynamic-orientation) bodies at the current pose.
+        ///   4. Re-pin static kinematic bodies at the current pose. Mode-2 dynamic-orientation bodies remain
+        ///      active dynamic bodies after the reset seed.
         /// This is a settle, not a sweep from bind, so a pure-dynamic body never snaps toward the origin-space
         /// bind while the model is animated far away (the reported "揺れ骨が BindPose の場所に戻る" bug).
         /// </summary>
@@ -950,7 +1031,7 @@ namespace Mmd.UnityIntegration
         {
             // 1. saba MMDRigidBody::ResetTransform: place EVERY body (including pure-dynamic mode-1) at its
             //    current bone-derived model-space pose, overriding the origin-bind that native Reset() set.
-            MmdLivePhysicsPinnedBodyDiagnostics diagnostics =
+            MmdLivePhysicsPinnedBodyDiagnostics seedDiagnostics =
                 SyncBoneDrivenPhysicsBodies(backend, includeDynamicBodies: true);
 
             // 2. Re-align the native interpolation transform with the just-placed world transform and zero
@@ -963,8 +1044,10 @@ namespace Mmd.UnityIntegration
             //    the dynamics settle in place instead of being dragged toward the origin.
             backend.Step(frame, LivePhysicsSeedSettleSeconds);
 
-            // 4. Re-pin the bone-driven (kinematic / dynamic-orientation) bodies at the current pose.
-            return SyncBoneDrivenPhysicsBodies(backend, includeDynamicBodies: false);
+            // 4. Re-pin only static bodies at the current pose. Return the seed diagnostics so reset-frame
+            //    reports still show that mode-1 and mode-2 dynamic bodies were initialized and zeroed.
+            SyncBoneDrivenPhysicsBodies(backend, includeDynamicBodies: false);
+            return seedDiagnostics;
         }
 
         private MmdLivePhysicsPinnedBodyDiagnostics SyncBoneDrivenPhysicsBodies(
@@ -980,7 +1063,8 @@ namespace Mmd.UnityIntegration
                 bool isStatic = IsStaticPhysicsKind(body.physicsKind);
                 bool isDynamicOrientation = IsDynamicWithBonePhysicsKind(body.physicsKind);
                 bool isDynamic = IsDynamicPhysicsKind(body.physicsKind);
-                if (!isStatic && !isDynamicOrientation && !(includeDynamicBodies && isDynamic))
+                bool shouldSyncBody = isStatic || (includeDynamicBodies && (isDynamicOrientation || isDynamic));
+                if (!shouldSyncBody)
                 {
                     continue;
                 }
@@ -1010,10 +1094,6 @@ namespace Mmd.UnityIntegration
                 Quaternion boneModelRotation = ToMmdModelRotation(Quaternion.Inverse(root.rotation) * bone.rotation);
                 Quaternion bodyLocalRotation = ToMmdEulerRotation(body.rotation);
                 Quaternion bodyModelRotation = boneModelRotation * bodyLocalRotation;
-                if (isDynamicOrientation && !includeDynamicBodies)
-                {
-                    bodyModelRotation = ToMmdQuaternion(backend.GetRigidbodyTransform(i).rotation);
-                }
 
                 Vector3 rotatedBodyOffset = boneModelRotation * bodyOffset;
                 backend.SetRigidbodyTransform(
@@ -1393,10 +1473,10 @@ namespace Mmd.UnityIntegration
             Matrix4x4 matrix = Matrix4x4.TRS(position, rotation, Vector3.one);
             return new[]
             {
-                matrix.m00, matrix.m01, matrix.m02, matrix.m03,
-                matrix.m10, matrix.m11, matrix.m12, matrix.m13,
-                matrix.m20, matrix.m21, matrix.m22, matrix.m23,
-                matrix.m30, matrix.m31, matrix.m32, matrix.m33
+                matrix.m00, matrix.m10, matrix.m20, matrix.m30,
+                matrix.m01, matrix.m11, matrix.m21, matrix.m31,
+                matrix.m02, matrix.m12, matrix.m22, matrix.m32,
+                matrix.m03, matrix.m13, matrix.m23, matrix.m33
             };
         }
 

@@ -2,6 +2,7 @@
 
 using System;
 using System.IO;
+using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 using Mmd.UnityIntegration;
@@ -12,6 +13,13 @@ namespace Mmd.Editor
     [InitializeOnLoad]
     public static class MmdSceneDragAndDrop
     {
+        private static readonly MethodInfo? InstanceIdToObjectMethod = typeof(EditorUtility).GetMethod(
+            "InstanceIDToObject",
+            BindingFlags.Public | BindingFlags.Static,
+            binder: null,
+            types: new[] { typeof(int) },
+            modifiers: null);
+
         static MmdSceneDragAndDrop()
         {
             SceneView.duringSceneGui -= HandleSceneGui;
@@ -286,7 +294,7 @@ namespace Mmd.Editor
 
         public static GameObject? GetHierarchyDropParent(int instanceId)
         {
-            return EditorUtility.InstanceIDToObject(instanceId) as GameObject;
+            return InstanceIdToObjectMethod?.Invoke(null, new object[] { instanceId }) as GameObject;
         }
 
         public static GameObject? GetHierarchyDropParent(EntityId entityId)
@@ -596,10 +604,15 @@ namespace Mmd.Editor
 
             if (!string.IsNullOrWhiteSpace(pmxPath))
             {
+                string resolvedPmxPath = pmxPath!;
                 // Same split for raw paths: model-only provider vs full playback provider.
-                return string.IsNullOrWhiteSpace(vmdPath)
-                    ? LoadPmxPathForDragAndDrop(pmxPath, position, parent).Root
-                    : LoadPlaybackPathForDragAndDrop(pmxPath, vmdPath, position, parent).Instance.Root;
+                if (string.IsNullOrWhiteSpace(vmdPath))
+                {
+                    return LoadPmxPathForDragAndDrop(resolvedPmxPath, position, parent).Root;
+                }
+
+                string resolvedVmdPath = vmdPath!;
+                return LoadPlaybackPathForDragAndDrop(resolvedPmxPath, resolvedVmdPath, position, parent).Instance.Root;
             }
 
             throw new ArgumentException("Dragged PMX source is required.");

@@ -86,16 +86,22 @@ namespace Mmd.UnityIntegration
             bool groupMorphsResolvedExternally)
         {
             MmdRenderingDescriptor descriptor = instance.RenderingDescriptor;
+            IReadOnlyList<MmdMeshVertexDescriptor>? vertices = descriptor.vertices;
+            IReadOnlyList<MmdVertexMorphDescriptor>? vertexMorphs = descriptor.vertexMorphs;
+            IReadOnlyList<MmdGroupMorphDescriptor>? groupMorphs = descriptor.groupMorphs;
+            IReadOnlyList<MmdMorphDescriptorBuilder.MmdUvMorphDescriptor>? uvMorphs = descriptor.uvMorphs;
+            IReadOnlyList<MmdMorphDescriptorBuilder.MmdMaterialMorphDescriptor>? materialMorphs = descriptor.materialMorphs;
+            IReadOnlyList<MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor>? flipMorphs = descriptor.flipMorphs;
             if (timing != null)
             {
-                timing.vertexCount = descriptor.vertices?.Count ?? 0;
+                timing.vertexCount = vertices?.Count ?? 0;
                 timing.morphWeightCount = frame.morphs?.Count ?? 0;
             }
 
             long totalStart = timing != null ? Stopwatch.GetTimestamp() : 0L;
-            bool hasVertexMorphs = descriptor.vertexMorphs != null && descriptor.vertexMorphs.Count > 0;
-            bool hasTextureUvMorphs = HasTextureUvMorphs(descriptor.uvMorphs);
-            bool hasMaterialMorphs = descriptor.materialMorphs != null && descriptor.materialMorphs.Count > 0;
+            bool hasVertexMorphs = vertexMorphs != null && vertexMorphs.Count > 0;
+            bool hasTextureUvMorphs = HasTextureUvMorphs(uvMorphs);
+            bool hasMaterialMorphs = materialMorphs != null && materialMorphs.Count > 0;
             bool hasAnyMorph = hasVertexMorphs || hasTextureUvMorphs || hasMaterialMorphs;
             if (timing != null)
             {
@@ -131,11 +137,11 @@ namespace Mmd.UnityIntegration
             stageStart = timing != null ? Stopwatch.GetTimestamp() : 0L;
             IReadOnlyList<MmdGroupMorphDescriptor> groupMorphsForResolve = groupMorphsResolvedExternally
                 ? EmptyGroupMorphs
-                : (descriptor.groupMorphs ?? EmptyGroupMorphs);
+                : (groupMorphs ?? EmptyGroupMorphs);
             IReadOnlyDictionary<string, float> resolvedWeights = MmdCompositeMorphWeightResolver.Resolve(
                 morphWeightMap,
                 groupMorphsForResolve,
-                descriptor.flipMorphs ?? new List<MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor>());
+                flipMorphs ?? Array.Empty<MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor>());
             if (timing != null)
             {
                 timing.resolveCompositeWeightsMs = ToMilliseconds(Stopwatch.GetTimestamp() - stageStart);
@@ -143,17 +149,22 @@ namespace Mmd.UnityIntegration
                 timing.nonZeroResolvedWeightCount = CountNonZeroWeights(resolvedWeights);
             }
 
-            bool useBlendShapeWeights = hasVertexMorphs
-                && instance.SkinnedMeshRenderer != null
-                && instance.VertexMorphBlendShapes.Count > 0;
+            SkinnedMeshRenderer? blendShapeRenderer = hasVertexMorphs && instance.VertexMorphBlendShapes.Count > 0
+                ? instance.SkinnedMeshRenderer
+                : null;
+            bool useBlendShapeWeights = blendShapeRenderer != null;
 
-            IReadOnlyList<MmdMeshVertexDescriptor> morphedVertices = descriptor.vertices;
+            IReadOnlyList<MmdMeshVertexDescriptor>? morphedVertices = vertices;
             if (hasVertexMorphs && !useBlendShapeWeights)
             {
+                IReadOnlyList<MmdMeshVertexDescriptor> baseVertices = vertices
+                    ?? throw new InvalidOperationException("Rendering descriptor vertices are required for vertex morph evaluation.");
+                IReadOnlyList<MmdVertexMorphDescriptor> activeVertexMorphs = vertexMorphs
+                    ?? throw new InvalidOperationException("Rendering descriptor vertex morphs are required for vertex morph evaluation.");
                 stageStart = timing != null ? Stopwatch.GetTimestamp() : 0L;
                 morphedVertices = MmdVertexMorphEvaluator.ApplyVertexMorphs(
-                    descriptor.vertices,
-                    descriptor.vertexMorphs,
+                    baseVertices,
+                    activeVertexMorphs,
                     resolvedWeights);
                 if (timing != null)
                 {
@@ -163,13 +174,15 @@ namespace Mmd.UnityIntegration
 
             if (hasTextureUvMorphs)
             {
-                stageStart = timing != null ? Stopwatch.GetTimestamp() : 0L;
                 IReadOnlyList<MmdMeshVertexDescriptor> baseForUv = useBlendShapeWeights
-                    ? descriptor.vertices
-                    : morphedVertices;
+                    ? (vertices ?? throw new InvalidOperationException("Rendering descriptor vertices are required for texture UV morph evaluation."))
+                    : (morphedVertices ?? throw new InvalidOperationException("Morphed vertices are required for texture UV morph evaluation."));
+                IReadOnlyList<MmdMorphDescriptorBuilder.MmdUvMorphDescriptor> activeUvMorphs = uvMorphs
+                    ?? throw new InvalidOperationException("Rendering descriptor UV morphs are required for texture UV morph evaluation.");
+                stageStart = timing != null ? Stopwatch.GetTimestamp() : 0L;
                 morphedVertices = MmdTextureUvMorphEvaluator.ApplyTextureUvMorphs(
                     baseForUv,
-                    descriptor.uvMorphs,
+                    activeUvMorphs,
                     resolvedWeights);
                 if (timing != null)
                 {
@@ -187,7 +200,7 @@ namespace Mmd.UnityIntegration
                 }
             }
 
-            if (useBlendShapeWeights)
+            if (blendShapeRenderer != null)
             {
                 stageStart = timing != null ? Stopwatch.GetTimestamp() : 0L;
                 bool blendShapeBoundsWeightsChanged = false;
@@ -211,7 +224,7 @@ namespace Mmd.UnityIntegration
                         instance.LastBlendShapeBoundsWeights[bindingSlot] = resolvedWeight;
                     }
 
-                    instance.SkinnedMeshRenderer.SetBlendShapeWeight(binding.BlendShapeIndex, resolvedWeight * 100f);
+                    blendShapeRenderer.SetBlendShapeWeight(binding.BlendShapeIndex, resolvedWeight * 100f);
                     bindingSlot++;
                 }
 
@@ -223,16 +236,18 @@ namespace Mmd.UnityIntegration
 
                 if (hasTextureUvMorphs)
                 {
+                    IReadOnlyList<MmdMeshVertexDescriptor> uvMorphedVertices = morphedVertices
+                        ?? throw new InvalidOperationException("Morphed vertices are required for texture UV upload.");
                     if (timing != null)
                     {
                         timing.meshUploadRequired = true;
                     }
 
                     stageStart = timing != null ? Stopwatch.GetTimestamp() : 0L;
-                    var unityUvsOnly = new List<Vector2>(morphedVertices.Count);
-                    for (int i = 0; i < morphedVertices.Count; i++)
+                    var unityUvsOnly = new List<Vector2>(uvMorphedVertices.Count);
+                    for (int i = 0; i < uvMorphedVertices.Count; i++)
                     {
-                        float[] uv = ValidateMorphedVector2(morphedVertices[i].uv, i, "uv");
+                        float[] uv = ValidateMorphedVector2(uvMorphedVertices[i].uv, i, "uv");
                         float[] viewportUv = MmdTextureOrientationDescriptorBuilder.ToViewportUv(uv);
                         unityUvsOnly.Add(new Vector2(viewportUv[0], viewportUv[1]));
                     }
@@ -247,7 +262,7 @@ namespace Mmd.UnityIntegration
                 if (blendShapeBoundsWeightsChanged)
                 {
                     stageStart = timing != null ? Stopwatch.GetTimestamp() : 0L;
-                    instance.SkinnedMeshRenderer.localBounds = CalculateBlendShapeMorphedBounds(descriptor, resolvedWeights, instance.ImportScale);
+                    blendShapeRenderer.localBounds = CalculateBlendShapeMorphedBounds(descriptor, resolvedWeights, instance.ImportScale);
                     if (timing != null)
                     {
                         timing.localBoundsAssignMs = ToMilliseconds(Stopwatch.GetTimestamp() - stageStart);
@@ -277,19 +292,22 @@ namespace Mmd.UnityIntegration
                 return;
             }
 
+            IReadOnlyList<MmdMeshVertexDescriptor> uploadVertices = morphedVertices
+                ?? throw new InvalidOperationException("Morphed vertices are required for mesh upload.");
+
             if (timing != null)
             {
                 timing.meshUploadRequired = true;
             }
 
             stageStart = timing != null ? Stopwatch.GetTimestamp() : 0L;
-            var unityVertices = new List<Vector3>(morphedVertices.Count);
-            var unityUvs = new List<Vector2>(morphedVertices.Count);
-            for (int i = 0; i < morphedVertices.Count; i++)
+            var unityVertices = new List<Vector3>(uploadVertices.Count);
+            var unityUvs = new List<Vector2>(uploadVertices.Count);
+            for (int i = 0; i < uploadVertices.Count; i++)
             {
-                Vector3 morphedPos = ToUnityPosition(ValidateMorphedVector3(morphedVertices[i].position, i, "position"));
+                Vector3 morphedPos = ToUnityPosition(ValidateMorphedVector3(uploadVertices[i].position, i, "position"));
                 unityVertices.Add(morphedPos * instance.ImportScale);
-                float[] uv = ValidateMorphedVector2(morphedVertices[i].uv, i, "uv");
+                float[] uv = ValidateMorphedVector2(uploadVertices[i].uv, i, "uv");
                 float[] viewportUv = MmdTextureOrientationDescriptorBuilder.ToViewportUv(uv);
                 unityUvs.Add(new Vector2(viewportUv[0], viewportUv[1]));
             }
@@ -320,10 +338,11 @@ namespace Mmd.UnityIntegration
                 timing.recalculateBoundsMs = ToMilliseconds(Stopwatch.GetTimestamp() - stageStart);
             }
 
-            if (instance.SkinnedMeshRenderer != null)
+            SkinnedMeshRenderer? meshUploadRenderer = instance.SkinnedMeshRenderer;
+            if (meshUploadRenderer != null)
             {
                 stageStart = timing != null ? Stopwatch.GetTimestamp() : 0L;
-                instance.SkinnedMeshRenderer.localBounds = mesh.bounds;
+                meshUploadRenderer.localBounds = mesh.bounds;
                 if (timing != null)
                 {
                     timing.localBoundsAssignMs = ToMilliseconds(Stopwatch.GetTimestamp() - stageStart);
@@ -341,9 +360,13 @@ namespace Mmd.UnityIntegration
             MmdRenderingDescriptor descriptor,
             IReadOnlyDictionary<string, float> resolvedWeights)
         {
+            IReadOnlyList<MmdMaterialDescriptor> materials = descriptor.materials
+                ?? throw new InvalidOperationException("Rendering descriptor materials are required for material morph evaluation.");
+            IReadOnlyList<MmdMorphDescriptorBuilder.MmdMaterialMorphDescriptor> materialMorphs = descriptor.materialMorphs
+                ?? throw new InvalidOperationException("Rendering descriptor material morphs are required for material morph evaluation.");
             IReadOnlyList<MmdMaterialDescriptor> modifiedDescriptors = MmdMaterialMorphEvaluator.ApplyMaterialMorphs(
-                descriptor.materials,
-                descriptor.materialMorphs,
+                materials,
+                materialMorphs,
                 resolvedWeights);
 
             for (int i = 0; i < instance.Materials.Length && i < modifiedDescriptors.Count; i++)
@@ -488,21 +511,24 @@ namespace Mmd.UnityIntegration
             float importScale)
         {
             float scale = (float.IsFinite(importScale) && importScale > 0.0f) ? importScale : 1.0f;
-            if (descriptor.vertices == null || descriptor.vertices.Count == 0)
+            IReadOnlyList<MmdMeshVertexDescriptor>? vertices = descriptor.vertices;
+            if (vertices == null || vertices.Count == 0)
             {
                 return new Bounds(Vector3.zero, Vector3.zero);
             }
 
-            var vertexSlotsByIndex = new Dictionary<int, int>(descriptor.vertices.Count);
-            var positions = new Vector3[descriptor.vertices.Count];
-            for (int i = 0; i < descriptor.vertices.Count; i++)
+            IReadOnlyList<MmdVertexMorphDescriptor> vertexMorphs = descriptor.vertexMorphs
+                ?? throw new InvalidOperationException("Rendering descriptor vertex morphs are required for BlendShape bounds evaluation.");
+            var vertexSlotsByIndex = new Dictionary<int, int>(vertices.Count);
+            var positions = new Vector3[vertices.Count];
+            for (int i = 0; i < vertices.Count; i++)
             {
-                MmdMeshVertexDescriptor vertex = descriptor.vertices[i];
+                MmdMeshVertexDescriptor vertex = vertices[i];
                 vertexSlotsByIndex[vertex.vertexIndex] = i;
                 positions[i] = ToUnityPosition(ValidateMorphedVector3(vertex.position, i, "position")) * scale;
             }
 
-            foreach (MmdVertexMorphDescriptor morph in descriptor.vertexMorphs)
+            foreach (MmdVertexMorphDescriptor morph in vertexMorphs)
             {
                 if (string.IsNullOrWhiteSpace(morph.morphName))
                 {

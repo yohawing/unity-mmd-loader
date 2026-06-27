@@ -378,7 +378,8 @@
             "appendParentIndex": -1,
             "appendRatio": 1.0,
             "appendRotation": false,
-            "appendTranslation": false
+            "appendTranslation": false,
+            "deformAfterPhysics": false
         }
     ],
     "morphs": [],

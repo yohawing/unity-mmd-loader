@@ -159,7 +159,7 @@ namespace Mmd
 
             trace.frames.Add(MmdTraceBuilder.BuildMorphEvaluationFrame(model, evaluation.IkMotion, evaluation.IkWorldMatrices, frame, time));
 
-            trace.frames.Add(MmdTraceBuilder.BuildFinalWorldFrame(model, evaluation.IkMotion, evaluation.WorldMatrices, frame, time));
+            trace.frames.Add(MmdTraceBuilder.BuildFinalWorldFrame(model, evaluation.FinalMotion, evaluation.WorldMatrices, frame, time));
         }
     }
 }

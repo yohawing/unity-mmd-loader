@@ -203,7 +203,8 @@ namespace Mmd.Rendering
                 vertexIndex = splitVertexIndex,
                 position = source.position.ToArray(),
                 normal = source.normal.ToArray(),
-                uv = source.uv.ToArray()
+                uv = source.uv.ToArray(),
+                edgeScale = source.edgeScale
             };
         }
 

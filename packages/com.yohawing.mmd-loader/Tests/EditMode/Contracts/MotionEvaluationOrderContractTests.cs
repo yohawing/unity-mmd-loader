@@ -64,6 +64,66 @@ namespace Mmd.Tests.Contracts
             Assert.That(trace.frames.Skip(5).Take(5).Select(frame => frame.checkpoint), Is.EqualTo(PhaseOneCheckpoints));
         }
 
+        [Test]
+        public void DeformAfterPhysicsBoneReceivesAppendOnlyInFinalWorldUpdate()
+        {
+            MmdTrace trace = MmdRuntimeTraceEvaluator.EvaluatePhaseOneTrace(
+                CreateAppendChildModel(deformAfterPhysics: true),
+                CreateTranslatedRootMotion(),
+                frame: 0,
+                time: 0.0f,
+                modelId: "deform-after-physics.pmx",
+                motionId: "root-translate.vmd");
+
+            MmdTraceFrame afterAppend = trace.frames.Single(frame => frame.checkpoint == MmdTraceCheckpoints.AfterAppendTransform);
+            MmdTraceFrame afterIk = trace.frames.Single(frame => frame.checkpoint == MmdTraceCheckpoints.AfterIk);
+            MmdTraceFrame final = trace.frames.Single(frame => frame.checkpoint == MmdTraceCheckpoints.FinalWorldUpdate);
+
+            Assert.That(FindBone(afterAppend, "append").localPosition[0], Is.EqualTo(0.0f).Within(0.00001f));
+            Assert.That(FindBone(afterIk, "append").localPosition[0], Is.EqualTo(0.0f).Within(0.00001f));
+            Assert.That(FindBone(final, "append").localPosition[0], Is.EqualTo(1.0f).Within(0.00001f));
+            Assert.That(trace.frames.Select(frame => frame.checkpoint), Is.EqualTo(PhaseOneCheckpoints));
+        }
+
+        [Test]
+        public void BeforePhysicsPlaybackFrameUsesIkMotionBeforeFinalAfterPhysicsMerge()
+        {
+            MmdModelDefinition model = CreateAppendChildModel(deformAfterPhysics: true);
+            MmdMotionDefinition motion = CreateTranslatedRootMotion();
+
+            MmdEvaluatedFrame beforePhysics = MmdRuntimeFrameEvaluator.EvaluateValidatedBeforePhysicsPlaybackFrame(
+                model,
+                motion,
+                frame: 0,
+                time: 0.0f);
+            MmdEvaluatedFrame final = MmdRuntimeFrameEvaluator.EvaluateValidatedPhaseOnePlaybackFrame(
+                model,
+                motion,
+                frame: 0,
+                time: 0.0f);
+
+            Assert.That(FindBone(beforePhysics, "append").localPosition[0], Is.EqualTo(0.0f).Within(0.00001f));
+            Assert.That(FindBone(final, "append").localPosition[0], Is.EqualTo(1.0f).Within(0.00001f));
+        }
+
+        [Test]
+        public void BeforePhysicsBoneKeepsExistingAppendCheckpointBehavior()
+        {
+            MmdTrace trace = MmdRuntimeTraceEvaluator.EvaluatePhaseOneTrace(
+                CreateAppendChildModel(deformAfterPhysics: false),
+                CreateTranslatedRootMotion(),
+                frame: 0,
+                time: 0.0f,
+                modelId: "before-physics.pmx",
+                motionId: "root-translate.vmd");
+
+            MmdTraceFrame afterAppend = trace.frames.Single(frame => frame.checkpoint == MmdTraceCheckpoints.AfterAppendTransform);
+            MmdTraceFrame final = trace.frames.Single(frame => frame.checkpoint == MmdTraceCheckpoints.FinalWorldUpdate);
+
+            Assert.That(FindBone(afterAppend, "append").localPosition[0], Is.EqualTo(1.0f).Within(0.00001f));
+            Assert.That(FindBone(final, "append").localPosition[0], Is.EqualTo(1.0f).Within(0.00001f));
+        }
+
         private static MmdModelDefinition CreateSingleBoneModel()
         {
             var model = new MmdModelDefinition();
@@ -73,6 +133,23 @@ namespace Mmd.Tests.Contracts
                 name = "root",
                 parentIndex = -1,
                 origin = new[] { 0.0f, 0.0f, 0.0f }
+            });
+            return model;
+        }
+
+        private static MmdModelDefinition CreateAppendChildModel(bool deformAfterPhysics)
+        {
+            var model = CreateSingleBoneModel();
+            model.bones.Add(new MmdBoneDefinition
+            {
+                index = 1,
+                name = "append",
+                parentIndex = 0,
+                origin = new[] { 0.0f, 0.0f, 0.0f },
+                appendParentIndex = 0,
+                appendRatio = 1.0f,
+                appendTranslation = true,
+                deformAfterPhysics = deformAfterPhysics
             });
             return model;
         }
@@ -101,6 +178,16 @@ namespace Mmd.Tests.Contracts
                 translationZ = linear,
                 rotation = linear
             };
+        }
+
+        private static MmdTraceBone FindBone(MmdTraceFrame frame, string name)
+        {
+            return frame.bones.Single(bone => bone.name == name);
+        }
+
+        private static MmdEvaluatedBonePose FindBone(MmdEvaluatedFrame frame, string name)
+        {
+            return frame.bones.Single(bone => bone.name == name);
         }
     }
 }

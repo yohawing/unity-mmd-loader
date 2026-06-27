@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using System.Collections.Generic;
 
@@ -7,6 +9,9 @@ namespace Mmd.Parser
     public sealed class MmdModelDefinition
     {
         public string name = string.Empty;
+        public string englishName = string.Empty;
+        public string comment = string.Empty;
+        public string englishComment = string.Empty;
         public List<MmdVertexDefinition> vertices = new();
         public List<int> indices = new();
         public List<MmdBoneDefinition> bones = new();
@@ -14,6 +19,27 @@ namespace Mmd.Parser
         public List<MmdMaterialDefinition> materials = new();
         public List<MmdIkDefinition> ik = new();
         public MmdPhysicsDefinition physics = new();
+
+        public bool HasDeformAfterPhysicsBones
+        {
+            get
+            {
+                if (bones == null)
+                {
+                    return false;
+                }
+
+                for (int i = 0; i < bones.Count; i++)
+                {
+                    if (bones[i]?.deformAfterPhysics == true)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
     }
 
     [Serializable]
@@ -23,6 +49,7 @@ namespace Mmd.Parser
         public float[] position = Array.Empty<float>();
         public float[] normal = Array.Empty<float>();
         public float[] uv = Array.Empty<float>();
+        public float edgeScale = float.NaN;
         public string skinningMode = "unknown";
         public int[] boneIndices = Array.Empty<int>();
         public float[] boneWeights = Array.Empty<float>();
@@ -53,6 +80,7 @@ namespace Mmd.Parser
         public float[] localXAxis = Array.Empty<float>();
         public float[] localZAxis = Array.Empty<float>();
         public bool externalParentTransform;
+        public bool deformAfterPhysics;
     }
 
     [Serializable]

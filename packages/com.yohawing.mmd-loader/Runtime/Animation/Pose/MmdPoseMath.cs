@@ -1,10 +1,12 @@
+#nullable enable
+
 using System;
 
 namespace Mmd.Pose
 {
     public static class MmdPoseMath
     {
-        public static float[] LocalMatrix(float[] translation, float[] rotation, float[] scale)
+        public static float[] LocalMatrix(float[]? translation, float[]? rotation, float[]? scale)
         {
             float tx = Component(translation, 0, 0.0f);
             float ty = Component(translation, 1, 0.0f);
@@ -37,7 +39,7 @@ namespace Mmd.Pose
             };
         }
 
-        public static float[] Multiply(float[] left, float[] right)
+        public static float[] Multiply(float[]? left, float[]? right)
         {
             if (left == null || left.Length != 16)
             {
@@ -75,7 +77,7 @@ namespace Mmd.Pose
             return result;
         }
 
-        private static float Component(float[] values, int index, float fallback)
+        private static float Component(float[]? values, int index, float fallback)
         {
             if (values == null || values.Length <= index)
             {
@@ -90,7 +92,7 @@ namespace Mmd.Pose
             return values[index];
         }
 
-        private static float[] NormalizeQuaternion(float[] values)
+        private static float[] NormalizeQuaternion(float[]? values)
         {
             float x = Component(values, 0, 0.0f);
             float y = Component(values, 1, 0.0f);

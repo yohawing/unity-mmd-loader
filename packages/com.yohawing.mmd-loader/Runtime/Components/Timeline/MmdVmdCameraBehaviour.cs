@@ -21,10 +21,10 @@ namespace Mmd.Timeline
     {
         public MmdSceneEnvironmentBinding? Binding { get; set; }
 
-        public IReadOnlyList<MmdCameraKeyframeDefinition> CameraKeyframes { get; set; }
+        public IReadOnlyList<MmdCameraKeyframeDefinition>? CameraKeyframes { get; set; }
             = Array.Empty<MmdCameraKeyframeDefinition>();
 
-        public IReadOnlyList<MmdLightKeyframeDefinition> LightKeyframes { get; set; }
+        public IReadOnlyList<MmdLightKeyframeDefinition>? LightKeyframes { get; set; }
             = Array.Empty<MmdLightKeyframeDefinition>();
 
         public string MotionSourceId { get; set; } = string.Empty;
@@ -61,7 +61,7 @@ namespace Mmd.Timeline
         /// Samples and applies the camera at the given Timeline local time. Returns the proxy's apply
         /// status; when the track has no camera keyframes it is a no-op (<see cref="MmdSceneCameraApplyStatus.NotApplied"/>).
         /// </summary>
-        public MmdSceneCameraApplyStatus EvaluateAtLocalTime(MmdSceneEnvironmentBinding target, double localTime)
+        public MmdSceneCameraApplyStatus EvaluateAtLocalTime(MmdSceneEnvironmentBinding? target, double localTime)
         {
             if (target == null)
             {

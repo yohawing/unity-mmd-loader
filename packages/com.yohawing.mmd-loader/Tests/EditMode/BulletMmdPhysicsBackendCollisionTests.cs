@@ -384,6 +384,26 @@ namespace Mmd.Tests
                 "clamped, so a frame hitch / seek would let physics explode on resume. y=" + y);
         }
 
+        [Test]
+        public void MaxSubStepEstimateCanUseDiagnosticFixedStepWithoutChangingDefault()
+        {
+            try
+            {
+                BulletMmdPhysicsBackend.ResetMaxSubStepEstimateFixedTimeStepSecondsForDiagnostics();
+                Assert.That(BulletMmdPhysicsBackend.MaxSubStepEstimateFixedTimeStepSecondsForDiagnostics, Is.EqualTo(1.0f / 60.0f).Within(0.000001f));
+                Assert.That(BulletMmdPhysicsBackend.EstimateMaxSubSteps(1.0f / 30.0f), Is.EqualTo(2));
+
+                BulletMmdPhysicsBackend.SetMaxSubStepEstimateFixedTimeStepSecondsForDiagnostics(1.0f / 120.0f);
+                Assert.That(BulletMmdPhysicsBackend.MaxSubStepEstimateFixedTimeStepSecondsForDiagnostics, Is.EqualTo(1.0f / 120.0f).Within(0.000001f));
+                Assert.That(BulletMmdPhysicsBackend.EstimateMaxSubSteps(1.0f / 30.0f), Is.EqualTo(4));
+                Assert.That(BulletMmdPhysicsBackend.EstimateMaxSubSteps(2.0f), Is.EqualTo(BulletMmdPhysicsBackend.MaxSubStepsLimit));
+            }
+            finally
+            {
+                BulletMmdPhysicsBackend.ResetMaxSubStepEstimateFixedTimeStepSecondsForDiagnostics();
+            }
+        }
+
         private static MmdRigidbodyDefinition MakeBody(
             int index,
             string name,
