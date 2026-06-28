@@ -15,16 +15,34 @@ namespace Mmd.Samples.RuntimeVerification
             string manifestPath,
             List<string> errors)
         {
+            MmdRuntimeViewerFixtureCase[] viewerCases = LoadViewerCases(manifestPath, errors);
+            var playbackCases = new List<MmdRuntimeVerificationCase>(viewerCases.Length);
+            for (int i = 0; i < viewerCases.Length; i++)
+            {
+                playbackCases.Add(new MmdRuntimeVerificationCase(
+                    viewerCases[i].Name,
+                    viewerCases[i].PmxPath,
+                    viewerCases[i].VmdPath,
+                    parseOnly: false));
+            }
+
+            return playbackCases.ToArray();
+        }
+
+        public static MmdRuntimeViewerFixtureCase[] LoadViewerCases(
+            string manifestPath,
+            List<string> errors)
+        {
             if (string.IsNullOrWhiteSpace(manifestPath))
             {
-                return Array.Empty<MmdRuntimeVerificationCase>();
+                return Array.Empty<MmdRuntimeViewerFixtureCase>();
             }
 
             string fullManifestPath = Path.GetFullPath(manifestPath);
             if (!File.Exists(fullManifestPath))
             {
                 errors.Add("Fixture manifest does not exist: " + fullManifestPath);
-                return Array.Empty<MmdRuntimeVerificationCase>();
+                return Array.Empty<MmdRuntimeViewerFixtureCase>();
             }
 
             Dictionary<string, object?> manifest;
@@ -35,14 +53,14 @@ namespace Mmd.Samples.RuntimeVerification
             catch (Exception ex)
             {
                 errors.Add("Fixture manifest JSON parse failed: " + ex.Message);
-                return Array.Empty<MmdRuntimeVerificationCase>();
+                return Array.Empty<MmdRuntimeViewerFixtureCase>();
             }
 
             int schemaVersion = GetInt(manifest, "schemaVersion", defaultValue: 0);
             if (schemaVersion != SupportedSchemaVersion)
             {
                 errors.Add("Unsupported fixture manifest schemaVersion: " + schemaVersion);
-                return Array.Empty<MmdRuntimeVerificationCase>();
+                return Array.Empty<MmdRuntimeViewerFixtureCase>();
             }
 
             Dictionary<string, object?>? paths = GetObject(manifest, "paths");
@@ -53,7 +71,7 @@ namespace Mmd.Samples.RuntimeVerification
             if (cases == null || cases.Count == 0)
             {
                 errors.Add("Fixture manifest has no paths.playbackSmoke.cases entries: " + fullManifestPath);
-                return Array.Empty<MmdRuntimeVerificationCase>();
+                return Array.Empty<MmdRuntimeViewerFixtureCase>();
             }
 
             string manifestDirectory = Path.GetDirectoryName(fullManifestPath) ?? Directory.GetCurrentDirectory();
@@ -61,7 +79,7 @@ namespace Mmd.Samples.RuntimeVerification
                 manifestDirectory,
                 GetString(manifest, "basePath"));
 
-            var resolvedCases = new List<MmdRuntimeVerificationCase>(cases.Count);
+            var resolvedCases = new List<MmdRuntimeViewerFixtureCase>(cases.Count);
             for (int i = 0; i < cases.Count; i++)
             {
                 if (cases[i] is not Dictionary<string, object?> fixtureCase)
@@ -83,6 +101,9 @@ namespace Mmd.Samples.RuntimeVerification
 
                 Dictionary<string, object?>? model = GetObject(fixtureCase, "model");
                 Dictionary<string, object?>? motion = GetObject(fixtureCase, "motion");
+                Dictionary<string, object?>? camera = GetObject(fixtureCase, "camera");
+                Dictionary<string, object?>? audio = GetObject(fixtureCase, "audio");
+                Dictionary<string, object?>? background = GetObject(fixtureCase, "background");
                 string modelExtension = GetString(model, "extension");
                 string modelKey = GetString(model, "key");
                 string motionKey = GetString(motion, "key");
@@ -111,11 +132,13 @@ namespace Mmd.Samples.RuntimeVerification
                     continue;
                 }
 
-                resolvedCases.Add(new MmdRuntimeVerificationCase(
+                resolvedCases.Add(new MmdRuntimeViewerFixtureCase(
                     caseName,
                     pmxPath,
                     vmdPath,
-                    parseOnly: false));
+                    ResolveOptionalReference(byExtension, baseDirectory, camera, "cameraVmd"),
+                    ResolveOptionalReference(byExtension, baseDirectory, audio, string.Empty),
+                    ResolveOptionalReference(byExtension, baseDirectory, background, string.Empty)));
             }
 
             return resolvedCases.ToArray();
@@ -154,6 +177,36 @@ namespace Mmd.Samples.RuntimeVerification
             if (string.IsNullOrWhiteSpace(relativePath))
             {
                 errors.Add("Fixture case '" + caseName + "' references missing fixture key: " + extension + "." + key);
+                return string.Empty;
+            }
+
+            return Path.IsPathRooted(relativePath)
+                ? Path.GetFullPath(relativePath)
+                : Path.GetFullPath(Path.Combine(baseDirectory, relativePath));
+        }
+
+        private static string ResolveOptionalReference(
+            Dictionary<string, object?>? byExtension,
+            string baseDirectory,
+            Dictionary<string, object?>? reference,
+            string defaultExtension)
+        {
+            string extension = GetString(reference, "extension");
+            if (string.IsNullOrWhiteSpace(extension))
+            {
+                extension = defaultExtension;
+            }
+
+            string key = GetString(reference, "key");
+            if (string.IsNullOrWhiteSpace(extension) || string.IsNullOrWhiteSpace(key))
+            {
+                return string.Empty;
+            }
+
+            Dictionary<string, object?>? map = GetObject(byExtension, extension);
+            string relativePath = GetString(map, key);
+            if (string.IsNullOrWhiteSpace(relativePath))
+            {
                 return string.Empty;
             }
 
@@ -505,5 +558,31 @@ namespace Mmd.Samples.RuntimeVerification
                 }
             }
         }
+    }
+
+    public readonly struct MmdRuntimeViewerFixtureCase
+    {
+        public MmdRuntimeViewerFixtureCase(
+            string name,
+            string pmxPath,
+            string vmdPath,
+            string cameraPath,
+            string audioPath,
+            string backgroundPath)
+        {
+            Name = name ?? string.Empty;
+            PmxPath = pmxPath ?? string.Empty;
+            VmdPath = vmdPath ?? string.Empty;
+            CameraPath = cameraPath ?? string.Empty;
+            AudioPath = audioPath ?? string.Empty;
+            BackgroundPath = backgroundPath ?? string.Empty;
+        }
+
+        public string Name { get; }
+        public string PmxPath { get; }
+        public string VmdPath { get; }
+        public string CameraPath { get; }
+        public string AudioPath { get; }
+        public string BackgroundPath { get; }
     }
 }

@@ -84,9 +84,10 @@ Fixture manifest playback sweep:
 `paths.playbackSmoke.cases` format used by three-mmd-loader. It resolves PMX
 model and VMD motion keys through `paths.releaseSmoke.byExtension`. The
 `MMD_RUNTIME_VIEWER_FIXTURES` environment variable can provide the manifest path
-when the command-line option is omitted. Viewer-only fields such as camera,
-audio, background, oracle, watch bones, and frame lists are ignored by this
-verification player for now.
+when the command-line option is omitted. Optional viewer fields such as camera,
+audio, and background are resolved and kept for the viewer UI path, but this
+verification player only drives PMX + VMD playback for now. Test-only fields
+such as oracle, watch bones, epsilon, and frame lists are ignored.
 
 ## JSON Schema Overview
 
