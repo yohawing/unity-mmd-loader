@@ -138,7 +138,8 @@ namespace Mmd.Samples.RuntimeVerification
                     vmdPath,
                     ResolveOptionalReference(byExtension, baseDirectory, camera, "cameraVmd"),
                     ResolveOptionalReference(byExtension, baseDirectory, audio, string.Empty),
-                    ResolveOptionalReference(byExtension, baseDirectory, background, string.Empty)));
+                    ResolveOptionalReference(byExtension, baseDirectory, background, string.Empty),
+                    ResolveAudioOffsetFrame(fixtureCase, audio)));
             }
 
             return resolvedCases.ToArray();
@@ -262,6 +263,37 @@ namespace Mmd.Samples.RuntimeVerification
             if (child is double number)
             {
                 return (int)number;
+            }
+
+            return defaultValue;
+        }
+
+        private static float ResolveAudioOffsetFrame(
+            Dictionary<string, object?> fixtureCase,
+            Dictionary<string, object?>? audio)
+        {
+            float caseOffset = GetFloat(fixtureCase, "audioOffsetFrame", float.NaN);
+            if (!float.IsNaN(caseOffset))
+            {
+                return caseOffset;
+            }
+
+            return GetFloat(audio, "offsetFrame", 0.0f);
+        }
+
+        private static float GetFloat(
+            Dictionary<string, object?>? value,
+            string key,
+            float defaultValue)
+        {
+            if (value == null || !value.TryGetValue(key, out object? child))
+            {
+                return defaultValue;
+            }
+
+            if (child is double number)
+            {
+                return (float)number;
             }
 
             return defaultValue;
@@ -568,7 +600,8 @@ namespace Mmd.Samples.RuntimeVerification
             string vmdPath,
             string cameraPath,
             string audioPath,
-            string backgroundPath)
+            string backgroundPath,
+            float audioOffsetFrame)
         {
             Name = name ?? string.Empty;
             PmxPath = pmxPath ?? string.Empty;
@@ -576,6 +609,7 @@ namespace Mmd.Samples.RuntimeVerification
             CameraPath = cameraPath ?? string.Empty;
             AudioPath = audioPath ?? string.Empty;
             BackgroundPath = backgroundPath ?? string.Empty;
+            AudioOffsetFrame = audioOffsetFrame;
         }
 
         public string Name { get; }
@@ -584,5 +618,6 @@ namespace Mmd.Samples.RuntimeVerification
         public string CameraPath { get; }
         public string AudioPath { get; }
         public string BackgroundPath { get; }
+        public float AudioOffsetFrame { get; }
     }
 }
