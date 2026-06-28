@@ -87,8 +87,9 @@ model and VMD motion keys through `paths.releaseSmoke.byExtension`. The
 when the command-line option is omitted. Optional viewer fields such as camera,
 audio, audio offset, and background are resolved and kept for the viewer UI
 path, but this verification player only drives PMX + VMD playback for now.
-Test-only fields such as oracle, watch bones, epsilon, and frame lists are
-ignored.
+Cases with `skipReason` are skipped by the verification sweep while remaining
+available to the viewer descriptor list. Test-only fields such as oracle, watch
+bones, epsilon, and frame lists are ignored.
 
 ## JSON Schema Overview
 

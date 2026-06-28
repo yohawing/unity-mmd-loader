@@ -15,7 +15,10 @@ namespace Mmd.Samples.RuntimeVerification
             string manifestPath,
             List<string> errors)
         {
-            MmdRuntimeViewerFixtureCase[] viewerCases = LoadViewerCases(manifestPath, errors);
+            MmdRuntimeViewerFixtureCase[] viewerCases = LoadViewerCases(
+                manifestPath,
+                errors,
+                includeSkipped: false);
             var playbackCases = new List<MmdRuntimeVerificationCase>(viewerCases.Length);
             for (int i = 0; i < viewerCases.Length; i++)
             {
@@ -31,7 +34,8 @@ namespace Mmd.Samples.RuntimeVerification
 
         public static MmdRuntimeViewerFixtureCase[] LoadViewerCases(
             string manifestPath,
-            List<string> errors)
+            List<string> errors,
+            bool includeSkipped = true)
         {
             if (string.IsNullOrWhiteSpace(manifestPath))
             {
@@ -88,7 +92,8 @@ namespace Mmd.Samples.RuntimeVerification
                     continue;
                 }
 
-                if (!string.IsNullOrWhiteSpace(GetString(fixtureCase, "skipReason")))
+                string skipReason = GetString(fixtureCase, "skipReason");
+                if (!includeSkipped && !string.IsNullOrWhiteSpace(skipReason))
                 {
                     continue;
                 }
@@ -139,7 +144,8 @@ namespace Mmd.Samples.RuntimeVerification
                     ResolveOptionalReference(byExtension, baseDirectory, camera, "cameraVmd"),
                     ResolveOptionalReference(byExtension, baseDirectory, audio, string.Empty),
                     ResolveOptionalReference(byExtension, baseDirectory, background, string.Empty),
-                    ResolveAudioOffsetFrame(fixtureCase, audio)));
+                    ResolveAudioOffsetFrame(fixtureCase, audio),
+                    skipReason));
             }
 
             return resolvedCases.ToArray();
@@ -601,7 +607,8 @@ namespace Mmd.Samples.RuntimeVerification
             string cameraPath,
             string audioPath,
             string backgroundPath,
-            float audioOffsetFrame)
+            float audioOffsetFrame,
+            string skipReason)
         {
             Name = name ?? string.Empty;
             PmxPath = pmxPath ?? string.Empty;
@@ -610,6 +617,7 @@ namespace Mmd.Samples.RuntimeVerification
             AudioPath = audioPath ?? string.Empty;
             BackgroundPath = backgroundPath ?? string.Empty;
             AudioOffsetFrame = audioOffsetFrame;
+            SkipReason = skipReason ?? string.Empty;
         }
 
         public string Name { get; }
@@ -619,5 +627,6 @@ namespace Mmd.Samples.RuntimeVerification
         public string AudioPath { get; }
         public string BackgroundPath { get; }
         public float AudioOffsetFrame { get; }
+        public string SkipReason { get; }
     }
 }
