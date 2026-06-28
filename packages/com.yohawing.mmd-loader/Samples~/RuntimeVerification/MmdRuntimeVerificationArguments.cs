@@ -18,6 +18,7 @@ namespace Mmd.Samples.RuntimeVerification
         public string PmxPath { get; private set; } = string.Empty;
         public string VmdPath { get; private set; } = string.Empty;
         public string DirectoryPath { get; private set; } = string.Empty;
+        public string FixtureManifestPath { get; private set; } = string.Empty;
         public string OutputPath { get; private set; } = string.Empty;
         public float DurationSeconds { get; private set; } = 3.0f;
         public float FrameRate { get; private set; } = 30.0f;
@@ -55,6 +56,7 @@ namespace Mmd.Samples.RuntimeVerification
                 string? value = inlineValue;
                 bool requiresValue = name is "--pmx" or "--vmd" or "--dir" or "--out" or
                     "--duration" or "--frame-rate" or "--drive" or "--fast-runtime" or
+                    "--fixture-manifest" or
                     "--sample-frames" or "--physics-max-substep-fixed-step";
                 if (requiresValue && value == null)
                 {
@@ -80,6 +82,10 @@ namespace Mmd.Samples.RuntimeVerification
             bool hasPmx = !string.IsNullOrWhiteSpace(PmxPath);
             bool hasVmd = !string.IsNullOrWhiteSpace(VmdPath);
             bool hasDir = !string.IsNullOrWhiteSpace(DirectoryPath);
+            if (!string.IsNullOrWhiteSpace(FixtureManifestPath))
+            {
+                return MmdRuntimeViewerFixtureManifest.LoadPlaybackCases(FixtureManifestPath, Errors);
+            }
 
             if (!hasDir)
             {
@@ -162,6 +168,9 @@ namespace Mmd.Samples.RuntimeVerification
                     break;
                 case "--dir":
                     DirectoryPath = value;
+                    break;
+                case "--fixture-manifest":
+                    FixtureManifestPath = value;
                     break;
                 case "--out":
                     OutputPath = value;
@@ -249,6 +258,11 @@ namespace Mmd.Samples.RuntimeVerification
             PmxPath = ResolveInputPath(PmxPath);
             VmdPath = ResolveInputPath(VmdPath);
             DirectoryPath = ResolveInputPath(DirectoryPath);
+            FixtureManifestPath = ResolveInputPath(ResolveFixtureManifestPath(
+                FixtureManifestPath,
+                PmxPath,
+                VmdPath,
+                DirectoryPath));
             OutputPath = ResolveInputPath(OutputPath);
 
             if (DurationSeconds < 0.0f || float.IsNaN(DurationSeconds) || float.IsInfinity(DurationSeconds))
@@ -266,13 +280,41 @@ namespace Mmd.Samples.RuntimeVerification
                 Errors.Add("--dir does not exist: " + DirectoryPath);
             }
 
+            if (!string.IsNullOrWhiteSpace(FixtureManifestPath) && !File.Exists(FixtureManifestPath))
+            {
+                Errors.Add("--fixture-manifest does not exist: " + FixtureManifestPath);
+            }
+
             if (string.IsNullOrWhiteSpace(DirectoryPath) &&
                 string.IsNullOrWhiteSpace(PmxPath) &&
                 string.IsNullOrWhiteSpace(VmdPath) &&
+                string.IsNullOrWhiteSpace(FixtureManifestPath) &&
                 !HelpRequested)
             {
-                Errors.Add("Provide --pmx/--vmd, or --dir for a parse-only sweep.");
+                Errors.Add("Provide --pmx/--vmd, --fixture-manifest, or --dir for a parse-only sweep.");
             }
+        }
+
+        private static string ResolveFixtureManifestPath(
+            string path,
+            string pmxPath,
+            string vmdPath,
+            string directoryPath)
+        {
+            if (!string.IsNullOrWhiteSpace(path))
+            {
+                return path;
+            }
+
+            if (!string.IsNullOrWhiteSpace(pmxPath) ||
+                !string.IsNullOrWhiteSpace(vmdPath) ||
+                !string.IsNullOrWhiteSpace(directoryPath))
+            {
+                return string.Empty;
+            }
+
+            string? environmentPath = Environment.GetEnvironmentVariable("MMD_RUNTIME_VIEWER_FIXTURES");
+            return environmentPath ?? string.Empty;
         }
 
         private static string ResolveInputPath(string path)

@@ -77,6 +77,25 @@ namespace Mmd.Samples.RuntimeVerification
             }
 
             MmdRuntimeVerificationCase[] cases = arguments.CreateCases();
+            if (arguments.Errors.Count > 0)
+            {
+                report.status = "invalid-arguments";
+                report.exitCode = 2;
+                report.caseResults = new[]
+                {
+                    new MmdRuntimeVerificationCaseResult
+                    {
+                        name = "arguments",
+                        status = "failed",
+                        parseStatus = "not-run",
+                        playbackStatus = "not-run",
+                        exception = string.Join(Environment.NewLine, arguments.Errors)
+                    }
+                };
+                Finish(report, stopwatch, report.exitCode);
+                yield break;
+            }
+
             if (cases.Length == 0)
             {
                 report.status = "failed";
