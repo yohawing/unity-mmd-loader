@@ -39,10 +39,31 @@ namespace Mmd.Native
         internal static extern IntPtr VmdCameraTrackFrameCount(IntPtr track);
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_camera_track_sample", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern byte VmdCameraTrackSample(IntPtr track, float frame, out MmdRuntimeFfiCameraState outCamera);
+        internal static extern byte VmdCameraTrackSample(IntPtr track, float frame, [Out] float[] outF32, IntPtr outF32Len);
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_sample_camera", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern byte VmdSampleCamera(byte[] data, IntPtr len, float frame, out MmdRuntimeFfiCameraState outCamera);
+        internal static extern byte VmdSampleCamera(byte[] data, IntPtr len, float frame, [Out] float[] outF32, IntPtr outF32Len);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_light_track_sample", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern byte VmdLightTrackSample(IntPtr track, float frame, [Out] float[] outF32, IntPtr outF32Len);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_sample_light", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern byte VmdSampleLight(byte[] data, IntPtr len, float frame, [Out] float[] outF32, IntPtr outF32Len);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_light_track_create_from_vmd_bytes", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr VmdLightTrackCreateFromVmdBytes(byte[] data, IntPtr len);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_light_track_frame_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr VmdLightTrackFrameCount(IntPtr track);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_light_track_free", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void VmdLightTrackFree(IntPtr track);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_self_shadow_track_sample", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern byte VmdSelfShadowTrackSample(IntPtr track, float frame, [Out] float[] outF32, IntPtr outF32Len);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_sample_self_shadow", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern byte VmdSampleSelfShadow(byte[] data, IntPtr len, float frame, [Out] float[] outF32, IntPtr outF32Len);
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_camera_track_free", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void VmdCameraTrackFree(IntPtr track);
@@ -96,21 +117,6 @@ namespace Mmd.Native
         }
 
     }
-
-    [StructLayout(LayoutKind.Sequential)]
-    internal readonly struct MmdRuntimeFfiCameraState
-    {
-        public readonly float distance;
-        public readonly float positionX;
-        public readonly float positionY;
-        public readonly float positionZ;
-        public readonly float rotationX;
-        public readonly float rotationY;
-        public readonly float rotationZ;
-        public readonly float fov;
-        public readonly byte perspective;
-    }
-
     internal sealed class MmdRuntimeFfiPlaybackSession : IDisposable
     {
         private readonly IntPtr model;

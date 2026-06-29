@@ -46,6 +46,9 @@ namespace Mmd.Timeline
         private NativeVmdCameraTrackSampler? nativeCameraSampler;
         private byte[]? nativeCameraSamplerSource;
         private bool nativeCameraSamplerUnavailable;
+        private NativeVmdLightTrackSampler? nativeLightSampler;
+        private byte[]? nativeLightSamplerSource;
+        private bool nativeLightSamplerUnavailable;
 
         public override void ProcessFrame(Playable playable, FrameData info, object playerData)
         {
@@ -66,6 +69,7 @@ namespace Mmd.Timeline
         public override void OnPlayableDestroy(Playable playable)
         {
             DisposeNativeCameraSampler();
+            DisposeNativeLightSampler();
         }
 
         /// <summary>
@@ -104,10 +108,9 @@ namespace Mmd.Timeline
                 LastApplyStatus = MmdSceneCameraApplyStatus.NotApplied;
             }
 
-            if (LightKeyframes != null && LightKeyframes.Count > 0)
+            if (TrySampleLight(frame, out MmdLightState lightState))
             {
-                MmdLightState ls = VmdLightSampler.Sample(LightKeyframes, frame);
-                target.ApplyLightState(ls);
+                target.ApplyLightState(lightState);
             }
 
             return LastApplyStatus;
@@ -159,12 +162,66 @@ namespace Mmd.Timeline
             return nativeCameraSampler != null && nativeCameraSampler.TrySample(frame, out state);
         }
 
+        private bool TrySampleLight(float frame, out MmdLightState state)
+        {
+            if (TrySampleNativeLight(frame, out state))
+            {
+                return true;
+            }
+
+            if (LightKeyframes != null && LightKeyframes.Count > 0)
+            {
+                state = VmdLightSampler.Sample(LightKeyframes, frame);
+                return true;
+            }
+
+            state = MmdLightState.Default;
+            return false;
+        }
+
+        private bool TrySampleNativeLight(float frame, out MmdLightState state)
+        {
+            state = MmdLightState.Default;
+            byte[]? motionBytes = MotionBytes;
+            if (motionBytes == null || motionBytes.Length == 0)
+            {
+                return false;
+            }
+
+            if (!ReferenceEquals(nativeLightSamplerSource, motionBytes))
+            {
+                DisposeNativeLightSampler();
+                nativeLightSamplerSource = motionBytes;
+                nativeLightSamplerUnavailable = false;
+                if (!NativeVmdLightTrackSampler.TryCreate(motionBytes, out nativeLightSampler))
+                {
+                    nativeLightSamplerUnavailable = true;
+                    return false;
+                }
+            }
+
+            if (nativeLightSamplerUnavailable)
+            {
+                return false;
+            }
+
+            return nativeLightSampler != null && nativeLightSampler.TrySample(frame, out state);
+        }
+
         private void DisposeNativeCameraSampler()
         {
             nativeCameraSampler?.Dispose();
             nativeCameraSampler = null;
             nativeCameraSamplerSource = null;
             nativeCameraSamplerUnavailable = false;
+        }
+
+        private void DisposeNativeLightSampler()
+        {
+            nativeLightSampler?.Dispose();
+            nativeLightSampler = null;
+            nativeLightSamplerSource = null;
+            nativeLightSamplerUnavailable = false;
         }
     }
 }

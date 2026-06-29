@@ -5,104 +5,42 @@ using Mmd.Native;
 
 namespace Mmd.Motion
 {
-    internal sealed class NativeVmdCameraTrackSampler : IDisposable
+    internal sealed class NativeVmdCameraTrackSampler : NativeVmdTrackSampler<MmdCameraState>
     {
-        private readonly IntPtr track;
-        private bool disposed;
+        private const int CameraSampleFloatCount = 9;
 
         private NativeVmdCameraTrackSampler(IntPtr track, int frameCount)
+            : base(track, frameCount, CameraSampleFloatCount, MmdRuntimeFfiMethods.VmdCameraTrackFree)
         {
-            this.track = track;
-            FrameCount = frameCount;
         }
 
-        public int FrameCount { get; }
+        protected override MmdCameraState DefaultState => MmdCameraState.Default;
 
         public static bool TryCreate(byte[]? vmdBytes, out NativeVmdCameraTrackSampler? sampler)
         {
-            sampler = null;
-            if (vmdBytes == null || vmdBytes.Length == 0)
-            {
-                return false;
-            }
-
-            try
-            {
-                MmdRuntimeFfiMethods.ValidateAbiVersion();
-                IntPtr track = MmdRuntimeFfiMethods.VmdCameraTrackCreateFromVmdBytes(vmdBytes, new IntPtr(vmdBytes.Length));
-                if (track == IntPtr.Zero)
-                {
-                    return false;
-                }
-
-                try
-                {
-                    int frameCount = MmdRuntimeFfiSmoke.CheckedIntPtrToInt(
-                        MmdRuntimeFfiMethods.VmdCameraTrackFrameCount(track),
-                        "VMD camera track frame count");
-                    sampler = new NativeVmdCameraTrackSampler(track, frameCount);
-                    return true;
-                }
-                catch
-                {
-                    MmdRuntimeFfiMethods.VmdCameraTrackFree(track);
-                    throw;
-                }
-            }
-            catch (DllNotFoundException)
-            {
-                return false;
-            }
-            catch (EntryPointNotFoundException)
-            {
-                return false;
-            }
-            catch (BadImageFormatException)
-            {
-                return false;
-            }
-            catch (InvalidOperationException)
-            {
-                return false;
-            }
+            return TryCreateTrack(
+                vmdBytes,
+                MmdRuntimeFfiMethods.VmdCameraTrackCreateFromVmdBytes,
+                MmdRuntimeFfiMethods.VmdCameraTrackFrameCount,
+                MmdRuntimeFfiMethods.VmdCameraTrackFree,
+                (track, frameCount) => new NativeVmdCameraTrackSampler(track, frameCount),
+                "VMD camera track frame count",
+                out sampler);
         }
 
-        public bool TrySample(float frame, out MmdCameraState state)
+        protected override byte SampleTrack(IntPtr track, float frame, float[] values, IntPtr valueCount)
         {
-            state = MmdCameraState.Default;
-            if (disposed || track == IntPtr.Zero || !float.IsFinite(frame))
-            {
-                return false;
-            }
-
-            if (MmdRuntimeFfiMethods.VmdCameraTrackSample(track, frame, out MmdRuntimeFfiCameraState camera) == 0)
-            {
-                return false;
-            }
-
-            state = ToCameraState(camera);
-            return true;
+            return MmdRuntimeFfiMethods.VmdCameraTrackSample(track, frame, values, valueCount);
         }
 
-        public void Dispose()
-        {
-            if (disposed)
-            {
-                return;
-            }
-
-            MmdRuntimeFfiMethods.VmdCameraTrackFree(track);
-            disposed = true;
-        }
-
-        private static MmdCameraState ToCameraState(MmdRuntimeFfiCameraState camera)
+        protected override MmdCameraState ToState(float[] values)
         {
             return new MmdCameraState(
-                camera.distance,
-                new[] { camera.positionX, camera.positionY, camera.positionZ },
-                new[] { camera.rotationX, camera.rotationY, camera.rotationZ },
-                camera.fov,
-                camera.perspective != 0);
+                values[0],
+                new[] { values[1], values[2], values[3] },
+                new[] { values[4], values[5], values[6] },
+                values[7],
+                values[8] != 0.0f);
         }
     }
 }

@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.Playables;
@@ -257,6 +258,46 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void CameraEmptyWithNativeMotionBytesAppliesLightOnly()
+        {
+            var bindingGo = new GameObject("binding");
+            var cameraGo = new GameObject("camera");
+            var lightGo = new GameObject("light");
+            try
+            {
+                Camera camera = cameraGo.AddComponent<Camera>();
+                Light light = lightGo.AddComponent<Light>();
+                light.type = LightType.Directional;
+                MmdSceneEnvironmentBinding binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
+                binding.TargetCamera = camera;
+                binding.TargetLight = light;
+
+                var behaviour = new MmdVmdCameraBehaviour
+                {
+                    CameraKeyframes = Array.Empty<MmdCameraKeyframeDefinition>(),
+                    LightKeyframes = Array.Empty<MmdLightKeyframeDefinition>(),
+                    MotionBytes = BuildLightOnlyVmdBytes(),
+                    FrameRate = 30f,
+                    ImportScale = 1.0f
+                };
+
+                MmdSceneCameraApplyStatus status = behaviour.EvaluateAtLocalTime(binding, 20.0 / 30.0);
+
+                Assert.That(status, Is.EqualTo(MmdSceneCameraApplyStatus.NotApplied));
+                Assert.That(binding.LastLightApplyStatus, Is.EqualTo(MmdSceneLightApplyStatus.Applied));
+                Assert.That(light.color.r, Is.EqualTo(0.5f).Within(0.001f));
+                Assert.That(light.color.g, Is.EqualTo(0.25f).Within(0.001f));
+                Assert.That(light.color.b, Is.EqualTo(0.5f).Within(0.001f));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(lightGo);
+                UnityEngine.Object.DestroyImmediate(cameraGo);
+                UnityEngine.Object.DestroyImmediate(bindingGo);
+            }
+        }
+
+        [Test]
         public void EmptyLightTrackDoesNotApplyLight()
         {
             var bindingGo = new GameObject("binding");
@@ -438,6 +479,51 @@ namespace Mmd.Tests
             {
                 UnityEngine.Object.DestroyImmediate(clip);
             }
+        }
+
+        private static byte[] BuildLightOnlyVmdBytes()
+        {
+            using var stream = new MemoryStream();
+            using var writer = new BinaryWriter(stream);
+
+            WriteFixedAscii(writer, "Vocaloid Motion Data 0002", 30);
+            WriteFixedAscii(writer, "light_shadow", 20);
+            writer.Write(0u); // bone frames
+            writer.Write(0u); // morph frames
+            writer.Write(0u); // camera frames
+            writer.Write(2u); // light frames
+            WriteLightFrame(writer, 10u, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f);
+            WriteLightFrame(writer, 30u, 1.0f, 0.5f, 0.0f, 0.0f, -1.0f, 0.0f);
+            writer.Write(0u); // self-shadow frames
+            writer.Write(0u); // property frames
+            return stream.ToArray();
+        }
+
+        private static void WriteLightFrame(
+            BinaryWriter writer,
+            uint frame,
+            float r,
+            float g,
+            float b,
+            float x,
+            float y,
+            float z)
+        {
+            writer.Write(frame);
+            writer.Write(r);
+            writer.Write(g);
+            writer.Write(b);
+            writer.Write(x);
+            writer.Write(y);
+            writer.Write(z);
+        }
+
+        private static void WriteFixedAscii(BinaryWriter writer, string text, int byteLength)
+        {
+            byte[] bytes = new byte[byteLength];
+            byte[] source = System.Text.Encoding.ASCII.GetBytes(text);
+            Array.Copy(source, bytes, Math.Min(source.Length, bytes.Length));
+            writer.Write(bytes);
         }
     }
 }
