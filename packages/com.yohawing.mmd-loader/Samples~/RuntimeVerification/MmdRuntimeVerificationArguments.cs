@@ -24,6 +24,7 @@ namespace Mmd.Samples.RuntimeVerification
         public float FrameRate { get; private set; } = 30.0f;
         public int[] SampleFrames { get; private set; } = Array.Empty<int>();
         public bool DumpBones { get; private set; }
+        public bool ViewerMode { get; private set; }
         public float PhysicsMaxSubStepFixedStepSeconds { get; private set; }
         public MmdRuntimeVerificationDrive Drive { get; private set; } =
             MmdRuntimeVerificationDrive.Timeline;
@@ -211,6 +212,9 @@ namespace Mmd.Samples.RuntimeVerification
                 case "--dump-bones":
                     DumpBones = true;
                     break;
+                case "--viewer":
+                    ViewerMode = true;
+                    break;
                 case "--drive":
                     if (string.Equals(value, "timeline", StringComparison.OrdinalIgnoreCase))
                     {
@@ -289,7 +293,8 @@ namespace Mmd.Samples.RuntimeVerification
                 string.IsNullOrWhiteSpace(PmxPath) &&
                 string.IsNullOrWhiteSpace(VmdPath) &&
                 string.IsNullOrWhiteSpace(FixtureManifestPath) &&
-                !HelpRequested)
+                !HelpRequested &&
+                !ViewerMode)
             {
                 Errors.Add("Provide --pmx/--vmd, --fixture-manifest, or --dir for a parse-only sweep.");
             }

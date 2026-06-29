@@ -91,6 +91,19 @@ Cases with `skipReason` are skipped by the verification sweep while remaining
 available to the viewer descriptor list. Test-only fields such as oracle, watch
 bones, epsilon, and frame lists are ignored.
 
+Interactive runtime viewer:
+
+```powershell
+.\artifacts\runtime-verification\MmdRuntimeVerification.exe `
+  --viewer `
+  --fixture-manifest F:\Develop\MMDDev\data\fixtures.local.json
+```
+
+`--viewer` keeps the player open, lists manifest cases, and reloads PMX + VMD
+playback when a case is selected. Camera, audio, background, and audio-offset
+references are shown as resolved case metadata; runtime application for those
+optional fields is a later viewer slice.
+
 ## JSON Schema Overview
 
 The report is emitted to `--out` and also logged as a fallback. The top-level

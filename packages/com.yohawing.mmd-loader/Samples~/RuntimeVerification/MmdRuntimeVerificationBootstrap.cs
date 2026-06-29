@@ -29,6 +29,15 @@ namespace Mmd.Samples.RuntimeVerification
                 BulletMmdPhysicsBackend.ResetMaxSubStepEstimateFixedTimeStepSecondsForDiagnostics();
             }
 
+            if (arguments.ViewerMode)
+            {
+                MmdRuntimeViewerController viewer =
+                    gameObject.GetComponent<MmdRuntimeViewerController>() ??
+                    gameObject.AddComponent<MmdRuntimeViewerController>();
+                viewer.Initialize(arguments);
+                yield break;
+            }
+
             try
             {
                 var runner = new MmdRuntimeVerificationRunner(arguments);
@@ -60,7 +69,7 @@ namespace Mmd.Samples.RuntimeVerification
 
         private static void ConfigureSceneView()
         {
-            Camera camera = Camera.main ?? FindFirstObjectByType<Camera>();
+            Camera camera = Camera.main ?? FindAnyObjectByType<Camera>();
             if (camera != null)
             {
                 camera.clearFlags = CameraClearFlags.SolidColor;
