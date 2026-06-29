@@ -35,6 +35,28 @@ namespace Mmd.UnityIntegration
             // Clear non-scene hideFlags on the instantiated hierarchy to ensure scene-visibility.
             ClearNonSceneHideFlags(instanceRoot.transform);
 
+            return CreateFromInstantiatedImportedHierarchy(instanceRoot, model, sourcePath, importScale);
+        }
+
+        internal static MmdUnityModelInstance CreateFromInstantiatedImportedHierarchy(
+            GameObject instanceRoot,
+            MmdModelDefinition model,
+            string? sourcePath,
+            float importScale)
+        {
+            if (instanceRoot == null)
+            {
+                throw new ArgumentNullException(nameof(instanceRoot));
+            }
+
+            if (model == null)
+            {
+                throw new ArgumentNullException(nameof(model));
+            }
+
+            float scale = NormalizeImportScale(importScale);
+            ClearNonSceneHideFlags(instanceRoot.transform);
+
             MmdRenderingDescriptor descriptor = BuildRuntimeRenderingDescriptor(model);
             ValidateDescriptor(descriptor);
 

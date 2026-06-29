@@ -3,6 +3,8 @@
 using System;
 using System.IO;
 using System.Reflection;
+using Mmd;
+using Mmd.Parser;
 using UnityEditor;
 using UnityEngine;
 using Mmd.UnityIntegration;
@@ -500,7 +502,8 @@ namespace Mmd.Editor
 
         public static MmdUnityModelInstance LoadPmxForDragAndDrop(MmdPmxAsset pmxAsset, Vector3 position, GameObject? parent)
         {
-            MmdUnityModelInstance instance = MmdEditorPmxLoader.LoadPmxIntoScene(pmxAsset);
+            MmdUnityModelInstance instance = LoadPmxPrefabInstanceForDragAndDrop(pmxAsset)
+                ?? MmdEditorPmxLoader.LoadPmxIntoScene(pmxAsset);
             MmdUnityPlaybackController controller = instance.Root.GetComponent<MmdUnityPlaybackController>()
                 ?? instance.Root.AddComponent<MmdUnityPlaybackController>();
             controller.ConfigureModelAsset(pmxAsset);
@@ -515,6 +518,41 @@ namespace Mmd.Editor
                 instance.IndexCount,
                 instance.BoneTransforms.Length);
             return instance;
+        }
+
+        private static MmdUnityModelInstance? LoadPmxPrefabInstanceForDragAndDrop(MmdPmxAsset pmxAsset)
+        {
+            if (pmxAsset == null || pmxAsset.ImportedRoot == null)
+            {
+                return null;
+            }
+
+            GameObject? instanceRoot = null;
+            try
+            {
+                instanceRoot = PrefabUtility.InstantiatePrefab(pmxAsset.ImportedRoot) as GameObject;
+                if (instanceRoot == null)
+                {
+                    return null;
+                }
+
+                Undo.RegisterCreatedObjectUndo(instanceRoot, "Load PMX Asset Into Scene");
+                MmdModelDefinition model = pmxAsset.LoadModel();
+                return MmdUnityModelFactory.CreateFromInstantiatedImportedHierarchy(
+                    instanceRoot,
+                    model,
+                    string.IsNullOrWhiteSpace(pmxAsset.SourcePath) ? null : pmxAsset.SourcePath,
+                    pmxAsset.ImportScale);
+            }
+            catch
+            {
+                if (instanceRoot != null)
+                {
+                    Object.DestroyImmediate(instanceRoot);
+                }
+
+                throw;
+            }
         }
 
         public static MmdUnityModelInstance LoadPmxPathForDragAndDrop(string pmxPath, Vector3 position, GameObject? parent)

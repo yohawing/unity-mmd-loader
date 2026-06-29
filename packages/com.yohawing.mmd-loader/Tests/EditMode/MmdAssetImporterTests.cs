@@ -2311,6 +2311,40 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void SceneDragAndDropLoadsPmxAssetAsImportedPrefabInstance()
+        {
+            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+            Assert.That(pmxAsset.ImportedRoot, Is.Not.Null);
+            MmdUnityModelInstance? instance = null;
+
+            try
+            {
+                instance = MmdSceneDragAndDrop.LoadPmxForDragAndDrop(
+                    pmxAsset,
+                    new Vector3(1.0f, 0.0f, 2.0f),
+                    parent: null);
+
+                Assert.That(instance.Root.transform.parent, Is.Null);
+                Assert.That(instance.Root.transform.position, Is.EqualTo(new Vector3(1.0f, 0.0f, 2.0f)));
+                Assert.That(PrefabUtility.GetPrefabInstanceStatus(instance.Root), Is.EqualTo(PrefabInstanceStatus.Connected));
+                Assert.That(PrefabUtility.GetCorrespondingObjectFromSource(instance.Root), Is.SameAs(pmxAsset.ImportedRoot));
+                Assert.That(instance.Mesh, Is.SameAs(pmxAsset.ImportedMesh));
+                Assert.That(instance.Materials, Is.Not.Empty);
+                Assert.That(instance.Materials[0], Is.SameAs(pmxAsset.ImportedMaterials[0]));
+
+                MmdUnityPlaybackController controller = instance.Root.GetComponent<MmdUnityPlaybackController>();
+                Assert.That(controller, Is.Not.Null);
+                Assert.That(controller.HasModelSource, Is.True);
+                Assert.That(controller.ModelAssetSource, Is.SameAs(pmxAsset));
+            }
+            finally
+            {
+                DestroyInstance(instance);
+            }
+        }
+
+        [Test]
         public void SceneDragAndDropLoadsRawPmxPathUnderHierarchyParent()
         {
             string pmxPath = Path.Combine(RepositoryRoot, "packages", "com.yohawing.mmd-loader", "Tests", "Fixtures", "Assets", "test_1bone_cube.pmx");
