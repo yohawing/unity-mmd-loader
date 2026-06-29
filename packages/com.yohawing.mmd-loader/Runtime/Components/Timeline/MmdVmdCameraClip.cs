@@ -98,6 +98,9 @@ namespace Mmd.Timeline
             behaviour.LoopPolicy = loopPolicy;
             behaviour.MinFieldOfView = minFieldOfView;
             behaviour.ImportScale = ImportScale;
+            behaviour.MotionBytes = motionAsset != null && motionAsset.ByteLength > 0
+                ? motionAsset.GetBytesCopy()
+                : null;
             (IReadOnlyList<MmdCameraKeyframeDefinition> cam, IReadOnlyList<MmdLightKeyframeDefinition> lit) = LoadSceneKeyframes(motionAsset);
             behaviour.CameraKeyframes = cam;
             behaviour.LightKeyframes = lit;

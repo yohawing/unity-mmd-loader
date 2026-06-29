@@ -32,6 +32,21 @@ namespace Mmd.Native
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_create_from_vmd_bytes_for_model", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr ClipCreateFromVmdBytesForModel(IntPtr model, byte[] data, IntPtr len);
 
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_camera_track_create_from_vmd_bytes", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr VmdCameraTrackCreateFromVmdBytes(byte[] data, IntPtr len);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_camera_track_frame_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr VmdCameraTrackFrameCount(IntPtr track);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_camera_track_sample", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern byte VmdCameraTrackSample(IntPtr track, float frame, out MmdRuntimeFfiCameraState outCamera);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_sample_camera", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern byte VmdSampleCamera(byte[] data, IntPtr len, float frame, out MmdRuntimeFfiCameraState outCamera);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_camera_track_free", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void VmdCameraTrackFree(IntPtr track);
+
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_frame_range", CallingConvention = CallingConvention.Cdecl)]
         internal static extern byte ClipFrameRange(IntPtr clip, out uint firstFrame, out uint lastFrame);
 
@@ -80,6 +95,20 @@ namespace Mmd.Native
             return abiVersion;
         }
 
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal readonly struct MmdRuntimeFfiCameraState
+    {
+        public readonly float distance;
+        public readonly float positionX;
+        public readonly float positionY;
+        public readonly float positionZ;
+        public readonly float rotationX;
+        public readonly float rotationY;
+        public readonly float rotationZ;
+        public readonly float fov;
+        public readonly byte perspective;
     }
 
     internal sealed class MmdRuntimeFfiPlaybackSession : IDisposable

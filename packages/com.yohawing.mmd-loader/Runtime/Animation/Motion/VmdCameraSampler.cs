@@ -42,9 +42,9 @@ namespace Mmd.Motion
     /// <summary>
     /// Samples a VMD camera track (<see cref="MmdCameraKeyframeDefinition"/>) at an arbitrary frame.
     ///
-    /// Interpolation uses the next keyframe's 24-byte VMD camera block as six per-channel bezier
-    /// curves: position X/Y/Z, rotation, distance, and view angle. <see cref="MmdCameraState.Perspective"/>
-    /// is a step value taken from the previous keyframe (it is a flag, not interpolated).
+    /// Interpolation mirrors mmd-anim's VMD camera sampler: it uses the next keyframe's
+    /// 24-byte VMD camera block as six contiguous bezier curves (X/Y/Z, rotation,
+    /// distance, and view angle). <see cref="MmdCameraState.Perspective"/> is a step value.
     /// </summary>
     public static class VmdCameraSampler
     {
@@ -107,8 +107,7 @@ namespace Mmd.Motion
                 return FromKeyframe(previous);
             }
 
-            float span = next.frame - previous.frame;
-            float t = (frame - previous.frame) / span;
+            float t = InterpolationRatio(previous.frame, next.frame, frame);
             float distanceT = Interpolate(next.interpolation, DistanceChannel, t);
             float positionXT = Interpolate(next.interpolation, PositionXChannel, t);
             float positionYT = Interpolate(next.interpolation, PositionYChannel, t);
@@ -162,11 +161,28 @@ namespace Mmd.Motion
             }
 
             return VmdBezier.Evaluate(
-                interpolation[channel],
-                interpolation[channel + 6],
-                interpolation[channel + 12],
-                interpolation[channel + 18],
+                interpolation[channel * 4],
+                interpolation[channel * 4 + 1],
+                interpolation[channel * 4 + 2],
+                interpolation[channel * 4 + 3],
                 progress);
+        }
+
+        private static float InterpolationRatio(int previousFrame, int nextFrame, float frame)
+        {
+            if (nextFrame <= previousFrame)
+            {
+                return 0.0f;
+            }
+
+            int span = nextFrame - previousFrame;
+            if (span <= 1)
+            {
+                return frame >= nextFrame ? 1.0f : 0.0f;
+            }
+
+            float t = (frame - previousFrame) / span;
+            return Math.Clamp(t, 0.0f, 1.0f);
         }
 
         private static float Component(float[]? values, int index)

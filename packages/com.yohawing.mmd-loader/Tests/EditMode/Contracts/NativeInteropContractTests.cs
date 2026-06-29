@@ -123,6 +123,16 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void RuntimeFfiPinsVmdCameraSamplerEntrypoints()
+        {
+            AssertRuntimeFfiSignature("VmdCameraTrackCreateFromVmdBytes", typeof(IntPtr), typeof(byte[]), typeof(IntPtr));
+            AssertRuntimeFfiSignature("VmdCameraTrackFrameCount", typeof(IntPtr), typeof(IntPtr));
+            AssertRuntimeFfiSignature("VmdCameraTrackSample", typeof(byte), typeof(IntPtr), typeof(float), typeof(MmdRuntimeFfiCameraState).MakeByRefType());
+            AssertRuntimeFfiSignature("VmdSampleCamera", typeof(byte), typeof(byte[]), typeof(IntPtr), typeof(float), typeof(MmdRuntimeFfiCameraState).MakeByRefType());
+            AssertRuntimeFfiSignature("VmdCameraTrackFree", typeof(void), typeof(IntPtr));
+        }
+
+        [Test]
         public void WindowsPluginLayoutContainsRuntimeAndPhysicsButNoLegacyParserDll()
         {
             string pluginRoot = Path.Combine(MmdTestFixtures.PackageRoot, "Runtime", "Plugins", "x86_64");
@@ -161,6 +171,14 @@ namespace Mmd.Tests
             MethodInfo method = typeof(MmdParserFfiMethods).GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Static);
             Assert.That(method, Is.Not.Null, methodName);
             return method;
+        }
+
+        private static void AssertRuntimeFfiSignature(string methodName, Type returnType, params Type[] parameterTypes)
+        {
+            MethodInfo method = typeof(MmdRuntimeFfiMethods).GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.That(method, Is.Not.Null, methodName);
+            Assert.That(method.ReturnType, Is.EqualTo(returnType), methodName);
+            CollectionAssert.AreEqual(parameterTypes, method.GetParameters().Select(parameter => parameter.ParameterType).ToArray(), methodName);
         }
     }
 }

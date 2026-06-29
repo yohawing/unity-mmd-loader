@@ -24,6 +24,8 @@ namespace Mmd.Timeline
         public IReadOnlyList<MmdCameraKeyframeDefinition>? CameraKeyframes { get; set; }
             = Array.Empty<MmdCameraKeyframeDefinition>();
 
+        public byte[]? MotionBytes { get; set; }
+
         public IReadOnlyList<MmdLightKeyframeDefinition>? LightKeyframes { get; set; }
             = Array.Empty<MmdLightKeyframeDefinition>();
 
@@ -41,6 +43,10 @@ namespace Mmd.Timeline
 
         public MmdSceneCameraApplyStatus LastApplyStatus { get; private set; }
 
+        private NativeVmdCameraTrackSampler? nativeCameraSampler;
+        private byte[]? nativeCameraSamplerSource;
+        private bool nativeCameraSamplerUnavailable;
+
         public override void ProcessFrame(Playable playable, FrameData info, object playerData)
         {
             if (info.effectiveWeight <= 0.0f)
@@ -55,6 +61,11 @@ namespace Mmd.Timeline
             }
 
             EvaluateAtLocalTime(target, playable.GetTime());
+        }
+
+        public override void OnPlayableDestroy(Playable playable)
+        {
+            DisposeNativeCameraSampler();
         }
 
         /// <summary>
@@ -84,10 +95,9 @@ namespace Mmd.Timeline
 
             float frame = (float)(sourceTime * FrameRate);
 
-            if (CameraKeyframes != null && CameraKeyframes.Count > 0)
+            if (TrySampleCamera(frame, out MmdCameraState cameraState))
             {
-                MmdCameraState cs = VmdCameraSampler.Sample(CameraKeyframes, frame);
-                LastApplyStatus = target.ApplyCameraState(cs, MinFieldOfView, ImportScale);
+                LastApplyStatus = target.ApplyCameraState(cameraState, MinFieldOfView, ImportScale);
             }
             else
             {
@@ -101,6 +111,60 @@ namespace Mmd.Timeline
             }
 
             return LastApplyStatus;
+        }
+
+        private bool TrySampleCamera(float frame, out MmdCameraState state)
+        {
+            if (TrySampleNativeCamera(frame, out state))
+            {
+                return true;
+            }
+
+            if (CameraKeyframes != null && CameraKeyframes.Count > 0)
+            {
+                state = VmdCameraSampler.Sample(CameraKeyframes, frame);
+                return true;
+            }
+
+            state = MmdCameraState.Default;
+            return false;
+        }
+
+        private bool TrySampleNativeCamera(float frame, out MmdCameraState state)
+        {
+            state = MmdCameraState.Default;
+            byte[]? motionBytes = MotionBytes;
+            if (motionBytes == null || motionBytes.Length == 0)
+            {
+                return false;
+            }
+
+            if (!ReferenceEquals(nativeCameraSamplerSource, motionBytes))
+            {
+                DisposeNativeCameraSampler();
+                nativeCameraSamplerSource = motionBytes;
+                nativeCameraSamplerUnavailable = false;
+                if (!NativeVmdCameraTrackSampler.TryCreate(motionBytes, out nativeCameraSampler))
+                {
+                    nativeCameraSamplerUnavailable = true;
+                    return false;
+                }
+            }
+
+            if (nativeCameraSamplerUnavailable)
+            {
+                return false;
+            }
+
+            return nativeCameraSampler != null && nativeCameraSampler.TrySample(frame, out state);
+        }
+
+        private void DisposeNativeCameraSampler()
+        {
+            nativeCameraSampler?.Dispose();
+            nativeCameraSampler = null;
+            nativeCameraSamplerSource = null;
+            nativeCameraSamplerUnavailable = false;
         }
     }
 }

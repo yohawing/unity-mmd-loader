@@ -89,15 +89,17 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void CameraInterpolationUsesNextKeyframePerChannelBezierBlock()
+        public void CameraInterpolationUsesMmdAnimContiguousNextKeyframeBezierBlock()
         {
             byte[] interpolation =
             {
-                // VMD camera layout stores six channel X1 values, then six Y1 values, X2, Y2.
-                0, 127, 20, 0, 64, 0,
-                127, 0, 20, 0, 127, 64,
-                127, 127, 107, 127, 127, 64,
-                127, 0, 107, 64, 0, 127
+                // mmd-anim decodes VMD camera interpolation as six contiguous 4-byte curves.
+                0, 1, 2, 3,
+                4, 5, 6, 7,
+                8, 9, 10, 11,
+                12, 13, 14, 15,
+                16, 17, 18, 19,
+                20, 21, 22, 23
             };
             var keyframes = new List<MmdCameraKeyframeDefinition>
             {
@@ -107,15 +109,44 @@ namespace Mmd.Tests
 
             MmdCameraState mid = VmdCameraSampler.Sample(keyframes, 5.0f);
 
-            Assert.That(mid.Position[0], Is.EqualTo(10.0f * VmdBezier.Evaluate(0, 127, 127, 127, 0.5f)).Within(0.0001f));
-            Assert.That(mid.Position[1], Is.EqualTo(20.0f * VmdBezier.Evaluate(127, 0, 127, 0, 0.5f)).Within(0.0001f));
-            Assert.That(mid.Position[2], Is.EqualTo(15.0f).Within(0.0001f));
-            Assert.That(mid.Rotation[0], Is.EqualTo(1.0f * VmdBezier.Evaluate(0, 0, 127, 64, 0.5f)).Within(0.0001f));
-            Assert.That(mid.Rotation[1], Is.EqualTo(2.0f * VmdBezier.Evaluate(0, 0, 127, 64, 0.5f)).Within(0.0001f));
-            Assert.That(mid.Distance, Is.EqualTo(100.0f * VmdBezier.Evaluate(64, 127, 127, 0, 0.5f)).Within(0.0001f));
-            Assert.That(mid.ViewAngle, Is.EqualTo(20.0f + (40.0f * VmdBezier.Evaluate(0, 64, 64, 127, 0.5f))).Within(0.0001f));
+            Assert.That(mid.Position[0], Is.EqualTo(10.0f * VmdBezier.Evaluate(0, 1, 2, 3, 0.5f)).Within(0.0001f));
+            Assert.That(mid.Position[1], Is.EqualTo(20.0f * VmdBezier.Evaluate(4, 5, 6, 7, 0.5f)).Within(0.0001f));
+            Assert.That(mid.Position[2], Is.EqualTo(30.0f * VmdBezier.Evaluate(8, 9, 10, 11, 0.5f)).Within(0.0001f));
+            Assert.That(mid.Rotation[0], Is.EqualTo(1.0f * VmdBezier.Evaluate(12, 13, 14, 15, 0.5f)).Within(0.0001f));
+            Assert.That(mid.Rotation[1], Is.EqualTo(2.0f * VmdBezier.Evaluate(12, 13, 14, 15, 0.5f)).Within(0.0001f));
+            Assert.That(mid.Distance, Is.EqualTo(100.0f * VmdBezier.Evaluate(16, 17, 18, 19, 0.5f)).Within(0.0001f));
+            Assert.That(mid.ViewAngle, Is.EqualTo(20.0f + (40.0f * VmdBezier.Evaluate(20, 21, 22, 23, 0.5f))).Within(0.0001f));
             Assert.That(mid.Position[0], Is.Not.EqualTo(5.0f).Within(0.0001f));
             Assert.That(mid.Distance, Is.Not.EqualTo(50.0f).Within(0.0001f));
+        }
+
+        [Test]
+        public void OneFrameSpanStepsLikeMmdAnimCameraSampler()
+        {
+            byte[] interpolation =
+            {
+                0, 127, 127, 127,
+                0, 127, 127, 127,
+                0, 127, 127, 127,
+                0, 127, 127, 127,
+                0, 127, 127, 127,
+                0, 127, 127, 127
+            };
+            var keyframes = new List<MmdCameraKeyframeDefinition>
+            {
+                Keyframe(0, -40.0f, new[] { 0.0f, 10.0f, 0.0f }, new[] { 0.0f, 0.0f, 0.0f }, 20, true),
+                Keyframe(1, -20.0f, new[] { 2.0f, 20.0f, -4.0f }, new[] { 0.1f, 0.1f, 0.1f }, 40, true, interpolation)
+            };
+
+            MmdCameraState between = VmdCameraSampler.Sample(keyframes, 0.5f);
+            MmdCameraState exactNext = VmdCameraSampler.Sample(keyframes, 1.0f);
+
+            Assert.That(between.Distance, Is.EqualTo(-40.0f));
+            Assert.That(between.ViewAngle, Is.EqualTo(20.0f));
+            CollectionAssert.AreEqual(new[] { 0.0f, 10.0f, 0.0f }, between.Position);
+            Assert.That(exactNext.Distance, Is.EqualTo(-20.0f));
+            Assert.That(exactNext.ViewAngle, Is.EqualTo(40.0f));
+            CollectionAssert.AreEqual(new[] { 2.0f, 20.0f, -4.0f }, exactNext.Position);
         }
 
         [Test]

@@ -136,6 +136,41 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void EvaluateAtLocalTimeFallsBackToManagedSamplerWhenNativeCameraTrackUnavailable()
+        {
+            var bindingGo = new GameObject("binding");
+            var cameraGo = new GameObject("camera");
+            try
+            {
+                var binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
+                Camera camera = cameraGo.AddComponent<Camera>();
+                binding.TargetCamera = camera;
+
+                List<MmdCameraKeyframeDefinition> keyframes = TwoKeyframeTrack();
+                var behaviour = new MmdVmdCameraBehaviour
+                {
+                    CameraKeyframes = keyframes,
+                    MotionBytes = new byte[] { 0, 1, 2, 3 },
+                    FrameRate = 30f,
+                    ImportScale = 1.0f
+                };
+
+                MmdSceneCameraApplyStatus status = behaviour.EvaluateAtLocalTime(binding, 0.5);
+
+                MmdUnityCameraPose expectedPose = MmdCameraStateToUnity.Convert(VmdCameraSampler.Sample(keyframes, 15f));
+                Assert.That(status, Is.EqualTo(MmdSceneCameraApplyStatus.Applied));
+                Assert.That(camera.transform.position.x, Is.EqualTo(expectedPose.Position.x).Within(0.0001f));
+                Assert.That(camera.transform.position.y, Is.EqualTo(expectedPose.Position.y).Within(0.0001f));
+                Assert.That(camera.transform.position.z, Is.EqualTo(expectedPose.Position.z).Within(0.0001f));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(bindingGo);
+                UnityEngine.Object.DestroyImmediate(cameraGo);
+            }
+        }
+
+        [Test]
         public void EvaluateAtLocalTimeAppliesLightToBoundProxy()
         {
             var bindingGo = new GameObject("binding");
@@ -374,6 +409,7 @@ namespace Mmd.Tests
                 Assert.That(behaviour.ImportScale, Is.EqualTo(0.25f).Within(0.001f));
                 Assert.That(behaviour.MotionSourceId, Is.EqualTo("cam-src"));
                 Assert.That(behaviour.LoopPolicy, Is.EqualTo(MmdVmdTimelineLoopPolicy.None));
+                Assert.That(behaviour.MotionBytes, Is.Null);
                 Assert.That(behaviour.CameraKeyframes, Is.Empty);
                 Assert.That(behaviour.LightKeyframes, Is.Empty);
                 Assert.That(behaviour.Binding, Is.Null, "unresolved ExposedReference resolves to null");
