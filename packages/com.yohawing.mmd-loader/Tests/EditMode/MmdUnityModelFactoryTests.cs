@@ -651,16 +651,22 @@ namespace Mmd.Tests
             {
                 MmdModelDefinition model = CreateTwoTransparentTriangleModel();
                 model.materials[0].cullingPolicy = "double-sided";
+                model.materials[0].drawEdgeFlag = true;
+                model.materials[0].edgeSize = 1.0f;
                 model.materials[1].cullingPolicy = "backface-culling";
+                model.materials[1].drawEdgeFlag = true;
+                model.materials[1].edgeSize = 1.0f;
 
                 instance = MmdUnityModelFactory.CreateStaticModel(model);
 
                 Assert.That(ReadMaterialFloat(instance.Materials[0], "_Cull"), Is.EqualTo((float)UnityEngine.Rendering.CullMode.Off).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_OutlineVisible"), Is.EqualTo(1.0f).Within(0.00001f));
                 Assert.That(instance.MaterialBindingDiagnostics[0].cull, Is.EqualTo((float)UnityEngine.Rendering.CullMode.Off).Within(0.00001f));
                 Assert.That(instance.MaterialBindingDiagnostics[0].cullingPolicy, Is.EqualTo("double-sided"));
                 Assert.That(instance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
 
                 Assert.That(ReadMaterialFloat(instance.Materials[1], "_Cull"), Is.EqualTo((float)UnityEngine.Rendering.CullMode.Back).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(instance.Materials[1], "_OutlineVisible"), Is.EqualTo(0.0f).Within(0.00001f));
                 Assert.That(instance.MaterialBindingDiagnostics[1].cull, Is.EqualTo((float)UnityEngine.Rendering.CullMode.Back).Within(0.00001f));
                 Assert.That(instance.MaterialBindingDiagnostics[1].cullingPolicy, Is.EqualTo("backface-culling"));
                 Assert.That(instance.Materials[1].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent + 1));
