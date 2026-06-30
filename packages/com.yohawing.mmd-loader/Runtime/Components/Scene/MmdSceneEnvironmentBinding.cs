@@ -51,6 +51,27 @@ namespace Mmd.UnityIntegration
     }
 
     /// <summary>
+    /// Result of applying an MMD self-shadow state to the bound Scene Directional Light.
+    /// </summary>
+    public enum MmdSceneSelfShadowApplyStatus
+    {
+        /// <summary>Default before any apply call — distinguishes "never applied" from "applied".</summary>
+        NotApplied = 0,
+
+        /// <summary>Runtime application is disabled by policy; nothing was mutated.</summary>
+        Disabled = 1,
+
+        /// <summary>The mapped self-shadow settings were applied to the bound Light.</summary>
+        Applied = 2,
+
+        /// <summary>No target Light is bound; nothing was applied (structured diagnostic).</summary>
+        NoTargetLight = 3,
+
+        /// <summary>The bound light is not directional; nothing was applied.</summary>
+        UnsupportedLightType = 4
+    }
+
+    /// <summary>
     /// The "scene environment" proxy a VMD camera (and later light / self-shadow) track binds to on
     /// a Timeline. It does NOT own a Camera — it points at an existing Scene <see cref="Camera"/> and
     /// drives it. Nothing is auto-created; an unbound target is surfaced as a structured diagnostic
@@ -66,6 +87,30 @@ namespace Mmd.UnityIntegration
         [Tooltip("The Directional Light that VMD light motion drives. Optional; nothing is auto-created.")]
         private Light? targetLight;
 
+        [SerializeField]
+        [Tooltip("Opt-in only. When enabled, VMD self-shadow mode/distance may drive the bound Directional Light shadow settings.")]
+        private bool applySelfShadowToLight;
+
+        [SerializeField]
+        [Tooltip("Scale applied to VMD self-shadow distance before clamping. Recorded for diagnostics; Unity directional shadow distance remains untouched.")]
+        private float selfShadowDistanceScale = 100.0f;
+
+        [SerializeField]
+        [Tooltip("Minimum mapped VMD self-shadow distance. Recorded for diagnostics; Unity directional shadow distance remains untouched.")]
+        private float selfShadowMinDistance = 1.0f;
+
+        [SerializeField]
+        [Tooltip("Maximum mapped VMD self-shadow distance. Recorded for diagnostics; Unity directional shadow distance remains untouched.")]
+        private float selfShadowMaxDistance = 100.0f;
+
+        [SerializeField]
+        [Tooltip("Shadow strength applied to the bound Directional Light when VMD self-shadow mode casts shadows.")]
+        private float selfShadowStrength = 1.0f;
+
+        [SerializeField]
+        [Tooltip("Unity shadow mode used on the bound Directional Light when VMD self-shadow mode casts shadows.")]
+        private LightShadows selfShadowLightMode = LightShadows.Soft;
+
         public Camera? TargetCamera
         {
             get => targetCamera;
@@ -78,11 +123,53 @@ namespace Mmd.UnityIntegration
             set => targetLight = value;
         }
 
+        public bool ApplySelfShadowToLight
+        {
+            get => applySelfShadowToLight;
+            set => applySelfShadowToLight = value;
+        }
+
+        public float SelfShadowDistanceScale
+        {
+            get => selfShadowDistanceScale;
+            set => selfShadowDistanceScale = value;
+        }
+
+        public float SelfShadowMinDistance
+        {
+            get => selfShadowMinDistance;
+            set => selfShadowMinDistance = value;
+        }
+
+        public float SelfShadowMaxDistance
+        {
+            get => selfShadowMaxDistance;
+            set => selfShadowMaxDistance = value;
+        }
+
+        public float SelfShadowStrength
+        {
+            get => selfShadowStrength;
+            set => selfShadowStrength = value;
+        }
+
+        public LightShadows SelfShadowLightMode
+        {
+            get => selfShadowLightMode;
+            set => selfShadowLightMode = value == LightShadows.None ? LightShadows.Soft : value;
+        }
+
         /// <summary>The status of the most recent <see cref="ApplyCameraState"/> call.</summary>
         public MmdSceneCameraApplyStatus LastCameraApplyStatus { get; private set; }
 
         /// <summary>The status of the most recent <see cref="ApplyLightState"/> call.</summary>
         public MmdSceneLightApplyStatus LastLightApplyStatus { get; private set; }
+
+        /// <summary>The status of the most recent <see cref="ApplySelfShadowState"/> call.</summary>
+        public MmdSceneSelfShadowApplyStatus LastSelfShadowApplyStatus { get; private set; }
+
+        /// <summary>The most recent mapped self-shadow settings. Distance is diagnostic-only for now.</summary>
+        public MmdSelfShadowUnityShadowSettings LastSelfShadowSettings { get; private set; }
 
         /// <summary>
         /// Converts <paramref name="state"/> (via <see cref="MmdCameraStateToUnity"/>) and applies it to
@@ -152,6 +239,52 @@ namespace Mmd.UnityIntegration
                 ? MmdSceneLightApplyStatus.Applied
                 : MmdSceneLightApplyStatus.AppliedNonDirectional;
             return LastLightApplyStatus;
+        }
+
+        /// <summary>
+        /// Maps <paramref name="state"/> through the explicit self-shadow policy and, only when opted in,
+        /// applies Light-local shadow settings to the bound Directional Light. This method intentionally
+        /// does not mutate RenderSettings, QualitySettings shadow distance, URP assets, or Materials.
+        /// </summary>
+        public MmdSceneSelfShadowApplyStatus ApplySelfShadowState(MmdSelfShadowState state)
+        {
+            LastSelfShadowSettings = VmdSelfShadowSampler.MapToUnityShadowSettings(
+                state,
+                new MmdSelfShadowMappingPolicy(
+                    applySelfShadowToLight,
+                    selfShadowDistanceScale,
+                    selfShadowMinDistance,
+                    selfShadowMaxDistance,
+                    selfShadowStrength));
+
+            if (!LastSelfShadowSettings.RuntimeApplicationEnabled)
+            {
+                LastSelfShadowApplyStatus = MmdSceneSelfShadowApplyStatus.Disabled;
+                return LastSelfShadowApplyStatus;
+            }
+
+            if (targetLight == null)
+            {
+                LastSelfShadowApplyStatus = MmdSceneSelfShadowApplyStatus.NoTargetLight;
+                return LastSelfShadowApplyStatus;
+            }
+
+            if (targetLight.type != LightType.Directional)
+            {
+                LastSelfShadowApplyStatus = MmdSceneSelfShadowApplyStatus.UnsupportedLightType;
+                return LastSelfShadowApplyStatus;
+            }
+
+            LightShadows shadowMode = selfShadowLightMode == LightShadows.None
+                ? LightShadows.Soft
+                : selfShadowLightMode;
+            targetLight.shadows = LastSelfShadowSettings.CastShadows
+                ? shadowMode
+                : LightShadows.None;
+            targetLight.shadowStrength = LastSelfShadowSettings.ShadowStrength;
+
+            LastSelfShadowApplyStatus = MmdSceneSelfShadowApplyStatus.Applied;
+            return LastSelfShadowApplyStatus;
         }
 
         private static float Component(float[] values, int index)

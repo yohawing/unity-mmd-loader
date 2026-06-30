@@ -29,6 +29,9 @@ namespace Mmd.Timeline
         public IReadOnlyList<MmdLightKeyframeDefinition>? LightKeyframes { get; set; }
             = Array.Empty<MmdLightKeyframeDefinition>();
 
+        public IReadOnlyList<MmdSelfShadowKeyframeDefinition>? SelfShadowKeyframes { get; set; }
+            = Array.Empty<MmdSelfShadowKeyframeDefinition>();
+
         public string MotionSourceId { get; set; } = string.Empty;
 
         public float FrameRate { get; set; } = 30.0f;
@@ -111,6 +114,11 @@ namespace Mmd.Timeline
             if (TrySampleLight(frame, out MmdLightState lightState))
             {
                 target.ApplyLightState(lightState);
+            }
+
+            if (TrySampleSelfShadow(frame, out MmdSelfShadowState selfShadowState))
+            {
+                target.ApplySelfShadowState(selfShadowState);
             }
 
             return LastApplyStatus;
@@ -206,6 +214,18 @@ namespace Mmd.Timeline
             }
 
             return nativeLightSampler != null && nativeLightSampler.TrySample(frame, out state);
+        }
+
+        private bool TrySampleSelfShadow(float frame, out MmdSelfShadowState state)
+        {
+            if (SelfShadowKeyframes != null && SelfShadowKeyframes.Count > 0)
+            {
+                state = VmdSelfShadowSampler.Sample(SelfShadowKeyframes, frame);
+                return true;
+            }
+
+            state = MmdSelfShadowState.Default;
+            return false;
         }
 
         private void DisposeNativeCameraSampler()

@@ -59,6 +59,25 @@ namespace Mmd.Tests
             };
         }
 
+        private static List<MmdSelfShadowKeyframeDefinition> SelfShadowKeyframes()
+        {
+            return new List<MmdSelfShadowKeyframeDefinition>
+            {
+                new MmdSelfShadowKeyframeDefinition
+                {
+                    frame = 0,
+                    mode = 1,
+                    distance = 0.2f
+                },
+                new MmdSelfShadowKeyframeDefinition
+                {
+                    frame = 30,
+                    mode = 2,
+                    distance = 0.6f
+                }
+            };
+        }
+
         [Test]
         public void EvaluateAtLocalTimeAppliesSampledCameraStateToBoundProxy()
         {
@@ -336,6 +355,91 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void EvaluateAtLocalTimeDoesNotApplySelfShadowByDefault()
+        {
+            var bindingGo = new GameObject("binding");
+            var lightGo = new GameObject("light");
+            float originalShadowDistance = QualitySettings.shadowDistance;
+            try
+            {
+                Light light = lightGo.AddComponent<Light>();
+                light.type = LightType.Directional;
+                light.shadows = LightShadows.Hard;
+                light.shadowStrength = 0.3f;
+
+                MmdSceneEnvironmentBinding binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
+                binding.TargetLight = light;
+
+                var behaviour = new MmdVmdCameraBehaviour
+                {
+                    CameraKeyframes = Array.Empty<MmdCameraKeyframeDefinition>(),
+                    LightKeyframes = Array.Empty<MmdLightKeyframeDefinition>(),
+                    SelfShadowKeyframes = SelfShadowKeyframes(),
+                    FrameRate = 30f,
+                    ImportScale = 1.0f
+                };
+
+                MmdSceneCameraApplyStatus status = behaviour.EvaluateAtLocalTime(binding, 0.5);
+
+                Assert.That(status, Is.EqualTo(MmdSceneCameraApplyStatus.NotApplied));
+                Assert.That(binding.LastSelfShadowApplyStatus, Is.EqualTo(MmdSceneSelfShadowApplyStatus.Disabled));
+                Assert.That(light.shadows, Is.EqualTo(LightShadows.Hard));
+                Assert.That(light.shadowStrength, Is.EqualTo(0.3f).Within(0.001f));
+                Assert.That(QualitySettings.shadowDistance, Is.EqualTo(originalShadowDistance).Within(0.001f));
+            }
+            finally
+            {
+                QualitySettings.shadowDistance = originalShadowDistance;
+                UnityEngine.Object.DestroyImmediate(lightGo);
+                UnityEngine.Object.DestroyImmediate(bindingGo);
+            }
+        }
+
+        [Test]
+        public void EvaluateAtLocalTimeAppliesSelfShadowWhenBindingOptedIn()
+        {
+            var bindingGo = new GameObject("binding");
+            var lightGo = new GameObject("light");
+            try
+            {
+                Light light = lightGo.AddComponent<Light>();
+                light.type = LightType.Directional;
+                light.shadows = LightShadows.None;
+
+                MmdSceneEnvironmentBinding binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
+                binding.TargetLight = light;
+                binding.ApplySelfShadowToLight = true;
+                binding.SelfShadowDistanceScale = 10.0f;
+                binding.SelfShadowMinDistance = 1.0f;
+                binding.SelfShadowMaxDistance = 10.0f;
+                binding.SelfShadowStrength = 0.5f;
+
+                var behaviour = new MmdVmdCameraBehaviour
+                {
+                    CameraKeyframes = Array.Empty<MmdCameraKeyframeDefinition>(),
+                    LightKeyframes = Array.Empty<MmdLightKeyframeDefinition>(),
+                    SelfShadowKeyframes = SelfShadowKeyframes(),
+                    FrameRate = 30f,
+                    ImportScale = 1.0f
+                };
+
+                MmdSceneCameraApplyStatus status = behaviour.EvaluateAtLocalTime(binding, 0.5);
+
+                Assert.That(status, Is.EqualTo(MmdSceneCameraApplyStatus.NotApplied));
+                Assert.That(binding.LastSelfShadowApplyStatus, Is.EqualTo(MmdSceneSelfShadowApplyStatus.Applied));
+                Assert.That(binding.LastSelfShadowSettings.Mode, Is.EqualTo(1));
+                Assert.That(binding.LastSelfShadowSettings.ShadowDistance, Is.EqualTo(4.0f).Within(0.001f));
+                Assert.That(light.shadows, Is.EqualTo(LightShadows.Soft));
+                Assert.That(light.shadowStrength, Is.EqualTo(0.5f).Within(0.001f));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(lightGo);
+                UnityEngine.Object.DestroyImmediate(bindingGo);
+            }
+        }
+
+        [Test]
         public void StartOffsetShiftsTheSampledFrame()
         {
             var bindingGo = new GameObject("binding");
@@ -453,6 +557,7 @@ namespace Mmd.Tests
                 Assert.That(behaviour.MotionBytes, Is.Null);
                 Assert.That(behaviour.CameraKeyframes, Is.Empty);
                 Assert.That(behaviour.LightKeyframes, Is.Empty);
+                Assert.That(behaviour.SelfShadowKeyframes, Is.Empty);
                 Assert.That(behaviour.Binding, Is.Null, "unresolved ExposedReference resolves to null");
             }
             finally
