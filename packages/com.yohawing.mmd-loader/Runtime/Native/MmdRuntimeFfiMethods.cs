@@ -9,7 +9,7 @@ namespace Mmd.Native
     internal static class MmdRuntimeFfiMethods
     {
         internal const string LibraryName = "mmd_runtime_ffi";
-        internal const uint ExpectedAbiVersion = 1;
+        internal const uint ExpectedAbiVersion = 2;
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_abi_version", CallingConvention = CallingConvention.Cdecl)]
         internal static extern uint AbiVersion();

@@ -118,7 +118,8 @@ namespace Mmd.Tests
         public void FastRuntimeAndPhysicsWrapperNamesAreSeparate()
         {
             Assert.That(MmdRuntimeFfiMethods.LibraryName, Is.EqualTo("mmd_runtime_ffi"));
-            Assert.That(MmdRuntimeFfiMethods.ExpectedAbiVersion, Is.EqualTo(1));
+            Assert.That(MmdRuntimeFfiMethods.ExpectedAbiVersion, Is.EqualTo(2));
+            Assert.That(MmdRuntimeFfiMethods.ValidateAbiVersion(), Is.EqualTo(2));
             Assert.That(MmdNativePhysicsMethods.LibraryName, Is.EqualTo("mmd_bullet"));
         }
 
