@@ -860,7 +860,7 @@ namespace Mmd.Editor
 
             string selfShadowStatus = shd > 0
                 ? string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                    "Self-shadow scene motion present (selfShadow:{0}; enable MmdSceneEnvironmentBinding.ApplySelfShadowToLight to drive the bound Directional Light)", shd)
+                    "Self-shadow scene state present (selfShadow:{0}; MmdSceneEnvironmentBinding records sampled MMD self-shadow state)", shd)
                 : "Self-shadow scene motion: none";
 
             string durationSrc = string.Format(System.Globalization.CultureInfo.InvariantCulture,

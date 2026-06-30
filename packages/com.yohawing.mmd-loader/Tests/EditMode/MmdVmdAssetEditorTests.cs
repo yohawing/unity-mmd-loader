@@ -135,8 +135,8 @@ namespace Mmd.Tests
                 Assert.That(r.HasSceneMotion, Is.True);
                 Assert.That(r.HasSelfShadowSceneMotion, Is.True);
                 Assert.That(r.SceneMotionStatus, Does.Contain("Camera/light scene motion present (camera:4, light:1)"));
-                Assert.That(r.SelfShadowSceneMotionStatus, Does.Contain("Self-shadow scene motion present (selfShadow:7"));
-                Assert.That(r.SelfShadowSceneMotionStatus, Does.Contain("enable MmdSceneEnvironmentBinding.ApplySelfShadowToLight"));
+                Assert.That(r.SelfShadowSceneMotionStatus, Does.Contain("Self-shadow scene state present (selfShadow:7"));
+                Assert.That(r.SelfShadowSceneMotionStatus, Does.Contain("MmdSceneEnvironmentBinding records sampled MMD self-shadow state"));
                 Assert.That(r.ClipDurationSource, Does.Contain("Cached VMD MaxFrame"));
             }
             finally
@@ -189,8 +189,8 @@ namespace Mmd.Tests
                 Assert.That(r.HasSceneMotion, Is.False);
                 Assert.That(r.HasSelfShadowSceneMotion, Is.True);
                 Assert.That(r.SceneMotionStatus, Does.Contain("Camera/light scene motion: none"));
-                Assert.That(r.SelfShadowSceneMotionStatus, Does.Contain("Self-shadow scene motion present (selfShadow:4"));
-                Assert.That(r.SelfShadowSceneMotionStatus, Does.Contain("enable MmdSceneEnvironmentBinding.ApplySelfShadowToLight"));
+                Assert.That(r.SelfShadowSceneMotionStatus, Does.Contain("Self-shadow scene state present (selfShadow:4"));
+                Assert.That(r.SelfShadowSceneMotionStatus, Does.Contain("MmdSceneEnvironmentBinding records sampled MMD self-shadow state"));
                 Assert.That(r.SelfShadowSceneMotionStatus, Does.Not.Contain("deferred"));
                 Assert.That(r.SelfShadowSceneMotionStatus, Does.Not.Contain("no-op"));
             }
