@@ -15,7 +15,7 @@ Shader "MMD Basic URP Toon"
         _AmbientColor ("Ambient Color", Color) = (0.25, 0.25, 0.25, 1)
         _MmdLightDirection ("Light Direction Override", Vector) = (0, 0, 0, 0)
         _MmdLightColor ("MMD Light Color", Color) = (1, 1, 1, 1)
-        _MmdReceiveShadows ("MMD Receive Shadows", Float) = 0
+        _MmdReceiveShadows ("MMD Receive Shadows", Float) = 1
         _ToonStrength ("Toon Strength", Range(0, 1)) = 1
         _OutlineColor ("Outline Color", Color) = (0, 0, 0, 1)
         _OutlineWidth ("Outline Width", Float) = 0

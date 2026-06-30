@@ -1058,6 +1058,7 @@ namespace Mmd.Tests
                 Assert.That(instance.MaterialBindingDiagnostics[0].mainTexBound, Is.True);
                 // Parity side effects applied via shared ApplyDiffuseBoundSideEffects.
                 Assert.That(ReadMaterialFloat(instance.Materials[0], "_BaseMapBound"), Is.EqualTo(1.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_MmdReceiveShadows"), Is.EqualTo(1.0f).Within(0.00001f));
             }
             finally
             {

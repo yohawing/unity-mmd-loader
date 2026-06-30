@@ -72,7 +72,7 @@ namespace Mmd.Tests
                 Assert.That(ReadMaterialFloat(instance.Materials[0], "_BodyVisible"), Is.EqualTo(1.0f).Within(0.00001f));
                 Assert.That(ReadMaterialFloat(instance.Materials[0], "_AlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
                 Assert.That(ReadMaterialFloat(instance.Materials[0], "_ShadowAlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
-                Assert.That(ReadMaterialFloat(instance.Materials[0], "_MmdReceiveShadows"), Is.EqualTo(0.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_MmdReceiveShadows"), Is.EqualTo(1.0f).Within(0.00001f));
                 Assert.That(instance.Materials[0].FindPass("ShadowCaster"), Is.GreaterThanOrEqualTo(0));
             }
             finally
@@ -97,7 +97,7 @@ namespace Mmd.Tests
                 Assert.That(ReadMaterialFloat(instance.Materials[0], "_BodyVisible"), Is.EqualTo(1.0f).Within(0.00001f));
                 Assert.That(ReadMaterialFloat(instance.Materials[0], "_AlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
                 Assert.That(ReadMaterialFloat(instance.Materials[0], "_ShadowAlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
-                Assert.That(ReadMaterialFloat(instance.Materials[0], "_MmdReceiveShadows"), Is.EqualTo(0.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_MmdReceiveShadows"), Is.EqualTo(1.0f).Within(0.00001f));
                 Assert.That(instance.Materials[0].FindPass("ShadowCaster"), Is.GreaterThanOrEqualTo(0));
             }
             finally
@@ -120,7 +120,7 @@ namespace Mmd.Tests
                 Assert.That(instance.Materials[0].renderQueue, Is.GreaterThanOrEqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
                 Assert.That(ReadMaterialFloat(instance.Materials[0], "_AlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
                 Assert.That(ReadMaterialFloat(instance.Materials[0], "_ShadowAlphaClipThreshold"), Is.EqualTo(0.01f).Within(0.00001f));
-                Assert.That(ReadMaterialFloat(instance.Materials[0], "_MmdReceiveShadows"), Is.EqualTo(0.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_MmdReceiveShadows"), Is.EqualTo(1.0f).Within(0.00001f));
             }
             finally
             {
@@ -4434,6 +4434,10 @@ namespace Mmd.Tests
                     material, descriptor, descriptor.materials[0], 0, "tex.png", "tex.png", alphaTex);
 
                 Assert.That(
+                    material.GetFloat("_MmdReceiveShadows"),
+                    Is.EqualTo(1.0f).Within(0.00001f),
+                    "importer material reapply keeps the MMD standard shadow receive baseline enabled");
+                Assert.That(
                     material.GetFloat("_DstBlend"),
                     Is.EqualTo((float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha).Within(0.00001f),
                     "alpha-128 texture should classify as alphaBlend (_DstBlend = OneMinusSrcAlpha)");
@@ -4455,6 +4459,10 @@ namespace Mmd.Tests
                 MmdUnityMaterialBuilder.ReapplyImportedMaterialTransparency(
                     material, descriptor, descriptor.materials[0], 0, "tex.png", "tex.png", opaqueTex);
 
+                Assert.That(
+                    material.GetFloat("_MmdReceiveShadows"),
+                    Is.EqualTo(1.0f).Within(0.00001f),
+                    "opaque reapply keeps the MMD standard shadow receive baseline enabled");
                 Assert.That(
                     material.GetFloat("_DstBlend"),
                     Is.EqualTo((float)UnityEngine.Rendering.BlendMode.Zero).Within(0.00001f),

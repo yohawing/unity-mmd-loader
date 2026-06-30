@@ -16,6 +16,7 @@ namespace Mmd.UnityIntegration
         private const int OpaqueRenderQueue = (int)RenderQueue.Geometry;
         private const int TransparentRenderQueueBase = (int)RenderQueue.Transparent;
         private const float AlphaClipThreshold = 0.01f;
+        private const float MmdReceiveShadowsDefault = 1.0f;
         private const int OutlineZTest = (int)CompareFunction.Less;
         // MMD's edge is a screen-space, constant-pixel silhouette (saba and babylon-mmd both expand
         // the hull by edgeSize pixels with a *w term that cancels the perspective divide). So the
@@ -332,6 +333,11 @@ namespace Mmd.UnityIntegration
                 material.SetFloat("_ShadowAlphaClipThreshold", transparencyMode == MmdMaterialTransparencyMode.Opaque
                     ? 0.0f
                     : AlphaClipThreshold);
+            }
+
+            if (material.HasProperty("_MmdReceiveShadows"))
+            {
+                material.SetFloat("_MmdReceiveShadows", MmdReceiveShadowsDefault);
             }
 
             if (material.HasProperty("_TextureAlphaOutputWeight"))
