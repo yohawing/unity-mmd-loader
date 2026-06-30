@@ -327,6 +327,13 @@ namespace Mmd.UnityIntegration
                     : 0.0f);
             }
 
+            if (material.HasProperty("_ShadowAlphaClipThreshold"))
+            {
+                material.SetFloat("_ShadowAlphaClipThreshold", transparencyMode == MmdMaterialTransparencyMode.Opaque
+                    ? 0.0f
+                    : AlphaClipThreshold);
+            }
+
             if (material.HasProperty("_TextureAlphaOutputWeight"))
             {
                 material.SetFloat("_TextureAlphaOutputWeight", transparencyMode == MmdMaterialTransparencyMode.AlphaBlend

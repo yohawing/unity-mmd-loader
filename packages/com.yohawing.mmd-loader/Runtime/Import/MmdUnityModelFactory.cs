@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 using Mmd.Parser;
 using Mmd.Rendering;
 
@@ -202,6 +203,7 @@ namespace Mmd.UnityIntegration
 
             var meshRenderer = modelRoot.gameObject.AddComponent<MeshRenderer>();
             meshRenderer.sharedMaterials = materials;
+            ApplyRendererShadowPolicy(meshRenderer);
 
             return new MmdUnityModelInstance(
                 root,
@@ -244,6 +246,7 @@ namespace Mmd.UnityIntegration
             renderer.sharedMaterials = materials;
             renderer.bones = boneTransforms;
             renderer.rootBone = boneTransforms.Length > 0 ? boneTransforms[0] : modelRoot;
+            ApplyRendererShadowPolicy(renderer);
 
             return new MmdUnityModelInstance(
                 root,
@@ -269,6 +272,12 @@ namespace Mmd.UnityIntegration
             modelObject.transform.localRotation = Quaternion.identity;
             modelObject.transform.localScale = Vector3.one;
             return modelObject.transform;
+        }
+
+        private static void ApplyRendererShadowPolicy(Renderer renderer)
+        {
+            renderer.shadowCastingMode = ShadowCastingMode.On;
+            renderer.receiveShadows = true;
         }
 
         private static Transform FindModelRoot(Transform root)

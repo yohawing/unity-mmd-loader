@@ -57,6 +57,78 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void CreateStaticModelEnablesStandardUnityShadowParticipation()
+        {
+            MmdUnityModelInstance? instance = null;
+            try
+            {
+                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+
+                instance = MmdUnityModelFactory.CreateStaticModel(model);
+
+                Assert.That(instance.MeshRenderer, Is.Not.Null);
+                Assert.That(instance.MeshRenderer!.shadowCastingMode, Is.EqualTo(UnityEngine.Rendering.ShadowCastingMode.On));
+                Assert.That(instance.MeshRenderer.receiveShadows, Is.True);
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_BodyVisible"), Is.EqualTo(1.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_AlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_ShadowAlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_MmdReceiveShadows"), Is.EqualTo(0.0f).Within(0.00001f));
+                Assert.That(instance.Materials[0].FindPass("ShadowCaster"), Is.GreaterThanOrEqualTo(0));
+            }
+            finally
+            {
+                DestroyInstance(instance);
+            }
+        }
+
+        [Test]
+        public void CreateSkinnedModelEnablesStandardUnityShadowParticipation()
+        {
+            MmdUnityModelInstance? instance = null;
+            try
+            {
+                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+
+                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
+
+                Assert.That(instance.SkinnedMeshRenderer, Is.Not.Null);
+                Assert.That(instance.SkinnedMeshRenderer!.shadowCastingMode, Is.EqualTo(UnityEngine.Rendering.ShadowCastingMode.On));
+                Assert.That(instance.SkinnedMeshRenderer.receiveShadows, Is.True);
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_BodyVisible"), Is.EqualTo(1.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_AlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_ShadowAlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_MmdReceiveShadows"), Is.EqualTo(0.0f).Within(0.00001f));
+                Assert.That(instance.Materials[0].FindPass("ShadowCaster"), Is.GreaterThanOrEqualTo(0));
+            }
+            finally
+            {
+                DestroyInstance(instance);
+            }
+        }
+
+        [Test]
+        public void CreateStaticModelSetsShadowAlphaClipForAlphaBlendMaterial()
+        {
+            MmdUnityModelInstance? instance = null;
+            try
+            {
+                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+                model.materials[0].alpha = 0.5f;
+
+                instance = MmdUnityModelFactory.CreateStaticModel(model);
+
+                Assert.That(instance.Materials[0].renderQueue, Is.GreaterThanOrEqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_AlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_ShadowAlphaClipThreshold"), Is.EqualTo(0.01f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_MmdReceiveShadows"), Is.EqualTo(0.0f).Within(0.00001f));
+            }
+            finally
+            {
+                DestroyInstance(instance);
+            }
+        }
+
+        [Test]
         public void CreateStaticModelConvertsMeshPositionsAndNormalsAtUnityBoundary()
         {
             MmdUnityModelInstance? instance = null;
@@ -218,6 +290,7 @@ namespace Mmd.Tests
                 Assert.That(instance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Geometry));
                 Assert.That(ReadMaterialFloat(instance.Materials[0], "_ZWrite"), Is.EqualTo(1.0f).Within(0.00001f));
                 Assert.That(ReadMaterialFloat(instance.Materials[0], "_AlphaClipThreshold"), Is.EqualTo(0.01f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_ShadowAlphaClipThreshold"), Is.EqualTo(0.01f).Within(0.00001f));
                 Assert.That(instance.MaterialBindingDiagnostics[0].isTransparent, Is.True);
                 Assert.That(instance.MaterialBindingDiagnostics[0].transparencyMode, Is.EqualTo("alphaTest"));
                 Assert.That(instance.MaterialBindingDiagnostics[0].renderOrderBucket, Is.EqualTo("alphaTest"));
