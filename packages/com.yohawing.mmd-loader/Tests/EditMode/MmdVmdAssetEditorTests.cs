@@ -66,7 +66,7 @@ namespace Mmd.Tests
             MmdVmdTimelineReadiness r0 = MmdAssetInspectorUtility.GetVmdTimelineReadiness(null);
             Assert.That(r0.MaxFrame, Is.EqualTo(0));
             Assert.That(r0.HasSceneMotion, Is.False);
-            Assert.That(r0.HasSelfShadowOptInSceneMotion, Is.False);
+            Assert.That(r0.HasSelfShadowSceneMotion, Is.False);
             Assert.That(r0.ClipCreationRequirement, Does.Contain("PMX"));
             Assert.That(r0.SceneMotionStatus, Does.Contain("No VMD"));
             Assert.That(r0.SelfShadowSceneMotionStatus, Does.Contain("No VMD"));
@@ -103,9 +103,9 @@ namespace Mmd.Tests
                 Assert.That(r.LightKeyframeCount, Is.EqualTo(0));
                 Assert.That(r.SelfShadowKeyframeCount, Is.EqualTo(0));
                 Assert.That(r.HasSceneMotion, Is.False);
-                Assert.That(r.HasSelfShadowOptInSceneMotion, Is.False);
+                Assert.That(r.HasSelfShadowSceneMotion, Is.False);
                 Assert.That(r.SceneMotionStatus, Does.Contain("Camera/light scene motion: none"));
-                Assert.That(r.SelfShadowSceneMotionStatus, Does.Contain("Self-shadow opt-in scene motion: none"));
+                Assert.That(r.SelfShadowSceneMotionStatus, Does.Contain("Self-shadow scene motion: none"));
                 Assert.That(r.ClipCreationRequirement, Does.Contain("PMX"));
                 Assert.That(r.ClipDurationSource, Does.Contain("77"));
             }
@@ -122,7 +122,7 @@ namespace Mmd.Tests
             try
             {
                 byte[] garbage = new byte[] { 0xFF, 0xCA, 0xFE };
-                // camera>0, light>0 -> ordinary scene motion; self>0 -> separate opt-in scene motion.
+                // camera>0, light>0 -> ordinary scene motion; self>0 -> separate binding-controlled scene motion.
                 var injected = new MmdVmdParseSummary("scene-present-model", 250, 120, 10, 2, 5, 4, 1, 7);
                 asset.Initialize(garbage, "scene.vmd", "scene.vmd", injected, System.Array.Empty<string>());
 
@@ -133,10 +133,10 @@ namespace Mmd.Tests
                 Assert.That(r.LightKeyframeCount, Is.EqualTo(1));
                 Assert.That(r.SelfShadowKeyframeCount, Is.EqualTo(7));
                 Assert.That(r.HasSceneMotion, Is.True);
-                Assert.That(r.HasSelfShadowOptInSceneMotion, Is.True);
+                Assert.That(r.HasSelfShadowSceneMotion, Is.True);
                 Assert.That(r.SceneMotionStatus, Does.Contain("Camera/light scene motion present (camera:4, light:1)"));
-                Assert.That(r.SelfShadowSceneMotionStatus, Does.Contain("Self-shadow opt-in scene motion present (selfShadow:7"));
-                Assert.That(r.SelfShadowSceneMotionStatus, Does.Contain("ApplySelfShadowToLight"));
+                Assert.That(r.SelfShadowSceneMotionStatus, Does.Contain("Self-shadow scene motion present (selfShadow:7"));
+                Assert.That(r.SelfShadowSceneMotionStatus, Does.Contain("enable MmdSceneEnvironmentBinding.ApplySelfShadowToLight"));
                 Assert.That(r.ClipDurationSource, Does.Contain("Cached VMD MaxFrame"));
             }
             finally
@@ -161,9 +161,9 @@ namespace Mmd.Tests
                 Assert.That(r.LightKeyframeCount, Is.EqualTo(3));
                 Assert.That(r.SelfShadowKeyframeCount, Is.EqualTo(0));
                 Assert.That(r.HasSceneMotion, Is.True);
-                Assert.That(r.HasSelfShadowOptInSceneMotion, Is.False);
+                Assert.That(r.HasSelfShadowSceneMotion, Is.False);
                 Assert.That(r.SceneMotionStatus, Does.Contain("Camera/light scene motion present (camera:0, light:3)"));
-                Assert.That(r.SelfShadowSceneMotionStatus, Does.Contain("Self-shadow opt-in scene motion: none"));
+                Assert.That(r.SelfShadowSceneMotionStatus, Does.Contain("Self-shadow scene motion: none"));
             }
             finally
             {
@@ -172,7 +172,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void GetVmdTimelineReadiness_SelfShadowOnlyReportsOptInSceneMotionWithoutCameraLightAcceptance()
+        public void GetVmdTimelineReadiness_SelfShadowOnlyReportsSceneMotionWithoutCameraLightAcceptance()
         {
             MmdVmdAsset asset = ScriptableObject.CreateInstance<MmdVmdAsset>();
             try
@@ -187,10 +187,10 @@ namespace Mmd.Tests
                 Assert.That(r.LightKeyframeCount, Is.EqualTo(0));
                 Assert.That(r.SelfShadowKeyframeCount, Is.EqualTo(4));
                 Assert.That(r.HasSceneMotion, Is.False);
-                Assert.That(r.HasSelfShadowOptInSceneMotion, Is.True);
+                Assert.That(r.HasSelfShadowSceneMotion, Is.True);
                 Assert.That(r.SceneMotionStatus, Does.Contain("Camera/light scene motion: none"));
-                Assert.That(r.SelfShadowSceneMotionStatus, Does.Contain("Self-shadow opt-in scene motion present (selfShadow:4"));
-                Assert.That(r.SelfShadowSceneMotionStatus, Does.Contain("ApplySelfShadowToLight"));
+                Assert.That(r.SelfShadowSceneMotionStatus, Does.Contain("Self-shadow scene motion present (selfShadow:4"));
+                Assert.That(r.SelfShadowSceneMotionStatus, Does.Contain("enable MmdSceneEnvironmentBinding.ApplySelfShadowToLight"));
                 Assert.That(r.SelfShadowSceneMotionStatus, Does.Not.Contain("deferred"));
                 Assert.That(r.SelfShadowSceneMotionStatus, Does.Not.Contain("no-op"));
             }

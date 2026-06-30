@@ -88,7 +88,7 @@ namespace Mmd.UnityIntegration
         private Light? targetLight;
 
         [SerializeField]
-        [Tooltip("Opt-in only. When enabled, VMD self-shadow mode/distance may drive the bound Directional Light shadow settings.")]
+        [Tooltip("Disabled by default. Enable to let VMD self-shadow drive the bound Directional Light shadow settings.")]
         private bool applySelfShadowToLight;
 
         [SerializeField]
@@ -242,7 +242,7 @@ namespace Mmd.UnityIntegration
         }
 
         /// <summary>
-        /// Maps <paramref name="state"/> through the explicit self-shadow policy and, only when opted in,
+        /// Maps <paramref name="state"/> through the explicit self-shadow policy and, only when enabled,
         /// applies Light-local shadow settings to the bound Directional Light. This method intentionally
         /// does not mutate RenderSettings, QualitySettings shadow distance, URP assets, or Materials.
         /// </summary>

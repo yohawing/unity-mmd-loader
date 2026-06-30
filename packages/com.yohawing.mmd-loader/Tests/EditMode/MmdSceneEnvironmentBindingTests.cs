@@ -53,6 +53,7 @@ namespace Mmd.Tests
             {
                 MmdSceneEnvironmentBinding binding = go.AddComponent<MmdSceneEnvironmentBinding>();
                 Assert.That(binding.LastSelfShadowApplyStatus, Is.EqualTo(MmdSceneSelfShadowApplyStatus.NotApplied));
+                Assert.That(binding.ApplySelfShadowToLight, Is.False);
             }
             finally
             {
@@ -220,7 +221,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void ApplySelfShadowState_OptInAppliesLightLocalShadowSettings()
+        public void ApplySelfShadowState_ExplicitEnableAppliesLightLocalShadowSettings()
         {
             var go = new GameObject("binding");
             var lightGo = new GameObject("light");
@@ -260,7 +261,46 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void ApplySelfShadowState_OptInModeZeroDisablesBoundLightShadowsOnly()
+        public void ApplySelfShadowState_ExplicitDisableDoesNotMutateLightOrGlobalShadowDistance()
+        {
+            var go = new GameObject("binding");
+            var lightGo = new GameObject("light");
+            float originalShadowDistance = QualitySettings.shadowDistance;
+            try
+            {
+                Light light = lightGo.AddComponent<Light>();
+                light.type = LightType.Directional;
+                light.shadows = LightShadows.None;
+                light.shadowStrength = 0.2f;
+
+                MmdSceneEnvironmentBinding binding = go.AddComponent<MmdSceneEnvironmentBinding>();
+                binding.TargetLight = light;
+                binding.ApplySelfShadowToLight = false;
+                binding.SelfShadowDistanceScale = 10.0f;
+                binding.SelfShadowMinDistance = 1.0f;
+                binding.SelfShadowMaxDistance = 5.0f;
+                binding.SelfShadowStrength = 0.6f;
+                binding.SelfShadowLightMode = LightShadows.Soft;
+
+                MmdSceneSelfShadowApplyStatus status = binding.ApplySelfShadowState(new MmdSelfShadowState(2, 0.8f));
+
+                Assert.That(status, Is.EqualTo(MmdSceneSelfShadowApplyStatus.Disabled));
+                Assert.That(binding.LastSelfShadowApplyStatus, Is.EqualTo(MmdSceneSelfShadowApplyStatus.Disabled));
+                Assert.That(binding.LastSelfShadowSettings.RuntimeApplicationEnabled, Is.False);
+                Assert.That(light.shadows, Is.EqualTo(LightShadows.None));
+                Assert.That(light.shadowStrength, Is.EqualTo(0.2f).Within(0.001f));
+                Assert.That(QualitySettings.shadowDistance, Is.EqualTo(originalShadowDistance).Within(0.001f));
+            }
+            finally
+            {
+                QualitySettings.shadowDistance = originalShadowDistance;
+                Object.DestroyImmediate(lightGo);
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void ApplySelfShadowState_ModeZeroDisablesBoundLightShadowsOnly()
         {
             var go = new GameObject("binding");
             var lightGo = new GameObject("light");

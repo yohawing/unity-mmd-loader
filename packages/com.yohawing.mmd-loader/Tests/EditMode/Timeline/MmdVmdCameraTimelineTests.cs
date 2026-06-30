@@ -396,7 +396,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void EvaluateAtLocalTimeAppliesSelfShadowWhenBindingOptedIn()
+        public void EvaluateAtLocalTimeAppliesSelfShadowWhenBindingExplicitlyEnabled()
         {
             var bindingGo = new GameObject("binding");
             var lightGo = new GameObject("light");
