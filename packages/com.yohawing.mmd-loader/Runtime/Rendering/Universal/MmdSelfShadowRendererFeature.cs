@@ -16,6 +16,7 @@ namespace Mmd.Rendering.Universal
         private int shadowMapSize = 1024;
 
         [SerializeField]
+        [Tooltip("Fallback self-shadow direction, not a scene Light binding. Used only when no scene self-shadow light, target light, VMD light, or RenderSettings.sun direction is available.")]
         private Vector3 shadowDirection = DefaultShadowDirection;
 
         [SerializeField]

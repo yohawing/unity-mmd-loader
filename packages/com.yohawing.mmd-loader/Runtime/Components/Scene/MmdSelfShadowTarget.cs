@@ -222,7 +222,7 @@ namespace Mmd.UnityIntegration
         public bool TryGetSelfShadowLightDirection(out Vector3 direction)
         {
             if (sceneEnvironment != null &&
-                sceneEnvironment.TryGetLastUnityLightDirection(out direction))
+                sceneEnvironment.TryGetSelfShadowUnityLightDirection(out direction))
             {
                 return true;
             }

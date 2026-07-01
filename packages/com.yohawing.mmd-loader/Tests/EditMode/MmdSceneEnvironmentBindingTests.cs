@@ -221,6 +221,80 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void SelfShadowUnityLightDirectionPrefersExplicitDirectionalLightWithoutChangingLastLightPolicy()
+        {
+            var go = new GameObject("binding");
+            var targetLightGo = new GameObject("target-light");
+            var selfShadowLightGo = new GameObject("self-shadow-light");
+            try
+            {
+                Light targetLight = targetLightGo.AddComponent<Light>();
+                targetLight.type = LightType.Directional;
+                Light selfShadowLight = selfShadowLightGo.AddComponent<Light>();
+                selfShadowLight.type = LightType.Directional;
+
+                MmdSceneEnvironmentBinding binding = go.AddComponent<MmdSceneEnvironmentBinding>();
+                binding.TargetLight = targetLight;
+                binding.SelfShadowDirectionLight = selfShadowLight;
+
+                binding.ApplyLightState(
+                    new MmdLightState(new[] { 0.2f, 0.4f, 0.6f }, new[] { -0.5f, -1f, 0.5f }));
+                targetLight.transform.rotation = Quaternion.LookRotation(Vector3.left);
+                selfShadowLight.transform.rotation = Quaternion.LookRotation(Vector3.right);
+
+                Assert.That(binding.TryGetSelfShadowUnityLightDirection(out Vector3 selfShadowDirection), Is.True);
+                Assert.That(Vector3.Dot(selfShadowDirection, Vector3.right), Is.EqualTo(1f).Within(0.001f));
+                Assert.That(binding.TryGetLastUnityLightDirection(out Vector3 lastLightDirection), Is.True);
+                Assert.That(Vector3.Dot(lastLightDirection, Vector3.left), Is.EqualTo(1f).Within(0.001f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(selfShadowLightGo);
+                Object.DestroyImmediate(targetLightGo);
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void SelfShadowUnityLightDirectionFallsBackPastInvalidExplicitLightToTargetThenRecordedVmdLight()
+        {
+            var go = new GameObject("binding");
+            var targetLightGo = new GameObject("target-light");
+            var invalidSelfShadowLightGo = new GameObject("self-shadow-light");
+            try
+            {
+                Light targetLight = targetLightGo.AddComponent<Light>();
+                targetLight.type = LightType.Directional;
+                targetLight.transform.rotation = Quaternion.LookRotation(Vector3.left);
+                Light invalidSelfShadowLight = invalidSelfShadowLightGo.AddComponent<Light>();
+                invalidSelfShadowLight.type = LightType.Point;
+
+                MmdSceneEnvironmentBinding binding = go.AddComponent<MmdSceneEnvironmentBinding>();
+                binding.TargetLight = targetLight;
+                binding.SelfShadowDirectionLight = invalidSelfShadowLight;
+                binding.ApplyLightState(
+                    new MmdLightState(new[] { 0.2f, 0.4f, 0.6f }, new[] { -0.25f, -1f, 0.75f }));
+                targetLight.transform.rotation = Quaternion.LookRotation(Vector3.left);
+
+                Assert.That(binding.TryGetSelfShadowUnityLightDirection(out Vector3 targetDirection), Is.True);
+                Assert.That(Vector3.Dot(targetDirection, Vector3.left), Is.EqualTo(1f).Within(0.001f));
+
+                binding.TargetLight = null;
+                Vector3 expectedRecordedDirection = MmdCoordinateSpace.MmdToUnityPosition(
+                    new Vector3(-0.25f, -1.0f, 0.75f)).normalized;
+
+                Assert.That(binding.TryGetSelfShadowUnityLightDirection(out Vector3 recordedDirection), Is.True);
+                Assert.That(Vector3.Dot(recordedDirection, expectedRecordedDirection), Is.EqualTo(1f).Within(0.001f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(invalidSelfShadowLightGo);
+                Object.DestroyImmediate(targetLightGo);
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
         public void ApplySelfShadowState_DefaultEnabledRecordsStateWithoutMutatingLightOrGlobalShadowDistance()
         {
             var go = new GameObject("binding");

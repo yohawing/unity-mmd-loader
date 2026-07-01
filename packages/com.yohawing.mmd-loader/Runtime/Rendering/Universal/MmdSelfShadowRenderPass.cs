@@ -178,6 +178,9 @@ namespace Mmd.Rendering.Universal
             return light != null &&
                 light.type == LightType.Directional &&
                 light.isActiveAndEnabled &&
+                float.IsFinite(light.transform.forward.x) &&
+                float.IsFinite(light.transform.forward.y) &&
+                float.IsFinite(light.transform.forward.z) &&
                 light.transform.forward.sqrMagnitude > 1e-8f;
         }
 

@@ -95,6 +95,10 @@ namespace Mmd.UnityIntegration
         private Light? targetLight;
 
         [SerializeField]
+        [Tooltip("Optional Directional Light used only as the explicit self-shadow direction source.")]
+        private Light? selfShadowDirectionLight;
+
+        [SerializeField]
         // Do not migrate the old Light-application flag; state recording defaults on for existing bindings too.
         [Tooltip("Records sampled VMD self-shadow as MMD scene/render state. Disable to ignore sampled self-shadow keys.")]
         private bool selfShadowEnabled = true;
@@ -112,6 +116,12 @@ namespace Mmd.UnityIntegration
         {
             get => targetLight;
             set => targetLight = value;
+        }
+
+        public Light? SelfShadowDirectionLight
+        {
+            get => selfShadowDirectionLight;
+            set => selfShadowDirectionLight = value;
         }
 
         public bool SelfShadowEnabled
@@ -175,12 +185,8 @@ namespace Mmd.UnityIntegration
         /// </summary>
         public bool TryGetLastUnityLightDirection(out Vector3 direction)
         {
-            if (targetLight != null &&
-                targetLight.type == LightType.Directional &&
-                targetLight.isActiveAndEnabled &&
-                IsUsableDirection(targetLight.transform.forward))
+            if (TryGetDirectionalLightDirection(targetLight, out direction))
             {
-                direction = targetLight.transform.forward.normalized;
                 return true;
             }
 
@@ -192,6 +198,21 @@ namespace Mmd.UnityIntegration
 
             direction = default;
             return false;
+        }
+
+        /// <summary>
+        /// Returns the Unity-space direction used by the dedicated MMD self-shadow map. The explicit
+        /// self-shadow source wins when it is an active Directional Light; otherwise this falls back to
+        /// the ordinary scene light direction policy without mutating any Light or global shadow state.
+        /// </summary>
+        public bool TryGetSelfShadowUnityLightDirection(out Vector3 direction)
+        {
+            if (TryGetDirectionalLightDirection(selfShadowDirectionLight, out direction))
+            {
+                return true;
+            }
+
+            return TryGetLastUnityLightDirection(out direction);
         }
 
         /// <summary>The status of the most recent <see cref="ApplySelfShadowState"/> call.</summary>
@@ -327,6 +348,21 @@ namespace Mmd.UnityIntegration
                 float.IsFinite(direction.y) &&
                 float.IsFinite(direction.z) &&
                 direction.sqrMagnitude > 1e-12f;
+        }
+
+        private static bool TryGetDirectionalLightDirection(Light? light, out Vector3 direction)
+        {
+            if (light != null &&
+                light.type == LightType.Directional &&
+                light.isActiveAndEnabled &&
+                IsUsableDirection(light.transform.forward))
+            {
+                direction = light.transform.forward.normalized;
+                return true;
+            }
+
+            direction = default;
+            return false;
         }
     }
 }
