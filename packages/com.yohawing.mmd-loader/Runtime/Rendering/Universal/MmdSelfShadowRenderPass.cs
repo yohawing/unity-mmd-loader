@@ -13,8 +13,10 @@ namespace Mmd.Rendering.Universal
     public sealed class MmdSelfShadowRenderPass : ScriptableRenderPass
     {
         public static readonly int MmdSelfShadowMapId = Shader.PropertyToID("_MmdSelfShadowMap");
+        public static readonly int MmdSelfShadowDebugDepthId = Shader.PropertyToID("_MmdSelfShadowDebugDepth");
         public static readonly int MmdSelfShadowWorldToShadowId = Shader.PropertyToID("_MmdSelfShadowWorldToShadow");
         public static readonly int MmdSelfShadowParamsId = Shader.PropertyToID("_MmdSelfShadowParams");
+        private static readonly int MmdSelfShadowDebugParamsId = Shader.PropertyToID("_MmdSelfShadowDebugParams");
         private static readonly int LightDirectionId = Shader.PropertyToID("_LightDirection");
         private static readonly int LightPositionId = Shader.PropertyToID("_LightPosition");
         private static readonly int ShadowBiasId = Shader.PropertyToID("_ShadowBias");
@@ -32,6 +34,9 @@ namespace Mmd.Rendering.Universal
         private Vector4 shadowParams = DisabledParams;
         private Vector4 lightDirection = new(0.35f, -1.0f, 0.35f, 0.0f);
         private int mapSize = 1024;
+        private bool debugDepthPreview;
+        private float debugDepthPreviewContrast = MmdSelfShadowRendererFeature.DefaultDebugDepthPreviewContrast;
+        private Material? debugDepthPreviewMaterial;
 
         private readonly struct ShadowDrawItem
         {
@@ -65,10 +70,17 @@ namespace Mmd.Rendering.Universal
             public float ClearDepth;
         }
 
+        private sealed class DebugDepthPassData
+        {
+            public Material? Material;
+            public Vector4 DebugParams;
+        }
+
         public static void PublishDisabledGlobals()
         {
             Shader.SetGlobalMatrix(MmdSelfShadowWorldToShadowId, Matrix4x4.identity);
             Shader.SetGlobalVector(MmdSelfShadowParamsId, DisabledParams);
+            Shader.SetGlobalTexture(MmdSelfShadowDebugDepthId, Texture2D.blackTexture);
         }
 
         public bool Setup(int requestedMapSize, Vector3 requestedShadowDirection)
@@ -78,10 +90,30 @@ namespace Mmd.Rendering.Universal
 
         public bool Setup(int requestedMapSize, Vector3 requestedShadowDirection, float requestedShadowDepthBias)
         {
+            return Setup(
+                requestedMapSize,
+                requestedShadowDirection,
+                requestedShadowDepthBias,
+                debugDepthPreview: false,
+                MmdSelfShadowRendererFeature.DefaultDebugDepthPreviewContrast,
+                debugDepthPreviewMaterial: null);
+        }
+
+        public bool Setup(
+            int requestedMapSize,
+            Vector3 requestedShadowDirection,
+            float requestedShadowDepthBias,
+            bool debugDepthPreview,
+            float requestedDebugDepthPreviewContrast,
+            Material? debugDepthPreviewMaterial)
+        {
             MmdSelfShadowTarget.CollectActiveTargets(TargetBuffer);
             ActiveProjectionTargets.Clear();
             drawItems.Clear();
             shadowParams = DisabledParams;
+            this.debugDepthPreview = false;
+            this.debugDepthPreviewContrast = SanitizeDebugDepthPreviewContrast(requestedDebugDepthPreviewContrast);
+            this.debugDepthPreviewMaterial = null;
 
             if (TargetBuffer.Count == 0)
             {
@@ -124,6 +156,13 @@ namespace Mmd.Rendering.Universal
             }
 
             mapSize = Mathf.Clamp(requestedMapSize, 128, 4096);
+            this.debugDepthPreview = debugDepthPreview && debugDepthPreviewMaterial != null;
+            this.debugDepthPreviewMaterial = this.debugDepthPreview ? debugDepthPreviewMaterial : null;
+            if (!this.debugDepthPreview)
+            {
+                Shader.SetGlobalTexture(MmdSelfShadowDebugDepthId, Texture2D.blackTexture);
+            }
+
             return true;
         }
 
@@ -198,48 +237,91 @@ namespace Mmd.Rendering.Universal
                 clearColor = Color.clear
             });
 
-            using var builder = renderGraph.AddRasterRenderPass<PassData>(
+            using (var builder = renderGraph.AddRasterRenderPass<PassData>(
                 "MMD Self Shadow Pass",
-                out var passData);
-
-            passData.DrawItems.Clear();
-            passData.DrawItems.AddRange(drawItems);
-            passData.ViewMatrix = viewMatrix;
-            passData.ProjectionMatrix = projectionMatrix;
-            passData.RestoreViewMatrix = cameraData.GetViewMatrix();
-            passData.RestoreProjectionMatrix = cameraData.GetProjectionMatrix();
-            passData.WorldToShadow = worldToShadow;
-            passData.ShadowParams = shadowParams;
-            passData.LightDirection = lightDirection;
-            passData.ClearDepth = SystemInfo.usesReversedZBuffer ? 0.0f : 1.0f;
-
-            builder.AllowGlobalStateModification(true);
-            builder.AllowPassCulling(false);
-            builder.SetRenderAttachmentDepth(shadowMap, AccessFlags.ReadWrite);
-            builder.SetGlobalTextureAfterPass(shadowMap, MmdSelfShadowMapId);
-            builder.SetRenderFunc(static (PassData data, RasterGraphContext context) =>
+                out var passData))
             {
-                RasterCommandBuffer cmd = context.cmd;
-                cmd.ClearRenderTarget(clearDepth: true, clearColor: false, backgroundColor: Color.clear, depth: data.ClearDepth);
-                cmd.SetGlobalMatrix(MmdSelfShadowWorldToShadowId, data.WorldToShadow);
-                cmd.SetGlobalVector(MmdSelfShadowParamsId, data.ShadowParams);
-                cmd.SetGlobalVector(LightDirectionId, data.LightDirection);
-                cmd.SetGlobalVector(LightPositionId, Vector4.zero);
-                cmd.SetGlobalVector(ShadowBiasId, Vector4.zero);
-                cmd.DisableShaderKeyword(CastingPunctualLightShadowKeyword);
-                cmd.SetViewProjectionMatrices(data.ViewMatrix, data.ProjectionMatrix);
+                passData.DrawItems.Clear();
+                passData.DrawItems.AddRange(drawItems);
+                passData.ViewMatrix = viewMatrix;
+                passData.ProjectionMatrix = projectionMatrix;
+                passData.RestoreViewMatrix = cameraData.GetViewMatrix();
+                passData.RestoreProjectionMatrix = cameraData.GetProjectionMatrix();
+                passData.WorldToShadow = worldToShadow;
+                passData.ShadowParams = shadowParams;
+                passData.LightDirection = lightDirection;
+                passData.ClearDepth = SystemInfo.usesReversedZBuffer ? 0.0f : 1.0f;
 
-                for (int i = 0; i < data.DrawItems.Count; i++)
+                builder.AllowGlobalStateModification(true);
+                builder.AllowPassCulling(false);
+                builder.SetRenderAttachmentDepth(shadowMap, AccessFlags.ReadWrite);
+                builder.SetGlobalTextureAfterPass(shadowMap, MmdSelfShadowMapId);
+                builder.SetRenderFunc(static (PassData data, RasterGraphContext context) =>
                 {
-                    ShadowDrawItem item = data.DrawItems[i];
-                    if (item.Renderer != null && item.Material != null)
-                    {
-                        cmd.DrawRenderer(item.Renderer, item.Material, item.SubmeshIndex, item.ShadowPassIndex);
-                    }
-                }
+                    RasterCommandBuffer cmd = context.cmd;
+                    cmd.ClearRenderTarget(clearDepth: true, clearColor: false, backgroundColor: Color.clear, depth: data.ClearDepth);
+                    cmd.SetGlobalMatrix(MmdSelfShadowWorldToShadowId, data.WorldToShadow);
+                    cmd.SetGlobalVector(MmdSelfShadowParamsId, data.ShadowParams);
+                    cmd.SetGlobalVector(LightDirectionId, data.LightDirection);
+                    cmd.SetGlobalVector(LightPositionId, Vector4.zero);
+                    cmd.SetGlobalVector(ShadowBiasId, Vector4.zero);
+                    cmd.DisableShaderKeyword(CastingPunctualLightShadowKeyword);
+                    cmd.SetViewProjectionMatrices(data.ViewMatrix, data.ProjectionMatrix);
 
-                cmd.SetViewProjectionMatrices(data.RestoreViewMatrix, data.RestoreProjectionMatrix);
-            });
+                    for (int i = 0; i < data.DrawItems.Count; i++)
+                    {
+                        ShadowDrawItem item = data.DrawItems[i];
+                        if (item.Renderer != null && item.Material != null)
+                        {
+                            cmd.DrawRenderer(item.Renderer, item.Material, item.SubmeshIndex, item.ShadowPassIndex);
+                        }
+                    }
+
+                    cmd.SetViewProjectionMatrices(data.RestoreViewMatrix, data.RestoreProjectionMatrix);
+                });
+            }
+
+            if (debugDepthPreview && debugDepthPreviewMaterial != null)
+            {
+                TextureHandle debugDepth = renderGraph.CreateTexture(new TextureDesc(mapSize, mapSize)
+                {
+                    name = "MMD Self Shadow Debug Depth",
+                    colorFormat = GraphicsFormat.R8G8B8A8_UNorm,
+                    filterMode = FilterMode.Bilinear,
+                    wrapMode = TextureWrapMode.Clamp,
+                    clearBuffer = true,
+                    clearColor = Color.black
+                });
+
+                using (var debugBuilder = renderGraph.AddRasterRenderPass<DebugDepthPassData>(
+                    "MMD Self Shadow Debug Depth Preview",
+                    out var debugPassData))
+                {
+                    debugPassData.Material = debugDepthPreviewMaterial;
+                    debugPassData.DebugParams = new Vector4(
+                        SystemInfo.usesReversedZBuffer ? 0.0f : 1.0f,
+                        debugDepthPreviewContrast,
+                        0.0f,
+                        0.0f);
+
+                    debugBuilder.AllowGlobalStateModification(true);
+                    debugBuilder.AllowPassCulling(false);
+                    debugBuilder.UseTexture(shadowMap, AccessFlags.Read);
+                    debugBuilder.SetRenderAttachment(debugDepth, 0);
+                    debugBuilder.SetGlobalTextureAfterPass(debugDepth, MmdSelfShadowDebugDepthId);
+                    debugBuilder.SetRenderFunc(static (DebugDepthPassData data, RasterGraphContext context) =>
+                    {
+                        if (data.Material == null)
+                        {
+                            return;
+                        }
+
+                        RasterCommandBuffer cmd = context.cmd;
+                        cmd.SetGlobalVector(MmdSelfShadowDebugParamsId, data.DebugParams);
+                        cmd.DrawProcedural(Matrix4x4.identity, data.Material, 0, MeshTopology.Triangles, 3, 1);
+                    });
+                }
+            }
         }
 
         private static void AddDrawItems(MmdSelfShadowTarget target, List<ShadowDrawItem> output)
@@ -364,6 +446,16 @@ namespace Mmd.Rendering.Universal
             }
 
             return Mathf.Clamp(value, 0.0f, MaxShadowDepthBias);
+        }
+
+        private static float SanitizeDebugDepthPreviewContrast(float value)
+        {
+            if (float.IsNaN(value) || float.IsInfinity(value))
+            {
+                return MmdSelfShadowRendererFeature.DefaultDebugDepthPreviewContrast;
+            }
+
+            return Mathf.Clamp(value, 1.0f, 4096.0f);
         }
 
         private static Bounds TransformBounds(Bounds bounds, Matrix4x4 matrix)

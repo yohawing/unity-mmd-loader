@@ -580,9 +580,15 @@ namespace Mmd.Tests
                     throwOnError: true)!;
                 System.Reflection.PropertyInfo shadowDepthBiasProperty =
                     featureType.GetProperty("ShadowDepthBias")!;
+                System.Reflection.PropertyInfo debugDepthPreviewProperty =
+                    featureType.GetProperty("DebugDepthPreview")!;
+                System.Reflection.PropertyInfo debugDepthPreviewContrastProperty =
+                    featureType.GetProperty("DebugDepthPreviewContrast")!;
                 feature = ScriptableObject.CreateInstance(featureType);
 
                 Assert.That((float)shadowDepthBiasProperty.GetValue(feature), Is.EqualTo(0.0025f).Within(0.000001f));
+                Assert.That((bool)debugDepthPreviewProperty.GetValue(feature), Is.False);
+                Assert.That((float)debugDepthPreviewContrastProperty.GetValue(feature), Is.EqualTo(64.0f).Within(0.000001f));
 
                 shadowDepthBiasProperty.SetValue(feature, 0.025f);
                 Assert.That((float)shadowDepthBiasProperty.GetValue(feature), Is.EqualTo(0.025f).Within(0.000001f));
@@ -598,6 +604,24 @@ namespace Mmd.Tests
 
                 shadowDepthBiasProperty.SetValue(feature, 1.0f);
                 Assert.That((float)shadowDepthBiasProperty.GetValue(feature), Is.EqualTo(0.1f));
+
+                debugDepthPreviewProperty.SetValue(feature, true);
+                Assert.That((bool)debugDepthPreviewProperty.GetValue(feature), Is.True);
+
+                debugDepthPreviewContrastProperty.SetValue(feature, 128.0f);
+                Assert.That((float)debugDepthPreviewContrastProperty.GetValue(feature), Is.EqualTo(128.0f).Within(0.000001f));
+
+                debugDepthPreviewContrastProperty.SetValue(feature, -1.0f);
+                Assert.That((float)debugDepthPreviewContrastProperty.GetValue(feature), Is.EqualTo(1.0f));
+
+                debugDepthPreviewContrastProperty.SetValue(feature, float.NaN);
+                Assert.That((float)debugDepthPreviewContrastProperty.GetValue(feature), Is.EqualTo(64.0f));
+
+                debugDepthPreviewContrastProperty.SetValue(feature, float.PositiveInfinity);
+                Assert.That((float)debugDepthPreviewContrastProperty.GetValue(feature), Is.EqualTo(64.0f));
+
+                debugDepthPreviewContrastProperty.SetValue(feature, 8192.0f);
+                Assert.That((float)debugDepthPreviewContrastProperty.GetValue(feature), Is.EqualTo(4096.0f));
             }
             finally
             {
@@ -642,6 +666,7 @@ namespace Mmd.Tests
             string feature = File.ReadAllText(Path.Combine(runtimeRoot, "Rendering", "Universal", "MmdSelfShadowRendererFeature.cs"));
             string pass = File.ReadAllText(Path.Combine(runtimeRoot, "Rendering", "Universal", "MmdSelfShadowRenderPass.cs"));
             string shader = File.ReadAllText(Path.Combine(runtimeRoot, "Shaders", "MmdBasicUrpToon.shader"));
+            string debugShader = File.ReadAllText(Path.Combine(runtimeRoot, "Shaders", "MmdSelfShadowDepthDebug.shader"));
 
             Assert.That(target, Does.Contain("MmdSuppressStandardShadowsId"));
             Assert.That(target, Does.Contain("SetFloat(MmdSelfShadowReceiveId, selfShadowValue)"));
@@ -655,15 +680,29 @@ namespace Mmd.Tests
             Assert.That(feature, Does.Contain("DisableAllReceiverGates"));
             Assert.That(feature, Does.Contain("Dispose(bool disposing)"));
             Assert.That(feature, Does.Contain("shadowDepthBias = DefaultShadowDepthBias"));
+            Assert.That(feature, Does.Contain("debugDepthPreview"));
+            Assert.That(feature, Does.Contain("public bool DebugDepthPreview"));
+            Assert.That(feature, Does.Contain("public float DebugDepthPreviewContrast"));
+            Assert.That(feature, Does.Contain("Hidden/MMD/SelfShadowDepthDebug"));
+            Assert.That(feature, Does.Contain("CoreUtils.CreateEngineMaterial"));
+            Assert.That(feature, Does.Contain("CoreUtils.Destroy(debugDepthPreviewMaterial)"));
             Assert.That(feature, Does.Contain("DefaultShadowDirection"));
             Assert.That(feature, Does.Contain("Fallback self-shadow direction"));
             Assert.That(feature, Does.Contain("public float ShadowDepthBias"));
-            Assert.That(feature, Does.Contain("if (pass.Setup(shadowMapSize, shadowDirection, ShadowDepthBias))"));
+            Assert.That(feature, Does.Contain("if (pass.Setup(shadowMapSize, shadowDirection, ShadowDepthBias, debugDepthPreview, DebugDepthPreviewContrast, debugMaterial))"));
             Assert.That(pass, Does.Contain("_MmdSelfShadowMap"));
+            Assert.That(pass, Does.Contain("_MmdSelfShadowDebugDepth"));
             Assert.That(pass, Does.Contain("_MmdSelfShadowWorldToShadow"));
             Assert.That(pass, Does.Contain("_MmdSelfShadowParams"));
             Assert.That(pass, Does.Contain("\"MMD Self Shadow Pass\""));
             Assert.That(pass, Does.Contain("name = \"MMD Self Shadow Map\""));
+            Assert.That(pass, Does.Contain("\"MMD Self Shadow Debug Depth Preview\""));
+            Assert.That(pass, Does.Contain("name = \"MMD Self Shadow Debug Depth\""));
+            Assert.That(pass, Does.Contain("SetGlobalTextureAfterPass(debugDepth, MmdSelfShadowDebugDepthId)"));
+            Assert.That(pass, Does.Contain("Shader.SetGlobalTexture(MmdSelfShadowDebugDepthId, Texture2D.blackTexture)"));
+            Assert.That(pass, Does.Contain("UseTexture(shadowMap, AccessFlags.Read)"));
+            Assert.That(pass, Does.Contain("SetRenderAttachment(debugDepth, 0)"));
+            Assert.That(pass, Does.Contain("DrawProcedural(Matrix4x4.identity, data.Material, 0, MeshTopology.Triangles, 3, 1)"));
             Assert.That(pass, Does.Contain("ResolveShadowDirection"));
             Assert.That(pass, Does.Contain("TryGetSelfShadowLightDirection"));
             Assert.That(pass, Does.Contain("IsDefaultShadowDirection"));
@@ -672,6 +711,9 @@ namespace Mmd.Tests
             Assert.That(pass, Does.Contain("Setup(int requestedMapSize, Vector3 requestedShadowDirection)"));
             Assert.That(pass, Does.Contain("MmdSelfShadowRendererFeature.DefaultShadowDepthBias"));
             Assert.That(pass, Does.Contain("Setup(int requestedMapSize, Vector3 requestedShadowDirection, float requestedShadowDepthBias)"));
+            Assert.That(pass, Does.Contain("bool debugDepthPreview"));
+            Assert.That(pass, Does.Contain("debugDepthPreview && debugDepthPreviewMaterial != null"));
+            Assert.That(pass, Does.Contain("if (!this.debugDepthPreview)"));
             Assert.That(pass, Does.Contain("parameters = new Vector4(1.0f, shadowDepthBias, 1.0f / Mathf.Max(1, targets.Count), 0.0f)"));
             Assert.That(pass, Does.Not.Contain("0.0025f"));
             Assert.That(pass, Does.Contain("SystemInfo.usesReversedZBuffer"));
@@ -705,6 +747,11 @@ namespace Mmd.Tests
             Assert.That(shader, Does.Contain("SampleMmdSelfShadow"));
             Assert.That(shader, Does.Contain("UNITY_REVERSED_Z"));
             Assert.That(shader, Does.Contain("half shadowAttenuation = SampleMmdSelfShadow(input.positionWS, selfShadowReceive);"));
+            Assert.That(debugShader, Does.Contain("Shader \"Hidden/MMD/SelfShadowDepthDebug\""));
+            Assert.That(debugShader, Does.Contain("TEXTURE2D(_MmdSelfShadowMap)"));
+            Assert.That(debugShader, Does.Contain("_MmdSelfShadowDebugParams"));
+            Assert.That(debugShader, Does.Contain("float occupancy = step(1e-6, depthDelta);"));
+            Assert.That(debugShader, Does.Contain("UNITY_REVERSED_Z"));
         }
     }
 }
