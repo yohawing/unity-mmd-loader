@@ -140,8 +140,8 @@ namespace Mmd.Tests
                 "Shadow visibility must not directly dim the base/direct light color.");
             Assert.That(
                 source,
-                Does.Contain("fallback remains flat white"),
-                "The no-toon-map fallback must stay flat instead of becoming a synthetic shadow band.");
+                Does.Contain("half3 fallbackToon = lerp(0.22h.xxx, 1.0h.xxx, shadowAttenuation);"),
+                "The no-toon-map fallback must stay flat for lighting but still show dedicated MMD self-shadow.");
         }
 
         [Test]

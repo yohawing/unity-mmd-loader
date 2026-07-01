@@ -287,11 +287,11 @@ Shader "MMD Basic URP Toon"
                 // visibility does not darken the direct light color. It pushes the toon ramp
                 // coordinate toward the dark side instead.
                 toonCoord = lerp(0.22h, toonCoord, shadowAttenuation);
-                // MMD only applies N.L shading through the toon ramp. A material with no toon
-                // texture (u_ToonTexMode == 0 in saba) is rendered completely flat: the toon
-                // multiplier is white (1.0). So the fallback remains flat white; self-shadow
-                // visibly affects materials through a bound toon ramp, not by dimming albedo.
-                half3 fallbackToon = 1.0h.xxx;
+                // Keep the no-toon-map fallback flat for ordinary lighting, but still let MMD
+                // self-shadow darken it. three-mmd-loader always feeds self-shadow through a toon
+                // coordinate/gradient path; without this fallback, skin materials with no bound
+                // toon texture would never receive visible skirt/body self-shadow.
+                half3 fallbackToon = lerp(0.22h.xxx, 1.0h.xxx, shadowAttenuation);
                 half3 mappedToon = SAMPLE_TEXTURE2D(_ToonMap, sampler_ToonMap, float2(0.5, toonCoord)).rgb;
                 half3 toonSample = lerp(fallbackToon, mappedToon, saturate(_ToonMapBound));
                 half3 toonLight = lerp(ndotl.xxx, toonSample, _ToonStrength);

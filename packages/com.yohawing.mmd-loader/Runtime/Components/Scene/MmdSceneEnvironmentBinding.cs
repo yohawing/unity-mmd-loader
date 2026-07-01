@@ -99,6 +99,9 @@ namespace Mmd.UnityIntegration
         [Tooltip("Records sampled VMD self-shadow as MMD scene/render state. Disable to ignore sampled self-shadow keys.")]
         private bool selfShadowEnabled = true;
 
+        private Vector3 lastUnityLightDirection;
+        private bool hasLastUnityLightDirection;
+
         public Camera? TargetCamera
         {
             get => targetCamera;
@@ -165,6 +168,32 @@ namespace Mmd.UnityIntegration
         /// <summary>The status of the most recent <see cref="ApplyLightState"/> call.</summary>
         public MmdSceneLightApplyStatus LastLightApplyStatus { get; private set; }
 
+        /// <summary>
+        /// Returns the most recent Unity-space MMD light direction. If no VMD light state has been
+        /// sampled yet, a bound Directional Light is used as an authoring fallback. This is read-only
+        /// scene state for MMD lighting/self-shadow and does not imply Unity shadow usage.
+        /// </summary>
+        public bool TryGetLastUnityLightDirection(out Vector3 direction)
+        {
+            if (targetLight != null &&
+                targetLight.type == LightType.Directional &&
+                targetLight.isActiveAndEnabled &&
+                IsUsableDirection(targetLight.transform.forward))
+            {
+                direction = targetLight.transform.forward.normalized;
+                return true;
+            }
+
+            if (IsUsableDirection(lastUnityLightDirection) && hasLastUnityLightDirection)
+            {
+                direction = lastUnityLightDirection.normalized;
+                return true;
+            }
+
+            direction = default;
+            return false;
+        }
+
         /// <summary>The status of the most recent <see cref="ApplySelfShadowState"/> call.</summary>
         public MmdSceneSelfShadowApplyStatus LastSelfShadowApplyStatus { get; private set; }
 
@@ -222,6 +251,14 @@ namespace Mmd.UnityIntegration
         /// </summary>
         public MmdSceneLightApplyStatus ApplyLightState(MmdLightState state)
         {
+            Vector3 mmdDir = new Vector3(
+                Component(state.Direction, 0),
+                Component(state.Direction, 1),
+                Component(state.Direction, 2));
+            Vector3 unityDir = MmdCoordinateSpace.MmdToUnityPosition(mmdDir);
+            hasLastUnityLightDirection = IsUsableDirection(unityDir);
+            lastUnityLightDirection = hasLastUnityLightDirection ? unityDir.normalized : default;
+
             if (targetLight == null)
             {
                 LastLightApplyStatus = MmdSceneLightApplyStatus.NoTargetLight;
@@ -233,16 +270,11 @@ namespace Mmd.UnityIntegration
                 Mathf.Clamp01(Component(state.Color, 1)),
                 Mathf.Clamp01(Component(state.Color, 2)));
 
-            Vector3 mmdDir = new Vector3(
-                Component(state.Direction, 0),
-                Component(state.Direction, 1),
-                Component(state.Direction, 2));
-            Vector3 unityDir = MmdCoordinateSpace.MmdToUnityPosition(mmdDir);
-            if (unityDir.sqrMagnitude > 1e-12f)
+            if (hasLastUnityLightDirection)
             {
                 // A Directional Light only uses its forward axis; roll about that axis has no lighting
                 // effect, so LookRotation's default up is fine even for a near-vertical light direction.
-                targetLight.transform.rotation = Quaternion.LookRotation(unityDir);
+                targetLight.transform.rotation = Quaternion.LookRotation(lastUnityLightDirection);
             }
 
             LastLightApplyStatus = targetLight.type == LightType.Directional
@@ -287,6 +319,14 @@ namespace Mmd.UnityIntegration
         private static float Component(float[] values, int index)
         {
             return values != null && values.Length > index && float.IsFinite(values[index]) ? values[index] : 0f;
+        }
+
+        private static bool IsUsableDirection(Vector3 direction)
+        {
+            return float.IsFinite(direction.x) &&
+                float.IsFinite(direction.y) &&
+                float.IsFinite(direction.z) &&
+                direction.sqrMagnitude > 1e-12f;
         }
     }
 }

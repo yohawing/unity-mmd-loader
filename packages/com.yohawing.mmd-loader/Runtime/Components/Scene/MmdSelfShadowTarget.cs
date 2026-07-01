@@ -219,6 +219,18 @@ namespace Mmd.UnityIntegration
             return projectionState.Active;
         }
 
+        public bool TryGetSelfShadowLightDirection(out Vector3 direction)
+        {
+            if (sceneEnvironment != null &&
+                sceneEnvironment.TryGetLastUnityLightDirection(out direction))
+            {
+                return true;
+            }
+
+            direction = default;
+            return false;
+        }
+
         private MmdSelfShadowProjectionPolicy EffectiveProjectionPolicy =>
             sceneEnvironment != null ? sceneEnvironment.SelfShadowProjectionPolicy : projectionPolicy;
 

@@ -105,7 +105,8 @@ namespace Mmd.Rendering.Universal
             }
 
             float shadowDepthBias = SanitizeShadowDepthBias(requestedShadowDepthBias);
-            if (!TryCreateMatrices(ActiveProjectionTargets, requestedShadowDirection, shadowDepthBias, out viewMatrix, out projectionMatrix, out worldToShadow, out shadowParams, out lightDirection))
+            Vector3 shadowDirection = ResolveShadowDirection(ActiveProjectionTargets, requestedShadowDirection);
+            if (!TryCreateMatrices(ActiveProjectionTargets, shadowDirection, shadowDepthBias, out viewMatrix, out projectionMatrix, out worldToShadow, out shadowParams, out lightDirection))
             {
                 PublishDisabledGlobals();
                 return false;
@@ -124,6 +125,60 @@ namespace Mmd.Rendering.Universal
 
             mapSize = Mathf.Clamp(requestedMapSize, 128, 4096);
             return true;
+        }
+
+        private static Vector3 ResolveShadowDirection(
+            List<MmdSelfShadowTarget> targets,
+            Vector3 fallbackDirection)
+        {
+            for (int i = 0; i < targets.Count; i++)
+            {
+                MmdSelfShadowTarget target = targets[i];
+                if (target != null &&
+                    target.TryGetSelfShadowLightDirection(out Vector3 direction) &&
+                    direction.sqrMagnitude > 1e-8f)
+                {
+                    return direction.normalized;
+                }
+            }
+
+            if (!IsDefaultShadowDirection(fallbackDirection))
+            {
+                return fallbackDirection;
+            }
+
+            if (TryGetRenderSettingsSunDirection(out Vector3 sceneDirection))
+            {
+                return sceneDirection;
+            }
+
+            return fallbackDirection;
+        }
+
+        private static bool IsDefaultShadowDirection(Vector3 direction)
+        {
+            return (direction - MmdSelfShadowRendererFeature.DefaultShadowDirection).sqrMagnitude < 1e-8f;
+        }
+
+        private static bool TryGetRenderSettingsSunDirection(out Vector3 direction)
+        {
+            Light sun = RenderSettings.sun;
+            if (IsUsableDirectionalLight(sun))
+            {
+                direction = sun.transform.forward.normalized;
+                return true;
+            }
+
+            direction = default;
+            return false;
+        }
+
+        private static bool IsUsableDirectionalLight(Light? light)
+        {
+            return light != null &&
+                light.type == LightType.Directional &&
+                light.isActiveAndEnabled &&
+                light.transform.forward.sqrMagnitude > 1e-8f;
         }
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)

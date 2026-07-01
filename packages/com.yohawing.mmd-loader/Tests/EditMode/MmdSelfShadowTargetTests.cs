@@ -223,6 +223,110 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void SelfShadowRenderPassUsesSceneEnvironmentLightDirectionWhenAvailable()
+        {
+            var root = new GameObject("mmd-root");
+            var environmentGo = new GameObject("environment");
+            GameObject? cube = null;
+            Material? material = null;
+            try
+            {
+                MmdSelfShadowTarget target = root.AddComponent<MmdSelfShadowTarget>();
+                cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                Object.DestroyImmediate(cube.GetComponent<Collider>());
+                cube.transform.SetParent(root.transform, worldPositionStays: false);
+
+                Shader shader = Shader.Find("MMD Basic URP Toon");
+                Assert.That(shader, Is.Not.Null);
+                material = new Material(shader);
+                cube.GetComponent<Renderer>().sharedMaterial = material;
+
+                MmdSceneEnvironmentBinding environment = environmentGo.AddComponent<MmdSceneEnvironmentBinding>();
+                environment.ApplyLightState(new MmdLightState(
+                    new[] { 1.0f, 1.0f, 1.0f },
+                    new[] { -0.25f, -1.0f, 0.75f }));
+                environment.ApplySelfShadowState(new MmdSelfShadowState(1, 0.5f));
+                target.SceneEnvironment = environment;
+
+                System.Type passType = System.Type.GetType(
+                    "Mmd.Rendering.Universal.MmdSelfShadowRenderPass, Mmd.Rendering.Universal",
+                    throwOnError: true)!;
+                object pass = System.Activator.CreateInstance(passType)!;
+                System.Reflection.MethodInfo setup = passType.GetMethod(
+                    "Setup",
+                    new[] { typeof(int), typeof(Vector3), typeof(float) })!;
+                Assert.That((bool)setup.Invoke(pass, new object[] { 512, new Vector3(0.35f, -1.0f, 0.35f), 0.0025f }),
+                    Is.True);
+
+                Vector3 expectedDirection = MmdCoordinateSpace.MmdToUnityPosition(
+                    new Vector3(-0.25f, -1.0f, 0.75f)).normalized;
+                Vector4 actualDirection = GetPassLightDirection(passType, pass);
+
+                Assert.That(Vector3.Dot(new Vector3(actualDirection.x, actualDirection.y, actualDirection.z), expectedDirection),
+                    Is.EqualTo(1.0f).Within(0.001f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(material);
+                Object.DestroyImmediate(cube);
+                Object.DestroyImmediate(environmentGo);
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void SelfShadowRenderPassKeepsCustomDirectionWhenRenderSettingsSunExists()
+        {
+            var root = new GameObject("mmd-root");
+            var lightGo = new GameObject("sun");
+            GameObject? cube = null;
+            Material? material = null;
+            Light? previousSun = RenderSettings.sun;
+            try
+            {
+                MmdSelfShadowTarget target = root.AddComponent<MmdSelfShadowTarget>();
+                Assert.That(target.SceneEnvironment, Is.Null);
+
+                cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                Object.DestroyImmediate(cube.GetComponent<Collider>());
+                cube.transform.SetParent(root.transform, worldPositionStays: false);
+
+                Shader shader = Shader.Find("MMD Basic URP Toon");
+                Assert.That(shader, Is.Not.Null);
+                material = new Material(shader);
+                cube.GetComponent<Renderer>().sharedMaterial = material;
+
+                Light sun = lightGo.AddComponent<Light>();
+                sun.type = LightType.Directional;
+                sun.transform.rotation = Quaternion.LookRotation(Vector3.right);
+                RenderSettings.sun = sun;
+
+                System.Type passType = System.Type.GetType(
+                    "Mmd.Rendering.Universal.MmdSelfShadowRenderPass, Mmd.Rendering.Universal",
+                    throwOnError: true)!;
+                object pass = System.Activator.CreateInstance(passType)!;
+                System.Reflection.MethodInfo setup = passType.GetMethod(
+                    "Setup",
+                    new[] { typeof(int), typeof(Vector3), typeof(float) })!;
+                Assert.That((bool)setup.Invoke(pass, new object[] { 512, Vector3.left, 0.0025f }),
+                    Is.True);
+
+                Vector4 actualDirection = GetPassLightDirection(passType, pass);
+
+                Assert.That(Vector3.Dot(new Vector3(actualDirection.x, actualDirection.y, actualDirection.z), Vector3.left),
+                    Is.EqualTo(1.0f).Within(0.001f));
+            }
+            finally
+            {
+                RenderSettings.sun = previousSun;
+                Object.DestroyImmediate(material);
+                Object.DestroyImmediate(cube);
+                Object.DestroyImmediate(lightGo);
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
         public void TargetClearsReceiverGateWhenDisabled()
         {
             var root = new GameObject("mmd-root");
@@ -462,6 +566,14 @@ namespace Mmd.Tests
             Assert.That(propertyBlock.GetFloat(propertyId), Is.EqualTo(expected));
         }
 
+        private static Vector4 GetPassLightDirection(System.Type passType, object pass)
+        {
+            System.Reflection.FieldInfo field = passType.GetField(
+                "lightDirection",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+            return (Vector4)field.GetValue(pass);
+        }
+
         [Test]
         public void SelfShadowRendererAndShaderUseDedicatedGlobals()
         {
@@ -484,11 +596,17 @@ namespace Mmd.Tests
             Assert.That(feature, Does.Contain("DisableAllReceiverGates"));
             Assert.That(feature, Does.Contain("Dispose(bool disposing)"));
             Assert.That(feature, Does.Contain("shadowDepthBias = DefaultShadowDepthBias"));
+            Assert.That(feature, Does.Contain("DefaultShadowDirection"));
             Assert.That(feature, Does.Contain("public float ShadowDepthBias"));
             Assert.That(feature, Does.Contain("if (pass.Setup(shadowMapSize, shadowDirection, ShadowDepthBias))"));
             Assert.That(pass, Does.Contain("_MmdSelfShadowMap"));
             Assert.That(pass, Does.Contain("_MmdSelfShadowWorldToShadow"));
             Assert.That(pass, Does.Contain("_MmdSelfShadowParams"));
+            Assert.That(pass, Does.Contain("ResolveShadowDirection"));
+            Assert.That(pass, Does.Contain("TryGetSelfShadowLightDirection"));
+            Assert.That(pass, Does.Contain("IsDefaultShadowDirection"));
+            Assert.That(pass, Does.Contain("RenderSettings.sun"));
+            Assert.That(pass, Does.Not.Contain("FindObjectsByType<Light>"));
             Assert.That(pass, Does.Contain("Setup(int requestedMapSize, Vector3 requestedShadowDirection)"));
             Assert.That(pass, Does.Contain("MmdSelfShadowRendererFeature.DefaultShadowDepthBias"));
             Assert.That(pass, Does.Contain("Setup(int requestedMapSize, Vector3 requestedShadowDirection, float requestedShadowDepthBias)"));

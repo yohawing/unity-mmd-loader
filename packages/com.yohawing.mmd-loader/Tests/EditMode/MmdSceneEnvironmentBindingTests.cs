@@ -115,6 +115,8 @@ namespace Mmd.Tests
                 Vector3 expectedDirection = MmdCoordinateSpace.MmdToUnityPosition(new Vector3(-0.5f, -1f, 0.5f)).normalized;
 
                 Assert.That(status, Is.EqualTo(MmdSceneLightApplyStatus.Applied));
+                Assert.That(binding.TryGetLastUnityLightDirection(out Vector3 recordedDirection), Is.True);
+                Assert.That(Vector3.Dot(recordedDirection, expectedDirection), Is.EqualTo(1f).Within(0.001f));
                 Assert.That(light.color.r, Is.EqualTo(0.2f).Within(0.001f));
                 Assert.That(light.color.g, Is.EqualTo(0.4f).Within(0.001f));
                 Assert.That(light.color.b, Is.EqualTo(0.6f).Within(0.001f));
@@ -183,6 +185,33 @@ namespace Mmd.Tests
                 Assert.That(status, Is.EqualTo(MmdSceneLightApplyStatus.Applied));
                 // v1 policy: VMD light carries color + direction only; intensity stays at the scene value.
                 Assert.That(light.intensity, Is.EqualTo(3.0f).Within(0.001f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(lightGo);
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void LastUnityLightDirectionPrefersCurrentBoundDirectionalLight()
+        {
+            var go = new GameObject("binding");
+            var lightGo = new GameObject("light");
+            try
+            {
+                Light light = lightGo.AddComponent<Light>();
+                light.type = LightType.Directional;
+
+                MmdSceneEnvironmentBinding binding = go.AddComponent<MmdSceneEnvironmentBinding>();
+                binding.TargetLight = light;
+
+                binding.ApplyLightState(
+                    new MmdLightState(new[] { 0.2f, 0.4f, 0.6f }, new[] { -0.5f, -1f, 0.5f }));
+                light.transform.rotation = Quaternion.LookRotation(Vector3.left);
+
+                Assert.That(binding.TryGetLastUnityLightDirection(out Vector3 direction), Is.True);
+                Assert.That(Vector3.Dot(direction, Vector3.left), Is.EqualTo(1f).Within(0.001f));
             }
             finally
             {
@@ -378,12 +407,15 @@ namespace Mmd.Tests
             {
                 MmdSceneEnvironmentBinding binding = go.AddComponent<MmdSceneEnvironmentBinding>();
                 Assert.That(binding.TargetLight, Is.Null);
+                Vector3 expectedDirection = MmdCoordinateSpace.MmdToUnityPosition(new Vector3(-0.5f, -1f, 0.5f)).normalized;
 
                 MmdSceneLightApplyStatus status = binding.ApplyLightState(
                     new MmdLightState(new[] { 0.2f, 0.4f, 0.6f }, new[] { -0.5f, -1f, 0.5f }));
 
                 Assert.That(status, Is.EqualTo(MmdSceneLightApplyStatus.NoTargetLight));
                 Assert.That(binding.LastLightApplyStatus, Is.EqualTo(MmdSceneLightApplyStatus.NoTargetLight));
+                Assert.That(binding.TryGetLastUnityLightDirection(out Vector3 recordedDirection), Is.True);
+                Assert.That(Vector3.Dot(recordedDirection, expectedDirection), Is.EqualTo(1f).Within(0.001f));
             }
             finally
             {

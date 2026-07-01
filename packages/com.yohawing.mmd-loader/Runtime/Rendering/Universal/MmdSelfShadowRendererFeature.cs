@@ -9,13 +9,14 @@ namespace Mmd.Rendering.Universal
     public sealed class MmdSelfShadowRendererFeature : ScriptableRendererFeature
     {
         internal const float DefaultShadowDepthBias = 0.0025f;
+        internal static readonly Vector3 DefaultShadowDirection = new(0.35f, -1.0f, 0.35f);
         private const float MaxShadowDepthBias = 0.1f;
 
         [SerializeField]
         private int shadowMapSize = 1024;
 
         [SerializeField]
-        private Vector3 shadowDirection = new(0.35f, -1.0f, 0.35f);
+        private Vector3 shadowDirection = DefaultShadowDirection;
 
         [SerializeField]
         private float shadowDepthBias = DefaultShadowDepthBias;
