@@ -243,9 +243,14 @@ Shader "MMD Basic URP Toon"
                 half3 normalWS = normalize(input.normalWS);
                 half ndotl = saturate(dot(normalWS, lightDirection));
                 half toonCoord = saturate(dot(normalWS, lightDirection) * 0.5h + 0.5h);
+                // Match the MMD toon self-shadow model used by three-mmd-loader: shadow map
+                // visibility does not darken the direct light color. It pushes the toon ramp
+                // coordinate toward the dark side instead.
+                toonCoord = lerp(0.22h, toonCoord, shadowAttenuation);
                 // MMD only applies N.L shading through the toon ramp. A material with no toon
                 // texture (u_ToonTexMode == 0 in saba) is rendered completely flat: the toon
-                // multiplier is white (1.0). So the fallback is flat white, not a synthetic band.
+                // multiplier is white (1.0). So the fallback remains flat white; self-shadow
+                // visibly affects materials through a bound toon ramp, not by dimming albedo.
                 half3 fallbackToon = 1.0h.xxx;
                 half3 mappedToon = SAMPLE_TEXTURE2D(_ToonMap, sampler_ToonMap, float2(0.5, toonCoord)).rgb;
                 half3 toonSample = lerp(fallbackToon, mappedToon, saturate(_ToonMapBound));
@@ -257,7 +262,7 @@ Shader "MMD Basic URP Toon"
                 // (base = clamp(diffuse*lightColor + ambient, 0, 1); base *= texture; base *= toon),
                 // then convert the result to linear for the sRGB render target. (_MmdLightColor
                 // defaults to white, so runtime/GameView output is unchanged.)
-                half3 baseSRGB = saturate(LinearToSRGB(_BaseColor.rgb) * LinearToSRGB(_MmdLightColor.rgb) * shadowAttenuation + LinearToSRGB(_AmbientColor.rgb));
+                half3 baseSRGB = saturate(LinearToSRGB(_BaseColor.rgb) * LinearToSRGB(_MmdLightColor.rgb) + LinearToSRGB(_AmbientColor.rgb));
                 half3 albedoSRGB = baseSRGB * LinearToSRGB(baseMap.rgb) * LinearToSRGB(_Color.rgb) * LinearToSRGB(_DiagnosticColor.rgb);
 
                 // Sphere (matcap) texture, applied after the diffuse texture and before the

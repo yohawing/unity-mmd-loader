@@ -107,6 +107,36 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void BasicUrpToonShaderUsesShadowVisibilityForToonCoordinate()
+        {
+            string shaderPath = Path.Combine(
+                MmdTestFixtures.PackageRoot,
+                "Runtime",
+                "Shaders",
+                "MmdBasicUrpToon.shader");
+            Assert.That(shaderPath, Does.Exist);
+
+            string source = File.ReadAllText(shaderPath);
+
+            Assert.That(
+                source,
+                Does.Contain("half shadowAttenuation = lerp(1.0h, mainLight.shadowAttenuation, saturate(_MmdReceiveShadows));"),
+                "_MmdReceiveShadows remains the gate for URP shadow map visibility.");
+            Assert.That(
+                source,
+                Does.Contain("toonCoord = lerp(0.22h, toonCoord, shadowAttenuation);"),
+                "MMD self-shadow should push the toon ramp coordinate toward the dark floor.");
+            Assert.That(
+                source,
+                Does.Not.Contain("LinearToSRGB(_MmdLightColor.rgb) * shadowAttenuation"),
+                "Shadow visibility must not directly dim the base/direct light color.");
+            Assert.That(
+                source,
+                Does.Contain("fallback remains flat white"),
+                "The no-toon-map fallback must stay flat instead of becoming a synthetic shadow band.");
+        }
+
+        [Test]
         public void CreateStaticModelSetsShadowAlphaClipForAlphaBlendMaterial()
         {
             MmdUnityModelInstance? instance = null;
