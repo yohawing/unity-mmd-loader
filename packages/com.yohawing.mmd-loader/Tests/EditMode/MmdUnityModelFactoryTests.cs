@@ -120,8 +120,16 @@ namespace Mmd.Tests
 
             Assert.That(
                 source,
-                Does.Contain("half shadowAttenuation = lerp(1.0h, mainLight.shadowAttenuation, saturate(_MmdReceiveShadows));"),
-                "_MmdReceiveShadows remains the gate for URP shadow map visibility.");
+                Does.Contain("half receiveShadows = saturate((half)UNITY_ACCESS_INSTANCED_PROP(MmdPerRenderer, _MmdReceiveShadows));"),
+                "_MmdReceiveShadows remains the per-renderer gate for URP shadow map visibility.");
+            Assert.That(
+                source,
+                Does.Contain("half effectiveReceiveShadows = receiveShadows * (1.0h - suppressStandardShadows);"),
+                "Forward shading must combine the external receive gate with the self-shadow-only standard-shadow suppression gate.");
+            Assert.That(
+                source,
+                Does.Contain("half shadowAttenuation = lerp(1.0h, mainLight.shadowAttenuation, effectiveReceiveShadows);"),
+                "Forward shading must use the effective per-renderer shadow visibility gate.");
             Assert.That(
                 source,
                 Does.Contain("toonCoord = lerp(0.22h, toonCoord, shadowAttenuation);"),

@@ -14,9 +14,12 @@ namespace Mmd.UnityIntegration
     public sealed class MmdSelfShadowTarget : MonoBehaviour
     {
         public static readonly int MmdSelfShadowReceiveId = Shader.PropertyToID("_MmdSelfShadowReceive");
+        public static readonly int MmdReceiveShadowsId = Shader.PropertyToID("_MmdReceiveShadows");
+        public static readonly int MmdSuppressStandardShadowsId = Shader.PropertyToID("_MmdSuppressStandardShadows");
 
         private static readonly List<MmdSelfShadowTarget> ActiveTargets = new();
         private static MaterialPropertyBlock? sharedPropertyBlock;
+        private static bool receiverGateAvailable;
 
         [SerializeField]
         [Tooltip("Enables the dedicated MMD self-shadow render path for this character.")]
@@ -33,6 +36,7 @@ namespace Mmd.UnityIntegration
         private MmdSelfShadowProjectionPolicy projectionPolicy = MmdSelfShadowProjectionPolicy.Default;
         private Transform? receiverGateRoot;
         private bool receiverGateEnabled;
+        private bool receiverGateSuppressesStandard;
         private bool receiverGateInitialized;
 
         public bool SelfShadowEnabled
@@ -65,7 +69,7 @@ namespace Mmd.UnityIntegration
 
                 if (isActiveAndEnabled)
                 {
-                    ApplyReceiverGateToRoot(BoundsRoot, false);
+                    ApplyReceiverGateToRoot(BoundsRoot, selfShadowReceive: false, suppressStandardShadows: false);
                 }
 
                 boundsRoot = value;
@@ -109,6 +113,7 @@ namespace Mmd.UnityIntegration
 
         public static void DisableAllReceiverGates()
         {
+            receiverGateAvailable = false;
             for (int i = ActiveTargets.Count - 1; i >= 0; i--)
             {
                 MmdSelfShadowTarget target = ActiveTargets[i];
@@ -119,6 +124,33 @@ namespace Mmd.UnityIntegration
                 }
 
                 target.ApplyReceiverGate(false, force: true);
+                target.receiverGateRoot = null;
+                target.receiverGateInitialized = false;
+            }
+        }
+
+        internal static void SetReceiverGateAvailableForRendering(bool available)
+        {
+            if (!available)
+            {
+                DisableAllReceiverGates();
+                return;
+            }
+
+            receiverGateAvailable = true;
+            for (int i = ActiveTargets.Count - 1; i >= 0; i--)
+            {
+                MmdSelfShadowTarget target = ActiveTargets[i];
+                if (target == null)
+                {
+                    ActiveTargets.RemoveAt(i);
+                    continue;
+                }
+
+                if (target.isActiveAndEnabled)
+                {
+                    target.ApplyReceiverGate(target.selfShadowEnabled, force: true);
+                }
             }
         }
 
@@ -202,10 +234,15 @@ namespace Mmd.UnityIntegration
 
         private void OnDisable()
         {
-            ApplyReceiverGate(false, force: true);
+            ApplyReceiverGateToRoot(BoundsRoot, selfShadowReceive: false, suppressStandardShadows: false);
             ActiveTargets.Remove(this);
             receiverGateRoot = null;
             receiverGateInitialized = false;
+        }
+
+        private void OnDestroy()
+        {
+            ApplyReceiverGateToRoot(BoundsRoot, selfShadowReceive: false, suppressStandardShadows: false);
         }
 
         private void OnTransformChildrenChanged()
@@ -229,27 +266,37 @@ namespace Mmd.UnityIntegration
         private void ApplyReceiverGate(bool enabled, bool force = false)
         {
             Transform root = BoundsRoot;
-            bool shouldReceive = enabled && TryGetActiveProjectionState(out _);
-            if (!force && receiverGateInitialized && receiverGateRoot == root && receiverGateEnabled == shouldReceive)
+            bool shouldReceive = receiverGateAvailable && enabled && TryGetActiveProjectionState(out _);
+            bool suppressStandard = shouldReceive;
+            if (!force &&
+                receiverGateInitialized &&
+                receiverGateRoot == root &&
+                receiverGateEnabled == shouldReceive &&
+                receiverGateSuppressesStandard == suppressStandard)
             {
                 return;
             }
 
             if (receiverGateRoot != null && receiverGateRoot != root)
             {
-                ApplyReceiverGateToRoot(receiverGateRoot, false);
+                ApplyReceiverGateToRoot(receiverGateRoot, selfShadowReceive: false, suppressStandardShadows: false);
             }
 
-            ApplyReceiverGateToRoot(root, shouldReceive);
+            ApplyReceiverGateToRoot(root, shouldReceive, suppressStandard);
             receiverGateRoot = root;
             receiverGateEnabled = shouldReceive;
+            receiverGateSuppressesStandard = suppressStandard;
             receiverGateInitialized = true;
         }
 
-        private static void ApplyReceiverGateToRoot(Transform root, bool enabled)
+        private static void ApplyReceiverGateToRoot(
+            Transform root,
+            bool selfShadowReceive,
+            bool suppressStandardShadows)
         {
             Renderer[] renderers = root.GetComponentsInChildren<Renderer>(includeInactive: true);
-            float value = enabled ? 1.0f : 0.0f;
+            float selfShadowValue = selfShadowReceive ? 1.0f : 0.0f;
+            float suppressStandardValue = suppressStandardShadows ? 1.0f : 0.0f;
             for (int i = 0; i < renderers.Length; i++)
             {
                 Renderer renderer = renderers[i];
@@ -259,7 +306,8 @@ namespace Mmd.UnityIntegration
                 }
 
                 renderer.GetPropertyBlock(SharedPropertyBlock);
-                SharedPropertyBlock.SetFloat(MmdSelfShadowReceiveId, value);
+                SharedPropertyBlock.SetFloat(MmdSelfShadowReceiveId, selfShadowValue);
+                SharedPropertyBlock.SetFloat(MmdSuppressStandardShadowsId, suppressStandardValue);
                 renderer.SetPropertyBlock(SharedPropertyBlock);
                 SharedPropertyBlock.Clear();
             }

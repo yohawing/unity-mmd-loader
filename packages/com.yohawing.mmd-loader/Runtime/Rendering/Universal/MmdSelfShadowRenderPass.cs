@@ -149,6 +149,7 @@ namespace Mmd.Rendering.Universal
             passData.ClearDepth = SystemInfo.usesReversedZBuffer ? 0.0f : 1.0f;
 
             builder.AllowGlobalStateModification(true);
+            builder.AllowPassCulling(false);
             builder.SetRenderAttachmentDepth(shadowMap, AccessFlags.ReadWrite);
             builder.SetGlobalTextureAfterPass(shadowMap, MmdSelfShadowMapId);
             builder.SetRenderFunc(static (PassData data, RasterGraphContext context) =>

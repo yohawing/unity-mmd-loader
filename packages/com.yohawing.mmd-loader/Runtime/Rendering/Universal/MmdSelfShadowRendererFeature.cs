@@ -43,6 +43,7 @@ namespace Mmd.Rendering.Universal
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
+            MmdSelfShadowTarget.SetReceiverGateAvailableForRendering(false);
             MmdSelfShadowRenderPass pass = selfShadowPass ?? new MmdSelfShadowRenderPass
             {
                 renderPassEvent = RenderPassEvent.BeforeRenderingShadows
@@ -51,6 +52,7 @@ namespace Mmd.Rendering.Universal
             selfShadowPass = pass;
             if (pass.Setup(shadowMapSize, shadowDirection))
             {
+                MmdSelfShadowTarget.SetReceiverGateAvailableForRendering(true);
                 renderer.EnqueuePass(pass);
             }
         }

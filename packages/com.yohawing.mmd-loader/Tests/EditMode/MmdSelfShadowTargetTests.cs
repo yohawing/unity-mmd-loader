@@ -11,6 +11,18 @@ namespace Mmd.Tests
 {
     public sealed class MmdSelfShadowTargetTests
     {
+        [SetUp]
+        public void SetUp()
+        {
+            MmdSelfShadowTarget.SetReceiverGateAvailableForRendering(true);
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            MmdSelfShadowTarget.SetReceiverGateAvailableForRendering(false);
+        }
+
         [Test]
         public void TargetRegistersOnlyEnabledActiveSelfShadowTargetsForRendererFeature()
         {
@@ -43,22 +55,20 @@ namespace Mmd.Tests
         {
             var root = new GameObject("mmd-root");
             GameObject? cube = null;
-            var propertyBlock = new MaterialPropertyBlock();
             try
             {
                 MmdSelfShadowTarget target = root.AddComponent<MmdSelfShadowTarget>();
                 cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                Object.DestroyImmediate(cube.GetComponent<Collider>());
                 cube.transform.SetParent(root.transform, worldPositionStays: false);
                 cube.transform.position = new Vector3(1, 2, 3);
                 cube.transform.localScale = new Vector3(2, 4, 6);
-                Object.DestroyImmediate(cube.GetComponent<Collider>());
 
                 MmdSelfShadowBoundsResult bounds = target.CollectBounds();
                 target.RefreshReceiverGate();
                 MmdSelfShadowProjectionState projectionState =
                     target.ProjectionPolicy.Evaluate(new MmdSelfShadowState(1, 0.5f));
                 Renderer renderer = cube.GetComponent<Renderer>();
-                renderer.GetPropertyBlock(propertyBlock);
 
                 Assert.That(target.SelfShadowEnabled, Is.True);
                 Assert.That(target.ProjectionPolicy.BoundsPadding, Is.EqualTo(MmdSelfShadowProjectionPolicy.Default.BoundsPadding));
@@ -68,11 +78,10 @@ namespace Mmd.Tests
                 Assert.That(bounds.Center.y, Is.EqualTo(2.0f).Within(0.001f));
                 Assert.That(bounds.Center.z, Is.EqualTo(3.0f).Within(0.001f));
                 Assert.That(projectionState.Active, Is.True);
-                Assert.That(propertyBlock.GetFloat(MmdSelfShadowTarget.MmdSelfShadowReceiveId), Is.EqualTo(1.0f));
+                AssertReceiverGate(renderer, expectedSelfShadowReceive: 1.0f, expectedSuppressStandard: 1.0f);
 
                 target.SelfShadowEnabled = false;
-                renderer.GetPropertyBlock(propertyBlock);
-                Assert.That(propertyBlock.GetFloat(MmdSelfShadowTarget.MmdSelfShadowReceiveId), Is.EqualTo(0.0f));
+                AssertReceiverGate(renderer, expectedSelfShadowReceive: 0.0f, expectedSuppressStandard: 0.0f);
             }
             finally
             {
@@ -118,32 +127,26 @@ namespace Mmd.Tests
             var newRoot = new GameObject("new-root");
             GameObject? oldCube = null;
             GameObject? newCube = null;
-            var propertyBlock = new MaterialPropertyBlock();
             try
             {
                 oldCube = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 newCube = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                oldCube.transform.SetParent(oldRoot.transform, worldPositionStays: false);
-                newCube.transform.SetParent(newRoot.transform, worldPositionStays: false);
                 Object.DestroyImmediate(oldCube.GetComponent<Collider>());
                 Object.DestroyImmediate(newCube.GetComponent<Collider>());
+                oldCube.transform.SetParent(oldRoot.transform, worldPositionStays: false);
+                newCube.transform.SetParent(newRoot.transform, worldPositionStays: false);
 
                 MmdSelfShadowTarget target = targetGo.AddComponent<MmdSelfShadowTarget>();
                 target.BoundsRoot = oldRoot.transform;
 
                 Renderer oldRenderer = oldCube.GetComponent<Renderer>();
                 Renderer newRenderer = newCube.GetComponent<Renderer>();
-                oldRenderer.GetPropertyBlock(propertyBlock);
-                Assert.That(propertyBlock.GetFloat(MmdSelfShadowTarget.MmdSelfShadowReceiveId), Is.EqualTo(1.0f));
-                newRenderer.GetPropertyBlock(propertyBlock);
-                Assert.That(propertyBlock.GetFloat(MmdSelfShadowTarget.MmdSelfShadowReceiveId), Is.EqualTo(0.0f));
+                AssertReceiverGate(oldRenderer, expectedSelfShadowReceive: 1.0f, expectedSuppressStandard: 1.0f);
 
                 target.BoundsRoot = newRoot.transform;
 
-                oldRenderer.GetPropertyBlock(propertyBlock);
-                Assert.That(propertyBlock.GetFloat(MmdSelfShadowTarget.MmdSelfShadowReceiveId), Is.EqualTo(0.0f));
-                newRenderer.GetPropertyBlock(propertyBlock);
-                Assert.That(propertyBlock.GetFloat(MmdSelfShadowTarget.MmdSelfShadowReceiveId), Is.EqualTo(1.0f));
+                AssertReceiverGate(oldRenderer, expectedSelfShadowReceive: 0.0f, expectedSuppressStandard: 0.0f);
+                AssertReceiverGate(newRenderer, expectedSelfShadowReceive: 1.0f, expectedSuppressStandard: 1.0f);
             }
             finally
             {
@@ -161,13 +164,12 @@ namespace Mmd.Tests
             var root = new GameObject("mmd-root");
             var environmentGo = new GameObject("environment");
             GameObject? cube = null;
-            var propertyBlock = new MaterialPropertyBlock();
             try
             {
                 MmdSelfShadowTarget target = root.AddComponent<MmdSelfShadowTarget>();
                 cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                cube.transform.SetParent(root.transform, worldPositionStays: false);
                 Object.DestroyImmediate(cube.GetComponent<Collider>());
+                cube.transform.SetParent(root.transform, worldPositionStays: false);
                 Renderer renderer = cube.GetComponent<Renderer>();
 
                 MmdSceneEnvironmentBinding environment = environmentGo.AddComponent<MmdSceneEnvironmentBinding>();
@@ -181,15 +183,13 @@ namespace Mmd.Tests
                 Assert.That(target.TryGetActiveProjectionState(out MmdSelfShadowProjectionState notAppliedState), Is.False);
                 Assert.That(notAppliedState.Active, Is.False);
                 target.RefreshReceiverGate();
-                renderer.GetPropertyBlock(propertyBlock);
-                Assert.That(propertyBlock.GetFloat(MmdSelfShadowTarget.MmdSelfShadowReceiveId), Is.EqualTo(0.0f));
+                AssertReceiverGate(renderer, expectedSelfShadowReceive: 0.0f, expectedSuppressStandard: 0.0f);
 
                 environment.ApplySelfShadowState(new MmdSelfShadowState(0, 0.4f));
                 Assert.That(target.TryGetActiveProjectionState(out MmdSelfShadowProjectionState inactiveState), Is.False);
                 Assert.That(inactiveState.Active, Is.False);
                 target.RefreshReceiverGate();
-                renderer.GetPropertyBlock(propertyBlock);
-                Assert.That(propertyBlock.GetFloat(MmdSelfShadowTarget.MmdSelfShadowReceiveId), Is.EqualTo(0.0f));
+                AssertReceiverGate(renderer, expectedSelfShadowReceive: 0.0f, expectedSuppressStandard: 0.0f);
 
                 environment.ApplySelfShadowState(new MmdSelfShadowState(2, 0.4f));
                 Assert.That(target.TryGetActiveProjectionState(out MmdSelfShadowProjectionState activeState), Is.True);
@@ -197,8 +197,7 @@ namespace Mmd.Tests
                 Assert.That(activeState.FarDistance, Is.EqualTo(4.0f).Within(0.001f));
                 Assert.That(activeState.BoundsPadding, Is.EqualTo(0.25f).Within(0.001f));
                 target.RefreshReceiverGate();
-                renderer.GetPropertyBlock(propertyBlock);
-                Assert.That(propertyBlock.GetFloat(MmdSelfShadowTarget.MmdSelfShadowReceiveId), Is.EqualTo(1.0f));
+                AssertReceiverGate(renderer, expectedSelfShadowReceive: 1.0f, expectedSuppressStandard: 1.0f);
 
                 environment.SelfShadowProjectionPolicy = new MmdSelfShadowProjectionPolicy(
                     distanceScale: 20.0f,
@@ -213,8 +212,7 @@ namespace Mmd.Tests
                 Assert.That(target.TryGetActiveProjectionState(out MmdSelfShadowProjectionState disabledState), Is.False);
                 Assert.That(disabledState.Active, Is.False);
                 target.RefreshReceiverGate();
-                renderer.GetPropertyBlock(propertyBlock);
-                Assert.That(propertyBlock.GetFloat(MmdSelfShadowTarget.MmdSelfShadowReceiveId), Is.EqualTo(0.0f));
+                AssertReceiverGate(renderer, expectedSelfShadowReceive: 0.0f, expectedSuppressStandard: 0.0f);
             }
             finally
             {
@@ -225,18 +223,228 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void TargetClearsReceiverGateWhenDisabled()
+        {
+            var root = new GameObject("mmd-root");
+            GameObject? cube = null;
+            try
+            {
+                cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                Object.DestroyImmediate(cube.GetComponent<Collider>());
+                cube.transform.SetParent(root.transform, worldPositionStays: false);
+                Renderer renderer = cube.GetComponent<Renderer>();
+
+                MmdSelfShadowTarget target = root.AddComponent<MmdSelfShadowTarget>();
+                target.RefreshReceiverGate();
+                AssertReceiverGate(renderer, expectedSelfShadowReceive: 1.0f, expectedSuppressStandard: 1.0f);
+
+                target.enabled = false;
+
+                AssertReceiverGate(renderer, expectedSelfShadowReceive: 0.0f, expectedSuppressStandard: 0.0f);
+            }
+            finally
+            {
+                Object.DestroyImmediate(cube);
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void DisableAllReceiverGatesClearsSelfShadowSuppression()
+        {
+            var root = new GameObject("mmd-root");
+            GameObject? cube = null;
+            try
+            {
+                cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                Object.DestroyImmediate(cube.GetComponent<Collider>());
+                cube.transform.SetParent(root.transform, worldPositionStays: false);
+                Renderer renderer = cube.GetComponent<Renderer>();
+
+                MmdSelfShadowTarget target = root.AddComponent<MmdSelfShadowTarget>();
+                target.RefreshReceiverGate();
+                AssertReceiverGate(renderer, expectedSelfShadowReceive: 1.0f, expectedSuppressStandard: 1.0f);
+
+                MmdSelfShadowTarget.DisableAllReceiverGates();
+
+                AssertReceiverGate(renderer, expectedSelfShadowReceive: 0.0f, expectedSuppressStandard: 0.0f);
+            }
+            finally
+            {
+                Object.DestroyImmediate(cube);
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void DisableAllReceiverGatesPreservesMaterialStandardReceiveOptOut()
+        {
+            var root = new GameObject("mmd-root");
+            GameObject? cube = null;
+            Material? material = null;
+            try
+            {
+                cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                Object.DestroyImmediate(cube.GetComponent<Collider>());
+                cube.transform.SetParent(root.transform, worldPositionStays: false);
+                Renderer renderer = cube.GetComponent<Renderer>();
+                material = new Material(Shader.Find("MMD Basic URP Toon"));
+                material.SetFloat(MmdSelfShadowTarget.MmdReceiveShadowsId, 0.0f);
+                renderer.sharedMaterial = material;
+
+                MmdSelfShadowTarget target = root.AddComponent<MmdSelfShadowTarget>();
+                target.RefreshReceiverGate();
+                AssertReceiverGate(renderer, expectedSelfShadowReceive: 1.0f, expectedSuppressStandard: 1.0f);
+
+                MmdSelfShadowTarget.DisableAllReceiverGates();
+
+                AssertReceiverGate(renderer, expectedSelfShadowReceive: 0.0f, expectedSuppressStandard: 0.0f);
+                Assert.That(material.GetFloat(MmdSelfShadowTarget.MmdReceiveShadowsId), Is.EqualTo(0.0f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(material);
+                Object.DestroyImmediate(cube);
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void TargetPreservesRendererStandardReceiveOptOutAcrossToggleAndDisableAll()
+        {
+            var root = new GameObject("mmd-root");
+            GameObject? cube = null;
+            try
+            {
+                cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                Object.DestroyImmediate(cube.GetComponent<Collider>());
+                cube.transform.SetParent(root.transform, worldPositionStays: false);
+                Renderer renderer = cube.GetComponent<Renderer>();
+                var propertyBlock = new MaterialPropertyBlock();
+                propertyBlock.SetFloat(MmdSelfShadowTarget.MmdReceiveShadowsId, 0.0f);
+                renderer.SetPropertyBlock(propertyBlock);
+
+                MmdSelfShadowTarget target = root.AddComponent<MmdSelfShadowTarget>();
+                target.RefreshReceiverGate();
+                AssertReceiverGate(renderer, expectedSelfShadowReceive: 1.0f, expectedSuppressStandard: 1.0f);
+                AssertPropertyBlockFloat(renderer, MmdSelfShadowTarget.MmdReceiveShadowsId, 0.0f);
+
+                target.SelfShadowEnabled = false;
+                AssertReceiverGate(renderer, expectedSelfShadowReceive: 0.0f, expectedSuppressStandard: 0.0f);
+                AssertPropertyBlockFloat(renderer, MmdSelfShadowTarget.MmdReceiveShadowsId, 0.0f);
+
+                target.SelfShadowEnabled = true;
+                AssertReceiverGate(renderer, expectedSelfShadowReceive: 1.0f, expectedSuppressStandard: 1.0f);
+                AssertPropertyBlockFloat(renderer, MmdSelfShadowTarget.MmdReceiveShadowsId, 0.0f);
+
+                MmdSelfShadowTarget.DisableAllReceiverGates();
+
+                AssertReceiverGate(renderer, expectedSelfShadowReceive: 0.0f, expectedSuppressStandard: 0.0f);
+                AssertPropertyBlockFloat(renderer, MmdSelfShadowTarget.MmdReceiveShadowsId, 0.0f);
+            }
+            finally
+            {
+                Object.DestroyImmediate(cube);
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void DisableAllReceiverGatesPreservesUnrelatedRendererPropertyBlock()
+        {
+            var root = new GameObject("mmd-root");
+            GameObject? cube = null;
+            try
+            {
+                cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                Object.DestroyImmediate(cube.GetComponent<Collider>());
+                cube.transform.SetParent(root.transform, worldPositionStays: false);
+                Renderer renderer = cube.GetComponent<Renderer>();
+                var propertyBlock = new MaterialPropertyBlock();
+                propertyBlock.SetFloat(Shader.PropertyToID("_UnrelatedRendererValue"), 0.25f);
+                renderer.SetPropertyBlock(propertyBlock);
+
+                MmdSelfShadowTarget target = root.AddComponent<MmdSelfShadowTarget>();
+                target.RefreshReceiverGate();
+                AssertReceiverGate(renderer, expectedSelfShadowReceive: 1.0f, expectedSuppressStandard: 1.0f);
+
+                MmdSelfShadowTarget.DisableAllReceiverGates();
+
+                AssertReceiverGate(renderer, expectedSelfShadowReceive: 0.0f, expectedSuppressStandard: 0.0f);
+                AssertPropertyBlockFloat(renderer, Shader.PropertyToID("_UnrelatedRendererValue"), 0.25f);
+            }
+            finally
+            {
+                Object.DestroyImmediate(cube);
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void TargetDoesNotSuppressStandardReceiveBeforeRendererFeatureEnablesReceiverGate()
+        {
+            MmdSelfShadowTarget.SetReceiverGateAvailableForRendering(false);
+            var root = new GameObject("mmd-root");
+            GameObject? cube = null;
+            try
+            {
+                cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                Object.DestroyImmediate(cube.GetComponent<Collider>());
+                cube.transform.SetParent(root.transform, worldPositionStays: false);
+                Renderer renderer = cube.GetComponent<Renderer>();
+
+                MmdSelfShadowTarget target = root.AddComponent<MmdSelfShadowTarget>();
+                target.RefreshReceiverGate();
+
+                AssertReceiverGate(renderer, expectedSelfShadowReceive: 0.0f, expectedSuppressStandard: 0.0f);
+            }
+            finally
+            {
+                Object.DestroyImmediate(cube);
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        private static void AssertReceiverGate(
+            Renderer renderer,
+            float expectedSelfShadowReceive,
+            float expectedSuppressStandard)
+        {
+            var propertyBlock = new MaterialPropertyBlock();
+            renderer.GetPropertyBlock(propertyBlock);
+            Assert.That(propertyBlock.GetFloat(MmdSelfShadowTarget.MmdSelfShadowReceiveId), Is.EqualTo(expectedSelfShadowReceive));
+            Assert.That(propertyBlock.GetFloat(MmdSelfShadowTarget.MmdSuppressStandardShadowsId), Is.EqualTo(expectedSuppressStandard));
+        }
+
+        private static void AssertPropertyBlockFloat(Renderer renderer, int propertyId, float expected)
+        {
+            var propertyBlock = new MaterialPropertyBlock();
+            renderer.GetPropertyBlock(propertyBlock);
+            Assert.That(propertyBlock.GetFloat(propertyId), Is.EqualTo(expected));
+        }
+
+        [Test]
         public void SelfShadowRendererAndShaderUseDedicatedGlobals()
         {
             string runtimeRoot = Path.Combine(MmdTestFixtures.PackageRoot, "Runtime");
+            string target = File.ReadAllText(Path.Combine(runtimeRoot, "Components", "Scene", "MmdSelfShadowTarget.cs"));
             string feature = File.ReadAllText(Path.Combine(runtimeRoot, "Rendering", "Universal", "MmdSelfShadowRendererFeature.cs"));
             string pass = File.ReadAllText(Path.Combine(runtimeRoot, "Rendering", "Universal", "MmdSelfShadowRenderPass.cs"));
             string shader = File.ReadAllText(Path.Combine(runtimeRoot, "Shaders", "MmdBasicUrpToon.shader"));
 
+            Assert.That(target, Does.Contain("MmdSuppressStandardShadowsId"));
+            Assert.That(target, Does.Contain("SetFloat(MmdSelfShadowReceiveId, selfShadowValue)"));
+            Assert.That(target, Does.Contain("SetFloat(MmdSuppressStandardShadowsId, suppressStandardValue)"));
+            Assert.That(target, Does.Not.Contain("SetFloat(MmdReceiveShadowsId"));
+            Assert.That(target, Does.Not.Contain("StandardReceiveRestoreValues"));
             Assert.That(feature, Does.Contain("MmdSelfShadowRenderPass"));
             Assert.That(feature, Does.Not.Contain("QualitySettings"));
             Assert.That(feature, Does.Not.Contain("RenderSettings"));
+            Assert.That(feature, Does.Contain("SetReceiverGateAvailableForRendering(true)"));
+            Assert.That(feature, Does.Contain("SetReceiverGateAvailableForRendering(false)"));
             Assert.That(feature, Does.Contain("DisableAllReceiverGates"));
             Assert.That(feature, Does.Contain("Dispose(bool disposing)"));
+            Assert.That(feature, Does.Contain("if (pass.Setup(shadowMapSize, shadowDirection))"));
             Assert.That(pass, Does.Contain("_MmdSelfShadowMap"));
             Assert.That(pass, Does.Contain("_MmdSelfShadowWorldToShadow"));
             Assert.That(pass, Does.Contain("_MmdSelfShadowParams"));
@@ -248,13 +456,26 @@ namespace Mmd.Tests
             Assert.That(pass, Does.Contain("_LightPosition"));
             Assert.That(pass, Does.Contain("_ShadowBias"));
             Assert.That(pass, Does.Contain("DisableShaderKeyword(CastingPunctualLightShadowKeyword)"));
+            Assert.That(pass, Does.Contain("AllowPassCulling(false)"));
             Assert.That(pass, Does.Contain("FindPass(\"ShadowCaster\")"));
             Assert.That(pass, Does.Contain("MmdSelfShadowTarget.CollectActiveTargets"));
-            Assert.That(shader, Does.Contain("TEXTURE2D_SHADOW(_MmdSelfShadowMap)"));
-            Assert.That(shader, Does.Contain("sampler_LinearClampCompare"));
-            Assert.That(shader, Does.Contain("SAMPLE_TEXTURE2D_SHADOW"));
-            Assert.That(shader, Does.Contain("_MmdSelfShadowReceive"));
-            Assert.That(shader, Does.Contain("_MmdReceiveShadows <= 0.5h"));
+            Assert.That(shader, Does.Contain("[PerRendererData] _MmdReceiveShadows"));
+            Assert.That(shader, Does.Contain("[PerRendererData] [HideInInspector] _MmdSelfShadowReceive"));
+            Assert.That(shader, Does.Contain("[PerRendererData] [HideInInspector] _MmdSuppressStandardShadows"));
+            Assert.That(shader, Does.Contain("#pragma multi_compile_instancing"));
+            Assert.That(shader, Does.Contain("UNITY_INSTANCING_BUFFER_START(MmdPerRenderer)"));
+            Assert.That(shader, Does.Contain("UNITY_DEFINE_INSTANCED_PROP(float, _MmdReceiveShadows)"));
+            Assert.That(shader, Does.Contain("UNITY_DEFINE_INSTANCED_PROP(float, _MmdSelfShadowReceive)"));
+            Assert.That(shader, Does.Contain("UNITY_DEFINE_INSTANCED_PROP(float, _MmdSuppressStandardShadows)"));
+            Assert.That(shader, Does.Contain("UNITY_ACCESS_INSTANCED_PROP(MmdPerRenderer, _MmdReceiveShadows)"));
+            Assert.That(shader, Does.Contain("UNITY_ACCESS_INSTANCED_PROP(MmdPerRenderer, _MmdSelfShadowReceive)"));
+            Assert.That(shader, Does.Contain("UNITY_ACCESS_INSTANCED_PROP(MmdPerRenderer, _MmdSuppressStandardShadows)"));
+            Assert.That(shader, Does.Contain("effectiveReceiveShadows = receiveShadows * (1.0h - suppressStandardShadows)"));
+            Assert.That(shader, Does.Contain("lerp(1.0h, mainLight.shadowAttenuation, effectiveReceiveShadows)"));
+            Assert.That(shader, Does.Contain("TEXTURE2D(_MmdSelfShadowMap)"));
+            Assert.That(shader, Does.Contain("SAMPLER(sampler_MmdSelfShadowMap)"));
+            Assert.That(shader, Does.Contain("SAMPLE_TEXTURE2D(_MmdSelfShadowMap"));
+            Assert.That(shader, Does.Not.Contain("_MmdSelfShadowReceive <= 0.5h || _MmdReceiveShadows"));
             Assert.That(shader, Does.Contain("SampleMmdSelfShadow"));
             Assert.That(shader, Does.Contain("UNITY_REVERSED_Z"));
             Assert.That(shader, Does.Contain("shadowAttenuation = min(shadowAttenuation, mmdSelfShadowAttenuation);"));
