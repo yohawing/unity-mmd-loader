@@ -16,6 +16,7 @@ Shader "MMD Basic URP Toon"
         _MmdLightDirection ("Light Direction Override", Vector) = (0, 0, 0, 0)
         _MmdLightColor ("MMD Light Color", Color) = (1, 1, 1, 1)
         _MmdReceiveShadows ("MMD Receive Shadows", Float) = 1
+        [HideInInspector] _MmdSelfShadowReceive ("MMD Self Shadow Receive", Float) = 0
         _ToonStrength ("Toon Strength", Range(0, 1)) = 1
         _OutlineColor ("Outline Color", Color) = (0, 0, 0, 1)
         _OutlineWidth ("Outline Width", Float) = 0
@@ -78,6 +79,7 @@ Shader "MMD Basic URP Toon"
                 half4 _MmdLightDirection;
                 half4 _MmdLightColor;
                 half _MmdReceiveShadows;
+                half _MmdSelfShadowReceive;
                 half _ToonStrength;
                 half _ToonMapBound;
                 half _SphereMode;
@@ -173,6 +175,11 @@ Shader "MMD Basic URP Toon"
             SAMPLER(sampler_SphereMap);
             TEXTURE2D(_ToonMap);
             SAMPLER(sampler_ToonMap);
+            TEXTURE2D(_MmdSelfShadowMap);
+            SAMPLER(sampler_MmdSelfShadowMap);
+
+            float4x4 _MmdSelfShadowWorldToShadow;
+            float4 _MmdSelfShadowParams;
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _BaseMap_ST;
@@ -184,6 +191,7 @@ Shader "MMD Basic URP Toon"
                 half4 _MmdLightDirection;
                 half4 _MmdLightColor;
                 half _MmdReceiveShadows;
+                half _MmdSelfShadowReceive;
                 half _ToonStrength;
                 half _ToonMapBound;
                 half _SphereMode;
@@ -214,6 +222,7 @@ Shader "MMD Basic URP Toon"
                 float3 normalWS : TEXCOORD0;
                 float2 uv : TEXCOORD1;
                 float4 shadowCoord : TEXCOORD2;
+                float3 positionWS : TEXCOORD3;
             };
 
             Varyings ForwardVertex(Attributes input)
@@ -221,10 +230,33 @@ Shader "MMD Basic URP Toon"
                 Varyings output;
                 float3 positionWS = TransformObjectToWorld(input.positionOS.xyz);
                 output.positionCS = TransformWorldToHClip(positionWS);
+                output.positionWS = positionWS;
                 output.normalWS = normalize(TransformObjectToWorldNormal(input.normalOS));
                 output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
                 output.shadowCoord = TransformWorldToShadowCoord(positionWS);
                 return output;
+            }
+
+            half SampleMmdSelfShadow(float3 positionWS)
+            {
+                if (_MmdSelfShadowParams.x <= 0.5 || _MmdSelfShadowReceive <= 0.5h || _MmdReceiveShadows <= 0.5h)
+                {
+                    return 1.0h;
+                }
+
+                float4 shadowCoord = mul(_MmdSelfShadowWorldToShadow, float4(positionWS, 1.0));
+                shadowCoord.xyz /= max(shadowCoord.w, 1e-5);
+                if (any(shadowCoord.xyz < 0.0) || any(shadowCoord.xyz > 1.0))
+                {
+                    return 1.0h;
+                }
+
+                half depth = SAMPLE_TEXTURE2D(_MmdSelfShadowMap, sampler_MmdSelfShadowMap, shadowCoord.xy).r;
+#if UNITY_REVERSED_Z
+                return shadowCoord.z + _MmdSelfShadowParams.y >= depth ? 1.0h : 0.22h;
+#else
+                return shadowCoord.z - _MmdSelfShadowParams.y <= depth ? 1.0h : 0.22h;
+#endif
             }
 
             half4 ForwardFragment(Varyings input) : SV_Target
@@ -240,6 +272,8 @@ Shader "MMD Basic URP Toon"
                     ? normalize(_MmdLightDirection.xyz)
                     : mainLight.direction;
                 half shadowAttenuation = lerp(1.0h, mainLight.shadowAttenuation, saturate(_MmdReceiveShadows));
+                half mmdSelfShadowAttenuation = SampleMmdSelfShadow(input.positionWS);
+                shadowAttenuation = min(shadowAttenuation, mmdSelfShadowAttenuation);
                 half3 normalWS = normalize(input.normalWS);
                 half ndotl = saturate(dot(normalWS, lightDirection));
                 half toonCoord = saturate(dot(normalWS, lightDirection) * 0.5h + 0.5h);
@@ -328,6 +362,7 @@ Shader "MMD Basic URP Toon"
                 half4 _MmdLightDirection;
                 half4 _MmdLightColor;
                 half _MmdReceiveShadows;
+                half _MmdSelfShadowReceive;
                 half _ToonStrength;
                 half _ToonMapBound;
                 half _SphereMode;
