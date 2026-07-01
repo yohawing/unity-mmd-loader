@@ -175,8 +175,7 @@ Shader "MMD Basic URP Toon"
             SAMPLER(sampler_SphereMap);
             TEXTURE2D(_ToonMap);
             SAMPLER(sampler_ToonMap);
-            TEXTURE2D(_MmdSelfShadowMap);
-            SAMPLER(sampler_MmdSelfShadowMap);
+            TEXTURE2D_SHADOW(_MmdSelfShadowMap);
 
             float4x4 _MmdSelfShadowWorldToShadow;
             float4 _MmdSelfShadowParams;
@@ -251,12 +250,19 @@ Shader "MMD Basic URP Toon"
                     return 1.0h;
                 }
 
-                half depth = SAMPLE_TEXTURE2D(_MmdSelfShadowMap, sampler_MmdSelfShadowMap, shadowCoord.xy).r;
+                // The shadow transform already follows URP's reversed-Z convention, so sample
+                // through the comparison sampler instead of manually reading depth.
+                float compareDepth = shadowCoord.z;
 #if UNITY_REVERSED_Z
-                return shadowCoord.z + _MmdSelfShadowParams.y >= depth ? 1.0h : 0.22h;
+                compareDepth += _MmdSelfShadowParams.y;
 #else
-                return shadowCoord.z - _MmdSelfShadowParams.y <= depth ? 1.0h : 0.22h;
+                compareDepth -= _MmdSelfShadowParams.y;
 #endif
+                half visibility = SAMPLE_TEXTURE2D_SHADOW(
+                    _MmdSelfShadowMap,
+                    sampler_LinearClampCompare,
+                    float3(shadowCoord.xy, compareDepth));
+                return lerp(0.22h, 1.0h, visibility);
             }
 
             half4 ForwardFragment(Varyings input) : SV_Target

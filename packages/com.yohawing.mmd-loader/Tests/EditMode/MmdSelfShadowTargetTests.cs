@@ -250,7 +250,9 @@ namespace Mmd.Tests
             Assert.That(pass, Does.Contain("DisableShaderKeyword(CastingPunctualLightShadowKeyword)"));
             Assert.That(pass, Does.Contain("FindPass(\"ShadowCaster\")"));
             Assert.That(pass, Does.Contain("MmdSelfShadowTarget.CollectActiveTargets"));
-            Assert.That(shader, Does.Contain("TEXTURE2D(_MmdSelfShadowMap)"));
+            Assert.That(shader, Does.Contain("TEXTURE2D_SHADOW(_MmdSelfShadowMap)"));
+            Assert.That(shader, Does.Contain("sampler_LinearClampCompare"));
+            Assert.That(shader, Does.Contain("SAMPLE_TEXTURE2D_SHADOW"));
             Assert.That(shader, Does.Contain("_MmdSelfShadowReceive"));
             Assert.That(shader, Does.Contain("_MmdReceiveShadows <= 0.5h"));
             Assert.That(shader, Does.Contain("SampleMmdSelfShadow"));

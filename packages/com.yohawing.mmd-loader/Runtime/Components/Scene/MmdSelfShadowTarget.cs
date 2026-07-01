@@ -16,7 +16,7 @@ namespace Mmd.UnityIntegration
         public static readonly int MmdSelfShadowReceiveId = Shader.PropertyToID("_MmdSelfShadowReceive");
 
         private static readonly List<MmdSelfShadowTarget> ActiveTargets = new();
-        private static readonly MaterialPropertyBlock SharedPropertyBlock = new();
+        private static MaterialPropertyBlock? sharedPropertyBlock;
 
         [SerializeField]
         [Tooltip("Enables the dedicated MMD self-shadow render path for this character.")]
@@ -104,6 +104,8 @@ namespace Mmd.UnityIntegration
         }
 
         public static int ActiveTargetCount => ActiveTargets.Count;
+
+        private static MaterialPropertyBlock SharedPropertyBlock => sharedPropertyBlock ??= new MaterialPropertyBlock();
 
         public static void DisableAllReceiverGates()
         {
