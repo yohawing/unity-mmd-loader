@@ -57,7 +57,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void CreateStaticModelEnablesStandardUnityShadowParticipation()
+        public void CreateStaticModelKeepsShadowCasterButDisablesMmdToonStandardShadowReceive()
         {
             MmdUnityModelInstance? instance = null;
             try
@@ -72,7 +72,7 @@ namespace Mmd.Tests
                 Assert.That(ReadMaterialFloat(instance.Materials[0], "_BodyVisible"), Is.EqualTo(1.0f).Within(0.00001f));
                 Assert.That(ReadMaterialFloat(instance.Materials[0], "_AlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
                 Assert.That(ReadMaterialFloat(instance.Materials[0], "_ShadowAlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
-                Assert.That(ReadMaterialFloat(instance.Materials[0], "_MmdReceiveShadows"), Is.EqualTo(1.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_MmdReceiveShadows"), Is.EqualTo(0.0f).Within(0.00001f));
                 Assert.That(instance.Materials[0].FindPass("ShadowCaster"), Is.GreaterThanOrEqualTo(0));
             }
             finally
@@ -82,7 +82,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void CreateSkinnedModelEnablesStandardUnityShadowParticipation()
+        public void CreateSkinnedModelKeepsShadowCasterButDisablesMmdToonStandardShadowReceive()
         {
             MmdUnityModelInstance? instance = null;
             try
@@ -97,7 +97,7 @@ namespace Mmd.Tests
                 Assert.That(ReadMaterialFloat(instance.Materials[0], "_BodyVisible"), Is.EqualTo(1.0f).Within(0.00001f));
                 Assert.That(ReadMaterialFloat(instance.Materials[0], "_AlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
                 Assert.That(ReadMaterialFloat(instance.Materials[0], "_ShadowAlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
-                Assert.That(ReadMaterialFloat(instance.Materials[0], "_MmdReceiveShadows"), Is.EqualTo(1.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_MmdReceiveShadows"), Is.EqualTo(0.0f).Within(0.00001f));
                 Assert.That(instance.Materials[0].FindPass("ShadowCaster"), Is.GreaterThanOrEqualTo(0));
             }
             finally
@@ -107,7 +107,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void BasicUrpToonShaderUsesShadowVisibilityForToonCoordinate()
+        public void BasicUrpToonShaderUsesOnlyDedicatedSelfShadowForToonCoordinate()
         {
             string shaderPath = Path.Combine(
                 MmdTestFixtures.PackageRoot,
@@ -120,16 +120,16 @@ namespace Mmd.Tests
 
             Assert.That(
                 source,
-                Does.Contain("half receiveShadows = saturate((half)UNITY_ACCESS_INSTANCED_PROP(MmdPerRenderer, _MmdReceiveShadows));"),
-                "_MmdReceiveShadows remains the per-renderer gate for URP shadow map visibility.");
+                Does.Contain("half shadowAttenuation = SampleMmdSelfShadow(input.positionWS, selfShadowReceive);"),
+                "Forward shading must derive toon shadow visibility only from the dedicated MMD self-shadow map.");
             Assert.That(
                 source,
-                Does.Contain("half effectiveReceiveShadows = receiveShadows * (1.0h - suppressStandardShadows);"),
-                "Forward shading must combine the external receive gate with the self-shadow-only standard-shadow suppression gate.");
+                Does.Not.Contain("mainLight.shadowAttenuation"),
+                "URP main-light shadow attenuation must not affect MMD toon shading.");
             Assert.That(
                 source,
-                Does.Contain("half shadowAttenuation = lerp(1.0h, mainLight.shadowAttenuation, effectiveReceiveShadows);"),
-                "Forward shading must use the effective per-renderer shadow visibility gate.");
+                Does.Not.Contain("effectiveReceiveShadows"),
+                "_MmdReceiveShadows/_MmdSuppressStandardShadows must not gate ForwardLit toon shadowing.");
             Assert.That(
                 source,
                 Does.Contain("toonCoord = lerp(0.22h, toonCoord, shadowAttenuation);"),
@@ -158,7 +158,7 @@ namespace Mmd.Tests
                 Assert.That(instance.Materials[0].renderQueue, Is.GreaterThanOrEqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
                 Assert.That(ReadMaterialFloat(instance.Materials[0], "_AlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
                 Assert.That(ReadMaterialFloat(instance.Materials[0], "_ShadowAlphaClipThreshold"), Is.EqualTo(0.01f).Within(0.00001f));
-                Assert.That(ReadMaterialFloat(instance.Materials[0], "_MmdReceiveShadows"), Is.EqualTo(1.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_MmdReceiveShadows"), Is.EqualTo(0.0f).Within(0.00001f));
             }
             finally
             {
@@ -4473,8 +4473,8 @@ namespace Mmd.Tests
 
                 Assert.That(
                     material.GetFloat("_MmdReceiveShadows"),
-                    Is.EqualTo(1.0f).Within(0.00001f),
-                    "importer material reapply keeps the MMD standard shadow receive baseline enabled");
+                    Is.EqualTo(0.0f).Within(0.00001f),
+                    "importer material reapply keeps standard URP shadow receive disabled for MMD toon materials");
                 Assert.That(
                     material.GetFloat("_DstBlend"),
                     Is.EqualTo((float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha).Within(0.00001f),
@@ -4499,8 +4499,8 @@ namespace Mmd.Tests
 
                 Assert.That(
                     material.GetFloat("_MmdReceiveShadows"),
-                    Is.EqualTo(1.0f).Within(0.00001f),
-                    "opaque reapply keeps the MMD standard shadow receive baseline enabled");
+                    Is.EqualTo(0.0f).Within(0.00001f),
+                    "opaque reapply keeps standard URP shadow receive disabled for MMD toon materials");
                 Assert.That(
                     material.GetFloat("_DstBlend"),
                     Is.EqualTo((float)UnityEngine.Rendering.BlendMode.Zero).Within(0.00001f),

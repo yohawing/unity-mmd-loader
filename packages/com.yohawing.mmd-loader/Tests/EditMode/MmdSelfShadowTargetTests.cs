@@ -513,18 +513,18 @@ namespace Mmd.Tests
             Assert.That(shader, Does.Contain("UNITY_DEFINE_INSTANCED_PROP(float, _MmdReceiveShadows)"));
             Assert.That(shader, Does.Contain("UNITY_DEFINE_INSTANCED_PROP(float, _MmdSelfShadowReceive)"));
             Assert.That(shader, Does.Contain("UNITY_DEFINE_INSTANCED_PROP(float, _MmdSuppressStandardShadows)"));
-            Assert.That(shader, Does.Contain("UNITY_ACCESS_INSTANCED_PROP(MmdPerRenderer, _MmdReceiveShadows)"));
             Assert.That(shader, Does.Contain("UNITY_ACCESS_INSTANCED_PROP(MmdPerRenderer, _MmdSelfShadowReceive)"));
-            Assert.That(shader, Does.Contain("UNITY_ACCESS_INSTANCED_PROP(MmdPerRenderer, _MmdSuppressStandardShadows)"));
-            Assert.That(shader, Does.Contain("effectiveReceiveShadows = receiveShadows * (1.0h - suppressStandardShadows)"));
-            Assert.That(shader, Does.Contain("lerp(1.0h, mainLight.shadowAttenuation, effectiveReceiveShadows)"));
+            Assert.That(shader, Does.Not.Contain("UNITY_ACCESS_INSTANCED_PROP(MmdPerRenderer, _MmdReceiveShadows)"));
+            Assert.That(shader, Does.Not.Contain("UNITY_ACCESS_INSTANCED_PROP(MmdPerRenderer, _MmdSuppressStandardShadows)"));
+            Assert.That(shader, Does.Not.Contain("effectiveReceiveShadows"));
+            Assert.That(shader, Does.Not.Contain("mainLight.shadowAttenuation"));
             Assert.That(shader, Does.Contain("TEXTURE2D(_MmdSelfShadowMap)"));
             Assert.That(shader, Does.Contain("SAMPLER(sampler_MmdSelfShadowMap)"));
             Assert.That(shader, Does.Contain("SAMPLE_TEXTURE2D(_MmdSelfShadowMap"));
             Assert.That(shader, Does.Not.Contain("_MmdSelfShadowReceive <= 0.5h || _MmdReceiveShadows"));
             Assert.That(shader, Does.Contain("SampleMmdSelfShadow"));
             Assert.That(shader, Does.Contain("UNITY_REVERSED_Z"));
-            Assert.That(shader, Does.Contain("shadowAttenuation = min(shadowAttenuation, mmdSelfShadowAttenuation);"));
+            Assert.That(shader, Does.Contain("half shadowAttenuation = SampleMmdSelfShadow(input.positionWS, selfShadowReceive);"));
         }
     }
 }

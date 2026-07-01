@@ -15,7 +15,7 @@ Shader "MMD Basic URP Toon"
         _AmbientColor ("Ambient Color", Color) = (0.25, 0.25, 0.25, 1)
         _MmdLightDirection ("Light Direction Override", Vector) = (0, 0, 0, 0)
         _MmdLightColor ("MMD Light Color", Color) = (1, 1, 1, 1)
-        [PerRendererData] _MmdReceiveShadows ("MMD Receive Shadows", Float) = 1
+        [PerRendererData] _MmdReceiveShadows ("MMD Receive Shadows", Float) = 0
         [PerRendererData] [HideInInspector] _MmdSelfShadowReceive ("MMD Self Shadow Receive", Float) = 0
         [PerRendererData] [HideInInspector] _MmdSuppressStandardShadows ("MMD Suppress Standard Shadows", Float) = 0
         _ToonStrength ("Toon Strength", Range(0, 1)) = 1
@@ -226,8 +226,7 @@ Shader "MMD Basic URP Toon"
                 float4 positionCS : SV_POSITION;
                 float3 normalWS : TEXCOORD0;
                 float2 uv : TEXCOORD1;
-                float4 shadowCoord : TEXCOORD2;
-                float3 positionWS : TEXCOORD3;
+                float3 positionWS : TEXCOORD2;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -241,7 +240,6 @@ Shader "MMD Basic URP Toon"
                 output.positionWS = positionWS;
                 output.normalWS = normalize(TransformObjectToWorldNormal(input.normalOS));
                 output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
-                output.shadowCoord = TransformWorldToShadowCoord(positionWS);
                 return output;
             }
 
@@ -276,17 +274,12 @@ Shader "MMD Basic URP Toon"
                 half albedoAlpha = baseMap.a * _BaseColor.a * _DiagnosticColor.a;
                 clip(albedoAlpha - _AlphaClipThreshold);
 
-                Light mainLight = GetMainLight(input.shadowCoord);
+                Light mainLight = GetMainLight();
                 half3 lightDirection = dot(_MmdLightDirection.xyz, _MmdLightDirection.xyz) > 0.0h
                     ? normalize(_MmdLightDirection.xyz)
                     : mainLight.direction;
-                half receiveShadows = saturate((half)UNITY_ACCESS_INSTANCED_PROP(MmdPerRenderer, _MmdReceiveShadows));
                 half selfShadowReceive = (half)UNITY_ACCESS_INSTANCED_PROP(MmdPerRenderer, _MmdSelfShadowReceive);
-                half suppressStandardShadows = saturate((half)UNITY_ACCESS_INSTANCED_PROP(MmdPerRenderer, _MmdSuppressStandardShadows));
-                half effectiveReceiveShadows = receiveShadows * (1.0h - suppressStandardShadows);
-                half shadowAttenuation = lerp(1.0h, mainLight.shadowAttenuation, effectiveReceiveShadows);
-                half mmdSelfShadowAttenuation = SampleMmdSelfShadow(input.positionWS, selfShadowReceive);
-                shadowAttenuation = min(shadowAttenuation, mmdSelfShadowAttenuation);
+                half shadowAttenuation = SampleMmdSelfShadow(input.positionWS, selfShadowReceive);
                 half3 normalWS = normalize(input.normalWS);
                 half ndotl = saturate(dot(normalWS, lightDirection));
                 half toonCoord = saturate(dot(normalWS, lightDirection) * 0.5h + 0.5h);
