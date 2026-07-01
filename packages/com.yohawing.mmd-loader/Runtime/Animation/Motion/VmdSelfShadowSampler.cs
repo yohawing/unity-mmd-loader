@@ -25,6 +25,222 @@ namespace Mmd.Motion
         public static MmdSelfShadowState Default => new MmdSelfShadowState(0, 0.0f);
     }
 
+    public enum MmdSelfShadowProjectionScope
+    {
+        CharacterOnly = 0,
+        CharacterAndOptInBackground = 1
+    }
+
+    public readonly struct MmdSelfShadowProjectionBounds
+    {
+        public MmdSelfShadowProjectionBounds(
+            float centerX,
+            float centerY,
+            float centerZ,
+            float sizeX,
+            float sizeY,
+            float sizeZ)
+        {
+            CenterX = FiniteOrZero(centerX);
+            CenterY = FiniteOrZero(centerY);
+            CenterZ = FiniteOrZero(centerZ);
+            SizeX = NonNegativeFiniteOrZero(sizeX);
+            SizeY = NonNegativeFiniteOrZero(sizeY);
+            SizeZ = NonNegativeFiniteOrZero(sizeZ);
+        }
+
+        public float CenterX { get; }
+
+        public float CenterY { get; }
+
+        public float CenterZ { get; }
+
+        public float SizeX { get; }
+
+        public float SizeY { get; }
+
+        public float SizeZ { get; }
+
+        private static float FiniteOrZero(float value)
+        {
+            return float.IsFinite(value) ? value : 0.0f;
+        }
+
+        private static float NonNegativeFiniteOrZero(float value)
+        {
+            return float.IsFinite(value) && value > 0.0f ? value : 0.0f;
+        }
+    }
+
+    /// <summary>
+    /// Pure projection/far policy for a future MMD-dedicated self-shadow texture. It does not mutate
+    /// Unity Light, QualitySettings, RenderSettings, URP assets, or materials.
+    /// </summary>
+    public readonly struct MmdSelfShadowProjectionPolicy
+    {
+        public const float DefaultDistanceScale = 100.0f;
+        public const float DefaultMinFarDistance = 1.0f;
+        public const float DefaultMaxFarDistance = 100.0f;
+        public const float DefaultBoundsPadding = 0.0f;
+
+        public MmdSelfShadowProjectionPolicy(
+            float distanceScale = DefaultDistanceScale,
+            float minFarDistance = DefaultMinFarDistance,
+            float maxFarDistance = DefaultMaxFarDistance,
+            float boundsPadding = DefaultBoundsPadding,
+            MmdSelfShadowProjectionScope scope = MmdSelfShadowProjectionScope.CharacterOnly,
+            bool hasManualBoundsOverride = false,
+            MmdSelfShadowProjectionBounds manualBoundsOverride = default)
+        {
+            DistanceScale = PositiveFiniteOrDefault(distanceScale, DefaultDistanceScale);
+            MinFarDistance = PositiveFiniteOrDefault(minFarDistance, DefaultMinFarDistance);
+            MaxFarDistance = PositiveFiniteOrDefault(maxFarDistance, DefaultMaxFarDistance);
+            if (MaxFarDistance < MinFarDistance)
+            {
+                MaxFarDistance = MinFarDistance;
+            }
+
+            BoundsPadding = NonNegativeFiniteOrDefault(boundsPadding, DefaultBoundsPadding);
+            Scope = NormalizeScope(scope);
+            HasManualBoundsOverride = hasManualBoundsOverride;
+            ManualBoundsOverride = manualBoundsOverride;
+        }
+
+        public float DistanceScale { get; }
+
+        public float MinFarDistance { get; }
+
+        public float MaxFarDistance { get; }
+
+        public float BoundsPadding { get; }
+
+        public MmdSelfShadowProjectionScope Scope { get; }
+
+        public bool IncludesBackground => Scope == MmdSelfShadowProjectionScope.CharacterAndOptInBackground;
+
+        public bool HasManualBoundsOverride { get; }
+
+        public MmdSelfShadowProjectionBounds ManualBoundsOverride { get; }
+
+        public static MmdSelfShadowProjectionPolicy Default => new MmdSelfShadowProjectionPolicy(
+            DefaultDistanceScale,
+            DefaultMinFarDistance,
+            DefaultMaxFarDistance,
+            DefaultBoundsPadding,
+            MmdSelfShadowProjectionScope.CharacterOnly,
+            false,
+            default);
+
+        public MmdSelfShadowProjectionState Evaluate(MmdSelfShadowState state)
+        {
+            float distanceScale = PositiveFiniteOrDefault(DistanceScale, DefaultDistanceScale);
+            float minFarDistance = PositiveFiniteOrDefault(MinFarDistance, DefaultMinFarDistance);
+            float maxFarDistance = PositiveFiniteOrDefault(MaxFarDistance, DefaultMaxFarDistance);
+            if (maxFarDistance < minFarDistance)
+            {
+                maxFarDistance = minFarDistance;
+            }
+
+            float boundsPadding = NonNegativeFiniteOrDefault(BoundsPadding, DefaultBoundsPadding);
+            MmdSelfShadowProjectionScope scope = NormalizeScope(Scope);
+            bool active = state.Mode == 1 || state.Mode == 2;
+            if (!active)
+            {
+                return new MmdSelfShadowProjectionState(
+                    active: false,
+                    mode: state.Mode,
+                    farDistance: 0.0f,
+                    scope: scope,
+                    boundsPadding: boundsPadding,
+                    hasManualBoundsOverride: HasManualBoundsOverride,
+                    manualBoundsOverride: ManualBoundsOverride);
+            }
+
+            float scaledDistance = state.Distance * distanceScale;
+            if (!float.IsFinite(scaledDistance) || scaledDistance < 0.0f)
+            {
+                scaledDistance = minFarDistance;
+            }
+
+            float farDistance = MmdSelfShadowMappingPolicy.Clamp(
+                scaledDistance,
+                minFarDistance,
+                maxFarDistance);
+
+            return new MmdSelfShadowProjectionState(
+                active: true,
+                mode: state.Mode,
+                farDistance: farDistance,
+                scope: scope,
+                boundsPadding: boundsPadding,
+                hasManualBoundsOverride: HasManualBoundsOverride,
+                manualBoundsOverride: ManualBoundsOverride);
+        }
+
+        private static MmdSelfShadowProjectionScope NormalizeScope(MmdSelfShadowProjectionScope scope)
+        {
+            return scope == MmdSelfShadowProjectionScope.CharacterAndOptInBackground
+                ? MmdSelfShadowProjectionScope.CharacterAndOptInBackground
+                : MmdSelfShadowProjectionScope.CharacterOnly;
+        }
+
+        private static float PositiveFiniteOrDefault(float value, float fallback)
+        {
+            return float.IsFinite(value) && value > 0.0f ? value : fallback;
+        }
+
+        private static float NonNegativeFiniteOrDefault(float value, float fallback)
+        {
+            return float.IsFinite(value) && value >= 0.0f ? value : fallback;
+        }
+    }
+
+    public readonly struct MmdSelfShadowProjectionState
+    {
+        public MmdSelfShadowProjectionState(
+            bool active,
+            byte mode,
+            float farDistance,
+            MmdSelfShadowProjectionScope scope,
+            float boundsPadding,
+            bool hasManualBoundsOverride = false,
+            MmdSelfShadowProjectionBounds manualBoundsOverride = default)
+        {
+            Active = active;
+            Mode = mode;
+            FarDistance = float.IsFinite(farDistance) && farDistance > 0.0f ? farDistance : 0.0f;
+            Scope = scope == MmdSelfShadowProjectionScope.CharacterAndOptInBackground
+                ? MmdSelfShadowProjectionScope.CharacterAndOptInBackground
+                : MmdSelfShadowProjectionScope.CharacterOnly;
+            BoundsPadding = float.IsFinite(boundsPadding) && boundsPadding >= 0.0f ? boundsPadding : 0.0f;
+            HasManualBoundsOverride = hasManualBoundsOverride;
+            ManualBoundsOverride = manualBoundsOverride;
+        }
+
+        public bool Active { get; }
+
+        public byte Mode { get; }
+
+        public float FarDistance { get; }
+
+        public MmdSelfShadowProjectionScope Scope { get; }
+
+        public bool IncludesBackground => Scope == MmdSelfShadowProjectionScope.CharacterAndOptInBackground;
+
+        public float BoundsPadding { get; }
+
+        public bool HasManualBoundsOverride { get; }
+
+        public MmdSelfShadowProjectionBounds ManualBoundsOverride { get; }
+
+        public static MmdSelfShadowProjectionState Inactive => new MmdSelfShadowProjectionState(
+            active: false,
+            mode: 0,
+            farDistance: 0.0f,
+            scope: MmdSelfShadowProjectionScope.CharacterOnly,
+            boundsPadding: 0.0f);
+    }
+
     /// <summary>
     /// Opt-in mapping policy from VMD self-shadow state to Unity-standard shadow settings.
     /// The default policy is disabled so parsing/sampling self-shadow data never mutates scene

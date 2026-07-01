@@ -154,5 +154,78 @@ namespace Mmd.Tests
             Assert.That(settings.ShadowDistance, Is.EqualTo(5.0f));
             Assert.That(settings.ShadowStrength, Is.EqualTo(1.0f));
         }
+
+        [Test]
+        public void ProjectionPolicyActivatesOnlyForMmdSelfShadowModesOneAndTwo()
+        {
+            MmdSelfShadowProjectionPolicy policy = MmdSelfShadowProjectionPolicy.Default;
+
+            MmdSelfShadowProjectionState modeOne = policy.Evaluate(new MmdSelfShadowState(1, 0.5f));
+            MmdSelfShadowProjectionState modeTwo = policy.Evaluate(new MmdSelfShadowState(2, 0.5f));
+            MmdSelfShadowProjectionState modeZero = policy.Evaluate(new MmdSelfShadowState(0, 0.5f));
+            MmdSelfShadowProjectionState unknown = policy.Evaluate(new MmdSelfShadowState(99, 0.5f));
+
+            Assert.That(modeOne.Active, Is.True);
+            Assert.That(modeOne.Mode, Is.EqualTo(1));
+            Assert.That(modeOne.FarDistance, Is.EqualTo(50.0f).Within(0.0001f));
+            Assert.That(modeTwo.Active, Is.True);
+            Assert.That(modeTwo.Mode, Is.EqualTo(2));
+            Assert.That(modeTwo.FarDistance, Is.EqualTo(50.0f).Within(0.0001f));
+            Assert.That(modeZero.Active, Is.False);
+            Assert.That(modeZero.Mode, Is.EqualTo(0));
+            Assert.That(unknown.Active, Is.False);
+            Assert.That(unknown.Mode, Is.EqualTo(99));
+        }
+
+        [Test]
+        public void ProjectionPolicyMapsDistanceToFarDistanceWithScaleClampAndFallback()
+        {
+            var policy = new MmdSelfShadowProjectionPolicy(
+                distanceScale: 10.0f,
+                minFarDistance: 2.0f,
+                maxFarDistance: 5.0f);
+
+            MmdSelfShadowProjectionState scaled = policy.Evaluate(new MmdSelfShadowState(1, 0.3f));
+            MmdSelfShadowProjectionState clampedMax = policy.Evaluate(new MmdSelfShadowState(1, 0.8f));
+            MmdSelfShadowProjectionState clampedMin = policy.Evaluate(new MmdSelfShadowState(1, 0.05f));
+            MmdSelfShadowProjectionState negativeFallback = policy.Evaluate(new MmdSelfShadowState(1, -0.5f));
+            MmdSelfShadowProjectionState nonFiniteFallback = policy.Evaluate(new MmdSelfShadowState(1, float.NaN));
+
+            Assert.That(scaled.FarDistance, Is.EqualTo(3.0f).Within(0.0001f));
+            Assert.That(clampedMax.FarDistance, Is.EqualTo(5.0f).Within(0.0001f));
+            Assert.That(clampedMin.FarDistance, Is.EqualTo(2.0f).Within(0.0001f));
+            Assert.That(negativeFallback.FarDistance, Is.EqualTo(2.0f).Within(0.0001f));
+            Assert.That(nonFiniteFallback.FarDistance, Is.EqualTo(2.0f).Within(0.0001f));
+        }
+
+        [Test]
+        public void ProjectionPolicyDefaultsToCharacterOnlyAndBackgroundRequiresOptIn()
+        {
+            MmdSelfShadowProjectionState defaultState = MmdSelfShadowProjectionPolicy.Default.Evaluate(
+                new MmdSelfShadowState(1, 0.5f));
+            MmdSelfShadowProjectionState defaultConstructedState = new MmdSelfShadowProjectionPolicy().Evaluate(
+                new MmdSelfShadowState(1, 0.5f));
+
+            var optInPolicy = new MmdSelfShadowProjectionPolicy(
+                scope: MmdSelfShadowProjectionScope.CharacterAndOptInBackground,
+                boundsPadding: 0.25f,
+                hasManualBoundsOverride: true,
+                manualBoundsOverride: new MmdSelfShadowProjectionBounds(1, 2, 3, 4, 5, 6));
+            MmdSelfShadowProjectionState optInState = optInPolicy.Evaluate(new MmdSelfShadowState(1, 0.5f));
+
+            Assert.That(defaultState.Scope, Is.EqualTo(MmdSelfShadowProjectionScope.CharacterOnly));
+            Assert.That(defaultState.IncludesBackground, Is.False);
+            Assert.That(defaultState.FarDistance, Is.EqualTo(50.0f).Within(0.0001f));
+            Assert.That(defaultState.HasManualBoundsOverride, Is.False);
+            Assert.That(defaultConstructedState.Scope, Is.EqualTo(MmdSelfShadowProjectionScope.CharacterOnly));
+            Assert.That(defaultConstructedState.IncludesBackground, Is.False);
+            Assert.That(defaultConstructedState.FarDistance, Is.EqualTo(50.0f).Within(0.0001f));
+            Assert.That(optInState.Scope, Is.EqualTo(MmdSelfShadowProjectionScope.CharacterAndOptInBackground));
+            Assert.That(optInState.IncludesBackground, Is.True);
+            Assert.That(optInState.BoundsPadding, Is.EqualTo(0.25f).Within(0.0001f));
+            Assert.That(optInState.HasManualBoundsOverride, Is.True);
+            Assert.That(optInState.ManualBoundsOverride.CenterX, Is.EqualTo(1.0f));
+            Assert.That(optInState.ManualBoundsOverride.SizeZ, Is.EqualTo(6.0f));
+        }
     }
 }

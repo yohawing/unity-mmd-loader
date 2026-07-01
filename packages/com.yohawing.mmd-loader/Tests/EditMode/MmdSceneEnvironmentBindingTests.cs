@@ -56,6 +56,8 @@ namespace Mmd.Tests
                 Assert.That(binding.SelfShadowEnabled, Is.True);
                 Assert.That(binding.LastSelfShadowState.Mode, Is.EqualTo(0));
                 Assert.That(binding.LastSelfShadowState.Distance, Is.EqualTo(0.0f));
+                Assert.That(binding.LastSelfShadowProjectionState.Active, Is.False);
+                Assert.That(binding.LastSelfShadowProjectionState.Scope, Is.EqualTo(MmdSelfShadowProjectionScope.CharacterOnly));
             }
             finally
             {
@@ -204,6 +206,11 @@ namespace Mmd.Tests
 
                 MmdSceneEnvironmentBinding binding = go.AddComponent<MmdSceneEnvironmentBinding>();
                 binding.TargetLight = light;
+                binding.SelfShadowProjectionPolicy = new MmdSelfShadowProjectionPolicy(
+                    distanceScale: 10.0f,
+                    minFarDistance: 2.0f,
+                    maxFarDistance: 5.0f,
+                    boundsPadding: 0.25f);
 
                 MmdSceneSelfShadowApplyStatus status = binding.ApplySelfShadowState(new MmdSelfShadowState(1, 0.4f));
 
@@ -211,6 +218,12 @@ namespace Mmd.Tests
                 Assert.That(binding.LastSelfShadowApplyStatus, Is.EqualTo(MmdSceneSelfShadowApplyStatus.Recorded));
                 Assert.That(binding.LastSelfShadowState.Mode, Is.EqualTo(1));
                 Assert.That(binding.LastSelfShadowState.Distance, Is.EqualTo(0.4f).Within(0.001f));
+                Assert.That(binding.LastSelfShadowProjectionState.Active, Is.True);
+                Assert.That(binding.LastSelfShadowProjectionState.Mode, Is.EqualTo(1));
+                Assert.That(binding.LastSelfShadowProjectionState.FarDistance, Is.EqualTo(4.0f).Within(0.001f));
+                Assert.That(binding.LastSelfShadowProjectionState.BoundsPadding, Is.EqualTo(0.25f).Within(0.001f));
+                Assert.That(binding.LastSelfShadowProjectionState.Scope, Is.EqualTo(MmdSelfShadowProjectionScope.CharacterOnly));
+                Assert.That(binding.LastSelfShadowProjectionState.IncludesBackground, Is.False);
                 Assert.That(binding.LastSelfShadowSettings.RuntimeApplicationEnabled, Is.False);
                 Assert.That(light.shadows, Is.EqualTo(LightShadows.Hard));
                 Assert.That(light.shadowStrength, Is.EqualTo(0.25f).Within(0.001f));
@@ -240,6 +253,8 @@ namespace Mmd.Tests
                 MmdSceneEnvironmentBinding binding = go.AddComponent<MmdSceneEnvironmentBinding>();
                 binding.TargetLight = light;
                 binding.SelfShadowEnabled = true;
+                binding.SelfShadowProjectionPolicy = new MmdSelfShadowProjectionPolicy(
+                    scope: MmdSelfShadowProjectionScope.CharacterAndOptInBackground);
 
                 MmdSceneSelfShadowApplyStatus status = binding.ApplySelfShadowState(new MmdSelfShadowState(2, 0.8f));
 
@@ -248,6 +263,9 @@ namespace Mmd.Tests
                 Assert.That(binding.LastSelfShadowSettings.CastShadows, Is.False);
                 Assert.That(binding.LastSelfShadowState.Mode, Is.EqualTo(2));
                 Assert.That(binding.LastSelfShadowState.Distance, Is.EqualTo(0.8f).Within(0.001f));
+                Assert.That(binding.LastSelfShadowProjectionState.Active, Is.True);
+                Assert.That(binding.LastSelfShadowProjectionState.Scope, Is.EqualTo(MmdSelfShadowProjectionScope.CharacterAndOptInBackground));
+                Assert.That(binding.LastSelfShadowProjectionState.IncludesBackground, Is.True);
                 Assert.That(light.shadows, Is.EqualTo(LightShadows.None));
                 Assert.That(light.shadowStrength, Is.EqualTo(0.2f).Within(0.001f));
                 Assert.That(QualitySettings.shadowDistance, Is.EqualTo(originalShadowDistance).Within(0.001f));
@@ -283,6 +301,8 @@ namespace Mmd.Tests
                 Assert.That(binding.LastSelfShadowApplyStatus, Is.EqualTo(MmdSceneSelfShadowApplyStatus.Disabled));
                 Assert.That(binding.LastSelfShadowState.Mode, Is.EqualTo(0));
                 Assert.That(binding.LastSelfShadowState.Distance, Is.EqualTo(0.0f));
+                Assert.That(binding.LastSelfShadowProjectionState.Active, Is.False);
+                Assert.That(binding.LastSelfShadowProjectionState.Scope, Is.EqualTo(MmdSelfShadowProjectionScope.CharacterOnly));
                 Assert.That(binding.LastSelfShadowSettings.RuntimeApplicationEnabled, Is.False);
                 Assert.That(light.shadows, Is.EqualTo(LightShadows.None));
                 Assert.That(light.shadowStrength, Is.EqualTo(0.2f).Within(0.001f));
@@ -317,6 +337,8 @@ namespace Mmd.Tests
                 Assert.That(status, Is.EqualTo(MmdSceneSelfShadowApplyStatus.Recorded));
                 Assert.That(binding.LastSelfShadowState.Mode, Is.EqualTo(0));
                 Assert.That(binding.LastSelfShadowState.Distance, Is.EqualTo(0.4f).Within(0.001f));
+                Assert.That(binding.LastSelfShadowProjectionState.Active, Is.False);
+                Assert.That(binding.LastSelfShadowProjectionState.Mode, Is.EqualTo(0));
                 Assert.That(binding.LastSelfShadowSettings.CastShadows, Is.False);
                 Assert.That(light.shadows, Is.EqualTo(LightShadows.Soft));
                 Assert.That(light.shadowStrength, Is.EqualTo(0.75f).Within(0.001f));

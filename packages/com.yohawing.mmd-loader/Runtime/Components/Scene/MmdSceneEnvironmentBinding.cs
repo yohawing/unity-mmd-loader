@@ -174,6 +174,13 @@ namespace Mmd.UnityIntegration
         /// <summary>Compatibility diagnostic mirror. It no longer represents values applied to a Unity Light.</summary>
         public MmdSelfShadowUnityShadowSettings LastSelfShadowSettings { get; private set; }
 
+        /// <summary>Pure MMD self-shadow projection/far policy used for future dedicated shadow texture setup.</summary>
+        public MmdSelfShadowProjectionPolicy SelfShadowProjectionPolicy { get; set; } =
+            MmdSelfShadowProjectionPolicy.Default;
+
+        /// <summary>The most recent dedicated MMD self-shadow projection/far state.</summary>
+        public MmdSelfShadowProjectionState LastSelfShadowProjectionState { get; private set; }
+
         /// <summary>
         /// Converts <paramref name="state"/> (via <see cref="MmdCameraStateToUnity"/>) and applies it to
         /// the bound Camera's transform and field of view. Returns a structured status; never throws on
@@ -254,6 +261,7 @@ namespace Mmd.UnityIntegration
             if (!selfShadowEnabled)
             {
                 LastSelfShadowState = MmdSelfShadowState.Default;
+                LastSelfShadowProjectionState = MmdSelfShadowProjectionState.Inactive;
                 LastSelfShadowSettings = new MmdSelfShadowUnityShadowSettings(
                     runtimeApplicationEnabled: false,
                     castShadows: false,
@@ -265,6 +273,7 @@ namespace Mmd.UnityIntegration
             }
 
             LastSelfShadowState = state;
+            LastSelfShadowProjectionState = SelfShadowProjectionPolicy.Evaluate(state);
             LastSelfShadowSettings = new MmdSelfShadowUnityShadowSettings(
                 runtimeApplicationEnabled: false,
                 castShadows: false,
