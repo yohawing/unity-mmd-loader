@@ -8,11 +8,17 @@ namespace Mmd.Rendering.Universal
 {
     public sealed class MmdSelfShadowRendererFeature : ScriptableRendererFeature
     {
+        internal const float DefaultShadowDepthBias = 0.0025f;
+        private const float MaxShadowDepthBias = 0.1f;
+
         [SerializeField]
         private int shadowMapSize = 1024;
 
         [SerializeField]
         private Vector3 shadowDirection = new(0.35f, -1.0f, 0.35f);
+
+        [SerializeField]
+        private float shadowDepthBias = DefaultShadowDepthBias;
 
         private MmdSelfShadowRenderPass? selfShadowPass;
 
@@ -26,6 +32,12 @@ namespace Mmd.Rendering.Universal
         {
             get => shadowDirection;
             set => shadowDirection = value;
+        }
+
+        public float ShadowDepthBias
+        {
+            get => SanitizeShadowDepthBias(shadowDepthBias);
+            set => shadowDepthBias = SanitizeShadowDepthBias(value);
         }
 
         public override void Create()
@@ -50,7 +62,7 @@ namespace Mmd.Rendering.Universal
             };
 
             selfShadowPass = pass;
-            if (pass.Setup(shadowMapSize, shadowDirection))
+            if (pass.Setup(shadowMapSize, shadowDirection, ShadowDepthBias))
             {
                 MmdSelfShadowTarget.SetReceiverGateAvailableForRendering(true);
                 renderer.EnqueuePass(pass);
@@ -66,6 +78,16 @@ namespace Mmd.Rendering.Universal
         {
             MmdSelfShadowRenderPass.PublishDisabledGlobals();
             MmdSelfShadowTarget.DisableAllReceiverGates();
+        }
+
+        private static float SanitizeShadowDepthBias(float value)
+        {
+            if (float.IsNaN(value) || float.IsInfinity(value))
+            {
+                return 0.0f;
+            }
+
+            return Mathf.Clamp(value, 0.0f, MaxShadowDepthBias);
         }
     }
 }

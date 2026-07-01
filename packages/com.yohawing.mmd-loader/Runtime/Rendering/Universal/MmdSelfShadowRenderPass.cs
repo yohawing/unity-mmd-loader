@@ -23,6 +23,7 @@ namespace Mmd.Rendering.Universal
         private static readonly Vector4 DisabledParams = Vector4.zero;
         private static readonly List<MmdSelfShadowTarget> TargetBuffer = new();
         private static readonly List<MmdSelfShadowTarget> ActiveProjectionTargets = new();
+        private const float MaxShadowDepthBias = 0.1f;
 
         private readonly List<ShadowDrawItem> drawItems = new();
         private Matrix4x4 viewMatrix = Matrix4x4.identity;
@@ -72,6 +73,11 @@ namespace Mmd.Rendering.Universal
 
         public bool Setup(int requestedMapSize, Vector3 requestedShadowDirection)
         {
+            return Setup(requestedMapSize, requestedShadowDirection, MmdSelfShadowRendererFeature.DefaultShadowDepthBias);
+        }
+
+        public bool Setup(int requestedMapSize, Vector3 requestedShadowDirection, float requestedShadowDepthBias)
+        {
             MmdSelfShadowTarget.CollectActiveTargets(TargetBuffer);
             ActiveProjectionTargets.Clear();
             drawItems.Clear();
@@ -98,7 +104,8 @@ namespace Mmd.Rendering.Universal
                 return false;
             }
 
-            if (!TryCreateMatrices(ActiveProjectionTargets, requestedShadowDirection, out viewMatrix, out projectionMatrix, out worldToShadow, out shadowParams, out lightDirection))
+            float shadowDepthBias = SanitizeShadowDepthBias(requestedShadowDepthBias);
+            if (!TryCreateMatrices(ActiveProjectionTargets, requestedShadowDirection, shadowDepthBias, out viewMatrix, out projectionMatrix, out worldToShadow, out shadowParams, out lightDirection))
             {
                 PublishDisabledGlobals();
                 return false;
@@ -213,6 +220,7 @@ namespace Mmd.Rendering.Universal
         private static bool TryCreateMatrices(
             List<MmdSelfShadowTarget> targets,
             Vector3 shadowDirection,
+            float shadowDepthBias,
             out Matrix4x4 view,
             out Matrix4x4 projection,
             out Matrix4x4 worldToShadowMatrix,
@@ -286,8 +294,18 @@ namespace Mmd.Rendering.Universal
                 far);
 
             worldToShadowMatrix = GetShadowTransform(projection, view);
-            parameters = new Vector4(1.0f, 0.0025f, 1.0f / Mathf.Max(1, targets.Count), 0.0f);
+            parameters = new Vector4(1.0f, shadowDepthBias, 1.0f / Mathf.Max(1, targets.Count), 0.0f);
             return true;
+        }
+
+        private static float SanitizeShadowDepthBias(float value)
+        {
+            if (float.IsNaN(value) || float.IsInfinity(value))
+            {
+                return 0.0f;
+            }
+
+            return Mathf.Clamp(value, 0.0f, MaxShadowDepthBias);
         }
 
         private static Bounds TransformBounds(Bounds bounds, Matrix4x4 matrix)

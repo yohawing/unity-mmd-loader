@@ -405,6 +405,45 @@ namespace Mmd.Tests
             }
         }
 
+        [Test]
+        public void SelfShadowRendererFeatureClampsShadowDepthBias()
+        {
+            Object? feature = null;
+            try
+            {
+                System.Type featureType = System.Type.GetType(
+                    "Mmd.Rendering.Universal.MmdSelfShadowRendererFeature, Mmd.Rendering.Universal",
+                    throwOnError: true)!;
+                System.Reflection.PropertyInfo shadowDepthBiasProperty =
+                    featureType.GetProperty("ShadowDepthBias")!;
+                feature = ScriptableObject.CreateInstance(featureType);
+
+                Assert.That((float)shadowDepthBiasProperty.GetValue(feature), Is.EqualTo(0.0025f).Within(0.000001f));
+
+                shadowDepthBiasProperty.SetValue(feature, 0.025f);
+                Assert.That((float)shadowDepthBiasProperty.GetValue(feature), Is.EqualTo(0.025f).Within(0.000001f));
+
+                shadowDepthBiasProperty.SetValue(feature, -1.0f);
+                Assert.That((float)shadowDepthBiasProperty.GetValue(feature), Is.EqualTo(0.0f));
+
+                shadowDepthBiasProperty.SetValue(feature, float.NaN);
+                Assert.That((float)shadowDepthBiasProperty.GetValue(feature), Is.EqualTo(0.0f));
+
+                shadowDepthBiasProperty.SetValue(feature, float.PositiveInfinity);
+                Assert.That((float)shadowDepthBiasProperty.GetValue(feature), Is.EqualTo(0.0f));
+
+                shadowDepthBiasProperty.SetValue(feature, 1.0f);
+                Assert.That((float)shadowDepthBiasProperty.GetValue(feature), Is.EqualTo(0.1f));
+            }
+            finally
+            {
+                if (feature != null)
+                {
+                    Object.DestroyImmediate(feature);
+                }
+            }
+        }
+
         private static void AssertReceiverGate(
             Renderer renderer,
             float expectedSelfShadowReceive,
@@ -444,10 +483,17 @@ namespace Mmd.Tests
             Assert.That(feature, Does.Contain("SetReceiverGateAvailableForRendering(false)"));
             Assert.That(feature, Does.Contain("DisableAllReceiverGates"));
             Assert.That(feature, Does.Contain("Dispose(bool disposing)"));
-            Assert.That(feature, Does.Contain("if (pass.Setup(shadowMapSize, shadowDirection))"));
+            Assert.That(feature, Does.Contain("shadowDepthBias = DefaultShadowDepthBias"));
+            Assert.That(feature, Does.Contain("public float ShadowDepthBias"));
+            Assert.That(feature, Does.Contain("if (pass.Setup(shadowMapSize, shadowDirection, ShadowDepthBias))"));
             Assert.That(pass, Does.Contain("_MmdSelfShadowMap"));
             Assert.That(pass, Does.Contain("_MmdSelfShadowWorldToShadow"));
             Assert.That(pass, Does.Contain("_MmdSelfShadowParams"));
+            Assert.That(pass, Does.Contain("Setup(int requestedMapSize, Vector3 requestedShadowDirection)"));
+            Assert.That(pass, Does.Contain("MmdSelfShadowRendererFeature.DefaultShadowDepthBias"));
+            Assert.That(pass, Does.Contain("Setup(int requestedMapSize, Vector3 requestedShadowDirection, float requestedShadowDepthBias)"));
+            Assert.That(pass, Does.Contain("parameters = new Vector4(1.0f, shadowDepthBias, 1.0f / Mathf.Max(1, targets.Count), 0.0f)"));
+            Assert.That(pass, Does.Not.Contain("0.0025f"));
             Assert.That(pass, Does.Contain("SystemInfo.usesReversedZBuffer"));
             Assert.That(pass, Does.Contain("ClearDepth"));
             Assert.That(pass, Does.Contain("TryGetActiveProjectionState"));
