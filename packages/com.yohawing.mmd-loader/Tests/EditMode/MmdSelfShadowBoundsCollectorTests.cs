@@ -28,7 +28,7 @@ namespace Mmd.Tests
                 Assert.That(result.Source, Is.EqualTo(MmdSelfShadowBoundsSource.RendererCollection));
                 Assert.That(result.IncludedRendererCount, Is.EqualTo(2));
                 AssertVector(result.Center, new Vector3(2, 0, 0));
-                AssertVector(result.Size, new Vector3(6, 4, 2));
+                AssertVector(result.Size, new Vector3(6.5f, 4.5f, 2.5f));
             }
             finally
             {
@@ -60,7 +60,7 @@ namespace Mmd.Tests
                 Assert.That(result.HasBounds, Is.True);
                 Assert.That(result.IncludedRendererCount, Is.EqualTo(1));
                 AssertVector(result.Center, new Vector3(1, 2, 3));
-                AssertVector(result.Size, new Vector3(2, 4, 6));
+                AssertVector(result.Size, new Vector3(2.5f, 4.5f, 6.5f));
             }
             finally
             {
@@ -89,7 +89,7 @@ namespace Mmd.Tests
                 Assert.That(result.Source, Is.EqualTo(MmdSelfShadowBoundsSource.ManualOverride));
                 Assert.That(result.IncludedRendererCount, Is.EqualTo(0));
                 AssertVector(result.Center, new Vector3(1, 2, 3));
-                AssertVector(result.Size, new Vector3(4, 5, 6));
+                AssertVector(result.Size, new Vector3(4.5f, 5.5f, 6.5f));
             }
             finally
             {

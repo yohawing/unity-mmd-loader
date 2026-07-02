@@ -13,10 +13,8 @@ namespace Mmd.Rendering.Universal
     public sealed class MmdSelfShadowRenderPass : ScriptableRenderPass
     {
         public static readonly int MmdSelfShadowMapId = Shader.PropertyToID("_MmdSelfShadowMap");
-        public static readonly int MmdSelfShadowDebugDepthId = Shader.PropertyToID("_MmdSelfShadowDebugDepth");
         public static readonly int MmdSelfShadowWorldToShadowId = Shader.PropertyToID("_MmdSelfShadowWorldToShadow");
         public static readonly int MmdSelfShadowParamsId = Shader.PropertyToID("_MmdSelfShadowParams");
-        private static readonly int MmdSelfShadowDebugParamsId = Shader.PropertyToID("_MmdSelfShadowDebugParams");
         private static readonly int LightDirectionId = Shader.PropertyToID("_LightDirection");
         private static readonly int LightPositionId = Shader.PropertyToID("_LightPosition");
         private static readonly int ShadowBiasId = Shader.PropertyToID("_ShadowBias");
@@ -25,7 +23,9 @@ namespace Mmd.Rendering.Universal
         private static readonly Vector4 DisabledParams = Vector4.zero;
         private static readonly List<MmdSelfShadowTarget> TargetBuffer = new();
         private static readonly List<MmdSelfShadowTarget> ActiveProjectionTargets = new();
-        private const float MaxShadowDepthBias = 0.1f;
+        private const float MaxShadowDepthBias = 0.5f;
+        private const float ShadowNearMargin = 0.05f;
+        private const float MinShadowDepthRange = 0.1f;
 
         private readonly List<ShadowDrawItem> drawItems = new();
         private Matrix4x4 viewMatrix = Matrix4x4.identity;
@@ -34,9 +34,6 @@ namespace Mmd.Rendering.Universal
         private Vector4 shadowParams = DisabledParams;
         private Vector4 lightDirection = new(0.35f, -1.0f, 0.35f, 0.0f);
         private int mapSize = 1024;
-        private bool debugDepthPreview;
-        private float debugDepthPreviewContrast = MmdSelfShadowRendererFeature.DefaultDebugDepthPreviewContrast;
-        private Material? debugDepthPreviewMaterial;
 
         private readonly struct ShadowDrawItem
         {
@@ -68,19 +65,13 @@ namespace Mmd.Rendering.Universal
             public Vector4 ShadowParams;
             public Vector4 LightDirection;
             public float ClearDepth;
-        }
-
-        private sealed class DebugDepthPassData
-        {
-            public Material? Material;
-            public Vector4 DebugParams;
+            public Color ClearColor;
         }
 
         public static void PublishDisabledGlobals()
         {
             Shader.SetGlobalMatrix(MmdSelfShadowWorldToShadowId, Matrix4x4.identity);
             Shader.SetGlobalVector(MmdSelfShadowParamsId, DisabledParams);
-            Shader.SetGlobalTexture(MmdSelfShadowDebugDepthId, Texture2D.blackTexture);
         }
 
         public bool Setup(int requestedMapSize, Vector3 requestedShadowDirection)
@@ -90,30 +81,10 @@ namespace Mmd.Rendering.Universal
 
         public bool Setup(int requestedMapSize, Vector3 requestedShadowDirection, float requestedShadowDepthBias)
         {
-            return Setup(
-                requestedMapSize,
-                requestedShadowDirection,
-                requestedShadowDepthBias,
-                debugDepthPreview: false,
-                MmdSelfShadowRendererFeature.DefaultDebugDepthPreviewContrast,
-                debugDepthPreviewMaterial: null);
-        }
-
-        public bool Setup(
-            int requestedMapSize,
-            Vector3 requestedShadowDirection,
-            float requestedShadowDepthBias,
-            bool debugDepthPreview,
-            float requestedDebugDepthPreviewContrast,
-            Material? debugDepthPreviewMaterial)
-        {
             MmdSelfShadowTarget.CollectActiveTargets(TargetBuffer);
             ActiveProjectionTargets.Clear();
             drawItems.Clear();
             shadowParams = DisabledParams;
-            this.debugDepthPreview = false;
-            this.debugDepthPreviewContrast = SanitizeDebugDepthPreviewContrast(requestedDebugDepthPreviewContrast);
-            this.debugDepthPreviewMaterial = null;
 
             if (TargetBuffer.Count == 0)
             {
@@ -136,9 +107,10 @@ namespace Mmd.Rendering.Universal
                 return false;
             }
 
+            mapSize = Mathf.Clamp(requestedMapSize, 128, 4096);
             float shadowDepthBias = SanitizeShadowDepthBias(requestedShadowDepthBias);
             Vector3 shadowDirection = ResolveShadowDirection(ActiveProjectionTargets, requestedShadowDirection);
-            if (!TryCreateMatrices(ActiveProjectionTargets, shadowDirection, shadowDepthBias, out viewMatrix, out projectionMatrix, out worldToShadow, out shadowParams, out lightDirection))
+            if (!TryCreateMatrices(ActiveProjectionTargets, shadowDirection, shadowDepthBias, mapSize, out viewMatrix, out projectionMatrix, out worldToShadow, out shadowParams, out lightDirection))
             {
                 PublishDisabledGlobals();
                 return false;
@@ -153,14 +125,6 @@ namespace Mmd.Rendering.Universal
             {
                 PublishDisabledGlobals();
                 return false;
-            }
-
-            mapSize = Mathf.Clamp(requestedMapSize, 128, 4096);
-            this.debugDepthPreview = debugDepthPreview && debugDepthPreviewMaterial != null;
-            this.debugDepthPreviewMaterial = this.debugDepthPreview ? debugDepthPreviewMaterial : null;
-            if (!this.debugDepthPreview)
-            {
-                Shader.SetGlobalTexture(MmdSelfShadowDebugDepthId, Texture2D.blackTexture);
             }
 
             return true;
@@ -181,22 +145,17 @@ namespace Mmd.Rendering.Universal
                 }
             }
 
-            if (!IsDefaultShadowDirection(fallbackDirection))
-            {
-                return fallbackDirection;
-            }
-
             if (TryGetRenderSettingsSunDirection(out Vector3 sceneDirection))
             {
                 return sceneDirection;
             }
 
-            return fallbackDirection;
-        }
+            if (fallbackDirection.sqrMagnitude > 1e-8f)
+            {
+                return fallbackDirection.normalized;
+            }
 
-        private static bool IsDefaultShadowDirection(Vector3 direction)
-        {
-            return (direction - MmdSelfShadowRendererFeature.DefaultShadowDirection).sqrMagnitude < 1e-8f;
+            return MmdSelfShadowRendererFeature.DefaultShadowDirection.normalized;
         }
 
         private static bool TryGetRenderSettingsSunDirection(out Vector3 direction)
@@ -229,10 +188,17 @@ namespace Mmd.Rendering.Universal
             TextureHandle shadowMap = renderGraph.CreateTexture(new TextureDesc(mapSize, mapSize)
             {
                 name = "MMD Self Shadow Map",
-                depthBufferBits = DepthBits.Depth32,
-                isShadowMap = true,
+                colorFormat = GraphicsFormat.R32_SFloat,
                 filterMode = FilterMode.Bilinear,
                 wrapMode = TextureWrapMode.Clamp,
+                clearBuffer = true,
+                clearColor = SystemInfo.usesReversedZBuffer ? Color.black : Color.white
+            });
+
+            TextureHandle shadowDepth = renderGraph.CreateTexture(new TextureDesc(mapSize, mapSize)
+            {
+                name = "MMD Self Shadow Depth Test",
+                depthBufferBits = DepthBits.Depth32,
                 clearBuffer = true,
                 clearColor = Color.clear
             });
@@ -250,16 +216,21 @@ namespace Mmd.Rendering.Universal
                 passData.WorldToShadow = worldToShadow;
                 passData.ShadowParams = shadowParams;
                 passData.LightDirection = lightDirection;
-                passData.ClearDepth = SystemInfo.usesReversedZBuffer ? 0.0f : 1.0f;
+                // Depth attachment still uses the conventional clear value (1 = far); Unity handles
+                // reversed-Z internally there. The R32F color map stores the MMD-style z/w value
+                // directly, so its clear color must be the actual far depth in the sampled range.
+                passData.ClearDepth = 1.0f;
+                passData.ClearColor = SystemInfo.usesReversedZBuffer ? Color.black : Color.white;
 
                 builder.AllowGlobalStateModification(true);
                 builder.AllowPassCulling(false);
-                builder.SetRenderAttachmentDepth(shadowMap, AccessFlags.ReadWrite);
+                builder.SetRenderAttachment(shadowMap, 0, AccessFlags.Write);
+                builder.SetRenderAttachmentDepth(shadowDepth, AccessFlags.ReadWrite);
                 builder.SetGlobalTextureAfterPass(shadowMap, MmdSelfShadowMapId);
                 builder.SetRenderFunc(static (PassData data, RasterGraphContext context) =>
                 {
                     RasterCommandBuffer cmd = context.cmd;
-                    cmd.ClearRenderTarget(clearDepth: true, clearColor: false, backgroundColor: Color.clear, depth: data.ClearDepth);
+                    cmd.ClearRenderTarget(clearDepth: true, clearColor: true, backgroundColor: data.ClearColor, depth: data.ClearDepth);
                     cmd.SetGlobalMatrix(MmdSelfShadowWorldToShadowId, data.WorldToShadow);
                     cmd.SetGlobalVector(MmdSelfShadowParamsId, data.ShadowParams);
                     cmd.SetGlobalVector(LightDirectionId, data.LightDirection);
@@ -281,47 +252,6 @@ namespace Mmd.Rendering.Universal
                 });
             }
 
-            if (debugDepthPreview && debugDepthPreviewMaterial != null)
-            {
-                TextureHandle debugDepth = renderGraph.CreateTexture(new TextureDesc(mapSize, mapSize)
-                {
-                    name = "MMD Self Shadow Debug Depth",
-                    colorFormat = GraphicsFormat.R8G8B8A8_UNorm,
-                    filterMode = FilterMode.Bilinear,
-                    wrapMode = TextureWrapMode.Clamp,
-                    clearBuffer = true,
-                    clearColor = Color.black
-                });
-
-                using (var debugBuilder = renderGraph.AddRasterRenderPass<DebugDepthPassData>(
-                    "MMD Self Shadow Debug Depth Preview",
-                    out var debugPassData))
-                {
-                    debugPassData.Material = debugDepthPreviewMaterial;
-                    debugPassData.DebugParams = new Vector4(
-                        SystemInfo.usesReversedZBuffer ? 0.0f : 1.0f,
-                        debugDepthPreviewContrast,
-                        0.0f,
-                        0.0f);
-
-                    debugBuilder.AllowGlobalStateModification(true);
-                    debugBuilder.AllowPassCulling(false);
-                    debugBuilder.UseTexture(shadowMap, AccessFlags.Read);
-                    debugBuilder.SetRenderAttachment(debugDepth, 0);
-                    debugBuilder.SetGlobalTextureAfterPass(debugDepth, MmdSelfShadowDebugDepthId);
-                    debugBuilder.SetRenderFunc(static (DebugDepthPassData data, RasterGraphContext context) =>
-                    {
-                        if (data.Material == null)
-                        {
-                            return;
-                        }
-
-                        RasterCommandBuffer cmd = context.cmd;
-                        cmd.SetGlobalVector(MmdSelfShadowDebugParamsId, data.DebugParams);
-                        cmd.DrawProcedural(Matrix4x4.identity, data.Material, 0, MeshTopology.Triangles, 3, 1);
-                    });
-                }
-            }
         }
 
         private static void AddDrawItems(MmdSelfShadowTarget target, List<ShadowDrawItem> output)
@@ -348,7 +278,7 @@ namespace Mmd.Rendering.Universal
                         continue;
                     }
 
-                    int passIndex = material.FindPass("ShadowCaster");
+                    int passIndex = material.FindPass("MmdSelfShadowCaster");
                     if (passIndex >= 0)
                     {
                         output.Add(new ShadowDrawItem(renderer, material, submesh, passIndex));
@@ -361,6 +291,7 @@ namespace Mmd.Rendering.Universal
             List<MmdSelfShadowTarget> targets,
             Vector3 shadowDirection,
             float shadowDepthBias,
+            int shadowMapSize,
             out Matrix4x4 view,
             out Matrix4x4 projection,
             out Matrix4x4 worldToShadowMatrix,
@@ -381,12 +312,10 @@ namespace Mmd.Rendering.Universal
             Vector3 forward = shadowDirection.normalized;
             lightDirection = new Vector4(forward.x, forward.y, forward.z, 0.0f);
             Vector3 up = Mathf.Abs(Vector3.Dot(forward, Vector3.up)) > 0.99f ? Vector3.forward : Vector3.up;
-            Quaternion rotation = Quaternion.LookRotation(forward, up);
-            view = Matrix4x4.TRS(Vector3.zero, rotation, Vector3.one).inverse;
+            view = CreateLightViewMatrix(forward, up);
 
             bool hasBounds = false;
             Bounds aggregate = default;
-            float farDistance = 0.0f;
             for (int i = 0; i < targets.Count; i++)
             {
                 MmdSelfShadowBoundsResult result = targets[i].CollectBounds();
@@ -400,7 +329,6 @@ namespace Mmd.Rendering.Universal
                     continue;
                 }
 
-                farDistance = Mathf.Max(farDistance, projectionState.FarDistance);
                 if (!hasBounds)
                 {
                     aggregate = TransformBounds(result.Bounds, view);
@@ -417,13 +345,16 @@ namespace Mmd.Rendering.Universal
                 return false;
             }
 
+            float zOffset = -aggregate.max.z - ShadowNearMargin;
+            view.m23 += zOffset;
+            aggregate.center += new Vector3(0.0f, 0.0f, zOffset);
+
             Vector3 center = aggregate.center;
             Vector3 extents = aggregate.extents;
             float halfWidth = Mathf.Max(extents.x, 0.01f);
             float halfHeight = Mathf.Max(extents.y, 0.01f);
-            float depth = Mathf.Max(extents.z * 2.0f, farDistance, 0.1f);
-            float near = center.z - depth * 0.5f - 0.05f;
-            float far = Mathf.Max(near + 0.1f, center.z + depth * 0.5f);
+            float near = Mathf.Max(0.001f, -aggregate.max.z - 0.001f);
+            float far = Mathf.Max(near + MinShadowDepthRange, -aggregate.min.z + ShadowNearMargin);
 
             projection = Matrix4x4.Ortho(
                 center.x - halfWidth,
@@ -434,8 +365,33 @@ namespace Mmd.Rendering.Universal
                 far);
 
             worldToShadowMatrix = GetShadowTransform(projection, view);
-            parameters = new Vector4(1.0f, shadowDepthBias, 1.0f / Mathf.Max(1, targets.Count), 0.0f);
+            float normalizedShadowDepthBias = NormalizeShadowDepthBias(shadowDepthBias, far - near);
+            parameters = new Vector4(1.0f, normalizedShadowDepthBias, 1.0f / Mathf.Max(1, shadowMapSize), 0.0f);
             return true;
+        }
+
+        private static float NormalizeShadowDepthBias(float worldDepthBias, float depthRange)
+        {
+            if (worldDepthBias <= 0.0f ||
+                !float.IsFinite(worldDepthBias) ||
+                depthRange <= 1e-5f ||
+                !float.IsFinite(depthRange))
+            {
+                return 0.0f;
+            }
+
+            return Mathf.Clamp01(worldDepthBias / depthRange);
+        }
+
+        private static Matrix4x4 CreateLightViewMatrix(Vector3 forward, Vector3 up)
+        {
+            Quaternion rotation = Quaternion.LookRotation(forward, up);
+            Matrix4x4 view = Matrix4x4.TRS(Vector3.zero, rotation, Vector3.one).inverse;
+            view.m20 = -view.m20;
+            view.m21 = -view.m21;
+            view.m22 = -view.m22;
+            view.m23 = -view.m23;
+            return view;
         }
 
         private static float SanitizeShadowDepthBias(float value)
@@ -446,16 +402,6 @@ namespace Mmd.Rendering.Universal
             }
 
             return Mathf.Clamp(value, 0.0f, MaxShadowDepthBias);
-        }
-
-        private static float SanitizeDebugDepthPreviewContrast(float value)
-        {
-            if (float.IsNaN(value) || float.IsInfinity(value))
-            {
-                return MmdSelfShadowRendererFeature.DefaultDebugDepthPreviewContrast;
-            }
-
-            return Mathf.Clamp(value, 1.0f, 4096.0f);
         }
 
         private static Bounds TransformBounds(Bounds bounds, Matrix4x4 matrix)
@@ -503,5 +449,6 @@ namespace Mmd.Rendering.Universal
             textureScaleAndBias.m23 = 0.5f;
             return textureScaleAndBias * matrix;
         }
+
     }
 }

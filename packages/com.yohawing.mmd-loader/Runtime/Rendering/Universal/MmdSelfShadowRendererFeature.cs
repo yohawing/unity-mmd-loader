@@ -9,12 +9,9 @@ namespace Mmd.Rendering.Universal
 {
     public sealed class MmdSelfShadowRendererFeature : ScriptableRendererFeature
     {
-        internal const float DefaultShadowDepthBias = 0.0025f;
-        internal const float DefaultDebugDepthPreviewContrast = 64.0f;
+        internal const float DefaultShadowDepthBias = 0.02f;
         internal static readonly Vector3 DefaultShadowDirection = new(0.35f, -1.0f, 0.35f);
-        private const float MaxShadowDepthBias = 0.1f;
-        private const float MaxDebugDepthPreviewContrast = 4096.0f;
-        private const string DebugDepthPreviewShaderName = "Hidden/MMD/SelfShadowDepthDebug";
+        private const float MaxShadowDepthBias = 0.5f;
 
         [SerializeField]
         private int shadowMapSize = 1024;
@@ -24,17 +21,10 @@ namespace Mmd.Rendering.Universal
         private Vector3 shadowDirection = DefaultShadowDirection;
 
         [SerializeField]
+        [Tooltip("World-space MMD self-shadow depth bias in meters. The render pass normalizes this by the fitted character depth range.")]
         private float shadowDepthBias = DefaultShadowDepthBias;
 
-        [SerializeField]
-        [Tooltip("Opt-in Frame Debugger preview. Creates a color texture from the depth-only MMD self-shadow map without changing the receiver path.")]
-        private bool debugDepthPreview;
-
-        [SerializeField]
-        private float debugDepthPreviewContrast = DefaultDebugDepthPreviewContrast;
-
         private MmdSelfShadowRenderPass? selfShadowPass;
-        private Material? debugDepthPreviewMaterial;
 
         public int ShadowMapSize
         {
@@ -52,18 +42,6 @@ namespace Mmd.Rendering.Universal
         {
             get => SanitizeShadowDepthBias(shadowDepthBias);
             set => shadowDepthBias = SanitizeShadowDepthBias(value);
-        }
-
-        public bool DebugDepthPreview
-        {
-            get => debugDepthPreview;
-            set => debugDepthPreview = value;
-        }
-
-        public float DebugDepthPreviewContrast
-        {
-            get => SanitizeDebugDepthPreviewContrast(debugDepthPreviewContrast);
-            set => debugDepthPreviewContrast = SanitizeDebugDepthPreviewContrast(value);
         }
 
         public override void Create()
@@ -88,8 +66,10 @@ namespace Mmd.Rendering.Universal
             };
 
             selfShadowPass = pass;
-            Material? debugMaterial = debugDepthPreview ? GetDebugDepthPreviewMaterial() : null;
-            if (pass.Setup(shadowMapSize, shadowDirection, ShadowDepthBias, debugDepthPreview, DebugDepthPreviewContrast, debugMaterial))
+            if (pass.Setup(
+                shadowMapSize,
+                shadowDirection,
+                ShadowDepthBias))
             {
                 MmdSelfShadowTarget.SetReceiverGateAvailableForRendering(true);
                 renderer.EnqueuePass(pass);
@@ -99,8 +79,6 @@ namespace Mmd.Rendering.Universal
         protected override void Dispose(bool disposing)
         {
             DisableSelfShadowState();
-            CoreUtils.Destroy(debugDepthPreviewMaterial);
-            debugDepthPreviewMaterial = null;
         }
 
         private static void DisableSelfShadowState()
@@ -119,31 +97,5 @@ namespace Mmd.Rendering.Universal
             return Mathf.Clamp(value, 0.0f, MaxShadowDepthBias);
         }
 
-        private Material? GetDebugDepthPreviewMaterial()
-        {
-            if (debugDepthPreviewMaterial != null)
-            {
-                return debugDepthPreviewMaterial;
-            }
-
-            Shader shader = Shader.Find(DebugDepthPreviewShaderName);
-            if (shader == null)
-            {
-                return null;
-            }
-
-            debugDepthPreviewMaterial = CoreUtils.CreateEngineMaterial(shader);
-            return debugDepthPreviewMaterial;
-        }
-
-        private static float SanitizeDebugDepthPreviewContrast(float value)
-        {
-            if (float.IsNaN(value) || float.IsInfinity(value))
-            {
-                return DefaultDebugDepthPreviewContrast;
-            }
-
-            return Mathf.Clamp(value, 1.0f, MaxDebugDepthPreviewContrast);
-        }
     }
 }

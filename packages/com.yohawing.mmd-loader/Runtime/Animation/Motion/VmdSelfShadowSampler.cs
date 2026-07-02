@@ -81,7 +81,7 @@ namespace Mmd.Motion
         public const float DefaultDistanceScale = 100.0f;
         public const float DefaultMinFarDistance = 1.0f;
         public const float DefaultMaxFarDistance = 100.0f;
-        public const float DefaultBoundsPadding = 0.0f;
+        public const float DefaultBoundsPadding = 0.25f;
 
         public MmdSelfShadowProjectionPolicy(
             float distanceScale = DefaultDistanceScale,

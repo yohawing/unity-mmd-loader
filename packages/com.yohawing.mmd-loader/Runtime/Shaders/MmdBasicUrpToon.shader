@@ -15,9 +15,7 @@ Shader "MMD Basic URP Toon"
         _AmbientColor ("Ambient Color", Color) = (0.25, 0.25, 0.25, 1)
         _MmdLightDirection ("Light Direction Override", Vector) = (0, 0, 0, 0)
         _MmdLightColor ("MMD Light Color", Color) = (1, 1, 1, 1)
-        [PerRendererData] _MmdReceiveShadows ("MMD Receive Shadows", Float) = 0
         [PerRendererData] [HideInInspector] _MmdSelfShadowReceive ("MMD Self Shadow Receive", Float) = 0
-        [PerRendererData] [HideInInspector] _MmdSuppressStandardShadows ("MMD Suppress Standard Shadows", Float) = 0
         _ToonStrength ("Toon Strength", Range(0, 1)) = 1
         _OutlineColor ("Outline Color", Color) = (0, 0, 0, 1)
         _OutlineWidth ("Outline Width", Float) = 0
@@ -161,8 +159,6 @@ Shader "MMD Basic URP Toon"
             HLSLPROGRAM
             #pragma vertex ForwardVertex
             #pragma fragment ForwardFragment
-            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
-            #pragma multi_compile_fragment _ _SHADOWS_SOFT
             #pragma multi_compile_instancing
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
@@ -182,9 +178,7 @@ Shader "MMD Basic URP Toon"
             float4 _MmdSelfShadowParams;
 
             UNITY_INSTANCING_BUFFER_START(MmdPerRenderer)
-                UNITY_DEFINE_INSTANCED_PROP(float, _MmdReceiveShadows)
                 UNITY_DEFINE_INSTANCED_PROP(float, _MmdSelfShadowReceive)
-                UNITY_DEFINE_INSTANCED_PROP(float, _MmdSuppressStandardShadows)
             UNITY_INSTANCING_BUFFER_END(MmdPerRenderer)
 
             CBUFFER_START(UnityPerMaterial)
@@ -243,6 +237,21 @@ Shader "MMD Basic URP Toon"
                 return output;
             }
 
+            half ComputeMmdSelfShadowVisibility(float receiverDepth, half sampledDepth)
+            {
+#if UNITY_REVERSED_Z
+                float occluderDepthDelta = sampledDepth - receiverDepth - _MmdSelfShadowParams.y;
+#else
+                float occluderDepthDelta = receiverDepth - sampledDepth - _MmdSelfShadowParams.y;
+#endif
+                if (occluderDepthDelta <= 0.0)
+                {
+                    return 1.0h;
+                }
+
+                return 1.0h - saturate(occluderDepthDelta * 1500.0h - 0.3h);
+            }
+
             half SampleMmdSelfShadow(float3 positionWS, half selfShadowReceive)
             {
                 if (_MmdSelfShadowParams.x <= 0.5 || selfShadowReceive <= 0.5h)
@@ -257,12 +266,8 @@ Shader "MMD Basic URP Toon"
                     return 1.0h;
                 }
 
-                half depth = SAMPLE_TEXTURE2D(_MmdSelfShadowMap, sampler_MmdSelfShadowMap, shadowCoord.xy).r;
-#if UNITY_REVERSED_Z
-                return shadowCoord.z + _MmdSelfShadowParams.y >= depth ? 1.0h : 0.22h;
-#else
-                return shadowCoord.z - _MmdSelfShadowParams.y <= depth ? 1.0h : 0.22h;
-#endif
+                half sampledDepth = SAMPLE_TEXTURE2D(_MmdSelfShadowMap, sampler_MmdSelfShadowMap, shadowCoord.xy).r;
+                return ComputeMmdSelfShadowVisibility(shadowCoord.z, sampledDepth);
             }
 
             half4 ForwardFragment(Varyings input) : SV_Target
@@ -279,22 +284,20 @@ Shader "MMD Basic URP Toon"
                     ? normalize(_MmdLightDirection.xyz)
                     : mainLight.direction;
                 half selfShadowReceive = (half)UNITY_ACCESS_INSTANCED_PROP(MmdPerRenderer, _MmdSelfShadowReceive);
-                half shadowAttenuation = SampleMmdSelfShadow(input.positionWS, selfShadowReceive);
+                half selfShadowVisibility = SampleMmdSelfShadow(input.positionWS, selfShadowReceive);
+
                 half3 normalWS = normalize(input.normalWS);
                 half ndotl = saturate(dot(normalWS, lightDirection));
-                half toonCoord = saturate(dot(normalWS, lightDirection) * 0.5h + 0.5h);
-                // Match the MMD toon self-shadow model used by three-mmd-loader: shadow map
-                // visibility does not darken the direct light color. It pushes the toon ramp
-                // coordinate toward the dark side instead.
-                toonCoord = lerp(0.22h, toonCoord, shadowAttenuation);
-                // Keep the no-toon-map fallback flat for ordinary lighting, but still let MMD
-                // self-shadow darken it. three-mmd-loader always feeds self-shadow through a toon
-                // coordinate/gradient path; without this fallback, skin materials with no bound
-                // toon texture would never receive visible skirt/body self-shadow.
-                half3 fallbackToon = lerp(0.22h.xxx, 1.0h.xxx, shadowAttenuation);
-                half3 mappedToon = SAMPLE_TEXTURE2D(_ToonMap, sampler_ToonMap, float2(0.5, toonCoord)).rgb;
-                half3 toonSample = lerp(fallbackToon, mappedToon, saturate(_ToonMapBound));
-                half3 toonLight = lerp(ndotl.xxx, toonSample, _ToonStrength);
+                half lightVisibility = saturate(dot(normalWS, lightDirection) * 3.0h);
+                half toonVisibility = min(selfShadowVisibility, lightVisibility);
+                // MMD's traced self-shadow pixel shader receives ToonColor as a constant, not
+                // as a ramp sample. Approximate that CPU-side color generation from the bound
+                // toon ramp near the observed dark-edge band until the exact rule is traced.
+                half3 fallbackToonColor = half3(1.0h, 1.0h, 1.0h);
+                half3 mappedToonColor = SAMPLE_TEXTURE2D(_ToonMap, sampler_ToonMap, float2(0.5, 0.22)).rgb;
+                half3 toonColor = lerp(fallbackToonColor, mappedToonColor, saturate(_ToonMapBound));
+                half3 mmdToonLight = lerp(toonColor, half3(1.0h, 1.0h, 1.0h), toonVisibility);
+                half3 toonLight = lerp(ndotl.xxx, mmdToonLight, _ToonStrength);
 
                 // MMD performs its fixed-function lighting in gamma (sRGB) space, so the diffuse,
                 // ambient, light and toon are combined on the sRGB-valued colors — not on the
@@ -331,6 +334,87 @@ Shader "MMD Basic URP Toon"
                 color.rgb = _GammaTarget > 0.5h ? litSRGB : SRGBToLinear(litSRGB);
                 color.a = lerp(_Alpha, albedoAlpha, saturate(_TextureAlphaOutputWeight));
                 return color;
+            }
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "MmdSelfShadowCaster"
+            Tags { "LightMode" = "MmdSelfShadowCaster" }
+
+            Cull [_Cull]
+            ZWrite On
+            ZTest LEqual
+            ColorMask R
+
+            HLSLPROGRAM
+            #pragma vertex MmdSelfShadowVertex
+            #pragma fragment MmdSelfShadowFragment
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            TEXTURE2D(_BaseMap);
+            SAMPLER(sampler_BaseMap);
+
+            float4x4 _MmdSelfShadowWorldToShadow;
+
+            CBUFFER_START(UnityPerMaterial)
+                float4 _BaseMap_ST;
+                half4 _BaseColor;
+                half4 _Color;
+                half _Alpha;
+                half4 _DiagnosticColor;
+                half4 _AmbientColor;
+                half4 _MmdLightDirection;
+                half4 _MmdLightColor;
+                half _ToonStrength;
+                half _ToonMapBound;
+                half _SphereMode;
+                half4 _OutlineColor;
+                half _OutlineWidth;
+                half _OutlineScreenSpaceWeight;
+                half _BodyVisible;
+                half _OutlineVisible;
+                half _TextureAlphaOutputWeight;
+                half _BaseMapBound;
+                half _TextureFlatLightingWeight;
+                half _TextureFlatLightingValue;
+                half _AlphaClipThreshold;
+                half _ShadowAlphaClipThreshold;
+                half _GammaTarget;
+            CBUFFER_END
+
+            struct MmdSelfShadowAttributes
+            {
+                float4 positionOS : POSITION;
+                float2 uv : TEXCOORD0;
+            };
+
+            struct MmdSelfShadowVaryings
+            {
+                float4 positionCS : SV_POSITION;
+                float2 uv : TEXCOORD0;
+                float4 shadowCoord : TEXCOORD1;
+            };
+
+            MmdSelfShadowVaryings MmdSelfShadowVertex(MmdSelfShadowAttributes input)
+            {
+                MmdSelfShadowVaryings output;
+                float3 positionWS = TransformObjectToWorld(input.positionOS.xyz);
+                output.positionCS = TransformWorldToHClip(positionWS);
+                output.shadowCoord = mul(_MmdSelfShadowWorldToShadow, float4(positionWS, 1.0));
+                output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
+                return output;
+            }
+
+            half4 MmdSelfShadowFragment(MmdSelfShadowVaryings input) : SV_Target
+            {
+                clip(_BodyVisible - 0.5h);
+                half4 baseMap = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv);
+                half albedoAlpha = baseMap.a * _BaseColor.a * _DiagnosticColor.a;
+                clip(albedoAlpha - _ShadowAlphaClipThreshold);
+                float shadowDepth = input.shadowCoord.z / max(input.shadowCoord.w, 1e-5);
+                return half4((half)shadowDepth, 0.0h, 0.0h, 1.0h);
             }
             ENDHLSL
         }

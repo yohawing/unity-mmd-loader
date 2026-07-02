@@ -11,11 +11,10 @@ namespace Mmd.UnityIntegration
     /// </summary>
     [ExecuteAlways]
     [DisallowMultipleComponent]
+    [AddComponentMenu("")]
     public sealed class MmdSelfShadowTarget : MonoBehaviour
     {
         public static readonly int MmdSelfShadowReceiveId = Shader.PropertyToID("_MmdSelfShadowReceive");
-        public static readonly int MmdReceiveShadowsId = Shader.PropertyToID("_MmdReceiveShadows");
-        public static readonly int MmdSuppressStandardShadowsId = Shader.PropertyToID("_MmdSuppressStandardShadows");
 
         private static readonly List<MmdSelfShadowTarget> ActiveTargets = new();
         private static MaterialPropertyBlock? sharedPropertyBlock;
@@ -36,7 +35,6 @@ namespace Mmd.UnityIntegration
         private MmdSelfShadowProjectionPolicy projectionPolicy = MmdSelfShadowProjectionPolicy.Default;
         private Transform? receiverGateRoot;
         private bool receiverGateEnabled;
-        private bool receiverGateSuppressesStandard;
         private bool receiverGateInitialized;
 
         public bool SelfShadowEnabled
@@ -69,7 +67,7 @@ namespace Mmd.UnityIntegration
 
                 if (isActiveAndEnabled)
                 {
-                    ApplyReceiverGateToRoot(BoundsRoot, selfShadowReceive: false, suppressStandardShadows: false);
+                    ApplyReceiverGateToRoot(BoundsRoot, selfShadowReceive: false);
                 }
 
                 boundsRoot = value;
@@ -154,6 +152,23 @@ namespace Mmd.UnityIntegration
             }
         }
 
+        internal static MmdSelfShadowTarget EnsureHiddenTarget(GameObject root, Transform? boundsRoot = null)
+        {
+            MmdSelfShadowTarget target = root.GetComponent<MmdSelfShadowTarget>();
+            if (target == null)
+            {
+                target = root.AddComponent<MmdSelfShadowTarget>();
+            }
+
+            target.HideFromInspector();
+            if (boundsRoot != null)
+            {
+                target.BoundsRoot = boundsRoot;
+            }
+
+            return target;
+        }
+
         public static void CollectActiveTargets(List<MmdSelfShadowTarget> buffer)
         {
             buffer.Clear();
@@ -202,27 +217,29 @@ namespace Mmd.UnityIntegration
 
         public bool TryGetActiveProjectionState(out MmdSelfShadowProjectionState projectionState)
         {
-            if (sceneEnvironment != null)
+            MmdSceneEnvironmentBinding? effectiveEnvironment = ResolveSceneEnvironment();
+            if (effectiveEnvironment != null)
             {
-                if (!sceneEnvironment.SelfShadowEnabled ||
-                    sceneEnvironment.LastSelfShadowApplyStatus != MmdSceneSelfShadowApplyStatus.Recorded)
+                if (!effectiveEnvironment.SelfShadowEnabled ||
+                    effectiveEnvironment.LastSelfShadowApplyStatus != MmdSceneSelfShadowApplyStatus.Recorded)
                 {
                     projectionState = MmdSelfShadowProjectionState.Inactive;
                     return false;
                 }
 
-                projectionState = sceneEnvironment.SelfShadowProjectionPolicy.Evaluate(sceneEnvironment.LastSelfShadowState);
+                projectionState = effectiveEnvironment.SelfShadowProjectionPolicy.Evaluate(effectiveEnvironment.LastSelfShadowState);
                 return projectionState.Active;
             }
 
-            projectionState = EffectiveProjectionPolicy.Evaluate(new MmdSelfShadowState(1, 1.0f));
-            return projectionState.Active;
+            projectionState = MmdSelfShadowProjectionState.Inactive;
+            return false;
         }
 
         public bool TryGetSelfShadowLightDirection(out Vector3 direction)
         {
-            if (sceneEnvironment != null &&
-                sceneEnvironment.TryGetSelfShadowUnityLightDirection(out direction))
+            MmdSceneEnvironmentBinding? effectiveEnvironment = ResolveSceneEnvironmentForDirection();
+            if (effectiveEnvironment != null &&
+                effectiveEnvironment.TryGetSelfShadowUnityLightDirection(out direction))
             {
                 return true;
             }
@@ -231,11 +248,18 @@ namespace Mmd.UnityIntegration
             return false;
         }
 
-        private MmdSelfShadowProjectionPolicy EffectiveProjectionPolicy =>
-            sceneEnvironment != null ? sceneEnvironment.SelfShadowProjectionPolicy : projectionPolicy;
+        private MmdSelfShadowProjectionPolicy EffectiveProjectionPolicy
+        {
+            get
+            {
+                MmdSceneEnvironmentBinding? effectiveEnvironment = ResolveSceneEnvironment();
+                return effectiveEnvironment != null ? effectiveEnvironment.SelfShadowProjectionPolicy : projectionPolicy;
+            }
+        }
 
         private void OnEnable()
         {
+            HideFromInspector();
             if (!ActiveTargets.Contains(this))
             {
                 ActiveTargets.Add(this);
@@ -246,7 +270,7 @@ namespace Mmd.UnityIntegration
 
         private void OnDisable()
         {
-            ApplyReceiverGateToRoot(BoundsRoot, selfShadowReceive: false, suppressStandardShadows: false);
+            ApplyReceiverGateToRoot(BoundsRoot, selfShadowReceive: false);
             ActiveTargets.Remove(this);
             receiverGateRoot = null;
             receiverGateInitialized = false;
@@ -254,7 +278,7 @@ namespace Mmd.UnityIntegration
 
         private void OnDestroy()
         {
-            ApplyReceiverGateToRoot(BoundsRoot, selfShadowReceive: false, suppressStandardShadows: false);
+            ApplyReceiverGateToRoot(BoundsRoot, selfShadowReceive: false);
         }
 
         private void OnTransformChildrenChanged()
@@ -279,36 +303,29 @@ namespace Mmd.UnityIntegration
         {
             Transform root = BoundsRoot;
             bool shouldReceive = receiverGateAvailable && enabled && TryGetActiveProjectionState(out _);
-            bool suppressStandard = shouldReceive;
             if (!force &&
                 receiverGateInitialized &&
                 receiverGateRoot == root &&
-                receiverGateEnabled == shouldReceive &&
-                receiverGateSuppressesStandard == suppressStandard)
+                receiverGateEnabled == shouldReceive)
             {
                 return;
             }
 
             if (receiverGateRoot != null && receiverGateRoot != root)
             {
-                ApplyReceiverGateToRoot(receiverGateRoot, selfShadowReceive: false, suppressStandardShadows: false);
+                ApplyReceiverGateToRoot(receiverGateRoot, selfShadowReceive: false);
             }
 
-            ApplyReceiverGateToRoot(root, shouldReceive, suppressStandard);
+            ApplyReceiverGateToRoot(root, shouldReceive);
             receiverGateRoot = root;
             receiverGateEnabled = shouldReceive;
-            receiverGateSuppressesStandard = suppressStandard;
             receiverGateInitialized = true;
         }
 
-        private static void ApplyReceiverGateToRoot(
-            Transform root,
-            bool selfShadowReceive,
-            bool suppressStandardShadows)
+        private static void ApplyReceiverGateToRoot(Transform root, bool selfShadowReceive)
         {
             Renderer[] renderers = root.GetComponentsInChildren<Renderer>(includeInactive: true);
             float selfShadowValue = selfShadowReceive ? 1.0f : 0.0f;
-            float suppressStandardValue = suppressStandardShadows ? 1.0f : 0.0f;
             for (int i = 0; i < renderers.Length; i++)
             {
                 Renderer renderer = renderers[i];
@@ -319,10 +336,51 @@ namespace Mmd.UnityIntegration
 
                 renderer.GetPropertyBlock(SharedPropertyBlock);
                 SharedPropertyBlock.SetFloat(MmdSelfShadowReceiveId, selfShadowValue);
-                SharedPropertyBlock.SetFloat(MmdSuppressStandardShadowsId, suppressStandardValue);
                 renderer.SetPropertyBlock(SharedPropertyBlock);
                 SharedPropertyBlock.Clear();
             }
+        }
+
+        private void HideFromInspector()
+        {
+            hideFlags |= HideFlags.HideInInspector;
+        }
+
+        private MmdSceneEnvironmentBinding? ResolveSceneEnvironment()
+        {
+            if (sceneEnvironment != null)
+            {
+                return sceneEnvironment;
+            }
+
+            MmdSceneEnvironmentBinding? resolvedEnvironment = null;
+            MmdSceneEnvironmentBinding[] environments =
+                Object.FindObjectsByType<MmdSceneEnvironmentBinding>(FindObjectsInactive.Exclude);
+            for (int i = 0; i < environments.Length; i++)
+            {
+                MmdSceneEnvironmentBinding environment = environments[i];
+                if (environment != null &&
+                    (environment.LastSelfShadowApplyStatus == MmdSceneSelfShadowApplyStatus.Recorded ||
+                     environment.LastSelfShadowApplyStatus == MmdSceneSelfShadowApplyStatus.Disabled))
+                {
+                    if (resolvedEnvironment != null)
+                    {
+                        return null;
+                    }
+
+                    resolvedEnvironment = environment;
+                }
+            }
+
+            return resolvedEnvironment;
+        }
+
+        private MmdSceneEnvironmentBinding? ResolveSceneEnvironmentForDirection()
+        {
+            MmdSceneEnvironmentBinding? effectiveEnvironment = ResolveSceneEnvironment();
+            return effectiveEnvironment != null && effectiveEnvironment.TryGetSelfShadowUnityLightDirection(out _)
+                ? effectiveEnvironment
+                : null;
         }
     }
 }

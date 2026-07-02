@@ -152,6 +152,7 @@ namespace Mmd.UnityIntegration
                 renderer.sharedMesh = mesh;
             }
             MmdShaderBindingDiagnostics shaderDiagnostics = MmdUnityMaterialBuilder.BuildExistingShaderDiagnostics(renderer);
+            MmdSelfShadowTarget.EnsureHiddenTarget(root, modelRoot);
 
             MmdUnityPhysicsBody[] physicsBodies = root.GetComponentsInChildren<MmdUnityPhysicsBody>(includeInactive: true);
             return new MmdUnityModelInstance(
@@ -204,6 +205,7 @@ namespace Mmd.UnityIntegration
             var meshRenderer = modelRoot.gameObject.AddComponent<MeshRenderer>();
             meshRenderer.sharedMaterials = materials;
             ApplyRendererShadowPolicy(meshRenderer);
+            MmdSelfShadowTarget.EnsureHiddenTarget(root, modelRoot);
 
             return new MmdUnityModelInstance(
                 root,
@@ -247,6 +249,7 @@ namespace Mmd.UnityIntegration
             renderer.bones = boneTransforms;
             renderer.rootBone = boneTransforms.Length > 0 ? boneTransforms[0] : modelRoot;
             ApplyRendererShadowPolicy(renderer);
+            MmdSelfShadowTarget.EnsureHiddenTarget(root, modelRoot);
 
             return new MmdUnityModelInstance(
                 root,

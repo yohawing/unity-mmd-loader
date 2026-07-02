@@ -106,6 +106,7 @@ namespace Mmd.UnityIntegration
 
             MmdUnityPhysicsBody[] physicsBodies = instanceRoot.GetComponentsInChildren<MmdUnityPhysicsBody>(includeInactive: true);
             MmdShaderBindingDiagnostics shaderDiagnostics = MmdUnityMaterialBuilder.BuildExistingShaderDiagnostics(renderer);
+            MmdSelfShadowTarget.EnsureHiddenTarget(instanceRoot, modelRoot);
 
             return new MmdUnityModelInstance(
                 instanceRoot,
@@ -150,6 +151,7 @@ namespace Mmd.UnityIntegration
             }
 
             MmdShaderBindingDiagnostics shaderDiagnostics = BuildMeshRendererShaderDiagnostics(meshRenderer);
+            MmdSelfShadowTarget.EnsureHiddenTarget(instanceRoot, modelRoot);
 
             return new MmdUnityModelInstance(
                 instanceRoot,

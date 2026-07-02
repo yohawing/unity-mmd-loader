@@ -216,10 +216,12 @@ namespace Mmd.Tests
             Assert.That(defaultState.Scope, Is.EqualTo(MmdSelfShadowProjectionScope.CharacterOnly));
             Assert.That(defaultState.IncludesBackground, Is.False);
             Assert.That(defaultState.FarDistance, Is.EqualTo(50.0f).Within(0.0001f));
+            Assert.That(defaultState.BoundsPadding, Is.EqualTo(0.25f).Within(0.0001f));
             Assert.That(defaultState.HasManualBoundsOverride, Is.False);
             Assert.That(defaultConstructedState.Scope, Is.EqualTo(MmdSelfShadowProjectionScope.CharacterOnly));
             Assert.That(defaultConstructedState.IncludesBackground, Is.False);
             Assert.That(defaultConstructedState.FarDistance, Is.EqualTo(50.0f).Within(0.0001f));
+            Assert.That(defaultConstructedState.BoundsPadding, Is.EqualTo(0.25f).Within(0.0001f));
             Assert.That(optInState.Scope, Is.EqualTo(MmdSelfShadowProjectionScope.CharacterAndOptInBackground));
             Assert.That(optInState.IncludesBackground, Is.True);
             Assert.That(optInState.BoundsPadding, Is.EqualTo(0.25f).Within(0.0001f));
