@@ -100,7 +100,7 @@ namespace Mmd.Motion
                 MaxFarDistance = MinFarDistance;
             }
 
-            BoundsPadding = NonNegativeFiniteOrDefault(boundsPadding, DefaultBoundsPadding);
+            BoundsPadding = PositiveFiniteOrDefault(boundsPadding, DefaultBoundsPadding);
             Scope = NormalizeScope(scope);
             HasManualBoundsOverride = hasManualBoundsOverride;
             ManualBoundsOverride = manualBoundsOverride;
@@ -141,7 +141,7 @@ namespace Mmd.Motion
                 maxFarDistance = minFarDistance;
             }
 
-            float boundsPadding = NonNegativeFiniteOrDefault(BoundsPadding, DefaultBoundsPadding);
+            float boundsPadding = PositiveFiniteOrDefault(BoundsPadding, DefaultBoundsPadding);
             MmdSelfShadowProjectionScope scope = NormalizeScope(Scope);
             bool active = state.Mode == 1 || state.Mode == 2;
             if (!active)
@@ -189,10 +189,6 @@ namespace Mmd.Motion
             return float.IsFinite(value) && value > 0.0f ? value : fallback;
         }
 
-        private static float NonNegativeFiniteOrDefault(float value, float fallback)
-        {
-            return float.IsFinite(value) && value >= 0.0f ? value : fallback;
-        }
     }
 
     public readonly struct MmdSelfShadowProjectionState

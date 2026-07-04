@@ -1,5 +1,9 @@
 Shader "MMD Basic URP Toon"
 {
+    // Shadow ownership boundary:
+    // - URP standard shadows are only for casting MMD characters onto the scene/environment.
+    // - MMD character shadow receive comes only from the dedicated MMD self-shadow map.
+    // - ForwardLit intentionally does not sample URP main-light shadow attenuation.
     Properties
     {
         _BaseMap ("Base Map", 2D) = "white" {}

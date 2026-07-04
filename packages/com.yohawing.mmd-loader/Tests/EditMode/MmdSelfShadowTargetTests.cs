@@ -457,14 +457,27 @@ namespace Mmd.Tests
         [Test]
         public void SelfShadowRenderPassUsesUnityMinusZViewConventionForShadowDirection()
         {
+            Light? previousSun = RenderSettings.sun;
             var root = new GameObject("mmd-root");
+            var unusableSun = new GameObject("unusable-scene-sun");
             MmdSceneEnvironmentBinding? environment = null;
             GameObject? cube = null;
             Material? material = null;
+            List<MmdSelfShadowTarget>? activeTargets = null;
+            List<MmdSelfShadowTarget>? previousActiveTargets = null;
             try
             {
+                Light blocker = unusableSun.AddComponent<Light>();
+                blocker.type = LightType.Point;
+                unusableSun.SetActive(false);
+                RenderSettings.sun = blocker;
                 environment = CreateRecordedEnvironment("environment");
                 MmdSelfShadowTarget target = root.AddComponent<MmdSelfShadowTarget>();
+                target.SceneEnvironment = environment;
+                activeTargets = GetActiveTargetRegistry();
+                previousActiveTargets = new List<MmdSelfShadowTarget>(activeTargets);
+                activeTargets.Clear();
+                activeTargets.Add(target);
                 cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 Object.DestroyImmediate(cube.GetComponent<Collider>());
                 cube.transform.SetParent(root.transform, worldPositionStays: false);
@@ -507,12 +520,26 @@ namespace Mmd.Tests
             }
             finally
             {
+                RenderSettings.sun = previousSun;
+                if (activeTargets != null && previousActiveTargets != null)
+                {
+                    activeTargets.Clear();
+                    for (int i = 0; i < previousActiveTargets.Count; i++)
+                    {
+                        if (previousActiveTargets[i] != null)
+                        {
+                            activeTargets.Add(previousActiveTargets[i]);
+                        }
+                    }
+                }
+
                 Object.DestroyImmediate(material);
                 Object.DestroyImmediate(cube);
                 if (environment != null)
                 {
                     Object.DestroyImmediate(environment.gameObject);
                 }
+                Object.DestroyImmediate(unusableSun);
                 Object.DestroyImmediate(root);
             }
         }
@@ -813,6 +840,14 @@ namespace Mmd.Tests
             return environment;
         }
 
+        private static List<MmdSelfShadowTarget> GetActiveTargetRegistry()
+        {
+            System.Reflection.FieldInfo field = typeof(MmdSelfShadowTarget).GetField(
+                "ActiveTargets",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+            return (List<MmdSelfShadowTarget>)field.GetValue(null)!;
+        }
+
         private static void AssertReceiverGate(
             Renderer renderer,
             float expectedSelfShadowReceive)
@@ -917,7 +952,8 @@ namespace Mmd.Tests
             Assert.That(pass, Does.Not.Contain("debugVisibilityPreview"));
             Assert.That(pass, Does.Not.Contain("debugDepthPreview"));
             Assert.That(pass, Does.Contain("NormalizeShadowDepthBias(shadowDepthBias, far - near)"));
-            Assert.That(pass, Does.Contain("parameters = new Vector4(1.0f, normalizedShadowDepthBias, 1.0f / Mathf.Max(1, shadowMapSize), 0.0f)"));
+            Assert.That(pass, Does.Contain("parameters = new Vector4(1.0f, normalizedShadowDepthBias, 0.0f, 0.0f)"));
+            Assert.That(pass, Does.Not.Contain("1.0f / Mathf.Max(1, shadowMapSize)"));
             Assert.That(pass, Does.Not.Contain("0.0025f"));
             Assert.That(pass, Does.Contain("SystemInfo.usesReversedZBuffer"));
             Assert.That(pass, Does.Contain("ClearDepth"));
@@ -945,6 +981,8 @@ namespace Mmd.Tests
             Assert.That(shader, Does.Contain("UNITY_ACCESS_INSTANCED_PROP(MmdPerRenderer, _MmdSelfShadowReceive)"));
             Assert.That(shader, Does.Not.Contain("_MAIN_LIGHT_SHADOWS"));
             Assert.That(shader, Does.Not.Contain("_SHADOWS_SOFT"));
+            Assert.That(shader, Does.Contain("URP standard shadows are only for casting MMD characters onto the scene/environment."));
+            Assert.That(shader, Does.Contain("ForwardLit intentionally does not sample URP main-light shadow attenuation."));
             Assert.That(shader, Does.Not.Contain("effectiveReceiveShadows"));
             Assert.That(shader, Does.Not.Contain("mainLight.shadowAttenuation"));
             Assert.That(shader, Does.Contain("TEXTURE2D(_MmdSelfShadowMap)"));

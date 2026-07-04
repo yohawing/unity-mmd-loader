@@ -110,7 +110,7 @@ namespace Mmd.Rendering.Universal
             mapSize = Mathf.Clamp(requestedMapSize, 128, 4096);
             float shadowDepthBias = SanitizeShadowDepthBias(requestedShadowDepthBias);
             Vector3 shadowDirection = ResolveShadowDirection(ActiveProjectionTargets, requestedShadowDirection);
-            if (!TryCreateMatrices(ActiveProjectionTargets, shadowDirection, shadowDepthBias, mapSize, out viewMatrix, out projectionMatrix, out worldToShadow, out shadowParams, out lightDirection))
+            if (!TryCreateMatrices(ActiveProjectionTargets, shadowDirection, shadowDepthBias, out viewMatrix, out projectionMatrix, out worldToShadow, out shadowParams, out lightDirection))
             {
                 PublishDisabledGlobals();
                 return false;
@@ -291,7 +291,6 @@ namespace Mmd.Rendering.Universal
             List<MmdSelfShadowTarget> targets,
             Vector3 shadowDirection,
             float shadowDepthBias,
-            int shadowMapSize,
             out Matrix4x4 view,
             out Matrix4x4 projection,
             out Matrix4x4 worldToShadowMatrix,
@@ -366,7 +365,7 @@ namespace Mmd.Rendering.Universal
 
             worldToShadowMatrix = GetShadowTransform(projection, view);
             float normalizedShadowDepthBias = NormalizeShadowDepthBias(shadowDepthBias, far - near);
-            parameters = new Vector4(1.0f, normalizedShadowDepthBias, 1.0f / Mathf.Max(1, shadowMapSize), 0.0f);
+            parameters = new Vector4(1.0f, normalizedShadowDepthBias, 0.0f, 0.0f);
             return true;
         }
 
