@@ -1134,9 +1134,15 @@ namespace Mmd.Tests
             Assert.That(shader, Does.Not.Contain("return half4(selfShadowVisibility.xxx, 1.0h);"));
             Assert.That(shader, Does.Contain("half lightVisibility = saturate(dot(normalWS, lightDirection) * 3.0h);"));
             Assert.That(shader, Does.Contain("half toonVisibility = min(selfShadowVisibility, lightVisibility);"));
-            Assert.That(shader, Does.Contain("half3 fallbackToonColor = half3(1.0h, 1.0h, 1.0h);"));
-            Assert.That(shader, Does.Contain("half3 mappedToonColor = SAMPLE_TEXTURE2D(_ToonMap, sampler_ToonMap, float2(0.5, 0.22)).rgb;"));
-            Assert.That(shader, Does.Contain("half3 mmdToonLight = lerp(toonColor, half3(1.0h, 1.0h, 1.0h), toonVisibility);"));
+            Assert.That(shader, Does.Contain("half3 fallbackSelfShadowToon = half3(1.0h, 1.0h, 1.0h);"));
+            Assert.That(shader, Does.Contain("half3 mappedSelfShadowToon = SAMPLE_TEXTURE2D(_ToonMap, sampler_ToonMap, float2(0.5, 0.22)).rgb;"));
+            Assert.That(shader, Does.Contain("half3 mmdToonLight = lerp(selfShadowToon, half3(1.0h, 1.0h, 1.0h), lightVisibility);"));
+            Assert.That(shader, Does.Contain("half3 toonLight = lerp(ndotl.xxx, mmdToonLight, _ToonStrength);"));
+            Assert.That(shader, Does.Contain("if (selfShadowVisibility < 0.999h)"));
+            Assert.That(shader, Does.Contain("half3 selfShadowMmdToonLight = lerp(selfShadowToon, half3(1.0h, 1.0h, 1.0h), toonVisibility);"));
+            Assert.That(shader, Does.Contain("half3 selfShadowToonLight = lerp(ndotl.xxx, selfShadowMmdToonLight, _ToonStrength);"));
+            Assert.That(shader, Does.Contain("toonLight = min(toonLight, selfShadowToonLight);"));
+            Assert.That(shader, Does.Contain("half3 litSRGB = saturate(albedoSRGB * toonSRGB);"));
             Assert.That(shader, Does.Not.Contain("lerp(0.55h.xxx, 1.0h.xxx, selfShadowVisibility)"));
             Assert.That(shader, Does.Not.Contain("three-mmd-loader"));
         }

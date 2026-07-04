@@ -1,6 +1,6 @@
 # Release Flow
 
-この文書は `com.yohawing.mmd-loader` を外部利用可能な UPM package として切るための運用手順を固定する。テスト選択の詳細は `docs/TESTING.md`、公開する機能境界は `docs/ARCHITECTURE.md`、現行フェーズ判断は `docs/ROADMAP.md` を正とする。
+この文書は `com.yohawing.mmd-loader` を外部利用可能な UPM package として切るための運用手順を固定する。テスト選択の詳細は `docs/TESTING.md`、公開する機能境界は `docs/ARCHITECTURE.md`、現行の実行順序は root `TODO.md` を正とする。
 
 ## Release 判定
 
@@ -44,6 +44,7 @@ rtk git submodule status --recursive
    - `docs/README.ja.md` が README 内容の正本である。
    - `README.md` は `docs/README.ja.md` から英訳する。
    - `packages/com.yohawing.mmd-loader/Documentation~/README.md` は `README.md` から機械的にコピーする。個別編集しない。
+   - `packages/com.yohawing.mmd-loader/Documentation~/MMD_SELF_SHADOW.md` は `docs/MMD_SELF_SHADOW.md` からコピーする。
    - `packages/com.yohawing.mmd-loader/package.json`
    - `packages/com.yohawing.mmd-loader/CHANGELOG.md`
    - `packages/com.yohawing.mmd-loader/Documentation~/README.md`

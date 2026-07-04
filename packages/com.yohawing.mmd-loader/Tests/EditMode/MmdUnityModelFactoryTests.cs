@@ -166,16 +166,40 @@ namespace Mmd.Tests
                 "Shadow visibility must not directly dim the base/direct light color.");
             Assert.That(
                 source,
-                Does.Contain("half3 fallbackToonColor = half3(1.0h, 1.0h, 1.0h);"),
+                Does.Contain("half3 fallbackSelfShadowToon = half3(1.0h, 1.0h, 1.0h);"),
                 "Toonless material slots stay flat so face/skin materials without toon maps do not pick up dirty shadow bands.");
             Assert.That(
                 source,
-                Does.Contain("half3 mappedToonColor = SAMPLE_TEXTURE2D(_ToonMap, sampler_ToonMap, float2(0.5, 0.22)).rgb;"),
-                "Until ToonColor constant generation is fully traced, the shader should approximate CPU-side ToonColor from the observed dark-edge band of the bound toon ramp.");
+                Does.Contain("half3 mappedSelfShadowToon = SAMPLE_TEXTURE2D(_ToonMap, sampler_ToonMap, float2(0.5, 0.22)).rgb;"),
+                "Unity's built-in shared toon strips put very dark bands at v=0, so the self-shadow ToonColor probe must not collapse shared-toon materials to black.");
             Assert.That(
                 source,
-                Does.Contain("half3 mmdToonLight = lerp(toonColor, half3(1.0h, 1.0h, 1.0h), toonVisibility);"),
-                "MMD final composition blends ToonColor toward white by toonVisibility.");
+                Does.Contain("half3 mmdToonLight = lerp(selfShadowToon, half3(1.0h, 1.0h, 1.0h), lightVisibility);"),
+                "With self-shadow disabled, toon lighting must stay on the original NdotL-only path.");
+            Assert.That(
+                source,
+                Does.Contain("half3 toonLight = lerp(ndotl.xxx, mmdToonLight, _ToonStrength);"),
+                "Self-shadow OFF must match the original toon/NdotL blend.");
+            Assert.That(
+                source,
+                Does.Contain("if (selfShadowVisibility < 0.999h)"),
+                "Self-shadow toon color must only affect fragments shadowed by the dedicated self-shadow map.");
+            Assert.That(
+                source,
+                Does.Contain("half3 selfShadowMmdToonLight = lerp(selfShadowToon, half3(1.0h, 1.0h, 1.0h), toonVisibility);"),
+                "MMD final composition blends the self-shadow ToonColor toward white by toonVisibility.");
+            Assert.That(
+                source,
+                Does.Contain("half3 selfShadowToonLight = lerp(ndotl.xxx, selfShadowMmdToonLight, _ToonStrength);"),
+                "The crisp self-shadow branch should keep the same NdotL/toon blend model as the original path.");
+            Assert.That(
+                source,
+                Does.Contain("toonLight = min(toonLight, selfShadowToonLight);"),
+                "Self-shadow should darken the regular NdotL toon layer instead of replacing it, preserving the soft toon shading underneath the crisp self-shadow mask.");
+            Assert.That(
+                source,
+                Does.Contain("half3 litSRGB = saturate(albedoSRGB * toonSRGB);"),
+                "MMD toon/self-shadow darkening is shader arithmetic: diffuse base is multiplied by the toon color, then alpha-over blending happens at the draw level.");
             Assert.That(
                 source,
                 Does.Not.Contain("lerp(0.55h.xxx, 1.0h.xxx, selfShadowVisibility)"),

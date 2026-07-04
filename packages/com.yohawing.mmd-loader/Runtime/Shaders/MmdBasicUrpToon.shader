@@ -295,13 +295,19 @@ Shader "MMD Basic URP Toon"
                 half lightVisibility = saturate(dot(normalWS, lightDirection) * 3.0h);
                 half toonVisibility = min(selfShadowVisibility, lightVisibility);
                 // MMD's traced self-shadow pixel shader receives ToonColor as a constant, not
-                // as a ramp sample. Approximate that CPU-side color generation from the bound
-                // toon ramp near the observed dark-edge band until the exact rule is traced.
-                half3 fallbackToonColor = half3(1.0h, 1.0h, 1.0h);
-                half3 mappedToonColor = SAMPLE_TEXTURE2D(_ToonMap, sampler_ToonMap, float2(0.5, 0.22)).rgb;
-                half3 toonColor = lerp(fallbackToonColor, mappedToonColor, saturate(_ToonMapBound));
-                half3 mmdToonLight = lerp(toonColor, half3(1.0h, 1.0h, 1.0h), toonVisibility);
+                // as a ramp sample. Unity's built-in shared toon strips put the very dark MMD
+                // band at v=0, so do not use the traced custom-texture bottom row for every material.
+                half3 fallbackSelfShadowToon = half3(1.0h, 1.0h, 1.0h);
+                half3 mappedSelfShadowToon = SAMPLE_TEXTURE2D(_ToonMap, sampler_ToonMap, float2(0.5, 0.22)).rgb;
+                half3 selfShadowToon = lerp(fallbackSelfShadowToon, mappedSelfShadowToon, saturate(_ToonMapBound));
+                half3 mmdToonLight = lerp(selfShadowToon, half3(1.0h, 1.0h, 1.0h), lightVisibility);
                 half3 toonLight = lerp(ndotl.xxx, mmdToonLight, _ToonStrength);
+                if (selfShadowVisibility < 0.999h)
+                {
+                    half3 selfShadowMmdToonLight = lerp(selfShadowToon, half3(1.0h, 1.0h, 1.0h), toonVisibility);
+                    half3 selfShadowToonLight = lerp(ndotl.xxx, selfShadowMmdToonLight, _ToonStrength);
+                    toonLight = min(toonLight, selfShadowToonLight);
+                }
 
                 // MMD performs its fixed-function lighting in gamma (sRGB) space, so the diffuse,
                 // ambient, light and toon are combined on the sRGB-valued colors — not on the

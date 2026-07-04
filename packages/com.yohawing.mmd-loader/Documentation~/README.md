@@ -61,6 +61,10 @@ https://github.com/yohawing/unity-mmd-loader.git?path=packages/com.yohawing.mmd-
 
 For detailed steps, see [HOW_TO_USE.md](https://github.com/yohawing/unity-mmd-loader/blob/main/docs/HOW_TO_USE.md).
 
+Rendering implementation notes:
+
+- [MMD SelfShadow Implementation Notes](MMD_SELF_SHADOW.md)
+
 ## License Boundary
 
 This repository does not redistribute third-party PMX / VMD / texture / motion / audio / capture assets.
