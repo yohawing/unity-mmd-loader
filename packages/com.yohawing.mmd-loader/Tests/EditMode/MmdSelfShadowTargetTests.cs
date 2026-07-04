@@ -770,23 +770,151 @@ namespace Mmd.Tests
         {
             MmdSelfShadowTarget.SetReceiverGateAvailableForRendering(false);
             var root = new GameObject("mmd-root");
+            MmdSceneEnvironmentBinding? environment = null;
             GameObject? cube = null;
             try
             {
+                environment = CreateRecordedEnvironment("environment");
                 cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 Object.DestroyImmediate(cube.GetComponent<Collider>());
                 cube.transform.SetParent(root.transform, worldPositionStays: false);
                 Renderer renderer = cube.GetComponent<Renderer>();
 
                 MmdSelfShadowTarget target = root.AddComponent<MmdSelfShadowTarget>();
+                target.SceneEnvironment = environment;
                 target.RefreshReceiverGate();
 
                 AssertReceiverGate(renderer, expectedSelfShadowReceive: 0.0f);
+                Assert.That(target.EvaluateSelfShadowDiagnosticStatus(),
+                    Is.EqualTo(MmdSceneSelfShadowDiagnosticStatus.NoRendererFeature));
             }
             finally
             {
                 Object.DestroyImmediate(cube);
+                if (environment != null)
+                {
+                    Object.DestroyImmediate(environment.gameObject);
+                }
                 Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void TargetDiagnosticReportsAmbiguousEnvironmentWhenUnbound()
+        {
+            var root = new GameObject("mmd-root");
+            MmdSceneEnvironmentBinding? firstEnvironment = null;
+            MmdSceneEnvironmentBinding? secondEnvironment = null;
+            try
+            {
+                MmdSelfShadowTarget target = root.AddComponent<MmdSelfShadowTarget>();
+                firstEnvironment = CreateRecordedEnvironment("environment-a", mode: 1, distance: 0.4f);
+                secondEnvironment = CreateRecordedEnvironment("environment-b", mode: 2, distance: 0.8f);
+
+                Assert.That(target.EvaluateSelfShadowDiagnosticStatus(),
+                    Is.EqualTo(MmdSceneSelfShadowDiagnosticStatus.AmbiguousEnvironment));
+            }
+            finally
+            {
+                if (secondEnvironment != null)
+                {
+                    Object.DestroyImmediate(secondEnvironment.gameObject);
+                }
+                if (firstEnvironment != null)
+                {
+                    Object.DestroyImmediate(firstEnvironment.gameObject);
+                }
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void TargetDiagnosticReportsNoCasterPass()
+        {
+            var root = new GameObject("mmd-root");
+            MmdSceneEnvironmentBinding? environment = null;
+            GameObject? cube = null;
+            try
+            {
+                environment = CreateRecordedEnvironment("environment");
+                cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                Object.DestroyImmediate(cube.GetComponent<Collider>());
+                cube.transform.SetParent(root.transform, worldPositionStays: false);
+
+                MmdSelfShadowTarget target = root.AddComponent<MmdSelfShadowTarget>();
+                target.SceneEnvironment = environment;
+
+                Assert.That(target.EvaluateSelfShadowDiagnosticStatus(),
+                    Is.EqualTo(MmdSceneSelfShadowDiagnosticStatus.NoCasterPass));
+            }
+            finally
+            {
+                Object.DestroyImmediate(cube);
+                if (environment != null)
+                {
+                    Object.DestroyImmediate(environment.gameObject);
+                }
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void TargetDiagnosticReportsNoBounds()
+        {
+            var root = new GameObject("mmd-root");
+            MmdSceneEnvironmentBinding? environment = null;
+            try
+            {
+                environment = CreateRecordedEnvironment("environment");
+                MmdSelfShadowTarget target = root.AddComponent<MmdSelfShadowTarget>();
+                target.SceneEnvironment = environment;
+
+                Assert.That(target.EvaluateSelfShadowDiagnosticStatus(),
+                    Is.EqualTo(MmdSceneSelfShadowDiagnosticStatus.NoBounds));
+            }
+            finally
+            {
+                if (environment != null)
+                {
+                    Object.DestroyImmediate(environment.gameObject);
+                }
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void SelfShadowRenderPassDiagnosticReportsNoCharacterRoots()
+        {
+            List<MmdSelfShadowTarget> activeTargets = GetActiveTargetRegistry();
+            var previousActiveTargets = new List<MmdSelfShadowTarget>(activeTargets);
+            System.Type passType = System.Type.GetType(
+                "Mmd.Rendering.Universal.MmdSelfShadowRenderPass, Mmd.Rendering.Universal",
+                throwOnError: true)!;
+            try
+            {
+                activeTargets.Clear();
+                object pass = System.Activator.CreateInstance(passType)!;
+                System.Reflection.MethodInfo setup = passType.GetMethod(
+                    "Setup",
+                    new[] { typeof(int), typeof(Vector3), typeof(float) })!;
+                System.Reflection.PropertyInfo lastDiagnosticStatus =
+                    passType.GetProperty("LastDiagnosticStatus")!;
+
+                Assert.That((bool)setup.Invoke(pass, new object[] { 512, Vector3.down, 0.0025f }),
+                    Is.False);
+                Assert.That(lastDiagnosticStatus.GetValue(null),
+                    Is.EqualTo(MmdSceneSelfShadowDiagnosticStatus.NoCharacterRoots));
+            }
+            finally
+            {
+                activeTargets.Clear();
+                for (int i = 0; i < previousActiveTargets.Count; i++)
+                {
+                    if (previousActiveTargets[i] != null)
+                    {
+                        activeTargets.Add(previousActiveTargets[i]);
+                    }
+                }
             }
         }
 
@@ -911,7 +1039,8 @@ namespace Mmd.Tests
             Assert.That(feature, Does.Contain("MmdSelfShadowRenderPass"));
             Assert.That(feature, Does.Not.Contain("QualitySettings"));
             Assert.That(feature, Does.Contain("SetReceiverGateAvailableForRendering(true)"));
-            Assert.That(feature, Does.Contain("SetReceiverGateAvailableForRendering(false)"));
+            Assert.That(feature, Does.Not.Contain("SetReceiverGateAvailableForRendering(false)"));
+            Assert.That(feature, Does.Contain("DisableSelfShadowState(MmdSelfShadowRenderPass.LastDiagnosticStatus)"));
             Assert.That(feature, Does.Contain("DisableAllReceiverGates"));
             Assert.That(feature, Does.Contain("Dispose(bool disposing)"));
             Assert.That(feature, Does.Contain("shadowDepthBias = DefaultShadowDepthBias"));

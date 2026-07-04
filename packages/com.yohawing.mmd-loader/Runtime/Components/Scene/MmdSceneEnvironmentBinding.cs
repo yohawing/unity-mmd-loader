@@ -1,8 +1,10 @@
 #nullable enable
 
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using Mmd.Motion;
+using Mmd.Parser;
 
 namespace Mmd.UnityIntegration
 {
@@ -76,6 +78,39 @@ namespace Mmd.UnityIntegration
         /// <summary>Compatibility value. Light type is no longer relevant to self-shadow state recording.</summary>
         [Obsolete("Self-shadow no longer targets Light; use SelfShadowEnabled and Recorded/Disabled status.", false)]
         UnsupportedLightType = 4
+    }
+
+    /// <summary>
+    /// User-facing diagnostic for the scene self-shadow state and the dedicated render path.
+    /// </summary>
+    public enum MmdSceneSelfShadowDiagnosticStatus
+    {
+        /// <summary>No VMD self-shadow state has been sampled or recorded yet.</summary>
+        NoSelfShadowState = 0,
+
+        /// <summary>The binding has active self-shadow state that can be consumed by a render pass.</summary>
+        Active = 1,
+
+        /// <summary>The sampled MMD self-shadow mode, or the binding policy, disables self-shadow.</summary>
+        ModeDisabled = 2,
+
+        /// <summary>No enabled self-shadow target / character root is available to render.</summary>
+        NoCharacterRoots = 3,
+
+        /// <summary>The target exists, but no renderable bounds could be collected.</summary>
+        NoBounds = 4,
+
+        /// <summary>No renderer material exposes the dedicated MMD self-shadow caster pass.</summary>
+        NoCasterPass = 5,
+
+        /// <summary>An unbound target found multiple possible scene environment bindings.</summary>
+        AmbiguousEnvironment = 6,
+
+        /// <summary>The receiver gate is disabled because the renderer feature is unavailable this frame.</summary>
+        ReceiverGateOff = 7,
+
+        /// <summary>No active MMD self-shadow renderer feature is driving the dedicated render pass.</summary>
+        NoRendererFeature = 8
     }
 
     /// <summary>
@@ -231,6 +266,9 @@ namespace Mmd.UnityIntegration
         /// <summary>The most recent dedicated MMD self-shadow projection/far state.</summary>
         public MmdSelfShadowProjectionState LastSelfShadowProjectionState { get; private set; }
 
+        /// <summary>The most recent self-shadow diagnostic status for authoring and render-path UI.</summary>
+        public MmdSceneSelfShadowDiagnosticStatus LastSelfShadowDiagnosticStatus { get; private set; }
+
         /// <summary>
         /// Converts <paramref name="state"/> (via <see cref="MmdCameraStateToUnity"/>) and applies it to
         /// the bound Camera's transform and field of view. Returns a structured status; never throws on
@@ -322,6 +360,7 @@ namespace Mmd.UnityIntegration
                     shadowDistance: 0.0f,
                     shadowStrength: 0.0f);
                 LastSelfShadowApplyStatus = MmdSceneSelfShadowApplyStatus.Disabled;
+                LastSelfShadowDiagnosticStatus = EvaluateSelfShadowDiagnosticStatus();
                 return LastSelfShadowApplyStatus;
             }
 
@@ -334,7 +373,46 @@ namespace Mmd.UnityIntegration
                 shadowDistance: 0.0f,
                 shadowStrength: 0.0f);
             LastSelfShadowApplyStatus = MmdSceneSelfShadowApplyStatus.Recorded;
+            LastSelfShadowDiagnosticStatus = EvaluateSelfShadowDiagnosticStatus();
             return LastSelfShadowApplyStatus;
+        }
+
+        /// <summary>
+        /// Samples VMD self-shadow keyframes at <paramref name="frame"/> and records the result on this
+        /// scene environment. Returns false when the clip has no self-shadow state to sample.
+        /// </summary>
+        public bool TryEvaluateSelfShadowAtFrame(
+            IReadOnlyList<MmdSelfShadowKeyframeDefinition>? keyframes,
+            float frame,
+            out MmdSceneSelfShadowApplyStatus status)
+        {
+            if (keyframes == null || keyframes.Count == 0)
+            {
+                LastSelfShadowDiagnosticStatus = MmdSceneSelfShadowDiagnosticStatus.NoSelfShadowState;
+                status = MmdSceneSelfShadowApplyStatus.NotApplied;
+                return false;
+            }
+
+            status = ApplySelfShadowState(VmdSelfShadowSampler.Sample(keyframes, frame));
+            return true;
+        }
+
+        /// <summary>Evaluates the binding-local self-shadow diagnostic from the latest recorded state.</summary>
+        public MmdSceneSelfShadowDiagnosticStatus EvaluateSelfShadowDiagnosticStatus()
+        {
+            if (LastSelfShadowApplyStatus == MmdSceneSelfShadowApplyStatus.NotApplied)
+            {
+                return MmdSceneSelfShadowDiagnosticStatus.NoSelfShadowState;
+            }
+
+            if (!selfShadowEnabled || LastSelfShadowApplyStatus == MmdSceneSelfShadowApplyStatus.Disabled)
+            {
+                return MmdSceneSelfShadowDiagnosticStatus.ModeDisabled;
+            }
+
+            return LastSelfShadowProjectionState.Active
+                ? MmdSceneSelfShadowDiagnosticStatus.Active
+                : MmdSceneSelfShadowDiagnosticStatus.ModeDisabled;
         }
 
         private static float Component(float[] values, int index)

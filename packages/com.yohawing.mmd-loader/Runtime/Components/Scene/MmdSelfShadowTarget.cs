@@ -135,6 +135,7 @@ namespace Mmd.UnityIntegration
                 return;
             }
 
+            bool changed = !receiverGateAvailable;
             receiverGateAvailable = true;
             for (int i = ActiveTargets.Count - 1; i >= 0; i--)
             {
@@ -147,7 +148,7 @@ namespace Mmd.UnityIntegration
 
                 if (target.isActiveAndEnabled)
                 {
-                    target.ApplyReceiverGate(target.selfShadowEnabled, force: true);
+                    target.ApplyReceiverGate(target.selfShadowEnabled, force: changed);
                 }
             }
         }
@@ -213,6 +214,52 @@ namespace Mmd.UnityIntegration
             {
                 ApplyReceiverGate(selfShadowEnabled);
             }
+        }
+
+        public MmdSceneSelfShadowDiagnosticStatus EvaluateSelfShadowDiagnosticStatus()
+        {
+            if (!isActiveAndEnabled || !selfShadowEnabled)
+            {
+                return MmdSceneSelfShadowDiagnosticStatus.NoCharacterRoots;
+            }
+
+            MmdSceneEnvironmentBinding? effectiveEnvironment =
+                ResolveSceneEnvironment(out bool ambiguousEnvironment);
+            if (ambiguousEnvironment)
+            {
+                return MmdSceneSelfShadowDiagnosticStatus.AmbiguousEnvironment;
+            }
+
+            if (effectiveEnvironment == null)
+            {
+                return MmdSceneSelfShadowDiagnosticStatus.NoSelfShadowState;
+            }
+
+            MmdSceneSelfShadowDiagnosticStatus environmentStatus =
+                effectiveEnvironment.EvaluateSelfShadowDiagnosticStatus();
+            if (environmentStatus != MmdSceneSelfShadowDiagnosticStatus.Active)
+            {
+                return environmentStatus;
+            }
+
+            if (!receiverGateAvailable)
+            {
+                return MmdSceneSelfShadowDiagnosticStatus.NoRendererFeature;
+            }
+
+            if (receiverGateInitialized && !receiverGateEnabled)
+            {
+                return MmdSceneSelfShadowDiagnosticStatus.ReceiverGateOff;
+            }
+
+            if (!CollectBounds().HasBounds)
+            {
+                return MmdSceneSelfShadowDiagnosticStatus.NoBounds;
+            }
+
+            return HasSelfShadowCasterPass(BoundsRoot)
+                ? MmdSceneSelfShadowDiagnosticStatus.Active
+                : MmdSceneSelfShadowDiagnosticStatus.NoCasterPass;
         }
 
         public bool TryGetActiveProjectionState(out MmdSelfShadowProjectionState projectionState)
@@ -348,6 +395,12 @@ namespace Mmd.UnityIntegration
 
         private MmdSceneEnvironmentBinding? ResolveSceneEnvironment()
         {
+            return ResolveSceneEnvironment(out _);
+        }
+
+        private MmdSceneEnvironmentBinding? ResolveSceneEnvironment(out bool ambiguous)
+        {
+            ambiguous = false;
             if (sceneEnvironment != null)
             {
                 return sceneEnvironment;
@@ -365,6 +418,7 @@ namespace Mmd.UnityIntegration
                 {
                     if (resolvedEnvironment != null)
                     {
+                        ambiguous = true;
                         return null;
                     }
 
@@ -373,6 +427,34 @@ namespace Mmd.UnityIntegration
             }
 
             return resolvedEnvironment;
+        }
+
+        private static bool HasSelfShadowCasterPass(Transform root)
+        {
+            Renderer[] renderers = root.GetComponentsInChildren<Renderer>(includeInactive: false);
+            for (int rendererIndex = 0; rendererIndex < renderers.Length; rendererIndex++)
+            {
+                Renderer renderer = renderers[rendererIndex];
+                if (renderer == null || !renderer.enabled || !renderer.gameObject.activeInHierarchy)
+                {
+                    continue;
+                }
+
+                Material[] materials = renderer.sharedMaterials;
+                int submeshCount = renderer is SkinnedMeshRenderer skinned && skinned.sharedMesh != null
+                    ? skinned.sharedMesh.subMeshCount
+                    : materials.Length;
+                for (int submesh = 0; submesh < materials.Length && submesh < submeshCount; submesh++)
+                {
+                    Material material = materials[submesh];
+                    if (material != null && material.FindPass("MmdSelfShadowCaster") >= 0)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         private MmdSceneEnvironmentBinding? ResolveSceneEnvironmentForDirection()

@@ -1,8 +1,10 @@
 #nullable enable
 
+using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
 using Mmd.Motion;
+using Mmd.Parser;
 using Mmd.UnityIntegration;
 
 namespace Mmd.Tests
@@ -13,6 +15,16 @@ namespace Mmd.Tests
             float distance, float px, float py, float pz, float rx, float ry, float rz, float fov, bool perspective)
         {
             return new MmdCameraState(distance, new[] { px, py, pz }, new[] { rx, ry, rz }, fov, perspective);
+        }
+
+        private static MmdSelfShadowKeyframeDefinition SelfShadowKeyframe(int frame, byte mode, float distance)
+        {
+            return new MmdSelfShadowKeyframeDefinition
+            {
+                frame = frame,
+                mode = mode,
+                distance = distance
+            };
         }
 
         [Test]
@@ -58,6 +70,8 @@ namespace Mmd.Tests
                 Assert.That(binding.LastSelfShadowState.Distance, Is.EqualTo(0.0f));
                 Assert.That(binding.LastSelfShadowProjectionState.Active, Is.False);
                 Assert.That(binding.LastSelfShadowProjectionState.Scope, Is.EqualTo(MmdSelfShadowProjectionScope.CharacterOnly));
+                Assert.That(binding.LastSelfShadowDiagnosticStatus, Is.EqualTo(MmdSceneSelfShadowDiagnosticStatus.NoSelfShadowState));
+                Assert.That(binding.EvaluateSelfShadowDiagnosticStatus(), Is.EqualTo(MmdSceneSelfShadowDiagnosticStatus.NoSelfShadowState));
             }
             finally
             {
@@ -327,6 +341,8 @@ namespace Mmd.Tests
                 Assert.That(binding.LastSelfShadowProjectionState.BoundsPadding, Is.EqualTo(0.25f).Within(0.001f));
                 Assert.That(binding.LastSelfShadowProjectionState.Scope, Is.EqualTo(MmdSelfShadowProjectionScope.CharacterOnly));
                 Assert.That(binding.LastSelfShadowProjectionState.IncludesBackground, Is.False);
+                Assert.That(binding.LastSelfShadowDiagnosticStatus, Is.EqualTo(MmdSceneSelfShadowDiagnosticStatus.Active));
+                Assert.That(binding.EvaluateSelfShadowDiagnosticStatus(), Is.EqualTo(MmdSceneSelfShadowDiagnosticStatus.Active));
                 Assert.That(binding.LastSelfShadowSettings.RuntimeApplicationEnabled, Is.False);
                 Assert.That(light.shadows, Is.EqualTo(LightShadows.Hard));
                 Assert.That(light.shadowStrength, Is.EqualTo(0.25f).Within(0.001f));
@@ -406,6 +422,8 @@ namespace Mmd.Tests
                 Assert.That(binding.LastSelfShadowState.Distance, Is.EqualTo(0.0f));
                 Assert.That(binding.LastSelfShadowProjectionState.Active, Is.False);
                 Assert.That(binding.LastSelfShadowProjectionState.Scope, Is.EqualTo(MmdSelfShadowProjectionScope.CharacterOnly));
+                Assert.That(binding.LastSelfShadowDiagnosticStatus, Is.EqualTo(MmdSceneSelfShadowDiagnosticStatus.ModeDisabled));
+                Assert.That(binding.EvaluateSelfShadowDiagnosticStatus(), Is.EqualTo(MmdSceneSelfShadowDiagnosticStatus.ModeDisabled));
                 Assert.That(binding.LastSelfShadowSettings.RuntimeApplicationEnabled, Is.False);
                 Assert.That(light.shadows, Is.EqualTo(LightShadows.None));
                 Assert.That(light.shadowStrength, Is.EqualTo(0.2f).Within(0.001f));
@@ -442,6 +460,8 @@ namespace Mmd.Tests
                 Assert.That(binding.LastSelfShadowState.Distance, Is.EqualTo(0.4f).Within(0.001f));
                 Assert.That(binding.LastSelfShadowProjectionState.Active, Is.False);
                 Assert.That(binding.LastSelfShadowProjectionState.Mode, Is.EqualTo(0));
+                Assert.That(binding.LastSelfShadowDiagnosticStatus, Is.EqualTo(MmdSceneSelfShadowDiagnosticStatus.ModeDisabled));
+                Assert.That(binding.EvaluateSelfShadowDiagnosticStatus(), Is.EqualTo(MmdSceneSelfShadowDiagnosticStatus.ModeDisabled));
                 Assert.That(binding.LastSelfShadowSettings.CastShadows, Is.False);
                 Assert.That(light.shadows, Is.EqualTo(LightShadows.Soft));
                 Assert.That(light.shadowStrength, Is.EqualTo(0.75f).Within(0.001f));
@@ -449,6 +469,58 @@ namespace Mmd.Tests
             finally
             {
                 Object.DestroyImmediate(lightGo);
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void TryEvaluateSelfShadowAtFrameRecordsSampledStateAndDiagnostic()
+        {
+            var go = new GameObject("binding");
+            try
+            {
+                MmdSceneEnvironmentBinding binding = go.AddComponent<MmdSceneEnvironmentBinding>();
+                var keyframes = new List<MmdSelfShadowKeyframeDefinition>
+                {
+                    SelfShadowKeyframe(0, 1, 0.2f),
+                    SelfShadowKeyframe(30, 2, 0.8f)
+                };
+
+                bool sampled = binding.TryEvaluateSelfShadowAtFrame(keyframes, 15.0f, out MmdSceneSelfShadowApplyStatus status);
+
+                Assert.That(sampled, Is.True);
+                Assert.That(status, Is.EqualTo(MmdSceneSelfShadowApplyStatus.Recorded));
+                Assert.That(binding.LastSelfShadowApplyStatus, Is.EqualTo(MmdSceneSelfShadowApplyStatus.Recorded));
+                Assert.That(binding.LastSelfShadowState.Mode, Is.EqualTo(1));
+                Assert.That(binding.LastSelfShadowState.Distance, Is.EqualTo(0.5f).Within(0.0001f));
+                Assert.That(binding.LastSelfShadowDiagnosticStatus, Is.EqualTo(MmdSceneSelfShadowDiagnosticStatus.Active));
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void TryEvaluateSelfShadowAtFrameWithoutKeyframesReportsNoSelfShadowState()
+        {
+            var go = new GameObject("binding");
+            try
+            {
+                MmdSceneEnvironmentBinding binding = go.AddComponent<MmdSceneEnvironmentBinding>();
+
+                bool sampled = binding.TryEvaluateSelfShadowAtFrame(
+                    new List<MmdSelfShadowKeyframeDefinition>(),
+                    15.0f,
+                    out MmdSceneSelfShadowApplyStatus status);
+
+                Assert.That(sampled, Is.False);
+                Assert.That(status, Is.EqualTo(MmdSceneSelfShadowApplyStatus.NotApplied));
+                Assert.That(binding.LastSelfShadowApplyStatus, Is.EqualTo(MmdSceneSelfShadowApplyStatus.NotApplied));
+                Assert.That(binding.LastSelfShadowDiagnosticStatus, Is.EqualTo(MmdSceneSelfShadowDiagnosticStatus.NoSelfShadowState));
+            }
+            finally
+            {
                 Object.DestroyImmediate(go);
             }
         }

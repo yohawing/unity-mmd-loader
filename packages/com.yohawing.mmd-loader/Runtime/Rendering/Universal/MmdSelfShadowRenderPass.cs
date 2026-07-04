@@ -68,8 +68,14 @@ namespace Mmd.Rendering.Universal
             public Color ClearColor;
         }
 
-        public static void PublishDisabledGlobals()
+        public static MmdSceneSelfShadowDiagnosticStatus LastDiagnosticStatus { get; private set; } =
+            MmdSceneSelfShadowDiagnosticStatus.NoRendererFeature;
+
+        public static void PublishDisabledGlobals(
+            MmdSceneSelfShadowDiagnosticStatus diagnosticStatus =
+                MmdSceneSelfShadowDiagnosticStatus.NoRendererFeature)
         {
+            LastDiagnosticStatus = diagnosticStatus;
             Shader.SetGlobalMatrix(MmdSelfShadowWorldToShadowId, Matrix4x4.identity);
             Shader.SetGlobalVector(MmdSelfShadowParamsId, DisabledParams);
         }
@@ -88,22 +94,33 @@ namespace Mmd.Rendering.Universal
 
             if (TargetBuffer.Count == 0)
             {
-                PublishDisabledGlobals();
+                PublishDisabledGlobals(MmdSceneSelfShadowDiagnosticStatus.NoCharacterRoots);
                 return false;
             }
 
+            MmdSceneSelfShadowDiagnosticStatus firstInactiveStatus =
+                MmdSceneSelfShadowDiagnosticStatus.NoSelfShadowState;
             for (int i = 0; i < TargetBuffer.Count; i++)
             {
                 TargetBuffer[i].RefreshReceiverGate();
                 if (TargetBuffer[i].TryGetActiveProjectionState(out _))
                 {
                     ActiveProjectionTargets.Add(TargetBuffer[i]);
+                    continue;
+                }
+
+                MmdSceneSelfShadowDiagnosticStatus targetStatus =
+                    TargetBuffer[i].EvaluateSelfShadowDiagnosticStatus();
+                if (targetStatus != MmdSceneSelfShadowDiagnosticStatus.Active &&
+                    firstInactiveStatus == MmdSceneSelfShadowDiagnosticStatus.NoSelfShadowState)
+                {
+                    firstInactiveStatus = targetStatus;
                 }
             }
 
             if (ActiveProjectionTargets.Count == 0)
             {
-                PublishDisabledGlobals();
+                PublishDisabledGlobals(firstInactiveStatus);
                 return false;
             }
 
@@ -112,7 +129,7 @@ namespace Mmd.Rendering.Universal
             Vector3 shadowDirection = ResolveShadowDirection(ActiveProjectionTargets, requestedShadowDirection);
             if (!TryCreateMatrices(ActiveProjectionTargets, shadowDirection, shadowDepthBias, out viewMatrix, out projectionMatrix, out worldToShadow, out shadowParams, out lightDirection))
             {
-                PublishDisabledGlobals();
+                PublishDisabledGlobals(MmdSceneSelfShadowDiagnosticStatus.NoBounds);
                 return false;
             }
 
@@ -123,10 +140,11 @@ namespace Mmd.Rendering.Universal
 
             if (drawItems.Count == 0)
             {
-                PublishDisabledGlobals();
+                PublishDisabledGlobals(MmdSceneSelfShadowDiagnosticStatus.NoCasterPass);
                 return false;
             }
 
+            LastDiagnosticStatus = MmdSceneSelfShadowDiagnosticStatus.Active;
             return true;
         }
 

@@ -59,7 +59,6 @@ namespace Mmd.Rendering.Universal
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
-            MmdSelfShadowTarget.SetReceiverGateAvailableForRendering(false);
             MmdSelfShadowRenderPass pass = selfShadowPass ?? new MmdSelfShadowRenderPass
             {
                 renderPassEvent = RenderPassEvent.BeforeRenderingShadows
@@ -73,7 +72,10 @@ namespace Mmd.Rendering.Universal
             {
                 MmdSelfShadowTarget.SetReceiverGateAvailableForRendering(true);
                 renderer.EnqueuePass(pass);
+                return;
             }
+
+            DisableSelfShadowState(MmdSelfShadowRenderPass.LastDiagnosticStatus);
         }
 
         protected override void Dispose(bool disposing)
@@ -81,9 +83,11 @@ namespace Mmd.Rendering.Universal
             DisableSelfShadowState();
         }
 
-        private static void DisableSelfShadowState()
+        private static void DisableSelfShadowState(
+            MmdSceneSelfShadowDiagnosticStatus diagnosticStatus =
+                MmdSceneSelfShadowDiagnosticStatus.NoRendererFeature)
         {
-            MmdSelfShadowRenderPass.PublishDisabledGlobals();
+            MmdSelfShadowRenderPass.PublishDisabledGlobals(diagnosticStatus);
             MmdSelfShadowTarget.DisableAllReceiverGates();
         }
 

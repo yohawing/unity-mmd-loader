@@ -116,10 +116,7 @@ namespace Mmd.Timeline
                 target.ApplyLightState(lightState);
             }
 
-            if (TrySampleSelfShadow(frame, out MmdSelfShadowState selfShadowState))
-            {
-                target.ApplySelfShadowState(selfShadowState);
-            }
+            target.TryEvaluateSelfShadowAtFrame(SelfShadowKeyframes, frame, out _);
 
             return LastApplyStatus;
         }
@@ -214,18 +211,6 @@ namespace Mmd.Timeline
             }
 
             return nativeLightSampler != null && nativeLightSampler.TrySample(frame, out state);
-        }
-
-        private bool TrySampleSelfShadow(float frame, out MmdSelfShadowState state)
-        {
-            if (SelfShadowKeyframes != null && SelfShadowKeyframes.Count > 0)
-            {
-                state = VmdSelfShadowSampler.Sample(SelfShadowKeyframes, frame);
-                return true;
-            }
-
-            state = MmdSelfShadowState.Default;
-            return false;
         }
 
         private void DisposeNativeCameraSampler()
