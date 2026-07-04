@@ -398,6 +398,47 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void EvaluateAtLocalTimeKeepsEnabledDefaultSelfShadowWithoutSelfShadowKeyframes()
+        {
+            var bindingGo = new GameObject("binding");
+            var lightGo = new GameObject("light");
+            try
+            {
+                Light light = lightGo.AddComponent<Light>();
+                light.type = LightType.Directional;
+                light.shadows = LightShadows.None;
+                light.shadowStrength = 0.25f;
+
+                MmdSceneEnvironmentBinding binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
+                binding.TargetLight = light;
+
+                var behaviour = new MmdVmdCameraBehaviour
+                {
+                    CameraKeyframes = Array.Empty<MmdCameraKeyframeDefinition>(),
+                    LightKeyframes = Array.Empty<MmdLightKeyframeDefinition>(),
+                    SelfShadowKeyframes = Array.Empty<MmdSelfShadowKeyframeDefinition>(),
+                    FrameRate = 30f,
+                    ImportScale = 1.0f
+                };
+
+                MmdSceneCameraApplyStatus status = behaviour.EvaluateAtLocalTime(binding, 0.5);
+
+                Assert.That(status, Is.EqualTo(MmdSceneCameraApplyStatus.NotApplied));
+                Assert.That(binding.LastSelfShadowApplyStatus, Is.EqualTo(MmdSceneSelfShadowApplyStatus.Recorded));
+                Assert.That(binding.LastSelfShadowState.Mode, Is.EqualTo(MmdSceneEnvironmentBinding.DefaultSelfShadowMode));
+                Assert.That(binding.LastSelfShadowState.Distance, Is.EqualTo(MmdSceneEnvironmentBinding.DefaultSelfShadowDistance));
+                Assert.That(binding.LastSelfShadowDiagnosticStatus, Is.EqualTo(MmdSceneSelfShadowDiagnosticStatus.Active));
+                Assert.That(light.shadows, Is.EqualTo(LightShadows.None));
+                Assert.That(light.shadowStrength, Is.EqualTo(0.25f).Within(0.001f));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(lightGo);
+                UnityEngine.Object.DestroyImmediate(bindingGo);
+            }
+        }
+
+        [Test]
         public void EvaluateAtLocalTimeRecordsSelfShadowWhenBindingExplicitlyEnabledWithoutMutatingLight()
         {
             var bindingGo = new GameObject("binding");

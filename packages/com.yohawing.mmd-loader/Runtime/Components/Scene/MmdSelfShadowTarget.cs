@@ -267,6 +267,7 @@ namespace Mmd.UnityIntegration
             MmdSceneEnvironmentBinding? effectiveEnvironment = ResolveSceneEnvironment();
             if (effectiveEnvironment != null)
             {
+                effectiveEnvironment.EnsureSelfShadowDefaultState();
                 if (!effectiveEnvironment.SelfShadowEnabled ||
                     effectiveEnvironment.LastSelfShadowApplyStatus != MmdSceneSelfShadowApplyStatus.Recorded)
                 {

@@ -121,6 +121,9 @@ namespace Mmd.UnityIntegration
     /// </summary>
     public sealed class MmdSceneEnvironmentBinding : MonoBehaviour
     {
+        public const byte DefaultSelfShadowMode = 2;
+        public const float DefaultSelfShadowDistance = 0.5f;
+
         [SerializeField]
         [Tooltip("The Scene Camera that VMD camera motion drives. Required — nothing is auto-created.")]
         private Camera? targetCamera;
@@ -140,6 +143,7 @@ namespace Mmd.UnityIntegration
 
         private Vector3 lastUnityLightDirection;
         private bool hasLastUnityLightDirection;
+        private bool hasExplicitSelfShadowState;
 
         public Camera? TargetCamera
         {
@@ -162,7 +166,21 @@ namespace Mmd.UnityIntegration
         public bool SelfShadowEnabled
         {
             get => selfShadowEnabled;
-            set => selfShadowEnabled = value;
+            set
+            {
+                if (selfShadowEnabled == value)
+                {
+                    return;
+                }
+
+                selfShadowEnabled = value;
+                if (selfShadowEnabled ||
+                    LastSelfShadowApplyStatus == MmdSceneSelfShadowApplyStatus.NotApplied ||
+                    LastSelfShadowApplyStatus == MmdSceneSelfShadowApplyStatus.Disabled)
+                {
+                    ApplyDefaultSelfShadowState();
+                }
+            }
         }
 
         [Obsolete("Use SelfShadowEnabled. Self-shadow no longer drives Unity Light shadows.", false)]
@@ -269,6 +287,13 @@ namespace Mmd.UnityIntegration
         /// <summary>The most recent self-shadow diagnostic status for authoring and render-path UI.</summary>
         public MmdSceneSelfShadowDiagnosticStatus LastSelfShadowDiagnosticStatus { get; private set; }
 
+        public MmdSceneSelfShadowApplyStatus EnsureSelfShadowDefaultState()
+        {
+            return LastSelfShadowApplyStatus == MmdSceneSelfShadowApplyStatus.NotApplied || !hasExplicitSelfShadowState
+                ? ApplyDefaultSelfShadowState()
+                : LastSelfShadowApplyStatus;
+        }
+
         /// <summary>
         /// Converts <paramref name="state"/> (via <see cref="MmdCameraStateToUnity"/>) and applies it to
         /// the bound Camera's transform and field of view. Returns a structured status; never throws on
@@ -349,8 +374,19 @@ namespace Mmd.UnityIntegration
         /// </summary>
         public MmdSceneSelfShadowApplyStatus ApplySelfShadowState(MmdSelfShadowState state)
         {
+            return ApplySelfShadowState(state, explicitState: true);
+        }
+
+        private MmdSceneSelfShadowApplyStatus ApplyDefaultSelfShadowState()
+        {
+            return ApplySelfShadowState(DefaultSelfShadowState, explicitState: false);
+        }
+
+        private MmdSceneSelfShadowApplyStatus ApplySelfShadowState(MmdSelfShadowState state, bool explicitState)
+        {
             if (!selfShadowEnabled)
             {
+                hasExplicitSelfShadowState = explicitState;
                 LastSelfShadowState = MmdSelfShadowState.Default;
                 LastSelfShadowProjectionState = MmdSelfShadowProjectionState.Inactive;
                 LastSelfShadowSettings = new MmdSelfShadowUnityShadowSettings(
@@ -360,10 +396,11 @@ namespace Mmd.UnityIntegration
                     shadowDistance: 0.0f,
                     shadowStrength: 0.0f);
                 LastSelfShadowApplyStatus = MmdSceneSelfShadowApplyStatus.Disabled;
-                LastSelfShadowDiagnosticStatus = EvaluateSelfShadowDiagnosticStatus();
+                LastSelfShadowDiagnosticStatus = EvaluateSelfShadowDiagnosticStatusCore();
                 return LastSelfShadowApplyStatus;
             }
 
+            hasExplicitSelfShadowState = explicitState;
             LastSelfShadowState = state;
             LastSelfShadowProjectionState = SelfShadowProjectionPolicy.Evaluate(state);
             LastSelfShadowSettings = new MmdSelfShadowUnityShadowSettings(
@@ -373,7 +410,7 @@ namespace Mmd.UnityIntegration
                 shadowDistance: 0.0f,
                 shadowStrength: 0.0f);
             LastSelfShadowApplyStatus = MmdSceneSelfShadowApplyStatus.Recorded;
-            LastSelfShadowDiagnosticStatus = EvaluateSelfShadowDiagnosticStatus();
+            LastSelfShadowDiagnosticStatus = EvaluateSelfShadowDiagnosticStatusCore();
             return LastSelfShadowApplyStatus;
         }
 
@@ -388,8 +425,7 @@ namespace Mmd.UnityIntegration
         {
             if (keyframes == null || keyframes.Count == 0)
             {
-                LastSelfShadowDiagnosticStatus = MmdSceneSelfShadowDiagnosticStatus.NoSelfShadowState;
-                status = MmdSceneSelfShadowApplyStatus.NotApplied;
+                status = EnsureSelfShadowDefaultState();
                 return false;
             }
 
@@ -399,6 +435,12 @@ namespace Mmd.UnityIntegration
 
         /// <summary>Evaluates the binding-local self-shadow diagnostic from the latest recorded state.</summary>
         public MmdSceneSelfShadowDiagnosticStatus EvaluateSelfShadowDiagnosticStatus()
+        {
+            EnsureSelfShadowDefaultState();
+            return EvaluateSelfShadowDiagnosticStatusCore();
+        }
+
+        private MmdSceneSelfShadowDiagnosticStatus EvaluateSelfShadowDiagnosticStatusCore()
         {
             if (LastSelfShadowApplyStatus == MmdSceneSelfShadowApplyStatus.NotApplied)
             {
@@ -414,6 +456,14 @@ namespace Mmd.UnityIntegration
                 ? MmdSceneSelfShadowDiagnosticStatus.Active
                 : MmdSceneSelfShadowDiagnosticStatus.ModeDisabled;
         }
+
+        private void OnEnable()
+        {
+            EnsureSelfShadowDefaultState();
+        }
+
+        private static MmdSelfShadowState DefaultSelfShadowState =>
+            new MmdSelfShadowState(DefaultSelfShadowMode, DefaultSelfShadowDistance);
 
         private static float Component(float[] values, int index)
         {

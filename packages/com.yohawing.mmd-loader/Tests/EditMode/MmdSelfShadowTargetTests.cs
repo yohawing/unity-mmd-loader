@@ -189,10 +189,12 @@ namespace Mmd.Tests
                     boundsPadding: 0.25f);
                 target.SceneEnvironment = environment;
 
-                Assert.That(target.TryGetActiveProjectionState(out MmdSelfShadowProjectionState notAppliedState), Is.False);
-                Assert.That(notAppliedState.Active, Is.False);
+                Assert.That(target.TryGetActiveProjectionState(out MmdSelfShadowProjectionState defaultState), Is.True);
+                Assert.That(defaultState.Active, Is.True);
+                Assert.That(defaultState.Mode, Is.EqualTo(MmdSceneEnvironmentBinding.DefaultSelfShadowMode));
+                Assert.That(defaultState.FarDistance, Is.EqualTo(5.0f).Within(0.001f));
                 target.RefreshReceiverGate();
-                AssertReceiverGate(renderer, expectedSelfShadowReceive: 0.0f);
+                AssertReceiverGate(renderer, expectedSelfShadowReceive: 1.0f);
 
                 environment.ApplySelfShadowState(new MmdSelfShadowState(0, 0.4f));
                 Assert.That(target.TryGetActiveProjectionState(out MmdSelfShadowProjectionState inactiveState), Is.False);
