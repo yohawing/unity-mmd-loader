@@ -259,7 +259,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void UnboundTargetUsesSingleUnrecordedSceneEnvironmentDefaultState()
+        public void UnboundTargetUsesSingleDefaultSceneEnvironmentState()
         {
             var root = new GameObject("mmd-root");
             MmdSceneEnvironmentBinding? environment = null;
@@ -269,7 +269,7 @@ namespace Mmd.Tests
                 environment = CreateUnrecordedEnvironment("environment");
 
                 Assert.That(environment.LastSelfShadowApplyStatus,
-                    Is.EqualTo(MmdSceneSelfShadowApplyStatus.NotApplied));
+                    Is.EqualTo(MmdSceneSelfShadowApplyStatus.Recorded));
                 Assert.That(target.SceneEnvironment, Is.Null);
                 Assert.That(target.TryGetActiveProjectionState(out MmdSelfShadowProjectionState state), Is.True);
                 Assert.That(state.Active, Is.True);

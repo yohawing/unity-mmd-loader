@@ -25,7 +25,7 @@ It is designed to provide a natural import experience for modern Unity, letting 
 | VMD | Import and Timeline clip supported. Motion playback is evaluated at runtime by [mmd-anim](https://github.com/yohawing/mmd-anim). Camera motion supported |
 | Morph | Vertex (blend shape) / UV / material / bone / group morphs supported |
 | Physics | Real-time physics during Play Mode forward playback |
-| Rendering | URP-based toon, outline RendererFeature, alpha, texture diagnostics, material order handoff |
+| Rendering | URP-based toon, outline, transparent material draw order, and self-shadow supported |
 | Humanoid | Animator and proxy rig are set up automatically on import. Existing Humanoid motion assets can be retargeted |
 
 ## Roadmap
@@ -36,7 +36,7 @@ Items we plan to work on in future releases (scope and priority may change).
 | --- | --- |
 | Timeline enhancements | Expand Timeline editing and direction features, including audio/music-synced playback |
 | Runtime MMD Rig | Support runtime MMD rig features such as IK, append parent, and axis limits |
-| Higher rendering fidelity | Tune and verify outline fidelity, self-shadow visual quality, and additional real-model rendering cases |
+| Higher rendering fidelity | Tune and verify outline fidelity and additional real-model rendering cases |
 | Broader URP pipeline support | Build on the existing outline RendererFeature and verify additional paths such as Forward+ / Deferred and Render Pipeline Asset / Volume integration |
 | Runtime loading | Add an API to load PMX / VMD dynamically at runtime |
 | macOS / Linux native | Distribute native binaries for each platform |
@@ -60,10 +60,6 @@ https://github.com/yohawing/unity-mmd-loader.git?path=packages/com.yohawing.mmd-
 6. In Edit Mode, Timeline scrub is treated as physics-off animation preview.
 
 For detailed steps, see [HOW_TO_USE.md](https://github.com/yohawing/unity-mmd-loader/blob/main/docs/HOW_TO_USE.md).
-
-Rendering implementation notes:
-
-- [MMD SelfShadow Implementation Notes](MMD_SELF_SHADOW.md)
 
 ## License Boundary
 
