@@ -13,6 +13,12 @@ name: Unity CI
 
 on:
   workflow_dispatch:
+    inputs:
+      release_gate:
+        description: "Run release-only checks"
+        required: false
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths:
@@ -31,6 +37,46 @@ permissions:
   checks: write
 
 jobs:
+  release-submodule-latest:
+    if: github.event_name == 'workflow_dispatch' && inputs.release_gate
+    name: Release Submodule Latest Tag Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check mmd-anim submodule points at latest release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          path="native/mmd-anim"
+          url="$(git config -f .gitmodules --get "submodule.${path}.url")"
+          current="$(git ls-tree HEAD "$path" | awk '{print $3}')"
+
+          refs="$(git ls-remote --tags --sort=-v:refname "$url" 'v[0-9]*')"
+          latest_tag="$(printf '%s\n' "$refs" | awk '{print $2}' | sed 's#refs/tags/##; s#\^{}##' | head -n 1)"
+          if [ -z "$latest_tag" ]; then
+            echo "::error::No v* tags found for $url"
+            exit 1
+          fi
+
+          latest="$(git ls-remote "$url" "refs/tags/${latest_tag}^{}" | awk '{print $1}' | head -n 1)"
+          if [ -z "$latest" ]; then
+            latest="$(git ls-remote "$url" "refs/tags/${latest_tag}" | awk '{print $1}' | head -n 1)"
+          fi
+
+          echo "submodule=$path"
+          echo "url=$url"
+          echo "current=$current"
+          echo "latest_tag=$latest_tag"
+          echo "latest=$latest"
+
+          if [ "$current" != "$latest" ]; then
+            echo "::error::${path} points at ${current}, but latest ${latest_tag} is ${latest}"
+            exit 1
+          fi
+
   native-build:
     name: Native Build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
