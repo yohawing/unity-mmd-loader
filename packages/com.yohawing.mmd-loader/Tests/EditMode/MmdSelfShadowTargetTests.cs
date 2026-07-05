@@ -259,6 +259,35 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void UnboundTargetUsesSingleUnrecordedSceneEnvironmentDefaultState()
+        {
+            var root = new GameObject("mmd-root");
+            MmdSceneEnvironmentBinding? environment = null;
+            try
+            {
+                MmdSelfShadowTarget target = root.AddComponent<MmdSelfShadowTarget>();
+                environment = CreateUnrecordedEnvironment("environment");
+
+                Assert.That(environment.LastSelfShadowApplyStatus,
+                    Is.EqualTo(MmdSceneSelfShadowApplyStatus.NotApplied));
+                Assert.That(target.SceneEnvironment, Is.Null);
+                Assert.That(target.TryGetActiveProjectionState(out MmdSelfShadowProjectionState state), Is.True);
+                Assert.That(state.Active, Is.True);
+                Assert.That(state.Mode, Is.EqualTo(MmdSceneEnvironmentBinding.DefaultSelfShadowMode));
+                Assert.That(environment.LastSelfShadowApplyStatus,
+                    Is.EqualTo(MmdSceneSelfShadowApplyStatus.Recorded));
+            }
+            finally
+            {
+                if (environment != null)
+                {
+                    Object.DestroyImmediate(environment.gameObject);
+                }
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
         public void UnboundTargetDoesNotUseAmbiguousSceneEnvironments()
         {
             var root = new GameObject("mmd-root");
@@ -968,6 +997,12 @@ namespace Mmd.Tests
             MmdSceneEnvironmentBinding environment = go.AddComponent<MmdSceneEnvironmentBinding>();
             environment.ApplySelfShadowState(new MmdSelfShadowState((byte)mode, distance));
             return environment;
+        }
+
+        private static MmdSceneEnvironmentBinding CreateUnrecordedEnvironment(string name)
+        {
+            var go = new GameObject(name);
+            return go.AddComponent<MmdSceneEnvironmentBinding>();
         }
 
         private static List<MmdSelfShadowTarget> GetActiveTargetRegistry()

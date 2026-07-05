@@ -408,14 +408,20 @@ namespace Mmd.UnityIntegration
             }
 
             MmdSceneEnvironmentBinding? resolvedEnvironment = null;
+            MmdSceneEnvironmentBinding? fallbackEnvironment = null;
+            bool hasAmbiguousFallback = false;
             MmdSceneEnvironmentBinding[] environments =
                 Object.FindObjectsByType<MmdSceneEnvironmentBinding>(FindObjectsInactive.Exclude);
             for (int i = 0; i < environments.Length; i++)
             {
                 MmdSceneEnvironmentBinding environment = environments[i];
-                if (environment != null &&
-                    (environment.LastSelfShadowApplyStatus == MmdSceneSelfShadowApplyStatus.Recorded ||
-                     environment.LastSelfShadowApplyStatus == MmdSceneSelfShadowApplyStatus.Disabled))
+                if (environment == null)
+                {
+                    continue;
+                }
+
+                if (environment.LastSelfShadowApplyStatus == MmdSceneSelfShadowApplyStatus.Recorded ||
+                    environment.LastSelfShadowApplyStatus == MmdSceneSelfShadowApplyStatus.Disabled)
                 {
                     if (resolvedEnvironment != null)
                     {
@@ -424,10 +430,30 @@ namespace Mmd.UnityIntegration
                     }
 
                     resolvedEnvironment = environment;
+                    continue;
                 }
+
+                if (fallbackEnvironment != null)
+                {
+                    hasAmbiguousFallback = true;
+                    continue;
+                }
+
+                fallbackEnvironment = environment;
             }
 
-            return resolvedEnvironment;
+            if (resolvedEnvironment != null)
+            {
+                return resolvedEnvironment;
+            }
+
+            if (hasAmbiguousFallback)
+            {
+                ambiguous = true;
+                return null;
+            }
+
+            return fallbackEnvironment;
         }
 
         private static bool HasSelfShadowCasterPass(Transform root)
