@@ -55,6 +55,5 @@ docs/*
 !docs/README.ja.md
 !docs/HOW_TO_USE.md
 !docs/RELEASE.md
-!docs/MMD_SELF_SHADOW.md
 !docs/assets/
 !docs/assets/**

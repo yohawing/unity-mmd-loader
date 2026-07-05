@@ -56,6 +56,8 @@ The available editor actions may change between package versions, but the basic 
 
 MMD Loader expects a URP project. If your project uses multiple URP assets or quality levels, check the Renderer Data that is actually used by the Game View or build target.
 
+![howtouse5](./assets/howtouse5.png)
+
 1. Open **Project Settings > Graphics** and confirm the active URP Asset.
 2. Open the Renderer Data asset referenced by that URP Asset.
 3. Add **MmdSelfShadowRendererFeature** to the Renderer Features list.
@@ -68,26 +70,15 @@ The PMX importer generates materials for the `MMD Basic URP Toon` shader. Self-s
 
 The scene needs the playback object from the PMX placement step and a scene environment binding for camera, light, and self-shadow state.
 
+
+![howtouse6](./assets/howtouse6.png)
+
 1. Place the PMX in the Scene so the MMD playback object and `MmdUnityPlaybackController` exist.
 2. Add `MmdSceneEnvironmentBinding` to a scene GameObject. A small empty GameObject such as `MMD Scene Environment` is fine.
 3. Assign **Target Camera** to the Camera that VMD camera motion should drive.
 4. Assign **Target Light** to a Directional Light if the VMD light track should drive scene light color and direction.
-5. Leave **Self Shadow Enabled** on when you want MMD self-shadow rendering. A VMD with self-shadow keys can drive this state; when the VMD has no self-shadow keys, the binding's enabled default state is used instead.
-6. Optional: assign **Self Shadow Direction Light** when you want a specific Directional Light to provide the self-shadow direction without making it the VMD light target.
-7. Bind the same scene environment object to the Timeline track or clip that drives VMD camera/light scene motion, then bind the MMD playback object for model playback.
 
-You do not need to add hidden self-shadow helper components by hand. The PMX placement/factory path creates the required internal hookup for the model root.
+## Credits
 
-If self-shadow does not appear, check the setup in this order:
-
-- The Game View is using a URP Renderer Data asset that contains **MmdSelfShadowRendererFeature**.
-- The PMX object is in the Scene and still has its generated `MMD Basic URP Toon` materials.
-- `MmdSceneEnvironmentBinding` exists in the Scene and **Self Shadow Enabled** is on.
-- The Timeline binding points at the scene environment object when VMD scene motion is used.
-- The VMD self-shadow state is not explicitly off.
-- Frame Debugger shows **MMD Self Shadow Pass** during rendering.
-
-For lower-level implementation details, see
-[MMD_SELF_SHADOW.md](./MMD_SELF_SHADOW.md).
-
-> Credits — Model: [Sour](https://bowlroll.net/file/146103) / Motion: [mobiusP](https://www.nicovideo.jp/watch/sm42576784)
+- Model: [Sour](https://bowlroll.net/file/146103) 
+- Motion: [mobiusP](https://www.nicovideo.jp/watch/sm42576784)
