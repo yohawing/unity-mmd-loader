@@ -8,14 +8,14 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 
 - MMD SelfShadow rendering path with dedicated URP RendererFeature, character bounds collection, scene binding state, R32F map sampling, and diagnostics.
 - Runtime Verification viewer mode for fixture-manifest-driven PMX/VMD playback case switching.
-- VMD camera/light native track sampling through the `mmd-anim` v0.1.8 runtime surface.
+- VMD camera/light native track sampling through the `mmd-anim` v0.1.9 runtime surface.
 - PMX scene placement now instantiates the imported prefab hierarchy path instead of rebuilding a separate scene hierarchy.
 - Public SelfShadow setup and troubleshooting documentation.
 
 ### Changed
 
 - MMD toon materials no longer receive Unity/URP standard main-light shadows as their character self-shadow source; MMD SelfShadow is explicit and isolated from scene-wide lighting mutation.
-- Native runtime package binary is aligned with `native/mmd-anim` v0.1.8.
+- Native runtime package binary is aligned with `native/mmd-anim` v0.1.9.
 - Backface-culled materials keep outline visibility disabled to match culling policy.
 
 ### Known Limitations
