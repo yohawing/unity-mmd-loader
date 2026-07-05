@@ -221,7 +221,8 @@ namespace Mmd.UnityIntegration
                 root,
                 model,
                 string.IsNullOrWhiteSpace(modelAsset.SourcePath) ? null : modelAsset.SourcePath,
-                importScale);
+                importScale,
+                MmdPmxModelPresetPolicy.AllowsAutomaticSelfShadowTarget(modelAsset.ModelPreset));
             var session = new MmdRuntimeSession(
                 model,
                 motion,
@@ -261,7 +262,8 @@ namespace Mmd.UnityIntegration
                 root,
                 model,
                 string.IsNullOrWhiteSpace(modelAsset.SourcePath) ? null : modelAsset.SourcePath,
-                importScale);
+                importScale,
+                MmdPmxModelPresetPolicy.AllowsAutomaticSelfShadowTarget(modelAsset.ModelPreset));
             string resolvedModelId = string.IsNullOrWhiteSpace(modelAsset.SourceId) ? modelAsset.name : modelAsset.SourceId;
             string resolvedMotionId = string.IsNullOrWhiteSpace(motionId) ? "humanoid-physics" : motionId;
             var session = new MmdRuntimeSession(model, restMotion, resolvedModelId, resolvedMotionId);

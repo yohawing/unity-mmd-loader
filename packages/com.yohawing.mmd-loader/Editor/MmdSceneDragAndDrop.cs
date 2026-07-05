@@ -542,7 +542,8 @@ namespace Mmd.Editor
                     instanceRoot,
                     model,
                     string.IsNullOrWhiteSpace(pmxAsset.SourcePath) ? null : pmxAsset.SourcePath,
-                    pmxAsset.ImportScale);
+                    pmxAsset.ImportScale,
+                    MmdPmxModelPresetPolicy.AllowsAutomaticSelfShadowTarget(pmxAsset.ModelPreset));
             }
             catch
             {
