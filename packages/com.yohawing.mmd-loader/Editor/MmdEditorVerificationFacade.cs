@@ -65,7 +65,8 @@ namespace Mmd.Editor
                         importedRoot,
                         model,
                         sourcePath,
-                        importScale));
+                        importScale,
+                        MmdPmxModelPresetPolicy.AllowsAutomaticSelfShadowTarget(pmxAsset.ModelPreset)));
                 // Apply material remaps on the Slice B path (consistent with UseImportedPmxAssetReferences).
                 instance = ApplyMaterialRemapsToInstance(instance, pmxAsset);
             }
@@ -75,7 +76,11 @@ namespace Mmd.Editor
                 instance = RunStage(
                     UnityInstantiationStage,
                     () => UseImportedPmxAssetReferences(
-                        CreatePmxSceneModel(model, sourcePath, importScale),
+                        CreatePmxSceneModel(
+                            model,
+                            sourcePath,
+                            importScale,
+                            MmdPmxModelPresetPolicy.AllowsAutomaticSelfShadowTarget(pmxAsset.ModelPreset)),
                         pmxAsset));
             }
             return new MmdEditorPmxSceneLoadResult(
@@ -195,7 +200,8 @@ namespace Mmd.Editor
                     () => CreatePmxSceneModel(
                         model,
                         string.IsNullOrWhiteSpace(pmxAsset.SourcePath) ? null : pmxAsset.SourcePath,
-                        importScale));
+                        importScale,
+                        MmdPmxModelPresetPolicy.AllowsAutomaticSelfShadowTarget(pmxAsset.ModelPreset)));
                 placedInstance = RunStage(
                     UnityInstantiationStage,
                     () => UseImportedPmxAssetReferences(transient, pmxAsset));
@@ -279,18 +285,22 @@ namespace Mmd.Editor
 
         private static MmdUnityModelInstance CreatePmxSceneModel(MmdModelDefinition model, string? sourcePath)
         {
-            return CreatePmxSceneModel(model, sourcePath, importScale: 1.0f);
+            return CreatePmxSceneModel(model, sourcePath, importScale: 1.0f, includeSelfShadowTarget: true);
         }
 
-        private static MmdUnityModelInstance CreatePmxSceneModel(MmdModelDefinition model, string? sourcePath, float importScale)
+        private static MmdUnityModelInstance CreatePmxSceneModel(
+            MmdModelDefinition model,
+            string? sourcePath,
+            float importScale,
+            bool includeSelfShadowTarget = true)
         {
             float scale = importScale;
             if (model.bones != null && model.bones.Count > 0)
             {
-                return MmdUnityModelFactory.CreateSkinnedModel(model, sourcePath, scale);
+                return MmdUnityModelFactory.CreateSkinnedModel(model, sourcePath, scale, includeSelfShadowTarget);
             }
 
-            return MmdUnityModelFactory.CreateStaticModel(model, sourcePath, scale);
+            return MmdUnityModelFactory.CreateStaticModel(model, sourcePath, scale, includeSelfShadowTarget);
         }
 
         private static void RunStage(string stage, Action action)

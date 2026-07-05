@@ -71,6 +71,39 @@ Directory sweep:
 run each PMX in the directory against one VMD, or `--dir` with `--pmx` to run
 one PMX against each VMD in the directory.
 
+Fixture manifest playback sweep:
+
+```powershell
+.\artifacts\runtime-verification\MmdRuntimeVerification.exe `
+  --fixture-manifest F:\Develop\MMDDev\data\fixtures.local.json `
+  --out F:\Develop\MMDDev\unity-mmd-loader\artifacts\runtime-verification\manifest-report.json `
+  --duration 3
+```
+
+`--fixture-manifest` reads the shared `fixtures.local.json`
+`paths.playbackSmoke.cases` format used by three-mmd-loader. It resolves PMX
+model and VMD motion keys through `paths.releaseSmoke.byExtension`. The
+`MMD_RUNTIME_VIEWER_FIXTURES` environment variable can provide the manifest path
+when the command-line option is omitted. Optional viewer fields such as camera,
+audio, audio offset, and background are resolved and kept for the viewer UI
+path, but this verification player only drives PMX + VMD playback for now.
+Cases with `skipReason` are skipped by the verification sweep while remaining
+available to the viewer descriptor list. Test-only fields such as oracle, watch
+bones, epsilon, and frame lists are ignored.
+
+Interactive runtime viewer:
+
+```powershell
+.\artifacts\runtime-verification\MmdRuntimeVerification.exe `
+  --viewer `
+  --fixture-manifest F:\Develop\MMDDev\data\fixtures.local.json
+```
+
+`--viewer` keeps the player open, lists manifest cases, and reloads PMX + VMD
+playback when a case is selected. Camera, audio, background, and audio-offset
+references are shown as resolved case metadata; runtime application for those
+optional fields is a later viewer slice.
+
 ## JSON Schema Overview
 
 The report is emitted to `--out` and also logged as a fallback. The top-level

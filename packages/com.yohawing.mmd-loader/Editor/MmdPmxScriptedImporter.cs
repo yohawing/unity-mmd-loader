@@ -40,11 +40,12 @@ namespace Mmd.Editor
         MmdBasicUrpToon = 0
     }
 
-    [ScriptedImporter(22, "pmx")]
+    [ScriptedImporter(23, "pmx")]
     public sealed class MmdPmxScriptedImporter : ScriptedImporter
     {
         [SerializeField] private float importScale = MmdPmxAsset.DefaultImportScale;
         [SerializeField] private MmdPmxModelPreset modelPreset = MmdPmxModelPreset.Custom;
+        [SerializeField] private bool modelPresetAutoAssigned;
         [SerializeField] private MmdPmxMeshGenerationMode meshGenerationMode = MmdPmxMeshGenerationMode.SingleMesh;
         [SerializeField] private MmdPmxMaterialTexturePolicy materialTexturePolicy = MmdPmxMaterialTexturePolicy.ResolveReferencesOnly;
         [SerializeField] private MmdPmxAnimationType animationType = MmdPmxAnimationType.Generic;
@@ -95,12 +96,16 @@ namespace Mmd.Editor
             MmdPmxParsePayload payload = MmdPmxParsePayload.FromBytes(bytes);
             MmdModelDefinition model = payload.Model;
             MmdPmxParseSummary parseSummary = payload.ParseSummary;
+            MmdPmxModelPreset effectiveModelPreset = ResolveModelPresetForImport(model);
 
             MmdUnityModelInstance? generatedAssets = null;
             bool hierarchyAdded = false;
             try
             {
-                generatedAssets = MmdPmxImportAssetCacheBuilder.CreateImportedAssetCache(model, ImportScale);
+                generatedAssets = MmdPmxImportAssetCacheBuilder.CreateImportedAssetCache(
+                    model,
+                    ImportScale,
+                    MmdPmxModelPresetAutoDetector.IsCharacter(effectiveModelPreset));
                 Mesh importedMesh = generatedAssets.Mesh;
                 Material[] importedMaterials = generatedAssets.Materials;
 
@@ -117,7 +122,7 @@ namespace Mmd.Editor
                     ctx.assetPath,
                     resolvedSourcePath,
                     ImportScale,
-                    modelPreset.ToString(),
+                    effectiveModelPreset.ToString(),
                     meshGenerationMode.ToString(),
                     materialTexturePolicy.ToString(),
                     shaderPreset.ToString(),
@@ -228,6 +233,17 @@ namespace Mmd.Editor
         private static float NormalizeImportScale(float value)
         {
             return float.IsFinite(value) && value > 0.0f ? value : MmdPmxAsset.DefaultImportScale;
+        }
+
+        private MmdPmxModelPreset ResolveModelPresetForImport(MmdModelDefinition model)
+        {
+            if (!modelPresetAutoAssigned && modelPreset == MmdPmxModelPreset.Custom)
+            {
+                modelPreset = MmdPmxModelPresetAutoDetector.Detect(model);
+                modelPresetAutoAssigned = true;
+            }
+
+            return modelPreset;
         }
 
         private static Animator? ConfigureImportedAnimator(

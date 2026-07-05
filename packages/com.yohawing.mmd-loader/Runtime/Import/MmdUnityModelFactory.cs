@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 using Mmd.Parser;
 using Mmd.Rendering;
 
@@ -24,6 +25,15 @@ namespace Mmd.UnityIntegration
 
         public static MmdUnityModelInstance CreateStaticModel(MmdModelDefinition model, string? sourcePath, float importScale)
         {
+            return CreateStaticModel(model, sourcePath, importScale, includeSelfShadowTarget: true);
+        }
+
+        internal static MmdUnityModelInstance CreateStaticModel(
+            MmdModelDefinition model,
+            string? sourcePath,
+            float importScale,
+            bool includeSelfShadowTarget)
+        {
             if (model == null)
             {
                 throw new ArgumentNullException(nameof(model));
@@ -36,12 +46,20 @@ namespace Mmd.UnityIntegration
                 model.bones,
                 model.physics,
                 MmdUnityModelSourceContext.FromOptionalPath(sourcePath),
-                scale);
+                scale,
+                includeSelfShadowTarget);
         }
 
         public static MmdUnityModelInstance CreateStaticModel(MmdRenderingDescriptor descriptor, string modelName)
         {
-            return CreateStaticModel(descriptor, modelName, bones: null, physics: null, sourceContext: null, importScale: 1.0f);
+            return CreateStaticModel(
+                descriptor,
+                modelName,
+                bones: null,
+                physics: null,
+                sourceContext: null,
+                importScale: 1.0f,
+                includeSelfShadowTarget: true);
         }
 
         public static MmdUnityModelInstance CreateSkinnedModel(MmdModelDefinition model)
@@ -55,6 +73,15 @@ namespace Mmd.UnityIntegration
         }
 
         public static MmdUnityModelInstance CreateSkinnedModel(MmdModelDefinition model, string? sourcePath, float importScale)
+        {
+            return CreateSkinnedModel(model, sourcePath, importScale, includeSelfShadowTarget: true);
+        }
+
+        internal static MmdUnityModelInstance CreateSkinnedModel(
+            MmdModelDefinition model,
+            string? sourcePath,
+            float importScale,
+            bool includeSelfShadowTarget)
         {
             if (model == null)
             {
@@ -73,7 +100,8 @@ namespace Mmd.UnityIntegration
                 model.bones,
                 model.physics,
                 MmdUnityModelSourceContext.FromOptionalPath(sourcePath),
-                scale);
+                scale,
+                includeSelfShadowTarget);
         }
 
         public static MmdUnityModelInstance CreateExistingSkinnedModelInstance(
@@ -88,7 +116,8 @@ namespace Mmd.UnityIntegration
             GameObject root,
             MmdModelDefinition model,
             string? sourcePath,
-            float importScale)
+            float importScale,
+            bool includeSelfShadowTarget = true)
         {
             if (root == null)
             {
@@ -151,6 +180,7 @@ namespace Mmd.UnityIntegration
                 renderer.sharedMesh = mesh;
             }
             MmdShaderBindingDiagnostics shaderDiagnostics = MmdUnityMaterialBuilder.BuildExistingShaderDiagnostics(renderer);
+            ApplySelfShadowTargetPolicy(root, modelRoot, includeSelfShadowTarget);
 
             MmdUnityPhysicsBody[] physicsBodies = root.GetComponentsInChildren<MmdUnityPhysicsBody>(includeInactive: true);
             return new MmdUnityModelInstance(
@@ -180,7 +210,8 @@ namespace Mmd.UnityIntegration
             IReadOnlyList<MmdBoneDefinition>? bones,
             MmdPhysicsDefinition? physics,
             MmdUnityModelSourceContext? sourceContext,
-            float importScale)
+            float importScale,
+            bool includeSelfShadowTarget)
         {
             if (descriptor == null)
             {
@@ -202,6 +233,8 @@ namespace Mmd.UnityIntegration
 
             var meshRenderer = modelRoot.gameObject.AddComponent<MeshRenderer>();
             meshRenderer.sharedMaterials = materials;
+            ApplyRendererShadowPolicy(meshRenderer);
+            ApplySelfShadowTargetPolicy(root, modelRoot, includeSelfShadowTarget);
 
             return new MmdUnityModelInstance(
                 root,
@@ -225,7 +258,8 @@ namespace Mmd.UnityIntegration
             IReadOnlyList<MmdBoneDefinition> bones,
             MmdPhysicsDefinition? physics,
             MmdUnityModelSourceContext? sourceContext,
-            float importScale)
+            float importScale,
+            bool includeSelfShadowTarget)
         {
             ValidateDescriptor(descriptor);
 
@@ -244,6 +278,8 @@ namespace Mmd.UnityIntegration
             renderer.sharedMaterials = materials;
             renderer.bones = boneTransforms;
             renderer.rootBone = boneTransforms.Length > 0 ? boneTransforms[0] : modelRoot;
+            ApplyRendererShadowPolicy(renderer);
+            ApplySelfShadowTargetPolicy(root, modelRoot, includeSelfShadowTarget);
 
             return new MmdUnityModelInstance(
                 root,
@@ -269,6 +305,37 @@ namespace Mmd.UnityIntegration
             modelObject.transform.localRotation = Quaternion.identity;
             modelObject.transform.localScale = Vector3.one;
             return modelObject.transform;
+        }
+
+        private static void ApplyRendererShadowPolicy(Renderer renderer)
+        {
+            renderer.shadowCastingMode = ShadowCastingMode.On;
+            renderer.receiveShadows = true;
+        }
+
+        private static void ApplySelfShadowTargetPolicy(GameObject root, Transform modelRoot, bool includeSelfShadowTarget)
+        {
+            if (includeSelfShadowTarget)
+            {
+                MmdSelfShadowTarget.EnsureHiddenTarget(root, modelRoot);
+                return;
+            }
+
+            MmdSelfShadowTarget existingTarget = root.GetComponent<MmdSelfShadowTarget>();
+            if (existingTarget == null)
+            {
+                return;
+            }
+
+            existingTarget.enabled = false;
+            if (Application.isPlaying)
+            {
+                UnityEngine.Object.Destroy(existingTarget);
+            }
+            else
+            {
+                UnityEngine.Object.DestroyImmediate(existingTarget);
+            }
         }
 
         private static Transform FindModelRoot(Transform root)

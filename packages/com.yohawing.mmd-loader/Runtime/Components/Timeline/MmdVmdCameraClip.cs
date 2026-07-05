@@ -98,9 +98,16 @@ namespace Mmd.Timeline
             behaviour.LoopPolicy = loopPolicy;
             behaviour.MinFieldOfView = minFieldOfView;
             behaviour.ImportScale = ImportScale;
-            (IReadOnlyList<MmdCameraKeyframeDefinition> cam, IReadOnlyList<MmdLightKeyframeDefinition> lit) = LoadSceneKeyframes(motionAsset);
+            behaviour.MotionBytes = motionAsset != null && motionAsset.ByteLength > 0
+                ? motionAsset.GetBytesCopy()
+                : null;
+            (
+                IReadOnlyList<MmdCameraKeyframeDefinition> cam,
+                IReadOnlyList<MmdLightKeyframeDefinition> lit,
+                IReadOnlyList<MmdSelfShadowKeyframeDefinition> shd) = LoadSceneKeyframes(motionAsset);
             behaviour.CameraKeyframes = cam;
             behaviour.LightKeyframes = lit;
+            behaviour.SelfShadowKeyframes = shd;
             return playable;
         }
 
@@ -109,18 +116,24 @@ namespace Mmd.Timeline
             return float.IsFinite(value) && value > 0.0f ? value : MmdPmxAsset.DefaultImportScale;
         }
 
-        private static (IReadOnlyList<MmdCameraKeyframeDefinition> camera, IReadOnlyList<MmdLightKeyframeDefinition> light) LoadSceneKeyframes(
+        private static (
+            IReadOnlyList<MmdCameraKeyframeDefinition> camera,
+            IReadOnlyList<MmdLightKeyframeDefinition> light,
+            IReadOnlyList<MmdSelfShadowKeyframeDefinition> selfShadow) LoadSceneKeyframes(
             MmdVmdAsset? asset)
         {
             if (asset == null || asset.ByteLength <= 0)
             {
-                return (Array.Empty<MmdCameraKeyframeDefinition>(), Array.Empty<MmdLightKeyframeDefinition>());
+                return (
+                    Array.Empty<MmdCameraKeyframeDefinition>(),
+                    Array.Empty<MmdLightKeyframeDefinition>(),
+                    Array.Empty<MmdSelfShadowKeyframeDefinition>());
             }
 
             try
             {
                 MmdMotionDefinition motion = asset.LoadMotion();
-                return (motion.cameraKeyframes, motion.lightKeyframes);
+                return (motion.cameraKeyframes, motion.lightKeyframes, motion.selfShadowKeyframes);
             }
             catch (Exception ex)
             {
@@ -129,8 +142,11 @@ namespace Mmd.Timeline
                 // camera/light lane degrades to a no-op and the failure is surfaced as a warning. The broad
                 // catch is intentional at this graph-build boundary — there is no safe partial state.
                 Debug.LogWarning(
-                    $"MmdVmdCameraClip: failed to load camera/light keyframes from '{asset.name}'; the camera/light track is a no-op. {ex.Message}");
-                return (Array.Empty<MmdCameraKeyframeDefinition>(), Array.Empty<MmdLightKeyframeDefinition>());
+                    $"MmdVmdCameraClip: failed to load camera/light/self-shadow keyframes from '{asset.name}'; the camera/light track is a no-op. {ex.Message}");
+                return (
+                    Array.Empty<MmdCameraKeyframeDefinition>(),
+                    Array.Empty<MmdLightKeyframeDefinition>(),
+                    Array.Empty<MmdSelfShadowKeyframeDefinition>());
             }
         }
     }

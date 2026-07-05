@@ -20,7 +20,10 @@ namespace Mmd.UnityIntegration
         /// sourcePath is intentionally forced to null for the importer material sub-asset path.
         /// Mesh and Material assets receive hideFlags=None and stable names based on modelName.
         /// </summary>
-        public static MmdUnityModelInstance CreateImportedAssetCache(MmdModelDefinition model, float importScale)
+        public static MmdUnityModelInstance CreateImportedAssetCache(
+            MmdModelDefinition model,
+            float importScale,
+            bool includeSelfShadowTarget = true)
         {
             if (model == null)
             {
@@ -32,11 +35,19 @@ namespace Mmd.UnityIntegration
             MmdUnityModelInstance generatedAssets;
             if (model.bones != null && model.bones.Count > 0)
             {
-                generatedAssets = MmdUnityModelFactory.CreateSkinnedModel(model, sourcePath: null, scale);
+                generatedAssets = MmdUnityModelFactory.CreateSkinnedModel(
+                    model,
+                    sourcePath: null,
+                    scale,
+                    includeSelfShadowTarget);
             }
             else
             {
-                generatedAssets = MmdUnityModelFactory.CreateStaticModel(model, sourcePath: null, scale);
+                generatedAssets = MmdUnityModelFactory.CreateStaticModel(
+                    model,
+                    sourcePath: null,
+                    scale,
+                    includeSelfShadowTarget);
             }
 
             PrepareImportedMeshAsset(generatedAssets.Mesh, model.name);

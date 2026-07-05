@@ -16,6 +16,21 @@ namespace Mmd.UnityIntegration
             string? sourcePath,
             float importScale)
         {
+            return CreateFromImportedHierarchy(
+                importedRoot,
+                model,
+                sourcePath,
+                importScale,
+                includeSelfShadowTarget: true);
+        }
+
+        internal static MmdUnityModelInstance CreateFromImportedHierarchy(
+            GameObject importedRoot,
+            MmdModelDefinition model,
+            string? sourcePath,
+            float importScale,
+            bool includeSelfShadowTarget)
+        {
             if (importedRoot == null)
             {
                 throw new ArgumentNullException(nameof(importedRoot));
@@ -35,15 +50,55 @@ namespace Mmd.UnityIntegration
             // Clear non-scene hideFlags on the instantiated hierarchy to ensure scene-visibility.
             ClearNonSceneHideFlags(instanceRoot.transform);
 
+            return CreateFromInstantiatedImportedHierarchy(
+                instanceRoot,
+                model,
+                sourcePath,
+                importScale,
+                includeSelfShadowTarget);
+        }
+
+        internal static MmdUnityModelInstance CreateFromInstantiatedImportedHierarchy(
+            GameObject instanceRoot,
+            MmdModelDefinition model,
+            string? sourcePath,
+            float importScale,
+            bool includeSelfShadowTarget = true)
+        {
+            if (instanceRoot == null)
+            {
+                throw new ArgumentNullException(nameof(instanceRoot));
+            }
+
+            if (model == null)
+            {
+                throw new ArgumentNullException(nameof(model));
+            }
+
+            float scale = NormalizeImportScale(importScale);
+            ClearNonSceneHideFlags(instanceRoot.transform);
+
             MmdRenderingDescriptor descriptor = BuildRuntimeRenderingDescriptor(model);
             ValidateDescriptor(descriptor);
 
             if (model.bones != null && model.bones.Count > 0)
             {
-                return CreateFromImportedSkinnedHierarchy(instanceRoot, model, descriptor, sourcePath, scale);
+                return CreateFromImportedSkinnedHierarchy(
+                    instanceRoot,
+                    model,
+                    descriptor,
+                    sourcePath,
+                    scale,
+                    includeSelfShadowTarget);
             }
 
-            return CreateFromImportedStaticHierarchy(instanceRoot, model, descriptor, sourcePath, scale);
+            return CreateFromImportedStaticHierarchy(
+                instanceRoot,
+                model,
+                descriptor,
+                sourcePath,
+                scale,
+                includeSelfShadowTarget);
         }
 
         private static MmdUnityModelInstance CreateFromImportedSkinnedHierarchy(
@@ -51,7 +106,8 @@ namespace Mmd.UnityIntegration
             MmdModelDefinition model,
             MmdRenderingDescriptor descriptor,
             string? sourcePath,
-            float scale)
+            float scale,
+            bool includeSelfShadowTarget)
         {
             Transform modelRoot = FindModelRoot(instanceRoot.transform);
             SkinnedMeshRenderer renderer = modelRoot.GetComponent<SkinnedMeshRenderer>()
@@ -84,6 +140,7 @@ namespace Mmd.UnityIntegration
 
             MmdUnityPhysicsBody[] physicsBodies = instanceRoot.GetComponentsInChildren<MmdUnityPhysicsBody>(includeInactive: true);
             MmdShaderBindingDiagnostics shaderDiagnostics = MmdUnityMaterialBuilder.BuildExistingShaderDiagnostics(renderer);
+            ApplySelfShadowTargetPolicy(instanceRoot, modelRoot, includeSelfShadowTarget);
 
             return new MmdUnityModelInstance(
                 instanceRoot,
@@ -106,7 +163,8 @@ namespace Mmd.UnityIntegration
             MmdModelDefinition model,
             MmdRenderingDescriptor descriptor,
             string? sourcePath,
-            float scale)
+            float scale,
+            bool includeSelfShadowTarget)
         {
             Transform modelRoot = FindModelRoot(instanceRoot.transform);
             MeshRenderer meshRenderer = modelRoot.GetComponent<MeshRenderer>()
@@ -128,6 +186,7 @@ namespace Mmd.UnityIntegration
             }
 
             MmdShaderBindingDiagnostics shaderDiagnostics = BuildMeshRendererShaderDiagnostics(meshRenderer);
+            ApplySelfShadowTargetPolicy(instanceRoot, modelRoot, includeSelfShadowTarget);
 
             return new MmdUnityModelInstance(
                 instanceRoot,

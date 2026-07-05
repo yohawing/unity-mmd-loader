@@ -327,6 +327,13 @@ namespace Mmd.UnityIntegration
                     : 0.0f);
             }
 
+            if (material.HasProperty("_ShadowAlphaClipThreshold"))
+            {
+                material.SetFloat("_ShadowAlphaClipThreshold", transparencyMode == MmdMaterialTransparencyMode.Opaque
+                    ? 0.0f
+                    : AlphaClipThreshold);
+            }
+
             if (material.HasProperty("_TextureAlphaOutputWeight"))
             {
                 material.SetFloat("_TextureAlphaOutputWeight", transparencyMode == MmdMaterialTransparencyMode.AlphaBlend
@@ -402,6 +409,7 @@ namespace Mmd.UnityIntegration
         {
             if (!material.HasProperty("_Cull"))
             {
+                ApplyOutlineCullingPolicy(material, cullingPolicy);
                 return;
             }
 
@@ -413,6 +421,22 @@ namespace Mmd.UnityIntegration
             {
                 material.SetFloat("_Cull", (float)CullMode.Back);
             }
+
+            ApplyOutlineCullingPolicy(material, cullingPolicy);
+        }
+
+        private static void ApplyOutlineCullingPolicy(Material material, string cullingPolicy)
+        {
+            if (!material.HasProperty("_OutlineVisible") ||
+                !string.Equals(cullingPolicy, "backface-culling", StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            // The outline pass uses an inverted hull. If a PMX material is backface-culled,
+            // the body pass writes no depth from the reverse side, so the hull can remain as a
+            // black backface-only fill. Keep outline conservative for culled materials.
+            material.SetFloat("_OutlineVisible", 0.0f);
         }
 
         private static MmdMaterialTransparencyMode ResolveMaterialTransparencyMode(

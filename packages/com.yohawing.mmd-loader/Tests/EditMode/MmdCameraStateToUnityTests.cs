@@ -54,7 +54,7 @@ namespace Mmd.Tests
         [TestCase(-12.5f, -5f, 1f, 8f, -0.2f, 1.2f, 0.4f)]
         [TestCase(30f, 1f, 2f, 3f, 0.1f, -0.6f, 0f)]
         [TestCase(20f, 0f, 5f, 0f, 0.4f, 0.8f, 0.2f)] // positive distance with pan/tilt/roll
-        public void CameraIsDistanceAwayFromTargetAndLooksAtIt(
+        public void CameraUsesMmdAnimSignedDistanceRig(
             float distance, float px, float py, float pz, float rx, float ry, float rz)
         {
             MmdUnityCameraPose pose = MmdCameraStateToUnity.Convert(State(distance, px, py, pz, rx, ry, rz, 35f, true));
@@ -67,8 +67,9 @@ namespace Mmd.Tests
 
             Vector3 forward = pose.Rotation * Vector3.forward;
             Vector3 toTarget = (targetUnity - pose.Position).normalized;
-            Assert.That(Vector3.Dot(forward, toTarget), Is.EqualTo(1f).Within(0.001f),
-                "Camera forward must point at the look-at target.");
+            float expectedDot = distance <= 0.0f ? 1.0f : -1.0f;
+            Assert.That(Vector3.Dot(forward, toTarget), Is.EqualTo(expectedDot).Within(0.001f),
+                "Signed MMD camera distance must match the mmd-anim/Three camera rig.");
         }
 
         [Test]
@@ -131,10 +132,8 @@ namespace Mmd.Tests
             Assert.That(pose.FieldOfView, Is.EqualTo(MmdCameraStateToUnity.DefaultMinFieldOfView).Within(0.001f));
         }
 
-        // The four golden tests below PIN the current conversion convention (Euler YXZ order +
-        // MMD->Unity 180°-Y map + look-back flip) so an accidental change to the rotation order or
-        // multiply side is caught as a regression. They assert observed output, not correctness vs
-        // MMD; the absolute pan/tilt/roll sign is confirmed visually in the Timeline slice (3c).
+        // The golden tests below pin the mmd-anim/Three camera application convention so an
+        // accidental change to the rotation order or multiply side is caught as a regression.
         private static void AssertPose(MmdUnityCameraPose pose, Vector3 expectedPosition, Quaternion expectedRotation)
         {
             Assert.That(pose.Position.x, Is.EqualTo(expectedPosition.x).Within(0.01f), "position.x");
@@ -156,7 +155,7 @@ namespace Mmd.Tests
         [Test]
         public void GoldenPitchFortyFiveDegrees()
         {
-            // +45° MMD pitch swings the camera below the target and tilts it up at it.
+            // Matches three-mmd-loader's Euler(-x, -y, -z, "YXZ") camera convention.
             AssertPose(
                 MmdCameraStateToUnity.Convert(State(-45f, 0, 0, 0, Mathf.PI / 4f, 0, 0, 30f, true)),
                 new Vector3(0f, -31.81981f, 31.8198f),
@@ -176,11 +175,79 @@ namespace Mmd.Tests
         [Test]
         public void GoldenPositiveDistanceLooksFromBehind()
         {
-            // distance > 0 places the camera on Unity -Z (behind), still looking at the target.
+            // distance > 0 places the camera on Unity -Z while preserving the signed rig direction.
             AssertPose(
                 MmdCameraStateToUnity.Convert(State(30f, 0, 0, 0, 0, 0, 0, 30f, true)),
                 new Vector3(0f, 0f, -30f),
-                new Quaternion(0f, 0f, 0f, 1f));
+                new Quaternion(0f, 1f, 0f, 0f));
+        }
+
+        [Test]
+        public void MmdAnimCameraRegressionFrame2080StaysAboveGround()
+        {
+            MmdCameraState state = State(
+                -82.7447f,
+                -2.0272f,
+                9.1883f,
+                0.0173f,
+                0.0879f,
+                0.3978f,
+                0.1600f,
+                19f,
+                true);
+
+            MmdUnityCameraPose pose = MmdCameraStateToUnity.Convert(state, importScale: 0.1f);
+
+            Assert.That(pose.Position.x, Is.EqualTo(-2.9904f).Within(0.01f), "position.x");
+            Assert.That(pose.Position.y, Is.GreaterThan(0.0f), "2080F camera must not be below the ground plane");
+            Assert.That(pose.Position.y, Is.EqualTo(0.1924f).Within(0.01f), "position.y");
+            Assert.That(pose.Position.z, Is.EqualTo(7.5972f).Within(0.01f), "position.z");
+            Assert.That(pose.FieldOfView, Is.EqualTo(19f).Within(0.001f));
+        }
+
+        [Test]
+        public void MmdAnimCameraRegressionFrame540MatchesThreeCameraRig()
+        {
+            MmdCameraState state = State(
+                -61.0f,
+                0.7594f,
+                11.6923f,
+                -0.3784f,
+                0.2200f,
+                0.0f,
+                -0.2800f,
+                18f,
+                true);
+
+            MmdUnityCameraPose pose = MmdCameraStateToUnity.Convert(state, importScale: 0.1f);
+
+            Assert.That(pose.Position.x, Is.EqualTo(-0.0759f).Within(0.01f), "position.x");
+            Assert.That(pose.Position.y, Is.EqualTo(-0.1620f).Within(0.01f), "position.y");
+            Assert.That(pose.Position.z, Is.EqualTo(5.9908f).Within(0.01f), "position.z");
+            Assert.That(pose.FieldOfView, Is.EqualTo(18f).Within(0.001f));
+        }
+
+        [Test]
+        public void MmdAnimCameraRegressionFrame788StaysAboveGround()
+        {
+            MmdCameraState state = State(
+                -115.3063f,
+                -2.9867f,
+                3.3132f,
+                1.2109f,
+                -0.1932f,
+                -0.2452f,
+                0.0247f,
+                14.4677f,
+                true);
+
+            MmdUnityCameraPose pose = MmdCameraStateToUnity.Convert(state, importScale: 0.1f);
+
+            Assert.That(pose.Position.x, Is.EqualTo(3.0457f).Within(0.01f), "position.x");
+            Assert.That(pose.Position.y, Is.GreaterThan(0.0f), "788F camera must not be below the ground plane");
+            Assert.That(pose.Position.y, Is.EqualTo(2.5452f).Within(0.01f), "position.y");
+            Assert.That(pose.Position.z, Is.EqualTo(10.8565f).Within(0.01f), "position.z");
+            Assert.That(pose.FieldOfView, Is.EqualTo(14.4677f).Within(0.001f));
         }
 
         [Test]

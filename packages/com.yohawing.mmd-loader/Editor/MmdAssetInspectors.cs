@@ -823,6 +823,7 @@ namespace Mmd.Editor
             {
                 EditorGUILayout.IntField("Max Frame (Duration)", readiness.MaxFrame);
                 EditorGUILayout.TextField("Scene Motion", readiness.SceneMotionStatus);
+                EditorGUILayout.TextField("Self-Shadow Motion", readiness.SelfShadowSceneMotionStatus);
                 EditorGUILayout.TextField("Clip Creation", readiness.ClipCreationRequirement);
             }
             // Compact diagnostic rows only. No long normal-state HelpBox per UI contract.
@@ -840,6 +841,7 @@ namespace Mmd.Editor
                     selfShadowKeyframeCount: 0,
                     clipDurationSource: "Unavailable",
                     sceneMotionStatus: "No VMD asset",
+                    selfShadowSceneMotionStatus: "No VMD asset",
                     clipCreationRequirement: "PMX model source and Timeline are required for VMD Clip creation.");
             }
 
@@ -853,11 +855,13 @@ namespace Mmd.Editor
 
             string sceneStatus = (cam > 0 || lit > 0)
                 ? string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                    "Present (camera:{0}, light:{1}, selfShadow:{2})", cam, lit, shd)
-                : shd > 0
-                    ? string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                        "None (camera/light only; selfShadow:{0} deferred)", shd)
-                    : "None (model motion only)";
+                    "Camera/light scene motion present (camera:{0}, light:{1})", cam, lit)
+                : "Camera/light scene motion: none";
+
+            string selfShadowStatus = shd > 0
+                ? string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                    "Self-shadow scene state present (selfShadow:{0}; MmdSceneEnvironmentBinding records sampled MMD self-shadow state)", shd)
+                : "Self-shadow scene motion: none";
 
             string durationSrc = string.Format(System.Globalization.CultureInfo.InvariantCulture,
                 "Cached VMD MaxFrame ({0})", mf);
@@ -869,6 +873,7 @@ namespace Mmd.Editor
                 shd,
                 durationSrc,
                 sceneStatus,
+                selfShadowStatus,
                 "PMX model source and Timeline are required for VMD Clip creation.");
         }
 
@@ -1072,7 +1077,7 @@ namespace Mmd.Editor
 
     /// <summary>
     /// Small immutable diagnostic shape for VMD Timeline readiness preview.
-    /// Duration (MaxFrame) and scene-motion presence (camera/light/self-shadow counts)
+    /// Duration (MaxFrame), camera/light scene-motion presence, and self-shadow scene-motion diagnostics
     /// are derived exclusively from MmdVmdAsset cached import summary.
     /// No LoadMotion or parse occurs through this helper (see GetVmdTimelineReadiness).
     /// </summary>
@@ -1085,6 +1090,7 @@ namespace Mmd.Editor
             int selfShadowKeyframeCount,
             string clipDurationSource,
             string sceneMotionStatus,
+            string selfShadowSceneMotionStatus,
             string clipCreationRequirement)
         {
             MaxFrame = Math.Max(0, maxFrame);
@@ -1092,8 +1098,12 @@ namespace Mmd.Editor
             LightKeyframeCount = Math.Max(0, lightKeyframeCount);
             SelfShadowKeyframeCount = Math.Max(0, selfShadowKeyframeCount);
             HasSceneMotion = (CameraKeyframeCount > 0) || (LightKeyframeCount > 0);
+            HasSelfShadowSceneMotion = SelfShadowKeyframeCount > 0;
             ClipDurationSource = string.IsNullOrWhiteSpace(clipDurationSource) ? "Unavailable" : clipDurationSource;
             SceneMotionStatus = string.IsNullOrWhiteSpace(sceneMotionStatus) ? "None" : sceneMotionStatus;
+            SelfShadowSceneMotionStatus = string.IsNullOrWhiteSpace(selfShadowSceneMotionStatus)
+                ? "Self-shadow scene motion: none"
+                : selfShadowSceneMotionStatus;
             ClipCreationRequirement = string.IsNullOrWhiteSpace(clipCreationRequirement)
                 ? "PMX model source and Timeline are required for VMD Clip creation."
                 : clipCreationRequirement;
@@ -1109,9 +1119,13 @@ namespace Mmd.Editor
 
         public bool HasSceneMotion { get; }
 
+        public bool HasSelfShadowSceneMotion { get; }
+
         public string ClipDurationSource { get; }
 
         public string SceneMotionStatus { get; }
+
+        public string SelfShadowSceneMotionStatus { get; }
 
         public string ClipCreationRequirement { get; }
     }

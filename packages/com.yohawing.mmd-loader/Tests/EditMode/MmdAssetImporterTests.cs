@@ -117,13 +117,24 @@ namespace Mmd.Tests
 
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
 
-            Assert.That(pmxAsset.ModelPreset, Is.EqualTo(nameof(MmdPmxModelPreset.Custom)));
+            Assert.That(pmxAsset.ModelPreset, Is.EqualTo(nameof(MmdPmxModelPreset.Stage)));
             Assert.That(pmxAsset.MeshGenerationMode, Is.EqualTo(nameof(MmdPmxMeshGenerationMode.SingleMesh)));
             Assert.That(pmxAsset.MaterialTexturePolicy, Is.EqualTo(nameof(MmdPmxMaterialTexturePolicy.ResolveReferencesOnly)));
             Assert.That(pmxAsset.AnimationType, Is.EqualTo(nameof(MmdPmxAnimationType.Generic)));
             Assert.That(pmxAsset.ShaderPreset, Is.EqualTo(nameof(MmdPmxShaderPreset.MmdBasicUrpToon)));
             Assert.That(pmxAsset.ImportedAvatar, Is.Null);
             Assert.That(pmxAsset.HumanoidAvatarReadiness, Is.EqualTo("NotRequested"));
+        }
+
+        [Test]
+        public void InitialPmxImportAutoAssignsCharacterPresetFromStandardBones()
+        {
+            CopyFixtureToAssetDatabase("test_semi_basic_bone.pmx", TempHumanoidPmxPath);
+
+            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempHumanoidPmxPath);
+
+            Assert.That(pmxAsset, Is.Not.Null);
+            Assert.That(pmxAsset.ModelPreset, Is.EqualTo(nameof(MmdPmxModelPreset.Character)));
         }
 
         [Test]
@@ -279,6 +290,7 @@ namespace Mmd.Tests
 
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempHumanoidPmxPath);
             Assert.That(pmxAsset, Is.Not.Null);
+            Assert.That(pmxAsset.ModelPreset, Is.EqualTo(nameof(MmdPmxModelPreset.Character)));
             Assert.That(pmxAsset.AnimationType, Is.EqualTo(nameof(MmdPmxAnimationType.Humanoid)));
             Assert.That(pmxAsset.HumanoidAvatarReadiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
             Assert.That(pmxAsset.HumanoidAvatarDiagnostic, Is.Not.Empty);
@@ -369,7 +381,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void PmxScriptedImporterVersionIsTwentyTwoForPlaybackControllerRetargetMerge()
+        public void PmxScriptedImporterVersionIsTwentyThreeForModelPresetSelfShadowPolicy()
         {
             object[] attributes = typeof(MmdPmxScriptedImporter).GetCustomAttributes(
                 typeof(ScriptedImporterAttribute),
@@ -377,8 +389,8 @@ namespace Mmd.Tests
 
             Assert.That(attributes, Has.Length.EqualTo(1));
             var attribute = (ScriptedImporterAttribute)attributes[0];
-            Assert.That(attribute.version, Is.EqualTo(22),
-                "PMX importer version must force reimport for playback-controller-owned PMX source and humanoid retarget bindings.");
+            Assert.That(attribute.version, Is.EqualTo(23),
+                "PMX importer version must force reimport for auto model preset assignment and self-shadow target policy.");
         }
 
         [Test]
@@ -748,6 +760,23 @@ namespace Mmd.Tests
             // rootBone must be set
             Assert.That(smr.rootBone, Is.Not.Null);
             Assert.That(smr.rootBone, Is.SameAs(smr.bones[0]));
+            Assert.That(importedRoot.GetComponent<MmdSelfShadowTarget>(), Is.Null,
+                "auto Stage PMX assets must not carry a self-shadow target because they would inflate the character AABB.");
+        }
+
+        [Test]
+        public void ImportedCharacterPmxHierarchyCarriesSelfShadowTarget()
+        {
+            CopyFixtureToAssetDatabase("test_semi_basic_bone.pmx", TempHumanoidPmxPath);
+
+            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempHumanoidPmxPath);
+            Assert.That(pmxAsset, Is.Not.Null);
+            Assert.That(pmxAsset.ModelPreset, Is.EqualTo(nameof(MmdPmxModelPreset.Character)));
+            Assert.That(pmxAsset.ImportedRoot, Is.Not.Null);
+
+            MmdSelfShadowTarget target = pmxAsset.ImportedRoot!.GetComponent<MmdSelfShadowTarget>();
+            Assert.That(target, Is.Not.Null);
+            Assert.That(target.BoundsRoot.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true), Is.Not.Null);
         }
 
         [Test]
@@ -936,12 +965,54 @@ namespace Mmd.Tests
 
                 // ImportScale preserved on instance.
                 Assert.That(instance.ImportScale, Is.EqualTo(pmxAsset.ImportScale).Within(0.0001f));
+                Assert.That(root.GetComponent<MmdSelfShadowTarget>(), Is.Null,
+                    "Stage preset PMX scene instances must not be registered as character self-shadow targets.");
             }
             finally
             {
                 if (instance?.Root != null)
                 {
                     Object.DestroyImmediate(instance.Root);
+                }
+            }
+        }
+
+        [Test]
+        public void ImportedHierarchyWrapperDropsStaleSelfShadowTargetWhenExcluded()
+        {
+            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+            Assert.That(pmxAsset, Is.Not.Null);
+            Assert.That(pmxAsset.ModelPreset, Is.EqualTo(nameof(MmdPmxModelPreset.Stage)));
+            Assert.That(pmxAsset.ImportedRoot, Is.Not.Null);
+
+            GameObject sceneRoot = Object.Instantiate(pmxAsset.ImportedRoot!);
+            MmdUnityModelInstance? instance = null;
+            try
+            {
+                MmdSelfShadowTarget staleTarget = sceneRoot.AddComponent<MmdSelfShadowTarget>();
+                staleTarget.BoundsRoot = sceneRoot.transform;
+
+                instance = MmdUnityModelFactory.CreateFromInstantiatedImportedHierarchy(
+                    sceneRoot,
+                    pmxAsset.LoadModel(),
+                    sourcePath: null,
+                    pmxAsset.ImportScale,
+                    includeSelfShadowTarget: false);
+
+                Assert.That(instance.Root, Is.SameAs(sceneRoot));
+                Assert.That(sceneRoot.GetComponent<MmdSelfShadowTarget>(), Is.Null,
+                    "Stage/Custom imported hierarchy wrappers must remove legacy self-shadow target components.");
+            }
+            finally
+            {
+                if (instance?.Root != null)
+                {
+                    Object.DestroyImmediate(instance.Root);
+                }
+                else if (sceneRoot != null)
+                {
+                    Object.DestroyImmediate(sceneRoot);
                 }
             }
         }
@@ -1470,6 +1541,8 @@ namespace Mmd.Tests
                 SkinnedMeshRenderer? smr = loadResult.Instance.SkinnedMeshRenderer;
                 Assert.That(smr, Is.Not.Null);
                 Assert.That(smr!.sharedMaterials[0], Is.SameAs(pmxAsset.ImportedMaterials[0]));
+                Assert.That(loadResult.Instance.Root.GetComponent<MmdSelfShadowTarget>(), Is.Null,
+                    "Stage preset PMX+VMD asset scene load must not register a character self-shadow target.");
 
                 Assert.That(loadResult.Controller.ModelAssetSource, Is.SameAs(pmxAsset));
                 Assert.That(loadResult.Controller.MotionAssetSource, Is.SameAs(vmdAsset));
@@ -2307,6 +2380,40 @@ namespace Mmd.Tests
             {
                 DestroyInstance(instance);
                 Object.DestroyImmediate(parent);
+            }
+        }
+
+        [Test]
+        public void SceneDragAndDropLoadsPmxAssetAsImportedPrefabInstance()
+        {
+            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+            Assert.That(pmxAsset.ImportedRoot, Is.Not.Null);
+            MmdUnityModelInstance? instance = null;
+
+            try
+            {
+                instance = MmdSceneDragAndDrop.LoadPmxForDragAndDrop(
+                    pmxAsset,
+                    new Vector3(1.0f, 0.0f, 2.0f),
+                    parent: null);
+
+                Assert.That(instance.Root.transform.parent, Is.Null);
+                Assert.That(instance.Root.transform.position, Is.EqualTo(new Vector3(1.0f, 0.0f, 2.0f)));
+                Assert.That(PrefabUtility.GetPrefabInstanceStatus(instance.Root), Is.EqualTo(PrefabInstanceStatus.Connected));
+                Assert.That(PrefabUtility.GetCorrespondingObjectFromSource(instance.Root), Is.SameAs(pmxAsset.ImportedRoot));
+                Assert.That(instance.Mesh, Is.SameAs(pmxAsset.ImportedMesh));
+                Assert.That(instance.Materials, Is.Not.Empty);
+                Assert.That(instance.Materials[0], Is.SameAs(pmxAsset.ImportedMaterials[0]));
+
+                MmdUnityPlaybackController controller = instance.Root.GetComponent<MmdUnityPlaybackController>();
+                Assert.That(controller, Is.Not.Null);
+                Assert.That(controller.HasModelSource, Is.True);
+                Assert.That(controller.ModelAssetSource, Is.SameAs(pmxAsset));
+            }
+            finally
+            {
+                DestroyInstance(instance);
             }
         }
 

@@ -118,8 +118,108 @@ namespace Mmd.Tests
         public void FastRuntimeAndPhysicsWrapperNamesAreSeparate()
         {
             Assert.That(MmdRuntimeFfiMethods.LibraryName, Is.EqualTo("mmd_runtime_ffi"));
-            Assert.That(MmdRuntimeFfiMethods.ExpectedAbiVersion, Is.EqualTo(1));
+            Assert.That(MmdRuntimeFfiMethods.ExpectedAbiVersion, Is.EqualTo(2));
+            Assert.That(MmdRuntimeFfiMethods.ValidateAbiVersion(), Is.EqualTo(2));
             Assert.That(MmdNativePhysicsMethods.LibraryName, Is.EqualTo("mmd_bullet"));
+        }
+
+        [Test]
+        public void RuntimeFfiPinsVmdCameraSamplerEntrypoints()
+        {
+            AssertRuntimeFfiSignature("VmdCameraTrackCreateFromVmdBytes", typeof(IntPtr), typeof(byte[]), typeof(IntPtr));
+            AssertRuntimeFfiSignature("VmdCameraTrackFrameCount", typeof(IntPtr), typeof(IntPtr));
+            AssertRuntimeFfiSignature("VmdCameraTrackSample", typeof(byte), typeof(IntPtr), typeof(float), typeof(float[]), typeof(IntPtr));
+            AssertRuntimeFfiSignature("VmdSampleCamera", typeof(byte), typeof(byte[]), typeof(IntPtr), typeof(float), typeof(float[]), typeof(IntPtr));
+            AssertRuntimeFfiSignature("VmdLightTrackCreateFromVmdBytes", typeof(IntPtr), typeof(byte[]), typeof(IntPtr));
+            AssertRuntimeFfiSignature("VmdLightTrackFrameCount", typeof(IntPtr), typeof(IntPtr));
+            AssertRuntimeFfiSignature("VmdLightTrackSample", typeof(byte), typeof(IntPtr), typeof(float), typeof(float[]), typeof(IntPtr));
+            AssertRuntimeFfiSignature("VmdSampleLight", typeof(byte), typeof(byte[]), typeof(IntPtr), typeof(float), typeof(float[]), typeof(IntPtr));
+            AssertRuntimeFfiSignature("VmdLightTrackFree", typeof(void), typeof(IntPtr));
+            AssertRuntimeFfiSignature("VmdSelfShadowTrackSample", typeof(byte), typeof(IntPtr), typeof(float), typeof(float[]), typeof(IntPtr));
+            AssertRuntimeFfiSignature("VmdSampleSelfShadow", typeof(byte), typeof(byte[]), typeof(IntPtr), typeof(float), typeof(float[]), typeof(IntPtr));
+            AssertRuntimeFfiSignature("VmdCameraTrackFree", typeof(void), typeof(IntPtr));
+        }
+
+        [Test]
+        public void RuntimeFfiSamplesVmdCameraIntoCallerOwnedBuffer()
+        {
+            string fixturePath = Path.Combine(
+                MmdTestFixtures.RepositoryRoot,
+                "native",
+                "mmd-anim",
+                "crates",
+                "mmd-anim-format",
+                "fixtures",
+                "vmd",
+                "simple_camera.vmd");
+            Assert.That(fixturePath, Does.Exist);
+
+            byte[] vmdBytes = File.ReadAllBytes(fixturePath);
+            float[] values = new float[9];
+
+            Assert.That(
+                MmdRuntimeFfiMethods.VmdSampleCamera(vmdBytes, new IntPtr(vmdBytes.Length), 22.5f, values, new IntPtr(values.Length)),
+                Is.Not.Zero,
+                "one-shot camera sample");
+            AssertCameraSample(values);
+
+            IntPtr track = MmdRuntimeFfiMethods.VmdCameraTrackCreateFromVmdBytes(vmdBytes, new IntPtr(vmdBytes.Length));
+            Assert.That(track, Is.Not.EqualTo(IntPtr.Zero));
+            try
+            {
+                Array.Clear(values, 0, values.Length);
+                Assert.That(
+                    MmdRuntimeFfiMethods.VmdCameraTrackSample(track, 22.5f, values, new IntPtr(values.Length)),
+                    Is.Not.Zero,
+                    "track camera sample");
+                AssertCameraSample(values);
+
+                float[] shortBuffer = new float[8];
+                Assert.That(
+                    MmdRuntimeFfiMethods.VmdCameraTrackSample(track, 22.5f, shortBuffer, new IntPtr(shortBuffer.Length)),
+                    Is.Zero,
+                    "short buffer must be rejected");
+            }
+            finally
+            {
+                MmdRuntimeFfiMethods.VmdCameraTrackFree(track);
+            }
+        }
+
+        [Test]
+        public void RuntimeFfiSamplesVmdLightIntoCallerOwnedBuffer()
+        {
+            byte[] vmdBytes = BuildLightOnlyVmdBytes();
+            float[] values = new float[6];
+
+            Assert.That(
+                MmdRuntimeFfiMethods.VmdSampleLight(vmdBytes, new IntPtr(vmdBytes.Length), 20.0f, values, new IntPtr(values.Length)),
+                Is.Not.Zero,
+                "one-shot light sample");
+            AssertLightSample(values);
+
+            IntPtr track = MmdRuntimeFfiMethods.VmdLightTrackCreateFromVmdBytes(vmdBytes, new IntPtr(vmdBytes.Length));
+            Assert.That(track, Is.Not.EqualTo(IntPtr.Zero));
+            try
+            {
+                Assert.That(MmdRuntimeFfiMethods.VmdLightTrackFrameCount(track).ToInt64(), Is.EqualTo(2));
+                Array.Clear(values, 0, values.Length);
+                Assert.That(
+                    MmdRuntimeFfiMethods.VmdLightTrackSample(track, 20.0f, values, new IntPtr(values.Length)),
+                    Is.Not.Zero,
+                    "track light sample");
+                AssertLightSample(values);
+
+                float[] shortBuffer = new float[5];
+                Assert.That(
+                    MmdRuntimeFfiMethods.VmdLightTrackSample(track, 20.0f, shortBuffer, new IntPtr(shortBuffer.Length)),
+                    Is.Zero,
+                    "short buffer must be rejected");
+            }
+            finally
+            {
+                MmdRuntimeFfiMethods.VmdLightTrackFree(track);
+            }
         }
 
         [Test]
@@ -161,6 +261,84 @@ namespace Mmd.Tests
             MethodInfo method = typeof(MmdParserFfiMethods).GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Static);
             Assert.That(method, Is.Not.Null, methodName);
             return method;
+        }
+
+        private static void AssertRuntimeFfiSignature(string methodName, Type returnType, params Type[] parameterTypes)
+        {
+            MethodInfo method = typeof(MmdRuntimeFfiMethods).GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.That(method, Is.Not.Null, methodName);
+            Assert.That(method.ReturnType, Is.EqualTo(returnType), methodName);
+            CollectionAssert.AreEqual(parameterTypes, method.GetParameters().Select(parameter => parameter.ParameterType).ToArray(), methodName);
+        }
+
+        private static void AssertCameraSample(float[] values)
+        {
+            Assert.That(values.Length, Is.EqualTo(9));
+            Assert.That(values[0], Is.EqualTo(-40.25f).Within(0.0001f), "distance");
+            Assert.That(values[1], Is.EqualTo(-0.25f).Within(0.0001f), "position.x");
+            Assert.That(values[2], Is.EqualTo(6.0f).Within(0.0001f), "position.y");
+            Assert.That(values[3], Is.EqualTo(1.625f).Within(0.0001f), "position.z");
+            Assert.That(values[4], Is.EqualTo(-0.1f).Within(0.0001f), "rotation.x");
+            Assert.That(values[5], Is.EqualTo(-0.1f).Within(0.0001f), "rotation.y");
+            Assert.That(values[6], Is.EqualTo(0.75f).Within(0.0001f), "rotation.z");
+            Assert.That(values[7], Is.EqualTo(47.5f).Within(0.0001f), "fov");
+            Assert.That(values[8], Is.EqualTo(1.0f).Within(0.0001f), "perspective");
+        }
+
+        private static void AssertLightSample(float[] values)
+        {
+            Assert.That(values.Length, Is.EqualTo(6));
+            Assert.That(values[0], Is.EqualTo(0.5f).Within(0.0001f), "color.r");
+            Assert.That(values[1], Is.EqualTo(0.25f).Within(0.0001f), "color.g");
+            Assert.That(values[2], Is.EqualTo(0.5f).Within(0.0001f), "color.b");
+            Assert.That(values[3], Is.EqualTo(0.5f).Within(0.0001f), "direction.x");
+            Assert.That(values[4], Is.EqualTo(-0.5f).Within(0.0001f), "direction.y");
+            Assert.That(values[5], Is.EqualTo(0.0f).Within(0.0001f), "direction.z");
+        }
+
+        private static byte[] BuildLightOnlyVmdBytes()
+        {
+            using var stream = new MemoryStream();
+            using var writer = new BinaryWriter(stream);
+
+            WriteFixedAscii(writer, "Vocaloid Motion Data 0002", 30);
+            WriteFixedAscii(writer, "light_shadow", 20);
+            writer.Write(0u); // bone frames
+            writer.Write(0u); // morph frames
+            writer.Write(0u); // camera frames
+            writer.Write(2u); // light frames
+            WriteLightFrame(writer, 10u, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f);
+            WriteLightFrame(writer, 30u, 1.0f, 0.5f, 0.0f, 0.0f, -1.0f, 0.0f);
+            writer.Write(0u); // self-shadow frames
+            writer.Write(0u); // property frames
+            return stream.ToArray();
+        }
+
+        private static void WriteLightFrame(
+            BinaryWriter writer,
+            uint frame,
+            float r,
+            float g,
+            float b,
+            float x,
+            float y,
+            float z)
+        {
+            writer.Write(frame);
+            writer.Write(r);
+            writer.Write(g);
+            writer.Write(b);
+            writer.Write(x);
+            writer.Write(y);
+            writer.Write(z);
+        }
+
+        private static void WriteFixedAscii(BinaryWriter writer, string text, int byteLength)
+        {
+            byte[] bytes = new byte[byteLength];
+            byte[] source = System.Text.Encoding.ASCII.GetBytes(text);
+            Array.Copy(source, bytes, Math.Min(source.Length, bytes.Length));
+            writer.Write(bytes);
         }
     }
 }

@@ -57,6 +57,209 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void CreateStaticModelKeepsShadowCasterAndAddsHiddenSelfShadowTarget()
+        {
+            MmdUnityModelInstance? instance = null;
+            try
+            {
+                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+
+                instance = MmdUnityModelFactory.CreateStaticModel(model);
+
+                Assert.That(instance.MeshRenderer, Is.Not.Null);
+                Assert.That(instance.MeshRenderer!.shadowCastingMode, Is.EqualTo(UnityEngine.Rendering.ShadowCastingMode.On));
+                Assert.That(instance.MeshRenderer.receiveShadows, Is.True);
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_BodyVisible"), Is.EqualTo(1.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_AlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_ShadowAlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
+                Assert.That(instance.Materials[0].FindPass("ShadowCaster"), Is.GreaterThanOrEqualTo(0));
+                MmdSelfShadowTarget target = instance.Root!.GetComponent<MmdSelfShadowTarget>();
+                Assert.That(target, Is.Not.Null);
+                Assert.That((target.hideFlags & HideFlags.HideInInspector) != 0, Is.True);
+                Assert.That(target.BoundsRoot, Is.EqualTo(instance.MeshRenderer!.transform));
+            }
+            finally
+            {
+                DestroyInstance(instance);
+            }
+        }
+
+        [Test]
+        public void CreateSkinnedModelKeepsShadowCasterAndAddsHiddenSelfShadowTarget()
+        {
+            MmdUnityModelInstance? instance = null;
+            try
+            {
+                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+
+                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
+
+                Assert.That(instance.SkinnedMeshRenderer, Is.Not.Null);
+                Assert.That(instance.SkinnedMeshRenderer!.shadowCastingMode, Is.EqualTo(UnityEngine.Rendering.ShadowCastingMode.On));
+                Assert.That(instance.SkinnedMeshRenderer.receiveShadows, Is.True);
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_BodyVisible"), Is.EqualTo(1.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_AlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_ShadowAlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
+                Assert.That(instance.Materials[0].FindPass("ShadowCaster"), Is.GreaterThanOrEqualTo(0));
+                MmdSelfShadowTarget target = instance.Root!.GetComponent<MmdSelfShadowTarget>();
+                Assert.That(target, Is.Not.Null);
+                Assert.That((target.hideFlags & HideFlags.HideInInspector) != 0, Is.True);
+                Assert.That(target.BoundsRoot, Is.EqualTo(instance.SkinnedMeshRenderer!.transform));
+            }
+            finally
+            {
+                DestroyInstance(instance);
+            }
+        }
+
+        [Test]
+        public void BasicUrpToonShaderUsesOnlyDedicatedSelfShadowForToonCoordinate()
+        {
+            string shaderPath = Path.Combine(
+                MmdTestFixtures.PackageRoot,
+                "Runtime",
+                "Shaders",
+                "MmdBasicUrpToon.shader");
+            Assert.That(shaderPath, Does.Exist);
+
+            string source = File.ReadAllText(shaderPath);
+
+            Assert.That(
+                source,
+                Does.Contain("half selfShadowVisibility = SampleMmdSelfShadow(input.positionWS, selfShadowReceive);"),
+                "Forward shading must derive toon shadow visibility only from the dedicated MMD self-shadow map.");
+            Assert.That(
+                source,
+                Does.Not.Contain("mainLight.shadowAttenuation"),
+                "URP main-light shadow attenuation must not affect MMD toon shading.");
+            Assert.That(
+                source,
+                Does.Not.Contain("effectiveReceiveShadows"),
+                "ForwardLit toon shadowing must not be gated by legacy standard-shadow receive wiring.");
+            Assert.That(
+                source,
+                Does.Not.Contain("_MmdReceiveShadows"),
+                "Legacy standard-shadow receive properties are not part of the MMD toon receive path.");
+            Assert.That(
+                source,
+                Does.Not.Contain("_MmdSuppressStandardShadows"),
+                "Legacy standard-shadow suppression properties are not part of the MMD toon receive path.");
+            Assert.That(
+                source,
+                Does.Not.Contain("_MAIN_LIGHT_SHADOWS"),
+                "ForwardLit must not compile URP main-light shadow variants it does not sample.");
+            Assert.That(
+                source,
+                Does.Not.Contain("_SHADOWS_SOFT"),
+                "ForwardLit must not compile URP soft-shadow variants it does not sample.");
+            Assert.That(
+                source,
+                Does.Contain("half lightVisibility = saturate(dot(normalWS, lightDirection) * 3.0h);"),
+                "MMD toon visibility should use the traced saturate(dot(N, -LightDir) * 3) shape.");
+            Assert.That(
+                source,
+                Does.Contain("half toonVisibility = min(selfShadowVisibility, lightVisibility);"),
+                "MMD self-shadow should combine shadow visibility and light-side toon visibility with min().");
+            Assert.That(
+                source,
+                Does.Not.Contain("LinearToSRGB(_MmdLightColor.rgb) * selfShadowVisibility"),
+                "Shadow visibility must not directly dim the base/direct light color.");
+            Assert.That(
+                source,
+                Does.Contain("half3 fallbackSelfShadowToon = half3(1.0h, 1.0h, 1.0h);"),
+                "Toonless material slots stay flat so face/skin materials without toon maps do not pick up dirty shadow bands.");
+            Assert.That(
+                source,
+                Does.Contain("half3 mappedSelfShadowToon = SAMPLE_TEXTURE2D(_ToonMap, sampler_ToonMap, float2(0.5, 0.22)).rgb;"),
+                "Unity's built-in shared toon strips put very dark bands at v=0, so the self-shadow ToonColor probe must not collapse shared-toon materials to black.");
+            Assert.That(
+                source,
+                Does.Contain("half3 mmdToonLight = lerp(selfShadowToon, half3(1.0h, 1.0h, 1.0h), lightVisibility);"),
+                "With self-shadow disabled, toon lighting must stay on the original NdotL-only path.");
+            Assert.That(
+                source,
+                Does.Contain("half3 toonLight = lerp(ndotl.xxx, mmdToonLight, _ToonStrength);"),
+                "Self-shadow OFF must match the original toon/NdotL blend.");
+            Assert.That(
+                source,
+                Does.Contain("if (selfShadowVisibility < 0.999h)"),
+                "Self-shadow toon color must only affect fragments shadowed by the dedicated self-shadow map.");
+            Assert.That(
+                source,
+                Does.Contain("half3 selfShadowMmdToonLight = lerp(selfShadowToon, half3(1.0h, 1.0h, 1.0h), toonVisibility);"),
+                "MMD final composition blends the self-shadow ToonColor toward white by toonVisibility.");
+            Assert.That(
+                source,
+                Does.Contain("half3 selfShadowToonLight = lerp(ndotl.xxx, selfShadowMmdToonLight, _ToonStrength);"),
+                "The crisp self-shadow branch should keep the same NdotL/toon blend model as the original path.");
+            Assert.That(
+                source,
+                Does.Contain("toonLight = min(toonLight, selfShadowToonLight);"),
+                "Self-shadow should darken the regular NdotL toon layer instead of replacing it, preserving the soft toon shading underneath the crisp self-shadow mask.");
+            Assert.That(
+                source,
+                Does.Contain("half3 litSRGB = saturate(albedoSRGB * toonSRGB);"),
+                "MMD toon/self-shadow darkening is shader arithmetic: diffuse base is multiplied by the toon color, then alpha-over blending happens at the draw level.");
+            Assert.That(
+                source,
+                Does.Not.Contain("lerp(0.55h.xxx, 1.0h.xxx, selfShadowVisibility)"),
+                "Toonless material slots must not invent a dedicated self-shadow fallback ramp.");
+            Assert.That(
+                source,
+                Does.Contain("half sampledDepth = SAMPLE_TEXTURE2D(_MmdSelfShadowMap, sampler_MmdSelfShadowMap, shadowCoord.xy).r;"),
+                "MMD self-shadow samples the R32F z/w map first, then compares the sampled depth.");
+            Assert.That(
+                source,
+                Does.Contain("return ComputeMmdSelfShadowVisibility(shadowCoord.z, sampledDepth);"),
+                "The receiver-side compare should mirror the MMD main pass texld + currentDepth-shadowDepth pattern.");
+            Assert.That(
+                source,
+                Does.Contain("return 1.0h - saturate(occluderDepthDelta * 1500.0h - 0.3h);"),
+                "MMD's traced main shader softens the self-shadow edge with mad_sat(diff * 1500 - 0.3).");
+            Assert.That(
+                source,
+                Does.Not.Contain("LOAD_TEXTURE2D(_MmdSelfShadowMap"),
+                "MMD's traced shader uses texld before the depth compare, not point-load compare-before-filter PCF.");
+            Assert.That(
+                source,
+                Does.Contain("Name \"MmdSelfShadowCaster\""),
+                "Dedicated MMD self-shadow caster must write z/w into the R32F map instead of using URP's depth-only ShadowCaster output.");
+            Assert.That(
+                source,
+                Does.Contain("float shadowDepth = input.shadowCoord.z / max(input.shadowCoord.w, 1e-5);"),
+                "The traced MMD caster pixel shader writes light clip z/w.");
+            Assert.That(
+                source,
+                Does.Not.Contain("0.22h"),
+                "Dedicated MMD self-shadow visibility must be a 0/1 mask before toon ramp sampling.");
+            Assert.That(
+                source,
+                Does.Not.Contain("three-mmd-loader"),
+                "The package shader contract must describe its own visibility path, not a copied reference note.");
+        }
+
+        [Test]
+        public void CreateStaticModelSetsShadowAlphaClipForAlphaBlendMaterial()
+        {
+            MmdUnityModelInstance? instance = null;
+            try
+            {
+                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+                model.materials[0].alpha = 0.5f;
+
+                instance = MmdUnityModelFactory.CreateStaticModel(model);
+
+                Assert.That(instance.Materials[0].renderQueue, Is.GreaterThanOrEqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_AlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_ShadowAlphaClipThreshold"), Is.EqualTo(0.01f).Within(0.00001f));
+            }
+            finally
+            {
+                DestroyInstance(instance);
+            }
+        }
+
+        [Test]
         public void CreateStaticModelConvertsMeshPositionsAndNormalsAtUnityBoundary()
         {
             MmdUnityModelInstance? instance = null;
@@ -218,6 +421,7 @@ namespace Mmd.Tests
                 Assert.That(instance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Geometry));
                 Assert.That(ReadMaterialFloat(instance.Materials[0], "_ZWrite"), Is.EqualTo(1.0f).Within(0.00001f));
                 Assert.That(ReadMaterialFloat(instance.Materials[0], "_AlphaClipThreshold"), Is.EqualTo(0.01f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_ShadowAlphaClipThreshold"), Is.EqualTo(0.01f).Within(0.00001f));
                 Assert.That(instance.MaterialBindingDiagnostics[0].isTransparent, Is.True);
                 Assert.That(instance.MaterialBindingDiagnostics[0].transparencyMode, Is.EqualTo("alphaTest"));
                 Assert.That(instance.MaterialBindingDiagnostics[0].renderOrderBucket, Is.EqualTo("alphaTest"));
@@ -651,16 +855,22 @@ namespace Mmd.Tests
             {
                 MmdModelDefinition model = CreateTwoTransparentTriangleModel();
                 model.materials[0].cullingPolicy = "double-sided";
+                model.materials[0].drawEdgeFlag = true;
+                model.materials[0].edgeSize = 1.0f;
                 model.materials[1].cullingPolicy = "backface-culling";
+                model.materials[1].drawEdgeFlag = true;
+                model.materials[1].edgeSize = 1.0f;
 
                 instance = MmdUnityModelFactory.CreateStaticModel(model);
 
                 Assert.That(ReadMaterialFloat(instance.Materials[0], "_Cull"), Is.EqualTo((float)UnityEngine.Rendering.CullMode.Off).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_OutlineVisible"), Is.EqualTo(1.0f).Within(0.00001f));
                 Assert.That(instance.MaterialBindingDiagnostics[0].cull, Is.EqualTo((float)UnityEngine.Rendering.CullMode.Off).Within(0.00001f));
                 Assert.That(instance.MaterialBindingDiagnostics[0].cullingPolicy, Is.EqualTo("double-sided"));
                 Assert.That(instance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
 
                 Assert.That(ReadMaterialFloat(instance.Materials[1], "_Cull"), Is.EqualTo((float)UnityEngine.Rendering.CullMode.Back).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(instance.Materials[1], "_OutlineVisible"), Is.EqualTo(0.0f).Within(0.00001f));
                 Assert.That(instance.MaterialBindingDiagnostics[1].cull, Is.EqualTo((float)UnityEngine.Rendering.CullMode.Back).Within(0.00001f));
                 Assert.That(instance.MaterialBindingDiagnostics[1].cullingPolicy, Is.EqualTo("backface-culling"));
                 Assert.That(instance.Materials[1].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent + 1));
