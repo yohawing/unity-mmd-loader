@@ -11,6 +11,8 @@ namespace Mmd.Samples.RuntimeVerification
 {
     public sealed class MmdRuntimeViewerController : MonoBehaviour
     {
+        public static Func<string, string, string>? BrowseFileOverride;
+
         private readonly List<string> statusLines = new();
         private MmdRuntimeVerificationArguments? arguments;
         private MmdRuntimeViewerFixtureCase[] cases = Array.Empty<MmdRuntimeViewerFixtureCase>();
@@ -18,14 +20,30 @@ namespace Mmd.Samples.RuntimeVerification
         private MmdUnityPlaybackController? playbackController;
         private Vector2 listScroll;
         private int selectedIndex = -1;
+        private string pmxInput = string.Empty;
+        private string vmdInput = string.Empty;
 
         public void Initialize(MmdRuntimeVerificationArguments viewerArguments)
         {
             arguments = viewerArguments ?? throw new ArgumentNullException(nameof(viewerArguments));
+            if (!string.IsNullOrWhiteSpace(arguments.PmxPath))
+            {
+                pmxInput = arguments.PmxPath;
+            }
+
+            if (!string.IsNullOrWhiteSpace(arguments.VmdPath))
+            {
+                vmdInput = arguments.VmdPath;
+            }
+
             ReloadCases();
             if (cases.Length > 0)
             {
                 SelectCase(0);
+            }
+            else
+            {
+                AddStatus("No cases loaded. Enter PMX/VMD paths below and click Load.");
             }
         }
 
@@ -72,8 +90,11 @@ namespace Mmd.Samples.RuntimeVerification
             GUILayout.EndHorizontal();
 
             GUILayout.Space(6.0f);
+            DrawFileInputSection();
+
+            GUILayout.Space(6.0f);
             GUILayout.Label("Cases");
-            listScroll = GUILayout.BeginScrollView(listScroll, GUILayout.Height(Mathf.Max(160.0f, Screen.height - 360.0f)));
+            listScroll = GUILayout.BeginScrollView(listScroll, GUILayout.Height(Mathf.Max(120.0f, Screen.height - 480.0f)));
             for (int i = 0; i < cases.Length; i++)
             {
                 string label = i == selectedIndex ? "> " + cases[i].Name : cases[i].Name;
@@ -161,31 +182,7 @@ namespace Mmd.Samples.RuntimeVerification
 
             try
             {
-                ClearPlayback();
-                var holder = new GameObject("MMD Runtime Viewer Case: " + selected.Name);
-                playbackRoot = holder;
-                var importer = holder.AddComponent<MmdRuntimeImporterComponent>();
-                playbackController = holder.AddComponent<MmdUnityPlaybackController>();
-                playbackController.SetPlayOnStart(false);
-                playbackController.SetPhysicsMode(MmdPhysicsMode.Live);
-                importer.ConfigurePaths(
-                    selected.PmxPath,
-                    selected.VmdPath,
-                    arguments.FrameRate,
-                    startFrame: 0,
-                    shouldPlayOnStart: false);
-                playbackController.ConfigureFromRuntimeImporterPaths(
-                    selected.PmxPath,
-                    selected.VmdPath,
-                    new MmdPlaybackConfig(arguments.FrameRate, 0, playOnStart: false),
-                    allowRuntimeFallback: true);
-                playbackController.SetPhysicsMode(MmdPhysicsMode.Live);
-                if (!arguments.FastRuntimeEnabled)
-                {
-                    playbackController.DisableFastRuntime();
-                }
-
-                playbackController.Play();
+                StartPlayback(selected.PmxPath, selected.VmdPath, selected.Name);
                 AddStatus("Playing: " + selected.Name);
             }
             catch (Exception ex)
@@ -193,6 +190,138 @@ namespace Mmd.Samples.RuntimeVerification
                 ClearPlayback();
                 AddStatus("Load failed: " + ex.GetType().Name + ": " + ex.Message);
             }
+        }
+
+        private void DrawFileInputSection()
+        {
+            GUILayout.Label("Load Files");
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("PMX", GUILayout.Width(36.0f));
+            pmxInput = GUILayout.TextField(pmxInput);
+#if UNITY_EDITOR
+            if (BrowseFileOverride != null &&
+                GUILayout.Button("Browse...", GUILayout.Width(72.0f)))
+            {
+                string result = BrowseFileOverride("Select PMX file", "pmx");
+                if (!string.IsNullOrWhiteSpace(result))
+                {
+                    pmxInput = result;
+                }
+            }
+#endif
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("VMD", GUILayout.Width(36.0f));
+            vmdInput = GUILayout.TextField(vmdInput);
+#if UNITY_EDITOR
+            if (BrowseFileOverride != null &&
+                GUILayout.Button("Browse...", GUILayout.Width(72.0f)))
+            {
+                string result = BrowseFileOverride("Select VMD file", "vmd");
+                if (!string.IsNullOrWhiteSpace(result))
+                {
+                    vmdInput = result;
+                }
+            }
+#endif
+            GUILayout.EndHorizontal();
+
+            if (GUILayout.Button("Load", GUILayout.Width(88.0f)))
+            {
+                LoadFromInput();
+            }
+        }
+
+        private void LoadFromInput()
+        {
+            if (arguments == null)
+            {
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(pmxInput))
+            {
+                AddStatus("PMX path is required.");
+                return;
+            }
+
+            string pmxPath = Path.GetFullPath(pmxInput.Trim());
+            if (!File.Exists(pmxPath))
+            {
+                AddStatus("PMX file not found: " + pmxPath);
+                return;
+            }
+
+            string vmdPath = string.Empty;
+            if (!string.IsNullOrWhiteSpace(vmdInput))
+            {
+                vmdPath = Path.GetFullPath(vmdInput.Trim());
+                if (!File.Exists(vmdPath))
+                {
+                    AddStatus("VMD file not found: " + vmdPath);
+                    return;
+                }
+            }
+
+            string displayName = BuildDisplayName(pmxPath, vmdPath);
+            try
+            {
+                selectedIndex = -1;
+                StartPlayback(pmxPath, vmdPath, displayName);
+                AddStatus("Playing: " + displayName);
+            }
+            catch (Exception ex)
+            {
+                ClearPlayback();
+                AddStatus("Load failed: " + ex.GetType().Name + ": " + ex.Message);
+            }
+        }
+
+        private void StartPlayback(string pmxPath, string vmdPath, string displayName)
+        {
+            if (arguments == null)
+            {
+                return;
+            }
+
+            ClearPlayback();
+            var holder = new GameObject("MMD Runtime Viewer Case: " + displayName);
+            playbackRoot = holder;
+            var importer = holder.AddComponent<MmdRuntimeImporterComponent>();
+            playbackController = holder.AddComponent<MmdUnityPlaybackController>();
+            playbackController.SetPlayOnStart(false);
+            playbackController.SetPhysicsMode(MmdPhysicsMode.Live);
+            importer.ConfigurePaths(
+                pmxPath,
+                vmdPath,
+                arguments.FrameRate,
+                startFrame: 0,
+                shouldPlayOnStart: false);
+            playbackController.ConfigureFromRuntimeImporterPaths(
+                pmxPath,
+                vmdPath,
+                new MmdPlaybackConfig(arguments.FrameRate, 0, playOnStart: false),
+                allowRuntimeFallback: true);
+            playbackController.SetPhysicsMode(MmdPhysicsMode.Live);
+            if (!arguments.FastRuntimeEnabled)
+            {
+                playbackController.DisableFastRuntime();
+            }
+
+            playbackController.Play();
+        }
+
+        private static string BuildDisplayName(string pmxPath, string vmdPath)
+        {
+            string pmxName = Path.GetFileNameWithoutExtension(pmxPath);
+            if (string.IsNullOrWhiteSpace(vmdPath))
+            {
+                return pmxName;
+            }
+
+            return pmxName + "__" + Path.GetFileNameWithoutExtension(vmdPath);
         }
 
         private void TogglePlayback()
@@ -239,7 +368,17 @@ namespace Mmd.Samples.RuntimeVerification
         {
             if (selectedIndex < 0 || selectedIndex >= cases.Length)
             {
-                GUILayout.Label("No case selected.");
+                if (playbackController != null)
+                {
+                    GUILayout.Label("Loaded from file input.");
+                    GUILayout.Label("Frame: " + playbackController.CurrentFrame);
+                    GUILayout.Label("Fast runtime: " + playbackController.IsFastRuntimeEnabled);
+                }
+                else
+                {
+                    GUILayout.Label("No case selected.");
+                }
+
                 return;
             }
 
