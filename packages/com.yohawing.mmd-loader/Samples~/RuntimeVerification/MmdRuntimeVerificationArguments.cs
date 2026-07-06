@@ -24,6 +24,7 @@ namespace Mmd.Samples.RuntimeVerification
         public float FrameRate { get; private set; } = 30.0f;
         public int[] SampleFrames { get; private set; } = Array.Empty<int>();
         public bool DumpBones { get; private set; }
+        public string ScreenshotDir { get; private set; } = string.Empty;
         public bool ViewerMode { get; private set; }
         public float PhysicsMaxSubStepFixedStepSeconds { get; private set; }
         public MmdRuntimeVerificationDrive Drive { get; private set; } =
@@ -57,7 +58,7 @@ namespace Mmd.Samples.RuntimeVerification
                 string? value = inlineValue;
                 bool requiresValue = name is "--pmx" or "--vmd" or "--dir" or "--out" or
                     "--duration" or "--frame-rate" or "--drive" or "--fast-runtime" or
-                    "--fixture-manifest" or
+                    "--fixture-manifest" or "--screenshot-dir" or
                     "--sample-frames" or "--physics-max-substep-fixed-step";
                 if (requiresValue && value == null)
                 {
@@ -179,6 +180,9 @@ namespace Mmd.Samples.RuntimeVerification
                 case "--fixture-manifest":
                     FixtureManifestPath = value;
                     break;
+                case "--screenshot-dir":
+                    ScreenshotDir = value;
+                    break;
                 case "--out":
                     OutputPath = value;
                     break;
@@ -274,6 +278,7 @@ namespace Mmd.Samples.RuntimeVerification
                 VmdPath,
                 DirectoryPath));
             OutputPath = ResolveInputPath(OutputPath);
+            ScreenshotDir = ResolveInputPath(ScreenshotDir);
 
             if (DurationSeconds < 0.0f || float.IsNaN(DurationSeconds) || float.IsInfinity(DurationSeconds))
             {
