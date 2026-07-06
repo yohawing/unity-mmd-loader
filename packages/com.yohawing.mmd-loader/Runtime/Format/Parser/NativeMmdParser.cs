@@ -47,7 +47,9 @@ namespace Mmd.Parser
             PmxModelSourceSnapshot snapshot = UnityEngine.JsonUtility.FromJson<PmxModelSourceSnapshot>(json)
                 ?? new PmxModelSourceSnapshot();
             snapshot.geometry = createPmxGeometry(bytes);
-            return BuildModelDefinition(snapshot);
+            MmdModelDefinition model = BuildModelDefinition(snapshot);
+            model.sourceBytes = bytes;
+            return model;
         }
 
         public MmdMotionDefinition LoadMotion(ReadOnlySpan<byte> data)
@@ -60,7 +62,9 @@ namespace Mmd.Parser
             }
 
             VmdParsedAnimationJson? parsed = UnityEngine.JsonUtility.FromJson<VmdParsedAnimationJson>(json);
-            return BuildMotionDefinition(CreateMotionSnapshot(parsed));
+            MmdMotionDefinition motion = BuildMotionDefinition(CreateMotionSnapshot(parsed));
+            motion.sourceBytes = data.ToArray();
+            return motion;
         }
 
         internal static MmdModelDefinition BuildModelDefinition(PmxModelSourceSnapshot? source)

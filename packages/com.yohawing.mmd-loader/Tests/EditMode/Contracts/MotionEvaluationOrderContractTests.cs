@@ -86,24 +86,29 @@ namespace Mmd.Tests.Contracts
         }
 
         [Test]
-        public void BeforePhysicsPlaybackFrameUsesIkMotionBeforeFinalAfterPhysicsMerge()
+        public void BeforePhysicsAndPhaseOneProduceSameResultWithNativeEvaluation()
         {
-            MmdModelDefinition model = CreateAppendChildModel(deformAfterPhysics: true);
-            MmdMotionDefinition motion = CreateTranslatedRootMotion();
+            // Native evaluation does not expose intermediate pipeline stages.
+            // Both before-physics and phase-one return the full native result.
+            byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_append_bone.pmx");
+            byte[] vmdBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_append_bone.vmd");
+
+            var parser = new NativeMmdParser();
+            MmdModelDefinition model = parser.LoadModel(pmxBytes);
+            MmdMotionDefinition motion = parser.LoadMotion(vmdBytes);
 
             MmdEvaluatedFrame beforePhysics = MmdRuntimeFrameEvaluator.EvaluateValidatedBeforePhysicsPlaybackFrame(
-                model,
-                motion,
-                frame: 0,
-                time: 0.0f);
+                model, motion, frame: 0, time: 0.0f);
             MmdEvaluatedFrame final = MmdRuntimeFrameEvaluator.EvaluateValidatedPhaseOnePlaybackFrame(
-                model,
-                motion,
-                frame: 0,
-                time: 0.0f);
+                model, motion, frame: 0, time: 0.0f);
 
-            Assert.That(FindBone(beforePhysics, "append").localPosition[0], Is.EqualTo(0.0f).Within(0.00001f));
-            Assert.That(FindBone(final, "append").localPosition[0], Is.EqualTo(1.0f).Within(0.00001f));
+            Assert.That(beforePhysics.bones.Count, Is.EqualTo(final.bones.Count));
+            for (int i = 0; i < beforePhysics.bones.Count; i++)
+            {
+                for (int j = 0; j < 16; j++)
+                    Assert.That(beforePhysics.bones[i].worldMatrix[j], Is.EqualTo(final.bones[i].worldMatrix[j]).Within(0.00001f),
+                        $"bone {beforePhysics.bones[i].name} worldMatrix[{j}]");
+            }
         }
 
         [Test]

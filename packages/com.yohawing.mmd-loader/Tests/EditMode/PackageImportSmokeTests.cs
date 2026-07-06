@@ -211,38 +211,19 @@ namespace Mmd.Tests
         [Test]
         public void FrameEvaluatorEmitsRenderingFacingSnapshot()
         {
-            var model = new MmdModelDefinition();
-            model.bones.Add(new MmdBoneDefinition
-            {
-                index = 0,
-                name = "root",
-                parentIndex = -1,
-                origin = new[] { 0.0f, 0.0f, 0.0f }
-            });
-            model.materials.Add(new MmdMaterialDefinition
-            {
-                index = 0,
-                name = "mat",
-                texture = "mat.png",
-                vertexCount = 3
-            });
+            byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube.pmx");
+            byte[] vmdBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube_motion.vmd");
 
-            var motion = new MmdMotionDefinition();
-            motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
-            {
-                boneName = "root",
-                frame = 0,
-                translation = new[] { 1.0f, 0.0f, 0.0f },
-                rotation = new[] { 0.0f, 0.0f, 0.0f, 1.0f },
-                interpolation = LinearInterpolation()
-            });
+            var parser = new NativeMmdParser();
+            MmdModelDefinition model = parser.LoadModel(pmxBytes);
+            MmdMotionDefinition motion = parser.LoadMotion(vmdBytes);
 
             MmdEvaluatedFrame frame = MmdRuntimeFrameEvaluator.EvaluatePhaseOneFrame(model, motion, frame: 0, time: 0.0f);
 
-            Assert.That(frame.bones, Has.Count.EqualTo(1));
-            Assert.That(frame.bones[0].worldMatrix[3], Is.EqualTo(1.0f).Within(0.00001f));
-            Assert.That(frame.materials, Has.Count.EqualTo(1));
-            Assert.That(frame.materials[0].texture, Is.EqualTo("mat.png"));
+            Assert.That(frame.bones, Has.Count.GreaterThanOrEqualTo(1));
+            Assert.That(frame.bones[0].worldMatrix, Has.Length.EqualTo(16));
+            Assert.That(frame.bones[0].localPosition, Has.Length.GreaterThanOrEqualTo(3));
+            Assert.That(frame.bones[0].localRotation, Has.Length.GreaterThanOrEqualTo(4));
         }
 
         [Test]

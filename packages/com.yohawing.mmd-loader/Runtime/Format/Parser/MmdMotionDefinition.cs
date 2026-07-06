@@ -19,6 +19,8 @@ namespace Mmd.Parser
         public int lightKeyframeCount;
         public List<MmdSelfShadowKeyframeDefinition> selfShadowKeyframes = new();
         public int selfShadowKeyframeCount;
+
+        [NonSerialized] internal byte[]? sourceBytes;
     }
 
     /// <summary>

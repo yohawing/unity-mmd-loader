@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Text;
 using Mmd;
 using Mmd.Motion;
 using Mmd.Native;
@@ -299,7 +300,7 @@ namespace Mmd.UnityIntegration
 
         private static MmdMotionDefinition CreateModelOnlyRestMotion(MmdModelDefinition model)
         {
-            return new MmdMotionDefinition
+            var motion = new MmdMotionDefinition
             {
                 targetModelName = model.name ?? string.Empty,
                 maxFrame = 0,
@@ -307,6 +308,18 @@ namespace Mmd.UnityIntegration
                 morphKeyframes = new List<MmdMorphKeyframeDefinition>(),
                 modelKeyframes = new List<MmdModelKeyframeDefinition>()
             };
+            motion.sourceBytes = BuildMinimalVmdBytes(model.name ?? string.Empty);
+            return motion;
+        }
+
+        private static byte[] BuildMinimalVmdBytes(string modelName)
+        {
+            byte[] bytes = new byte[66];
+            byte[] header = Encoding.ASCII.GetBytes("Vocaloid Motion Data 0002");
+            Array.Copy(header, 0, bytes, 0, Math.Min(header.Length, 30));
+            byte[] name = Encoding.GetEncoding(932).GetBytes(modelName);
+            Array.Copy(name, 0, bytes, 30, Math.Min(name.Length, 20));
+            return bytes;
         }
 
         public static MmdUnityPlaybackBinding CreateSkinned(
