@@ -1118,7 +1118,7 @@ namespace Mmd.Tests
             Assert.That(pass, Does.Not.Contain("debugVisibilityPreview"));
             Assert.That(pass, Does.Not.Contain("debugDepthPreview"));
             Assert.That(pass, Does.Contain("NormalizeShadowDepthBias(shadowDepthBias, far - near)"));
-            Assert.That(pass, Does.Contain("parameters = new Vector4(1.0f, normalizedShadowDepthBias, 0.0f, 0.0f)"));
+            Assert.That(pass, Does.Contain("parameters = new Vector4(1.0f, normalizedShadowDepthBias, pcfTapCount, uvRadius)"));
             Assert.That(pass, Does.Not.Contain("1.0f / Mathf.Max(1, shadowMapSize)"));
             Assert.That(pass, Does.Not.Contain("0.0025f"));
             Assert.That(pass, Does.Contain("SystemInfo.usesReversedZBuffer"));

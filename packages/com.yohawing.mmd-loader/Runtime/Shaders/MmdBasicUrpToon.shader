@@ -256,6 +256,17 @@ Shader "MMD Basic URP Toon"
                 return 1.0h - saturate(occluderDepthDelta * 1500.0h - 0.3h);
             }
 
+            static const float2 PoissonDisk[8] = {
+                float2(-0.7071, 0.7071),
+                float2( 0.0,   -1.0),
+                float2( 0.7071, 0.7071),
+                float2(-1.0,    0.0),
+                float2( 0.3536,-0.3536),
+                float2(-0.3536,-0.3536),
+                float2( 0.3536, 0.3536),
+                float2(-0.3536, 0.3536)
+            };
+
             half SampleMmdSelfShadow(float3 positionWS, half selfShadowReceive)
             {
                 if (_MmdSelfShadowParams.x <= 0.5 || selfShadowReceive <= 0.5h)
@@ -270,8 +281,27 @@ Shader "MMD Basic URP Toon"
                     return 1.0h;
                 }
 
-                half sampledDepth = SAMPLE_TEXTURE2D(_MmdSelfShadowMap, sampler_MmdSelfShadowMap, shadowCoord.xy).r;
-                return ComputeMmdSelfShadowVisibility(shadowCoord.z, sampledDepth);
+                if (_MmdSelfShadowParams.z <= 1.5)
+                {
+                    half sampledDepth = SAMPLE_TEXTURE2D(_MmdSelfShadowMap, sampler_MmdSelfShadowMap, shadowCoord.xy).r;
+                    return ComputeMmdSelfShadowVisibility(shadowCoord.z, sampledDepth);
+                }
+
+                int tapCount = _MmdSelfShadowParams.z <= 4.5 ? 4 : 8;
+                half visibility = 0.0h;
+                for (int i = 0; i < tapCount; i++)
+                {
+                    float2 sampleUv = shadowCoord.xy + PoissonDisk[i] * _MmdSelfShadowParams.w;
+                    if (any(sampleUv < 0.0) || any(sampleUv > 1.0))
+                    {
+                        visibility += 1.0h;
+                        continue;
+                    }
+                    half sampledDepth = SAMPLE_TEXTURE2D(_MmdSelfShadowMap, sampler_MmdSelfShadowMap, sampleUv).r;
+                    visibility += ComputeMmdSelfShadowVisibility(shadowCoord.z, sampledDepth);
+                }
+
+                return visibility / tapCount;
             }
 
             half4 ForwardFragment(Varyings input) : SV_Target
