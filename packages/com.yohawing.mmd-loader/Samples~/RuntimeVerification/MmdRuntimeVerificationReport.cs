@@ -41,6 +41,9 @@ namespace Mmd.Samples.RuntimeVerification
         public MmdRuntimeVerificationSampledFrame[] sampledFrames =
             Array.Empty<MmdRuntimeVerificationSampledFrame>();
         public string exception = string.Empty;
+        public int consoleErrorCount;
+        public int consoleWarningCount;
+        public string skipReason = string.Empty;
     }
 
     [Serializable]

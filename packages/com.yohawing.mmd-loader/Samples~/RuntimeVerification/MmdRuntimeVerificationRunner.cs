@@ -122,7 +122,8 @@ namespace Mmd.Samples.RuntimeVerification
                 MmdRuntimeVerificationCaseResult result = CreateInitialResult(verificationCase);
                 results.Add(result);
                 yield return RunCase(verificationCase, result);
-                if (!string.Equals(result.status, "passed", StringComparison.Ordinal))
+                if (!string.Equals(result.status, "passed", StringComparison.Ordinal) &&
+                    !string.Equals(result.status, "skipped", StringComparison.Ordinal))
                 {
                     anyFailure = true;
                 }
@@ -141,34 +142,83 @@ namespace Mmd.Samples.RuntimeVerification
             MmdRuntimeVerificationCaseResult result)
         {
             var stopwatch = Stopwatch.StartNew();
-            bool parsed = ParseInputs(verificationCase, result);
-            if (!parsed)
+            int consoleErrorCount = 0;
+            int consoleWarningCount = 0;
+            Application.LogCallback onLogMessage = OnLogMessage;
+            Application.logMessageReceived += onLogMessage;
+            try
             {
-                result.status = "failed";
-                result.playbackStatus = "skipped";
+                if (!string.IsNullOrWhiteSpace(verificationCase.SkipReason))
+                {
+                    result.status = "skipped";
+                    result.skipReason = verificationCase.SkipReason;
+                    result.parseStatus = "skipped";
+                    result.playbackStatus = "skipped";
+                    result.durationSeconds = (float)stopwatch.Elapsed.TotalSeconds;
+                    yield break;
+                }
+
+                bool parsed = ParseInputs(verificationCase, result);
+                if (!parsed)
+                {
+                    result.parseStatus = "failed";
+                    result.status = "failed";
+                    result.playbackStatus = "skipped";
+                    result.durationSeconds = (float)stopwatch.Elapsed.TotalSeconds;
+                    yield break;
+                }
+
+                result.parseStatus = "passed";
+                if (verificationCase.ParseOnly)
+                {
+                    result.status = "passed";
+                    result.playbackStatus = "skipped";
+                    result.durationSeconds = (float)stopwatch.Elapsed.TotalSeconds;
+                    yield break;
+                }
+
+                if (arguments.Drive == MmdRuntimeVerificationDrive.Timeline)
+                {
+                    yield return DriveTimeline(verificationCase, result);
+                }
+                else
+                {
+                    yield return DriveController(verificationCase, result);
+                }
+
                 result.durationSeconds = (float)stopwatch.Elapsed.TotalSeconds;
-                yield break;
+            }
+            finally
+            {
+                Application.logMessageReceived -= onLogMessage;
+                if (!string.Equals(result.status, "skipped", StringComparison.Ordinal))
+                {
+                    result.consoleErrorCount = consoleErrorCount;
+                    result.consoleWarningCount = consoleWarningCount;
+                    if (consoleErrorCount > 0)
+                    {
+                        result.status = "failed";
+                        AppendException(
+                            result,
+                            "Console reported " + consoleErrorCount + " error(s) during case execution.");
+                    }
+                }
             }
 
-            result.parseStatus = "passed";
-            if (verificationCase.ParseOnly)
+            void OnLogMessage(string logString, string stackTrace, LogType type)
             {
-                result.status = "passed";
-                result.playbackStatus = "skipped";
-                result.durationSeconds = (float)stopwatch.Elapsed.TotalSeconds;
-                yield break;
+                switch (type)
+                {
+                    case LogType.Error:
+                    case LogType.Exception:
+                    case LogType.Assert:
+                        consoleErrorCount++;
+                        break;
+                    case LogType.Warning:
+                        consoleWarningCount++;
+                        break;
+                }
             }
-
-            if (arguments.Drive == MmdRuntimeVerificationDrive.Timeline)
-            {
-                yield return DriveTimeline(verificationCase, result);
-            }
-            else
-            {
-                yield return DriveController(verificationCase, result);
-            }
-
-            result.durationSeconds = (float)stopwatch.Elapsed.TotalSeconds;
         }
 
         private bool ParseInputs(

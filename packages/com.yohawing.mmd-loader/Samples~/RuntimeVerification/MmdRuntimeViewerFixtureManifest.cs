@@ -26,10 +26,33 @@ namespace Mmd.Samples.RuntimeVerification
                     viewerCases[i].Name,
                     viewerCases[i].PmxPath,
                     viewerCases[i].VmdPath,
-                    parseOnly: false));
+                    parseOnly: false,
+                    skipReason: string.Empty));
             }
 
             return playbackCases.ToArray();
+        }
+
+        public static MmdRuntimeVerificationCase[] LoadGateCases(
+            string manifestPath,
+            List<string> errors)
+        {
+            MmdRuntimeViewerFixtureCase[] viewerCases = LoadViewerCases(
+                manifestPath,
+                errors,
+                includeSkipped: true);
+            var gateCases = new List<MmdRuntimeVerificationCase>(viewerCases.Length);
+            for (int i = 0; i < viewerCases.Length; i++)
+            {
+                gateCases.Add(new MmdRuntimeVerificationCase(
+                    viewerCases[i].Name,
+                    viewerCases[i].PmxPath,
+                    viewerCases[i].VmdPath,
+                    parseOnly: false,
+                    skipReason: viewerCases[i].SkipReason));
+            }
+
+            return gateCases.ToArray();
         }
 
         public static MmdRuntimeViewerFixtureCase[] LoadViewerCases(

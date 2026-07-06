@@ -85,7 +85,7 @@ namespace Mmd.Samples.RuntimeVerification
             bool hasDir = !string.IsNullOrWhiteSpace(DirectoryPath);
             if (!string.IsNullOrWhiteSpace(FixtureManifestPath))
             {
-                return MmdRuntimeViewerFixtureManifest.LoadPlaybackCases(FixtureManifestPath, Errors);
+                return MmdRuntimeViewerFixtureManifest.LoadGateCases(FixtureManifestPath, Errors);
             }
 
             if (!hasDir)
@@ -94,7 +94,8 @@ namespace Mmd.Samples.RuntimeVerification
                     CaseName(PmxPath, VmdPath, "single"),
                     PmxPath,
                     VmdPath,
-                    parseOnly: !(hasPmx && hasVmd)));
+                    parseOnly: !(hasPmx && hasVmd),
+                    skipReason: string.Empty));
                 return cases.ToArray();
             }
 
@@ -106,7 +107,8 @@ namespace Mmd.Samples.RuntimeVerification
                         CaseName(pmx, VmdPath, Path.GetFileNameWithoutExtension(pmx)),
                         pmx,
                         VmdPath,
-                        parseOnly: false));
+                        parseOnly: false,
+                        skipReason: string.Empty));
                 }
 
                 return cases.ToArray();
@@ -120,7 +122,8 @@ namespace Mmd.Samples.RuntimeVerification
                         CaseName(PmxPath, vmd, Path.GetFileNameWithoutExtension(vmd)),
                         PmxPath,
                         vmd,
-                        parseOnly: false));
+                        parseOnly: false,
+                        skipReason: string.Empty));
                 }
 
                 return cases.ToArray();
@@ -132,7 +135,8 @@ namespace Mmd.Samples.RuntimeVerification
                     CaseName(PmxPath, VmdPath, "single"),
                     PmxPath,
                     VmdPath,
-                    parseOnly: false));
+                    parseOnly: false,
+                    skipReason: string.Empty));
                 return cases.ToArray();
             }
 
@@ -142,7 +146,8 @@ namespace Mmd.Samples.RuntimeVerification
                     "parse-pmx:" + Path.GetFileName(pmx),
                     pmx,
                     string.Empty,
-                    parseOnly: true));
+                    parseOnly: true,
+                    skipReason: string.Empty));
             }
 
             foreach (string vmd in EnumerateFiles(DirectoryPath, "*.vmd"))
@@ -151,7 +156,8 @@ namespace Mmd.Samples.RuntimeVerification
                     "parse-vmd:" + Path.GetFileName(vmd),
                     string.Empty,
                     vmd,
-                    parseOnly: true));
+                    parseOnly: true,
+                    skipReason: string.Empty));
             }
 
             return cases.ToArray();
@@ -439,17 +445,20 @@ namespace Mmd.Samples.RuntimeVerification
             string name,
             string pmxPath,
             string vmdPath,
-            bool parseOnly)
+            bool parseOnly,
+            string skipReason)
         {
             Name = name ?? string.Empty;
             PmxPath = pmxPath ?? string.Empty;
             VmdPath = vmdPath ?? string.Empty;
             ParseOnly = parseOnly;
+            SkipReason = skipReason ?? string.Empty;
         }
 
         public string Name { get; }
         public string PmxPath { get; }
         public string VmdPath { get; }
         public bool ParseOnly { get; }
+        public string SkipReason { get; }
     }
 }
