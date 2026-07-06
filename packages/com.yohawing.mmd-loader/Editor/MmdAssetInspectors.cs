@@ -16,6 +16,8 @@ namespace Mmd.Editor
     [CustomEditor(typeof(MmdPmxAsset))]
     public sealed class MmdPmxAssetEditor : UnityEditor.Editor
     {
+        private bool showReadinessDiagnostics;
+
         public override void OnInspectorGUI()
         {
             if (target is not MmdPmxAsset asset)
@@ -32,13 +34,6 @@ namespace Mmd.Editor
                 asset.ShaderPreset);
             MmdAssetInspectorUtility.DrawModelSummary(asset);
             MmdAssetInspectorUtility.DrawParseSummary(asset);
-            MmdAssetInspectorUtility.DrawMaterialSummary(asset);
-            DrawMissingTextureActions(asset);
-            MmdAssetInspectorUtility.DrawOutlineSummary(asset);
-            MmdAssetInspectorUtility.DrawHierarchyReadinessSummary(asset);
-            MmdAssetInspectorUtility.DrawPhysicsSummary(asset);
-            MmdAssetInspectorUtility.DrawHumanoidSummary(asset);
-            MmdAssetInspectorUtility.DrawAnimationTimelineSummary(asset);
 
             using (new EditorGUI.DisabledScope(asset.ByteLength == 0))
             {
@@ -60,6 +55,19 @@ namespace Mmd.Editor
                     Selection.activeObject = setup;
                     EditorGUIUtility.PingObject(setup);
                 }
+            }
+
+            DrawMissingTextureActions(asset);
+
+            showReadinessDiagnostics = EditorGUILayout.Foldout(showReadinessDiagnostics, "Readiness Diagnostics", true);
+            if (showReadinessDiagnostics)
+            {
+                MmdAssetInspectorUtility.DrawMaterialSummary(asset);
+                MmdAssetInspectorUtility.DrawOutlineSummary(asset);
+                MmdAssetInspectorUtility.DrawHierarchyReadinessSummary(asset);
+                MmdAssetInspectorUtility.DrawPhysicsSummary(asset);
+                MmdAssetInspectorUtility.DrawHumanoidSummary(asset);
+                MmdAssetInspectorUtility.DrawAnimationTimelineSummary(asset);
             }
         }
 
@@ -105,6 +113,7 @@ namespace Mmd.Editor
     [CustomEditor(typeof(MmdVmdAsset))]
     public sealed class MmdVmdAssetEditor : UnityEditor.Editor
     {
+        private bool showReadinessDiagnostics;
         private IReadOnlyList<string>? lastStructuralDiagnostics;
 
         // Non-persistent preview references for Humanoid Clip Readiness (per Inspector lifetime).
@@ -127,31 +136,35 @@ namespace Mmd.Editor
                 MmdAssetInspectorUtility.DrawVmdMotionSummary(asset);
 
                 EditorGUILayout.Space();
-                // Initialize from import-time cached structural diagnostics.
-                // Do NOT call LoadMotion / Refresh on mere asset selection or inspector open.
-                if (lastStructuralDiagnostics == null)
-                {
-                    lastStructuralDiagnostics = asset.StructuralDiagnostics;
-                }
-
-                MmdAssetInspectorUtility.DrawVmdStructuralDiagnostics(lastStructuralDiagnostics);
-
-                EditorGUILayout.Space();
-                MmdAssetInspectorUtility.DrawVmdTimelineReadiness(asset);
-
-                EditorGUILayout.Space();
-                MmdAssetInspectorUtility.DrawVmdHumanoidClipReadinessSection(
-                    asset,
-                    ref previewPmxAsset,
-                    ref previewSetupAsset);
-
-                EditorGUILayout.Space();
                 using (new EditorGUI.DisabledScope(false))
                 {
                     if (GUILayout.Button("Run VMD Diagnostics"))
                     {
                         RefreshDiagnostics(asset, repaint: true);
                     }
+                }
+
+                showReadinessDiagnostics = EditorGUILayout.Foldout(showReadinessDiagnostics, "Readiness Diagnostics", true);
+                if (showReadinessDiagnostics)
+                {
+                    // Initialize from import-time cached structural diagnostics.
+                    // Do NOT call LoadMotion / Refresh on mere asset selection or inspector open.
+                    if (lastStructuralDiagnostics == null)
+                    {
+                        lastStructuralDiagnostics = asset.StructuralDiagnostics;
+                    }
+
+                    EditorGUILayout.Space();
+                    MmdAssetInspectorUtility.DrawVmdStructuralDiagnostics(lastStructuralDiagnostics);
+
+                    EditorGUILayout.Space();
+                    MmdAssetInspectorUtility.DrawVmdTimelineReadiness(asset);
+
+                    EditorGUILayout.Space();
+                    MmdAssetInspectorUtility.DrawVmdHumanoidClipReadinessSection(
+                        asset,
+                        ref previewPmxAsset,
+                        ref previewSetupAsset);
                 }
             }
             else
@@ -482,10 +495,6 @@ namespace Mmd.Editor
                 EditorGUILayout.Vector3Field("MMD Bounds Size", asset.BoundsSize);
                 EditorGUILayout.TextField("Unity Conversion", "[-x, y, -z] at instantiation");
             }
-
-            EditorGUILayout.HelpBox(
-                "Bounds are cached in unscaled MMD model space. Import Scale and MMD-to-Unity basis conversion are applied only at Unity instantiation/export boundaries.",
-                MessageType.Info);
         }
 
         public static void DrawParseSummary(MmdPmxAsset asset)
@@ -634,10 +643,6 @@ namespace Mmd.Editor
                 EditorGUILayout.TextField("Scale-Aware Handoff", readiness.ScaleAwareHandoffReadiness);
                 EditorGUILayout.TextField("Required Smoke", readiness.RequiredSmoke);
             }
-
-            EditorGUILayout.HelpBox(
-                "Import Scale is stored as import metadata. Runtime playback and live physics apply scale at Unity/MMD boundaries while cached PMX summaries stay in MMD space.",
-                MessageType.Info);
         }
 
         internal static MmdScaleAwarePhysicsReadiness GetScaleAwarePhysicsReadiness(MmdPmxAsset? asset)
@@ -675,10 +680,6 @@ namespace Mmd.Editor
                 EditorGUILayout.TextField("Humanoid Setup Asset", "Explicit asset workflow");
                 EditorGUILayout.TextField("Native Playback Impact", "None");
             }
-
-            EditorGUILayout.HelpBox(
-                "Create Humanoid Setup Asset stores PMX source and H1 readiness metadata only. It does not create Avatar, proxy rig, or mapping assets.",
-                MessageType.Info);
         }
 
         public static void DrawAnimationTimelineSummary(MmdPmxAsset asset)
@@ -692,10 +693,6 @@ namespace Mmd.Editor
                 EditorGUILayout.TextField("VMD Drop Readiness", readiness.VmdDropReadiness);
                 EditorGUILayout.TextField("Playback Source", readiness.PlaybackSource);
             }
-
-            EditorGUILayout.HelpBox(
-                "PMX import does not auto-create scene playback objects. Use Load PMX Into Scene to create a controller root that can receive VMD clips or playback sources.",
-                MessageType.Info);
         }
 
         internal static MmdAnimationTimelineReadiness GetAnimationTimelineReadiness(MmdPmxAsset? asset)
