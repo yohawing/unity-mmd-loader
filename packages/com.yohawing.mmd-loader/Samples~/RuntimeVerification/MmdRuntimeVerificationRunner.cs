@@ -12,6 +12,7 @@ using Mmd.Physics;
 using Mmd.UnityIntegration;
 using UnityEngine;
 using UnityEngine.Playables;
+using UnityEngine.Rendering;
 
 namespace Mmd.Samples.RuntimeVerification
 {
@@ -202,6 +203,15 @@ namespace Mmd.Samples.RuntimeVerification
                             result,
                             "Console reported " + consoleErrorCount + " error(s) during case execution.");
                     }
+
+                    if (string.Equals(result.visualSmoke.smokeStatus, "failed", StringComparison.Ordinal))
+                    {
+                        result.status = "failed";
+                        AppendException(result, "Visual smoke failed:"
+                            + (result.visualSmoke.isBlank ? " blank" : "")
+                            + (result.visualSmoke.isAllBlack ? " all-black" : "")
+                            + (result.visualSmoke.isAllWhite ? " all-white" : ""));
+                    }
                 }
             }
 
@@ -304,6 +314,7 @@ namespace Mmd.Samples.RuntimeVerification
                         controller.Pause();
                         result.playback = SummarizePlayback(controller, "controller", arguments.DurationSeconds);
                         result.physics = SummarizePhysics(controller);
+                        result.visualSmoke = CaptureAndAnalyzeSmoke(verificationCase.Name);
                         result.playbackStatus = "passed";
                         result.status = "passed";
                     }
@@ -375,6 +386,7 @@ namespace Mmd.Samples.RuntimeVerification
                     {
                         result.playback = SummarizePlayback(controller, "timeline", arguments.DurationSeconds);
                         result.physics = SummarizePhysics(controller);
+                        result.visualSmoke = CaptureAndAnalyzeSmoke(verificationCase.Name);
                         result.playbackStatus = "passed";
                         result.status = "passed";
                     }
@@ -700,6 +712,129 @@ namespace Mmd.Samples.RuntimeVerification
         private static string FormatException(Exception ex)
         {
             return ex.GetType().Name + ": " + ex.Message;
+        }
+
+        private MmdRuntimeVerificationVisualSmoke CaptureAndAnalyzeSmoke(string caseName)
+        {
+            var smoke = new MmdRuntimeVerificationVisualSmoke();
+            Camera? camera = Camera.main;
+            if (camera == null)
+            {
+                camera = UnityEngine.Object.FindAnyObjectByType<Camera>();
+            }
+
+            if (camera == null)
+            {
+                smoke.smokeStatus = "no-camera";
+                return smoke;
+            }
+
+            const int width = 640;
+            const int height = 480;
+            var rt = RenderTexture.GetTemporary(width, height, 24, RenderTextureFormat.ARGB32);
+            RenderTexture previousTarget = camera.targetTexture;
+            camera.targetTexture = rt;
+            camera.Render();
+            camera.targetTexture = previousTarget;
+
+            RenderTexture previousActive = RenderTexture.active;
+            RenderTexture.active = rt;
+            var texture = new Texture2D(width, height, TextureFormat.RGB24, mipChain: false);
+            texture.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+            texture.Apply();
+            RenderTexture.active = previousActive;
+            RenderTexture.ReleaseTemporary(rt);
+
+            smoke.captured = true;
+            smoke.width = width;
+            smoke.height = height;
+
+            if (!string.IsNullOrWhiteSpace(arguments.ScreenshotDir))
+            {
+                try
+                {
+                    Directory.CreateDirectory(arguments.ScreenshotDir);
+                    string safeName = caseName.Replace('/', '_').Replace('\\', '_').Replace(':', '_');
+                    string path = Path.Combine(arguments.ScreenshotDir, safeName + ".png");
+                    byte[] png = texture.EncodeToPNG();
+                    File.WriteAllBytes(path, png);
+                    smoke.screenshotPath = path;
+                }
+                catch (Exception ex)
+                {
+                    smoke.screenshotPath = "write-failed: " + ex.Message;
+                }
+            }
+
+            AnalyzePixels(texture, smoke);
+            UnityEngine.Object.Destroy(texture);
+            return smoke;
+        }
+
+        private static void AnalyzePixels(Texture2D texture, MmdRuntimeVerificationVisualSmoke smoke)
+        {
+            Color32[] pixels = texture.GetPixels32();
+            if (pixels.Length == 0)
+            {
+                smoke.smokeStatus = "no-pixels";
+                return;
+            }
+
+            double luminanceSum = 0.0;
+            int blackCount = 0;
+            int whiteCount = 0;
+            Color32 firstPixel = pixels[0];
+            bool allSame = true;
+            var uniqueColors = new HashSet<int>();
+            const int sampleStride = 4;
+            int sampledForUnique = 0;
+
+            for (int i = 0; i < pixels.Length; i++)
+            {
+                Color32 p = pixels[i];
+                float luminance = (0.2126f * p.r + 0.7152f * p.g + 0.0722f * p.b) / 255.0f;
+                luminanceSum += luminance;
+
+                if (p.r < 5 && p.g < 5 && p.b < 5)
+                {
+                    blackCount++;
+                }
+
+                if (p.r > 250 && p.g > 250 && p.b > 250)
+                {
+                    whiteCount++;
+                }
+
+                if (allSame && (p.r != firstPixel.r || p.g != firstPixel.g || p.b != firstPixel.b))
+                {
+                    allSame = false;
+                }
+
+                if (i % sampleStride == 0 && sampledForUnique < 10000)
+                {
+                    uniqueColors.Add((p.r << 16) | (p.g << 8) | p.b);
+                    sampledForUnique++;
+                }
+            }
+
+            float avgLuminance = (float)(luminanceSum / pixels.Length);
+            float blackRatio = (float)blackCount / pixels.Length;
+            float whiteRatio = (float)whiteCount / pixels.Length;
+
+            smoke.averageLuminance = avgLuminance;
+            smoke.uniqueColorCount = uniqueColors.Count;
+            smoke.isBlank = allSame;
+            smoke.isAllBlack = blackRatio > 0.99f;
+            smoke.isAllWhite = whiteRatio > 0.99f;
+
+            if (smoke.isBlank || smoke.isAllBlack || smoke.isAllWhite)
+            {
+                smoke.smokeStatus = "failed";
+            }
+            else
+            {
+                smoke.smokeStatus = "passed";
+            }
         }
 
         private void Finish(

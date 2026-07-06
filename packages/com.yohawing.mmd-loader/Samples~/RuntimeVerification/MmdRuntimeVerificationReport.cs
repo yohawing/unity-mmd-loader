@@ -44,6 +44,22 @@ namespace Mmd.Samples.RuntimeVerification
         public int consoleErrorCount;
         public int consoleWarningCount;
         public string skipReason = string.Empty;
+        public MmdRuntimeVerificationVisualSmoke visualSmoke = new();
+    }
+
+    [Serializable]
+    public sealed class MmdRuntimeVerificationVisualSmoke
+    {
+        public bool captured;
+        public string screenshotPath = string.Empty;
+        public int width;
+        public int height;
+        public bool isBlank;
+        public bool isAllBlack;
+        public bool isAllWhite;
+        public float averageLuminance;
+        public int uniqueColorCount;
+        public string smokeStatus = "not-run";
     }
 
     [Serializable]
