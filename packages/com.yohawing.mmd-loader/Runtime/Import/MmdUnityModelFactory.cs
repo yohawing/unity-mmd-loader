@@ -34,7 +34,17 @@ namespace Mmd.UnityIntegration
             float importScale,
             MmdMaterialPreset preset)
         {
-            return CreateStaticModel(model, sourcePath, importScale, preset, includeSelfShadowTarget: true);
+            return CreateStaticModel(model, sourcePath, importScale, preset, materialOverride: null);
+        }
+
+        public static MmdUnityModelInstance CreateStaticModel(
+            MmdModelDefinition model,
+            string? sourcePath,
+            float importScale,
+            MmdMaterialPreset preset,
+            MmdMaterialOverrideAsset? materialOverride)
+        {
+            return CreateStaticModel(model, sourcePath, importScale, preset, includeSelfShadowTarget: true, materialOverride: materialOverride);
         }
 
         internal static MmdUnityModelInstance CreateStaticModel(
@@ -53,6 +63,17 @@ namespace Mmd.UnityIntegration
             MmdMaterialPreset preset,
             bool includeSelfShadowTarget)
         {
+            return CreateStaticModel(model, sourcePath, importScale, preset, includeSelfShadowTarget, materialOverride: null);
+        }
+
+        internal static MmdUnityModelInstance CreateStaticModel(
+            MmdModelDefinition model,
+            string? sourcePath,
+            float importScale,
+            MmdMaterialPreset preset,
+            bool includeSelfShadowTarget,
+            MmdMaterialOverrideAsset? materialOverride)
+        {
             if (model == null)
             {
                 throw new ArgumentNullException(nameof(model));
@@ -66,7 +87,8 @@ namespace Mmd.UnityIntegration
                 model.physics,
                 MmdUnityModelSourceContext.FromOptionalPath(sourcePath),
                 scale,
-                includeSelfShadowTarget);
+                includeSelfShadowTarget,
+                materialOverride);
         }
 
         public static MmdUnityModelInstance CreateStaticModel(MmdRenderingDescriptor descriptor, string modelName)
@@ -102,7 +124,17 @@ namespace Mmd.UnityIntegration
             float importScale,
             MmdMaterialPreset preset)
         {
-            return CreateSkinnedModel(model, sourcePath, importScale, preset, includeSelfShadowTarget: true);
+            return CreateSkinnedModel(model, sourcePath, importScale, preset, materialOverride: null);
+        }
+
+        public static MmdUnityModelInstance CreateSkinnedModel(
+            MmdModelDefinition model,
+            string? sourcePath,
+            float importScale,
+            MmdMaterialPreset preset,
+            MmdMaterialOverrideAsset? materialOverride)
+        {
+            return CreateSkinnedModel(model, sourcePath, importScale, preset, includeSelfShadowTarget: true, materialOverride: materialOverride);
         }
 
         internal static MmdUnityModelInstance CreateSkinnedModel(
@@ -120,6 +152,17 @@ namespace Mmd.UnityIntegration
             float importScale,
             MmdMaterialPreset preset,
             bool includeSelfShadowTarget)
+        {
+            return CreateSkinnedModel(model, sourcePath, importScale, preset, includeSelfShadowTarget, materialOverride: null);
+        }
+
+        internal static MmdUnityModelInstance CreateSkinnedModel(
+            MmdModelDefinition model,
+            string? sourcePath,
+            float importScale,
+            MmdMaterialPreset preset,
+            bool includeSelfShadowTarget,
+            MmdMaterialOverrideAsset? materialOverride)
         {
             if (model == null)
             {
@@ -139,7 +182,8 @@ namespace Mmd.UnityIntegration
                 model.physics,
                 MmdUnityModelSourceContext.FromOptionalPath(sourcePath),
                 scale,
-                includeSelfShadowTarget);
+                includeSelfShadowTarget,
+                materialOverride);
         }
 
         public static MmdUnityModelInstance CreateExistingSkinnedModelInstance(
@@ -251,7 +295,8 @@ namespace Mmd.UnityIntegration
             MmdPhysicsDefinition? physics,
             MmdUnityModelSourceContext? sourceContext,
             float importScale,
-            bool includeSelfShadowTarget)
+            bool includeSelfShadowTarget,
+            MmdMaterialOverrideAsset? materialOverride = null)
         {
             if (descriptor == null)
             {
@@ -265,6 +310,7 @@ namespace Mmd.UnityIntegration
             var mesh = BuildMesh(descriptor, importScale);
             MmdRuntimeTextureResolution textureResolution = MmdRuntimeTextureResolver.ResolveDiffuseTextures(descriptor, sourceContext);
             Material[] materials = MmdUnityMaterialBuilder.BuildMaterials(descriptor, textureResolution, out MmdShaderBindingDiagnostics shaderDiagnostics);
+            MmdMaterialOverrideApplier.Apply(materialOverride, materials);
             Transform[] boneTransforms = BuildBoneTransforms(modelRoot, bones, importScale);
             MmdUnityPhysicsBody[] physicsBodies = BuildPhysicsBodies(modelRoot, bones, boneTransforms, physics, importScale);
 
@@ -299,7 +345,8 @@ namespace Mmd.UnityIntegration
             MmdPhysicsDefinition? physics,
             MmdUnityModelSourceContext? sourceContext,
             float importScale,
-            bool includeSelfShadowTarget)
+            bool includeSelfShadowTarget,
+            MmdMaterialOverrideAsset? materialOverride = null)
         {
             ValidateDescriptor(descriptor);
 
@@ -312,6 +359,7 @@ namespace Mmd.UnityIntegration
             BakeVertexMorphBlendShapes(mesh, descriptor, importScale);
             MmdRuntimeTextureResolution textureResolution = MmdRuntimeTextureResolver.ResolveDiffuseTextures(descriptor, sourceContext);
             Material[] materials = MmdUnityMaterialBuilder.BuildMaterials(descriptor, textureResolution, out MmdShaderBindingDiagnostics shaderDiagnostics);
+            MmdMaterialOverrideApplier.Apply(materialOverride, materials);
 
             var renderer = modelRoot.gameObject.AddComponent<SkinnedMeshRenderer>();
             renderer.sharedMesh = mesh;
