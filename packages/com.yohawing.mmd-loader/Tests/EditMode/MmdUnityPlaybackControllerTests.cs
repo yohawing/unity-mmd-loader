@@ -355,22 +355,31 @@ namespace Mmd.Tests
             MmdUnityPlaybackBinding? binding = null;
             try
             {
+                (MmdModelDefinition model, MmdMotionDefinition motion) = LoadPlaybackFixturePair();
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    CreateMinimalTriangleModel(),
-                    CreateRootTranslationMotion(),
-                    "synthetic.pmx",
-                    "synthetic.vmd");
+                    model,
+                    motion,
+                    "test_1bone_cube.pmx",
+                    "test_1bone_cube_motion.vmd");
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f);
+                // This test is about fractional frame accumulation, not Live physics sequencing.
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+                const int frame = 9;
+                float[] expectedMmdLocalRotation = { -0.3826833665f, 0.0f, 0.0f, 0.9238795638f };
+                Quaternion expectedLocalRotation = binding.Instance.BindLocalRotations[0]
+                    * ToUnityRotation(expectedMmdLocalRotation);
 
                 controller.Play();
-                controller.Tick(0.5f / 30.0f);
-                controller.Tick(0.5f / 30.0f);
+                controller.Tick(4.5f / 30.0f);
+                controller.Tick(4.5f / 30.0f);
 
-                Assert.That(controller.CurrentFrame, Is.EqualTo(1));
+                Assert.That(controller.CurrentFrame, Is.EqualTo(frame));
                 Assert.That(controller.LastSnapshot, Is.Not.Null);
-                Assert.That(controller.LastSnapshot!.frame.frame, Is.EqualTo(1));
-                Assert.That(binding.Instance.BoneTransforms[0].localPosition.x, Is.EqualTo(-0.2f).Within(0.00001f));
+                Assert.That(controller.LastSnapshot!.frame.frame, Is.EqualTo(frame));
+                MmdEvaluatedBonePose bonePose = controller.LastSnapshot.frame.bones.Single(bone => bone.index == 0);
+                Assert.That(Quaternion.Angle(ToQuaternion(bonePose.localRotation), ToQuaternion(expectedMmdLocalRotation)), Is.LessThan(0.001f));
+                Assert.That(Quaternion.Angle(binding.Instance.BoneTransforms[0].localRotation, expectedLocalRotation), Is.LessThan(0.001f));
             }
             finally
             {
