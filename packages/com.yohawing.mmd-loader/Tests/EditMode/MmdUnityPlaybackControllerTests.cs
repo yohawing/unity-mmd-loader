@@ -24,11 +24,12 @@ namespace Mmd.Tests
             MmdUnityPlaybackBinding? binding = null;
             try
             {
+                (MmdModelDefinition model, MmdMotionDefinition motion) = LoadPlaybackFixturePair();
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    CreateMinimalTriangleModel(),
-                    CreateRootTranslationMotion(),
-                    "synthetic-config.pmx",
-                    "synthetic-config.vmd");
+                    model,
+                    motion,
+                    "test_1bone_cube.pmx",
+                    "test_1bone_cube_motion.vmd");
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 // Note: MmdPlaybackConfig no longer carries PhysicsMode; controller.physicsMode (default Live) is the source of truth for normal playback.
                 var config = new MmdPlaybackConfig(
@@ -58,11 +59,12 @@ namespace Mmd.Tests
             MmdUnityPlaybackBinding? binding = null;
             try
             {
+                (MmdModelDefinition model, MmdMotionDefinition motion) = LoadPlaybackFixturePair();
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    CreateMinimalTriangleModel(),
-                    CreateRootTranslationMotion(),
-                    "synthetic-config-controller-physics.pmx",
-                    "synthetic-config-controller-physics.vmd");
+                    model,
+                    motion,
+                    "test_1bone_cube.pmx",
+                    "test_1bone_cube_motion.vmd");
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.SetPhysicsMode(MmdPhysicsMode.Off); // explicit set on controller is the only way
                 var config = new MmdPlaybackConfig(
