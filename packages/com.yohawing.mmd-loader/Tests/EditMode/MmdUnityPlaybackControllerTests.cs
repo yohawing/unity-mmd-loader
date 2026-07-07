@@ -393,31 +393,41 @@ namespace Mmd.Tests
             MmdUnityPlaybackBinding? binding = null;
             try
             {
+                (MmdModelDefinition model, MmdMotionDefinition motion) = LoadPlaybackFixturePair();
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    CreateMinimalTriangleModel(),
-                    CreateRootTranslationMotion(),
-                    "synthetic.pmx",
-                    "synthetic.vmd");
+                    model,
+                    motion,
+                    "test_1bone_cube.pmx",
+                    "test_1bone_cube_motion.vmd");
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f);
                 // arbitrary EditMode evaluation (ApplyTime random/reverse seek), not normal Live forward playback
                 controller.SetPhysicsMode(MmdPhysicsMode.Off);
+                const int forwardFrame = 29;
+                const int reverseFrame = 9;
+                float[] expectedForwardMmdLocalRotation = { 0.0f, 0.0f, 0.3826833665f, 0.9238795638f };
+                float[] expectedReverseMmdLocalRotation = { -0.3826833665f, 0.0f, 0.0f, 0.9238795638f };
+                Quaternion expectedForwardLocalRotation = binding.Instance.BindLocalRotations[0]
+                    * ToUnityRotation(expectedForwardMmdLocalRotation);
+                Quaternion expectedReverseLocalRotation = binding.Instance.BindLocalRotations[0]
+                    * ToUnityRotation(expectedReverseMmdLocalRotation);
 
-                MmdPlaybackSnapshot frameTen = controller.ApplyTime(10.25f / 30.0f);
-                Vector3 frameTenPosition = binding.Instance.BoneTransforms[0].localPosition;
-                MmdPlaybackSnapshot repeatedFrameTen = controller.ApplyTime(10.25f / 30.0f);
-                Vector3 repeatedFrameTenPosition = binding.Instance.BoneTransforms[0].localPosition;
-                MmdPlaybackSnapshot frameThree = controller.ApplyTime(3.0f / 30.0f);
+                MmdPlaybackSnapshot forward = controller.ApplyTime(forwardFrame / 30.0f);
+                Quaternion forwardRotation = binding.Instance.BoneTransforms[0].localRotation;
+                MmdPlaybackSnapshot repeatedForward = controller.ApplyTime(forwardFrame / 30.0f);
+                Quaternion repeatedForwardRotation = binding.Instance.BoneTransforms[0].localRotation;
+                MmdPlaybackSnapshot reverse = controller.ApplyTime(reverseFrame / 30.0f);
 
-                Assert.That(frameTen.frame.frame, Is.EqualTo(10));
-                Assert.That(frameTen.frame.time, Is.EqualTo(10.25f / 30.0f).Within(0.00001f));
-                Assert.That(frameTen.rendering, Is.SameAs(binding.Instance.RenderingDescriptor));
-                Assert.That(repeatedFrameTen.frame.frame, Is.EqualTo(10));
-                Assert.That(repeatedFrameTen.rendering, Is.SameAs(binding.Instance.RenderingDescriptor));
-                Assert.That(repeatedFrameTenPosition, Is.EqualTo(frameTenPosition));
-                Assert.That(frameThree.frame.frame, Is.EqualTo(3));
-                Assert.That(controller.CurrentFrame, Is.EqualTo(3));
-                Assert.That(binding.Instance.BoneTransforms[0].localPosition.x, Is.EqualTo(-0.6f).Within(0.00001f));
+                Assert.That(forward.frame.frame, Is.EqualTo(forwardFrame));
+                Assert.That(forward.frame.time, Is.EqualTo(forwardFrame / 30.0f).Within(0.00001f));
+                Assert.That(forward.rendering, Is.SameAs(binding.Instance.RenderingDescriptor));
+                Assert.That(Quaternion.Angle(forwardRotation, expectedForwardLocalRotation), Is.LessThan(0.001f));
+                Assert.That(repeatedForward.frame.frame, Is.EqualTo(forwardFrame));
+                Assert.That(repeatedForward.rendering, Is.SameAs(binding.Instance.RenderingDescriptor));
+                Assert.That(Quaternion.Angle(repeatedForwardRotation, forwardRotation), Is.LessThan(0.001f));
+                Assert.That(reverse.frame.frame, Is.EqualTo(reverseFrame));
+                Assert.That(controller.CurrentFrame, Is.EqualTo(reverseFrame));
+                Assert.That(Quaternion.Angle(binding.Instance.BoneTransforms[0].localRotation, expectedReverseLocalRotation), Is.LessThan(0.001f));
             }
             finally
             {
