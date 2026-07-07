@@ -1189,19 +1189,28 @@ namespace Mmd.Tests
         [Test]
         public void PlaybackBindingBuildsSnapshotAndAppliesFrameToSkinnedModel()
         {
-            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-            MmdMotionDefinition motion = CreateRootTranslationMotion();
+            (MmdModelDefinition model, MmdMotionDefinition motion) = LoadPlaybackFixturePair();
 
-            MmdUnityPlaybackBinding binding = MmdUnityPlaybackBinding.CreateSkinned(model, motion, "model.pmx", "motion.vmd");
+            MmdUnityPlaybackBinding binding = MmdUnityPlaybackBinding.CreateSkinned(
+                model,
+                motion,
+                "test_1bone_cube.pmx",
+                "test_1bone_cube_motion.vmd");
             using var bindingScope = new MmdTestInstanceScope(binding.Instance);
-            MmdPlaybackSnapshot snapshot = binding.ApplyFrame(frame: 10, frameRate: 30.0f);
+            MmdPlaybackSnapshot snapshot = binding.ApplyFrame(frame: 9, frameRate: 30.0f);
 
-            Assert.That(snapshot.model, Is.EqualTo("model.pmx"));
-            Assert.That(snapshot.motion, Is.EqualTo("motion.vmd"));
-            Assert.That(snapshot.frame.frame, Is.EqualTo(10));
+            Assert.That(snapshot.model, Is.EqualTo("test_1bone_cube.pmx"));
+            Assert.That(snapshot.motion, Is.EqualTo("test_1bone_cube_motion.vmd"));
+            Assert.That(snapshot.frame.frame, Is.EqualTo(9));
             Assert.That(snapshot.rendering, Is.SameAs(binding.Instance.RenderingDescriptor));
             Assert.That(binding.Instance.SkinnedMeshRenderer, Is.Not.Null);
-            Assert.That(binding.Instance.BoneTransforms[0].localPosition, Is.EqualTo(new Vector3(-2.0f, 0.0f, 0.0f)));
+            Assert.That(snapshot.frame.bones, Has.Count.GreaterThan(0));
+            Quaternion expectedRotation = ToUnityModelRotation(new Quaternion(
+                snapshot.frame.bones[0].localRotation[0],
+                snapshot.frame.bones[0].localRotation[1],
+                snapshot.frame.bones[0].localRotation[2],
+                snapshot.frame.bones[0].localRotation[3]));
+            Assert.That(Quaternion.Angle(binding.Instance.BoneTransforms[0].localRotation, expectedRotation), Is.LessThan(0.0001f));
             Assert.That(binding.Instance.Root.transform.localScale, Is.EqualTo(Vector3.one));
         }
 
@@ -2166,6 +2175,14 @@ namespace Mmd.Tests
                 interpolation = LinearInterpolation()
             });
             return motion;
+        }
+
+        private static (MmdModelDefinition Model, MmdMotionDefinition Motion) LoadPlaybackFixturePair()
+        {
+            var parser = new NativeMmdParser();
+            MmdModelDefinition model = parser.LoadModel(MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube.pmx"));
+            MmdMotionDefinition motion = parser.LoadMotion(MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube_motion.vmd"));
+            return (model, motion);
         }
 
         private static MmdMotionDefinition CreateBlinkMorphMotion()
