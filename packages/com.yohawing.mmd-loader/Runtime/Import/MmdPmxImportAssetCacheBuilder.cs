@@ -2,6 +2,7 @@
 
 using UnityEngine;
 using Mmd.Parser;
+using Mmd.Rendering;
 
 namespace Mmd.UnityIntegration
 {
@@ -23,7 +24,8 @@ namespace Mmd.UnityIntegration
         public static MmdUnityModelInstance CreateImportedAssetCache(
             MmdModelDefinition model,
             float importScale,
-            bool includeSelfShadowTarget = true)
+            bool includeSelfShadowTarget = true,
+            MmdMaterialPreset preset = MmdMaterialPreset.MmdToon)
         {
             if (model == null)
             {
@@ -39,6 +41,7 @@ namespace Mmd.UnityIntegration
                     model,
                     sourcePath: null,
                     scale,
+                    preset,
                     includeSelfShadowTarget);
             }
             else
@@ -47,6 +50,7 @@ namespace Mmd.UnityIntegration
                     model,
                     sourcePath: null,
                     scale,
+                    preset,
                     includeSelfShadowTarget);
             }
 

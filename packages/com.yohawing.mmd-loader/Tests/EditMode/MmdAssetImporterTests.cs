@@ -12,6 +12,7 @@ using UnityEngine.TestTools;
 using Mmd.Editor;
 using Mmd.Parser;
 using Mmd.Physics;
+using Mmd.Rendering;
 using Mmd.UnityIntegration;
 using Object = UnityEngine.Object;
 
@@ -203,7 +204,6 @@ namespace Mmd.Tests
             serializedImporter.FindProperty("meshGenerationMode").enumValueIndex = (int)MmdPmxMeshGenerationMode.SplitByMaterial;
             serializedImporter.FindProperty("materialTexturePolicy").enumValueIndex = (int)MmdPmxMaterialTexturePolicy.ResolveReferencesOnly;
             serializedImporter.FindProperty("animationType").enumValueIndex = (int)MmdPmxAnimationType.Humanoid;
-            // This enum currently has one value; add a non-default round-trip assertion when a second preset exists.
             serializedImporter.FindProperty("shaderPreset").enumValueIndex = (int)MmdPmxShaderPreset.MmdBasicUrpToon;
             serializedImporter.ApplyModifiedPropertiesWithoutUndo();
             importer!.SaveAndReimport();
@@ -247,6 +247,27 @@ namespace Mmd.Tests
                     Object.DestroyImmediate(loadInstance.Root);
                 }
             }
+        }
+
+        [Test]
+        public void PmxImporterUrpLitShaderPresetGeneratesUrpLitMaterials()
+        {
+            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            var importer = AssetImporter.GetAtPath(TempPmxPath) as MmdPmxScriptedImporter;
+            Assert.That(importer, Is.Not.Null);
+
+            var serializedImporter = new SerializedObject(importer!);
+            serializedImporter.FindProperty("shaderPreset").enumValueIndex = (int)MmdPmxShaderPreset.UrpLit;
+            serializedImporter.ApplyModifiedPropertiesWithoutUndo();
+            importer!.SaveAndReimport();
+
+            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+
+            Assert.That(pmxAsset.ShaderPreset, Is.EqualTo(nameof(MmdPmxShaderPreset.UrpLit)));
+            Assert.That(pmxAsset.ImportedMaterials, Is.Not.Null.And.Not.Empty);
+            Assert.That(pmxAsset.ImportedMaterials[0].shader, Is.Not.Null);
+            Assert.That(pmxAsset.ImportedMaterials[0].shader.name,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName));
         }
 
         [Test]
@@ -519,6 +540,9 @@ namespace Mmd.Tests
             Assert.That(pmxAsset.ImportedMaterials[0], Is.Not.Null);
             Assert.That(AssetDatabase.Contains(pmxAsset.ImportedMaterials[0]), Is.True);
             Assert.That(AssetDatabase.GetAssetPath(pmxAsset.ImportedMaterials[0]), Is.EqualTo(TempPmxPath));
+            Assert.That(pmxAsset.ImportedMaterials[0].shader, Is.Not.Null);
+            Assert.That(pmxAsset.ImportedMaterials[0].shader.name,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName));
         }
 
         [Test]

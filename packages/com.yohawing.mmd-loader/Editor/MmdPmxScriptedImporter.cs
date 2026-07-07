@@ -6,6 +6,7 @@ using UnityEditor;
 using UnityEditor.AssetImporters;
 using Mmd.Parser;
 using Mmd.UnityIntegration;
+using Mmd.Rendering;
 using Mmd;
 
 namespace Mmd.Editor
@@ -37,7 +38,8 @@ namespace Mmd.Editor
 
     public enum MmdPmxShaderPreset
     {
-        MmdBasicUrpToon = 0
+        MmdBasicUrpToon = 0,
+        UrpLit = 1
     }
 
     [ScriptedImporter(23, "pmx")]
@@ -105,7 +107,8 @@ namespace Mmd.Editor
                 generatedAssets = MmdPmxImportAssetCacheBuilder.CreateImportedAssetCache(
                     model,
                     ImportScale,
-                    MmdPmxModelPresetAutoDetector.IsCharacter(effectiveModelPreset));
+                    MmdPmxModelPresetAutoDetector.IsCharacter(effectiveModelPreset),
+                    MapMaterialPreset(shaderPreset));
                 Mesh importedMesh = generatedAssets.Mesh;
                 Material[] importedMaterials = generatedAssets.Materials;
 
@@ -233,6 +236,16 @@ namespace Mmd.Editor
         private static float NormalizeImportScale(float value)
         {
             return float.IsFinite(value) && value > 0.0f ? value : MmdPmxAsset.DefaultImportScale;
+        }
+
+        private static MmdMaterialPreset MapMaterialPreset(MmdPmxShaderPreset value)
+        {
+            return value switch
+            {
+                MmdPmxShaderPreset.MmdBasicUrpToon => MmdMaterialPreset.MmdToon,
+                MmdPmxShaderPreset.UrpLit => MmdMaterialPreset.UrpLit,
+                _ => MmdMaterialPreset.MmdToon
+            };
         }
 
         private MmdPmxModelPreset ResolveModelPresetForImport(MmdModelDefinition model)
