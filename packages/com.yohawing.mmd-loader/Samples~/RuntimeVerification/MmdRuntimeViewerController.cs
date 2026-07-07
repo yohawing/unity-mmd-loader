@@ -1,11 +1,15 @@
 #nullable enable
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using Mmd.Motion;
+using Mmd.Parser;
 using Mmd.Physics;
 using Mmd.UnityIntegration;
 using UnityEngine;
+using UnityEngine.Networking;
 
 namespace Mmd.Samples.RuntimeVerification
 {
@@ -22,6 +26,18 @@ namespace Mmd.Samples.RuntimeVerification
         private int selectedIndex = -1;
         private string pmxInput = string.Empty;
         private string vmdInput = string.Empty;
+        private float orbitYaw = 180.0f;
+        private float orbitPitch = 15.0f;
+        private float orbitDistance = 10.0f;
+        private Vector3 orbitTarget = new Vector3(0.0f, 1.0f, 0.0f);
+        private bool orbitDragging;
+        private bool panDragging;
+        private Vector2 lastMousePosition;
+        private NativeVmdCameraTrackSampler? cameraSampler;
+        private bool cameraVmdActive;
+        private AudioSource? audioSource;
+        private float audioOffsetFrame;
+        private GameObject? backgroundRoot;
 
         public void Initialize(MmdRuntimeVerificationArguments viewerArguments)
         {
@@ -51,6 +67,115 @@ namespace Mmd.Samples.RuntimeVerification
         {
             ClearPlayback();
             BulletMmdPhysicsBackend.ResetMaxSubStepEstimateFixedTimeStepSecondsForDiagnostics();
+        }
+
+        private void Update()
+        {
+            if (cameraVmdActive && cameraSampler != null && playbackController != null)
+            {
+                if (cameraSampler.TrySample(playbackController.CurrentFrame, out MmdCameraState cameraState))
+                {
+                    MmdUnityCameraPose pose = MmdCameraStateToUnity.Convert(cameraState, importScale: 0.1f);
+                    Camera main = Camera.main;
+                    if (main != null)
+                    {
+                        main.transform.position = pose.Position;
+                        main.transform.rotation = pose.Rotation;
+                        main.fieldOfView = pose.FieldOfView;
+                    }
+                }
+            }
+
+            if (audioSource != null && audioSource.clip != null && playbackController != null)
+            {
+                float frameRate = arguments?.FrameRate ?? 30.0f;
+                float audioTime = (playbackController.CurrentFrame - audioOffsetFrame) / frameRate;
+                if (playbackController.IsPlaying && audioTime >= 0.0f)
+                {
+                    if (!audioSource.isPlaying)
+                    {
+                        audioSource.time = audioTime;
+                        audioSource.Play();
+                    }
+                }
+                else
+                {
+                    if (audioSource.isPlaying)
+                    {
+                        audioSource.Pause();
+                    }
+                }
+            }
+
+            if (!cameraVmdActive)
+            {
+                Quaternion rotation = Quaternion.Euler(orbitPitch, orbitYaw, 0.0f);
+                Vector3 offset = rotation * new Vector3(0.0f, 0.0f, -orbitDistance);
+                Camera main = Camera.main;
+                if (main != null)
+                {
+                    main.transform.position = orbitTarget + offset;
+                    main.transform.LookAt(orbitTarget);
+                }
+
+                if (Input.mousePosition.x < 384.0f)
+                {
+                    orbitDragging = false;
+                    panDragging = false;
+                    return;
+                }
+
+                Vector2 mousePosition = Input.mousePosition;
+
+                if (Input.GetMouseButtonDown(1))
+                {
+                    orbitDragging = true;
+                    lastMousePosition = mousePosition;
+                }
+
+                if (Input.GetMouseButtonUp(1))
+                {
+                    orbitDragging = false;
+                }
+
+                if (orbitDragging && Input.GetMouseButton(1))
+                {
+                    Vector2 delta = mousePosition - lastMousePosition;
+                    orbitYaw += delta.x * 0.3f;
+                    orbitPitch -= delta.y * 0.3f;
+                    orbitPitch = Mathf.Clamp(orbitPitch, -89.0f, 89.0f);
+                    lastMousePosition = mousePosition;
+                }
+
+                if (Input.GetMouseButtonDown(2))
+                {
+                    panDragging = true;
+                    lastMousePosition = mousePosition;
+                }
+
+                if (Input.GetMouseButtonUp(2))
+                {
+                    panDragging = false;
+                }
+
+                if (panDragging && Input.GetMouseButton(2))
+                {
+                    Vector2 delta = mousePosition - lastMousePosition;
+                    float panScale = orbitDistance * 0.002f;
+                    Vector3 right = rotation * Vector3.right;
+                    Vector3 up = rotation * Vector3.up;
+                    orbitTarget -= right * delta.x * panScale;
+                    orbitTarget += up * delta.y * panScale;
+                    lastMousePosition = mousePosition;
+                }
+
+                float scrollDelta = Input.mouseScrollDelta.y;
+                if (Mathf.Abs(scrollDelta) > 0.01f)
+                {
+                    orbitDistance *= 1.0f - scrollDelta * 0.1f;
+                    orbitDistance = Mathf.Clamp(orbitDistance, 0.1f, 100.0f);
+                }
+            }
         }
 
         private void OnGUI()
@@ -113,6 +238,25 @@ namespace Mmd.Samples.RuntimeVerification
                 {
                     GUILayout.Label("Frame: " + playbackController.CurrentFrame);
                 }
+            }
+
+            if (cameraSampler != null)
+            {
+                GUILayout.BeginHorizontal();
+                if (GUILayout.Button(cameraVmdActive ? "Camera: VMD" : "Camera: Free", GUILayout.Width(120.0f)))
+                {
+                    cameraVmdActive = !cameraVmdActive;
+                    if (!cameraVmdActive)
+                    {
+                        AutoCenterCamera();
+                    }
+                }
+
+                GUILayout.EndHorizontal();
+            }
+            else
+            {
+                GUILayout.Label("Camera: Free");
             }
 
             GUILayout.Space(6.0f);
@@ -208,7 +352,14 @@ namespace Mmd.Samples.RuntimeVerification
 
             try
             {
-                StartPlayback(selected.PmxPath, selected.VmdPath, selected.Name);
+                StartPlayback(
+                    selected.PmxPath,
+                    selected.VmdPath,
+                    selected.Name,
+                    selected.CameraPath,
+                    selected.AudioPath,
+                    selected.BackgroundPath,
+                    selected.AudioOffsetFrame);
                 AddStatus("Playing: " + selected.Name);
             }
             catch (Exception ex)
@@ -305,7 +456,14 @@ namespace Mmd.Samples.RuntimeVerification
             }
         }
 
-        private void StartPlayback(string pmxPath, string vmdPath, string displayName)
+        private void StartPlayback(
+            string pmxPath,
+            string vmdPath,
+            string displayName,
+            string cameraPath = "",
+            string audioPath = "",
+            string backgroundPath = "",
+            float audioOffset = 0.0f)
         {
             if (arguments == null)
             {
@@ -337,6 +495,69 @@ namespace Mmd.Samples.RuntimeVerification
             }
 
             playbackController.Play();
+            AutoCenterCamera();
+
+            cameraSampler?.Dispose();
+            cameraSampler = null;
+            cameraVmdActive = false;
+            if (!string.IsNullOrWhiteSpace(cameraPath) && File.Exists(cameraPath))
+            {
+                byte[] cameraVmdBytes = File.ReadAllBytes(cameraPath);
+                if (NativeVmdCameraTrackSampler.TryCreate(cameraVmdBytes, out NativeVmdCameraTrackSampler? sampler))
+                {
+                    cameraSampler = sampler;
+                    cameraVmdActive = true;
+                    AddStatus("Camera VMD loaded.");
+                }
+            }
+
+            if (audioSource != null)
+            {
+                Destroy(audioSource);
+                audioSource = null;
+            }
+
+            audioOffsetFrame = audioOffset;
+            if (!string.IsNullOrWhiteSpace(audioPath) && File.Exists(audioPath))
+            {
+                StartCoroutine(LoadAudioClip(audioPath));
+            }
+
+            if (backgroundRoot != null)
+            {
+                Destroy(backgroundRoot);
+                backgroundRoot = null;
+            }
+
+            if (!string.IsNullOrWhiteSpace(backgroundPath) && File.Exists(backgroundPath))
+            {
+                LoadBackground(backgroundPath);
+            }
+        }
+
+        private void AutoCenterCamera()
+        {
+            if (playbackRoot == null)
+            {
+                return;
+            }
+
+            Renderer[] renderers = playbackRoot.GetComponentsInChildren<Renderer>();
+            if (renderers.Length == 0)
+            {
+                return;
+            }
+
+            Bounds bounds = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++)
+            {
+                bounds.Encapsulate(renderers[i].bounds);
+            }
+
+            orbitTarget = bounds.center;
+            orbitDistance = bounds.size.magnitude * 1.5f;
+            orbitPitch = 15.0f;
+            orbitYaw = 180.0f;
         }
 
         private static string BuildDisplayName(string pmxPath, string vmdPath)
@@ -382,11 +603,73 @@ namespace Mmd.Samples.RuntimeVerification
 
         private void ClearPlayback()
         {
+            cameraSampler?.Dispose();
+            cameraSampler = null;
+            cameraVmdActive = false;
+            if (audioSource != null)
+            {
+                audioSource.Stop();
+                audioSource = null;
+            }
+
+            audioOffsetFrame = 0.0f;
             playbackController = null;
+            if (backgroundRoot != null)
+            {
+                Destroy(backgroundRoot);
+                backgroundRoot = null;
+            }
+
             if (playbackRoot != null)
             {
                 Destroy(playbackRoot);
                 playbackRoot = null;
+            }
+        }
+
+        private IEnumerator LoadAudioClip(string path)
+        {
+            GameObject expectedRoot = playbackRoot;
+            string uri = "file:///" + path.Replace("\\", "/");
+            using UnityWebRequest request = UnityWebRequestMultimedia.GetAudioClip(uri, AudioType.UNKNOWN);
+            yield return request.SendWebRequest();
+            if (request.result != UnityWebRequest.Result.Success)
+            {
+                AddStatus("Audio load failed: " + request.error);
+                yield break;
+            }
+
+            if (playbackRoot != expectedRoot || playbackRoot == null)
+            {
+                yield break;
+            }
+
+            AudioClip clip = DownloadHandlerAudioClip.GetContent(request);
+            audioSource = playbackRoot.AddComponent<AudioSource>();
+            audioSource.clip = clip;
+            audioSource.playOnAwake = false;
+            AddStatus("Audio loaded: " + Path.GetFileName(path));
+        }
+
+        private void LoadBackground(string path)
+        {
+            try
+            {
+                string extension = Path.GetExtension(path).ToLowerInvariant();
+                if (extension == ".pmx")
+                {
+                    byte[] pmxBytes = File.ReadAllBytes(path);
+                    var parser = new NativeMmdParser();
+                    MmdModelDefinition model = parser.LoadModel(pmxBytes);
+                    backgroundRoot = new GameObject("MMD Background: " + Path.GetFileName(path));
+                    MmdUnityModelInstance instance = MmdUnityModelFactory.CreateSkinnedModel(model, path, importScale: 0.1f);
+                    instance.Root.transform.SetParent(backgroundRoot.transform, worldPositionStays: false);
+                    AddStatus("Background loaded: " + Path.GetFileName(path));
+                }
+            }
+            catch (Exception ex)
+            {
+                AddStatus("Background load failed: " + ex.GetType().Name + ": " + ex.Message);
             }
         }
 
