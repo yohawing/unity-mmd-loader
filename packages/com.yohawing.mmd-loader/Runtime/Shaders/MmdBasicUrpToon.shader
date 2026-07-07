@@ -30,6 +30,8 @@ Shader "MMD Basic URP Toon"
         _BaseMapBound ("Base Map Bound", Float) = 0
         _TextureFlatLightingWeight ("Texture Flat Lighting Weight", Float) = 0
         _TextureFlatLightingValue ("Texture Flat Lighting Value", Float) = 2.12
+        _MmdNormalMap ("Normal Map", 2D) = "bump" {}
+        _MmdNormalMapBound ("Normal Map Bound", Float) = 0
         _AlphaClipThreshold ("Alpha Clip Threshold", Range(0, 1)) = 0
         _ShadowAlphaClipThreshold ("Shadow Alpha Clip Threshold", Range(0, 1)) = 0
         _Cull ("Cull", Float) = 2
@@ -96,6 +98,7 @@ Shader "MMD Basic URP Toon"
                 half _AlphaClipThreshold;
                 half _ShadowAlphaClipThreshold;
                 half _GammaTarget;
+                half _MmdNormalMapBound;
             CBUFFER_END
 
             struct Attributes
@@ -177,6 +180,8 @@ Shader "MMD Basic URP Toon"
             SAMPLER(sampler_ToonMap);
             TEXTURE2D(_MmdSelfShadowMap);
             SAMPLER(sampler_MmdSelfShadowMap);
+            TEXTURE2D(_MmdNormalMap);
+            SAMPLER(sampler_MmdNormalMap);
 
             float4x4 _MmdSelfShadowWorldToShadow;
             float4 _MmdSelfShadowParams;
@@ -209,12 +214,14 @@ Shader "MMD Basic URP Toon"
                 half _AlphaClipThreshold;
                 half _ShadowAlphaClipThreshold;
                 half _GammaTarget;
+                half _MmdNormalMapBound;
             CBUFFER_END
 
             struct Attributes
             {
                 float4 positionOS : POSITION;
                 float3 normalOS : NORMAL;
+                float4 tangentOS : TANGENT;
                 float2 uv : TEXCOORD0;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
@@ -225,6 +232,8 @@ Shader "MMD Basic URP Toon"
                 float3 normalWS : TEXCOORD0;
                 float2 uv : TEXCOORD1;
                 float3 positionWS : TEXCOORD2;
+                float3 tangentWS : TEXCOORD3;
+                float3 bitangentWS : TEXCOORD4;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -238,6 +247,9 @@ Shader "MMD Basic URP Toon"
                 output.positionWS = positionWS;
                 output.normalWS = normalize(TransformObjectToWorldNormal(input.normalOS));
                 output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
+                float3 tangentWS = normalize(TransformObjectToWorldDir(input.tangentOS.xyz));
+                output.tangentWS = tangentWS;
+                output.bitangentWS = cross(output.normalWS, tangentWS) * input.tangentOS.w;
                 return output;
             }
 
@@ -320,7 +332,19 @@ Shader "MMD Basic URP Toon"
                 half selfShadowReceive = (half)UNITY_ACCESS_INSTANCED_PROP(MmdPerRenderer, _MmdSelfShadowReceive);
                 half selfShadowVisibility = SampleMmdSelfShadow(input.positionWS, selfShadowReceive);
 
-                half3 normalWS = normalize(input.normalWS);
+                half3 normalWS;
+                if (_MmdNormalMapBound > 0.5h)
+                {
+                    half3 normalTS = UnpackNormal(SAMPLE_TEXTURE2D(_MmdNormalMap, sampler_MmdNormalMap, input.uv));
+                    float3 T = normalize(input.tangentWS);
+                    float3 B = normalize(input.bitangentWS);
+                    float3 N = normalize(input.normalWS);
+                    normalWS = normalize(T * normalTS.x + B * normalTS.y + N * normalTS.z);
+                }
+                else
+                {
+                    normalWS = normalize(input.normalWS);
+                }
                 half ndotl = saturate(dot(normalWS, lightDirection));
                 half lightVisibility = saturate(dot(normalWS, lightDirection) * 3.0h);
                 half toonVisibility = min(selfShadowVisibility, lightVisibility);
@@ -422,6 +446,7 @@ Shader "MMD Basic URP Toon"
                 half _AlphaClipThreshold;
                 half _ShadowAlphaClipThreshold;
                 half _GammaTarget;
+                half _MmdNormalMapBound;
             CBUFFER_END
 
             struct MmdSelfShadowAttributes
@@ -506,6 +531,7 @@ Shader "MMD Basic URP Toon"
                 half _AlphaClipThreshold;
                 half _ShadowAlphaClipThreshold;
                 half _GammaTarget;
+                half _MmdNormalMapBound;
             CBUFFER_END
 
             struct Attributes
