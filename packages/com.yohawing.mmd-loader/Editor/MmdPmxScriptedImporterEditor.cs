@@ -14,6 +14,7 @@ namespace Mmd.Editor
         private SerializedProperty? modelPresetProperty;
         private SerializedProperty? materialTexturePolicyProperty;
         private SerializedProperty? shaderPresetProperty;
+        private SerializedProperty? materialOverrideAssetProperty;
         private SerializedProperty? materialRemapsProperty;
         private SerializedProperty? animationTypeProperty;
         private SerializedProperty? humanoidBoneMappingOverridesProperty;
@@ -43,6 +44,7 @@ namespace Mmd.Editor
             modelPresetProperty = serializedObject.FindProperty("modelPreset");
             materialTexturePolicyProperty = serializedObject.FindProperty("materialTexturePolicy");
             shaderPresetProperty = serializedObject.FindProperty("shaderPreset");
+            materialOverrideAssetProperty = serializedObject.FindProperty("materialOverrideAsset");
             materialRemapsProperty = serializedObject.FindProperty("materialRemaps");
             animationTypeProperty = serializedObject.FindProperty("animationType");
             humanoidBoneMappingOverridesProperty = serializedObject.FindProperty("humanoidBoneMappingOverrides");
@@ -126,6 +128,15 @@ namespace Mmd.Editor
             else
             {
                 EditorGUILayout.HelpBox("Apply import settings to refresh material data.", MessageType.Warning);
+            }
+
+            if (materialOverrideAssetProperty != null)
+            {
+                EditorGUILayout.PropertyField(
+                    materialOverrideAssetProperty,
+                    new GUIContent(
+                        "Material Override",
+                        "Applies per-material PBR overrides after PMX texture binding."));
             }
 
             // Minimal Toon Shader Settings surface. Shader Preset is an importer setting; diagnostics stay out of the normal UI.

@@ -30,6 +30,7 @@ namespace Mmd.Tests
         private const string TempPrefabPath = TempDirectory + "/test_1bone_cube.prefab";
         private const string TempScenePath = TempDirectory + "/test_1bone_cube_scene.unity";
         private const string TempRemapMaterialPath = TempDirectory + "/remapped_body.mat";
+        private const string TempMaterialOverridePath = TempDirectory + "/material_override.asset";
         private const int TestOneBoneCubeVertexCount = 14;
 
         [SetUp]
@@ -268,6 +269,54 @@ namespace Mmd.Tests
             Assert.That(pmxAsset.ImportedMaterials[0].shader, Is.Not.Null);
             Assert.That(pmxAsset.ImportedMaterials[0].shader.name,
                 Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName));
+        }
+
+        [Test]
+        public void PmxImporterAppliesPersistentMaterialOverrideAssetAfterTextureBinding()
+        {
+            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+
+            MmdMaterialOverrideAsset overrideAsset = ScriptableObject.CreateInstance<MmdMaterialOverrideAsset>();
+            overrideAsset.entries = new[]
+            {
+                new MmdMaterialOverrideEntry
+                {
+                    materialIndex = 0,
+                    hasMetallic = true,
+                    metallic = 0.72f,
+                    hasSmoothness = true,
+                    smoothness = 0.18f
+                }
+            };
+            AssetDatabase.CreateAsset(overrideAsset, TempMaterialOverridePath);
+            AssetDatabase.ImportAsset(TempMaterialOverridePath, ImportAssetOptions.ForceUpdate);
+            MmdMaterialOverrideAsset persistedOverride =
+                AssetDatabase.LoadAssetAtPath<MmdMaterialOverrideAsset>(TempMaterialOverridePath);
+
+            var importer = AssetImporter.GetAtPath(TempPmxPath) as MmdPmxScriptedImporter;
+            Assert.That(importer, Is.Not.Null);
+            Assert.That(persistedOverride, Is.Not.Null);
+
+            var serializedImporter = new SerializedObject(importer!);
+            serializedImporter.FindProperty("shaderPreset").enumValueIndex = (int)MmdPmxShaderPreset.UrpLit;
+            serializedImporter.FindProperty("materialOverrideAsset").objectReferenceValue = persistedOverride;
+            serializedImporter.ApplyModifiedPropertiesWithoutUndo();
+            importer!.SaveAndReimport();
+
+            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+
+            Assert.That(pmxAsset.ShaderPreset, Is.EqualTo(nameof(MmdPmxShaderPreset.UrpLit)));
+            Assert.That(pmxAsset.ImportedMaterials, Is.Not.Null.And.Not.Empty);
+            Material importedMaterial = pmxAsset.ImportedMaterials[0];
+            Assert.That(importedMaterial.shader, Is.Not.Null);
+            Assert.That(importedMaterial.shader.name,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName));
+            Assert.That(importedMaterial.HasProperty(MmdMaterialPropertyNames.Metallic), Is.True);
+            Assert.That(importedMaterial.HasProperty(MmdMaterialPropertyNames.Smoothness), Is.True);
+            Assert.That(importedMaterial.GetFloat(MmdMaterialPropertyNames.Metallic),
+                Is.EqualTo(0.72f).Within(0.00001f));
+            Assert.That(importedMaterial.GetFloat(MmdMaterialPropertyNames.Smoothness),
+                Is.EqualTo(0.18f).Within(0.00001f));
         }
 
         [Test]
