@@ -56,6 +56,7 @@ namespace Mmd.UnityIntegration
         private int lastHumanoidLivePhysicsFrameCount = int.MinValue / 2;
         private LivePhysicsDriveSource livePhysicsDriveSource = LivePhysicsDriveSource.None;
         private bool isApplyingPlaybackPose;
+        private bool pendingSeekReseed;
 
         private bool _userExplicitLive;
 
@@ -68,6 +69,8 @@ namespace Mmd.UnityIntegration
         public float FrameRate => frameRate;
 
         public MmdPhysicsMode PhysicsMode => physicsMode;
+
+        public int MotionMaxFrame => binding?.MotionMaxFrame ?? 0;
 
         public bool PlayOnStart => playOnStart;
 
@@ -744,6 +747,47 @@ namespace Mmd.UnityIntegration
             return ApplyPlaybackPose(() => ApplyCurrentFrame());
         }
 
+        public MmdPlaybackSnapshot SeekFrame(int frame)
+        {
+            if (binding == null)
+            {
+                throw new InvalidOperationException("Playback controller must be configured before seeking.");
+            }
+
+            if (frame < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(frame), "Frame index must not be negative.");
+            }
+
+            MmdPhysicsMode originalBindingMode = binding.PhysicsMode;
+            if (originalBindingMode == MmdPhysicsMode.Live)
+            {
+                binding.SetPhysicsMode(MmdPhysicsMode.Off);
+            }
+
+            try
+            {
+                playbackFrame = frame;
+                CurrentFrame = frame;
+                return ApplyPlaybackPose(() =>
+                {
+                    LastSnapshot = binding.ApplyFrame(CurrentFrame, frameRate);
+                    ApplyEditableRigLayer("post-seek-frame");
+                    return LastSnapshot;
+                });
+            }
+            finally
+            {
+                if (originalBindingMode == MmdPhysicsMode.Live)
+                {
+                    binding.SetPhysicsMode(MmdPhysicsMode.Live);
+                    pendingSeekReseed = true;
+                }
+
+                ResetLivePhysicsDriveSource();
+            }
+        }
+
         public MmdPlaybackSnapshot ApplyTime(float time)
         {
             return ApplyTime(time, frameRate);
@@ -782,6 +826,7 @@ namespace Mmd.UnityIntegration
         public void Stop()
         {
             IsPlaying = false;
+            pendingSeekReseed = false;
             if (binding != null)
             {
                 binding.ResetLivePhysics();
@@ -1196,6 +1241,7 @@ namespace Mmd.UnityIntegration
 
             binding.SetPhysicsMode(mode);
             ResetLivePhysicsDriveSource();
+            pendingSeekReseed = false;
             if (mode == MmdPhysicsMode.Live)
             {
                 playbackFrame = 0.0f;
@@ -1308,6 +1354,16 @@ namespace Mmd.UnityIntegration
             if (binding == null)
             {
                 throw new InvalidOperationException("Playback controller must be configured before applying frames.");
+            }
+
+            if (binding.PhysicsMode == MmdPhysicsMode.Live && pendingSeekReseed)
+            {
+                pendingSeekReseed = false;
+                PrepareLivePhysicsDriveSource(LivePhysicsDriveSource.VmdForward);
+                LastSnapshot = binding.ApplyLivePhysicsForwardFrame(CurrentFrame, frameRate);
+                lastVmdLivePhysicsFrameCount = Time.frameCount;
+                ApplyEditableRigLayer("post-physics-live-frame");
+                return LastSnapshot;
             }
 
             if (binding.PhysicsMode == MmdPhysicsMode.Live)

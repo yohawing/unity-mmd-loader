@@ -63,6 +63,8 @@ namespace Mmd.UnityIntegration
 
         public bool IsFastRuntimeEnabled => fastSession != null;
 
+        public int MotionMaxFrame => session.MotionMaxFrame;
+
         public static MmdUnityPlaybackBinding CreateSkinned(
             MmdPmxAsset modelAsset,
             MmdVmdAsset motionAsset)

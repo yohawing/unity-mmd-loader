@@ -51,6 +51,8 @@ namespace Mmd
             this.motionId = motionId;
         }
 
+        public int MotionMaxFrame => motion.maxFrame;
+
         public MmdTrace EvaluateTrace(int frame, float time, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
         {
             return MmdRuntimeTraceEvaluator.EvaluatePhaseOneTrace(model, motion, frame, time, modelId, motionId, physicsBackend, ikSolver);

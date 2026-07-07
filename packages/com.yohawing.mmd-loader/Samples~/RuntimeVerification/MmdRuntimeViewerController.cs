@@ -89,6 +89,32 @@ namespace Mmd.Samples.RuntimeVerification
 
             GUILayout.EndHorizontal();
 
+            if (playbackController != null)
+            {
+                int maxFrame = playbackController.MotionMaxFrame;
+                if (maxFrame > 0)
+                {
+                    int displayFrame = Mathf.Min(playbackController.CurrentFrame, maxFrame);
+                    float newFrame = GUILayout.HorizontalSlider(displayFrame, 0, maxFrame);
+                    int seekTarget = Mathf.RoundToInt(newFrame);
+                    if (seekTarget != displayFrame)
+                    {
+                        if (playbackController.IsPlaying)
+                        {
+                            playbackController.Pause();
+                        }
+
+                        playbackController.SeekFrame(seekTarget);
+                    }
+
+                    GUILayout.Label("Frame: " + playbackController.CurrentFrame + " / " + maxFrame);
+                }
+                else
+                {
+                    GUILayout.Label("Frame: " + playbackController.CurrentFrame);
+                }
+            }
+
             GUILayout.Space(6.0f);
             DrawFileInputSection();
 
