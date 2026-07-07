@@ -42,7 +42,7 @@ namespace Mmd.Editor
         UrpLit = 1
     }
 
-    [ScriptedImporter(24, "pmx")]
+    [ScriptedImporter(25, "pmx")]
     public sealed class MmdPmxScriptedImporter : ScriptedImporter
     {
         [SerializeField] private float importScale = MmdPmxAsset.DefaultImportScale;
@@ -121,6 +121,15 @@ namespace Mmd.Editor
                         importedMaterials,
                         generatedAssets.RenderingDescriptor,
                         ctx);
+
+                if (shaderPreset == MmdPmxShaderPreset.UrpLit)
+                {
+                    MmdPbrTextureConventionScanner.ApplyScannedMaterialOverrides(
+                        ctx,
+                        model,
+                        ctx.assetPath,
+                        importedMaterials);
+                }
 
                 ApplyMaterialOverrideAsset(ctx, importedMaterials);
 

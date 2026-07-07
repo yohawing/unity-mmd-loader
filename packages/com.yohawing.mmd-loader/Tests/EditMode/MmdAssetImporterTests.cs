@@ -467,7 +467,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void PmxScriptedImporterVersionIsTwentyThreeForModelPresetSelfShadowPolicy()
+        public void PmxScriptedImporterVersionIsTwentyFiveForPbrTextureScanPolicy()
         {
             object[] attributes = typeof(MmdPmxScriptedImporter).GetCustomAttributes(
                 typeof(ScriptedImporterAttribute),
@@ -475,8 +475,8 @@ namespace Mmd.Tests
 
             Assert.That(attributes, Has.Length.EqualTo(1));
             var attribute = (ScriptedImporterAttribute)attributes[0];
-            Assert.That(attribute.version, Is.EqualTo(23),
-                "PMX importer version must force reimport for auto model preset assignment and self-shadow target policy.");
+            Assert.That(attribute.version, Is.EqualTo(25),
+                "PMX importer version must force reimport for URP Lit PBR texture convention scan outputs and dependencies.");
         }
 
         [Test]

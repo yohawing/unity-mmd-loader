@@ -12,6 +12,12 @@ namespace Mmd.Rendering
         public const string MmdSelfShadowParams = "_MmdSelfShadowParams";
         public const string MmdNormalMap = "_MmdNormalMap";
         public const string MmdNormalMapBound = "_MmdNormalMapBound";
+        public const string MmdMetallicMap = "_MmdMetallicMap";
+        public const string MmdMetallicMapBound = "_MmdMetallicMapBound";
+        public const string MmdRoughnessMap = "_MmdRoughnessMap";
+        public const string MmdRoughnessMapBound = "_MmdRoughnessMapBound";
+        public const string MmdOcclusionMap = "_MmdOcclusionMap";
+        public const string MmdOcclusionMapBound = "_MmdOcclusionMapBound";
 
         public const string BaseColor = "_BaseColor";
         public const string Color = "_Color";
@@ -31,5 +37,7 @@ namespace Mmd.Rendering
         public const string TextureAlphaOutputWeight = "_TextureAlphaOutputWeight";
         public const string BumpMap = "_BumpMap";
         public const string BumpScale = "_BumpScale";
+        public const string MetallicGlossMap = "_MetallicGlossMap";
+        public const string OcclusionMap = "_OcclusionMap";
     }
 }

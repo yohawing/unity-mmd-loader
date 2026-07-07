@@ -10,6 +10,8 @@ namespace Mmd.UnityIntegration
     internal static class MmdMaterialOverrideApplier
     {
         private const string UrpNormalMapKeyword = "_NORMALMAP";
+        private const string UrpMetallicGlossMapKeyword = "_METALLICSPECGLOSSMAP";
+        private const string UrpOcclusionMapKeyword = "_OCCLUSIONMAP";
         private const string SurfaceTypeTransparentKeyword = "_SURFACE_TYPE_TRANSPARENT";
         private const string AlphaBlendKeyword = "_ALPHABLEND_ON";
         private const string AlphaTestKeyword = "_ALPHATEST_ON";
@@ -301,6 +303,63 @@ namespace Mmd.UnityIntegration
             if (entry.hasNormalScale)
             {
                 SetFloatIfPresent(material, MmdMaterialPropertyNames.BumpScale, entry.normalScale);
+            }
+
+            if (entry.hasMetallicMap && entry.metallicMap != null)
+            {
+                bool mmdMetallicMapBound = SetTextureIfPresent(
+                    material,
+                    MmdMaterialPropertyNames.MmdMetallicMap,
+                    entry.metallicMap);
+                if (entry.metallicMapIncludesSmoothness)
+                {
+                    bool urpMetallicMapBound = SetTextureIfPresent(
+                        material,
+                        MmdMaterialPropertyNames.MetallicGlossMap,
+                        entry.metallicMap);
+                    if (urpMetallicMapBound)
+                    {
+                        material.EnableKeyword(UrpMetallicGlossMapKeyword);
+                    }
+                }
+
+                if (mmdMetallicMapBound)
+                {
+                    SetFloatIfPresent(material, MmdMaterialPropertyNames.MmdMetallicMapBound, 1.0f);
+                }
+            }
+
+            if (entry.hasRoughnessMap && entry.roughnessMap != null)
+            {
+                bool mmdRoughnessMapBound = SetTextureIfPresent(
+                    material,
+                    MmdMaterialPropertyNames.MmdRoughnessMap,
+                    entry.roughnessMap);
+                if (mmdRoughnessMapBound)
+                {
+                    SetFloatIfPresent(material, MmdMaterialPropertyNames.MmdRoughnessMapBound, 1.0f);
+                }
+            }
+
+            if (entry.hasOcclusionMap && entry.occlusionMap != null)
+            {
+                bool mmdOcclusionMapBound = SetTextureIfPresent(
+                    material,
+                    MmdMaterialPropertyNames.MmdOcclusionMap,
+                    entry.occlusionMap);
+                bool urpOcclusionMapBound = SetTextureIfPresent(
+                    material,
+                    MmdMaterialPropertyNames.OcclusionMap,
+                    entry.occlusionMap);
+                if (urpOcclusionMapBound)
+                {
+                    material.EnableKeyword(UrpOcclusionMapKeyword);
+                }
+
+                if (mmdOcclusionMapBound)
+                {
+                    SetFloatIfPresent(material, MmdMaterialPropertyNames.MmdOcclusionMapBound, 1.0f);
+                }
             }
 
             if (entry.hasSurfaceMode && entry.surfaceMode != MmdMaterialOverrideSurfaceMode.Preserve)

@@ -77,6 +77,16 @@ namespace Mmd
 
         public bool hasNormalScale;
         public float normalScale = 1.0f;
+
+        public bool hasMetallicMap;
+        public Texture2D? metallicMap;
+        public bool metallicMapIncludesSmoothness;
+
+        public bool hasRoughnessMap;
+        public Texture2D? roughnessMap;
+
+        public bool hasOcclusionMap;
+        public Texture2D? occlusionMap;
     }
 
     [CreateAssetMenu(

@@ -216,6 +216,75 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void UrpLitMaterialOverrideByIndexAppliesPbrTextureMaps()
+        {
+            MmdModelDefinition model = CreateTwoMaterialModel();
+            MmdMaterialOverrideAsset? overrideAsset = null;
+            MmdUnityModelInstance? instance = null;
+            Texture2D? metallicMap = null;
+            Texture2D? roughnessMap = null;
+            Texture2D? occlusionMap = null;
+
+            try
+            {
+                metallicMap = CreateColorTexture(new Color(1.0f, 0.0f, 0.0f, 1.0f));
+                roughnessMap = CreateColorTexture(new Color(0.0f, 1.0f, 0.0f, 1.0f));
+                occlusionMap = CreateColorTexture(new Color(0.0f, 0.0f, 1.0f, 1.0f));
+                overrideAsset = ScriptableObject.CreateInstance<MmdMaterialOverrideAsset>();
+                overrideAsset.entries = new[]
+                {
+                    new MmdMaterialOverrideEntry
+                    {
+                        materialIndex = 1,
+                        hasMetallicMap = true,
+                        metallicMap = metallicMap,
+                        metallicMapIncludesSmoothness = true,
+                        hasRoughnessMap = true,
+                        roughnessMap = roughnessMap,
+                        hasOcclusionMap = true,
+                        occlusionMap = occlusionMap
+                    }
+                };
+
+                instance = MmdUnityModelFactory.CreateStaticModel(
+                    model,
+                    sourcePath: null,
+                    importScale: 1.0f,
+                    preset: MmdMaterialPreset.UrpLit,
+                    materialOverride: overrideAsset);
+
+                Material material = instance.Materials[1];
+                Assert.That(ReadMaterialTexture(material, MmdMaterialPropertyNames.MetallicGlossMap), Is.SameAs(metallicMap));
+                Assert.That(material.IsKeywordEnabled("_METALLICSPECGLOSSMAP"), Is.True);
+                Assert.That(ReadMaterialTexture(material, MmdMaterialPropertyNames.OcclusionMap), Is.SameAs(occlusionMap));
+                Assert.That(material.IsKeywordEnabled("_OCCLUSIONMAP"), Is.True);
+            }
+            finally
+            {
+                if (metallicMap != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(metallicMap);
+                }
+
+                if (roughnessMap != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(roughnessMap);
+                }
+
+                if (occlusionMap != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(occlusionMap);
+                }
+
+                DestroyInstance(instance);
+                if (overrideAsset != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(overrideAsset);
+                }
+            }
+        }
+
+        [Test]
         public void MmdToonMaterialOverrideByIndexAppliesMmdNormalMapBound()
         {
             MmdModelDefinition model = CreateTwoMaterialModel();
