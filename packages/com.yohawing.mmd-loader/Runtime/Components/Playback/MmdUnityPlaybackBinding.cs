@@ -375,7 +375,8 @@ namespace Mmd.UnityIntegration
             MmdMotionDefinition motion,
             string modelId,
             string motionId,
-            string? sourcePath = null)
+            string? sourcePath = null,
+            MmdMaterialPreset materialPreset = MmdMaterialPreset.MmdToon)
         {
             if (model == null)
             {
@@ -387,7 +388,11 @@ namespace Mmd.UnityIntegration
                 throw new ArgumentNullException(nameof(motion));
             }
 
-            MmdUnityModelInstance instance = MmdUnityModelFactory.CreateSkinnedModel(model, sourcePath);
+            MmdUnityModelInstance instance = MmdUnityModelFactory.CreateSkinnedModel(
+                model,
+                sourcePath,
+                importScale: 1.0f,
+                materialPreset);
             var session = new MmdRuntimeSession(model, motion, modelId, motionId);
             return new MmdUnityPlaybackBinding(instance, session, model, modelId, motionId);
         }
@@ -425,6 +430,27 @@ namespace Mmd.UnityIntegration
             float importScale,
             MmdMaterialOverrideAsset? materialOverride = null)
         {
+            return CreateSkinned(
+                model,
+                motion,
+                modelId,
+                motionId,
+                sourcePath,
+                importScale,
+                MmdMaterialPreset.MmdToon,
+                materialOverride);
+        }
+
+        public static MmdUnityPlaybackBinding CreateSkinned(
+            MmdModelDefinition model,
+            MmdMotionDefinition motion,
+            string modelId,
+            string motionId,
+            string? sourcePath,
+            float importScale,
+            MmdMaterialPreset materialPreset,
+            MmdMaterialOverrideAsset? materialOverride = null)
+        {
             if (model == null)
             {
                 throw new ArgumentNullException(nameof(model));
@@ -440,7 +466,7 @@ namespace Mmd.UnityIntegration
                 model,
                 sourcePath,
                 scale,
-                MmdMaterialPreset.MmdToon,
+                materialPreset,
                 materialOverride);
             var session = new MmdRuntimeSession(model, motion, modelId, motionId);
             return new MmdUnityPlaybackBinding(instance, session, model, modelId, motionId);

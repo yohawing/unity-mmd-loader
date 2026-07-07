@@ -34,6 +34,8 @@ namespace Mmd.Samples.RuntimeVerification
         public string playbackStatus = "not-run";
         public string status = "not-run";
         public float durationSeconds;
+        public string requestedMaterialPreset = string.Empty;
+        public string[] materialShaders = Array.Empty<string>();
         public MmdRuntimeVerificationModelSummary model = new();
         public MmdRuntimeVerificationMotionSummary motion = new();
         public MmdRuntimeVerificationPlaybackSummary playback = new();

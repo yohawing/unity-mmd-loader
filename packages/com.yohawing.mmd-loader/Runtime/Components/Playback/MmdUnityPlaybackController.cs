@@ -7,6 +7,7 @@ using UnityEngine;
 using Mmd;
 using Mmd.Parser;
 using Mmd.Physics;
+using Mmd.Rendering;
 
 namespace Mmd.UnityIntegration
 {
@@ -338,7 +339,8 @@ namespace Mmd.UnityIntegration
             string pmxPath,
             string vmdPath,
             MmdPlaybackConfig config,
-            bool allowRuntimeFallback = true)
+            bool allowRuntimeFallback = true,
+            MmdMaterialPreset materialPreset = MmdMaterialPreset.MmdToon)
         {
             if (string.IsNullOrWhiteSpace(pmxPath))
             {
@@ -430,7 +432,8 @@ namespace Mmd.UnityIntegration
                     motion,
                     resolvedPmxPath,
                     resolvedVmdPath,
-                    resolvedPmxPath);
+                    resolvedPmxPath,
+                    materialPreset);
                 AttachRestoredRuntimeInstance(runtimeImporterBinding.Instance);
             }
 

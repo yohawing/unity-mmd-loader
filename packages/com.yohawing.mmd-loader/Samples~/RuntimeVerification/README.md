@@ -46,6 +46,17 @@ Controller-driven check with the managed path forced after configuration:
   --fast-runtime off
 ```
 
+URP Lit material preset visual smoke:
+
+```powershell
+.\artifacts\runtime-verification\MmdRuntimeVerification.exe `
+  --pmx F:\MMD\model.pmx `
+  --vmd F:\MMD\motion.vmd `
+  --out F:\Develop\MMDDev\unity-mmd-loader\artifacts\runtime-verification\urp-lit-report.json `
+  --drive timeline `
+  --material-preset urp-lit
+```
+
 Physics max-substep A/B diagnostic:
 
 ```powershell
@@ -89,7 +100,9 @@ audio, audio offset, and background are resolved and kept for the viewer UI
 path, but this verification player only drives PMX + VMD playback for now.
 Cases with `skipReason` are skipped by the verification sweep while remaining
 available to the viewer descriptor list. Test-only fields such as oracle, watch
-bones, epsilon, and frame lists are ignored.
+bones, epsilon, and frame lists are ignored. A case may set `materialPreset` to
+`MmdToon` or `UrpLit`; `expectedFeatures` can include `urp-lit-preset` to fail
+the gate unless the report captured the URP Lit shader binding.
 
 Interactive runtime viewer:
 

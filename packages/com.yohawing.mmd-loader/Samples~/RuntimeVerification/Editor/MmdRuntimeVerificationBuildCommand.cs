@@ -4,11 +4,15 @@ using System;
 using System.IO;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
+using UnityEngine;
 
 namespace Mmd.Samples.RuntimeVerification.Editor
 {
     public static class MmdRuntimeVerificationBuildCommand
     {
+        private const string UrpLitShaderName = "Universal Render Pipeline/Lit";
+        private const string UrpLitAnchorMaterialPath = "Assets/RuntimeVerification/Resources/RuntimeVerificationUrpLitAnchor.mat";
+
         public static void BuildFromCommandLine()
         {
             BuildArguments arguments = BuildArguments.Parse(Environment.GetCommandLineArgs());
@@ -26,11 +30,13 @@ namespace Mmd.Samples.RuntimeVerification.Editor
                 options = arguments.Development ? BuildOptions.Development : BuildOptions.None
             };
 
+            EnsureRuntimeShaderAnchorAsset();
+
             BuildReport report = BuildPipeline.BuildPlayer(options);
             BuildSummary summary = report.summary;
             if (summary.result == BuildResult.Succeeded)
             {
-                UnityEngine.Debug.Log(
+                Debug.Log(
                     "Runtime verification player build succeeded: " +
                     arguments.OutputPath +
                     " size=" +
@@ -39,12 +45,42 @@ namespace Mmd.Samples.RuntimeVerification.Editor
                 return;
             }
 
-            UnityEngine.Debug.LogError(
+            Debug.LogError(
                 "Runtime verification player build failed: " +
                 summary.result +
                 " errors=" +
                 summary.totalErrors);
             EditorApplication.Exit(1);
+        }
+
+        private static void EnsureRuntimeShaderAnchorAsset()
+        {
+            Shader urpLitShader = Shader.Find(UrpLitShaderName);
+            if (urpLitShader == null)
+            {
+                Debug.LogWarning("Runtime verification build could not resolve " + UrpLitShaderName + ".");
+                return;
+            }
+
+            Directory.CreateDirectory(Path.GetDirectoryName(UrpLitAnchorMaterialPath) ?? "Assets/RuntimeVerification/Resources");
+            Material material = AssetDatabase.LoadAssetAtPath<Material>(UrpLitAnchorMaterialPath);
+            if (material == null)
+            {
+                material = new Material(urpLitShader)
+                {
+                    name = "RuntimeVerificationUrpLitAnchor"
+                };
+                AssetDatabase.CreateAsset(material, UrpLitAnchorMaterialPath);
+                Debug.Log("Runtime verification build created shader anchor: " + UrpLitAnchorMaterialPath);
+            }
+            else if (material.shader != urpLitShader)
+            {
+                material.shader = urpLitShader;
+                EditorUtility.SetDirty(material);
+                Debug.Log("Runtime verification build updated shader anchor: " + UrpLitAnchorMaterialPath);
+            }
+
+            AssetDatabase.SaveAssets();
         }
 
         private sealed class BuildArguments

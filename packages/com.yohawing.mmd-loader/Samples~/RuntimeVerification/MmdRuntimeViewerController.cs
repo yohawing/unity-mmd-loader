@@ -7,6 +7,7 @@ using System.IO;
 using Mmd.Motion;
 using Mmd.Parser;
 using Mmd.Physics;
+using Mmd.Rendering;
 using Mmd.UnityIntegration;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -22,6 +23,7 @@ namespace Mmd.Samples.RuntimeVerification
         public string cameraPath = string.Empty;
         public string audioPath = string.Empty;
         public string backgroundPath = string.Empty;
+        public string materialPreset = string.Empty;
         public float audioOffsetFrame;
         public long timestamp;
     }
@@ -327,7 +329,11 @@ namespace Mmd.Samples.RuntimeVerification
                         {
                             selectedIndex = -1;
                             StartPlayback(entry.pmxPath, entry.vmdPath, entry.name,
-                                entry.cameraPath, entry.audioPath, entry.backgroundPath, entry.audioOffsetFrame);
+                                entry.cameraPath,
+                                entry.audioPath,
+                                entry.backgroundPath,
+                                entry.audioOffsetFrame,
+                                ResolveRecentMaterialPreset(entry));
                             AddStatus("Playing (recent): " + entry.name);
                         }
                         catch (Exception ex)
@@ -394,7 +400,8 @@ namespace Mmd.Samples.RuntimeVerification
                         string.Empty,
                         string.Empty,
                         0.0f,
-                        verificationCases[i].ParseOnly ? "parse-only" : string.Empty);
+                        verificationCases[i].ParseOnly ? "parse-only" : string.Empty,
+                        materialPreset: verificationCases[i].MaterialPreset);
                 }
             }
 
@@ -426,7 +433,8 @@ namespace Mmd.Samples.RuntimeVerification
                     selected.CameraPath,
                     selected.AudioPath,
                     selected.BackgroundPath,
-                    selected.AudioOffsetFrame);
+                    selected.AudioOffsetFrame,
+                    selected.MaterialPreset);
                 AddStatus("Playing: " + selected.Name);
             }
             catch (Exception ex)
@@ -530,7 +538,8 @@ namespace Mmd.Samples.RuntimeVerification
             string cameraPath = "",
             string audioPath = "",
             string backgroundPath = "",
-            float audioOffset = 0.0f)
+            float audioOffset = 0.0f,
+            MmdMaterialPreset materialPreset = MmdMaterialPreset.MmdToon)
         {
             if (arguments == null)
             {
@@ -554,7 +563,8 @@ namespace Mmd.Samples.RuntimeVerification
                 pmxPath,
                 vmdPath,
                 new MmdPlaybackConfig(arguments.FrameRate, 0, playOnStart: false),
-                allowRuntimeFallback: true);
+                allowRuntimeFallback: true,
+                materialPreset: materialPreset);
             playbackController.SetPhysicsMode(MmdPhysicsMode.Live);
             if (!arguments.FastRuntimeEnabled)
             {
@@ -601,7 +611,7 @@ namespace Mmd.Samples.RuntimeVerification
                 LoadBackground(backgroundPath);
             }
 
-            AddRecent(displayName, pmxPath, vmdPath, cameraPath, audioPath, backgroundPath, audioOffset);
+            AddRecent(displayName, pmxPath, vmdPath, cameraPath, audioPath, backgroundPath, audioOffset, materialPreset);
         }
 
         private void AutoCenterCamera()
@@ -767,6 +777,7 @@ namespace Mmd.Samples.RuntimeVerification
             DrawPath("Camera", selected.CameraPath);
             DrawPath("Audio", selected.AudioPath);
             DrawPath("Background", selected.BackgroundPath);
+            GUILayout.Label("Material preset: " + selected.MaterialPreset);
             if (Math.Abs(selected.AudioOffsetFrame) > float.Epsilon)
             {
                 GUILayout.Label("Audio offset frame: " + selected.AudioOffsetFrame.ToString("0.###"));
@@ -848,8 +859,19 @@ namespace Mmd.Samples.RuntimeVerification
             }
         }
 
+        private static MmdMaterialPreset ResolveRecentMaterialPreset(MmdRecentEntry entry)
+        {
+            return MmdRuntimeVerificationArguments.TryParseMaterialPreset(entry.materialPreset, out MmdMaterialPreset preset)
+                ? preset
+                : MmdMaterialPreset.MmdToon;
+        }
+
         private void AddRecent(string name, string pmxPath, string vmdPath,
-            string cameraPath = "", string audioPath = "", string backgroundPath = "", float audioOffset = 0.0f)
+            string cameraPath = "",
+            string audioPath = "",
+            string backgroundPath = "",
+            float audioOffset = 0.0f,
+            MmdMaterialPreset materialPreset = MmdMaterialPreset.MmdToon)
         {
             recentEntries.entries.RemoveAll(e =>
                 string.Equals(e.pmxPath, pmxPath, StringComparison.OrdinalIgnoreCase) &&
@@ -866,6 +888,7 @@ namespace Mmd.Samples.RuntimeVerification
                 cameraPath = cameraPath,
                 audioPath = audioPath,
                 backgroundPath = backgroundPath,
+                materialPreset = materialPreset.ToString(),
                 audioOffsetFrame = audioOffset,
                 timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
             };

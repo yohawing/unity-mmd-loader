@@ -9,6 +9,7 @@ using System.Reflection;
 using Mmd;
 using Mmd.Parser;
 using Mmd.Physics;
+using Mmd.Rendering;
 using Mmd.UnityIntegration;
 using UnityEngine;
 using UnityEngine.Playables;
@@ -314,9 +315,14 @@ namespace Mmd.Samples.RuntimeVerification
                         controller.Pause();
                         result.playback = SummarizePlayback(controller, "controller", arguments.DurationSeconds);
                         result.physics = SummarizePhysics(controller);
+                        result.materialShaders = CaptureMaterialShaders(controller);
                         result.visualSmoke = CaptureAndAnalyzeSmoke(verificationCase.Name);
+                        ValidateExpectedFeatures(verificationCase, result);
                         result.playbackStatus = "passed";
-                        result.status = "passed";
+                        if (!string.Equals(result.status, "failed", StringComparison.Ordinal))
+                        {
+                            result.status = "passed";
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -386,9 +392,14 @@ namespace Mmd.Samples.RuntimeVerification
                     {
                         result.playback = SummarizePlayback(controller, "timeline", arguments.DurationSeconds);
                         result.physics = SummarizePhysics(controller);
+                        result.materialShaders = CaptureMaterialShaders(controller);
                         result.visualSmoke = CaptureAndAnalyzeSmoke(verificationCase.Name);
+                        ValidateExpectedFeatures(verificationCase, result);
                         result.playbackStatus = "passed";
-                        result.status = "passed";
+                        if (!string.Equals(result.status, "failed", StringComparison.Ordinal))
+                        {
+                            result.status = "passed";
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -433,7 +444,8 @@ namespace Mmd.Samples.RuntimeVerification
                 verificationCase.PmxPath,
                 verificationCase.VmdPath,
                 new MmdPlaybackConfig(arguments.FrameRate, 0, playOnStart: false),
-                allowRuntimeFallback: true);
+                allowRuntimeFallback: true,
+                materialPreset: verificationCase.MaterialPreset);
 
             controller.SetPhysicsMode(MmdPhysicsMode.Live);
             if (!arguments.FastRuntimeEnabled)
@@ -605,8 +617,71 @@ namespace Mmd.Samples.RuntimeVerification
                 pmxPath = verificationCase.PmxPath,
                 vmdPath = verificationCase.VmdPath,
                 parseOnly = verificationCase.ParseOnly,
+                requestedMaterialPreset = verificationCase.MaterialPreset.ToString(),
                 expectedFeatures = verificationCase.ExpectedFeatures
             };
+        }
+
+        private static string[] CaptureMaterialShaders(MmdUnityPlaybackController controller)
+        {
+            GameObject? root = controller.ConfiguredInstanceRoot;
+            if (root == null)
+            {
+                return Array.Empty<string>();
+            }
+
+            Renderer[] renderers = root.GetComponentsInChildren<Renderer>(includeInactive: true);
+            var names = new List<string>();
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                Material[] materials = renderers[i].sharedMaterials;
+                for (int j = 0; j < materials.Length; j++)
+                {
+                    string shaderName = materials[j]?.shader != null ? materials[j].shader.name : string.Empty;
+                    if (!string.IsNullOrWhiteSpace(shaderName) && !names.Contains(shaderName))
+                    {
+                        names.Add(shaderName);
+                    }
+                }
+            }
+
+            return names.ToArray();
+        }
+
+        private static void ValidateExpectedFeatures(
+            MmdRuntimeVerificationCase verificationCase,
+            MmdRuntimeVerificationCaseResult result)
+        {
+            for (int i = 0; i < verificationCase.ExpectedFeatures.Length; i++)
+            {
+                string feature = verificationCase.ExpectedFeatures[i];
+                if (string.Equals(feature, "urp-lit-preset", StringComparison.Ordinal))
+                {
+                    bool requested = verificationCase.MaterialPreset == MmdMaterialPreset.UrpLit;
+                    bool shaderBound = Contains(result.materialShaders, MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName);
+                    if (!requested || !shaderBound)
+                    {
+                        result.status = "failed";
+                        AppendException(
+                            result,
+                            "Expected URP Lit material preset, requested=" + verificationCase.MaterialPreset +
+                            ", shaders=[" + string.Join(", ", result.materialShaders) + "].");
+                    }
+                }
+            }
+        }
+
+        private static bool Contains(string[] values, string expected)
+        {
+            for (int i = 0; i < values.Length; i++)
+            {
+                if (string.Equals(values[i], expected, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static byte[] ReadRequiredFile(string path)

@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using Mmd.Rendering;
 
 namespace Mmd.Samples.RuntimeVerification
 {
@@ -27,7 +28,8 @@ namespace Mmd.Samples.RuntimeVerification
                     viewerCases[i].PmxPath,
                     viewerCases[i].VmdPath,
                     parseOnly: false,
-                    skipReason: string.Empty));
+                    skipReason: string.Empty,
+                    materialPreset: viewerCases[i].MaterialPreset));
             }
 
             return playbackCases.ToArray();
@@ -50,6 +52,7 @@ namespace Mmd.Samples.RuntimeVerification
                     viewerCases[i].VmdPath,
                     parseOnly: viewerCases[i].ParseOnly,
                     skipReason: viewerCases[i].SkipReason,
+                    materialPreset: viewerCases[i].MaterialPreset,
                     expectedFeatures: viewerCases[i].ExpectedFeatures));
             }
 
@@ -162,6 +165,10 @@ namespace Mmd.Samples.RuntimeVerification
                 }
 
                 bool caseParseOnly = GetBool(fixtureCase, "parseOnly", false);
+                MmdMaterialPreset materialPreset = ResolveMaterialPreset(
+                    GetString(fixtureCase, "materialPreset"),
+                    caseName,
+                    errors);
                 string[] expectedFeatures = GetStringArray(fixtureCase, "expectedFeatures");
 
                 resolvedCases.Add(new MmdRuntimeViewerFixtureCase(
@@ -174,6 +181,7 @@ namespace Mmd.Samples.RuntimeVerification
                     ResolveAudioOffsetFrame(fixtureCase, audio),
                     skipReason,
                     parseOnly: caseParseOnly,
+                    materialPreset: materialPreset,
                     expectedFeatures: expectedFeatures));
             }
 
@@ -358,6 +366,25 @@ namespace Mmd.Samples.RuntimeVerification
             }
 
             return result.ToArray();
+        }
+
+        private static MmdMaterialPreset ResolveMaterialPreset(
+            string value,
+            string caseName,
+            List<string> errors)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return MmdMaterialPreset.MmdToon;
+            }
+
+            if (MmdRuntimeVerificationArguments.TryParseMaterialPreset(value, out MmdMaterialPreset preset))
+            {
+                return preset;
+            }
+
+            errors.Add("Fixture case '" + caseName + "' has invalid materialPreset: " + value + ".");
+            return MmdMaterialPreset.MmdToon;
         }
 
         private static float GetFloat(
@@ -683,6 +710,7 @@ namespace Mmd.Samples.RuntimeVerification
             float audioOffsetFrame,
             string skipReason,
             bool parseOnly = false,
+            MmdMaterialPreset materialPreset = MmdMaterialPreset.MmdToon,
             string[]? expectedFeatures = null)
         {
             Name = name ?? string.Empty;
@@ -694,6 +722,7 @@ namespace Mmd.Samples.RuntimeVerification
             AudioOffsetFrame = audioOffsetFrame;
             SkipReason = skipReason ?? string.Empty;
             ParseOnly = parseOnly;
+            MaterialPreset = materialPreset;
             ExpectedFeatures = expectedFeatures ?? Array.Empty<string>();
         }
 
@@ -706,6 +735,7 @@ namespace Mmd.Samples.RuntimeVerification
         public float AudioOffsetFrame { get; }
         public string SkipReason { get; }
         public bool ParseOnly { get; }
+        public MmdMaterialPreset MaterialPreset { get; }
         public string[] ExpectedFeatures { get; }
     }
 }

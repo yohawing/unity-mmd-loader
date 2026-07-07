@@ -20,6 +20,22 @@ function Resolve-AbsolutePath {
     return [System.IO.Path]::GetFullPath((Join-Path (Get-Location) $Path))
 }
 
+function ConvertTo-ProcessArgument {
+    param([Parameter(Mandatory = $true)][string] $Argument)
+
+    if ($Argument -notmatch '[\s"]') {
+        return $Argument
+    }
+
+    return '"' + ($Argument -replace '"', '\"') + '"'
+}
+
+function ConvertTo-ProcessArgumentList {
+    param([Parameter(Mandatory = $true)][string[]] $Arguments)
+
+    return (($Arguments | ForEach-Object { ConvertTo-ProcessArgument $_ }) -join ' ')
+}
+
 $ProjectPath = Resolve-AbsolutePath $ProjectPath
 $SamplePath = Resolve-AbsolutePath $SamplePath
 $ProjectSamplePath = Resolve-AbsolutePath $ProjectSamplePath
@@ -67,8 +83,8 @@ if ($Development) {
     $unityArgs += "--development"
 }
 
-& $Unity @unityArgs
-$exitCode = if ($null -eq $LASTEXITCODE) { 0 } else { $LASTEXITCODE }
+$process = Start-Process -FilePath $Unity -ArgumentList (ConvertTo-ProcessArgumentList $unityArgs) -Wait -PassThru -WindowStyle Hidden
+$exitCode = $process.ExitCode
 if ($exitCode -ne 0) {
     throw "Runtime verification player build failed with exit code $exitCode. log=$logFile"
 }

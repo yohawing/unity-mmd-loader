@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using Mmd.Rendering;
 
 namespace Mmd.Samples.RuntimeVerification
 {
@@ -25,6 +26,7 @@ namespace Mmd.Samples.RuntimeVerification
         public int[] SampleFrames { get; private set; } = Array.Empty<int>();
         public bool DumpBones { get; private set; }
         public string ScreenshotDir { get; private set; } = string.Empty;
+        public MmdMaterialPreset MaterialPreset { get; private set; } = MmdMaterialPreset.MmdToon;
         public bool ViewerMode { get; private set; }
         public float PhysicsMaxSubStepFixedStepSeconds { get; private set; }
         public MmdRuntimeVerificationDrive Drive { get; private set; } =
@@ -59,7 +61,8 @@ namespace Mmd.Samples.RuntimeVerification
                 bool requiresValue = name is "--pmx" or "--vmd" or "--dir" or "--out" or
                     "--duration" or "--frame-rate" or "--drive" or "--fast-runtime" or
                     "--fixture-manifest" or "--screenshot-dir" or
-                    "--sample-frames" or "--physics-max-substep-fixed-step";
+                    "--sample-frames" or "--physics-max-substep-fixed-step" or
+                    "--material-preset";
                 if (requiresValue && value == null)
                 {
                     if (i + 1 >= args.Length)
@@ -96,7 +99,8 @@ namespace Mmd.Samples.RuntimeVerification
                     PmxPath,
                     VmdPath,
                     parseOnly: !(hasPmx && hasVmd),
-                    skipReason: string.Empty));
+                    skipReason: string.Empty,
+                    materialPreset: MaterialPreset));
                 return cases.ToArray();
             }
 
@@ -109,7 +113,8 @@ namespace Mmd.Samples.RuntimeVerification
                         pmx,
                         VmdPath,
                         parseOnly: false,
-                        skipReason: string.Empty));
+                        skipReason: string.Empty,
+                        materialPreset: MaterialPreset));
                 }
 
                 return cases.ToArray();
@@ -124,7 +129,8 @@ namespace Mmd.Samples.RuntimeVerification
                         PmxPath,
                         vmd,
                         parseOnly: false,
-                        skipReason: string.Empty));
+                        skipReason: string.Empty,
+                        materialPreset: MaterialPreset));
                 }
 
                 return cases.ToArray();
@@ -137,7 +143,8 @@ namespace Mmd.Samples.RuntimeVerification
                     PmxPath,
                     VmdPath,
                     parseOnly: false,
-                    skipReason: string.Empty));
+                    skipReason: string.Empty,
+                    materialPreset: MaterialPreset));
                 return cases.ToArray();
             }
 
@@ -148,7 +155,8 @@ namespace Mmd.Samples.RuntimeVerification
                     pmx,
                     string.Empty,
                     parseOnly: true,
-                    skipReason: string.Empty));
+                    skipReason: string.Empty,
+                    materialPreset: MaterialPreset));
             }
 
             foreach (string vmd in EnumerateFiles(DirectoryPath, "*.vmd"))
@@ -158,7 +166,8 @@ namespace Mmd.Samples.RuntimeVerification
                     string.Empty,
                     vmd,
                     parseOnly: true,
-                    skipReason: string.Empty));
+                    skipReason: string.Empty,
+                    materialPreset: MaterialPreset));
             }
 
             return cases.ToArray();
@@ -182,6 +191,16 @@ namespace Mmd.Samples.RuntimeVerification
                     break;
                 case "--screenshot-dir":
                     ScreenshotDir = value;
+                    break;
+                case "--material-preset":
+                    if (TryParseMaterialPreset(value, out MmdMaterialPreset preset))
+                    {
+                        MaterialPreset = preset;
+                    }
+                    else
+                    {
+                        Errors.Add("Invalid --material-preset value: " + value + ". Expected mmd-toon or urp-lit.");
+                    }
                     break;
                 case "--out":
                     OutputPath = value;
@@ -384,6 +403,31 @@ namespace Mmd.Samples.RuntimeVerification
             return frames.ToArray();
         }
 
+        internal static bool TryParseMaterialPreset(string value, out MmdMaterialPreset preset)
+        {
+            string normalized = (value ?? string.Empty).Trim();
+            if (string.Equals(normalized, "mmd-toon", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(normalized, "mmdtoon", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(normalized, "toon", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(normalized, nameof(MmdMaterialPreset.MmdToon), StringComparison.OrdinalIgnoreCase))
+            {
+                preset = MmdMaterialPreset.MmdToon;
+                return true;
+            }
+
+            if (string.Equals(normalized, "urp-lit", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(normalized, "urplit", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(normalized, "lit", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(normalized, nameof(MmdMaterialPreset.UrpLit), StringComparison.OrdinalIgnoreCase))
+            {
+                preset = MmdMaterialPreset.UrpLit;
+                return true;
+            }
+
+            preset = MmdMaterialPreset.MmdToon;
+            return false;
+        }
+
         private static bool TryParsePositiveFloatOrFraction(string value, out float result)
         {
             result = 0.0f;
@@ -452,6 +496,7 @@ namespace Mmd.Samples.RuntimeVerification
             string vmdPath,
             bool parseOnly,
             string skipReason,
+            MmdMaterialPreset materialPreset = MmdMaterialPreset.MmdToon,
             string[]? expectedFeatures = null)
         {
             Name = name ?? string.Empty;
@@ -459,6 +504,7 @@ namespace Mmd.Samples.RuntimeVerification
             VmdPath = vmdPath ?? string.Empty;
             ParseOnly = parseOnly;
             SkipReason = skipReason ?? string.Empty;
+            MaterialPreset = materialPreset;
             ExpectedFeatures = expectedFeatures ?? Array.Empty<string>();
         }
 
@@ -467,6 +513,7 @@ namespace Mmd.Samples.RuntimeVerification
         public string VmdPath { get; }
         public bool ParseOnly { get; }
         public string SkipReason { get; }
+        public MmdMaterialPreset MaterialPreset { get; }
         public string[] ExpectedFeatures { get; }
     }
 }
