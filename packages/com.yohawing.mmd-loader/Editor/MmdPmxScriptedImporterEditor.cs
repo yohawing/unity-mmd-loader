@@ -150,7 +150,7 @@ namespace Mmd.Editor
                         shaderPresetProperty,
                         new GUIContent(
                             "Shader Preset",
-                            "Selects the target shader family for material generation and Toon settings handoff. Only MmdBasicUrpToon is available in this slice. The value is an importer setting; it is summarized on the imported asset after Apply/Reimport. This UI is not a full Material Editor and does not mutate generated materials."));
+                            "Selects the target shader family for material generation. Available presets are MMD Basic URP Toon and URP Lit. The value is an importer setting; it is summarized on the imported asset after Apply/Reimport. This UI is not a full Material Editor and does not mutate generated materials."));
                 }
             }
 
