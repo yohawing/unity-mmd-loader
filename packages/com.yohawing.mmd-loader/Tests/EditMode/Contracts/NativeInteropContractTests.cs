@@ -129,14 +129,11 @@ namespace Mmd.Tests
             AssertRuntimeFfiSignature("VmdCameraTrackCreateFromVmdBytes", typeof(IntPtr), typeof(byte[]), typeof(IntPtr));
             AssertRuntimeFfiSignature("VmdCameraTrackFrameCount", typeof(IntPtr), typeof(IntPtr));
             AssertRuntimeFfiSignature("VmdCameraTrackSample", typeof(byte), typeof(IntPtr), typeof(float), typeof(float[]), typeof(IntPtr));
-            AssertRuntimeFfiSignature("VmdSampleCamera", typeof(byte), typeof(byte[]), typeof(IntPtr), typeof(float), typeof(float[]), typeof(IntPtr));
             AssertRuntimeFfiSignature("VmdLightTrackCreateFromVmdBytes", typeof(IntPtr), typeof(byte[]), typeof(IntPtr));
             AssertRuntimeFfiSignature("VmdLightTrackFrameCount", typeof(IntPtr), typeof(IntPtr));
             AssertRuntimeFfiSignature("VmdLightTrackSample", typeof(byte), typeof(IntPtr), typeof(float), typeof(float[]), typeof(IntPtr));
-            AssertRuntimeFfiSignature("VmdSampleLight", typeof(byte), typeof(byte[]), typeof(IntPtr), typeof(float), typeof(float[]), typeof(IntPtr));
             AssertRuntimeFfiSignature("VmdLightTrackFree", typeof(void), typeof(IntPtr));
             AssertRuntimeFfiSignature("VmdSelfShadowTrackSample", typeof(byte), typeof(IntPtr), typeof(float), typeof(float[]), typeof(IntPtr));
-            AssertRuntimeFfiSignature("VmdSampleSelfShadow", typeof(byte), typeof(byte[]), typeof(IntPtr), typeof(float), typeof(float[]), typeof(IntPtr));
             AssertRuntimeFfiSignature("VmdCameraTrackFree", typeof(void), typeof(IntPtr));
         }
 
@@ -156,12 +153,6 @@ namespace Mmd.Tests
 
             byte[] vmdBytes = File.ReadAllBytes(fixturePath);
             float[] values = new float[9];
-
-            Assert.That(
-                MmdRuntimeFfiMethods.VmdSampleCamera(vmdBytes, new IntPtr(vmdBytes.Length), 22.5f, values, new IntPtr(values.Length)),
-                Is.Not.Zero,
-                "one-shot camera sample");
-            AssertCameraSample(values);
 
             IntPtr track = MmdRuntimeFfiMethods.VmdCameraTrackCreateFromVmdBytes(vmdBytes, new IntPtr(vmdBytes.Length));
             Assert.That(track, Is.Not.EqualTo(IntPtr.Zero));
@@ -191,12 +182,6 @@ namespace Mmd.Tests
         {
             byte[] vmdBytes = BuildLightOnlyVmdBytes();
             float[] values = new float[6];
-
-            Assert.That(
-                MmdRuntimeFfiMethods.VmdSampleLight(vmdBytes, new IntPtr(vmdBytes.Length), 20.0f, values, new IntPtr(values.Length)),
-                Is.Not.Zero,
-                "one-shot light sample");
-            AssertLightSample(values);
 
             IntPtr track = MmdRuntimeFfiMethods.VmdLightTrackCreateFromVmdBytes(vmdBytes, new IntPtr(vmdBytes.Length));
             Assert.That(track, Is.Not.EqualTo(IntPtr.Zero));

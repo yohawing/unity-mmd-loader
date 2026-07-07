@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using NUnit.Framework;
+using Mmd.Motion;
 using Mmd.Native;
 using Mmd.Parser;
 using UnityEngine;
@@ -60,11 +61,15 @@ namespace Mmd.Tests.Contracts
                 return;
             }
 
-            const int cameraSampleFloatCount = 9;
-            float[] nativeBuffer = new float[cameraSampleFloatCount];
-            byte ok = MmdRuntimeFfiMethods.VmdSampleCamera(
-                vmdBytes, new IntPtr(vmdBytes.Length), 0.0f, nativeBuffer, new IntPtr(nativeBuffer.Length));
-            Assert.That(ok, Is.EqualTo((byte)1), "Native camera sampling should succeed");
+            if (!NativeVmdCameraTrackSampler.TryCreate(vmdBytes, out var cameraSampler))
+            {
+                Assert.Fail("Failed to create camera track sampler");
+            }
+
+            using (cameraSampler)
+            {
+                Assert.That(cameraSampler!.TrySample(0.0f, out _), Is.True, "Native camera sampling should succeed");
+            }
         }
 
         [Test]
@@ -81,11 +86,15 @@ namespace Mmd.Tests.Contracts
                 return;
             }
 
-            const int lightSampleFloatCount = 6;
-            float[] nativeBuffer = new float[lightSampleFloatCount];
-            byte ok = MmdRuntimeFfiMethods.VmdSampleLight(
-                vmdBytes, new IntPtr(vmdBytes.Length), 0.0f, nativeBuffer, new IntPtr(nativeBuffer.Length));
-            Assert.That(ok, Is.EqualTo((byte)1), "Native light sampling should succeed");
+            if (!NativeVmdLightTrackSampler.TryCreate(vmdBytes, out var lightSampler))
+            {
+                Assert.Fail("Failed to create light track sampler");
+            }
+
+            using (lightSampler)
+            {
+                Assert.That(lightSampler!.TrySample(0.0f, out _), Is.True, "Native light sampling should succeed");
+            }
         }
 
         private static void RunNativeConsistencyCheck(

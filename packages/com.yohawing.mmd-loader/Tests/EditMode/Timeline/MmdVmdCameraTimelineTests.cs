@@ -8,7 +8,6 @@ using UnityEngine;
 using UnityEngine.Playables;
 using UnityEngine.Timeline;
 using Mmd.Motion;
-using Mmd.Native;
 using Mmd.Parser;
 using Mmd.Timeline;
 using Mmd.UnityIntegration;
@@ -760,25 +759,36 @@ namespace Mmd.Tests
 
         private static MmdCameraState SampleNativeCamera(byte[] vmdBytes, float frame)
         {
-            float[] buf = new float[9];
-            byte ok = MmdRuntimeFfiMethods.VmdSampleCamera(
-                vmdBytes, new IntPtr(vmdBytes.Length), frame, buf, new IntPtr(buf.Length));
-            Assert.That(ok, Is.EqualTo((byte)1), $"Native camera sample failed at frame {frame}");
-            return new MmdCameraState(buf[0],
-                new[] { buf[1], buf[2], buf[3] },
-                new[] { buf[4], buf[5], buf[6] },
-                buf[7], buf[8] != 0.0f);
+            if (!NativeVmdCameraTrackSampler.TryCreate(vmdBytes, out var sampler))
+            {
+                Assert.Fail("Failed to create camera track sampler");
+            }
+
+            using (sampler)
+            {
+                Assert.That(
+                    sampler!.TrySample(frame, out MmdCameraState state),
+                    Is.True,
+                    $"Native camera sample failed at frame {frame}");
+                return state;
+            }
         }
 
         private static MmdLightState SampleNativeLight(byte[] vmdBytes, float frame)
         {
-            float[] buf = new float[6];
-            byte ok = MmdRuntimeFfiMethods.VmdSampleLight(
-                vmdBytes, new IntPtr(vmdBytes.Length), frame, buf, new IntPtr(buf.Length));
-            Assert.That(ok, Is.EqualTo((byte)1), $"Native light sample failed at frame {frame}");
-            return new MmdLightState(
-                new[] { buf[0], buf[1], buf[2] },
-                new[] { buf[3], buf[4], buf[5] });
+            if (!NativeVmdLightTrackSampler.TryCreate(vmdBytes, out var sampler))
+            {
+                Assert.Fail("Failed to create light track sampler");
+            }
+
+            using (sampler)
+            {
+                Assert.That(
+                    sampler!.TrySample(frame, out MmdLightState state),
+                    Is.True,
+                    $"Native light sample failed at frame {frame}");
+                return state;
+            }
         }
 
         private static void WriteFixedAscii(BinaryWriter writer, string text, int byteLength)
