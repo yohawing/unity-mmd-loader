@@ -8,6 +8,8 @@ namespace Mmd.UnityIntegration
 {
     internal static class MmdMaterialOverrideApplier
     {
+        private const string UrpNormalMapKeyword = "_NORMALMAP";
+
         internal static void Apply(
             MmdMaterialOverrideAsset? overrideAsset,
             Material[]? materials)
@@ -80,6 +82,27 @@ namespace Mmd.UnityIntegration
                 SetFloatIfPresent(material, MmdMaterialPropertyNames.Smoothness, entry.smoothness);
             }
 
+            if (entry.hasNormalMap && entry.normalMap != null)
+            {
+                bool mmdNormalMapBound = SetTextureIfPresent(
+                    material,
+                    MmdMaterialPropertyNames.MmdNormalMap,
+                    entry.normalMap);
+                bool urpNormalMapBound = SetTextureIfPresent(
+                    material,
+                    MmdMaterialPropertyNames.BumpMap,
+                    entry.normalMap);
+                if (urpNormalMapBound)
+                {
+                    material.EnableKeyword(UrpNormalMapKeyword);
+                }
+
+                if (mmdNormalMapBound)
+                {
+                    SetFloatIfPresent(material, MmdMaterialPropertyNames.MmdNormalMapBound, 1.0f);
+                }
+            }
+
             if (entry.hasOcclusionStrength)
             {
                 SetFloatIfPresent(material, MmdMaterialPropertyNames.OcclusionStrength, entry.occlusionStrength);
@@ -102,6 +125,17 @@ namespace Mmd.UnityIntegration
             {
                 material.SetFloat(propertyName, value);
             }
+        }
+
+        private static bool SetTextureIfPresent(Material material, string propertyName, Texture value)
+        {
+            if (!material.HasProperty(propertyName))
+            {
+                return false;
+            }
+
+            material.SetTexture(propertyName, value);
+            return true;
         }
 
         private static void SetEmissionColorIfPresent(Material material, Color value)

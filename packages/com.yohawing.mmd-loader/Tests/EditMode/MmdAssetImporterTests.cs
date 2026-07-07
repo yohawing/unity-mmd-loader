@@ -31,6 +31,7 @@ namespace Mmd.Tests
         private const string TempScenePath = TempDirectory + "/test_1bone_cube_scene.unity";
         private const string TempRemapMaterialPath = TempDirectory + "/remapped_body.mat";
         private const string TempMaterialOverridePath = TempDirectory + "/material_override.asset";
+        private const string TempNormalMapPath = TempDirectory + "/normal_map.png";
         private const int TestOneBoneCubeVertexCount = 14;
 
         [SetUp]
@@ -275,6 +276,11 @@ namespace Mmd.Tests
         public void PmxImporterAppliesPersistentMaterialOverrideAssetAfterTextureBinding()
         {
             CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            string normalMapPath = Path.Combine(ProjectRoot, TempNormalMapPath);
+            WritePng(normalMapPath, new Color(0.2f, 0.3f, 0.4f, 1.0f));
+            AssetDatabase.ImportAsset(TempNormalMapPath, ImportAssetOptions.ForceUpdate);
+            Texture2D? normalMap = AssetDatabase.LoadAssetAtPath<Texture2D>(TempNormalMapPath);
+            Assert.That(normalMap, Is.Not.Null);
 
             MmdMaterialOverrideAsset overrideAsset = ScriptableObject.CreateInstance<MmdMaterialOverrideAsset>();
             overrideAsset.entries = new[]
@@ -285,7 +291,11 @@ namespace Mmd.Tests
                     hasMetallic = true,
                     metallic = 0.72f,
                     hasSmoothness = true,
-                    smoothness = 0.18f
+                    smoothness = 0.18f,
+                    hasNormalMap = true,
+                    normalMap = normalMap,
+                    hasNormalScale = true,
+                    normalScale = 0.33f
                 }
             };
             AssetDatabase.CreateAsset(overrideAsset, TempMaterialOverridePath);
@@ -313,10 +323,16 @@ namespace Mmd.Tests
                 Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName));
             Assert.That(importedMaterial.HasProperty(MmdMaterialPropertyNames.Metallic), Is.True);
             Assert.That(importedMaterial.HasProperty(MmdMaterialPropertyNames.Smoothness), Is.True);
+            Assert.That(importedMaterial.HasProperty(MmdMaterialPropertyNames.BumpMap), Is.True);
+            Assert.That(importedMaterial.HasProperty(MmdMaterialPropertyNames.BumpScale), Is.True);
             Assert.That(importedMaterial.GetFloat(MmdMaterialPropertyNames.Metallic),
                 Is.EqualTo(0.72f).Within(0.00001f));
             Assert.That(importedMaterial.GetFloat(MmdMaterialPropertyNames.Smoothness),
                 Is.EqualTo(0.18f).Within(0.00001f));
+            Assert.That(importedMaterial.GetTexture(MmdMaterialPropertyNames.BumpMap), Is.SameAs(normalMap));
+            Assert.That(importedMaterial.IsKeywordEnabled("_NORMALMAP"), Is.True);
+            Assert.That(importedMaterial.GetFloat(MmdMaterialPropertyNames.BumpScale),
+                Is.EqualTo(0.33f).Within(0.00001f));
         }
 
         [Test]

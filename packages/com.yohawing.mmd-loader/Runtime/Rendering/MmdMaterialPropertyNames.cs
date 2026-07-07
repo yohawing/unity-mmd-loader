@@ -22,6 +22,7 @@ namespace Mmd.Rendering
         public const string EmissionMap = "_EmissionMap";
         public const string Cutoff = "_Cutoff";
         public const string AlphaClipThreshold = "_AlphaClipThreshold";
+        public const string BumpMap = "_BumpMap";
         public const string BumpScale = "_BumpScale";
     }
 }

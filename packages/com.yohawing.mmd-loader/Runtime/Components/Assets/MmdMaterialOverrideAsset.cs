@@ -43,6 +43,9 @@ namespace Mmd
         // Material-morph write-set overrides (_BaseColor, _Color, _Alpha, _AmbientColor,
         // _OutlineColor, _OutlineWidth) are deferred until Slice 6 frame-applier layering.
         // Alpha cutoff and surface mode overrides are deferred to a surface slice with render policy.
+        public bool hasNormalMap;
+        public Texture2D? normalMap;
+
         public bool hasNormalScale;
         public float normalScale = 1.0f;
     }

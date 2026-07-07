@@ -165,6 +165,105 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void UrpLitMaterialOverrideByIndexAppliesNormalMapAndScale()
+        {
+            MmdModelDefinition model = CreateTwoMaterialModel();
+            MmdMaterialOverrideAsset? overrideAsset = null;
+            MmdUnityModelInstance? instance = null;
+            Texture2D? normalMap = null;
+
+            try
+            {
+                normalMap = CreateColorTexture(new Color(0.8f, 0.2f, 0.1f, 1.0f));
+                overrideAsset = ScriptableObject.CreateInstance<MmdMaterialOverrideAsset>();
+                overrideAsset.entries = new[]
+                {
+                    new MmdMaterialOverrideEntry
+                    {
+                        materialIndex = 1,
+                        hasNormalMap = true,
+                        normalMap = normalMap,
+                        hasNormalScale = true,
+                        normalScale = 0.25f
+                    }
+                };
+
+                instance = MmdUnityModelFactory.CreateStaticModel(
+                    model,
+                    sourcePath: null,
+                    importScale: 1.0f,
+                    preset: MmdMaterialPreset.UrpLit,
+                    materialOverride: overrideAsset);
+
+                Material material = instance.Materials[1];
+                Assert.That(ReadMaterialTexture(material, MmdMaterialPropertyNames.BumpMap), Is.SameAs(normalMap));
+                Assert.That(material.IsKeywordEnabled("_NORMALMAP"), Is.True);
+                Assert.That(ReadMaterialFloat(material, MmdMaterialPropertyNames.BumpScale), Is.EqualTo(0.25f).Within(0.00001f));
+            }
+            finally
+            {
+                if (normalMap != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(normalMap);
+                }
+
+                DestroyInstance(instance);
+                if (overrideAsset != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(overrideAsset);
+                }
+            }
+        }
+
+        [Test]
+        public void MmdToonMaterialOverrideByIndexAppliesMmdNormalMapBound()
+        {
+            MmdModelDefinition model = CreateTwoMaterialModel();
+            MmdMaterialOverrideAsset? overrideAsset = null;
+            MmdUnityModelInstance? instance = null;
+            Texture2D? normalMap = null;
+
+            try
+            {
+                normalMap = CreateColorTexture(new Color(0.2f, 0.4f, 0.8f, 1.0f));
+                overrideAsset = ScriptableObject.CreateInstance<MmdMaterialOverrideAsset>();
+                overrideAsset.entries = new[]
+                {
+                    new MmdMaterialOverrideEntry
+                    {
+                        materialIndex = 0,
+                        hasNormalMap = true,
+                        normalMap = normalMap
+                    }
+                };
+
+                instance = MmdUnityModelFactory.CreateStaticModel(
+                    model,
+                    sourcePath: null,
+                    importScale: 1.0f,
+                    preset: MmdMaterialPreset.MmdToon,
+                    materialOverride: overrideAsset);
+
+                Material material = instance.Materials[0];
+                Assert.That(ReadMaterialTexture(material, MmdMaterialPropertyNames.MmdNormalMap), Is.SameAs(normalMap));
+                Assert.That(ReadMaterialFloat(material, MmdMaterialPropertyNames.MmdNormalMapBound), Is.EqualTo(1.0f).Within(0.00001f));
+            }
+            finally
+            {
+                if (normalMap != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(normalMap);
+                }
+
+                DestroyInstance(instance);
+                if (overrideAsset != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(overrideAsset);
+                }
+            }
+        }
+
+        [Test]
         public void MaterialNameMatchOnlyAppliesWhenMaterialIndexIsInvalid()
         {
             MmdModelDefinition model = CreateTwoMaterialModel();
@@ -227,6 +326,22 @@ namespace Mmd.Tests
         {
             Assert.That(material.HasProperty(propertyName), Is.True, propertyName);
             return material.GetFloat(propertyName);
+        }
+
+        private static Texture ReadMaterialTexture(Material material, string propertyName)
+        {
+            Assert.That(material.HasProperty(propertyName), Is.True, propertyName);
+            Texture? texture = material.GetTexture(propertyName);
+            Assert.That(texture, Is.Not.Null);
+            return texture;
+        }
+
+        private static Texture2D CreateColorTexture(Color color)
+        {
+            var texture = new Texture2D(2, 2, TextureFormat.RGBA32, mipChain: false);
+            texture.SetPixels(new[] { color, color, color, color });
+            texture.Apply();
+            return texture;
         }
 
         private static Color ReadMaterialColor(Material material, string propertyName)
