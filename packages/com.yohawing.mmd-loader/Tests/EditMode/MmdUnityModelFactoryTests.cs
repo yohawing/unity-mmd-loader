@@ -18,98 +18,80 @@ namespace Mmd.Tests
         [Test]
         public void CreateStaticModelFromModelCreatesMeshObjectAndMaterials()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
 
-                instance = MmdUnityModelFactory.CreateStaticModel(model);
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
 
-                Assert.That(instance, Is.Not.Null);
-                Assert.That(instance.Root, Is.Not.Null);
-                Assert.That(instance.Mesh, Is.Not.Null);
-                Assert.That(instance.Materials, Is.Not.Null);
-                GameObject root = instance.Root!;
-                Assert.That(root.GetComponent<MeshFilter>(), Is.Null);
-                Assert.That(root.GetComponent<MeshRenderer>(), Is.Null);
-                Assert.That(root.transform.Find("Model"), Is.Not.Null);
-                Assert.That(instance.MeshRenderer, Is.Not.Null);
-                MeshRenderer meshRenderer = instance.MeshRenderer!;
-                Assert.That(meshRenderer.transform.parent, Is.EqualTo(root.transform));
-                Assert.That(instance.SkinnedMeshRenderer, Is.Null);
-                Assert.That(root.transform.localScale, Is.EqualTo(Vector3.one));
-                Assert.That(instance.Mesh.vertexCount, Is.EqualTo(3));
-                Assert.That(instance.Mesh.subMeshCount, Is.EqualTo(1));
-                Assert.That(instance.Materials, Has.Length.EqualTo(1));
-                Assert.That(instance.ShaderDiagnostics.requestedShaderName, Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName));
-                Assert.That(instance.ShaderDiagnostics.resolvedShaderName, Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName));
-                Assert.That(instance.ShaderDiagnostics.shaderFallbackUsed, Is.False);
-                Assert.That(instance.MaterialBindingDiagnostics, Has.Length.EqualTo(1));
-                Assert.That(instance.MaterialBindingDiagnostics[0].materialIndex, Is.EqualTo(0));
-                Assert.That(instance.MaterialBindingDiagnostics[0].shaderName, Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName));
-                Assert.That(instance.MaterialBindingDiagnostics[0].resolvedShaderName, Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName));
-                Assert.That(instance.MaterialBindingDiagnostics[0].cullingPolicy, Is.EqualTo("unknown"));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            Assert.That(instance, Is.Not.Null);
+            Assert.That(instance.Root, Is.Not.Null);
+            Assert.That(instance.Mesh, Is.Not.Null);
+            Assert.That(instance.Materials, Is.Not.Null);
+            GameObject root = instance.Root!;
+            Assert.That(root.GetComponent<MeshFilter>(), Is.Null);
+            Assert.That(root.GetComponent<MeshRenderer>(), Is.Null);
+            Assert.That(root.transform.Find("Model"), Is.Not.Null);
+            Assert.That(instance.MeshRenderer, Is.Not.Null);
+            MeshRenderer meshRenderer = instance.MeshRenderer!;
+            Assert.That(meshRenderer.transform.parent, Is.EqualTo(root.transform));
+            Assert.That(instance.SkinnedMeshRenderer, Is.Null);
+            Assert.That(root.transform.localScale, Is.EqualTo(Vector3.one));
+            Assert.That(instance.Mesh.vertexCount, Is.EqualTo(3));
+            Assert.That(instance.Mesh.subMeshCount, Is.EqualTo(1));
+            Assert.That(instance.Materials, Has.Length.EqualTo(1));
+            Assert.That(instance.ShaderDiagnostics.requestedShaderName, Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName));
+            Assert.That(instance.ShaderDiagnostics.resolvedShaderName, Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName));
+            Assert.That(instance.ShaderDiagnostics.shaderFallbackUsed, Is.False);
+            Assert.That(instance.MaterialBindingDiagnostics, Has.Length.EqualTo(1));
+            Assert.That(instance.MaterialBindingDiagnostics[0].materialIndex, Is.EqualTo(0));
+            Assert.That(instance.MaterialBindingDiagnostics[0].shaderName, Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName));
+            Assert.That(instance.MaterialBindingDiagnostics[0].resolvedShaderName, Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName));
+            Assert.That(instance.MaterialBindingDiagnostics[0].cullingPolicy, Is.EqualTo("unknown"));
         }
 
         [Test]
         public void CreateStaticModelKeepsShadowCasterAndAddsHiddenSelfShadowTarget()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
 
-                instance = MmdUnityModelFactory.CreateStaticModel(model);
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
 
-                Assert.That(instance.MeshRenderer, Is.Not.Null);
-                Assert.That(instance.MeshRenderer!.shadowCastingMode, Is.EqualTo(UnityEngine.Rendering.ShadowCastingMode.On));
-                Assert.That(instance.MeshRenderer.receiveShadows, Is.True);
-                Assert.That(ReadMaterialFloat(instance.Materials[0], "_BodyVisible"), Is.EqualTo(1.0f).Within(0.00001f));
-                Assert.That(ReadMaterialFloat(instance.Materials[0], "_AlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
-                Assert.That(ReadMaterialFloat(instance.Materials[0], "_ShadowAlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
-                Assert.That(instance.Materials[0].FindPass("ShadowCaster"), Is.GreaterThanOrEqualTo(0));
-                MmdSelfShadowTarget target = instance.Root!.GetComponent<MmdSelfShadowTarget>();
-                Assert.That(target, Is.Not.Null);
-                Assert.That((target.hideFlags & HideFlags.HideInInspector) != 0, Is.True);
-                Assert.That(target.BoundsRoot, Is.EqualTo(instance.MeshRenderer!.transform));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            Assert.That(instance.MeshRenderer, Is.Not.Null);
+            Assert.That(instance.MeshRenderer!.shadowCastingMode, Is.EqualTo(UnityEngine.Rendering.ShadowCastingMode.On));
+            Assert.That(instance.MeshRenderer.receiveShadows, Is.True);
+            Assert.That(ReadMaterialFloat(instance.Materials[0], "_BodyVisible"), Is.EqualTo(1.0f).Within(0.00001f));
+            Assert.That(ReadMaterialFloat(instance.Materials[0], "_AlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
+            Assert.That(ReadMaterialFloat(instance.Materials[0], "_ShadowAlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
+            Assert.That(instance.Materials[0].FindPass("ShadowCaster"), Is.GreaterThanOrEqualTo(0));
+            MmdSelfShadowTarget target = instance.Root!.GetComponent<MmdSelfShadowTarget>();
+            Assert.That(target, Is.Not.Null);
+            Assert.That((target.hideFlags & HideFlags.HideInInspector) != 0, Is.True);
+            Assert.That(target.BoundsRoot, Is.EqualTo(instance.MeshRenderer!.transform));
         }
 
         [Test]
         public void CreateSkinnedModelKeepsShadowCasterAndAddsHiddenSelfShadowTarget()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
 
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
 
-                Assert.That(instance.SkinnedMeshRenderer, Is.Not.Null);
-                Assert.That(instance.SkinnedMeshRenderer!.shadowCastingMode, Is.EqualTo(UnityEngine.Rendering.ShadowCastingMode.On));
-                Assert.That(instance.SkinnedMeshRenderer.receiveShadows, Is.True);
-                Assert.That(ReadMaterialFloat(instance.Materials[0], "_BodyVisible"), Is.EqualTo(1.0f).Within(0.00001f));
-                Assert.That(ReadMaterialFloat(instance.Materials[0], "_AlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
-                Assert.That(ReadMaterialFloat(instance.Materials[0], "_ShadowAlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
-                Assert.That(instance.Materials[0].FindPass("ShadowCaster"), Is.GreaterThanOrEqualTo(0));
-                MmdSelfShadowTarget target = instance.Root!.GetComponent<MmdSelfShadowTarget>();
-                Assert.That(target, Is.Not.Null);
-                Assert.That((target.hideFlags & HideFlags.HideInInspector) != 0, Is.True);
-                Assert.That(target.BoundsRoot, Is.EqualTo(instance.SkinnedMeshRenderer!.transform));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            Assert.That(instance.SkinnedMeshRenderer, Is.Not.Null);
+            Assert.That(instance.SkinnedMeshRenderer!.shadowCastingMode, Is.EqualTo(UnityEngine.Rendering.ShadowCastingMode.On));
+            Assert.That(instance.SkinnedMeshRenderer.receiveShadows, Is.True);
+            Assert.That(ReadMaterialFloat(instance.Materials[0], "_BodyVisible"), Is.EqualTo(1.0f).Within(0.00001f));
+            Assert.That(ReadMaterialFloat(instance.Materials[0], "_AlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
+            Assert.That(ReadMaterialFloat(instance.Materials[0], "_ShadowAlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
+            Assert.That(instance.Materials[0].FindPass("ShadowCaster"), Is.GreaterThanOrEqualTo(0));
+            MmdSelfShadowTarget target = instance.Root!.GetComponent<MmdSelfShadowTarget>();
+            Assert.That(target, Is.Not.Null);
+            Assert.That((target.hideFlags & HideFlags.HideInInspector) != 0, Is.True);
+            Assert.That(target.BoundsRoot, Is.EqualTo(instance.SkinnedMeshRenderer!.transform));
         }
 
         [Test]
@@ -241,200 +223,155 @@ namespace Mmd.Tests
         [Test]
         public void CreateStaticModelSetsShadowAlphaClipForAlphaBlendMaterial()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                model.materials[0].alpha = 0.5f;
 
-                instance = MmdUnityModelFactory.CreateStaticModel(model);
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.materials[0].alpha = 0.5f;
 
-                Assert.That(instance.Materials[0].renderQueue, Is.GreaterThanOrEqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
-                Assert.That(ReadMaterialFloat(instance.Materials[0], "_AlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
-                Assert.That(ReadMaterialFloat(instance.Materials[0], "_ShadowAlphaClipThreshold"), Is.EqualTo(0.01f).Within(0.00001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            Assert.That(instance.Materials[0].renderQueue, Is.GreaterThanOrEqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
+            Assert.That(ReadMaterialFloat(instance.Materials[0], "_AlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
+            Assert.That(ReadMaterialFloat(instance.Materials[0], "_ShadowAlphaClipThreshold"), Is.EqualTo(0.01f).Within(0.00001f));
         }
 
         [Test]
         public void CreateStaticModelConvertsMeshPositionsAndNormalsAtUnityBoundary()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                model.vertices[1].position = new[] { 1.0f, 0.0f, 2.0f };
-                model.vertices[1].normal = new[] { 0.0f, 0.0f, 1.0f };
 
-                instance = MmdUnityModelFactory.CreateStaticModel(model);
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.vertices[1].position = new[] { 1.0f, 0.0f, 2.0f };
+            model.vertices[1].normal = new[] { 0.0f, 0.0f, 1.0f };
 
-                Vector3[] vertices = instance.Mesh.vertices;
-                Vector3[] normals = instance.Mesh.normals;
-                Assert.That(vertices[1], Is.EqualTo(new Vector3(-1.0f, 0.0f, -2.0f)));
-                Assert.That(normals[1], Is.EqualTo(new Vector3(0.0f, 0.0f, -1.0f)));
-                Assert.That(instance.Mesh.GetIndices(0), Is.EqualTo(new[] { 0, 1, 2 }));
-                Assert.That(instance.Root.transform.localScale, Is.EqualTo(Vector3.one));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            Vector3[] vertices = instance.Mesh.vertices;
+            Vector3[] normals = instance.Mesh.normals;
+            Assert.That(vertices[1], Is.EqualTo(new Vector3(-1.0f, 0.0f, -2.0f)));
+            Assert.That(normals[1], Is.EqualTo(new Vector3(0.0f, 0.0f, -1.0f)));
+            Assert.That(instance.Mesh.GetIndices(0), Is.EqualTo(new[] { 0, 1, 2 }));
+            Assert.That(instance.Root.transform.localScale, Is.EqualTo(Vector3.one));
         }
 
         [Test]
         public void CreateStaticModelFromDescriptorReportsDescriptorCounts()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                model.vertices[1].position = new[] { 1.0f, 2.0f, 3.0f };
-                model.vertices[1].normal = new[] { 0.0f, 1.0f, 0.0f };
-                model.vertices[1].uv = new[] { 0.25f, 0.75f };
-                model.vertices[1].boneIndices = new[] { 0 };
-                model.vertices[1].boneWeights = new[] { 1.0f };
-                MmdRenderingDescriptor descriptor = MmdRenderingDescriptorBuilder.Build(model);
 
-                instance = MmdUnityModelFactory.CreateStaticModel(descriptor, "minimal-static-triangle");
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.vertices[1].position = new[] { 1.0f, 2.0f, 3.0f };
+            model.vertices[1].normal = new[] { 0.0f, 1.0f, 0.0f };
+            model.vertices[1].uv = new[] { 0.25f, 0.75f };
+            model.vertices[1].boneIndices = new[] { 0 };
+            model.vertices[1].boneWeights = new[] { 1.0f };
+            MmdRenderingDescriptor descriptor = MmdRenderingDescriptorBuilder.Build(model);
 
-                Assert.That(instance, Is.Not.Null);
-                Assert.That(instance.VertexCount, Is.EqualTo(descriptor.vertices.Count));
-                Assert.That(instance.IndexCount, Is.EqualTo(descriptor.indices.Count));
-                Assert.That(instance.SubmeshCount, Is.EqualTo(descriptor.submeshes.Count));
-                Assert.That(instance.Mesh.vertexCount, Is.EqualTo(descriptor.vertices.Count));
-                Assert.That(instance.Mesh.subMeshCount, Is.EqualTo(descriptor.submeshes.Count));
-                Assert.That(instance.Materials, Has.Length.EqualTo(descriptor.materials.Count));
-                Assert.That(instance.SkippedTextureReferenceCount, Is.EqualTo(0));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(descriptor, "minimal-static-triangle"));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            Assert.That(instance, Is.Not.Null);
+            Assert.That(instance.VertexCount, Is.EqualTo(descriptor.vertices.Count));
+            Assert.That(instance.IndexCount, Is.EqualTo(descriptor.indices.Count));
+            Assert.That(instance.SubmeshCount, Is.EqualTo(descriptor.submeshes.Count));
+            Assert.That(instance.Mesh.vertexCount, Is.EqualTo(descriptor.vertices.Count));
+            Assert.That(instance.Mesh.subMeshCount, Is.EqualTo(descriptor.submeshes.Count));
+            Assert.That(instance.Materials, Has.Length.EqualTo(descriptor.materials.Count));
+            Assert.That(instance.SkippedTextureReferenceCount, Is.EqualTo(0));
         }
 
         [Test]
         public void CreateStaticModelCountsSkippedTextureSphereAndToonReferences()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: true);
-                model.materials[0].diffuseColor = new[] { 0.6f, 0.4f, 0.2f };
-                model.materials[0].ambientColor = new[] { 0.2f, 0.1f, 0.05f };
-                model.materials[0].edgeColor = new[] { 0.01f, 0.02f, 0.03f, 0.75f };
-                model.materials[0].edgeSize = 0.9f;
 
-                instance = MmdUnityModelFactory.CreateStaticModel(model);
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: true);
+            model.materials[0].diffuseColor = new[] { 0.6f, 0.4f, 0.2f };
+            model.materials[0].ambientColor = new[] { 0.2f, 0.1f, 0.05f };
+            model.materials[0].edgeColor = new[] { 0.01f, 0.02f, 0.03f, 0.75f };
+            model.materials[0].edgeSize = 0.9f;
 
-                Assert.That(instance, Is.Not.Null);
-                Assert.That(instance.Materials, Has.Length.EqualTo(1));
-                Assert.That(instance.SkippedTextureReferenceCount, Is.EqualTo(5));
-                Assert.That(instance.UnsupportedTextureReferenceCount, Is.EqualTo(3));
-                Assert.That(instance.SkippedSphereTextureReferenceCount, Is.EqualTo(1));
-                Assert.That(instance.SkippedToonTextureReferenceCount, Is.EqualTo(1));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            Assert.That(instance, Is.Not.Null);
+            Assert.That(instance.Materials, Has.Length.EqualTo(1));
+            Assert.That(instance.SkippedTextureReferenceCount, Is.EqualTo(5));
+            Assert.That(instance.UnsupportedTextureReferenceCount, Is.EqualTo(3));
+            Assert.That(instance.SkippedSphereTextureReferenceCount, Is.EqualTo(1));
+            Assert.That(instance.SkippedToonTextureReferenceCount, Is.EqualTo(1));
         }
 
         [Test]
         public void CreateStaticModelWithSourcePathLoadsGrayscalePngDiffuseTexture()
         {
-            MmdUnityModelInstance? instance = null;
-            string tempRoot = CreateTempDirectory();
-            try
-            {
-                string pmxPath = Path.Combine(tempRoot, "model.pmx");
-                string textureDirectory = Path.Combine(tempRoot, "textures");
-                Directory.CreateDirectory(textureDirectory);
-                File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
-                WriteGrayscalePng(Path.Combine(textureDirectory, "gray.png"));
+            using var temp = new MmdTestTempScope();
 
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                model.materials[0].texture = Path.Combine("textures", "gray.png");
+            string pmxPath = Path.Combine(temp.Path, "model.pmx");
+            string textureDirectory = Path.Combine(temp.Path, "textures");
+            Directory.CreateDirectory(textureDirectory);
+            File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
+            WriteGrayscalePng(Path.Combine(textureDirectory, "gray.png"));
 
-                instance = MmdUnityModelFactory.CreateStaticModel(model, pmxPath);
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.materials[0].texture = Path.Combine("textures", "gray.png");
 
-                Assert.That(instance.LoadedDiffuseTextureCount, Is.EqualTo(1));
-                Assert.That(instance.UnsupportedTextureReferenceCount, Is.EqualTo(0));
-                Assert.That(instance.MaterialBindingDiagnostics[0].baseMapBound, Is.True);
-            }
-            finally
-            {
-                DestroyInstance(instance);
-                Directory.Delete(tempRoot, recursive: true);
-            }
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(model, pmxPath));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            Assert.That(instance.LoadedDiffuseTextureCount, Is.EqualTo(1));
+            Assert.That(instance.UnsupportedTextureReferenceCount, Is.EqualTo(0));
+            Assert.That(instance.MaterialBindingDiagnostics[0].baseMapBound, Is.True);
         }
 
         [Test]
         public void CreateStaticModelWithSourcePathLoadsRgbPngDiffuseTexture()
         {
-            MmdUnityModelInstance? instance = null;
-            string tempRoot = CreateTempDirectory();
-            try
-            {
-                string pmxPath = Path.Combine(tempRoot, "model.pmx");
-                string textureDirectory = Path.Combine(tempRoot, "textures");
-                Directory.CreateDirectory(textureDirectory);
-                File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
-                WriteRgbPng(Path.Combine(textureDirectory, "rgb.png"));
+            using var temp = new MmdTestTempScope();
 
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                model.materials[0].texture = Path.Combine("textures", "rgb.png");
+            string pmxPath = Path.Combine(temp.Path, "model.pmx");
+            string textureDirectory = Path.Combine(temp.Path, "textures");
+            Directory.CreateDirectory(textureDirectory);
+            File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
+            WriteRgbPng(Path.Combine(textureDirectory, "rgb.png"));
 
-                instance = MmdUnityModelFactory.CreateStaticModel(model, pmxPath);
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.materials[0].texture = Path.Combine("textures", "rgb.png");
 
-                Assert.That(instance.LoadedDiffuseTextureCount, Is.EqualTo(1));
-                Assert.That(instance.UnsupportedTextureReferenceCount, Is.EqualTo(0));
-                Assert.That(instance.MaterialBindingDiagnostics[0].baseMapBound, Is.True);
-            }
-            finally
-            {
-                DestroyInstance(instance);
-                Directory.Delete(tempRoot, recursive: true);
-            }
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(model, pmxPath));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            Assert.That(instance.LoadedDiffuseTextureCount, Is.EqualTo(1));
+            Assert.That(instance.UnsupportedTextureReferenceCount, Is.EqualTo(0));
+            Assert.That(instance.MaterialBindingDiagnostics[0].baseMapBound, Is.True);
         }
 
         [Test]
         public void CreateStaticModelClassifiesPngCutoutTextureAsAlphaTest()
         {
-            MmdUnityModelInstance? instance = null;
-            string tempRoot = CreateTempDirectory();
-            try
-            {
-                string pmxPath = Path.Combine(tempRoot, "model.pmx");
-                string textureDirectory = Path.Combine(tempRoot, "textures");
-                Directory.CreateDirectory(textureDirectory);
-                File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
-                WriteCutoutPng(Path.Combine(textureDirectory, "cutout.png"));
+            using var temp = new MmdTestTempScope();
 
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                model.materials[0].texture = Path.Combine("textures", "cutout.png");
+            string pmxPath = Path.Combine(temp.Path, "model.pmx");
+            string textureDirectory = Path.Combine(temp.Path, "textures");
+            Directory.CreateDirectory(textureDirectory);
+            File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
+            WriteCutoutPng(Path.Combine(textureDirectory, "cutout.png"));
 
-                instance = MmdUnityModelFactory.CreateStaticModel(model, pmxPath);
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.materials[0].texture = Path.Combine("textures", "cutout.png");
 
-                Assert.That(instance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Geometry));
-                Assert.That(ReadMaterialFloat(instance.Materials[0], "_ZWrite"), Is.EqualTo(1.0f).Within(0.00001f));
-                Assert.That(ReadMaterialFloat(instance.Materials[0], "_AlphaClipThreshold"), Is.EqualTo(0.01f).Within(0.00001f));
-                Assert.That(ReadMaterialFloat(instance.Materials[0], "_ShadowAlphaClipThreshold"), Is.EqualTo(0.01f).Within(0.00001f));
-                Assert.That(instance.MaterialBindingDiagnostics[0].isTransparent, Is.True);
-                Assert.That(instance.MaterialBindingDiagnostics[0].transparencyMode, Is.EqualTo("alphaTest"));
-                Assert.That(instance.MaterialBindingDiagnostics[0].renderOrderBucket, Is.EqualTo("alphaTest"));
-                Assert.That(instance.MaterialBindingDiagnostics[0].materialRenderOrder, Is.EqualTo(0));
-                Assert.That(instance.MaterialBindingDiagnostics[0].outlineRenderOrder, Is.EqualTo(1));
-                Assert.That(instance.MaterialBindingDiagnostics[0].transparentOrder, Is.EqualTo(-1));
-                Assert.That(instance.MaterialBindingDiagnostics[0].transparentPolicy, Is.EqualTo("mmd-material-alpha-test-depth-write"));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-                Directory.Delete(tempRoot, recursive: true);
-            }
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(model, pmxPath));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            Assert.That(instance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Geometry));
+            Assert.That(ReadMaterialFloat(instance.Materials[0], "_ZWrite"), Is.EqualTo(1.0f).Within(0.00001f));
+            Assert.That(ReadMaterialFloat(instance.Materials[0], "_AlphaClipThreshold"), Is.EqualTo(0.01f).Within(0.00001f));
+            Assert.That(ReadMaterialFloat(instance.Materials[0], "_ShadowAlphaClipThreshold"), Is.EqualTo(0.01f).Within(0.00001f));
+            Assert.That(instance.MaterialBindingDiagnostics[0].isTransparent, Is.True);
+            Assert.That(instance.MaterialBindingDiagnostics[0].transparencyMode, Is.EqualTo("alphaTest"));
+            Assert.That(instance.MaterialBindingDiagnostics[0].renderOrderBucket, Is.EqualTo("alphaTest"));
+            Assert.That(instance.MaterialBindingDiagnostics[0].materialRenderOrder, Is.EqualTo(0));
+            Assert.That(instance.MaterialBindingDiagnostics[0].outlineRenderOrder, Is.EqualTo(1));
+            Assert.That(instance.MaterialBindingDiagnostics[0].transparentOrder, Is.EqualTo(-1));
+            Assert.That(instance.MaterialBindingDiagnostics[0].transparentPolicy, Is.EqualTo("mmd-material-alpha-test-depth-write"));
         }
 
         [Test]
@@ -445,71 +382,57 @@ namespace Mmd.Tests
             // fully opaque (Sour_Miku_Black's hair.png strand edges fall to ~213/255) must therefore
             // alpha-blend, not snap to opaque. Regression: the old 195 opaque threshold absorbed the
             // 195-254 soft band and rendered such hair fully opaque, diverging from the GoldenOracle.
-            MmdUnityModelInstance? instance = null;
-            string tempRoot = CreateTempDirectory();
-            try
-            {
-                string pmxPath = Path.Combine(tempRoot, "model.pmx");
-                string textureDirectory = Path.Combine(tempRoot, "textures");
-                Directory.CreateDirectory(textureDirectory);
-                File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
-                // Uniform 213/255: high but not fully opaque. Coverage-independent so the assertion
-                // pins the threshold boundary regardless of which texels the triangle UV samples.
-                WriteTga32Alpha(Path.Combine(textureDirectory, "near-opaque-hair.tga"), width: 4, height: 4, alpha: 213);
+            using var temp = new MmdTestTempScope();
 
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                model.materials[0].name = "hair";
-                model.materials[0].texture = Path.Combine("textures", "near-opaque-hair.tga");
+            string pmxPath = Path.Combine(temp.Path, "model.pmx");
+            string textureDirectory = Path.Combine(temp.Path, "textures");
+            Directory.CreateDirectory(textureDirectory);
+            File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
+            // Uniform 213/255: high but not fully opaque. Coverage-independent so the assertion
+            // pins the threshold boundary regardless of which texels the triangle UV samples.
+            WriteTga32Alpha(Path.Combine(textureDirectory, "near-opaque-hair.tga"), width: 4, height: 4, alpha: 213);
 
-                instance = MmdUnityModelFactory.CreateStaticModel(model, pmxPath);
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.materials[0].name = "hair";
+            model.materials[0].texture = Path.Combine("textures", "near-opaque-hair.tga");
 
-                Assert.That(instance.MaterialBindingDiagnostics[0].transparencyMode, Is.EqualTo("alphaBlend"));
-                Assert.That(instance.MaterialBindingDiagnostics[0].isTransparent, Is.True);
-                Assert.That(instance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
-                Assert.That(
-                    ReadMaterialFloat(instance.Materials[0], "_DstBlend"),
-                    Is.EqualTo((float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha).Within(0.00001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-                Directory.Delete(tempRoot, recursive: true);
-            }
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(model, pmxPath));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            Assert.That(instance.MaterialBindingDiagnostics[0].transparencyMode, Is.EqualTo("alphaBlend"));
+            Assert.That(instance.MaterialBindingDiagnostics[0].isTransparent, Is.True);
+            Assert.That(instance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
+            Assert.That(
+                ReadMaterialFloat(instance.Materials[0], "_DstBlend"),
+                Is.EqualTo((float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha).Within(0.00001f));
         }
 
         [Test]
         public void CreateStaticModelIgnoresTransparentAtlasPaddingOutsideUsedUvs()
         {
-            MmdUnityModelInstance? instance = null;
-            string tempRoot = CreateTempDirectory();
-            try
-            {
-                string pmxPath = Path.Combine(tempRoot, "model.pmx");
-                string textureDirectory = Path.Combine(tempRoot, "textures");
-                Directory.CreateDirectory(textureDirectory);
-                File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
-                WriteAtlasPaddingPng(Path.Combine(textureDirectory, "atlas-padding.png"));
+            using var temp = new MmdTestTempScope();
 
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                model.vertices[0].uv = new[] { 0.40f, 0.60f };
-                model.vertices[1].uv = new[] { 0.60f, 0.60f };
-                model.vertices[2].uv = new[] { 0.40f, 0.40f };
-                model.materials[0].name = "mat_atlas_padding";
-                model.materials[0].texture = Path.Combine("textures", "atlas-padding.png");
+            string pmxPath = Path.Combine(temp.Path, "model.pmx");
+            string textureDirectory = Path.Combine(temp.Path, "textures");
+            Directory.CreateDirectory(textureDirectory);
+            File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
+            WriteAtlasPaddingPng(Path.Combine(textureDirectory, "atlas-padding.png"));
 
-                instance = MmdUnityModelFactory.CreateStaticModel(model, pmxPath);
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.vertices[0].uv = new[] { 0.40f, 0.60f };
+            model.vertices[1].uv = new[] { 0.60f, 0.60f };
+            model.vertices[2].uv = new[] { 0.40f, 0.40f };
+            model.materials[0].name = "mat_atlas_padding";
+            model.materials[0].texture = Path.Combine("textures", "atlas-padding.png");
 
-                Assert.That(instance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Geometry));
-                Assert.That(ReadMaterialFloat(instance.Materials[0], "_AlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
-                Assert.That(instance.MaterialBindingDiagnostics[0].isTransparent, Is.False);
-                Assert.That(instance.MaterialBindingDiagnostics[0].transparencyMode, Is.EqualTo("opaque"));
-                Assert.That(instance.MaterialBindingDiagnostics[0].renderOrderBucket, Is.EqualTo("opaque"));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-                Directory.Delete(tempRoot, recursive: true);
-            }
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(model, pmxPath));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            Assert.That(instance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Geometry));
+            Assert.That(ReadMaterialFloat(instance.Materials[0], "_AlphaClipThreshold"), Is.EqualTo(0.0f).Within(0.00001f));
+            Assert.That(instance.MaterialBindingDiagnostics[0].isTransparent, Is.False);
+            Assert.That(instance.MaterialBindingDiagnostics[0].transparencyMode, Is.EqualTo("opaque"));
+            Assert.That(instance.MaterialBindingDiagnostics[0].renderOrderBucket, Is.EqualTo("opaque"));
         }
 
         [Test]
@@ -521,196 +444,160 @@ namespace Mmd.Tests
             // while a fully-opaque TGA stays opaque. The texture alpha content — not the ".tga"
             // extension or an overlay-looking name — drives the mode. (Earlier behavior wrongly forced
             // every non-overlay TGA to opaque, painting masked TGAs as solid blocks vs the GoldenOracle.)
-            MmdUnityModelInstance? maskedInstance = null;
-            MmdUnityModelInstance? opaqueInstance = null;
-            string tempRoot = CreateTempDirectory();
-            try
-            {
-                string pmxPath = Path.Combine(tempRoot, "model.pmx");
-                string textureDirectory = Path.Combine(tempRoot, "textures");
-                Directory.CreateDirectory(textureDirectory);
-                WriteTga32Alpha(Path.Combine(textureDirectory, "tga-regular-masked.tga"), width: 4, height: 4, alpha: 96);
-                WriteTga32Alpha(Path.Combine(textureDirectory, "tga-regular-solid.tga"), width: 4, height: 4, alpha: 255);
+            using var temp = new MmdTestTempScope();
 
-                MmdModelDefinition maskedModel = CreateMinimalTriangleModel(includeTextureReferences: false);
-                maskedModel.materials[0].name = "mat_tga_regular_hair";
-                maskedModel.materials[0].texture = Path.Combine("textures", "tga-regular-masked.tga");
+            string pmxPath = Path.Combine(temp.Path, "model.pmx");
+            string textureDirectory = Path.Combine(temp.Path, "textures");
+            Directory.CreateDirectory(textureDirectory);
+            WriteTga32Alpha(Path.Combine(textureDirectory, "tga-regular-masked.tga"), width: 4, height: 4, alpha: 96);
+            WriteTga32Alpha(Path.Combine(textureDirectory, "tga-regular-solid.tga"), width: 4, height: 4, alpha: 255);
 
-                MmdModelDefinition opaqueModel = CreateMinimalTriangleModel(includeTextureReferences: false);
-                opaqueModel.materials[0].name = "mat_tga_regular_solid";
-                opaqueModel.materials[0].texture = Path.Combine("textures", "tga-regular-solid.tga");
+            MmdModelDefinition maskedModel = CreateMinimalTriangleModel(includeTextureReferences: false);
+            maskedModel.materials[0].name = "mat_tga_regular_hair";
+            maskedModel.materials[0].texture = Path.Combine("textures", "tga-regular-masked.tga");
 
-                maskedInstance = MmdUnityModelFactory.CreateStaticModel(maskedModel, pmxPath);
-                opaqueInstance = MmdUnityModelFactory.CreateStaticModel(opaqueModel, pmxPath);
+            MmdModelDefinition opaqueModel = CreateMinimalTriangleModel(includeTextureReferences: false);
+            opaqueModel.materials[0].name = "mat_tga_regular_solid";
+            opaqueModel.materials[0].texture = Path.Combine("textures", "tga-regular-solid.tga");
 
-                // Partial alpha on a regular-named TGA now blends (was wrongly forced opaque before).
-                Assert.That(maskedInstance.MaterialBindingDiagnostics[0].isTransparent, Is.True);
-                Assert.That(maskedInstance.MaterialBindingDiagnostics[0].transparencyMode, Is.EqualTo("alphaBlend"));
-                Assert.That(maskedInstance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
+            using var maskedScope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(maskedModel, pmxPath));
+            MmdUnityModelInstance maskedInstance = maskedScope.Instance;
+            using var opaqueScope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(opaqueModel, pmxPath));
+            MmdUnityModelInstance opaqueInstance = opaqueScope.Instance;
 
-                // A fully-opaque TGA stays opaque purely from its alpha content.
-                Assert.That(opaqueInstance.MaterialBindingDiagnostics[0].isTransparent, Is.False);
-                Assert.That(opaqueInstance.MaterialBindingDiagnostics[0].transparencyMode, Is.EqualTo("opaque"));
-                Assert.That(opaqueInstance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Geometry));
-            }
-            finally
-            {
-                DestroyInstance(maskedInstance);
-                DestroyInstance(opaqueInstance);
-                Directory.Delete(tempRoot, recursive: true);
-            }
+            // Partial alpha on a regular-named TGA now blends (was wrongly forced opaque before).
+            Assert.That(maskedInstance.MaterialBindingDiagnostics[0].isTransparent, Is.True);
+            Assert.That(maskedInstance.MaterialBindingDiagnostics[0].transparencyMode, Is.EqualTo("alphaBlend"));
+            Assert.That(maskedInstance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
+
+            // A fully-opaque TGA stays opaque purely from its alpha content.
+            Assert.That(opaqueInstance.MaterialBindingDiagnostics[0].isTransparent, Is.False);
+            Assert.That(opaqueInstance.MaterialBindingDiagnostics[0].transparencyMode, Is.EqualTo("opaque"));
+            Assert.That(opaqueInstance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Geometry));
         }
 
         [Test]
         public void CreateStaticModelWithSourcePathLoadsRelativeTgaDiffuseTexture()
         {
-            MmdUnityModelInstance? instance = null;
-            string tempRoot = CreateTempDirectory();
-            try
-            {
-                string pmxPath = Path.Combine(tempRoot, "model.pmx");
-                string textureDirectory = Path.Combine(tempRoot, "tex");
-                Directory.CreateDirectory(textureDirectory);
-                File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
-                WriteTga24(Path.Combine(textureDirectory, "diffuse.TGA"), width: 2, height: 2);
+            using var temp = new MmdTestTempScope();
 
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                model.materials[0].texture = Path.Combine("tex", "diffuse.TGA");
+            string pmxPath = Path.Combine(temp.Path, "model.pmx");
+            string textureDirectory = Path.Combine(temp.Path, "tex");
+            Directory.CreateDirectory(textureDirectory);
+            File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
+            WriteTga24(Path.Combine(textureDirectory, "diffuse.TGA"), width: 2, height: 2);
 
-                instance = MmdUnityModelFactory.CreateStaticModel(model, pmxPath);
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.materials[0].texture = Path.Combine("tex", "diffuse.TGA");
 
-                Assert.That(instance.LoadedDiffuseTextureCount, Is.EqualTo(1));
-                Assert.That(instance.UnsupportedTextureReferenceCount, Is.EqualTo(0));
-                Assert.That(instance.OwnedTextures, Has.Length.EqualTo(1));
-                Assert.That(instance.OwnedTextures[0].width, Is.EqualTo(2));
-                Assert.That(instance.OwnedTextures[0].height, Is.EqualTo(2));
-                Assert.That(ReadBoundDiffuseTexture(instance.Materials[0]), Is.EqualTo(instance.OwnedTextures[0]));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-                Directory.Delete(tempRoot, recursive: true);
-            }
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(model, pmxPath));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            Assert.That(instance.LoadedDiffuseTextureCount, Is.EqualTo(1));
+            Assert.That(instance.UnsupportedTextureReferenceCount, Is.EqualTo(0));
+            Assert.That(instance.OwnedTextures, Has.Length.EqualTo(1));
+            Assert.That(instance.OwnedTextures[0].width, Is.EqualTo(2));
+            Assert.That(instance.OwnedTextures[0].height, Is.EqualTo(2));
+            Assert.That(ReadBoundDiffuseTexture(instance.Materials[0]), Is.EqualTo(instance.OwnedTextures[0]));
         }
 
         [Test]
         public void CreateStaticModelWithSourcePathLoadsRelativeDdsDiffuseTexture()
         {
-            MmdUnityModelInstance? instance = null;
-            string tempRoot = CreateTempDirectory();
-            try
-            {
-                string pmxPath = Path.Combine(tempRoot, "model.pmx");
-                string textureDirectory = Path.Combine(tempRoot, "tex");
-                Directory.CreateDirectory(textureDirectory);
-                File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
-                WriteDdsDxt3(Path.Combine(textureDirectory, "diffuse.dds"));
+            using var temp = new MmdTestTempScope();
 
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                model.materials[0].texture = Path.Combine("tex", "diffuse.dds");
+            string pmxPath = Path.Combine(temp.Path, "model.pmx");
+            string textureDirectory = Path.Combine(temp.Path, "tex");
+            Directory.CreateDirectory(textureDirectory);
+            File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
+            WriteDdsDxt3(Path.Combine(textureDirectory, "diffuse.dds"));
 
-                instance = MmdUnityModelFactory.CreateStaticModel(model, pmxPath);
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.materials[0].texture = Path.Combine("tex", "diffuse.dds");
 
-                Assert.That(instance.LoadedDiffuseTextureCount, Is.EqualTo(1));
-                Assert.That(instance.UnsupportedTextureReferenceCount, Is.EqualTo(0));
-                Assert.That(instance.OwnedTextures, Has.Length.EqualTo(1));
-                Assert.That(instance.OwnedTextures[0].width, Is.EqualTo(4));
-                Assert.That(instance.OwnedTextures[0].height, Is.EqualTo(4));
-                Assert.That(ReadBoundDiffuseTexture(instance.Materials[0]), Is.EqualTo(instance.OwnedTextures[0]));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-                Directory.Delete(tempRoot, recursive: true);
-            }
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(model, pmxPath));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            Assert.That(instance.LoadedDiffuseTextureCount, Is.EqualTo(1));
+            Assert.That(instance.UnsupportedTextureReferenceCount, Is.EqualTo(0));
+            Assert.That(instance.OwnedTextures, Has.Length.EqualTo(1));
+            Assert.That(instance.OwnedTextures[0].width, Is.EqualTo(4));
+            Assert.That(instance.OwnedTextures[0].height, Is.EqualTo(4));
+            Assert.That(ReadBoundDiffuseTexture(instance.Materials[0]), Is.EqualTo(instance.OwnedTextures[0]));
         }
 
         [Test]
         public void CreateStaticModelWithSourcePathLoadsSphereAndToonTexturesForDiagnostics()
         {
-            MmdUnityModelInstance? instance = null;
-            string tempRoot = CreateTempDirectory();
-            try
-            {
-                string pmxPath = Path.Combine(tempRoot, "model.pmx");
-                string sphereDirectory = Path.Combine(tempRoot, "sp");
-                string toonDirectory = Path.Combine(tempRoot, "spt");
-                Directory.CreateDirectory(sphereDirectory);
-                Directory.CreateDirectory(toonDirectory);
-                File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
-                WriteBmp24(Path.Combine(sphereDirectory, "sphere.bmp"), width: 2, height: 2);
-                WriteJpg(Path.Combine(toonDirectory, "toon.jpg"), Color.green);
+            using var temp = new MmdTestTempScope();
 
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                model.materials[0].sphereTexture = Path.Combine("sp", "sphere.bmp");
-                model.materials[0].toonTexture = Path.Combine("spt", "toon.jpg");
+            string pmxPath = Path.Combine(temp.Path, "model.pmx");
+            string sphereDirectory = Path.Combine(temp.Path, "sp");
+            string toonDirectory = Path.Combine(temp.Path, "spt");
+            Directory.CreateDirectory(sphereDirectory);
+            Directory.CreateDirectory(toonDirectory);
+            File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
+            WriteBmp24(Path.Combine(sphereDirectory, "sphere.bmp"), width: 2, height: 2);
+            WriteJpg(Path.Combine(toonDirectory, "toon.jpg"), Color.green);
 
-                instance = MmdUnityModelFactory.CreateStaticModel(model, pmxPath);
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.materials[0].sphereTexture = Path.Combine("sp", "sphere.bmp");
+            model.materials[0].toonTexture = Path.Combine("spt", "toon.jpg");
 
-                Assert.That(instance.LoadedDiffuseTextureCount, Is.EqualTo(0));
-                Assert.That(instance.LoadedSphereTextureCount, Is.EqualTo(1));
-                Assert.That(instance.LoadedToonTextureCount, Is.EqualTo(1));
-                Assert.That(instance.SkippedSphereTextureReferenceCount, Is.EqualTo(1));
-                Assert.That(instance.SkippedToonTextureReferenceCount, Is.EqualTo(1));
-                Assert.That(instance.MissingTextureReferenceCount, Is.EqualTo(0));
-                Assert.That(instance.UnsupportedTextureReferenceCount, Is.EqualTo(0));
-                Assert.That(instance.OwnedTextures, Has.Length.EqualTo(2));
-                Assert.That(instance.OwnedTextures[0].hideFlags, Is.EqualTo(HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild));
-                Assert.That(instance.OwnedTextures[1].hideFlags, Is.EqualTo(HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild));
-                Assert.That(instance.MaterialBindingDiagnostics[0].sphereMapBound, Is.True);
-                Assert.That(instance.MaterialBindingDiagnostics[0].toonMapBound, Is.True);
-                Assert.That(ReadMaterialTexture(instance.Materials[0], "_SphereMap"), Is.EqualTo(instance.OwnedTextures[0]));
-                Assert.That(ReadMaterialTexture(instance.Materials[0], "_ToonMap"), Is.EqualTo(instance.OwnedTextures[1]));
-                Assert.That(
-                    instance.TextureDiagnostics.Messages.Any(message => message.Contains("loaded for diagnostics")),
-                    Is.True);
-            }
-            finally
-            {
-                DestroyInstance(instance);
-                Directory.Delete(tempRoot, recursive: true);
-            }
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(model, pmxPath));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            Assert.That(instance.LoadedDiffuseTextureCount, Is.EqualTo(0));
+            Assert.That(instance.LoadedSphereTextureCount, Is.EqualTo(1));
+            Assert.That(instance.LoadedToonTextureCount, Is.EqualTo(1));
+            Assert.That(instance.SkippedSphereTextureReferenceCount, Is.EqualTo(1));
+            Assert.That(instance.SkippedToonTextureReferenceCount, Is.EqualTo(1));
+            Assert.That(instance.MissingTextureReferenceCount, Is.EqualTo(0));
+            Assert.That(instance.UnsupportedTextureReferenceCount, Is.EqualTo(0));
+            Assert.That(instance.OwnedTextures, Has.Length.EqualTo(2));
+            Assert.That(instance.OwnedTextures[0].hideFlags, Is.EqualTo(HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild));
+            Assert.That(instance.OwnedTextures[1].hideFlags, Is.EqualTo(HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild));
+            Assert.That(instance.MaterialBindingDiagnostics[0].sphereMapBound, Is.True);
+            Assert.That(instance.MaterialBindingDiagnostics[0].toonMapBound, Is.True);
+            Assert.That(ReadMaterialTexture(instance.Materials[0], "_SphereMap"), Is.EqualTo(instance.OwnedTextures[0]));
+            Assert.That(ReadMaterialTexture(instance.Materials[0], "_ToonMap"), Is.EqualTo(instance.OwnedTextures[1]));
+            Assert.That(
+                instance.TextureDiagnostics.Messages.Any(message => message.Contains("loaded for diagnostics")),
+                Is.True);
         }
 
         [Test]
         public void CreateStaticModelWithSharedToonResolvesBuiltInToonRamp()
         {
-            MmdUnityModelInstance? instance = null;
-            string tempRoot = CreateTempDirectory();
-            try
-            {
-                string pmxPath = Path.Combine(tempRoot, "model.pmx");
-                File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
+            using var temp = new MmdTestTempScope();
 
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                // A shared toon material carries an index (toon01..toon10), not a texture path.
-                model.materials[0].toonTexture = string.Empty;
-                model.materials[0].toonShared = true;
-                model.materials[0].sharedToonIndex = 0; // toon01
+            string pmxPath = Path.Combine(temp.Path, "model.pmx");
+            File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
 
-                instance = MmdUnityModelFactory.CreateStaticModel(model, pmxPath);
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            // A shared toon material carries an index (toon01..toon10), not a texture path.
+            model.materials[0].toonTexture = string.Empty;
+            model.materials[0].toonShared = true;
+            model.materials[0].sharedToonIndex = 0; // toon01
 
-                Assert.That(instance.LoadedToonTextureCount, Is.EqualTo(1));
-                Texture? nullableToonMap = ReadMaterialTexture(instance.Materials[0], "_ToonMap");
-                Assert.That(nullableToonMap, Is.Not.Null, "shared toon ramp should be bound to _ToonMap");
-                Texture toonMap = nullableToonMap!;
-                // 1x32 vertical ramp (toon carries no horizontal detail; shader samples U=0.5).
-                Assert.That(toonMap.width, Is.EqualTo(1));
-                Assert.That(toonMap.height, Is.EqualTo(32));
-                Assert.That(instance.Materials[0].GetFloat("_ToonMapBound"), Is.EqualTo(1.0f));
-                Assert.That(instance.MaterialBindingDiagnostics[0].toonMapBound, Is.True);
-                Assert.That(
-                    instance.OwnedTextures.Any(texture =>
-                        texture == toonMap &&
-                        texture.hideFlags == (HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild)),
-                    Is.True,
-                    "shared toon ramp should be an owned, non-persisted runtime texture");
-            }
-            finally
-            {
-                DestroyInstance(instance);
-                Directory.Delete(tempRoot, recursive: true);
-            }
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(model, pmxPath));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            Assert.That(instance.LoadedToonTextureCount, Is.EqualTo(1));
+            Texture? nullableToonMap = ReadMaterialTexture(instance.Materials[0], "_ToonMap");
+            Assert.That(nullableToonMap, Is.Not.Null, "shared toon ramp should be bound to _ToonMap");
+            Texture toonMap = nullableToonMap!;
+            // 1x32 vertical ramp (toon carries no horizontal detail; shader samples U=0.5).
+            Assert.That(toonMap.width, Is.EqualTo(1));
+            Assert.That(toonMap.height, Is.EqualTo(32));
+            Assert.That(instance.Materials[0].GetFloat("_ToonMapBound"), Is.EqualTo(1.0f));
+            Assert.That(instance.MaterialBindingDiagnostics[0].toonMapBound, Is.True);
+            Assert.That(
+                instance.OwnedTextures.Any(texture =>
+                    texture == toonMap &&
+                    texture.hideFlags == (HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild)),
+                Is.True,
+                "shared toon ramp should be an owned, non-persisted runtime texture");
         }
 
         [Test]
@@ -747,1400 +634,1169 @@ namespace Mmd.Tests
         [Test]
         public void CreateStaticModelAppliesTransparentMaterialAlpha()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                model.materials[0].alpha = 0.25f;
-                model.materials[0].diffuseColor = new[] { 0.8f, 0.2f, 0.1f };
-                model.materials[0].ambientColor = new[] { 0.3f, 0.1f, 0.05f };
-                model.materials[0].edgeColor = new[] { 0.01f, 0.02f, 0.03f, 0.75f };
-                model.materials[0].edgeSize = 1.25f;
-                model.materials[0].drawEdgeFlag = true;
 
-                instance = MmdUnityModelFactory.CreateStaticModel(model);
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.materials[0].alpha = 0.25f;
+            model.materials[0].diffuseColor = new[] { 0.8f, 0.2f, 0.1f };
+            model.materials[0].ambientColor = new[] { 0.3f, 0.1f, 0.05f };
+            model.materials[0].edgeColor = new[] { 0.01f, 0.02f, 0.03f, 0.75f };
+            model.materials[0].edgeSize = 1.25f;
+            model.materials[0].drawEdgeFlag = true;
 
-                Assert.That(instance.RenderingDescriptor.materials[0].alpha, Is.EqualTo(0.25f).Within(0.00001f));
-                Assert.That(instance.RenderingDescriptor.materials[0].diffuseColor[0], Is.EqualTo(0.8f).Within(0.00001f));
-                Assert.That(instance.RenderingDescriptor.materials[0].edgeSize, Is.EqualTo(1.25f).Within(0.00001f));
-                Assert.That(instance.RenderingDescriptor.materials[0].drawEdgeFlag, Is.True);
-                Assert.That(instance.RenderingDescriptor.urpMaterialBindings[0].edgeSize, Is.EqualTo(1.25f).Within(0.00001f));
-                Assert.That(instance.RenderingDescriptor.urpMaterialBindings[0].drawEdgeFlag, Is.True);
-                Assert.That(instance.RenderingDescriptor.urpMaterialBindings[0].isTransparent, Is.True);
-                Assert.That(instance.Mesh.hideFlags, Is.EqualTo(HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild));
-                Assert.That(instance.Materials[0].hideFlags, Is.EqualTo(HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild));
-                Assert.That(instance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
-                Assert.That(ReadMaterialAlpha(instance.Materials[0]), Is.EqualTo(0.25f).Within(0.00001f));
-                Assert.That(ReadMaterialColor(instance.Materials[0], "_BaseColor").r, Is.EqualTo(0.8f).Within(0.00001f));
-                Assert.That(ReadMaterialColor(instance.Materials[0], "_AmbientColor").r, Is.EqualTo(0.3f).Within(0.00001f));
-                Assert.That(ReadMaterialColor(instance.Materials[0], "_OutlineColor").a, Is.EqualTo(0.75f).Within(0.00001f));
-                Assert.That(ReadMaterialFloat(instance.Materials[0], "_OutlineWidth"), Is.EqualTo(1.25f).Within(0.00001f));
-                // MMD's edge is a screen-space, constant-pixel silhouette: the loader runs the outline
-                // shader in screen-space mode (weight 1) with edgeSize as the raw pixel width.
-                Assert.That(ReadMaterialFloat(instance.Materials[0], "_OutlineScreenSpaceWeight"), Is.EqualTo(1.0f).Within(0.00001f));
-                Assert.That(ReadMaterialFloat(instance.Materials[0], "_OutlineZTest"), Is.EqualTo((float)UnityEngine.Rendering.CompareFunction.Less).Within(0.00001f));
-                Assert.That(ReadMaterialFloat(instance.Materials[0], "_Alpha"), Is.EqualTo(0.25f).Within(0.00001f));
-                Assert.That(ReadMaterialFloat(instance.Materials[0], "_ZWrite"), Is.EqualTo(1.0f).Within(0.00001f));
-                Assert.That(ReadMaterialFloat(instance.Materials[0], "_SrcBlend"), Is.EqualTo((float)UnityEngine.Rendering.BlendMode.SrcAlpha).Within(0.00001f));
-                Assert.That(ReadMaterialFloat(instance.Materials[0], "_DstBlend"), Is.EqualTo((float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha).Within(0.00001f));
-                Assert.That(instance.MaterialBindingDiagnostics[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
-                Assert.That(instance.MaterialBindingDiagnostics[0].isTransparent, Is.True);
-                Assert.That(instance.MaterialBindingDiagnostics[0].diffuseColor[0], Is.EqualTo(0.8f).Within(0.00001f));
-                Assert.That(instance.MaterialBindingDiagnostics[0].diffuseColor[1], Is.EqualTo(0.2f).Within(0.00001f));
-                Assert.That(instance.MaterialBindingDiagnostics[0].diffuseColor[2], Is.EqualTo(0.1f).Within(0.00001f));
-                Assert.That(instance.MaterialBindingDiagnostics[0].ambientColor[0], Is.EqualTo(0.3f).Within(0.00001f));
-                Assert.That(instance.MaterialBindingDiagnostics[0].edgeColor[3], Is.EqualTo(0.75f).Within(0.00001f));
-                Assert.That(instance.MaterialBindingDiagnostics[0].baseColorProperty[0], Is.EqualTo(0.8f).Within(0.00001f));
-                Assert.That(instance.MaterialBindingDiagnostics[0].baseColorProperty[3], Is.EqualTo(0.25f).Within(0.00001f));
-                Assert.That(instance.MaterialBindingDiagnostics[0].ambientColorProperty[0], Is.EqualTo(0.3f).Within(0.00001f));
-                Assert.That(instance.MaterialBindingDiagnostics[0].outlineColorProperty[3], Is.EqualTo(0.75f).Within(0.00001f));
-                Assert.That(instance.MaterialBindingDiagnostics[0].edgeSize, Is.EqualTo(1.25f).Within(0.00001f));
-                Assert.That(instance.MaterialBindingDiagnostics[0].outlineWidth, Is.EqualTo(1.25f).Within(0.00001f));
-                Assert.That(instance.MaterialBindingDiagnostics[0].transparencyMode, Is.EqualTo("alphaBlend"));
-                Assert.That(instance.MaterialBindingDiagnostics[0].renderOrderBucket, Is.EqualTo("alphaBlend"));
-                Assert.That(instance.MaterialBindingDiagnostics[0].materialRenderOrder, Is.EqualTo(0));
-                Assert.That(instance.MaterialBindingDiagnostics[0].outlineRenderOrder, Is.EqualTo(1));
-                Assert.That(instance.MaterialBindingDiagnostics[0].transparentOrder, Is.EqualTo(0));
-                Assert.That(instance.MaterialBindingDiagnostics[0].renderQueueOffset, Is.EqualTo(0));
-                Assert.That(instance.MaterialBindingDiagnostics[0].sortingPriority, Is.EqualTo(0));
-                Assert.That(instance.MaterialBindingDiagnostics[0].transparentPolicy, Is.EqualTo("mmd-material-order-queue-depth-write"));
-                Assert.That(instance.MaterialBindingDiagnostics[0].zWrite, Is.EqualTo(1.0f).Within(0.00001f));
-                Assert.That(instance.MaterialBindingDiagnostics[0].srcBlend, Is.EqualTo((float)UnityEngine.Rendering.BlendMode.SrcAlpha).Within(0.00001f));
-                Assert.That(instance.MaterialBindingDiagnostics[0].dstBlend, Is.EqualTo((float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha).Within(0.00001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            Assert.That(instance.RenderingDescriptor.materials[0].alpha, Is.EqualTo(0.25f).Within(0.00001f));
+            Assert.That(instance.RenderingDescriptor.materials[0].diffuseColor[0], Is.EqualTo(0.8f).Within(0.00001f));
+            Assert.That(instance.RenderingDescriptor.materials[0].edgeSize, Is.EqualTo(1.25f).Within(0.00001f));
+            Assert.That(instance.RenderingDescriptor.materials[0].drawEdgeFlag, Is.True);
+            Assert.That(instance.RenderingDescriptor.urpMaterialBindings[0].edgeSize, Is.EqualTo(1.25f).Within(0.00001f));
+            Assert.That(instance.RenderingDescriptor.urpMaterialBindings[0].drawEdgeFlag, Is.True);
+            Assert.That(instance.RenderingDescriptor.urpMaterialBindings[0].isTransparent, Is.True);
+            Assert.That(instance.Mesh.hideFlags, Is.EqualTo(HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild));
+            Assert.That(instance.Materials[0].hideFlags, Is.EqualTo(HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild));
+            Assert.That(instance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
+            Assert.That(ReadMaterialAlpha(instance.Materials[0]), Is.EqualTo(0.25f).Within(0.00001f));
+            Assert.That(ReadMaterialColor(instance.Materials[0], "_BaseColor").r, Is.EqualTo(0.8f).Within(0.00001f));
+            Assert.That(ReadMaterialColor(instance.Materials[0], "_AmbientColor").r, Is.EqualTo(0.3f).Within(0.00001f));
+            Assert.That(ReadMaterialColor(instance.Materials[0], "_OutlineColor").a, Is.EqualTo(0.75f).Within(0.00001f));
+            Assert.That(ReadMaterialFloat(instance.Materials[0], "_OutlineWidth"), Is.EqualTo(1.25f).Within(0.00001f));
+            // MMD's edge is a screen-space, constant-pixel silhouette: the loader runs the outline
+            // shader in screen-space mode (weight 1) with edgeSize as the raw pixel width.
+            Assert.That(ReadMaterialFloat(instance.Materials[0], "_OutlineScreenSpaceWeight"), Is.EqualTo(1.0f).Within(0.00001f));
+            Assert.That(ReadMaterialFloat(instance.Materials[0], "_OutlineZTest"), Is.EqualTo((float)UnityEngine.Rendering.CompareFunction.Less).Within(0.00001f));
+            Assert.That(ReadMaterialFloat(instance.Materials[0], "_Alpha"), Is.EqualTo(0.25f).Within(0.00001f));
+            Assert.That(ReadMaterialFloat(instance.Materials[0], "_ZWrite"), Is.EqualTo(1.0f).Within(0.00001f));
+            Assert.That(ReadMaterialFloat(instance.Materials[0], "_SrcBlend"), Is.EqualTo((float)UnityEngine.Rendering.BlendMode.SrcAlpha).Within(0.00001f));
+            Assert.That(ReadMaterialFloat(instance.Materials[0], "_DstBlend"), Is.EqualTo((float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha).Within(0.00001f));
+            Assert.That(instance.MaterialBindingDiagnostics[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
+            Assert.That(instance.MaterialBindingDiagnostics[0].isTransparent, Is.True);
+            Assert.That(instance.MaterialBindingDiagnostics[0].diffuseColor[0], Is.EqualTo(0.8f).Within(0.00001f));
+            Assert.That(instance.MaterialBindingDiagnostics[0].diffuseColor[1], Is.EqualTo(0.2f).Within(0.00001f));
+            Assert.That(instance.MaterialBindingDiagnostics[0].diffuseColor[2], Is.EqualTo(0.1f).Within(0.00001f));
+            Assert.That(instance.MaterialBindingDiagnostics[0].ambientColor[0], Is.EqualTo(0.3f).Within(0.00001f));
+            Assert.That(instance.MaterialBindingDiagnostics[0].edgeColor[3], Is.EqualTo(0.75f).Within(0.00001f));
+            Assert.That(instance.MaterialBindingDiagnostics[0].baseColorProperty[0], Is.EqualTo(0.8f).Within(0.00001f));
+            Assert.That(instance.MaterialBindingDiagnostics[0].baseColorProperty[3], Is.EqualTo(0.25f).Within(0.00001f));
+            Assert.That(instance.MaterialBindingDiagnostics[0].ambientColorProperty[0], Is.EqualTo(0.3f).Within(0.00001f));
+            Assert.That(instance.MaterialBindingDiagnostics[0].outlineColorProperty[3], Is.EqualTo(0.75f).Within(0.00001f));
+            Assert.That(instance.MaterialBindingDiagnostics[0].edgeSize, Is.EqualTo(1.25f).Within(0.00001f));
+            Assert.That(instance.MaterialBindingDiagnostics[0].outlineWidth, Is.EqualTo(1.25f).Within(0.00001f));
+            Assert.That(instance.MaterialBindingDiagnostics[0].transparencyMode, Is.EqualTo("alphaBlend"));
+            Assert.That(instance.MaterialBindingDiagnostics[0].renderOrderBucket, Is.EqualTo("alphaBlend"));
+            Assert.That(instance.MaterialBindingDiagnostics[0].materialRenderOrder, Is.EqualTo(0));
+            Assert.That(instance.MaterialBindingDiagnostics[0].outlineRenderOrder, Is.EqualTo(1));
+            Assert.That(instance.MaterialBindingDiagnostics[0].transparentOrder, Is.EqualTo(0));
+            Assert.That(instance.MaterialBindingDiagnostics[0].renderQueueOffset, Is.EqualTo(0));
+            Assert.That(instance.MaterialBindingDiagnostics[0].sortingPriority, Is.EqualTo(0));
+            Assert.That(instance.MaterialBindingDiagnostics[0].transparentPolicy, Is.EqualTo("mmd-material-order-queue-depth-write"));
+            Assert.That(instance.MaterialBindingDiagnostics[0].zWrite, Is.EqualTo(1.0f).Within(0.00001f));
+            Assert.That(instance.MaterialBindingDiagnostics[0].srcBlend, Is.EqualTo((float)UnityEngine.Rendering.BlendMode.SrcAlpha).Within(0.00001f));
+            Assert.That(instance.MaterialBindingDiagnostics[0].dstBlend, Is.EqualTo((float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha).Within(0.00001f));
         }
 
         [Test]
         public void CreateStaticModelOffsetsTransparentQueuesByMaterialOrder()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateTwoTransparentTriangleModel();
 
-                instance = MmdUnityModelFactory.CreateStaticModel(model);
+            MmdModelDefinition model = CreateTwoTransparentTriangleModel();
 
-                Assert.That(instance.Mesh.subMeshCount, Is.EqualTo(2));
-                Assert.That(instance.Materials, Has.Length.EqualTo(2));
-                Assert.That(instance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
-                Assert.That(instance.Materials[1].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent + 1));
-                Assert.That(instance.MaterialBindingDiagnostics[0].materialIndex, Is.EqualTo(0));
-                Assert.That(instance.MaterialBindingDiagnostics[0].materialSlot, Is.EqualTo(0));
-                Assert.That(instance.MaterialBindingDiagnostics[0].submeshIndex, Is.EqualTo(0));
-                Assert.That(instance.MaterialBindingDiagnostics[0].transparentOrder, Is.EqualTo(0));
-                Assert.That(instance.MaterialBindingDiagnostics[0].transparentPolicy, Is.EqualTo("mmd-material-order-queue-depth-write"));
-                Assert.That(instance.MaterialBindingDiagnostics[1].materialIndex, Is.EqualTo(1));
-                Assert.That(instance.MaterialBindingDiagnostics[1].materialSlot, Is.EqualTo(1));
-                Assert.That(instance.MaterialBindingDiagnostics[1].submeshIndex, Is.EqualTo(1));
-                Assert.That(instance.MaterialBindingDiagnostics[1].transparentOrder, Is.EqualTo(1));
-                Assert.That(instance.MaterialBindingDiagnostics[1].renderQueueOffset, Is.EqualTo(1));
-                Assert.That(instance.MaterialBindingDiagnostics[1].sortingPriority, Is.EqualTo(1));
-                Assert.That(instance.MaterialBindingDiagnostics[1].zWrite, Is.EqualTo(1.0f).Within(0.00001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            Assert.That(instance.Mesh.subMeshCount, Is.EqualTo(2));
+            Assert.That(instance.Materials, Has.Length.EqualTo(2));
+            Assert.That(instance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
+            Assert.That(instance.Materials[1].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent + 1));
+            Assert.That(instance.MaterialBindingDiagnostics[0].materialIndex, Is.EqualTo(0));
+            Assert.That(instance.MaterialBindingDiagnostics[0].materialSlot, Is.EqualTo(0));
+            Assert.That(instance.MaterialBindingDiagnostics[0].submeshIndex, Is.EqualTo(0));
+            Assert.That(instance.MaterialBindingDiagnostics[0].transparentOrder, Is.EqualTo(0));
+            Assert.That(instance.MaterialBindingDiagnostics[0].transparentPolicy, Is.EqualTo("mmd-material-order-queue-depth-write"));
+            Assert.That(instance.MaterialBindingDiagnostics[1].materialIndex, Is.EqualTo(1));
+            Assert.That(instance.MaterialBindingDiagnostics[1].materialSlot, Is.EqualTo(1));
+            Assert.That(instance.MaterialBindingDiagnostics[1].submeshIndex, Is.EqualTo(1));
+            Assert.That(instance.MaterialBindingDiagnostics[1].transparentOrder, Is.EqualTo(1));
+            Assert.That(instance.MaterialBindingDiagnostics[1].renderQueueOffset, Is.EqualTo(1));
+            Assert.That(instance.MaterialBindingDiagnostics[1].sortingPriority, Is.EqualTo(1));
+            Assert.That(instance.MaterialBindingDiagnostics[1].zWrite, Is.EqualTo(1.0f).Within(0.00001f));
         }
 
         [Test]
         public void CreateStaticModelAppliesDescriptorCullingPolicy()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateTwoTransparentTriangleModel();
-                model.materials[0].cullingPolicy = "double-sided";
-                model.materials[0].drawEdgeFlag = true;
-                model.materials[0].edgeSize = 1.0f;
-                model.materials[1].cullingPolicy = "backface-culling";
-                model.materials[1].drawEdgeFlag = true;
-                model.materials[1].edgeSize = 1.0f;
 
-                instance = MmdUnityModelFactory.CreateStaticModel(model);
+            MmdModelDefinition model = CreateTwoTransparentTriangleModel();
+            model.materials[0].cullingPolicy = "double-sided";
+            model.materials[0].drawEdgeFlag = true;
+            model.materials[0].edgeSize = 1.0f;
+            model.materials[1].cullingPolicy = "backface-culling";
+            model.materials[1].drawEdgeFlag = true;
+            model.materials[1].edgeSize = 1.0f;
 
-                Assert.That(ReadMaterialFloat(instance.Materials[0], "_Cull"), Is.EqualTo((float)UnityEngine.Rendering.CullMode.Off).Within(0.00001f));
-                Assert.That(ReadMaterialFloat(instance.Materials[0], "_OutlineVisible"), Is.EqualTo(1.0f).Within(0.00001f));
-                Assert.That(instance.MaterialBindingDiagnostics[0].cull, Is.EqualTo((float)UnityEngine.Rendering.CullMode.Off).Within(0.00001f));
-                Assert.That(instance.MaterialBindingDiagnostics[0].cullingPolicy, Is.EqualTo("double-sided"));
-                Assert.That(instance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                Assert.That(ReadMaterialFloat(instance.Materials[1], "_Cull"), Is.EqualTo((float)UnityEngine.Rendering.CullMode.Back).Within(0.00001f));
-                Assert.That(ReadMaterialFloat(instance.Materials[1], "_OutlineVisible"), Is.EqualTo(0.0f).Within(0.00001f));
-                Assert.That(instance.MaterialBindingDiagnostics[1].cull, Is.EqualTo((float)UnityEngine.Rendering.CullMode.Back).Within(0.00001f));
-                Assert.That(instance.MaterialBindingDiagnostics[1].cullingPolicy, Is.EqualTo("backface-culling"));
-                Assert.That(instance.Materials[1].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent + 1));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            Assert.That(ReadMaterialFloat(instance.Materials[0], "_Cull"), Is.EqualTo((float)UnityEngine.Rendering.CullMode.Off).Within(0.00001f));
+            Assert.That(ReadMaterialFloat(instance.Materials[0], "_OutlineVisible"), Is.EqualTo(1.0f).Within(0.00001f));
+            Assert.That(instance.MaterialBindingDiagnostics[0].cull, Is.EqualTo((float)UnityEngine.Rendering.CullMode.Off).Within(0.00001f));
+            Assert.That(instance.MaterialBindingDiagnostics[0].cullingPolicy, Is.EqualTo("double-sided"));
+            Assert.That(instance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
+
+            Assert.That(ReadMaterialFloat(instance.Materials[1], "_Cull"), Is.EqualTo((float)UnityEngine.Rendering.CullMode.Back).Within(0.00001f));
+            Assert.That(ReadMaterialFloat(instance.Materials[1], "_OutlineVisible"), Is.EqualTo(0.0f).Within(0.00001f));
+            Assert.That(instance.MaterialBindingDiagnostics[1].cull, Is.EqualTo((float)UnityEngine.Rendering.CullMode.Back).Within(0.00001f));
+            Assert.That(instance.MaterialBindingDiagnostics[1].cullingPolicy, Is.EqualTo("backface-culling"));
+            Assert.That(instance.Materials[1].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent + 1));
         }
 
         [Test]
         public void CreateStaticModelFallsBackWhenRequestedShaderIsMissing()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                MmdRenderingDescriptor descriptor = MmdRenderingDescriptorBuilder.Build(model);
-                descriptor.urpMaterialBindings[0].shaderName = "Missing/MMD Basic URP Toon Test";
 
-                instance = MmdUnityModelFactory.CreateStaticModel(descriptor, "missing-shader-fallback");
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            MmdRenderingDescriptor descriptor = MmdRenderingDescriptorBuilder.Build(model);
+            descriptor.urpMaterialBindings[0].shaderName = "Missing/MMD Basic URP Toon Test";
 
-                Assert.That(instance.ShaderDiagnostics.requestedShaderName, Is.EqualTo("Missing/MMD Basic URP Toon Test"));
-                Assert.That(instance.ShaderDiagnostics.shaderFallbackUsed, Is.True);
-                Assert.That(instance.ShaderDiagnostics.fallbackReason, Is.EqualTo("requested-shader-not-found"));
-                Assert.That(instance.ShaderDiagnostics.resolvedShaderName, Is.Not.Empty);
-                Assert.That(instance.ShaderDiagnostics.fallbackCandidates, Does.Contain("Missing/MMD Basic URP Toon Test"));
-                Assert.That(instance.Materials[0].shader, Is.Not.Null);
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(descriptor, "missing-shader-fallback"));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            Assert.That(instance.ShaderDiagnostics.requestedShaderName, Is.EqualTo("Missing/MMD Basic URP Toon Test"));
+            Assert.That(instance.ShaderDiagnostics.shaderFallbackUsed, Is.True);
+            Assert.That(instance.ShaderDiagnostics.fallbackReason, Is.EqualTo("requested-shader-not-found"));
+            Assert.That(instance.ShaderDiagnostics.resolvedShaderName, Is.Not.Empty);
+            Assert.That(instance.ShaderDiagnostics.fallbackCandidates, Does.Contain("Missing/MMD Basic URP Toon Test"));
+            Assert.That(instance.Materials[0].shader, Is.Not.Null);
         }
 
         [Test]
         public void CreateStaticModelPreservesRawSnapshotUvAndFlipsViewportUv()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                model.vertices[1].uv = new[] { 0.25f, 0.75f };
 
-                instance = MmdUnityModelFactory.CreateStaticModel(model);
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.vertices[1].uv = new[] { 0.25f, 0.75f };
 
-                Assert.That(instance.RenderingDescriptor.vertices[1].uv[0], Is.EqualTo(0.25f).Within(0.00001f));
-                Assert.That(instance.RenderingDescriptor.vertices[1].uv[1], Is.EqualTo(0.75f).Within(0.00001f));
-                Assert.That(instance.RenderingDescriptor.textureOrientation.flipVForViewport, Is.True);
-                Assert.That(instance.RenderingDescriptor.textureOrientation.flipTexturePixels, Is.False);
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                Vector2[] viewportUvs = instance.Mesh.uv;
-                Assert.That(viewportUvs, Has.Length.EqualTo(3));
-                Assert.That(viewportUvs[1].x, Is.EqualTo(0.25f).Within(0.00001f));
-                Assert.That(viewportUvs[1].y, Is.EqualTo(0.25f).Within(0.00001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            Assert.That(instance.RenderingDescriptor.vertices[1].uv[0], Is.EqualTo(0.25f).Within(0.00001f));
+            Assert.That(instance.RenderingDescriptor.vertices[1].uv[1], Is.EqualTo(0.75f).Within(0.00001f));
+            Assert.That(instance.RenderingDescriptor.textureOrientation.flipVForViewport, Is.True);
+            Assert.That(instance.RenderingDescriptor.textureOrientation.flipTexturePixels, Is.False);
+
+            Vector2[] viewportUvs = instance.Mesh.uv;
+            Assert.That(viewportUvs, Has.Length.EqualTo(3));
+            Assert.That(viewportUvs[1].x, Is.EqualTo(0.25f).Within(0.00001f));
+            Assert.That(viewportUvs[1].y, Is.EqualTo(0.25f).Within(0.00001f));
         }
 
         [Test]
         public void CreateStaticModelViewportUvSamplesRawTextureWithFlippedV()
         {
-            MmdUnityModelInstance? instance = null;
-            string tempRoot = CreateTempDirectory();
-            try
-            {
-                string pmxPath = Path.Combine(tempRoot, "model.pmx");
-                string texturePath = Path.Combine(tempRoot, "orientation.png");
-                File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
-                WriteVerticalOrientationPng(texturePath);
+            using var temp = new MmdTestTempScope();
 
-                MmdModelDefinition model = CreateTexturedQuadModel("orientation.png");
-                instance = MmdUnityModelFactory.CreateStaticModel(model, pmxPath);
+            string pmxPath = Path.Combine(temp.Path, "model.pmx");
+            string texturePath = Path.Combine(temp.Path, "orientation.png");
+            File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
+            WriteVerticalOrientationPng(texturePath);
 
-                Texture? nullableTexture = ReadBoundDiffuseTexture(instance.Materials[0]);
-                Assert.That(nullableTexture, Is.Not.Null);
-                var texture = (Texture2D)nullableTexture!;
-                texture.filterMode = FilterMode.Point;
-                texture.wrapMode = TextureWrapMode.Clamp;
-                Vector2[] viewportUv = instance.Mesh.uv;
-                Color upper = texture.GetPixelBilinear(0.5f, (viewportUv[0].y + viewportUv[1].y) * 0.5f);
-                Color lower = texture.GetPixelBilinear(0.5f, (viewportUv[2].y + viewportUv[3].y) * 0.5f);
+            MmdModelDefinition model = CreateTexturedQuadModel("orientation.png");
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(model, pmxPath));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                Assert.That(instance.RenderingDescriptor.vertices[0].uv[1], Is.EqualTo(0.0f).Within(0.00001f));
-                Assert.That(viewportUv[0].y, Is.EqualTo(1.0f).Within(0.00001f));
-                Assert.That(upper.r, Is.GreaterThan(upper.b), "upper viewport UV should sample the red top texture row");
-                Assert.That(lower.b, Is.GreaterThan(lower.r), "lower viewport UV should sample the blue bottom texture row");
-            }
-            finally
-            {
-                DestroyInstance(instance);
-                Directory.Delete(tempRoot, recursive: true);
-            }
+            Texture? nullableTexture = ReadBoundDiffuseTexture(instance.Materials[0]);
+            Assert.That(nullableTexture, Is.Not.Null);
+            var texture = (Texture2D)nullableTexture!;
+            texture.filterMode = FilterMode.Point;
+            texture.wrapMode = TextureWrapMode.Clamp;
+            Vector2[] viewportUv = instance.Mesh.uv;
+            Color upper = texture.GetPixelBilinear(0.5f, (viewportUv[0].y + viewportUv[1].y) * 0.5f);
+            Color lower = texture.GetPixelBilinear(0.5f, (viewportUv[2].y + viewportUv[3].y) * 0.5f);
+
+            Assert.That(instance.RenderingDescriptor.vertices[0].uv[1], Is.EqualTo(0.0f).Within(0.00001f));
+            Assert.That(viewportUv[0].y, Is.EqualTo(1.0f).Within(0.00001f));
+            Assert.That(upper.r, Is.GreaterThan(upper.b), "upper viewport UV should sample the red top texture row");
+            Assert.That(lower.b, Is.GreaterThan(lower.r), "lower viewport UV should sample the blue bottom texture row");
         }
 
         [Test]
         public void CreateStaticModelWithSourcePathLoadsIndexedBmpSphereTextureForDiagnostics()
         {
-            MmdUnityModelInstance? instance = null;
-            string tempRoot = CreateTempDirectory();
-            try
-            {
-                string pmxPath = Path.Combine(tempRoot, "model.pmx");
-                string sphereDirectory = Path.Combine(tempRoot, "sp");
-                Directory.CreateDirectory(sphereDirectory);
-                File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
-                WriteBmp8Indexed(Path.Combine(sphereDirectory, "sphere.bmp"), width: 2, height: 2);
+            using var temp = new MmdTestTempScope();
 
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                model.materials[0].sphereTexture = Path.Combine("sp", "sphere.bmp");
+            string pmxPath = Path.Combine(temp.Path, "model.pmx");
+            string sphereDirectory = Path.Combine(temp.Path, "sp");
+            Directory.CreateDirectory(sphereDirectory);
+            File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
+            WriteBmp8Indexed(Path.Combine(sphereDirectory, "sphere.bmp"), width: 2, height: 2);
 
-                instance = MmdUnityModelFactory.CreateStaticModel(model, pmxPath);
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.materials[0].sphereTexture = Path.Combine("sp", "sphere.bmp");
 
-                Assert.That(instance.LoadedSphereTextureCount, Is.EqualTo(1));
-                Assert.That(instance.UnsupportedTextureReferenceCount, Is.EqualTo(0));
-                Assert.That(instance.OwnedTextures, Has.Length.EqualTo(1));
-                Assert.That(instance.OwnedTextures[0].width, Is.EqualTo(2));
-                Assert.That(instance.OwnedTextures[0].height, Is.EqualTo(2));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-                Directory.Delete(tempRoot, recursive: true);
-            }
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(model, pmxPath));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            Assert.That(instance.LoadedSphereTextureCount, Is.EqualTo(1));
+            Assert.That(instance.UnsupportedTextureReferenceCount, Is.EqualTo(0));
+            Assert.That(instance.OwnedTextures, Has.Length.EqualTo(1));
+            Assert.That(instance.OwnedTextures[0].width, Is.EqualTo(2));
+            Assert.That(instance.OwnedTextures[0].height, Is.EqualTo(2));
         }
 
         [Test]
         public void CreateStaticModelReportsMissingAndUnsupportedTexturesWithoutFailing()
         {
-            MmdUnityModelInstance? missingInstance = null;
-            MmdUnityModelInstance? unsupportedInstance = null;
-            string tempRoot = CreateTempDirectory();
-            try
-            {
-                string pmxPath = Path.Combine(tempRoot, "model.pmx");
-                File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
+            using var temp = new MmdTestTempScope();
 
-                MmdModelDefinition missingModel = CreateMinimalTriangleModel(includeTextureReferences: false);
-                missingModel.materials[0].texture = "missing.png";
-                missingInstance = MmdUnityModelFactory.CreateStaticModel(missingModel, pmxPath);
+            string pmxPath = Path.Combine(temp.Path, "model.pmx");
+            File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
 
-                Assert.That(missingInstance.Root, Is.Not.Null);
-                Assert.That(missingInstance.LoadedDiffuseTextureCount, Is.EqualTo(0));
-                Assert.That(missingInstance.MissingTextureReferenceCount, Is.EqualTo(1));
-                Assert.That(missingInstance.UnsupportedTextureReferenceCount, Is.EqualTo(0));
+            MmdModelDefinition missingModel = CreateMinimalTriangleModel(includeTextureReferences: false);
+            missingModel.materials[0].texture = "missing.png";
+            using var missingScope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(missingModel, pmxPath));
+            MmdUnityModelInstance missingInstance = missingScope.Instance;
 
-                MmdModelDefinition unsupportedModel = CreateMinimalTriangleModel(includeTextureReferences: false);
-                unsupportedModel.materials[0].texture = "diffuse.webp";
-                unsupportedInstance = MmdUnityModelFactory.CreateStaticModel(unsupportedModel, pmxPath);
+            Assert.That(missingInstance.Root, Is.Not.Null);
+            Assert.That(missingInstance.LoadedDiffuseTextureCount, Is.EqualTo(0));
+            Assert.That(missingInstance.MissingTextureReferenceCount, Is.EqualTo(1));
+            Assert.That(missingInstance.UnsupportedTextureReferenceCount, Is.EqualTo(0));
 
-                Assert.That(unsupportedInstance.Root, Is.Not.Null);
-                Assert.That(unsupportedInstance.LoadedDiffuseTextureCount, Is.EqualTo(0));
-                Assert.That(unsupportedInstance.MissingTextureReferenceCount, Is.EqualTo(0));
-                Assert.That(unsupportedInstance.UnsupportedTextureReferenceCount, Is.EqualTo(1));
-            }
-            finally
-            {
-                DestroyInstance(missingInstance);
-                DestroyInstance(unsupportedInstance);
-                Directory.Delete(tempRoot, recursive: true);
-            }
+            MmdModelDefinition unsupportedModel = CreateMinimalTriangleModel(includeTextureReferences: false);
+            unsupportedModel.materials[0].texture = "diffuse.webp";
+            using var unsupportedScope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(unsupportedModel, pmxPath));
+            MmdUnityModelInstance unsupportedInstance = unsupportedScope.Instance;
+
+            Assert.That(unsupportedInstance.Root, Is.Not.Null);
+            Assert.That(unsupportedInstance.LoadedDiffuseTextureCount, Is.EqualTo(0));
+            Assert.That(unsupportedInstance.MissingTextureReferenceCount, Is.EqualTo(0));
+            Assert.That(unsupportedInstance.UnsupportedTextureReferenceCount, Is.EqualTo(1));
         }
 
         [Test]
         public void CreateSkinnedModelCreatesSkinnedRendererBindposesAndBoneWeights()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                model.vertices[1].boneIndices = new[] { 0, 1 };
-                model.vertices[1].boneWeights = new[] { 0.25f, 0.75f };
 
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.vertices[1].boneIndices = new[] { 0, 1 };
+            model.vertices[1].boneWeights = new[] { 0.25f, 0.75f };
 
-                GameObject root = instance.Root!;
-                Assert.That(root.GetComponent<MeshFilter>(), Is.Null);
-                Assert.That(root.GetComponent<MeshRenderer>(), Is.Null);
-                Assert.That(root.transform.Find("Model"), Is.Not.Null);
-                Assert.That(instance.MeshRenderer, Is.Null);
-                Assert.That(instance.SkinnedMeshRenderer, Is.Not.Null);
-                SkinnedMeshRenderer renderer = instance.SkinnedMeshRenderer!;
-                Assert.That(renderer.transform.parent, Is.EqualTo(root.transform));
-                Assert.That(renderer.sharedMesh, Is.EqualTo(instance.Mesh));
-                Assert.That(renderer.sharedMaterials, Has.Length.EqualTo(1));
-                Assert.That(renderer.bones, Has.Length.EqualTo(2));
-                Assert.That(renderer.bones[0], Is.EqualTo(instance.BoneTransforms[0]));
-                Assert.That(instance.Mesh.bindposes, Has.Length.EqualTo(2));
-                Assert.That(instance.Mesh.boneWeights, Has.Length.EqualTo(3));
-                Assert.That(instance.Mesh.boneWeights[1].boneIndex0, Is.EqualTo(0));
-                Assert.That(instance.Mesh.boneWeights[1].boneIndex1, Is.EqualTo(1));
-                Assert.That(instance.Mesh.boneWeights[1].weight0, Is.EqualTo(0.25f).Within(0.00001f));
-                Assert.That(instance.Mesh.boneWeights[1].weight1, Is.EqualTo(0.75f).Within(0.00001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            GameObject root = instance.Root!;
+            Assert.That(root.GetComponent<MeshFilter>(), Is.Null);
+            Assert.That(root.GetComponent<MeshRenderer>(), Is.Null);
+            Assert.That(root.transform.Find("Model"), Is.Not.Null);
+            Assert.That(instance.MeshRenderer, Is.Null);
+            Assert.That(instance.SkinnedMeshRenderer, Is.Not.Null);
+            SkinnedMeshRenderer renderer = instance.SkinnedMeshRenderer!;
+            Assert.That(renderer.transform.parent, Is.EqualTo(root.transform));
+            Assert.That(renderer.sharedMesh, Is.EqualTo(instance.Mesh));
+            Assert.That(renderer.sharedMaterials, Has.Length.EqualTo(1));
+            Assert.That(renderer.bones, Has.Length.EqualTo(2));
+            Assert.That(renderer.bones[0], Is.EqualTo(instance.BoneTransforms[0]));
+            Assert.That(instance.Mesh.bindposes, Has.Length.EqualTo(2));
+            Assert.That(instance.Mesh.boneWeights, Has.Length.EqualTo(3));
+            Assert.That(instance.Mesh.boneWeights[1].boneIndex0, Is.EqualTo(0));
+            Assert.That(instance.Mesh.boneWeights[1].boneIndex1, Is.EqualTo(1));
+            Assert.That(instance.Mesh.boneWeights[1].weight0, Is.EqualTo(0.25f).Within(0.00001f));
+            Assert.That(instance.Mesh.boneWeights[1].weight1, Is.EqualTo(0.75f).Within(0.00001f));
         }
 
         [Test]
         public void CreateSkinnedModelCreatesPhysicsCollidersAndInspectableParameters()
         {
-            MmdUnityModelInstance? instance = null;
-            try
+
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.physics.rigidbodies.Add(new MmdRigidbodyDefinition
             {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                model.physics.rigidbodies.Add(new MmdRigidbodyDefinition
-                {
-                    index = 0,
-                    name = "child sphere",
-                    boneIndex = 1,
-                    boneName = "child",
-                    shapeType = "sphere",
-                    size = new[] { 0.25f, 0.0f, 0.0f },
-                    position = new[] { 0.0f, 2.0f, 3.0f },
-                    rotation = new[] { 0.0f, 0.0f, 0.0f },
-                    mass = 1.5f,
-                    linearDamping = 0.25f,
-                    angularDamping = 0.75f,
-                    friction = 0.4f,
-                    restitution = 0.2f,
-                    group = 3,
-                    mask = 0x000f,
-                    physicsKind = "dynamic"
-                });
-                model.physics.rigidbodies.Add(new MmdRigidbodyDefinition
-                {
-                    index = 1,
-                    name = "root box",
-                    boneIndex = 0,
-                    boneName = "root",
-                    shapeType = "box",
-                    size = new[] { 1.0f, 2.0f, 3.0f },
-                    position = new[] { 1.0f, 0.0f, 0.0f },
-                    rotation = new[] { 0.0f, 0.0f, 0.0f },
-                    mass = 0.0f,
-                    linearDamping = 0.1f,
-                    angularDamping = 0.2f,
-                    friction = 0.3f,
-                    restitution = 0.4f,
-                    group = 2,
-                    mask = 0x00ff,
-                    physicsKind = "static"
-                });
-                model.physics.rigidbodies.Add(new MmdRigidbodyDefinition
-                {
-                    index = 2,
-                    name = "root capsule",
-                    boneIndex = 0,
-                    boneName = "root",
-                    shapeType = "capsule",
-                    size = new[] { 0.5f, 2.0f, 0.0f },
-                    position = new[] { 0.0f, 0.0f, 0.0f },
-                    rotation = new[] { 0.0f, 0.0f, 0.0f },
-                    mass = 0.75f,
-                    linearDamping = 0.0f,
-                    angularDamping = 0.0f,
-                    friction = 0.1f,
-                    restitution = 0.0f,
-                    group = 1,
-                    mask = 0xffff,
-                    physicsKind = "dynamic-orientation"
-                });
-
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
-
-                Assert.That(instance.PhysicsBodies, Has.Length.EqualTo(3));
-                MmdUnityPhysicsBody sphereBody = instance.PhysicsBodies[0];
-                Assert.That(sphereBody.transform.parent, Is.EqualTo(instance.BoneTransforms[1]));
-                Assert.That(sphereBody.transform.localPosition, Is.EqualTo(new Vector3(0.0f, 1.0f, -3.0f)));
-                Assert.That(sphereBody.ShapeType, Is.EqualTo("sphere"));
-                Assert.That(sphereBody.DescriptorSize, Is.EqualTo(new Vector3(0.25f, 0.0f, 0.0f)));
-                Assert.That(sphereBody.DescriptorPosition, Is.EqualTo(new Vector3(0.0f, 2.0f, 3.0f)));
-                Assert.That(sphereBody.DescriptorRotation, Is.EqualTo(Vector3.zero));
-                Assert.That(sphereBody.GetComponent<SphereCollider>().radius, Is.EqualTo(0.25f).Within(0.00001f));
-                Rigidbody sphereRigidbody = sphereBody.GetComponent<Rigidbody>();
-                Assert.That(sphereRigidbody.isKinematic, Is.True);
-                Assert.That(sphereRigidbody.useGravity, Is.False);
-                Assert.That(sphereRigidbody.detectCollisions, Is.False);
-                Assert.That(sphereRigidbody.mass, Is.EqualTo(1.5f).Within(0.00001f));
-                Assert.That(sphereRigidbody.linearDamping, Is.EqualTo(0.25f).Within(0.00001f));
-                Assert.That(sphereRigidbody.angularDamping, Is.EqualTo(0.75f).Within(0.00001f));
-                Assert.That(sphereBody.Friction, Is.EqualTo(0.4f).Within(0.00001f));
-                Assert.That(sphereBody.Restitution, Is.EqualTo(0.2f).Within(0.00001f));
-                Assert.That(sphereBody.CollisionGroup, Is.EqualTo(3));
-                Assert.That(sphereBody.CollisionMask, Is.EqualTo(0x000f));
-
-                BoxCollider boxCollider = instance.PhysicsBodies[1].GetComponent<BoxCollider>();
-                Assert.That(instance.PhysicsBodies[1].ShapeType, Is.EqualTo("box"));
-                Assert.That(instance.PhysicsBodies[1].DescriptorSize, Is.EqualTo(new Vector3(1.0f, 2.0f, 3.0f)));
-                Assert.That(instance.PhysicsBodies[1].DescriptorPosition, Is.EqualTo(new Vector3(1.0f, 0.0f, 0.0f)));
-                Assert.That(boxCollider.size, Is.EqualTo(new Vector3(2.0f, 4.0f, 6.0f)));
-                CapsuleCollider capsuleCollider = instance.PhysicsBodies[2].GetComponent<CapsuleCollider>();
-                Assert.That(instance.PhysicsBodies[2].ShapeType, Is.EqualTo("capsule"));
-                Assert.That(instance.PhysicsBodies[2].DescriptorSize, Is.EqualTo(new Vector3(0.5f, 2.0f, 0.0f)));
-                Assert.That(instance.PhysicsBodies[2].PhysicsKind, Is.EqualTo("dynamic-orientation"));
-                Assert.That(capsuleCollider.radius, Is.EqualTo(0.5f).Within(0.00001f));
-                Assert.That(capsuleCollider.height, Is.EqualTo(3.0f).Within(0.00001f));
-                Assert.That(capsuleCollider.direction, Is.EqualTo(1));
-                Assert.That(instance.PhysicsBodies[2].HasNativeTransform, Is.False);
-            }
-            finally
+                index = 0,
+                name = "child sphere",
+                boneIndex = 1,
+                boneName = "child",
+                shapeType = "sphere",
+                size = new[] { 0.25f, 0.0f, 0.0f },
+                position = new[] { 0.0f, 2.0f, 3.0f },
+                rotation = new[] { 0.0f, 0.0f, 0.0f },
+                mass = 1.5f,
+                linearDamping = 0.25f,
+                angularDamping = 0.75f,
+                friction = 0.4f,
+                restitution = 0.2f,
+                group = 3,
+                mask = 0x000f,
+                physicsKind = "dynamic"
+            });
+            model.physics.rigidbodies.Add(new MmdRigidbodyDefinition
             {
-                DestroyInstance(instance);
-            }
+                index = 1,
+                name = "root box",
+                boneIndex = 0,
+                boneName = "root",
+                shapeType = "box",
+                size = new[] { 1.0f, 2.0f, 3.0f },
+                position = new[] { 1.0f, 0.0f, 0.0f },
+                rotation = new[] { 0.0f, 0.0f, 0.0f },
+                mass = 0.0f,
+                linearDamping = 0.1f,
+                angularDamping = 0.2f,
+                friction = 0.3f,
+                restitution = 0.4f,
+                group = 2,
+                mask = 0x00ff,
+                physicsKind = "static"
+            });
+            model.physics.rigidbodies.Add(new MmdRigidbodyDefinition
+            {
+                index = 2,
+                name = "root capsule",
+                boneIndex = 0,
+                boneName = "root",
+                shapeType = "capsule",
+                size = new[] { 0.5f, 2.0f, 0.0f },
+                position = new[] { 0.0f, 0.0f, 0.0f },
+                rotation = new[] { 0.0f, 0.0f, 0.0f },
+                mass = 0.75f,
+                linearDamping = 0.0f,
+                angularDamping = 0.0f,
+                friction = 0.1f,
+                restitution = 0.0f,
+                group = 1,
+                mask = 0xffff,
+                physicsKind = "dynamic-orientation"
+            });
+
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            Assert.That(instance.PhysicsBodies, Has.Length.EqualTo(3));
+            MmdUnityPhysicsBody sphereBody = instance.PhysicsBodies[0];
+            Assert.That(sphereBody.transform.parent, Is.EqualTo(instance.BoneTransforms[1]));
+            Assert.That(sphereBody.transform.localPosition, Is.EqualTo(new Vector3(0.0f, 1.0f, -3.0f)));
+            Assert.That(sphereBody.ShapeType, Is.EqualTo("sphere"));
+            Assert.That(sphereBody.DescriptorSize, Is.EqualTo(new Vector3(0.25f, 0.0f, 0.0f)));
+            Assert.That(sphereBody.DescriptorPosition, Is.EqualTo(new Vector3(0.0f, 2.0f, 3.0f)));
+            Assert.That(sphereBody.DescriptorRotation, Is.EqualTo(Vector3.zero));
+            Assert.That(sphereBody.GetComponent<SphereCollider>().radius, Is.EqualTo(0.25f).Within(0.00001f));
+            Rigidbody sphereRigidbody = sphereBody.GetComponent<Rigidbody>();
+            Assert.That(sphereRigidbody.isKinematic, Is.True);
+            Assert.That(sphereRigidbody.useGravity, Is.False);
+            Assert.That(sphereRigidbody.detectCollisions, Is.False);
+            Assert.That(sphereRigidbody.mass, Is.EqualTo(1.5f).Within(0.00001f));
+            Assert.That(sphereRigidbody.linearDamping, Is.EqualTo(0.25f).Within(0.00001f));
+            Assert.That(sphereRigidbody.angularDamping, Is.EqualTo(0.75f).Within(0.00001f));
+            Assert.That(sphereBody.Friction, Is.EqualTo(0.4f).Within(0.00001f));
+            Assert.That(sphereBody.Restitution, Is.EqualTo(0.2f).Within(0.00001f));
+            Assert.That(sphereBody.CollisionGroup, Is.EqualTo(3));
+            Assert.That(sphereBody.CollisionMask, Is.EqualTo(0x000f));
+
+            BoxCollider boxCollider = instance.PhysicsBodies[1].GetComponent<BoxCollider>();
+            Assert.That(instance.PhysicsBodies[1].ShapeType, Is.EqualTo("box"));
+            Assert.That(instance.PhysicsBodies[1].DescriptorSize, Is.EqualTo(new Vector3(1.0f, 2.0f, 3.0f)));
+            Assert.That(instance.PhysicsBodies[1].DescriptorPosition, Is.EqualTo(new Vector3(1.0f, 0.0f, 0.0f)));
+            Assert.That(boxCollider.size, Is.EqualTo(new Vector3(2.0f, 4.0f, 6.0f)));
+            CapsuleCollider capsuleCollider = instance.PhysicsBodies[2].GetComponent<CapsuleCollider>();
+            Assert.That(instance.PhysicsBodies[2].ShapeType, Is.EqualTo("capsule"));
+            Assert.That(instance.PhysicsBodies[2].DescriptorSize, Is.EqualTo(new Vector3(0.5f, 2.0f, 0.0f)));
+            Assert.That(instance.PhysicsBodies[2].PhysicsKind, Is.EqualTo("dynamic-orientation"));
+            Assert.That(capsuleCollider.radius, Is.EqualTo(0.5f).Within(0.00001f));
+            Assert.That(capsuleCollider.height, Is.EqualTo(3.0f).Within(0.00001f));
+            Assert.That(capsuleCollider.direction, Is.EqualTo(1));
+            Assert.That(instance.PhysicsBodies[2].HasNativeTransform, Is.False);
         }
 
         [Test]
         public void CreateSkinnedModelParentsPhysicsBodiesByPmxBoneIndex()
         {
-            MmdUnityModelInstance? instance = null;
-            try
+
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.bones[0].index = 10;
+            model.bones[1].index = 20;
+            model.bones[1].parentIndex = 10;
+            foreach (MmdVertexDefinition vertex in model.vertices)
             {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                model.bones[0].index = 10;
-                model.bones[1].index = 20;
-                model.bones[1].parentIndex = 10;
-                foreach (MmdVertexDefinition vertex in model.vertices)
-                {
-                    vertex.boneIndices = new[] { 10 };
-                }
-
-                model.physics.rigidbodies.Add(new MmdRigidbodyDefinition
-                {
-                    index = 0,
-                    name = "non-contiguous child body",
-                    boneIndex = 20,
-                    boneName = "child",
-                    shapeType = "sphere",
-                    size = new[] { 0.25f, 0.0f, 0.0f },
-                    position = new[] { 0.0f, 2.0f, 0.0f },
-                    rotation = new[] { 0.0f, 0.0f, 0.0f },
-                    mass = 1.0f,
-                    linearDamping = 0.0f,
-                    angularDamping = 0.0f,
-                    friction = 0.5f,
-                    restitution = 0.0f,
-                    group = 0,
-                    mask = 0,
-                    physicsKind = "dynamic"
-                });
-
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
-
-                Assert.That(instance.BoneTransforms, Has.Length.EqualTo(2));
-                Assert.That(instance.BoneTransforms[1].name, Is.EqualTo("child"));
-                Assert.That(instance.PhysicsBodies[0].transform.parent, Is.EqualTo(instance.BoneTransforms[1]));
-                Assert.That(instance.PhysicsBodies[0].transform.localPosition, Is.EqualTo(new Vector3(0.0f, 1.0f, 0.0f)));
+                vertex.boneIndices = new[] { 10 };
             }
-            finally
+
+            model.physics.rigidbodies.Add(new MmdRigidbodyDefinition
             {
-                DestroyInstance(instance);
-            }
+                index = 0,
+                name = "non-contiguous child body",
+                boneIndex = 20,
+                boneName = "child",
+                shapeType = "sphere",
+                size = new[] { 0.25f, 0.0f, 0.0f },
+                position = new[] { 0.0f, 2.0f, 0.0f },
+                rotation = new[] { 0.0f, 0.0f, 0.0f },
+                mass = 1.0f,
+                linearDamping = 0.0f,
+                angularDamping = 0.0f,
+                friction = 0.5f,
+                restitution = 0.0f,
+                group = 0,
+                mask = 0,
+                physicsKind = "dynamic"
+            });
+
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            Assert.That(instance.BoneTransforms, Has.Length.EqualTo(2));
+            Assert.That(instance.BoneTransforms[1].name, Is.EqualTo("child"));
+            Assert.That(instance.PhysicsBodies[0].transform.parent, Is.EqualTo(instance.BoneTransforms[1]));
+            Assert.That(instance.PhysicsBodies[0].transform.localPosition, Is.EqualTo(new Vector3(0.0f, 1.0f, 0.0f)));
         }
 
         [Test]
         public void CreateStaticModelFromModelCreatesBoneTransformHierarchy()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
 
-                instance = MmdUnityModelFactory.CreateStaticModel(model);
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
 
-                Assert.That(instance.BoneTransforms, Has.Length.EqualTo(2));
-                Assert.That(instance.BoneTransforms[0].name, Is.EqualTo("root"));
-                Assert.That(instance.BoneTransforms[1].name, Is.EqualTo("child"));
-                Transform modelRoot = instance.Root.transform.Find("Model");
-                Assert.That(modelRoot, Is.Not.Null);
-                Assert.That(instance.BoneTransforms[0].parent, Is.EqualTo(modelRoot));
-                Assert.That(instance.BoneTransforms[1].parent, Is.EqualTo(instance.BoneTransforms[0]));
-                Assert.That(instance.BoneTransforms[0].localPosition, Is.EqualTo(Vector3.zero));
-                Assert.That(instance.BoneTransforms[1].localPosition, Is.EqualTo(new Vector3(0.0f, 1.0f, 0.0f)));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            Assert.That(instance.BoneTransforms, Has.Length.EqualTo(2));
+            Assert.That(instance.BoneTransforms[0].name, Is.EqualTo("root"));
+            Assert.That(instance.BoneTransforms[1].name, Is.EqualTo("child"));
+            Transform modelRoot = instance.Root.transform.Find("Model");
+            Assert.That(modelRoot, Is.Not.Null);
+            Assert.That(instance.BoneTransforms[0].parent, Is.EqualTo(modelRoot));
+            Assert.That(instance.BoneTransforms[1].parent, Is.EqualTo(instance.BoneTransforms[0]));
+            Assert.That(instance.BoneTransforms[0].localPosition, Is.EqualTo(Vector3.zero));
+            Assert.That(instance.BoneTransforms[1].localPosition, Is.EqualTo(new Vector3(0.0f, 1.0f, 0.0f)));
         }
 
         [Test]
         public void ApplyFrameUpdatesBoneTransformsFromBindPose()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                MmdUnityFrameApplier.ApplyFrame(instance, CreateFrame(
-                    CreateBonePose(0, "root", 1.0f, 2.0f, 3.0f),
-                    CreateBonePose(1, "child", 0.0f, 0.0f, 2.0f)));
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                Assert.That(instance.BoneTransforms[0].localPosition, Is.EqualTo(new Vector3(-1.0f, 2.0f, -3.0f)));
-                Assert.That(instance.BoneTransforms[1].localPosition, Is.EqualTo(new Vector3(0.0f, 1.0f, -2.0f)));
+            MmdUnityFrameApplier.ApplyFrame(instance, CreateFrame(
+                CreateBonePose(0, "root", 1.0f, 2.0f, 3.0f),
+                CreateBonePose(1, "child", 0.0f, 0.0f, 2.0f)));
 
-                MmdUnityFrameApplier.ApplyFrame(instance, CreateFrame(
-                    CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f),
-                    CreateBonePose(1, "child", 0.0f, 0.0f, 4.0f)));
+            Assert.That(instance.BoneTransforms[0].localPosition, Is.EqualTo(new Vector3(-1.0f, 2.0f, -3.0f)));
+            Assert.That(instance.BoneTransforms[1].localPosition, Is.EqualTo(new Vector3(0.0f, 1.0f, -2.0f)));
 
-                Assert.That(instance.BoneTransforms[0].localPosition, Is.EqualTo(Vector3.zero));
-                Assert.That(instance.BoneTransforms[1].localPosition, Is.EqualTo(new Vector3(0.0f, 1.0f, -4.0f)));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            MmdUnityFrameApplier.ApplyFrame(instance, CreateFrame(
+                CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f),
+                CreateBonePose(1, "child", 0.0f, 0.0f, 4.0f)));
+
+            Assert.That(instance.BoneTransforms[0].localPosition, Is.EqualTo(Vector3.zero));
+            Assert.That(instance.BoneTransforms[1].localPosition, Is.EqualTo(new Vector3(0.0f, 1.0f, -4.0f)));
         }
 
         [Test]
         public void ApplyFrameConvertsRotationAtUnityBoundary()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
-                Quaternion mmdRotation = Quaternion.Euler(10.0f, 20.0f, 30.0f);
-                Quaternion expectedUnityRotation = new Quaternion(
-                    -mmdRotation.x,
-                    mmdRotation.y,
-                    -mmdRotation.z,
-                    mmdRotation.w);
 
-                MmdUnityFrameApplier.ApplyFrame(instance, CreateFrame(new MmdEvaluatedBonePose
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
+            Quaternion mmdRotation = Quaternion.Euler(10.0f, 20.0f, 30.0f);
+            Quaternion expectedUnityRotation = new Quaternion(
+                -mmdRotation.x,
+                mmdRotation.y,
+                -mmdRotation.z,
+                mmdRotation.w);
+
+            MmdUnityFrameApplier.ApplyFrame(instance, CreateFrame(new MmdEvaluatedBonePose
+            {
+                index = 0,
+                name = "root",
+                localPosition = new[] { 0.0f, 0.0f, 0.0f },
+                localRotation = new[] { mmdRotation.x, mmdRotation.y, mmdRotation.z, mmdRotation.w },
+                localScale = new[] { 1.0f, 1.0f, 1.0f },
+                worldMatrix = new[]
                 {
-                    index = 0,
-                    name = "root",
-                    localPosition = new[] { 0.0f, 0.0f, 0.0f },
-                    localRotation = new[] { mmdRotation.x, mmdRotation.y, mmdRotation.z, mmdRotation.w },
-                    localScale = new[] { 1.0f, 1.0f, 1.0f },
-                    worldMatrix = new[]
-                    {
-                        1.0f, 0.0f, 0.0f, 0.0f,
-                        0.0f, 1.0f, 0.0f, 0.0f,
-                        0.0f, 0.0f, 1.0f, 0.0f,
-                        0.0f, 0.0f, 0.0f, 1.0f
-                    }
-                }));
+                    1.0f, 0.0f, 0.0f, 0.0f,
+                    0.0f, 1.0f, 0.0f, 0.0f,
+                    0.0f, 0.0f, 1.0f, 0.0f,
+                    0.0f, 0.0f, 0.0f, 1.0f
+                }
+            }));
 
-                Assert.That(Quaternion.Angle(instance.BoneTransforms[0].localRotation, expectedUnityRotation), Is.LessThan(0.0001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            Assert.That(Quaternion.Angle(instance.BoneTransforms[0].localRotation, expectedUnityRotation), Is.LessThan(0.0001f));
         }
 
         [Test]
         public void ApplyColumnMajorWorldMatricesConvertsHierarchyWorldPoseAtUnityBoundary()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
-                Quaternion rootMmdRotation = Quaternion.Euler(0.0f, 45.0f, 0.0f);
-                Quaternion childMmdRotation = Quaternion.Euler(15.0f, 30.0f, 10.0f);
-                float[] worldMatrices = Concatenate(
-                    CreateColumnMajorWorldMatrix(new Vector3(1.0f, 2.0f, 3.0f), rootMmdRotation),
-                    CreateColumnMajorWorldMatrix(new Vector3(-2.0f, 4.0f, 5.0f), childMmdRotation));
 
-                MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(instance, worldMatrices);
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
+            Quaternion rootMmdRotation = Quaternion.Euler(0.0f, 45.0f, 0.0f);
+            Quaternion childMmdRotation = Quaternion.Euler(15.0f, 30.0f, 10.0f);
+            float[] worldMatrices = Concatenate(
+                CreateColumnMajorWorldMatrix(new Vector3(1.0f, 2.0f, 3.0f), rootMmdRotation),
+                CreateColumnMajorWorldMatrix(new Vector3(-2.0f, 4.0f, 5.0f), childMmdRotation));
 
-                Assert.That(Vector3.Distance(instance.BoneTransforms[0].position, new Vector3(-1.0f, 2.0f, -3.0f)), Is.LessThan(0.0001f));
-                Assert.That(Vector3.Distance(instance.BoneTransforms[1].position, new Vector3(2.0f, 4.0f, -5.0f)), Is.LessThan(0.0001f));
-                Assert.That(Quaternion.Angle(instance.BoneTransforms[0].rotation, ToUnityModelRotation(rootMmdRotation)), Is.LessThan(0.0001f));
-                Assert.That(Quaternion.Angle(instance.BoneTransforms[1].rotation, ToUnityModelRotation(childMmdRotation)), Is.LessThan(0.0001f));
-                Assert.That(instance.BoneTransforms[1].parent, Is.EqualTo(instance.BoneTransforms[0]));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(instance, worldMatrices);
+
+            Assert.That(Vector3.Distance(instance.BoneTransforms[0].position, new Vector3(-1.0f, 2.0f, -3.0f)), Is.LessThan(0.0001f));
+            Assert.That(Vector3.Distance(instance.BoneTransforms[1].position, new Vector3(2.0f, 4.0f, -5.0f)), Is.LessThan(0.0001f));
+            Assert.That(Quaternion.Angle(instance.BoneTransforms[0].rotation, ToUnityModelRotation(rootMmdRotation)), Is.LessThan(0.0001f));
+            Assert.That(Quaternion.Angle(instance.BoneTransforms[1].rotation, ToUnityModelRotation(childMmdRotation)), Is.LessThan(0.0001f));
+            Assert.That(instance.BoneTransforms[1].parent, Is.EqualTo(instance.BoneTransforms[0]));
         }
 
         [Test]
         public void ApplyColumnMajorWorldMatricesScalesPositionOnlyWithImportScale()
         {
-            MmdUnityModelInstance? scaleOneInstance = null;
-            MmdUnityModelInstance? scalePointOneInstance = null;
-            try
-            {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                scaleOneInstance = MmdUnityModelFactory.CreateSkinnedModel(model, sourcePath: null, importScale: 1.0f);
-                scalePointOneInstance = MmdUnityModelFactory.CreateSkinnedModel(model, sourcePath: null, importScale: 0.1f);
-                Quaternion rootMmdRotation = Quaternion.Euler(0.0f, 45.0f, 0.0f);
-                Quaternion childMmdRotation = Quaternion.Euler(15.0f, 30.0f, 10.0f);
-                float[] worldMatrices = Concatenate(
-                    CreateColumnMajorWorldMatrix(new Vector3(1.0f, 2.0f, 3.0f), rootMmdRotation),
-                    CreateColumnMajorWorldMatrix(new Vector3(-2.0f, 4.0f, 5.0f), childMmdRotation));
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            using var scaleOneScope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model, sourcePath: null, importScale: 1.0f));
+            MmdUnityModelInstance scaleOneInstance = scaleOneScope.Instance;
+            using var scalePointOneScope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model, sourcePath: null, importScale: 0.1f));
+            MmdUnityModelInstance scalePointOneInstance = scalePointOneScope.Instance;
+            Quaternion rootMmdRotation = Quaternion.Euler(0.0f, 45.0f, 0.0f);
+            Quaternion childMmdRotation = Quaternion.Euler(15.0f, 30.0f, 10.0f);
+            float[] worldMatrices = Concatenate(
+                CreateColumnMajorWorldMatrix(new Vector3(1.0f, 2.0f, 3.0f), rootMmdRotation),
+                CreateColumnMajorWorldMatrix(new Vector3(-2.0f, 4.0f, 5.0f), childMmdRotation));
 
-                MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(scaleOneInstance, worldMatrices);
-                MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(scalePointOneInstance, worldMatrices);
+            MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(scaleOneInstance, worldMatrices);
+            MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(scalePointOneInstance, worldMatrices);
 
-                Assert.That(Vector3.Distance(scaleOneInstance.BoneTransforms[0].position, new Vector3(-1.0f, 2.0f, -3.0f)), Is.LessThan(0.0001f));
-                Assert.That(Vector3.Distance(scaleOneInstance.BoneTransforms[1].position, new Vector3(2.0f, 4.0f, -5.0f)), Is.LessThan(0.0001f));
-                Assert.That(Vector3.Distance(scalePointOneInstance.BoneTransforms[0].position, scaleOneInstance.BoneTransforms[0].position * 0.1f), Is.LessThan(0.0001f));
-                Assert.That(Vector3.Distance(scalePointOneInstance.BoneTransforms[1].position, scaleOneInstance.BoneTransforms[1].position * 0.1f), Is.LessThan(0.0001f));
-                Assert.That(Quaternion.Angle(scalePointOneInstance.BoneTransforms[0].rotation, scaleOneInstance.BoneTransforms[0].rotation), Is.LessThan(0.0001f));
-                Assert.That(Quaternion.Angle(scalePointOneInstance.BoneTransforms[1].rotation, scaleOneInstance.BoneTransforms[1].rotation), Is.LessThan(0.0001f));
-                Assert.That(scalePointOneInstance.BoneTransforms[0].localScale, Is.EqualTo(Vector3.one));
-                Assert.That(scalePointOneInstance.BoneTransforms[1].localScale, Is.EqualTo(Vector3.one));
-            }
-            finally
-            {
-                DestroyInstance(scaleOneInstance);
-                DestroyInstance(scalePointOneInstance);
-            }
+            Assert.That(Vector3.Distance(scaleOneInstance.BoneTransforms[0].position, new Vector3(-1.0f, 2.0f, -3.0f)), Is.LessThan(0.0001f));
+            Assert.That(Vector3.Distance(scaleOneInstance.BoneTransforms[1].position, new Vector3(2.0f, 4.0f, -5.0f)), Is.LessThan(0.0001f));
+            Assert.That(Vector3.Distance(scalePointOneInstance.BoneTransforms[0].position, scaleOneInstance.BoneTransforms[0].position * 0.1f), Is.LessThan(0.0001f));
+            Assert.That(Vector3.Distance(scalePointOneInstance.BoneTransforms[1].position, scaleOneInstance.BoneTransforms[1].position * 0.1f), Is.LessThan(0.0001f));
+            Assert.That(Quaternion.Angle(scalePointOneInstance.BoneTransforms[0].rotation, scaleOneInstance.BoneTransforms[0].rotation), Is.LessThan(0.0001f));
+            Assert.That(Quaternion.Angle(scalePointOneInstance.BoneTransforms[1].rotation, scaleOneInstance.BoneTransforms[1].rotation), Is.LessThan(0.0001f));
+            Assert.That(scalePointOneInstance.BoneTransforms[0].localScale, Is.EqualTo(Vector3.one));
+            Assert.That(scalePointOneInstance.BoneTransforms[1].localScale, Is.EqualTo(Vector3.one));
         }
 
         [Test]
         public void ApplyFrameRejectsBoneIndexWithoutUnityTransform()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                var ex = Assert.Throws<ArgumentException>(() =>
-                    MmdUnityFrameApplier.ApplyFrame(instance, CreateFrame(CreateBonePose(2, "missing", 0.0f, 0.0f, 0.0f))));
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                Assert.That(ex.Message, Does.Contain("no Unity bone transform"));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            var ex = Assert.Throws<ArgumentException>(() =>
+                MmdUnityFrameApplier.ApplyFrame(instance, CreateFrame(CreateBonePose(2, "missing", 0.0f, 0.0f, 0.0f))));
+
+            Assert.That(ex.Message, Does.Contain("no Unity bone transform"));
         }
 
         [Test]
         public void PlaybackBindingBuildsSnapshotAndAppliesFrameToSkinnedModel()
         {
-            MmdUnityPlaybackBinding? binding = null;
-            try
-            {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                MmdMotionDefinition motion = CreateRootTranslationMotion();
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            MmdMotionDefinition motion = CreateRootTranslationMotion();
 
-                binding = MmdUnityPlaybackBinding.CreateSkinned(model, motion, "model.pmx", "motion.vmd");
-                MmdPlaybackSnapshot snapshot = binding.ApplyFrame(frame: 10, frameRate: 30.0f);
+            MmdUnityPlaybackBinding binding = MmdUnityPlaybackBinding.CreateSkinned(model, motion, "model.pmx", "motion.vmd");
+            using var bindingScope = new MmdTestInstanceScope(binding.Instance);
+            MmdPlaybackSnapshot snapshot = binding.ApplyFrame(frame: 10, frameRate: 30.0f);
 
-                Assert.That(snapshot.model, Is.EqualTo("model.pmx"));
-                Assert.That(snapshot.motion, Is.EqualTo("motion.vmd"));
-                Assert.That(snapshot.frame.frame, Is.EqualTo(10));
-                Assert.That(snapshot.rendering, Is.SameAs(binding.Instance.RenderingDescriptor));
-                Assert.That(binding.Instance.SkinnedMeshRenderer, Is.Not.Null);
-                Assert.That(binding.Instance.BoneTransforms[0].localPosition, Is.EqualTo(new Vector3(-2.0f, 0.0f, 0.0f)));
-                Assert.That(binding.Instance.Root.transform.localScale, Is.EqualTo(Vector3.one));
-            }
-            finally
-            {
-                DestroyInstance(binding?.Instance);
-            }
+            Assert.That(snapshot.model, Is.EqualTo("model.pmx"));
+            Assert.That(snapshot.motion, Is.EqualTo("motion.vmd"));
+            Assert.That(snapshot.frame.frame, Is.EqualTo(10));
+            Assert.That(snapshot.rendering, Is.SameAs(binding.Instance.RenderingDescriptor));
+            Assert.That(binding.Instance.SkinnedMeshRenderer, Is.Not.Null);
+            Assert.That(binding.Instance.BoneTransforms[0].localPosition, Is.EqualTo(new Vector3(-2.0f, 0.0f, 0.0f)));
+            Assert.That(binding.Instance.Root.transform.localScale, Is.EqualTo(Vector3.one));
         }
 
         [Test]
         public void PlaybackBindingAppliesVertexMorphWeightsToSkinnedMeshWithoutAccumulation()
         {
-            MmdUnityPlaybackBinding? binding = null;
-            try
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.morphs.Add(new MmdMorphDefinition
             {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                model.morphs.Add(new MmdMorphDefinition
+                index = 0,
+                name = "blink",
+                type = "vertex",
+                panel = "eye",
+                vertexOffsets =
                 {
-                    index = 0,
-                    name = "blink",
-                    type = "vertex",
-                    panel = "eye",
-                    vertexOffsets =
+                    new MmdVertexMorphOffsetDefinition
                     {
-                        new MmdVertexMorphOffsetDefinition
-                        {
-                            vertexIndex = 1,
-                            positionDelta = new[] { 0.0f, 2.0f, 0.0f }
-                        }
+                        vertexIndex = 1,
+                        positionDelta = new[] { 0.0f, 2.0f, 0.0f }
                     }
-                });
+                }
+            });
 
-                binding = MmdUnityPlaybackBinding.CreateSkinned(model, CreateBlinkMorphMotion(), "morph-model.pmx", "blink.vmd");
+            MmdUnityPlaybackBinding binding = MmdUnityPlaybackBinding.CreateSkinned(model, CreateBlinkMorphMotion(), "morph-model.pmx", "blink.vmd");
+            using var bindingScope = new MmdTestInstanceScope(binding.Instance);
 
-                Assert.That(binding.Instance.SkinnedMeshRenderer, Is.Not.Null);
-                SkinnedMeshRenderer renderer = binding.Instance.SkinnedMeshRenderer!;
-                int blinkShapeIndex = binding.Instance.Mesh.GetBlendShapeIndex("blink");
-                Assert.That(blinkShapeIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(binding.Instance.SkinnedMeshRenderer, Is.Not.Null);
+            SkinnedMeshRenderer renderer = binding.Instance.SkinnedMeshRenderer!;
+            int blinkShapeIndex = binding.Instance.Mesh.GetBlendShapeIndex("blink");
+            Assert.That(blinkShapeIndex, Is.GreaterThanOrEqualTo(0));
 
-                binding.ApplyFrame(frame: 10, frameRate: 30.0f);
-                float morphedWeight = renderer.GetBlendShapeWeight(blinkShapeIndex);
-                Bounds morphedBounds = renderer.localBounds;
+            binding.ApplyFrame(frame: 10, frameRate: 30.0f);
+            float morphedWeight = renderer.GetBlendShapeWeight(blinkShapeIndex);
+            Bounds morphedBounds = renderer.localBounds;
 
-                binding.ApplyFrame(frame: 10, frameRate: 30.0f);
-                float repeatedWeight = renderer.GetBlendShapeWeight(blinkShapeIndex);
+            binding.ApplyFrame(frame: 10, frameRate: 30.0f);
+            float repeatedWeight = renderer.GetBlendShapeWeight(blinkShapeIndex);
 
-                binding.ApplyFrame(frame: 0, frameRate: 30.0f);
-                float restoredWeight = renderer.GetBlendShapeWeight(blinkShapeIndex);
+            binding.ApplyFrame(frame: 0, frameRate: 30.0f);
+            float restoredWeight = renderer.GetBlendShapeWeight(blinkShapeIndex);
 
-                Assert.That(morphedWeight, Is.EqualTo(100f).Within(0.001f));
-                Assert.That(morphedBounds.Contains(new Vector3(-1.0f, 2.0f, 0.0f)), Is.True);
-                Assert.That(repeatedWeight, Is.EqualTo(morphedWeight).Within(0.001f));
-                Assert.That(restoredWeight, Is.EqualTo(0f).Within(0.001f));
-                Assert.That(binding.Instance.RenderingDescriptor.vertices[1].position[1], Is.EqualTo(0.0f).Within(0.00001f));
-            }
-            finally
-            {
-                DestroyInstance(binding?.Instance);
-            }
+            Assert.That(morphedWeight, Is.EqualTo(100f).Within(0.001f));
+            Assert.That(morphedBounds.Contains(new Vector3(-1.0f, 2.0f, 0.0f)), Is.True);
+            Assert.That(repeatedWeight, Is.EqualTo(morphedWeight).Within(0.001f));
+            Assert.That(restoredWeight, Is.EqualTo(0f).Within(0.001f));
+            Assert.That(binding.Instance.RenderingDescriptor.vertices[1].position[1], Is.EqualTo(0.0f).Within(0.00001f));
         }
 
         [Test]
         public void CreateSkinnedModelSplitsSharedVerticesPerSubmeshAndDuplicatesMorphOffsets()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateSharedVertexTwoSubmeshMorphModel();
 
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
+            MmdModelDefinition model = CreateSharedVertexTwoSubmeshMorphModel();
 
-                Assert.That(instance.Mesh.vertexCount, Is.EqualTo(6));
-                Assert.That(instance.Mesh.subMeshCount, Is.EqualTo(2));
-                Assert.That(instance.Mesh.GetIndices(0), Is.EqualTo(new[] { 0, 1, 2 }));
-                Assert.That(instance.Mesh.GetIndices(1), Is.EqualTo(new[] { 3, 4, 5 }));
-                Assert.That(instance.RenderingDescriptor.vertices.Select(vertex => vertex.vertexIndex), Is.EqualTo(new[] { 0, 1, 2, 3, 4, 5 }));
-                Assert.That(instance.RenderingDescriptor.skinning[0].skinningMode, Is.EqualTo("sdef"));
-                Assert.That(instance.RenderingDescriptor.skinning[0].supportStatus, Is.EqualTo(MmdSkinningDescriptorBuilder.LinearFallbackStatus));
-                Assert.That(instance.RenderingDescriptor.skinning[0].linearFallbackToBoneWeights, Is.True);
-                Assert.That(instance.RenderingDescriptor.skinning[3].skinningMode, Is.EqualTo("sdef"));
-                Assert.That(instance.RenderingDescriptor.skinning[3].supportStatus, Is.EqualTo(MmdSkinningDescriptorBuilder.LinearFallbackStatus));
-                Assert.That(instance.RenderingDescriptor.skinning[3].linearFallbackToBoneWeights, Is.True);
-                Assert.That(instance.RenderingDescriptor.vertexMorphs[0].offsets.Select(offset => offset.vertexIndex), Is.EqualTo(new[] { 0, 3 }));
-                Assert.That(instance.Mesh.blendShapeCount, Is.EqualTo(1));
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "shared-up", weight = 1.0f });
-                MmdUnityFrameApplier.ApplyFrame(instance, frame);
+            Assert.That(instance.Mesh.vertexCount, Is.EqualTo(6));
+            Assert.That(instance.Mesh.subMeshCount, Is.EqualTo(2));
+            Assert.That(instance.Mesh.GetIndices(0), Is.EqualTo(new[] { 0, 1, 2 }));
+            Assert.That(instance.Mesh.GetIndices(1), Is.EqualTo(new[] { 3, 4, 5 }));
+            Assert.That(instance.RenderingDescriptor.vertices.Select(vertex => vertex.vertexIndex), Is.EqualTo(new[] { 0, 1, 2, 3, 4, 5 }));
+            Assert.That(instance.RenderingDescriptor.skinning[0].skinningMode, Is.EqualTo("sdef"));
+            Assert.That(instance.RenderingDescriptor.skinning[0].supportStatus, Is.EqualTo(MmdSkinningDescriptorBuilder.LinearFallbackStatus));
+            Assert.That(instance.RenderingDescriptor.skinning[0].linearFallbackToBoneWeights, Is.True);
+            Assert.That(instance.RenderingDescriptor.skinning[3].skinningMode, Is.EqualTo("sdef"));
+            Assert.That(instance.RenderingDescriptor.skinning[3].supportStatus, Is.EqualTo(MmdSkinningDescriptorBuilder.LinearFallbackStatus));
+            Assert.That(instance.RenderingDescriptor.skinning[3].linearFallbackToBoneWeights, Is.True);
+            Assert.That(instance.RenderingDescriptor.vertexMorphs[0].offsets.Select(offset => offset.vertexIndex), Is.EqualTo(new[] { 0, 3 }));
+            Assert.That(instance.Mesh.blendShapeCount, Is.EqualTo(1));
 
-                int sharedUpIndex = instance.Mesh.GetBlendShapeIndex("shared-up");
-                Assert.That(sharedUpIndex, Is.GreaterThanOrEqualTo(0));
-                Assert.That(instance.SkinnedMeshRenderer, Is.Not.Null);
-                SkinnedMeshRenderer renderer = instance.SkinnedMeshRenderer!;
-                Vector3[] deltaVertices = new Vector3[instance.Mesh.vertexCount];
-                Vector3[] deltaNormals = new Vector3[instance.Mesh.vertexCount];
-                Vector3[] deltaTangents = new Vector3[instance.Mesh.vertexCount];
-                instance.Mesh.GetBlendShapeFrameVertices(sharedUpIndex, 0, deltaVertices, deltaNormals, deltaTangents);
-                Assert.That(deltaVertices[0], Is.EqualTo(new Vector3(0.0f, 1.0f, 0.0f)));
-                Assert.That(deltaVertices[3], Is.EqualTo(new Vector3(0.0f, 1.0f, 0.0f)));
-                Assert.That(renderer.GetBlendShapeWeight(sharedUpIndex), Is.EqualTo(100f).Within(0.001f));
-                Assert.That(instance.Mesh.vertices[0], Is.EqualTo(new Vector3(0.0f, 0.0f, 0.0f)));
-                Assert.That(instance.Mesh.vertices[3], Is.EqualTo(new Vector3(0.0f, 0.0f, 0.0f)));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "shared-up", weight = 1.0f });
+            MmdUnityFrameApplier.ApplyFrame(instance, frame);
+
+            int sharedUpIndex = instance.Mesh.GetBlendShapeIndex("shared-up");
+            Assert.That(sharedUpIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(instance.SkinnedMeshRenderer, Is.Not.Null);
+            SkinnedMeshRenderer renderer = instance.SkinnedMeshRenderer!;
+            Vector3[] deltaVertices = new Vector3[instance.Mesh.vertexCount];
+            Vector3[] deltaNormals = new Vector3[instance.Mesh.vertexCount];
+            Vector3[] deltaTangents = new Vector3[instance.Mesh.vertexCount];
+            instance.Mesh.GetBlendShapeFrameVertices(sharedUpIndex, 0, deltaVertices, deltaNormals, deltaTangents);
+            Assert.That(deltaVertices[0], Is.EqualTo(new Vector3(0.0f, 1.0f, 0.0f)));
+            Assert.That(deltaVertices[3], Is.EqualTo(new Vector3(0.0f, 1.0f, 0.0f)));
+            Assert.That(renderer.GetBlendShapeWeight(sharedUpIndex), Is.EqualTo(100f).Within(0.001f));
+            Assert.That(instance.Mesh.vertices[0], Is.EqualTo(new Vector3(0.0f, 0.0f, 0.0f)));
+            Assert.That(instance.Mesh.vertices[3], Is.EqualTo(new Vector3(0.0f, 0.0f, 0.0f)));
         }
 
         [Test]
         public void VertexOnlyBlendShapeMorphFrameDoesNotUploadMeshVertices()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateSharedVertexTwoSubmeshMorphModel();
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                int sharedUpIndex = instance.Mesh.GetBlendShapeIndex("shared-up");
-                Assert.That(sharedUpIndex, Is.GreaterThanOrEqualTo(0));
-                Assert.That(instance.SkinnedMeshRenderer, Is.Not.Null);
-                SkinnedMeshRenderer renderer = instance.SkinnedMeshRenderer!;
+            MmdModelDefinition model = CreateSharedVertexTwoSubmeshMorphModel();
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "shared-up", weight = 1.0f });
+            int sharedUpIndex = instance.Mesh.GetBlendShapeIndex("shared-up");
+            Assert.That(sharedUpIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(instance.SkinnedMeshRenderer, Is.Not.Null);
+            SkinnedMeshRenderer renderer = instance.SkinnedMeshRenderer!;
 
-                MmdUnityMorphApplyTimingSummary timing = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame);
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "shared-up", weight = 1.0f });
 
-                Assert.That(timing.blendShapePathUsed, Is.True);
-                Assert.That(timing.meshUploadRequired, Is.False);
-                Assert.That(timing.setVerticesMs, Is.EqualTo(0.0));
-                Assert.That(timing.setUvsMs, Is.EqualTo(0.0));
-                Assert.That(timing.recalculateBoundsMs, Is.EqualTo(0.0));
-                Assert.That(renderer.GetBlendShapeWeight(sharedUpIndex), Is.EqualTo(100f).Within(0.001f));
-                Assert.That(instance.Mesh.vertices[0], Is.EqualTo(new Vector3(0.0f, 0.0f, 0.0f)));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            MmdUnityMorphApplyTimingSummary timing = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame);
+
+            Assert.That(timing.blendShapePathUsed, Is.True);
+            Assert.That(timing.meshUploadRequired, Is.False);
+            Assert.That(timing.setVerticesMs, Is.EqualTo(0.0));
+            Assert.That(timing.setUvsMs, Is.EqualTo(0.0));
+            Assert.That(timing.recalculateBoundsMs, Is.EqualTo(0.0));
+            Assert.That(renderer.GetBlendShapeWeight(sharedUpIndex), Is.EqualTo(100f).Within(0.001f));
+            Assert.That(instance.Mesh.vertices[0], Is.EqualTo(new Vector3(0.0f, 0.0f, 0.0f)));
         }
 
         [Test]
         public void BlendShapeVertexMorphWithTextureUvMorphReportsUvMeshUpload()
         {
-            MmdUnityModelInstance? instance = null;
-            try
+
+            MmdModelDefinition model = CreateTextureUvMorphTriangleModel();
+            model.morphs.Add(new MmdMorphDefinition
             {
-                MmdModelDefinition model = CreateTextureUvMorphTriangleModel();
-                model.morphs.Add(new MmdMorphDefinition
+                index = 1,
+                name = "blink",
+                type = "vertex",
+                panel = "eye",
+                vertexOffsets =
                 {
-                    index = 1,
-                    name = "blink",
-                    type = "vertex",
-                    panel = "eye",
-                    vertexOffsets =
+                    new MmdVertexMorphOffsetDefinition
                     {
-                        new MmdVertexMorphOffsetDefinition
-                        {
-                            vertexIndex = 1,
-                            positionDelta = new[] { 0.0f, 1.0f, 0.0f }
-                        }
+                        vertexIndex = 1,
+                        positionDelta = new[] { 0.0f, 1.0f, 0.0f }
                     }
-                });
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
+                }
+            });
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "blink", weight = 1.0f });
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "uv-shift", weight = 1.0f });
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "blink", weight = 1.0f });
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "uv-shift", weight = 1.0f });
 
-                MmdUnityMorphApplyTimingSummary timing = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame);
+            MmdUnityMorphApplyTimingSummary timing = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame);
 
-                Assert.That(timing.blendShapePathUsed, Is.True);
-                Assert.That(timing.meshUploadRequired, Is.True);
-                Assert.That(timing.setVerticesMs, Is.EqualTo(0.0));
-                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
-                Assert.That(renderer.GetBlendShapeWeight(instance.BlendShapeIndexMap["blink"]), Is.EqualTo(100f).Within(0.001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            Assert.That(timing.blendShapePathUsed, Is.True);
+            Assert.That(timing.meshUploadRequired, Is.True);
+            Assert.That(timing.setVerticesMs, Is.EqualTo(0.0));
+            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+            Assert.That(renderer.GetBlendShapeWeight(instance.BlendShapeIndexMap["blink"]), Is.EqualTo(100f).Within(0.001f));
         }
 
         [Test]
         public void BlendShapeBoundsUseLocalBoundsWithoutRecalculateForResolvedWeightsAboveOne()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateGroupMorphTriangleModel();
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "smile", weight = 1.0f });
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 0.5f });
+            MmdModelDefinition model = CreateGroupMorphTriangleModel();
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                MmdUnityMorphApplyTimingSummary timing = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame);
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "smile", weight = 1.0f });
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 0.5f });
 
-                Assert.That(timing.blendShapePathUsed, Is.True);
-                Assert.That(timing.localBoundsAssigned, Is.True);
-                Assert.That(timing.localBoundsSkipped, Is.False);
-                Assert.That(timing.recalculateBoundsMs, Is.EqualTo(0.0));
-                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
-                Assert.That(renderer.localBounds.Contains(new Vector3(-1.0f, 2.5f, 0.0f)), Is.True);
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            MmdUnityMorphApplyTimingSummary timing = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame);
+
+            Assert.That(timing.blendShapePathUsed, Is.True);
+            Assert.That(timing.localBoundsAssigned, Is.True);
+            Assert.That(timing.localBoundsSkipped, Is.False);
+            Assert.That(timing.recalculateBoundsMs, Is.EqualTo(0.0));
+            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+            Assert.That(renderer.localBounds.Contains(new Vector3(-1.0f, 2.5f, 0.0f)), Is.True);
         }
 
         [Test]
         public void BlendShapeLocalBoundsSkipWhenResolvedWeightsAreUnchanged()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateGroupMorphTriangleModel();
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "smile", weight = 1.0f });
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 0.5f });
+            MmdModelDefinition model = CreateGroupMorphTriangleModel();
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                MmdUnityMorphApplyTimingSummary first = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame);
-                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
-                Bounds firstBounds = renderer.localBounds;
-                MmdUnityMorphApplyTimingSummary second = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame);
-                Bounds secondBounds = renderer.localBounds;
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "smile", weight = 1.0f });
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 0.5f });
 
-                Assert.That(first.localBoundsAssigned, Is.True);
-                Assert.That(first.localBoundsSkipped, Is.False);
-                Assert.That(second.localBoundsAssigned, Is.False);
-                Assert.That(second.localBoundsSkipped, Is.True);
-                Assert.That(second.localBoundsAssignMs, Is.EqualTo(0.0));
-                Assert.That(secondBounds.center, Is.EqualTo(firstBounds.center));
-                Assert.That(secondBounds.size, Is.EqualTo(firstBounds.size));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            MmdUnityMorphApplyTimingSummary first = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame);
+            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+            Bounds firstBounds = renderer.localBounds;
+            MmdUnityMorphApplyTimingSummary second = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame);
+            Bounds secondBounds = renderer.localBounds;
+
+            Assert.That(first.localBoundsAssigned, Is.True);
+            Assert.That(first.localBoundsSkipped, Is.False);
+            Assert.That(second.localBoundsAssigned, Is.False);
+            Assert.That(second.localBoundsSkipped, Is.True);
+            Assert.That(second.localBoundsAssignMs, Is.EqualTo(0.0));
+            Assert.That(secondBounds.center, Is.EqualTo(firstBounds.center));
+            Assert.That(secondBounds.size, Is.EqualTo(firstBounds.size));
         }
 
         [Test]
         public void BlendShapeLocalBoundsRecalculateWhenResolvedWeightsChangeAfterSkip()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateGroupMorphTriangleModel();
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "smile", weight = 1.0f });
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 0.5f });
+            MmdModelDefinition model = CreateGroupMorphTriangleModel();
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame);
-                MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame);
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "smile", weight = 1.0f });
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 0.5f });
 
-                MmdEvaluatedFrame changed = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                changed.morphs.Add(new MmdEvaluatedMorphWeight { name = "smile", weight = 1.0f });
-                changed.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 1.0f });
-                MmdUnityMorphApplyTimingSummary timing = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, changed);
+            MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame);
+            MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame);
 
-                Assert.That(timing.localBoundsAssigned, Is.True);
-                Assert.That(timing.localBoundsSkipped, Is.False);
-                Assert.That(timing.recalculateBoundsMs, Is.EqualTo(0.0));
-                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
-                Assert.That(renderer.localBounds.Contains(new Vector3(-1.0f, 3.0f, 0.0f)), Is.True);
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            MmdEvaluatedFrame changed = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            changed.morphs.Add(new MmdEvaluatedMorphWeight { name = "smile", weight = 1.0f });
+            changed.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 1.0f });
+            MmdUnityMorphApplyTimingSummary timing = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, changed);
+
+            Assert.That(timing.localBoundsAssigned, Is.True);
+            Assert.That(timing.localBoundsSkipped, Is.False);
+            Assert.That(timing.recalculateBoundsMs, Is.EqualTo(0.0));
+            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+            Assert.That(renderer.localBounds.Contains(new Vector3(-1.0f, 3.0f, 0.0f)), Is.True);
         }
 
         [Test]
         public void DuplicateNameVertexMorphsBakeDistinctBlendShapesAndShareResolvedWeight()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateDuplicateNameVertexMorphModel();
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                Assert.That(instance.Mesh.blendShapeCount, Is.EqualTo(2));
-                Assert.That(instance.VertexMorphBlendShapes.Select(binding => binding.BlendShapeName), Is.EqualTo(new[] { "0:duplicate", "1:duplicate" }));
+            MmdModelDefinition model = CreateDuplicateNameVertexMorphModel();
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "duplicate", weight = 0.5f });
+            Assert.That(instance.Mesh.blendShapeCount, Is.EqualTo(2));
+            Assert.That(instance.VertexMorphBlendShapes.Select(binding => binding.BlendShapeName), Is.EqualTo(new[] { "0:duplicate", "1:duplicate" }));
 
-                MmdUnityFrameApplier.ApplyFrame(instance, frame);
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "duplicate", weight = 0.5f });
 
-                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
-                Assert.That(renderer.GetBlendShapeWeight(instance.VertexMorphBlendShapes[0].BlendShapeIndex), Is.EqualTo(50f).Within(0.001f));
-                Assert.That(renderer.GetBlendShapeWeight(instance.VertexMorphBlendShapes[1].BlendShapeIndex), Is.EqualTo(50f).Within(0.001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            MmdUnityFrameApplier.ApplyFrame(instance, frame);
+
+            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+            Assert.That(renderer.GetBlendShapeWeight(instance.VertexMorphBlendShapes[0].BlendShapeIndex), Is.EqualTo(50f).Within(0.001f));
+            Assert.That(renderer.GetBlendShapeWeight(instance.VertexMorphBlendShapes[1].BlendShapeIndex), Is.EqualTo(50f).Within(0.001f));
         }
 
         [Test]
         public void DuplicateVertexMorphOffsetsAggregateIntoBakedBlendShapeDelta()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateDuplicateOffsetVertexMorphModel();
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                int blendShapeIndex = instance.Mesh.GetBlendShapeIndex("stacked");
-                Assert.That(blendShapeIndex, Is.GreaterThanOrEqualTo(0));
+            MmdModelDefinition model = CreateDuplicateOffsetVertexMorphModel();
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                Vector3[] deltaVertices = new Vector3[instance.Mesh.vertexCount];
-                Vector3[] deltaNormals = new Vector3[instance.Mesh.vertexCount];
-                Vector3[] deltaTangents = new Vector3[instance.Mesh.vertexCount];
-                instance.Mesh.GetBlendShapeFrameVertices(blendShapeIndex, 0, deltaVertices, deltaNormals, deltaTangents);
+            int blendShapeIndex = instance.Mesh.GetBlendShapeIndex("stacked");
+            Assert.That(blendShapeIndex, Is.GreaterThanOrEqualTo(0));
 
-                Assert.That(deltaVertices[1], Is.EqualTo(new Vector3(0.0f, 1.0f, 0.0f)));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            Vector3[] deltaVertices = new Vector3[instance.Mesh.vertexCount];
+            Vector3[] deltaNormals = new Vector3[instance.Mesh.vertexCount];
+            Vector3[] deltaTangents = new Vector3[instance.Mesh.vertexCount];
+            instance.Mesh.GetBlendShapeFrameVertices(blendShapeIndex, 0, deltaVertices, deltaNormals, deltaTangents);
+
+            Assert.That(deltaVertices[1], Is.EqualTo(new Vector3(0.0f, 1.0f, 0.0f)));
         }
 
         [Test]
         public void ApplyFrameAppliesTextureUvMorphToMeshUv()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateTextureUvMorphTriangleModel();
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                // Step 1: Apply texture UV morph at weight 1.0.
-                MmdEvaluatedFrame frame1 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame1.morphs.Add(new MmdEvaluatedMorphWeight { name = "uv-shift", weight = 1.0f });
-                MmdUnityFrameApplier.ApplyFrame(instance, frame1);
-                Vector2[] uv1 = instance.Mesh.uv;
+            MmdModelDefinition model = CreateTextureUvMorphTriangleModel();
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                // Vertex 1 source UV moves by (0.25, 0.5), then is converted to Unity viewport UV.
-                Assert.That(uv1[1].x, Is.EqualTo(1.25f).Within(0.00001f));
-                Assert.That(uv1[1].y, Is.EqualTo(0.5f).Within(0.00001f));
-                // Unmorphed vertices keep base viewport UV.
-                Assert.That(uv1[0].x, Is.EqualTo(0.0f).Within(0.00001f));
-                Assert.That(uv1[0].y, Is.EqualTo(1.0f).Within(0.00001f));
-                Assert.That(uv1[2].x, Is.EqualTo(0.0f).Within(0.00001f));
-                Assert.That(uv1[2].y, Is.EqualTo(0.0f).Within(0.00001f));
+            // Step 1: Apply texture UV morph at weight 1.0.
+            MmdEvaluatedFrame frame1 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame1.morphs.Add(new MmdEvaluatedMorphWeight { name = "uv-shift", weight = 1.0f });
+            MmdUnityFrameApplier.ApplyFrame(instance, frame1);
+            Vector2[] uv1 = instance.Mesh.uv;
 
-                // Step 2: Apply the same frame again; UVs must not accumulate.
-                MmdUnityFrameApplier.ApplyFrame(instance, frame1);
-                Vector2[] uv2 = instance.Mesh.uv;
-                Assert.That(uv2[1].x, Is.EqualTo(uv1[1].x).Within(0.00001f));
-                Assert.That(uv2[1].y, Is.EqualTo(uv1[1].y).Within(0.00001f));
+            // Vertex 1 source UV moves by (0.25, 0.5), then is converted to Unity viewport UV.
+            Assert.That(uv1[1].x, Is.EqualTo(1.25f).Within(0.00001f));
+            Assert.That(uv1[1].y, Is.EqualTo(0.5f).Within(0.00001f));
+            // Unmorphed vertices keep base viewport UV.
+            Assert.That(uv1[0].x, Is.EqualTo(0.0f).Within(0.00001f));
+            Assert.That(uv1[0].y, Is.EqualTo(1.0f).Within(0.00001f));
+            Assert.That(uv1[2].x, Is.EqualTo(0.0f).Within(0.00001f));
+            Assert.That(uv1[2].y, Is.EqualTo(0.0f).Within(0.00001f));
 
-                // Step 3: Apply zero-weight frame to restore base UV.
-                MmdEvaluatedFrame frame0 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame0.morphs.Add(new MmdEvaluatedMorphWeight { name = "uv-shift", weight = 0.0f });
-                MmdUnityFrameApplier.ApplyFrame(instance, frame0);
-                Vector2[] uv0 = instance.Mesh.uv;
+            // Step 2: Apply the same frame again; UVs must not accumulate.
+            MmdUnityFrameApplier.ApplyFrame(instance, frame1);
+            Vector2[] uv2 = instance.Mesh.uv;
+            Assert.That(uv2[1].x, Is.EqualTo(uv1[1].x).Within(0.00001f));
+            Assert.That(uv2[1].y, Is.EqualTo(uv1[1].y).Within(0.00001f));
 
-                Assert.That(uv0[1].x, Is.EqualTo(1.0f).Within(0.00001f));
-                Assert.That(uv0[1].y, Is.EqualTo(1.0f).Within(0.00001f));
-                Assert.That(uv0[0].x, Is.EqualTo(0.0f).Within(0.00001f));
-                Assert.That(uv0[0].y, Is.EqualTo(1.0f).Within(0.00001f));
-                Assert.That(uv0[2].x, Is.EqualTo(0.0f).Within(0.00001f));
-                Assert.That(uv0[2].y, Is.EqualTo(0.0f).Within(0.00001f));
+            // Step 3: Apply zero-weight frame to restore base UV.
+            MmdEvaluatedFrame frame0 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame0.morphs.Add(new MmdEvaluatedMorphWeight { name = "uv-shift", weight = 0.0f });
+            MmdUnityFrameApplier.ApplyFrame(instance, frame0);
+            Vector2[] uv0 = instance.Mesh.uv;
 
-                // Step 4: Underlying descriptor base UVs are unchanged.
-                Assert.That(instance.RenderingDescriptor.vertices[1].uv[0], Is.EqualTo(1.0f).Within(0.00001f));
-                Assert.That(instance.RenderingDescriptor.vertices[1].uv[1], Is.EqualTo(0.0f).Within(0.00001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            Assert.That(uv0[1].x, Is.EqualTo(1.0f).Within(0.00001f));
+            Assert.That(uv0[1].y, Is.EqualTo(1.0f).Within(0.00001f));
+            Assert.That(uv0[0].x, Is.EqualTo(0.0f).Within(0.00001f));
+            Assert.That(uv0[0].y, Is.EqualTo(1.0f).Within(0.00001f));
+            Assert.That(uv0[2].x, Is.EqualTo(0.0f).Within(0.00001f));
+            Assert.That(uv0[2].y, Is.EqualTo(0.0f).Within(0.00001f));
+
+            // Step 4: Underlying descriptor base UVs are unchanged.
+            Assert.That(instance.RenderingDescriptor.vertices[1].uv[0], Is.EqualTo(1.0f).Within(0.00001f));
+            Assert.That(instance.RenderingDescriptor.vertices[1].uv[1], Is.EqualTo(0.0f).Within(0.00001f));
         }
 
         [Test]
         public void ApplyTextureUvMorphToSplitSkinnedModelMovesBothCopies()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateSharedVertexTwoSubmeshTextureUvMorphModel();
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                // Confirm split structure and duplicated UV morph offsets.
-                Assert.That(instance.Mesh.vertexCount, Is.EqualTo(6));
-                Assert.That(instance.Mesh.subMeshCount, Is.EqualTo(2));
-                Assert.That(
-                    instance.RenderingDescriptor.uvMorphs[0].offsets.Select(offset => offset.vertexIndex),
-                    Is.EqualTo(new[] { 0, 3 }));
+            MmdModelDefinition model = CreateSharedVertexTwoSubmeshTextureUvMorphModel();
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                // Apply texture UV morph at weight 1.0.
-                MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "uv-shift", weight = 1.0f });
-                MmdUnityFrameApplier.ApplyFrame(instance, frame);
-                Vector2[] uv = instance.Mesh.uv;
+            // Confirm split structure and duplicated UV morph offsets.
+            Assert.That(instance.Mesh.vertexCount, Is.EqualTo(6));
+            Assert.That(instance.Mesh.subMeshCount, Is.EqualTo(2));
+            Assert.That(
+                instance.RenderingDescriptor.uvMorphs[0].offsets.Select(offset => offset.vertexIndex),
+                Is.EqualTo(new[] { 0, 3 }));
 
-                // Both split copies of source vertex 0 should receive the same UV delta.
-                Assert.That(uv[0].x, Is.EqualTo(0.25f).Within(0.00001f));
-                Assert.That(uv[0].y, Is.EqualTo(0.5f).Within(0.00001f));
-                Assert.That(uv[3].x, Is.EqualTo(0.25f).Within(0.00001f));
-                Assert.That(uv[3].y, Is.EqualTo(0.5f).Within(0.00001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            // Apply texture UV morph at weight 1.0.
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "uv-shift", weight = 1.0f });
+            MmdUnityFrameApplier.ApplyFrame(instance, frame);
+            Vector2[] uv = instance.Mesh.uv;
+
+            // Both split copies of source vertex 0 should receive the same UV delta.
+            Assert.That(uv[0].x, Is.EqualTo(0.25f).Within(0.00001f));
+            Assert.That(uv[0].y, Is.EqualTo(0.5f).Within(0.00001f));
+            Assert.That(uv[3].x, Is.EqualTo(0.25f).Within(0.00001f));
+            Assert.That(uv[3].y, Is.EqualTo(0.5f).Within(0.00001f));
         }
 
         [Test]
         public void ExistingSkinnedModelRebindAssignsRuntimeOwnedMeshBeforeVertexMorphApplication()
         {
-            MmdUnityModelInstance? sceneInstance = null;
-            MmdUnityModelInstance? reboundInstance = null;
-            Mesh? originalMesh = null;
-            Mesh? reboundMesh = null;
-            try
+
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.morphs.Add(new MmdMorphDefinition
             {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                model.morphs.Add(new MmdMorphDefinition
+                index = 0,
+                name = "blink",
+                type = "vertex",
+                panel = "eye",
+                vertexOffsets =
                 {
-                    index = 0,
-                    name = "blink",
-                    type = "vertex",
-                    panel = "eye",
-                    vertexOffsets =
+                    new MmdVertexMorphOffsetDefinition
                     {
-                        new MmdVertexMorphOffsetDefinition
-                        {
-                            vertexIndex = 1,
-                            positionDelta = new[] { 0.0f, 2.0f, 0.0f }
-                        }
+                        vertexIndex = 1,
+                        positionDelta = new[] { 0.0f, 2.0f, 0.0f }
                     }
-                });
+                }
+            });
 
-                sceneInstance = MmdUnityModelFactory.CreateSkinnedModel(model);
-                originalMesh = sceneInstance.Mesh;
-                Vector3 originalVertex = originalMesh.vertices[1];
-                reboundInstance = MmdUnityModelFactory.CreateExistingSkinnedModelInstance(sceneInstance.Root, model, sourcePath: null);
-                reboundMesh = reboundInstance.Mesh;
-                MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "blink", weight = 1.0f });
+            using var sceneScope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance sceneInstance = sceneScope.Instance;
+            Mesh originalMesh = sceneInstance.Mesh;
+            Vector3 originalVertex = originalMesh.vertices[1];
+            MmdUnityModelInstance reboundInstance = MmdUnityModelFactory.CreateExistingSkinnedModelInstance(sceneInstance.Root, model, sourcePath: null);
+            Mesh reboundMesh = reboundInstance.Mesh;
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "blink", weight = 1.0f });
 
-                MmdUnityFrameApplier.ApplyFrame(reboundInstance, frame);
+            MmdUnityFrameApplier.ApplyFrame(reboundInstance, frame);
 
-                // Existing mesh is preserved (not rebuilt) when it is already valid.
-                Assert.That(reboundMesh, Is.SameAs(originalMesh),
-                    "existing valid mesh must be preserved, not rebuilt with a new mesh");
-                SkinnedMeshRenderer sceneRenderer = RequireSkinnedRenderer(sceneInstance);
-                Assert.That(sceneRenderer.sharedMesh, Is.SameAs(reboundMesh));
-                int blinkIndex = reboundMesh.GetBlendShapeIndex("blink");
-                Assert.That(blinkIndex, Is.GreaterThanOrEqualTo(0));
-                SkinnedMeshRenderer reboundRenderer = RequireSkinnedRenderer(reboundInstance);
-                Assert.That(reboundRenderer.GetBlendShapeWeight(blinkIndex), Is.EqualTo(100f).Within(0.001f));
-                Assert.That(originalMesh.vertices[1], Is.EqualTo(originalVertex));
-            }
-            finally
-            {
-                DestroyInstance(sceneInstance);
-                // No separate DestroyImmediate needed; sceneInstance owns originalMesh/reboundMesh.
-            }
+            // Existing mesh is preserved (not rebuilt) when it is already valid.
+            Assert.That(reboundMesh, Is.SameAs(originalMesh),
+                "existing valid mesh must be preserved, not rebuilt with a new mesh");
+            SkinnedMeshRenderer sceneRenderer = RequireSkinnedRenderer(sceneInstance);
+            Assert.That(sceneRenderer.sharedMesh, Is.SameAs(reboundMesh));
+            int blinkIndex = reboundMesh.GetBlendShapeIndex("blink");
+            Assert.That(blinkIndex, Is.GreaterThanOrEqualTo(0));
+            SkinnedMeshRenderer reboundRenderer = RequireSkinnedRenderer(reboundInstance);
+            Assert.That(reboundRenderer.GetBlendShapeWeight(blinkIndex), Is.EqualTo(100f).Within(0.001f));
+            Assert.That(originalMesh.vertices[1], Is.EqualTo(originalVertex));
         }
 
         [Test]
         public void ExistingSkinnedModelRebindAllowsRendererWithoutSharedMesh()
         {
-            MmdUnityModelInstance? sceneInstance = null;
-            MmdUnityModelInstance? reboundInstance = null;
-            Mesh? originalMesh = null;
-            Mesh? reboundMesh = null;
-            try
-            {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                sceneInstance = MmdUnityModelFactory.CreateSkinnedModel(model);
-                originalMesh = sceneInstance.Mesh;
-                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(sceneInstance);
-                renderer.sharedMesh = null;
 
-                reboundInstance = MmdUnityModelFactory.CreateExistingSkinnedModelInstance(sceneInstance.Root, model, sourcePath: null);
-                reboundMesh = reboundInstance.Mesh;
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            using var sceneScope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance sceneInstance = sceneScope.Instance;
+            Mesh originalMesh = sceneInstance.Mesh;
+            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(sceneInstance);
+            renderer.sharedMesh = null;
 
-                Assert.That(reboundMesh, Is.Not.Null);
-                Assert.That(reboundMesh, Is.Not.SameAs(originalMesh));
-                Assert.That(renderer.sharedMesh, Is.SameAs(reboundMesh));
-                Assert.That(reboundInstance.Root, Is.SameAs(sceneInstance.Root));
-                Assert.That(reboundInstance.SkinnedMeshRenderer, Is.SameAs(renderer));
-            }
-            finally
+            MmdUnityModelInstance reboundInstance = MmdUnityModelFactory.CreateExistingSkinnedModelInstance(sceneInstance.Root, model, sourcePath: null);
+            Mesh reboundMesh = reboundInstance.Mesh;
+
+            Assert.That(reboundMesh, Is.Not.Null);
+            Assert.That(reboundMesh, Is.Not.SameAs(originalMesh));
+            Assert.That(renderer.sharedMesh, Is.SameAs(reboundMesh));
+            Assert.That(reboundInstance.Root, Is.SameAs(sceneInstance.Root));
+            Assert.That(reboundInstance.SkinnedMeshRenderer, Is.SameAs(renderer));
+
+            if (reboundMesh != null && reboundMesh != originalMesh)
             {
-                DestroyInstance(sceneInstance);
-                if (reboundMesh != null && reboundMesh != originalMesh)
-                {
-                    UnityEngine.Object.DestroyImmediate(reboundMesh);
-                }
+                UnityEngine.Object.DestroyImmediate(reboundMesh);
             }
         }
 
         [Test]
         public void ExistingSkinnedModelRebindCollectsPhysicsBodiesFromControllerRoot()
         {
-            MmdUnityModelInstance? sceneInstance = null;
-            MmdUnityModelInstance? reboundInstance = null;
-            try
+
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.physics.rigidbodies.Add(new MmdRigidbodyDefinition
             {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                model.physics.rigidbodies.Add(new MmdRigidbodyDefinition
-                {
-                    index = 0,
-                    name = "child sphere",
-                    boneIndex = 1,
-                    boneName = "child",
-                    shapeType = "sphere",
-                    size = new[] { 0.25f, 0.0f, 0.0f },
-                    position = new[] { 0.0f, 1.0f, 0.0f },
-                    rotation = new[] { 0.0f, 0.0f, 0.0f },
-                    mass = 1.0f,
-                    linearDamping = 0.0f,
-                    angularDamping = 0.0f,
-                    friction = 0.0f,
-                    restitution = 0.0f,
-                    group = 0,
-                    mask = 0,
-                    physicsKind = "dynamic"
-                });
+                index = 0,
+                name = "child sphere",
+                boneIndex = 1,
+                boneName = "child",
+                shapeType = "sphere",
+                size = new[] { 0.25f, 0.0f, 0.0f },
+                position = new[] { 0.0f, 1.0f, 0.0f },
+                rotation = new[] { 0.0f, 0.0f, 0.0f },
+                mass = 1.0f,
+                linearDamping = 0.0f,
+                angularDamping = 0.0f,
+                friction = 0.0f,
+                restitution = 0.0f,
+                group = 0,
+                mask = 0,
+                physicsKind = "dynamic"
+            });
 
-                sceneInstance = MmdUnityModelFactory.CreateSkinnedModel(model);
-                SkinnedMeshRenderer originalRenderer = RequireSkinnedRenderer(sceneInstance);
-                GameObject rendererObject = new GameObject("Renderer");
-                rendererObject.transform.SetParent(originalRenderer.transform, worldPositionStays: false);
-                SkinnedMeshRenderer movedRenderer = rendererObject.AddComponent<SkinnedMeshRenderer>();
-                movedRenderer.sharedMesh = originalRenderer.sharedMesh;
-                movedRenderer.sharedMaterials = originalRenderer.sharedMaterials;
-                movedRenderer.bones = originalRenderer.bones;
-                movedRenderer.rootBone = originalRenderer.rootBone;
-                UnityEngine.Object.DestroyImmediate(originalRenderer);
+            using var sceneScope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance sceneInstance = sceneScope.Instance;
+            SkinnedMeshRenderer originalRenderer = RequireSkinnedRenderer(sceneInstance);
+            GameObject rendererObject = new GameObject("Renderer");
+            rendererObject.transform.SetParent(originalRenderer.transform, worldPositionStays: false);
+            SkinnedMeshRenderer movedRenderer = rendererObject.AddComponent<SkinnedMeshRenderer>();
+            movedRenderer.sharedMesh = originalRenderer.sharedMesh;
+            movedRenderer.sharedMaterials = originalRenderer.sharedMaterials;
+            movedRenderer.bones = originalRenderer.bones;
+            movedRenderer.rootBone = originalRenderer.rootBone;
+            UnityEngine.Object.DestroyImmediate(originalRenderer);
 
-                reboundInstance = MmdUnityModelFactory.CreateExistingSkinnedModelInstance(sceneInstance.Root, model, sourcePath: null);
+            MmdUnityModelInstance reboundInstance = MmdUnityModelFactory.CreateExistingSkinnedModelInstance(sceneInstance.Root, model, sourcePath: null);
 
-                Assert.That(reboundInstance.SkinnedMeshRenderer, Is.SameAs(movedRenderer));
-                Assert.That(reboundInstance.PhysicsBodies, Has.Length.EqualTo(1));
-                Assert.That(reboundInstance.PhysicsBodies[0].BodyIndex, Is.EqualTo(0));
-            }
-            finally
-            {
-                DestroyInstance(sceneInstance);
-            }
+            Assert.That(reboundInstance.SkinnedMeshRenderer, Is.SameAs(movedRenderer));
+            Assert.That(reboundInstance.PhysicsBodies, Has.Length.EqualTo(1));
+            Assert.That(reboundInstance.PhysicsBodies[0].BodyIndex, Is.EqualTo(0));
         }
 
         [Test]
         public void CreateStaticModelScalesMeshPositionsButNotNormalsOrRootScale()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                model.vertices[1].position = new[] { 1.0f, 0.0f, 2.0f };
-                model.vertices[1].normal = new[] { 0.0f, 0.0f, 1.0f };
 
-                instance = MmdUnityModelFactory.CreateStaticModel(model, sourcePath: null, importScale: 2.5f);
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.vertices[1].position = new[] { 1.0f, 0.0f, 2.0f };
+            model.vertices[1].normal = new[] { 0.0f, 0.0f, 1.0f };
 
-                Vector3[] vertices = instance.Mesh.vertices;
-                Vector3[] normals = instance.Mesh.normals;
-                // basis conv then * scale
-                Assert.That(vertices[1], Is.EqualTo(new Vector3(-2.5f, 0.0f, -5.0f)));
-                // normals only basis, no scale
-                Assert.That(normals[1], Is.EqualTo(new Vector3(0.0f, 0.0f, -1.0f)));
-                Assert.That(instance.Root.transform.localScale, Is.EqualTo(Vector3.one));
-                Transform modelRoot = instance.Root.transform.Find("Model");
-                Assert.That(modelRoot, Is.Not.Null);
-                Assert.That(modelRoot.localScale, Is.EqualTo(Vector3.one));
-                Assert.That(instance.ImportScale, Is.EqualTo(2.5f).Within(0.0001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(model, sourcePath: null, importScale: 2.5f));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            Vector3[] vertices = instance.Mesh.vertices;
+            Vector3[] normals = instance.Mesh.normals;
+            // basis conv then * scale
+            Assert.That(vertices[1], Is.EqualTo(new Vector3(-2.5f, 0.0f, -5.0f)));
+            // normals only basis, no scale
+            Assert.That(normals[1], Is.EqualTo(new Vector3(0.0f, 0.0f, -1.0f)));
+            Assert.That(instance.Root.transform.localScale, Is.EqualTo(Vector3.one));
+            Transform modelRoot = instance.Root.transform.Find("Model");
+            Assert.That(modelRoot, Is.Not.Null);
+            Assert.That(modelRoot.localScale, Is.EqualTo(Vector3.one));
+            Assert.That(instance.ImportScale, Is.EqualTo(2.5f).Within(0.0001f));
         }
 
         [Test]
         public void CreateSkinnedModelBoneBindPositionsAndFrameTranslationDeltasUseSameImportScaleWithoutAccumulation()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                // child origin at (0,1,0) in MMD
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model, sourcePath: null, importScale: 0.5f);
 
-                // bind local for child: ToUnity( (0,1,0) - (0,0,0) ) * 0.5 = (0,0.5,0)
-                Assert.That(instance.BoneTransforms[1].localPosition, Is.EqualTo(new Vector3(0.0f, 0.5f, 0.0f)));
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            // child origin at (0,1,0) in MMD
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model, sourcePath: null, importScale: 0.5f));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                // apply delta (0,2,0) MMD -> basis (0,2,0)*0.5 = (0,1,0) added to bind
-                MmdUnityFrameApplier.ApplyFrame(instance, CreateFrame(
-                    CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f),
-                    CreateBonePose(1, "child", 0.0f, 2.0f, 0.0f)));
+            // bind local for child: ToUnity( (0,1,0) - (0,0,0) ) * 0.5 = (0,0.5,0)
+            Assert.That(instance.BoneTransforms[1].localPosition, Is.EqualTo(new Vector3(0.0f, 0.5f, 0.0f)));
 
-                Assert.That(instance.BoneTransforms[1].localPosition, Is.EqualTo(new Vector3(0.0f, 1.5f, 0.0f)));
+            // apply delta (0,2,0) MMD -> basis (0,2,0)*0.5 = (0,1,0) added to bind
+            MmdUnityFrameApplier.ApplyFrame(instance, CreateFrame(
+                CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f),
+                CreateBonePose(1, "child", 0.0f, 2.0f, 0.0f)));
 
-                // re-apply zero delta, back to bind (no accum)
-                MmdUnityFrameApplier.ApplyFrame(instance, CreateFrame(
-                    CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f),
-                    CreateBonePose(1, "child", 0.0f, 0.0f, 0.0f)));
+            Assert.That(instance.BoneTransforms[1].localPosition, Is.EqualTo(new Vector3(0.0f, 1.5f, 0.0f)));
 
-                Assert.That(instance.BoneTransforms[1].localPosition, Is.EqualTo(new Vector3(0.0f, 0.5f, 0.0f)));
-                Assert.That(instance.ImportScale, Is.EqualTo(0.5f).Within(0.0001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            // re-apply zero delta, back to bind (no accum)
+            MmdUnityFrameApplier.ApplyFrame(instance, CreateFrame(
+                CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f),
+                CreateBonePose(1, "child", 0.0f, 0.0f, 0.0f)));
+
+            Assert.That(instance.BoneTransforms[1].localPosition, Is.EqualTo(new Vector3(0.0f, 0.5f, 0.0f)));
+            Assert.That(instance.ImportScale, Is.EqualTo(0.5f).Within(0.0001f));
         }
 
         [Test]
         public void CreateSkinnedModelVertexMorphAndBlendShapePositionDeltasScaleWithImportScale()
         {
-            MmdUnityModelInstance? instance = null;
-            try
+
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.morphs.Add(new MmdMorphDefinition
             {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                model.morphs.Add(new MmdMorphDefinition
+                index = 0,
+                name = "up",
+                type = "vertex",
+                panel = "eye",
+                vertexOffsets =
                 {
-                    index = 0,
-                    name = "up",
-                    type = "vertex",
-                    panel = "eye",
-                    vertexOffsets =
+                    new MmdVertexMorphOffsetDefinition
                     {
-                        new MmdVertexMorphOffsetDefinition
-                        {
-                            vertexIndex = 1,
-                            positionDelta = new[] { 0.0f, 4.0f, 0.0f }
-                        }
+                        vertexIndex = 1,
+                        positionDelta = new[] { 0.0f, 4.0f, 0.0f }
                     }
-                });
+                }
+            });
 
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model, sourcePath: null, importScale: 0.1f);
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model, sourcePath: null, importScale: 0.1f));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                int upIndex = instance.Mesh.GetBlendShapeIndex("up");
-                Assert.That(upIndex, Is.GreaterThanOrEqualTo(0));
+            int upIndex = instance.Mesh.GetBlendShapeIndex("up");
+            Assert.That(upIndex, Is.GreaterThanOrEqualTo(0));
 
-                Vector3[] deltaVertices = new Vector3[instance.Mesh.vertexCount];
-                Vector3[] deltaNormals = new Vector3[instance.Mesh.vertexCount];
-                Vector3[] deltaTangents = new Vector3[instance.Mesh.vertexCount];
-                instance.Mesh.GetBlendShapeFrameVertices(upIndex, 0, deltaVertices, deltaNormals, deltaTangents);
+            Vector3[] deltaVertices = new Vector3[instance.Mesh.vertexCount];
+            Vector3[] deltaNormals = new Vector3[instance.Mesh.vertexCount];
+            Vector3[] deltaTangents = new Vector3[instance.Mesh.vertexCount];
+            instance.Mesh.GetBlendShapeFrameVertices(upIndex, 0, deltaVertices, deltaNormals, deltaTangents);
 
-                // delta (0,4,0) MMD -> basis (0,4,0) * 0.1 = (0, 0.4, 0)
-                Assert.That(deltaVertices[1], Is.EqualTo(new Vector3(0.0f, 0.4f, 0.0f)));
+            // delta (0,4,0) MMD -> basis (0,4,0) * 0.1 = (0, 0.4, 0)
+            Assert.That(deltaVertices[1], Is.EqualTo(new Vector3(0.0f, 0.4f, 0.0f)));
 
-                // apply and check
-                MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "up", weight = 1.0f });
-                MmdUnityFrameApplier.ApplyFrame(instance, frame);
+            // apply and check
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "up", weight = 1.0f });
+            MmdUnityFrameApplier.ApplyFrame(instance, frame);
 
-                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
-                Assert.That(renderer.GetBlendShapeWeight(upIndex), Is.EqualTo(100f).Within(0.001f));
-                // descriptor remains unscaled
-                Assert.That(instance.RenderingDescriptor.vertices[1].position[1], Is.EqualTo(0.0f).Within(0.00001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+            Assert.That(renderer.GetBlendShapeWeight(upIndex), Is.EqualTo(100f).Within(0.001f));
+            // descriptor remains unscaled
+            Assert.That(instance.RenderingDescriptor.vertices[1].position[1], Is.EqualTo(0.0f).Within(0.00001f));
         }
 
         [Test]
         public void CreateSkinnedModelPhysicsDebugBodyAndColliderScaleWhileDescriptorMetadataUnscaled()
         {
-            MmdUnityModelInstance? instance = null;
-            try
+
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.physics.rigidbodies.Add(new MmdRigidbodyDefinition
             {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                model.physics.rigidbodies.Add(new MmdRigidbodyDefinition
-                {
-                    index = 0,
-                    name = "test-body",
-                    boneIndex = 1,
-                    boneName = "child",
-                    shapeType = "sphere",
-                    size = new[] { 0.5f, 0.0f, 0.0f },
-                    position = new[] { 0.0f, 2.0f, 0.0f },
-                    rotation = new[] { 0.0f, 0.0f, 0.0f },
-                    mass = 1.0f,
-                    linearDamping = 0.0f,
-                    angularDamping = 0.0f,
-                    friction = 0.0f,
-                    restitution = 0.0f,
-                    group = 0,
-                    mask = 0,
-                    physicsKind = "dynamic"
-                });
+                index = 0,
+                name = "test-body",
+                boneIndex = 1,
+                boneName = "child",
+                shapeType = "sphere",
+                size = new[] { 0.5f, 0.0f, 0.0f },
+                position = new[] { 0.0f, 2.0f, 0.0f },
+                rotation = new[] { 0.0f, 0.0f, 0.0f },
+                mass = 1.0f,
+                linearDamping = 0.0f,
+                angularDamping = 0.0f,
+                friction = 0.0f,
+                restitution = 0.0f,
+                group = 0,
+                mask = 0,
+                physicsKind = "dynamic"
+            });
 
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model, sourcePath: null, importScale: 0.2f);
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model, sourcePath: null, importScale: 0.2f));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                Assert.That(instance.PhysicsBodies, Has.Length.EqualTo(1));
-                MmdUnityPhysicsBody body = instance.PhysicsBodies[0];
-                // local pos: body(0,2,0) - bone origin child(0,1,0) = (0,1,0) MMD basis -> (0,1,0)*0.2 = (0,0.2,0)
-                Assert.That(body.transform.localPosition, Is.EqualTo(new Vector3(0.0f, 0.2f, 0.0f)));
-                SphereCollider collider = body.GetComponent<SphereCollider>();
-                Assert.That(collider.radius, Is.EqualTo(0.1f).Within(0.00001f)); // 0.5 * 0.2
+            Assert.That(instance.PhysicsBodies, Has.Length.EqualTo(1));
+            MmdUnityPhysicsBody body = instance.PhysicsBodies[0];
+            // local pos: body(0,2,0) - bone origin child(0,1,0) = (0,1,0) MMD basis -> (0,1,0)*0.2 = (0,0.2,0)
+            Assert.That(body.transform.localPosition, Is.EqualTo(new Vector3(0.0f, 0.2f, 0.0f)));
+            SphereCollider collider = body.GetComponent<SphereCollider>();
+            Assert.That(collider.radius, Is.EqualTo(0.1f).Within(0.00001f)); // 0.5 * 0.2
 
-                // descriptor metadata unscaled
-                Assert.That(body.DescriptorSize, Is.EqualTo(new Vector3(0.5f, 0.0f, 0.0f)));
-                Assert.That(body.DescriptorPosition, Is.EqualTo(new Vector3(0.0f, 2.0f, 0.0f)));
-                Assert.That(instance.ImportScale, Is.EqualTo(0.2f).Within(0.0001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            // descriptor metadata unscaled
+            Assert.That(body.DescriptorSize, Is.EqualTo(new Vector3(0.5f, 0.0f, 0.0f)));
+            Assert.That(body.DescriptorPosition, Is.EqualTo(new Vector3(0.0f, 2.0f, 0.0f)));
+            Assert.That(instance.ImportScale, Is.EqualTo(0.2f).Within(0.0001f));
         }
 
         private static MmdModelDefinition CreateMinimalTriangleModel(bool includeTextureReferences)
@@ -2596,12 +2252,6 @@ namespace Mmd.Tests
             return model;
         }
 
-        private static string CreateTempDirectory()
-        {
-            string tempRoot = Path.Combine(Path.GetTempPath(), "yohawing-mmd-unity-tests", Path.GetRandomFileName());
-            Directory.CreateDirectory(tempRoot);
-            return tempRoot;
-        }
 
         private static void WritePng(string path, Color color)
         {
@@ -3055,605 +2705,515 @@ namespace Mmd.Tests
         [Test]
         public void ApplyFrameExpandsGroupMorphWeightToTargetVertexMorph()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateGroupMorphTriangleModel();
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                // Frame with group morph weight only, no direct vertex morph weight.
-                MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 1.0f });
+            MmdModelDefinition model = CreateGroupMorphTriangleModel();
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                MmdUnityFrameApplier.ApplyFrame(instance, frame);
+            // Frame with group morph weight only, no direct vertex morph weight.
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 1.0f });
 
-                // groupWeight(1.0) * offsetWeight(0.5) = resolved smile weight 0.5 -> BlendShape 50f
-                int smileIndex = instance.Mesh.GetBlendShapeIndex("smile");
-                Assert.That(smileIndex, Is.GreaterThanOrEqualTo(0));
-                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
-                Assert.That(renderer.GetBlendShapeWeight(smileIndex), Is.EqualTo(50f).Within(0.001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            MmdUnityFrameApplier.ApplyFrame(instance, frame);
+
+            // groupWeight(1.0) * offsetWeight(0.5) = resolved smile weight 0.5 -> BlendShape 50f
+            int smileIndex = instance.Mesh.GetBlendShapeIndex("smile");
+            Assert.That(smileIndex, Is.GreaterThanOrEqualTo(0));
+            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+            Assert.That(renderer.GetBlendShapeWeight(smileIndex), Is.EqualTo(50f).Within(0.001f));
         }
 
         [Test]
         public void FastRuntimeMorphFrameDoesNotReExpandNativeResolvedGroupMorphWeights()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateGroupMorphTriangleModel();
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                int smileIndex = instance.Mesh.GetBlendShapeIndex("smile");
-                Assert.That(smileIndex, Is.GreaterThanOrEqualTo(0));
+            MmdModelDefinition model = CreateGroupMorphTriangleModel();
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                // Reproduce the native fast-runtime morph weight array for a VMD that drives the GROUP
-                // morph "happy-face" at 1.0. RuntimeInstance::expand_group_morphs writes the expanded
-                // member weight into "smile" (1.0 * 0.5 = 0.5) AND leaves the group morph's own weight
-                // (1.0) in the array; the fast binding feeds BOTH into the applier.
-                MmdEvaluatedFrame fastFrame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                fastFrame.morphs.Add(new MmdEvaluatedMorphWeight { name = "smile", weight = 0.5f });
-                fastFrame.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 1.0f });
+            int smileIndex = instance.Mesh.GetBlendShapeIndex("smile");
+            Assert.That(smileIndex, Is.GreaterThanOrEqualTo(0));
 
-                // Fast path: group morphs are already resolved by the native runtime, so the applier
-                // must NOT expand them again. The native-resolved smile weight stays 0.5 -> BlendShape 50f.
-                MmdUnityFrameApplier.ApplyMorphs(instance, fastFrame, groupMorphsResolvedExternally: true);
-                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
-                Assert.That(
-                    renderer.GetBlendShapeWeight(smileIndex),
-                    Is.EqualTo(50f).Within(0.001f),
-                    "Fast path must apply the native-resolved member weight as-is, not re-expand the group.");
+            // Reproduce the native fast-runtime morph weight array for a VMD that drives the GROUP
+            // morph "happy-face" at 1.0. RuntimeInstance::expand_group_morphs writes the expanded
+            // member weight into "smile" (1.0 * 0.5 = 0.5) AND leaves the group morph's own weight
+            // (1.0) in the array; the fast binding feeds BOTH into the applier.
+            MmdEvaluatedFrame fastFrame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            fastFrame.morphs.Add(new MmdEvaluatedMorphWeight { name = "smile", weight = 0.5f });
+            fastFrame.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 1.0f });
 
-                // Regression guard: the default (managed) resolution WOULD re-expand the residual group
-                // weight, doubling "smile" to 1.0 -> BlendShape 100f. That over-driven blend shape is
-                // exactly the bug the fast path must avoid.
-                MmdUnityFrameApplier.ApplyMorphs(instance, fastFrame);
-                Assert.That(
-                    renderer.GetBlendShapeWeight(smileIndex),
-                    Is.EqualTo(100f).Within(0.001f),
-                    "Managed group resolution double-applies an already-resolved group weight (documents the bug).");
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            // Fast path: group morphs are already resolved by the native runtime, so the applier
+            // must NOT expand them again. The native-resolved smile weight stays 0.5 -> BlendShape 50f.
+            MmdUnityFrameApplier.ApplyMorphs(instance, fastFrame, groupMorphsResolvedExternally: true);
+            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+            Assert.That(
+                renderer.GetBlendShapeWeight(smileIndex),
+                Is.EqualTo(50f).Within(0.001f),
+                "Fast path must apply the native-resolved member weight as-is, not re-expand the group.");
+
+            // Regression guard: the default (managed) resolution WOULD re-expand the residual group
+            // weight, doubling "smile" to 1.0 -> BlendShape 100f. That over-driven blend shape is
+            // exactly the bug the fast path must avoid.
+            MmdUnityFrameApplier.ApplyMorphs(instance, fastFrame);
+            Assert.That(
+                renderer.GetBlendShapeWeight(smileIndex),
+                Is.EqualTo(100f).Within(0.001f),
+                "Managed group resolution double-applies an already-resolved group weight (documents the bug).");
         }
 
         [Test]
         public void ApplyFrameSumsDirectVertexWeightAndGroupContribution()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateGroupMorphTriangleModel();
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                // Frame with both direct vertex morph weight and group morph weight.
-                // Direct "smile" at 1.0 + group "happy-face" at 0.5 targeting "smile" with offset 0.5.
-                // Final smile weight = 1.0 + 0.5 * 0.5 = 1.25
-                MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "smile", weight = 1.0f });
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 0.5f });
+            MmdModelDefinition model = CreateGroupMorphTriangleModel();
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                MmdUnityFrameApplier.ApplyFrame(instance, frame);
+            // Frame with both direct vertex morph weight and group morph weight.
+            // Direct "smile" at 1.0 + group "happy-face" at 0.5 targeting "smile" with offset 0.5.
+            // Final smile weight = 1.0 + 0.5 * 0.5 = 1.25
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "smile", weight = 1.0f });
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 0.5f });
 
-                // smile(1.0) + happy-face(0.5) * 0.5 = resolved smile 1.25 -> BlendShape 125f
-                int smileIndex = instance.Mesh.GetBlendShapeIndex("smile");
-                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
-                Assert.That(renderer.GetBlendShapeWeight(smileIndex), Is.EqualTo(125f).Within(0.001f));
-                Assert.That(renderer.localBounds.Contains(new Vector3(-1.0f, 2.5f, 0.0f)), Is.True);
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            MmdUnityFrameApplier.ApplyFrame(instance, frame);
+
+            // smile(1.0) + happy-face(0.5) * 0.5 = resolved smile 1.25 -> BlendShape 125f
+            int smileIndex = instance.Mesh.GetBlendShapeIndex("smile");
+            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+            Assert.That(renderer.GetBlendShapeWeight(smileIndex), Is.EqualTo(125f).Within(0.001f));
+            Assert.That(renderer.localBounds.Contains(new Vector3(-1.0f, 2.5f, 0.0f)), Is.True);
         }
 
         [Test]
         public void RepeatedApplyFrameDoesNotAccumulateGroupMorphDeltas()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateGroupMorphTriangleModel();
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 1.0f });
+            MmdModelDefinition model = CreateGroupMorphTriangleModel();
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                int smileIndex = instance.Mesh.GetBlendShapeIndex("smile");
-                Assert.That(smileIndex, Is.GreaterThanOrEqualTo(0));
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 1.0f });
 
-                // First apply.
-                MmdUnityFrameApplier.ApplyFrame(instance, frame);
-                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
-                float firstWeight = renderer.GetBlendShapeWeight(smileIndex);
+            int smileIndex = instance.Mesh.GetBlendShapeIndex("smile");
+            Assert.That(smileIndex, Is.GreaterThanOrEqualTo(0));
 
-                // Second apply of the same frame.
-                MmdUnityFrameApplier.ApplyFrame(instance, frame);
-                float secondWeight = renderer.GetBlendShapeWeight(smileIndex);
+            // First apply.
+            MmdUnityFrameApplier.ApplyFrame(instance, frame);
+            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+            float firstWeight = renderer.GetBlendShapeWeight(smileIndex);
 
-                // groupWeight(1.0) * offsetWeight(0.5) = 0.5 -> BlendShape 50f; must not accumulate
-                Assert.That(firstWeight, Is.EqualTo(50f).Within(0.001f));
-                Assert.That(secondWeight, Is.EqualTo(firstWeight).Within(0.001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            // Second apply of the same frame.
+            MmdUnityFrameApplier.ApplyFrame(instance, frame);
+            float secondWeight = renderer.GetBlendShapeWeight(smileIndex);
+
+            // groupWeight(1.0) * offsetWeight(0.5) = 0.5 -> BlendShape 50f; must not accumulate
+            Assert.That(firstWeight, Is.EqualTo(50f).Within(0.001f));
+            Assert.That(secondWeight, Is.EqualTo(firstWeight).Within(0.001f));
         }
 
         [Test]
         public void ZeroGroupMorphWeightRestoresBaseShape()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateGroupMorphTriangleModel();
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                int smileIndex = instance.Mesh.GetBlendShapeIndex("smile");
-                Assert.That(smileIndex, Is.GreaterThanOrEqualTo(0));
+            MmdModelDefinition model = CreateGroupMorphTriangleModel();
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                // Apply with group morph weight.
-                MmdEvaluatedFrame frame1 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame1.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 1.0f });
-                MmdUnityFrameApplier.ApplyFrame(instance, frame1);
-                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
-                Assert.That(renderer.GetBlendShapeWeight(smileIndex), Is.EqualTo(50f).Within(0.001f));
+            int smileIndex = instance.Mesh.GetBlendShapeIndex("smile");
+            Assert.That(smileIndex, Is.GreaterThanOrEqualTo(0));
 
-                // Apply with zero group morph weight.
-                MmdEvaluatedFrame frame0 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame0.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 0.0f });
-                MmdUnityFrameApplier.ApplyFrame(instance, frame0);
+            // Apply with group morph weight.
+            MmdEvaluatedFrame frame1 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame1.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 1.0f });
+            MmdUnityFrameApplier.ApplyFrame(instance, frame1);
+            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+            Assert.That(renderer.GetBlendShapeWeight(smileIndex), Is.EqualTo(50f).Within(0.001f));
 
-                Assert.That(renderer.GetBlendShapeWeight(smileIndex), Is.EqualTo(0f).Within(0.001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            // Apply with zero group morph weight.
+            MmdEvaluatedFrame frame0 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame0.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 0.0f });
+            MmdUnityFrameApplier.ApplyFrame(instance, frame0);
+
+            Assert.That(renderer.GetBlendShapeWeight(smileIndex), Is.EqualTo(0f).Within(0.001f));
         }
 
         [Test]
         public void ApplyFrameWithGroupMorphOnSplitSkinnedModelMovesBothCopies()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateSplitGroupMorphModel();
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                Assert.That(instance.Mesh.vertexCount, Is.EqualTo(6));
-                Assert.That(instance.Mesh.subMeshCount, Is.EqualTo(2));
+            MmdModelDefinition model = CreateSplitGroupMorphModel();
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                // Frame with group morph weight only.
-                MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 1.0f });
+            Assert.That(instance.Mesh.vertexCount, Is.EqualTo(6));
+            Assert.That(instance.Mesh.subMeshCount, Is.EqualTo(2));
 
-                MmdUnityFrameApplier.ApplyFrame(instance, frame);
+            // Frame with group morph weight only.
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 1.0f });
 
-                // group "happy-face"(1.0) targets "shared-up"(1.0) -> resolved weight 1.0 -> BlendShape 100f
-                int sharedUpIndex = instance.Mesh.GetBlendShapeIndex("shared-up");
-                Assert.That(sharedUpIndex, Is.GreaterThanOrEqualTo(0));
-                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
-                Assert.That(renderer.GetBlendShapeWeight(sharedUpIndex), Is.EqualTo(100f).Within(0.001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            MmdUnityFrameApplier.ApplyFrame(instance, frame);
+
+            // group "happy-face"(1.0) targets "shared-up"(1.0) -> resolved weight 1.0 -> BlendShape 100f
+            int sharedUpIndex = instance.Mesh.GetBlendShapeIndex("shared-up");
+            Assert.That(sharedUpIndex, Is.GreaterThanOrEqualTo(0));
+            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+            Assert.That(renderer.GetBlendShapeWeight(sharedUpIndex), Is.EqualTo(100f).Within(0.001f));
         }
 
         [Test]
         public void GroupMorphCycleDetectionThrows()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateCycleGroupMorphModel();
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "loop-a", weight = 1.0f });
+            MmdModelDefinition model = CreateCycleGroupMorphModel();
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                var ex = Assert.Throws<InvalidOperationException>(() =>
-                    MmdUnityFrameApplier.ApplyFrame(instance, frame));
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "loop-a", weight = 1.0f });
 
-                Assert.That(ex.Message, Does.Contain("cycle"));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            var ex = Assert.Throws<InvalidOperationException>(() =>
+                MmdUnityFrameApplier.ApplyFrame(instance, frame));
+
+            Assert.That(ex.Message, Does.Contain("cycle"));
         }
 
         [Test]
         public void ApplyFrameWithMaterialMorphMutatesMaterialProperties()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateMaterialMorphTriangleModel();
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                // Base values before morph application.
-                Color baseColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
-                Color baseAmbient = ReadMaterialColor(instance.Materials[0], "_AmbientColor");
-                Color baseOutline = ReadMaterialColor(instance.Materials[0], "_OutlineColor");
-                float baseOutlineWidth = ReadMaterialFloat(instance.Materials[0], "_OutlineWidth");
+            MmdModelDefinition model = CreateMaterialMorphTriangleModel();
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                Assert.That(baseColor.r, Is.EqualTo(0.8f).Within(0.00001f));
-                Assert.That(baseColor.g, Is.EqualTo(0.2f).Within(0.00001f));
-                Assert.That(baseColor.a, Is.EqualTo(1.0f).Within(0.00001f));
-                Assert.That(baseAmbient.r, Is.EqualTo(0.1f).Within(0.00001f));
-                Assert.That(baseAmbient.g, Is.EqualTo(0.3f).Within(0.00001f));
-                Assert.That(baseOutline.a, Is.EqualTo(1.0f).Within(0.00001f));
-                // Outline width is the raw PMX edgeSize (screen-space pixel width), base edgeSize = 1.0.
-                Assert.That(baseOutlineWidth, Is.EqualTo(1.0f).Within(0.00001f));
+            // Base values before morph application.
+            Color baseColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
+            Color baseAmbient = ReadMaterialColor(instance.Materials[0], "_AmbientColor");
+            Color baseOutline = ReadMaterialColor(instance.Materials[0], "_OutlineColor");
+            float baseOutlineWidth = ReadMaterialFloat(instance.Materials[0], "_OutlineWidth");
 
-                // Apply material morph at weight 1.0.
-                MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "color-change", weight = 1.0f });
-                MmdUnityFrameApplier.ApplyFrame(instance, frame);
+            Assert.That(baseColor.r, Is.EqualTo(0.8f).Within(0.00001f));
+            Assert.That(baseColor.g, Is.EqualTo(0.2f).Within(0.00001f));
+            Assert.That(baseColor.a, Is.EqualTo(1.0f).Within(0.00001f));
+            Assert.That(baseAmbient.r, Is.EqualTo(0.1f).Within(0.00001f));
+            Assert.That(baseAmbient.g, Is.EqualTo(0.3f).Within(0.00001f));
+            Assert.That(baseOutline.a, Is.EqualTo(1.0f).Within(0.00001f));
+            // Outline width is the raw PMX edgeSize (screen-space pixel width), base edgeSize = 1.0.
+            Assert.That(baseOutlineWidth, Is.EqualTo(1.0f).Within(0.00001f));
 
-                Color morphedColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
-                Color morphedAmbient = ReadMaterialColor(instance.Materials[0], "_AmbientColor");
-                Color morphedOutline = ReadMaterialColor(instance.Materials[0], "_OutlineColor");
-                float morphedOutlineWidth = ReadMaterialFloat(instance.Materials[0], "_OutlineWidth");
+            // Apply material morph at weight 1.0.
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "color-change", weight = 1.0f });
+            MmdUnityFrameApplier.ApplyFrame(instance, frame);
 
-                // diffuseColor: base(0.8,0.2,0.6) + offset(0.0,0.5,0.0)*1.0 = (0.8,0.7,0.6)
-                Assert.That(morphedColor.r, Is.EqualTo(0.8f).Within(0.00001f));
-                Assert.That(morphedColor.g, Is.EqualTo(0.7f).Within(0.00001f));
-                Assert.That(morphedColor.b, Is.EqualTo(0.6f).Within(0.00001f));
-                // alpha: base(1.0) + opacity(-0.3)*1.0 = 0.7
-                Assert.That(morphedColor.a, Is.EqualTo(0.7f).Within(0.00001f));
+            Color morphedColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
+            Color morphedAmbient = ReadMaterialColor(instance.Materials[0], "_AmbientColor");
+            Color morphedOutline = ReadMaterialColor(instance.Materials[0], "_OutlineColor");
+            float morphedOutlineWidth = ReadMaterialFloat(instance.Materials[0], "_OutlineWidth");
 
-                // ambientColor: base(0.1,0.3,0.5) + offset(0.0,0.0,0.4)*1.0 = (0.1,0.3,0.9)
-                Assert.That(morphedAmbient.r, Is.EqualTo(0.1f).Within(0.00001f));
-                Assert.That(morphedAmbient.g, Is.EqualTo(0.3f).Within(0.00001f));
-                Assert.That(morphedAmbient.b, Is.EqualTo(0.9f).Within(0.00001f));
+            // diffuseColor: base(0.8,0.2,0.6) + offset(0.0,0.5,0.0)*1.0 = (0.8,0.7,0.6)
+            Assert.That(morphedColor.r, Is.EqualTo(0.8f).Within(0.00001f));
+            Assert.That(morphedColor.g, Is.EqualTo(0.7f).Within(0.00001f));
+            Assert.That(morphedColor.b, Is.EqualTo(0.6f).Within(0.00001f));
+            // alpha: base(1.0) + opacity(-0.3)*1.0 = 0.7
+            Assert.That(morphedColor.a, Is.EqualTo(0.7f).Within(0.00001f));
 
-                // edgeColor: base(0.0,0.0,0.0,1.0) + offset(0.5,0.0,0.0)*1.0 + opacity(0.0)*1.0 = (0.5,0.0,0.0,1.0)
-                Assert.That(morphedOutline.r, Is.EqualTo(0.5f).Within(0.00001f));
-                Assert.That(morphedOutline.g, Is.EqualTo(0.0f).Within(0.00001f));
-                Assert.That(morphedOutline.b, Is.EqualTo(0.0f).Within(0.00001f));
-                Assert.That(morphedOutline.a, Is.EqualTo(1.0f).Within(0.00001f));
+            // ambientColor: base(0.1,0.3,0.5) + offset(0.0,0.0,0.4)*1.0 = (0.1,0.3,0.9)
+            Assert.That(morphedAmbient.r, Is.EqualTo(0.1f).Within(0.00001f));
+            Assert.That(morphedAmbient.g, Is.EqualTo(0.3f).Within(0.00001f));
+            Assert.That(morphedAmbient.b, Is.EqualTo(0.9f).Within(0.00001f));
 
-                // edgeSize: base(1.0) + offset(2.0)*1.0 = 3.0 -> _OutlineWidth = raw edgeSize = 3.0
-                Assert.That(morphedOutlineWidth, Is.EqualTo(3.0f).Within(0.00001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            // edgeColor: base(0.0,0.0,0.0,1.0) + offset(0.5,0.0,0.0)*1.0 + opacity(0.0)*1.0 = (0.5,0.0,0.0,1.0)
+            Assert.That(morphedOutline.r, Is.EqualTo(0.5f).Within(0.00001f));
+            Assert.That(morphedOutline.g, Is.EqualTo(0.0f).Within(0.00001f));
+            Assert.That(morphedOutline.b, Is.EqualTo(0.0f).Within(0.00001f));
+            Assert.That(morphedOutline.a, Is.EqualTo(1.0f).Within(0.00001f));
+
+            // edgeSize: base(1.0) + offset(2.0)*1.0 = 3.0 -> _OutlineWidth = raw edgeSize = 3.0
+            Assert.That(morphedOutlineWidth, Is.EqualTo(3.0f).Within(0.00001f));
         }
 
         [Test]
         public void ApplyMaterialMorphTwiceDoesNotAccumulate()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateMaterialMorphTriangleModel();
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "color-change", weight = 1.0f });
+            MmdModelDefinition model = CreateMaterialMorphTriangleModel();
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                // First apply.
-                MmdUnityFrameApplier.ApplyFrame(instance, frame);
-                Color firstColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
-                float firstOutlineWidth = ReadMaterialFloat(instance.Materials[0], "_OutlineWidth");
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "color-change", weight = 1.0f });
 
-                // Second apply of the same frame.
-                MmdUnityFrameApplier.ApplyFrame(instance, frame);
-                Color secondColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
-                float secondOutlineWidth = ReadMaterialFloat(instance.Materials[0], "_OutlineWidth");
+            // First apply.
+            MmdUnityFrameApplier.ApplyFrame(instance, frame);
+            Color firstColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
+            float firstOutlineWidth = ReadMaterialFloat(instance.Materials[0], "_OutlineWidth");
 
-                Assert.That(secondColor.r, Is.EqualTo(firstColor.r).Within(0.00001f));
-                Assert.That(secondColor.g, Is.EqualTo(firstColor.g).Within(0.00001f));
-                Assert.That(secondColor.b, Is.EqualTo(firstColor.b).Within(0.00001f));
-                Assert.That(secondColor.a, Is.EqualTo(firstColor.a).Within(0.00001f));
-                Assert.That(secondOutlineWidth, Is.EqualTo(firstOutlineWidth).Within(0.00001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            // Second apply of the same frame.
+            MmdUnityFrameApplier.ApplyFrame(instance, frame);
+            Color secondColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
+            float secondOutlineWidth = ReadMaterialFloat(instance.Materials[0], "_OutlineWidth");
+
+            Assert.That(secondColor.r, Is.EqualTo(firstColor.r).Within(0.00001f));
+            Assert.That(secondColor.g, Is.EqualTo(firstColor.g).Within(0.00001f));
+            Assert.That(secondColor.b, Is.EqualTo(firstColor.b).Within(0.00001f));
+            Assert.That(secondColor.a, Is.EqualTo(firstColor.a).Within(0.00001f));
+            Assert.That(secondOutlineWidth, Is.EqualTo(firstOutlineWidth).Within(0.00001f));
         }
 
         [Test]
         public void ApplyMaterialMorphWithZeroWeightRestoresBaseMaterialValues()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateMaterialMorphTriangleModel();
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                // Record base values.
-                Color baseColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
-                float baseOutlineWidth = ReadMaterialFloat(instance.Materials[0], "_OutlineWidth");
+            MmdModelDefinition model = CreateMaterialMorphTriangleModel();
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                // Apply morph at full weight.
-                MmdEvaluatedFrame frame1 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame1.morphs.Add(new MmdEvaluatedMorphWeight { name = "color-change", weight = 1.0f });
-                MmdUnityFrameApplier.ApplyFrame(instance, frame1);
+            // Record base values.
+            Color baseColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
+            float baseOutlineWidth = ReadMaterialFloat(instance.Materials[0], "_OutlineWidth");
 
-                Color morphedColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
-                float morphedOutlineWidth = ReadMaterialFloat(instance.Materials[0], "_OutlineWidth");
-                Assert.That(morphedColor.g, Is.EqualTo(0.7f).Within(0.00001f), "Material should be morphed before zero-weight apply");
-                Assert.That(morphedOutlineWidth, Is.EqualTo(3.0f).Within(0.00001f), "Outline width should be morphed");
+            // Apply morph at full weight.
+            MmdEvaluatedFrame frame1 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame1.morphs.Add(new MmdEvaluatedMorphWeight { name = "color-change", weight = 1.0f });
+            MmdUnityFrameApplier.ApplyFrame(instance, frame1);
 
-                // Apply morph at zero weight.
-                MmdEvaluatedFrame frame0 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame0.morphs.Add(new MmdEvaluatedMorphWeight { name = "color-change", weight = 0.0f });
-                MmdUnityFrameApplier.ApplyFrame(instance, frame0);
+            Color morphedColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
+            float morphedOutlineWidth = ReadMaterialFloat(instance.Materials[0], "_OutlineWidth");
+            Assert.That(morphedColor.g, Is.EqualTo(0.7f).Within(0.00001f), "Material should be morphed before zero-weight apply");
+            Assert.That(morphedOutlineWidth, Is.EqualTo(3.0f).Within(0.00001f), "Outline width should be morphed");
 
-                Color restoredColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
-                float restoredOutlineWidth = ReadMaterialFloat(instance.Materials[0], "_OutlineWidth");
+            // Apply morph at zero weight.
+            MmdEvaluatedFrame frame0 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame0.morphs.Add(new MmdEvaluatedMorphWeight { name = "color-change", weight = 0.0f });
+            MmdUnityFrameApplier.ApplyFrame(instance, frame0);
 
-                Assert.That(restoredColor.r, Is.EqualTo(baseColor.r).Within(0.00001f));
-                Assert.That(restoredColor.g, Is.EqualTo(baseColor.g).Within(0.00001f));
-                Assert.That(restoredColor.b, Is.EqualTo(baseColor.b).Within(0.00001f));
-                Assert.That(restoredColor.a, Is.EqualTo(baseColor.a).Within(0.00001f));
-                Assert.That(restoredOutlineWidth, Is.EqualTo(baseOutlineWidth).Within(0.00001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            Color restoredColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
+            float restoredOutlineWidth = ReadMaterialFloat(instance.Materials[0], "_OutlineWidth");
+
+            Assert.That(restoredColor.r, Is.EqualTo(baseColor.r).Within(0.00001f));
+            Assert.That(restoredColor.g, Is.EqualTo(baseColor.g).Within(0.00001f));
+            Assert.That(restoredColor.b, Is.EqualTo(baseColor.b).Within(0.00001f));
+            Assert.That(restoredColor.a, Is.EqualTo(baseColor.a).Within(0.00001f));
+            Assert.That(restoredOutlineWidth, Is.EqualTo(baseOutlineWidth).Within(0.00001f));
         }
 
         [Test]
         public void GroupMorphWeightExpansionDrivesMaterialMorph()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateGroupMaterialMorphModel();
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                // Frame has no direct material morph weight, only group morph weight.
-                MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "mood-group", weight = 1.0f });
+            MmdModelDefinition model = CreateGroupMaterialMorphModel();
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                MmdUnityFrameApplier.ApplyFrame(instance, frame);
+            // Frame has no direct material morph weight, only group morph weight.
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "mood-group", weight = 1.0f });
 
-                // Group morph "mood-group" targets "color-change" with weight 0.8.
-                // Resolved "color-change" weight = 1.0 * 0.8 = 0.8.
-                // diffuseColor: base(0.8,0.2,0.6) + offset(0.0,0.5,0.0)*0.8 = (0.8,0.6,0.6)
-                Color morphedColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
-                Assert.That(morphedColor.r, Is.EqualTo(0.8f).Within(0.00001f));
-                Assert.That(morphedColor.g, Is.EqualTo(0.6f).Within(0.00001f));
-                Assert.That(morphedColor.b, Is.EqualTo(0.6f).Within(0.00001f));
-                // alpha: 1.0 + (-0.3)*0.8 = 0.76
-                Assert.That(morphedColor.a, Is.EqualTo(0.76f).Within(0.00001f));
+            MmdUnityFrameApplier.ApplyFrame(instance, frame);
 
-                // edgeSize: 1.0 + 2.0*0.8 = 2.6 -> _OutlineWidth = raw edgeSize = 2.6
-                float morphedOutlineWidth = ReadMaterialFloat(instance.Materials[0], "_OutlineWidth");
-                Assert.That(morphedOutlineWidth, Is.EqualTo(2.6f).Within(0.00001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            // Group morph "mood-group" targets "color-change" with weight 0.8.
+            // Resolved "color-change" weight = 1.0 * 0.8 = 0.8.
+            // diffuseColor: base(0.8,0.2,0.6) + offset(0.0,0.5,0.0)*0.8 = (0.8,0.6,0.6)
+            Color morphedColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
+            Assert.That(morphedColor.r, Is.EqualTo(0.8f).Within(0.00001f));
+            Assert.That(morphedColor.g, Is.EqualTo(0.6f).Within(0.00001f));
+            Assert.That(morphedColor.b, Is.EqualTo(0.6f).Within(0.00001f));
+            // alpha: 1.0 + (-0.3)*0.8 = 0.76
+            Assert.That(morphedColor.a, Is.EqualTo(0.76f).Within(0.00001f));
+
+            // edgeSize: 1.0 + 2.0*0.8 = 2.6 -> _OutlineWidth = raw edgeSize = 2.6
+            float morphedOutlineWidth = ReadMaterialFloat(instance.Materials[0], "_OutlineWidth");
+            Assert.That(morphedOutlineWidth, Is.EqualTo(2.6f).Within(0.00001f));
         }
 
         [Test]
         public void ApplyMaterialMorphMultiplyMutatesMaterialProperties()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateMaterialMorphMultiplyModel();
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                // Base values before morph application.
-                Color baseColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
-                Assert.That(baseColor.r, Is.EqualTo(0.8f).Within(0.00001f));
-                Assert.That(baseColor.g, Is.EqualTo(0.2f).Within(0.00001f));
-                Assert.That(baseColor.b, Is.EqualTo(0.6f).Within(0.00001f));
-                Assert.That(baseColor.a, Is.EqualTo(1.0f).Within(0.00001f));
+            MmdModelDefinition model = CreateMaterialMorphMultiplyModel();
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                // Apply multiply morph at weight 1.0.
-                MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "multiply-change", weight = 1.0f });
-                MmdUnityFrameApplier.ApplyFrame(instance, frame);
+            // Base values before morph application.
+            Color baseColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
+            Assert.That(baseColor.r, Is.EqualTo(0.8f).Within(0.00001f));
+            Assert.That(baseColor.g, Is.EqualTo(0.2f).Within(0.00001f));
+            Assert.That(baseColor.b, Is.EqualTo(0.6f).Within(0.00001f));
+            Assert.That(baseColor.a, Is.EqualTo(1.0f).Within(0.00001f));
 
-                Color morphedColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
-                Color morphedAmbient = ReadMaterialColor(instance.Materials[0], "_AmbientColor");
-                Color morphedOutline = ReadMaterialColor(instance.Materials[0], "_OutlineColor");
-                float morphedOutlineWidth = ReadMaterialFloat(instance.Materials[0], "_OutlineWidth");
+            // Apply multiply morph at weight 1.0.
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "multiply-change", weight = 1.0f });
+            MmdUnityFrameApplier.ApplyFrame(instance, frame);
 
-                // diffuseColor: base(0.8,0.2,0.6) * offset(0.5,2.0,0.75) = (0.4,0.4,0.45)
-                Assert.That(morphedColor.r, Is.EqualTo(0.4f).Within(0.00001f));
-                Assert.That(morphedColor.g, Is.EqualTo(0.4f).Within(0.00001f));
-                Assert.That(morphedColor.b, Is.EqualTo(0.45f).Within(0.00001f));
-                // alpha: 1.0 * 0.5 = 0.5
-                Assert.That(morphedColor.a, Is.EqualTo(0.5f).Within(0.00001f));
+            Color morphedColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
+            Color morphedAmbient = ReadMaterialColor(instance.Materials[0], "_AmbientColor");
+            Color morphedOutline = ReadMaterialColor(instance.Materials[0], "_OutlineColor");
+            float morphedOutlineWidth = ReadMaterialFloat(instance.Materials[0], "_OutlineWidth");
 
-                // ambientColor: base(0.1,0.3,0.5) * offset(2.0,0.5,1.0) = (0.2,0.15,0.5)
-                Assert.That(morphedAmbient.r, Is.EqualTo(0.2f).Within(0.00001f));
-                Assert.That(morphedAmbient.g, Is.EqualTo(0.15f).Within(0.00001f));
-                Assert.That(morphedAmbient.b, Is.EqualTo(0.5f).Within(0.00001f));
+            // diffuseColor: base(0.8,0.2,0.6) * offset(0.5,2.0,0.75) = (0.4,0.4,0.45)
+            Assert.That(morphedColor.r, Is.EqualTo(0.4f).Within(0.00001f));
+            Assert.That(morphedColor.g, Is.EqualTo(0.4f).Within(0.00001f));
+            Assert.That(morphedColor.b, Is.EqualTo(0.45f).Within(0.00001f));
+            // alpha: 1.0 * 0.5 = 0.5
+            Assert.That(morphedColor.a, Is.EqualTo(0.5f).Within(0.00001f));
 
-                // edgeColor: base(0,0,0,1) * offset(0.5,0.5,0.5,0) = (0,0,0,0)
-                Assert.That(morphedOutline.r, Is.EqualTo(0.0f).Within(0.00001f));
-                Assert.That(morphedOutline.g, Is.EqualTo(0.0f).Within(0.00001f));
-                Assert.That(morphedOutline.b, Is.EqualTo(0.0f).Within(0.00001f));
-                Assert.That(morphedOutline.a, Is.EqualTo(0.0f).Within(0.00001f));
+            // ambientColor: base(0.1,0.3,0.5) * offset(2.0,0.5,1.0) = (0.2,0.15,0.5)
+            Assert.That(morphedAmbient.r, Is.EqualTo(0.2f).Within(0.00001f));
+            Assert.That(morphedAmbient.g, Is.EqualTo(0.15f).Within(0.00001f));
+            Assert.That(morphedAmbient.b, Is.EqualTo(0.5f).Within(0.00001f));
 
-                // edgeSize: 1.0 * 2.0 = 2.0 -> _OutlineWidth = raw edgeSize = 2.0
-                Assert.That(morphedOutlineWidth, Is.EqualTo(2.0f).Within(0.00001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            // edgeColor: base(0,0,0,1) * offset(0.5,0.5,0.5,0) = (0,0,0,0)
+            Assert.That(morphedOutline.r, Is.EqualTo(0.0f).Within(0.00001f));
+            Assert.That(morphedOutline.g, Is.EqualTo(0.0f).Within(0.00001f));
+            Assert.That(morphedOutline.b, Is.EqualTo(0.0f).Within(0.00001f));
+            Assert.That(morphedOutline.a, Is.EqualTo(0.0f).Within(0.00001f));
+
+            // edgeSize: 1.0 * 2.0 = 2.0 -> _OutlineWidth = raw edgeSize = 2.0
+            Assert.That(morphedOutlineWidth, Is.EqualTo(2.0f).Within(0.00001f));
         }
 
         [Test]
         public void ApplyMaterialMorphAllMaterialAddTargetMutatesAllMaterials()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateMaterialMorphAllMaterialAddModel();
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                Assert.That(instance.Materials, Has.Length.EqualTo(2));
+            MmdModelDefinition model = CreateMaterialMorphAllMaterialAddModel();
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                // Apply add morph at weight 1.0 (materialIndex = -1 => all materials).
-                MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "all-add", weight = 1.0f });
-                MmdUnityFrameApplier.ApplyFrame(instance, frame);
+            Assert.That(instance.Materials, Has.Length.EqualTo(2));
 
-                // Material 0: base(0.8,0.2,0.6) + offset(0.0,0.5,0.0) = (0.8,0.7,0.6)
-                Color mat0Color = ReadMaterialColor(instance.Materials[0], "_BaseColor");
-                Assert.That(mat0Color.r, Is.EqualTo(0.8f).Within(0.00001f));
-                Assert.That(mat0Color.g, Is.EqualTo(0.7f).Within(0.00001f));
-                Assert.That(mat0Color.b, Is.EqualTo(0.6f).Within(0.00001f));
-                // alpha: 1.0 + (-0.3) = 0.7
-                Assert.That(mat0Color.a, Is.EqualTo(0.7f).Within(0.00001f));
+            // Apply add morph at weight 1.0 (materialIndex = -1 => all materials).
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "all-add", weight = 1.0f });
+            MmdUnityFrameApplier.ApplyFrame(instance, frame);
 
-                // Material 1: base(0.9,0.7,0.4) + offset(0.0,0.5,0.0) = (0.9,1.0,0.4)
-                Color mat1Color = ReadMaterialColor(instance.Materials[1], "_BaseColor");
-                Assert.That(mat1Color.r, Is.EqualTo(0.9f).Within(0.00001f));
-                Assert.That(mat1Color.g, Is.EqualTo(1.0f).Within(0.00001f));
-                Assert.That(mat1Color.b, Is.EqualTo(0.4f).Within(0.00001f));
-                // alpha: 0.8 + (-0.3) = 0.5
-                Assert.That(mat1Color.a, Is.EqualTo(0.5f).Within(0.00001f));
+            // Material 0: base(0.8,0.2,0.6) + offset(0.0,0.5,0.0) = (0.8,0.7,0.6)
+            Color mat0Color = ReadMaterialColor(instance.Materials[0], "_BaseColor");
+            Assert.That(mat0Color.r, Is.EqualTo(0.8f).Within(0.00001f));
+            Assert.That(mat0Color.g, Is.EqualTo(0.7f).Within(0.00001f));
+            Assert.That(mat0Color.b, Is.EqualTo(0.6f).Within(0.00001f));
+            // alpha: 1.0 + (-0.3) = 0.7
+            Assert.That(mat0Color.a, Is.EqualTo(0.7f).Within(0.00001f));
 
-                // Both materials edge size changed: material 0: 1.0+2.0=3.0, material 1: 0.5+2.0=2.5
-                // (_OutlineWidth = raw edgeSize)
-                Assert.That(ReadMaterialFloat(instance.Materials[0], "_OutlineWidth"), Is.EqualTo(3.0f).Within(0.00001f));
-                Assert.That(ReadMaterialFloat(instance.Materials[1], "_OutlineWidth"), Is.EqualTo(2.5f).Within(0.00001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            // Material 1: base(0.9,0.7,0.4) + offset(0.0,0.5,0.0) = (0.9,1.0,0.4)
+            Color mat1Color = ReadMaterialColor(instance.Materials[1], "_BaseColor");
+            Assert.That(mat1Color.r, Is.EqualTo(0.9f).Within(0.00001f));
+            Assert.That(mat1Color.g, Is.EqualTo(1.0f).Within(0.00001f));
+            Assert.That(mat1Color.b, Is.EqualTo(0.4f).Within(0.00001f));
+            // alpha: 0.8 + (-0.3) = 0.5
+            Assert.That(mat1Color.a, Is.EqualTo(0.5f).Within(0.00001f));
+
+            // Both materials edge size changed: material 0: 1.0+2.0=3.0, material 1: 0.5+2.0=2.5
+            // (_OutlineWidth = raw edgeSize)
+            Assert.That(ReadMaterialFloat(instance.Materials[0], "_OutlineWidth"), Is.EqualTo(3.0f).Within(0.00001f));
+            Assert.That(ReadMaterialFloat(instance.Materials[1], "_OutlineWidth"), Is.EqualTo(2.5f).Within(0.00001f));
         }
 
         [Test]
         public void ApplyMaterialMorphMultiplyAllMaterialTargetMutatesAllMaterials()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateMaterialMorphMultiplyAllMaterialModel();
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                Assert.That(instance.Materials, Has.Length.EqualTo(2));
+            MmdModelDefinition model = CreateMaterialMorphMultiplyAllMaterialModel();
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                // Apply multiply morph at weight 1.0 (materialIndex = -1 => all materials).
-                MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "all-multiply", weight = 1.0f });
-                MmdUnityFrameApplier.ApplyFrame(instance, frame);
+            Assert.That(instance.Materials, Has.Length.EqualTo(2));
 
-                // Material 0: base(0.8,0.2,0.6) * offset(0.5,1.5,0.75) = (0.4,0.3,0.45)
-                Color mat0Color = ReadMaterialColor(instance.Materials[0], "_BaseColor");
-                Assert.That(mat0Color.r, Is.EqualTo(0.4f).Within(0.00001f));
-                Assert.That(mat0Color.g, Is.EqualTo(0.3f).Within(0.00001f));
-                Assert.That(mat0Color.b, Is.EqualTo(0.45f).Within(0.00001f));
-                // alpha: 1.0 * 0.5 = 0.5
-                Assert.That(mat0Color.a, Is.EqualTo(0.5f).Within(0.00001f));
+            // Apply multiply morph at weight 1.0 (materialIndex = -1 => all materials).
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "all-multiply", weight = 1.0f });
+            MmdUnityFrameApplier.ApplyFrame(instance, frame);
 
-                // Material 1: base(0.9,0.7,0.4) * offset(0.5,1.5,0.75) = (0.45,1.0,0.3)
-                Color mat1Color = ReadMaterialColor(instance.Materials[1], "_BaseColor");
-                Assert.That(mat1Color.r, Is.EqualTo(0.45f).Within(0.00001f));
-                Assert.That(mat1Color.g, Is.EqualTo(1.0f).Within(0.00001f));
-                Assert.That(mat1Color.b, Is.EqualTo(0.3f).Within(0.00001f));
-                // alpha: 0.8 * 0.5 = 0.4
-                Assert.That(mat1Color.a, Is.EqualTo(0.4f).Within(0.00001f));
+            // Material 0: base(0.8,0.2,0.6) * offset(0.5,1.5,0.75) = (0.4,0.3,0.45)
+            Color mat0Color = ReadMaterialColor(instance.Materials[0], "_BaseColor");
+            Assert.That(mat0Color.r, Is.EqualTo(0.4f).Within(0.00001f));
+            Assert.That(mat0Color.g, Is.EqualTo(0.3f).Within(0.00001f));
+            Assert.That(mat0Color.b, Is.EqualTo(0.45f).Within(0.00001f));
+            // alpha: 1.0 * 0.5 = 0.5
+            Assert.That(mat0Color.a, Is.EqualTo(0.5f).Within(0.00001f));
 
-                // Material 0: base ambient(0.1,0.3,0.5) * offset(2.0,0.5,1.0) = (0.2,0.15,0.5)
-                Color mat0Ambient = ReadMaterialColor(instance.Materials[0], "_AmbientColor");
-                Assert.That(mat0Ambient.r, Is.EqualTo(0.2f).Within(0.00001f));
-                Assert.That(mat0Ambient.g, Is.EqualTo(0.15f).Within(0.00001f));
-                Assert.That(mat0Ambient.b, Is.EqualTo(0.5f).Within(0.00001f));
+            // Material 1: base(0.9,0.7,0.4) * offset(0.5,1.5,0.75) = (0.45,1.0,0.3)
+            Color mat1Color = ReadMaterialColor(instance.Materials[1], "_BaseColor");
+            Assert.That(mat1Color.r, Is.EqualTo(0.45f).Within(0.00001f));
+            Assert.That(mat1Color.g, Is.EqualTo(1.0f).Within(0.00001f));
+            Assert.That(mat1Color.b, Is.EqualTo(0.3f).Within(0.00001f));
+            // alpha: 0.8 * 0.5 = 0.4
+            Assert.That(mat1Color.a, Is.EqualTo(0.4f).Within(0.00001f));
 
-                // Material 1: base ambient(0.2,0.1,0.3) * offset(2.0,0.5,1.0) = (0.4,0.05,0.3)
-                Color mat1Ambient = ReadMaterialColor(instance.Materials[1], "_AmbientColor");
-                Assert.That(mat1Ambient.r, Is.EqualTo(0.4f).Within(0.00001f));
-                Assert.That(mat1Ambient.g, Is.EqualTo(0.05f).Within(0.00001f));
-                Assert.That(mat1Ambient.b, Is.EqualTo(0.3f).Within(0.00001f));
+            // Material 0: base ambient(0.1,0.3,0.5) * offset(2.0,0.5,1.0) = (0.2,0.15,0.5)
+            Color mat0Ambient = ReadMaterialColor(instance.Materials[0], "_AmbientColor");
+            Assert.That(mat0Ambient.r, Is.EqualTo(0.2f).Within(0.00001f));
+            Assert.That(mat0Ambient.g, Is.EqualTo(0.15f).Within(0.00001f));
+            Assert.That(mat0Ambient.b, Is.EqualTo(0.5f).Within(0.00001f));
 
-                // Both materials edge size changed (_OutlineWidth = raw edgeSize):
-                // material 0: 1.0*2.0=2.0, material 1: 0.5*2.0=1.0
-                Assert.That(ReadMaterialFloat(instance.Materials[0], "_OutlineWidth"), Is.EqualTo(2.0f).Within(0.00001f));
-                Assert.That(ReadMaterialFloat(instance.Materials[1], "_OutlineWidth"), Is.EqualTo(1.0f).Within(0.00001f));
+            // Material 1: base ambient(0.2,0.1,0.3) * offset(2.0,0.5,1.0) = (0.4,0.05,0.3)
+            Color mat1Ambient = ReadMaterialColor(instance.Materials[1], "_AmbientColor");
+            Assert.That(mat1Ambient.r, Is.EqualTo(0.4f).Within(0.00001f));
+            Assert.That(mat1Ambient.g, Is.EqualTo(0.05f).Within(0.00001f));
+            Assert.That(mat1Ambient.b, Is.EqualTo(0.3f).Within(0.00001f));
 
-                // Material 0: edgeColor(0,0,0,1) * offset(0.5,0.5,0.5,0.2) = (0,0,0,0.2)
-                Assert.That(ReadMaterialColor(instance.Materials[0], "_OutlineColor").a, Is.EqualTo(0.2f).Within(0.00001f));
-                // Material 1: edgeColor(0,0,0,0.9) * offset(0.5,0.5,0.5,0.2) = (0,0,0,0.18)
-                Assert.That(ReadMaterialColor(instance.Materials[1], "_OutlineColor").a, Is.EqualTo(0.18f).Within(0.00001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            // Both materials edge size changed (_OutlineWidth = raw edgeSize):
+            // material 0: 1.0*2.0=2.0, material 1: 0.5*2.0=1.0
+            Assert.That(ReadMaterialFloat(instance.Materials[0], "_OutlineWidth"), Is.EqualTo(2.0f).Within(0.00001f));
+            Assert.That(ReadMaterialFloat(instance.Materials[1], "_OutlineWidth"), Is.EqualTo(1.0f).Within(0.00001f));
+
+            // Material 0: edgeColor(0,0,0,1) * offset(0.5,0.5,0.5,0.2) = (0,0,0,0.2)
+            Assert.That(ReadMaterialColor(instance.Materials[0], "_OutlineColor").a, Is.EqualTo(0.2f).Within(0.00001f));
+            // Material 1: edgeColor(0,0,0,0.9) * offset(0.5,0.5,0.5,0.2) = (0,0,0,0.18)
+            Assert.That(ReadMaterialColor(instance.Materials[1], "_OutlineColor").a, Is.EqualTo(0.18f).Within(0.00001f));
         }
 
         [Test]
         public void MultiplyAllMaterialMorphDoesNotAccumulateAndRestoresOnZeroWeight()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateMaterialMorphMultiplyAllMaterialModel();
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                Assert.That(instance.Materials, Has.Length.EqualTo(2));
+            MmdModelDefinition model = CreateMaterialMorphMultiplyAllMaterialModel();
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                // Record base values.
-                Color base0Color = ReadMaterialColor(instance.Materials[0], "_BaseColor");
-                Color base1Color = ReadMaterialColor(instance.Materials[1], "_BaseColor");
-                float base0Outline = ReadMaterialFloat(instance.Materials[0], "_OutlineWidth");
+            Assert.That(instance.Materials, Has.Length.EqualTo(2));
 
-                // Step 1: Apply multiply all-material morph at weight 1.0.
-                MmdEvaluatedFrame frame1 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame1.morphs.Add(new MmdEvaluatedMorphWeight { name = "all-multiply", weight = 1.0f });
-                MmdUnityFrameApplier.ApplyFrame(instance, frame1);
+            // Record base values.
+            Color base0Color = ReadMaterialColor(instance.Materials[0], "_BaseColor");
+            Color base1Color = ReadMaterialColor(instance.Materials[1], "_BaseColor");
+            float base0Outline = ReadMaterialFloat(instance.Materials[0], "_OutlineWidth");
 
-                Color firstMat0Color = ReadMaterialColor(instance.Materials[0], "_BaseColor");
-                Assert.That(firstMat0Color.r, Is.EqualTo(0.4f).Within(0.00001f), "First apply should morph material 0");
+            // Step 1: Apply multiply all-material morph at weight 1.0.
+            MmdEvaluatedFrame frame1 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame1.morphs.Add(new MmdEvaluatedMorphWeight { name = "all-multiply", weight = 1.0f });
+            MmdUnityFrameApplier.ApplyFrame(instance, frame1);
 
-                // Step 2: apply the same frame again; it must not accumulate.
-                MmdUnityFrameApplier.ApplyFrame(instance, frame1);
-                Color secondMat0Color = ReadMaterialColor(instance.Materials[0], "_BaseColor");
-                Assert.That(secondMat0Color.r, Is.EqualTo(firstMat0Color.r).Within(0.00001f), "Repeated apply should not accumulate");
-                Assert.That(secondMat0Color.g, Is.EqualTo(firstMat0Color.g).Within(0.00001f));
-                Assert.That(secondMat0Color.b, Is.EqualTo(firstMat0Color.b).Within(0.00001f));
-                Assert.That(secondMat0Color.a, Is.EqualTo(firstMat0Color.a).Within(0.00001f));
+            Color firstMat0Color = ReadMaterialColor(instance.Materials[0], "_BaseColor");
+            Assert.That(firstMat0Color.r, Is.EqualTo(0.4f).Within(0.00001f), "First apply should morph material 0");
 
-                // Step 3: Apply zero-weight frame to restore base values.
-                MmdEvaluatedFrame frame0 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame0.morphs.Add(new MmdEvaluatedMorphWeight { name = "all-multiply", weight = 0.0f });
-                MmdUnityFrameApplier.ApplyFrame(instance, frame0);
+            // Step 2: apply the same frame again; it must not accumulate.
+            MmdUnityFrameApplier.ApplyFrame(instance, frame1);
+            Color secondMat0Color = ReadMaterialColor(instance.Materials[0], "_BaseColor");
+            Assert.That(secondMat0Color.r, Is.EqualTo(firstMat0Color.r).Within(0.00001f), "Repeated apply should not accumulate");
+            Assert.That(secondMat0Color.g, Is.EqualTo(firstMat0Color.g).Within(0.00001f));
+            Assert.That(secondMat0Color.b, Is.EqualTo(firstMat0Color.b).Within(0.00001f));
+            Assert.That(secondMat0Color.a, Is.EqualTo(firstMat0Color.a).Within(0.00001f));
 
-                Color restored0Color = ReadMaterialColor(instance.Materials[0], "_BaseColor");
-                Color restored1Color = ReadMaterialColor(instance.Materials[1], "_BaseColor");
-                float restored0Outline = ReadMaterialFloat(instance.Materials[0], "_OutlineWidth");
+            // Step 3: Apply zero-weight frame to restore base values.
+            MmdEvaluatedFrame frame0 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame0.morphs.Add(new MmdEvaluatedMorphWeight { name = "all-multiply", weight = 0.0f });
+            MmdUnityFrameApplier.ApplyFrame(instance, frame0);
 
-                Assert.That(restored0Color.r, Is.EqualTo(base0Color.r).Within(0.00001f), "Zero weight should restore material 0 diffuse red");
-                Assert.That(restored0Color.g, Is.EqualTo(base0Color.g).Within(0.00001f));
-                Assert.That(restored0Color.b, Is.EqualTo(base0Color.b).Within(0.00001f));
-                Assert.That(restored0Color.a, Is.EqualTo(base0Color.a).Within(0.00001f));
-                Assert.That(restored1Color.r, Is.EqualTo(base1Color.r).Within(0.00001f), "Zero weight should restore material 1 diffuse red");
-                Assert.That(restored1Color.a, Is.EqualTo(base1Color.a).Within(0.00001f), "Zero weight should restore material 1 alpha");
-                Assert.That(restored0Outline, Is.EqualTo(base0Outline).Within(0.00001f), "Zero weight should restore material 0 outline width");
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            Color restored0Color = ReadMaterialColor(instance.Materials[0], "_BaseColor");
+            Color restored1Color = ReadMaterialColor(instance.Materials[1], "_BaseColor");
+            float restored0Outline = ReadMaterialFloat(instance.Materials[0], "_OutlineWidth");
+
+            Assert.That(restored0Color.r, Is.EqualTo(base0Color.r).Within(0.00001f), "Zero weight should restore material 0 diffuse red");
+            Assert.That(restored0Color.g, Is.EqualTo(base0Color.g).Within(0.00001f));
+            Assert.That(restored0Color.b, Is.EqualTo(base0Color.b).Within(0.00001f));
+            Assert.That(restored0Color.a, Is.EqualTo(base0Color.a).Within(0.00001f));
+            Assert.That(restored1Color.r, Is.EqualTo(base1Color.r).Within(0.00001f), "Zero weight should restore material 1 diffuse red");
+            Assert.That(restored1Color.a, Is.EqualTo(base1Color.a).Within(0.00001f), "Zero weight should restore material 1 alpha");
+            Assert.That(restored0Outline, Is.EqualTo(base0Outline).Within(0.00001f), "Zero weight should restore material 0 outline width");
         }
 
         private static MmdModelDefinition CreateMaterialMorphMultiplyModel()
@@ -4089,109 +3649,85 @@ namespace Mmd.Tests
         [Test]
         public void ApplyFrameExpandsFlipMorphWeightToTargetVertexMorph()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateFlipMorphTriangleModel();
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                // Frame with flip morph weight only, no direct vertex morph weight.
-                MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "flip-smile", weight = 1.0f });
+            MmdModelDefinition model = CreateFlipMorphTriangleModel();
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                MmdUnityFrameApplier.ApplyFrame(instance, frame);
+            // Frame with flip morph weight only, no direct vertex morph weight.
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "flip-smile", weight = 1.0f });
 
-                // flipWeight(1.0) * offsetWeight(0.5) = resolved smile 0.5 -> BlendShape 50f
-                int smileIndex = instance.Mesh.GetBlendShapeIndex("smile");
-                Assert.That(smileIndex, Is.GreaterThanOrEqualTo(0));
-                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
-                Assert.That(renderer.GetBlendShapeWeight(smileIndex), Is.EqualTo(50f).Within(0.001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            MmdUnityFrameApplier.ApplyFrame(instance, frame);
+
+            // flipWeight(1.0) * offsetWeight(0.5) = resolved smile 0.5 -> BlendShape 50f
+            int smileIndex = instance.Mesh.GetBlendShapeIndex("smile");
+            Assert.That(smileIndex, Is.GreaterThanOrEqualTo(0));
+            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+            Assert.That(renderer.GetBlendShapeWeight(smileIndex), Is.EqualTo(50f).Within(0.001f));
         }
 
         [Test]
         public void ApplyFrameExpandsFlipMorphToMaterialMorph()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateFlipMaterialMorphModel();
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                // Frame with flip morph weight only, no direct material morph weight.
-                MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "flip-color", weight = 1.0f });
+            MmdModelDefinition model = CreateFlipMaterialMorphModel();
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                MmdUnityFrameApplier.ApplyFrame(instance, frame);
+            // Frame with flip morph weight only, no direct material morph weight.
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "flip-color", weight = 1.0f });
 
-                // Flip morph "flip-color" targets "color-change" with weight 0.8.
-                // Resolved "color-change" weight = 1.0 * 0.8 = 0.8.
-                // diffuseColor: base(0.8,0.2,0.6) + offset(0.0,0.5,0.0)*0.8 = (0.8,0.6,0.6)
-                Color morphedColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
-                Assert.That(morphedColor.r, Is.EqualTo(0.8f).Within(0.00001f));
-                Assert.That(morphedColor.g, Is.EqualTo(0.6f).Within(0.00001f));
-                Assert.That(morphedColor.b, Is.EqualTo(0.6f).Within(0.00001f));
-                // alpha: 1.0 + (-0.3)*0.8 = 0.76
-                Assert.That(morphedColor.a, Is.EqualTo(0.76f).Within(0.00001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            MmdUnityFrameApplier.ApplyFrame(instance, frame);
+
+            // Flip morph "flip-color" targets "color-change" with weight 0.8.
+            // Resolved "color-change" weight = 1.0 * 0.8 = 0.8.
+            // diffuseColor: base(0.8,0.2,0.6) + offset(0.0,0.5,0.0)*0.8 = (0.8,0.6,0.6)
+            Color morphedColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
+            Assert.That(morphedColor.r, Is.EqualTo(0.8f).Within(0.00001f));
+            Assert.That(morphedColor.g, Is.EqualTo(0.6f).Within(0.00001f));
+            Assert.That(morphedColor.b, Is.EqualTo(0.6f).Within(0.00001f));
+            // alpha: 1.0 + (-0.3)*0.8 = 0.76
+            Assert.That(morphedColor.a, Is.EqualTo(0.76f).Within(0.00001f));
         }
 
         [Test]
         public void ApplyFrameWithGroupToFlipRecursiveExpansion()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateGroupFlipRecursiveModel();
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                // Frame has group morph weight that targets a flip morph.
-                MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "mood-group", weight = 1.0f });
+            MmdModelDefinition model = CreateGroupFlipRecursiveModel();
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                MmdUnityFrameApplier.ApplyFrame(instance, frame);
+            // Frame has group morph weight that targets a flip morph.
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "mood-group", weight = 1.0f });
 
-                // mood-group(1.0) -> flip-smile(1.0) -> smile(0.5) = resolved smile 0.5 -> BlendShape 50f
-                int smileIndex = instance.Mesh.GetBlendShapeIndex("smile");
-                Assert.That(smileIndex, Is.GreaterThanOrEqualTo(0));
-                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
-                Assert.That(renderer.GetBlendShapeWeight(smileIndex), Is.EqualTo(50f).Within(0.001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            MmdUnityFrameApplier.ApplyFrame(instance, frame);
+
+            // mood-group(1.0) -> flip-smile(1.0) -> smile(0.5) = resolved smile 0.5 -> BlendShape 50f
+            int smileIndex = instance.Mesh.GetBlendShapeIndex("smile");
+            Assert.That(smileIndex, Is.GreaterThanOrEqualTo(0));
+            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+            Assert.That(renderer.GetBlendShapeWeight(smileIndex), Is.EqualTo(50f).Within(0.001f));
         }
 
         [Test]
         public void FlipMorphCycleDetectionThrows()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateCycleFlipMorphModel();
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "loop-a", weight = 1.0f });
+            MmdModelDefinition model = CreateCycleFlipMorphModel();
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                var ex = Assert.Throws<InvalidOperationException>(() =>
-                    MmdUnityFrameApplier.ApplyFrame(instance, frame));
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "loop-a", weight = 1.0f });
 
-                Assert.That(ex.Message, Does.Contain("cycle"));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            var ex = Assert.Throws<InvalidOperationException>(() =>
+                MmdUnityFrameApplier.ApplyFrame(instance, frame));
+
+            Assert.That(ex.Message, Does.Contain("cycle"));
         }
 
         private static MmdModelDefinition CreateFlipMorphTriangleModel()
@@ -4359,175 +3895,145 @@ namespace Mmd.Tests
         [Test]
         public void CreateSkinnedModelBakesBlendShapeFramesForVertexMorphs()
         {
-            MmdUnityModelInstance? instance = null;
-            try
+
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.morphs.Add(new MmdMorphDefinition
             {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                model.morphs.Add(new MmdMorphDefinition
+                index = 0,
+                name = "blink",
+                type = "vertex",
+                panel = "eye",
+                vertexOffsets =
                 {
-                    index = 0,
-                    name = "blink",
-                    type = "vertex",
-                    panel = "eye",
-                    vertexOffsets =
+                    new MmdVertexMorphOffsetDefinition
                     {
-                        new MmdVertexMorphOffsetDefinition
-                        {
-                            vertexIndex = 1,
-                            positionDelta = new[] { 0.0f, 2.0f, 0.0f }
-                        }
+                        vertexIndex = 1,
+                        positionDelta = new[] { 0.0f, 2.0f, 0.0f }
                     }
-                });
+                }
+            });
 
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                Assert.That(instance.Mesh.blendShapeCount, Is.EqualTo(1));
-                Assert.That(instance.Mesh.GetBlendShapeName(0), Is.EqualTo("blink"));
-                Assert.That(instance.BlendShapeIndexMap.ContainsKey("blink"), Is.True);
-                Assert.That(instance.BlendShapeIndexMap["blink"], Is.EqualTo(0));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            Assert.That(instance.Mesh.blendShapeCount, Is.EqualTo(1));
+            Assert.That(instance.Mesh.GetBlendShapeName(0), Is.EqualTo("blink"));
+            Assert.That(instance.BlendShapeIndexMap.ContainsKey("blink"), Is.True);
+            Assert.That(instance.BlendShapeIndexMap["blink"], Is.EqualTo(0));
         }
 
         [Test]
         public void SkinnedModelZeroBlendShapeWeightReturnsToBaseThroughSetBlendShapeWeightPath()
         {
-            MmdUnityModelInstance? instance = null;
-            try
+
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.morphs.Add(new MmdMorphDefinition
             {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                model.morphs.Add(new MmdMorphDefinition
+                index = 0,
+                name = "blink",
+                type = "vertex",
+                panel = "eye",
+                vertexOffsets =
                 {
-                    index = 0,
-                    name = "blink",
-                    type = "vertex",
-                    panel = "eye",
-                    vertexOffsets =
+                    new MmdVertexMorphOffsetDefinition
                     {
-                        new MmdVertexMorphOffsetDefinition
-                        {
-                            vertexIndex = 1,
-                            positionDelta = new[] { 0.0f, 2.0f, 0.0f }
-                        }
+                        vertexIndex = 1,
+                        positionDelta = new[] { 0.0f, 2.0f, 0.0f }
                     }
-                });
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
-                int blinkIndex = instance.Mesh.GetBlendShapeIndex("blink");
+                }
+            });
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
+            int blinkIndex = instance.Mesh.GetBlendShapeIndex("blink");
 
-                MmdEvaluatedFrame frame1 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame1.morphs.Add(new MmdEvaluatedMorphWeight { name = "blink", weight = 1.0f });
-                MmdUnityFrameApplier.ApplyFrame(instance, frame1);
-                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
-                Assert.That(renderer.GetBlendShapeWeight(blinkIndex), Is.EqualTo(100f).Within(0.001f));
+            MmdEvaluatedFrame frame1 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame1.morphs.Add(new MmdEvaluatedMorphWeight { name = "blink", weight = 1.0f });
+            MmdUnityFrameApplier.ApplyFrame(instance, frame1);
+            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+            Assert.That(renderer.GetBlendShapeWeight(blinkIndex), Is.EqualTo(100f).Within(0.001f));
 
-                MmdEvaluatedFrame frame0 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame0.morphs.Add(new MmdEvaluatedMorphWeight { name = "blink", weight = 0.0f });
-                MmdUnityFrameApplier.ApplyFrame(instance, frame0);
-                Assert.That(renderer.GetBlendShapeWeight(blinkIndex), Is.EqualTo(0f).Within(0.001f));
+            MmdEvaluatedFrame frame0 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame0.morphs.Add(new MmdEvaluatedMorphWeight { name = "blink", weight = 0.0f });
+            MmdUnityFrameApplier.ApplyFrame(instance, frame0);
+            Assert.That(renderer.GetBlendShapeWeight(blinkIndex), Is.EqualTo(0f).Within(0.001f));
 
-                Assert.That(instance.RenderingDescriptor.vertices[1].position[1], Is.EqualTo(0.0f).Within(0.00001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            Assert.That(instance.RenderingDescriptor.vertices[1].position[1], Is.EqualTo(0.0f).Within(0.00001f));
         }
 
         [Test]
         public void SplitVertexCopyReceivesMorphOffsetInBakedBlendShapeFrame()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateSharedVertexTwoSubmeshMorphModel();
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
 
-                Assert.That(instance.Mesh.blendShapeCount, Is.EqualTo(1));
-                int shapeIndex = instance.Mesh.GetBlendShapeIndex("shared-up");
-                Assert.That(shapeIndex, Is.GreaterThanOrEqualTo(0));
+            MmdModelDefinition model = CreateSharedVertexTwoSubmeshMorphModel();
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                var deltaVertices = new Vector3[instance.Mesh.vertexCount];
-                var deltaNormals = new Vector3[instance.Mesh.vertexCount];
-                var deltaTangents = new Vector3[instance.Mesh.vertexCount];
-                instance.Mesh.GetBlendShapeFrameVertices(shapeIndex, 0, deltaVertices, deltaNormals, deltaTangents);
+            Assert.That(instance.Mesh.blendShapeCount, Is.EqualTo(1));
+            int shapeIndex = instance.Mesh.GetBlendShapeIndex("shared-up");
+            Assert.That(shapeIndex, Is.GreaterThanOrEqualTo(0));
 
-                Assert.That(deltaVertices[0], Is.EqualTo(new Vector3(0.0f, 1.0f, 0.0f)));
-                Assert.That(deltaVertices[3], Is.EqualTo(new Vector3(0.0f, 1.0f, 0.0f)));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            var deltaVertices = new Vector3[instance.Mesh.vertexCount];
+            var deltaNormals = new Vector3[instance.Mesh.vertexCount];
+            var deltaTangents = new Vector3[instance.Mesh.vertexCount];
+            instance.Mesh.GetBlendShapeFrameVertices(shapeIndex, 0, deltaVertices, deltaNormals, deltaTangents);
+
+            Assert.That(deltaVertices[0], Is.EqualTo(new Vector3(0.0f, 1.0f, 0.0f)));
+            Assert.That(deltaVertices[3], Is.EqualTo(new Vector3(0.0f, 1.0f, 0.0f)));
         }
 
         [Test]
         public void GroupOrFlipResolvedWeightReachesBlendShapeWeight()
         {
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                MmdModelDefinition model = CreateGroupMorphTriangleModel();
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
-                int smileIndex = instance.Mesh.GetBlendShapeIndex("smile");
-                Assert.That(smileIndex, Is.GreaterThanOrEqualTo(0));
 
-                // Group "happy-face" at 0.75 targeting "smile" with weight 0.5
-                // => resolved smile = 0.75 * 0.5 = 0.375 -> BlendShape 37.5f
-                MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 0.75f });
-                MmdUnityFrameApplier.ApplyFrame(instance, frame);
+            MmdModelDefinition model = CreateGroupMorphTriangleModel();
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
+            int smileIndex = instance.Mesh.GetBlendShapeIndex("smile");
+            Assert.That(smileIndex, Is.GreaterThanOrEqualTo(0));
 
-                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
-                Assert.That(renderer.GetBlendShapeWeight(smileIndex), Is.EqualTo(37.5f).Within(0.001f));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            // Group "happy-face" at 0.75 targeting "smile" with weight 0.5
+            // => resolved smile = 0.75 * 0.5 = 0.375 -> BlendShape 37.5f
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 0.75f });
+            MmdUnityFrameApplier.ApplyFrame(instance, frame);
+
+            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+            Assert.That(renderer.GetBlendShapeWeight(smileIndex), Is.EqualTo(37.5f).Within(0.001f));
         }
 
         [Test]
         public void VertexOnlyApplyMorphsWithTimingReportsNoMeshUpload()
         {
-            MmdUnityModelInstance? instance = null;
-            try
+
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.morphs.Add(new MmdMorphDefinition
             {
-                MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-                model.morphs.Add(new MmdMorphDefinition
+                index = 0,
+                name = "blink",
+                type = "vertex",
+                panel = "eye",
+                vertexOffsets =
                 {
-                    index = 0,
-                    name = "blink",
-                    type = "vertex",
-                    panel = "eye",
-                    vertexOffsets =
+                    new MmdVertexMorphOffsetDefinition
                     {
-                        new MmdVertexMorphOffsetDefinition
-                        {
-                            vertexIndex = 1,
-                            positionDelta = new[] { 0.0f, 1.0f, 0.0f }
-                        }
+                        vertexIndex = 1,
+                        positionDelta = new[] { 0.0f, 1.0f, 0.0f }
                     }
-                });
-                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
+                }
+            });
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
 
-                MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-                frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "blink", weight = 1.0f });
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "blink", weight = 1.0f });
 
-                MmdUnityMorphApplyTimingSummary timing = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame);
+            MmdUnityMorphApplyTimingSummary timing = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame);
 
-                Assert.That(timing.hasVertexMorphs, Is.True);
-                Assert.That(timing.hasTextureUvMorphs, Is.False);
-                Assert.That(timing.meshUploadRequired, Is.False);
-                Assert.That(timing.blendShapePathUsed, Is.True);
-                Assert.That(timing.setVerticesMs, Is.EqualTo(0.0).Within(0.000001));
-            }
-            finally
-            {
-                DestroyInstance(instance);
-            }
+            Assert.That(timing.hasVertexMorphs, Is.True);
+            Assert.That(timing.hasTextureUvMorphs, Is.False);
+            Assert.That(timing.meshUploadRequired, Is.False);
+            Assert.That(timing.blendShapePathUsed, Is.True);
+            Assert.That(timing.setVerticesMs, Is.EqualTo(0.0).Within(0.000001));
         }
 
         [Test]
@@ -4609,37 +4115,5 @@ namespace Mmd.Tests
             return instance.SkinnedMeshRenderer!;
         }
 
-        private static void DestroyInstance(MmdUnityModelInstance? instance)
-        {
-            if (instance == null)
-            {
-                return;
-            }
-
-            if (instance.Root != null)
-            {
-                UnityEngine.Object.DestroyImmediate(instance.Root);
-            }
-
-            if (instance.Mesh != null)
-            {
-                UnityEngine.Object.DestroyImmediate(instance.Mesh);
-            }
-
-            if (instance.Materials == null)
-            {
-                return;
-            }
-
-            foreach (Material material in instance.Materials.Where(material => material != null).Distinct())
-            {
-                UnityEngine.Object.DestroyImmediate(material);
-            }
-
-            foreach (Texture2D texture in instance.OwnedTextures.Where(texture => texture != null).Distinct())
-            {
-                UnityEngine.Object.DestroyImmediate(texture);
-            }
-        }
     }
 }
