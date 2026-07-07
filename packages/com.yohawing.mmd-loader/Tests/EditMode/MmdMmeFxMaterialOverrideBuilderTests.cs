@@ -187,7 +187,33 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void BuildMaterialOverrides_IgnoresEmdAssociationForNow()
+        public void BuildMaterialOverrides_MatchesEmdMaterialIndexBeforeBasename()
+        {
+            MmdMaterialDescriptor[] materials =
+            {
+                new MmdMaterialDescriptor { materialIndex = 4, name = "Face" }
+            };
+            MmeFxEffectDescriptor[] effectDescriptors =
+            {
+                new MmeFxEffectDescriptor
+                {
+                    sourcePath = Path.Combine(ProjectRoot, TempDirectory, "body.fx"),
+                    materialIndex = 4,
+                    effectType = "AlternativeFull"
+                }
+            };
+
+            MmdMaterialOverrideEntry[] entries = MmdMmeFxMaterialOverrideBuilder.BuildMaterialOverrides(materials, effectDescriptors);
+
+            Assert.That(entries, Has.Length.EqualTo(1));
+            Assert.That(entries[0].materialIndex, Is.EqualTo(4));
+            Assert.That(entries[0].materialName, Is.EqualTo("Face"));
+            Assert.That(entries[0].sourcePath, Is.EqualTo(effectDescriptors[0].sourcePath));
+            Assert.That(entries[0].effectType, Is.EqualTo("AlternativeFull"));
+        }
+
+        [Test]
+        public void BuildMaterialOverrides_IgnoresRawEmdDescriptor()
         {
             MmdMaterialDescriptor[] materials =
             {

@@ -25,6 +25,20 @@ namespace Mmd.Editor
             }
 
             var entries = new List<MmdMaterialOverrideEntry>();
+            var assignedMaterialIndices = new HashSet<int>();
+            AppendMaterialOverrides(materialDescriptors, effectDescriptors, requireMaterialIndex: true, assignedMaterialIndices, entries);
+            AppendMaterialOverrides(materialDescriptors, effectDescriptors, requireMaterialIndex: false, assignedMaterialIndices, entries);
+
+            return entries.ToArray();
+        }
+
+        private static void AppendMaterialOverrides(
+            IReadOnlyList<MmdMaterialDescriptor> materialDescriptors,
+            IReadOnlyList<MmeFxEffectDescriptor> effectDescriptors,
+            bool requireMaterialIndex,
+            HashSet<int> assignedMaterialIndices,
+            List<MmdMaterialOverrideEntry> entries)
+        {
             for (int i = 0; i < effectDescriptors.Count; i++)
             {
                 MmeFxEffectDescriptor? effectDescriptor = effectDescriptors[i];
@@ -33,9 +47,19 @@ namespace Mmd.Editor
                     continue;
                 }
 
-                string materialName = Path.GetFileNameWithoutExtension(effectDescriptor.sourcePath ?? string.Empty);
-                MmdMaterialDescriptor? matchedMaterial = TryFindMaterialByName(materialDescriptors, materialName);
+                bool hasMaterialIndex = effectDescriptor.materialIndex >= 0;
+                if (hasMaterialIndex != requireMaterialIndex)
+                {
+                    continue;
+                }
+
+                MmdMaterialDescriptor? matchedMaterial = TryFindMaterial(materialDescriptors, effectDescriptor);
                 if (matchedMaterial == null)
+                {
+                    continue;
+                }
+
+                if (!assignedMaterialIndices.Add(matchedMaterial.materialIndex))
                 {
                     continue;
                 }
@@ -72,8 +96,35 @@ namespace Mmd.Editor
 
                 entries.Add(entry);
             }
+        }
 
-            return entries.ToArray();
+        private static MmdMaterialDescriptor? TryFindMaterial(
+            IReadOnlyList<MmdMaterialDescriptor> materialDescriptors,
+            MmeFxEffectDescriptor effectDescriptor)
+        {
+            if (effectDescriptor.materialIndex >= 0)
+            {
+                return TryFindMaterialByIndex(materialDescriptors, effectDescriptor.materialIndex);
+            }
+
+            string materialName = Path.GetFileNameWithoutExtension(effectDescriptor.sourcePath ?? string.Empty);
+            return TryFindMaterialByName(materialDescriptors, materialName);
+        }
+
+        private static MmdMaterialDescriptor? TryFindMaterialByIndex(
+            IReadOnlyList<MmdMaterialDescriptor> materialDescriptors,
+            int materialIndex)
+        {
+            for (int i = 0; i < materialDescriptors.Count; i++)
+            {
+                MmdMaterialDescriptor? materialDescriptor = materialDescriptors[i];
+                if (materialDescriptor != null && materialDescriptor.materialIndex == materialIndex)
+                {
+                    return materialDescriptor;
+                }
+            }
+
+            return null;
         }
 
         private static MmdMaterialDescriptor? TryFindMaterialByName(

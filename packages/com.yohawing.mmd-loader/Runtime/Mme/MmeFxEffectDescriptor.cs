@@ -17,6 +17,7 @@ namespace Mmd.Mme
     {
         public string sourcePath = string.Empty;
         public string effectType = string.Empty;
+        public int materialIndex = -1;
 
         public string? normalMapTexture;
         public string? thresholdTexture;
