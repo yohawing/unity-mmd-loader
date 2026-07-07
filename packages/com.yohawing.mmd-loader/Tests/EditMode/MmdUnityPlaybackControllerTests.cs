@@ -317,24 +317,31 @@ namespace Mmd.Tests
             MmdUnityPlaybackBinding? binding = null;
             try
             {
+                (MmdModelDefinition model, MmdMotionDefinition motion) = LoadPlaybackFixturePair();
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    CreateMinimalTriangleModel(),
-                    CreateRootTranslationMotion(),
-                    "synthetic.pmx",
-                    "synthetic.vmd");
+                    model,
+                    motion,
+                    "test_1bone_cube.pmx",
+                    "test_1bone_cube_motion.vmd");
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f);
                 // controller tick test is about frame advance + evaluated pose, not Live physics frame-0 sequencing
                 controller.SetPhysicsMode(MmdPhysicsMode.Off);
+                const int frame = 9;
+                float[] expectedMmdLocalRotation = { -0.3826833665f, 0.0f, 0.0f, 0.9238795638f };
+                Quaternion expectedLocalRotation = binding.Instance.BindLocalRotations[0]
+                    * ToUnityRotation(expectedMmdLocalRotation);
 
                 controller.Play();
-                controller.Tick(10.0f / 30.0f);
+                controller.Tick(frame / 30.0f);
 
                 Assert.That(controller.IsPlaying, Is.True);
-                Assert.That(controller.CurrentFrame, Is.EqualTo(10));
+                Assert.That(controller.CurrentFrame, Is.EqualTo(frame));
                 Assert.That(controller.LastSnapshot, Is.Not.Null);
-                Assert.That(controller.LastSnapshot!.frame.time, Is.EqualTo(10.0f / 30.0f).Within(0.00001f));
-                Assert.That(binding.Instance.BoneTransforms[0].localPosition, Is.EqualTo(new Vector3(-2.0f, 0.0f, 0.0f)));
+                Assert.That(controller.LastSnapshot!.frame.time, Is.EqualTo(frame / 30.0f).Within(0.00001f));
+                MmdEvaluatedBonePose bonePose = controller.LastSnapshot.frame.bones.Single(bone => bone.index == 0);
+                Assert.That(Quaternion.Angle(ToQuaternion(bonePose.localRotation), ToQuaternion(expectedMmdLocalRotation)), Is.LessThan(0.001f));
+                Assert.That(Quaternion.Angle(binding.Instance.BoneTransforms[0].localRotation, expectedLocalRotation), Is.LessThan(0.001f));
             }
             finally
             {
