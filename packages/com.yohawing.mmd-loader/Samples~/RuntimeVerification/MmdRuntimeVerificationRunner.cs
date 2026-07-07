@@ -604,7 +604,8 @@ namespace Mmd.Samples.RuntimeVerification
                 name = verificationCase.Name,
                 pmxPath = verificationCase.PmxPath,
                 vmdPath = verificationCase.VmdPath,
-                parseOnly = verificationCase.ParseOnly
+                parseOnly = verificationCase.ParseOnly,
+                expectedFeatures = verificationCase.ExpectedFeatures
             };
         }
 

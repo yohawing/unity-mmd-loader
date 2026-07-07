@@ -48,8 +48,9 @@ namespace Mmd.Samples.RuntimeVerification
                     viewerCases[i].Name,
                     viewerCases[i].PmxPath,
                     viewerCases[i].VmdPath,
-                    parseOnly: false,
-                    skipReason: viewerCases[i].SkipReason));
+                    parseOnly: viewerCases[i].ParseOnly,
+                    skipReason: viewerCases[i].SkipReason,
+                    expectedFeatures: viewerCases[i].ExpectedFeatures));
             }
 
             return gateCases.ToArray();
@@ -160,6 +161,9 @@ namespace Mmd.Samples.RuntimeVerification
                     continue;
                 }
 
+                bool caseParseOnly = GetBool(fixtureCase, "parseOnly", false);
+                string[] expectedFeatures = GetStringArray(fixtureCase, "expectedFeatures");
+
                 resolvedCases.Add(new MmdRuntimeViewerFixtureCase(
                     caseName,
                     pmxPath,
@@ -168,7 +172,9 @@ namespace Mmd.Samples.RuntimeVerification
                     ResolveOptionalReference(byExtension, baseDirectory, audio, string.Empty),
                     ResolveOptionalReference(byExtension, baseDirectory, background, string.Empty),
                     ResolveAudioOffsetFrame(fixtureCase, audio),
-                    skipReason));
+                    skipReason,
+                    parseOnly: caseParseOnly,
+                    expectedFeatures: expectedFeatures));
             }
 
             return resolvedCases.ToArray();
@@ -308,6 +314,50 @@ namespace Mmd.Samples.RuntimeVerification
             }
 
             return GetFloat(audio, "offsetFrame", 0.0f);
+        }
+
+        private static bool GetBool(
+            Dictionary<string, object?>? value,
+            string key,
+            bool defaultValue)
+        {
+            if (value == null || !value.TryGetValue(key, out object? child))
+            {
+                return defaultValue;
+            }
+
+            if (child is bool b)
+            {
+                return b;
+            }
+
+            return defaultValue;
+        }
+
+        private static string[] GetStringArray(
+            Dictionary<string, object?>? value,
+            string key)
+        {
+            if (value == null || !value.TryGetValue(key, out object? child))
+            {
+                return Array.Empty<string>();
+            }
+
+            if (child is not List<object?> list || list.Count == 0)
+            {
+                return Array.Empty<string>();
+            }
+
+            var result = new List<string>(list.Count);
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (list[i] is string s && !string.IsNullOrWhiteSpace(s))
+                {
+                    result.Add(s);
+                }
+            }
+
+            return result.ToArray();
         }
 
         private static float GetFloat(
@@ -631,7 +681,9 @@ namespace Mmd.Samples.RuntimeVerification
             string audioPath,
             string backgroundPath,
             float audioOffsetFrame,
-            string skipReason)
+            string skipReason,
+            bool parseOnly = false,
+            string[]? expectedFeatures = null)
         {
             Name = name ?? string.Empty;
             PmxPath = pmxPath ?? string.Empty;
@@ -641,6 +693,8 @@ namespace Mmd.Samples.RuntimeVerification
             BackgroundPath = backgroundPath ?? string.Empty;
             AudioOffsetFrame = audioOffsetFrame;
             SkipReason = skipReason ?? string.Empty;
+            ParseOnly = parseOnly;
+            ExpectedFeatures = expectedFeatures ?? Array.Empty<string>();
         }
 
         public string Name { get; }
@@ -651,5 +705,7 @@ namespace Mmd.Samples.RuntimeVerification
         public string BackgroundPath { get; }
         public float AudioOffsetFrame { get; }
         public string SkipReason { get; }
+        public bool ParseOnly { get; }
+        public string[] ExpectedFeatures { get; }
     }
 }

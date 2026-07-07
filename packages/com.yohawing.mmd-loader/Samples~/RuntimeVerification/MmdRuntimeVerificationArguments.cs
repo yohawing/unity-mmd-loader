@@ -451,13 +451,15 @@ namespace Mmd.Samples.RuntimeVerification
             string pmxPath,
             string vmdPath,
             bool parseOnly,
-            string skipReason)
+            string skipReason,
+            string[]? expectedFeatures = null)
         {
             Name = name ?? string.Empty;
             PmxPath = pmxPath ?? string.Empty;
             VmdPath = vmdPath ?? string.Empty;
             ParseOnly = parseOnly;
             SkipReason = skipReason ?? string.Empty;
+            ExpectedFeatures = expectedFeatures ?? Array.Empty<string>();
         }
 
         public string Name { get; }
@@ -465,5 +467,6 @@ namespace Mmd.Samples.RuntimeVerification
         public string VmdPath { get; }
         public bool ParseOnly { get; }
         public string SkipReason { get; }
+        public string[] ExpectedFeatures { get; }
     }
 }

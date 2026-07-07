@@ -40,6 +40,7 @@ namespace Mmd.Samples.RuntimeVerification
         public MmdRuntimeVerificationPhysicsSummary physics = new();
         public MmdRuntimeVerificationSampledFrame[] sampledFrames =
             Array.Empty<MmdRuntimeVerificationSampledFrame>();
+        public string[] expectedFeatures = Array.Empty<string>();
         public string exception = string.Empty;
         public int consoleErrorCount;
         public int consoleWarningCount;
