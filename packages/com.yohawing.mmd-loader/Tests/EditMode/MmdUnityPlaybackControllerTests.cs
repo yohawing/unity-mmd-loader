@@ -275,22 +275,34 @@ namespace Mmd.Tests
             MmdUnityPlaybackBinding? binding = null;
             try
             {
+                (MmdModelDefinition model, MmdMotionDefinition motion) = LoadPlaybackFixturePair();
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    CreateMinimalTriangleModel(),
-                    CreateRootTranslationMotion(),
-                    "synthetic.pmx",
-                    "synthetic.vmd");
+                    model,
+                    motion,
+                    "test_1bone_cube.pmx",
+                    "test_1bone_cube_motion.vmd");
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f);
                 // arbitrary EditMode evaluation (non-zero ApplyFrame), not normal Live forward playback
                 controller.SetPhysicsMode(MmdPhysicsMode.Off);
+                const int frame = 9;
+                float[] expectedMmdLocalPosition = { 0.0f, 0.0f, 0.0f };
+                float[] expectedMmdLocalRotation = { -0.3826833665f, 0.0f, 0.0f, 0.9238795638f };
+                Vector3 expectedLocalPosition = binding.Instance.BindLocalPositions[0]
+                    + ToUnityPosition(expectedMmdLocalPosition) * binding.Instance.ImportScale;
+                Quaternion expectedLocalRotation = binding.Instance.BindLocalRotations[0]
+                    * ToUnityRotation(expectedMmdLocalRotation);
 
-                MmdPlaybackSnapshot snapshot = controller.ApplyFrame(10);
+                MmdPlaybackSnapshot snapshot = controller.ApplyFrame(frame);
+                MmdEvaluatedBonePose bonePose = snapshot.frame.bones.Single(bone => bone.index == 0);
 
-                Assert.That(snapshot.frame.frame, Is.EqualTo(10));
-                Assert.That(controller.CurrentFrame, Is.EqualTo(10));
+                Assert.That(snapshot.frame.frame, Is.EqualTo(frame));
+                Assert.That(controller.CurrentFrame, Is.EqualTo(frame));
                 Assert.That(controller.LastSnapshot, Is.EqualTo(snapshot));
-                Assert.That(binding.Instance.BoneTransforms[0].localPosition, Is.EqualTo(new Vector3(-2.0f, 0.0f, 0.0f)));
+                Assert.That(Vector3.Distance(ToVector3(bonePose.localPosition), ToVector3(expectedMmdLocalPosition)), Is.LessThan(0.00001f));
+                Assert.That(Quaternion.Angle(ToQuaternion(bonePose.localRotation), ToQuaternion(expectedMmdLocalRotation)), Is.LessThan(0.001f));
+                Assert.That(Vector3.Distance(binding.Instance.BoneTransforms[0].localPosition, expectedLocalPosition), Is.LessThan(0.00001f));
+                Assert.That(Quaternion.Angle(binding.Instance.BoneTransforms[0].localRotation, expectedLocalRotation), Is.LessThan(0.001f));
                 Assert.That(binding.Instance.Root.transform.localScale, Is.EqualTo(Vector3.one));
             }
             finally
@@ -1932,6 +1944,34 @@ namespace Mmd.Tests
         private static string ResolvePackageFixture(string fileName)
         {
             return MmdTestFixtures.FixtureAssetPath(fileName);
+        }
+
+        private static (MmdModelDefinition Model, MmdMotionDefinition Motion) LoadPlaybackFixturePair()
+        {
+            var parser = new NativeMmdParser();
+            MmdModelDefinition model = parser.LoadModel(MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube.pmx"));
+            MmdMotionDefinition motion = parser.LoadMotion(MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube_motion.vmd"));
+            return (model, motion);
+        }
+
+        private static Vector3 ToUnityPosition(float[] position)
+        {
+            return new Vector3(-position[0], position[1], -position[2]);
+        }
+
+        private static Vector3 ToVector3(float[] position)
+        {
+            return new Vector3(position[0], position[1], position[2]);
+        }
+
+        private static Quaternion ToUnityRotation(float[] rotation)
+        {
+            return new Quaternion(-rotation[0], rotation[1], -rotation[2], rotation[3]);
+        }
+
+        private static Quaternion ToQuaternion(float[] rotation)
+        {
+            return new Quaternion(rotation[0], rotation[1], rotation[2], rotation[3]);
         }
 
         private static MmdPmxAsset CreatePmxAsset(string name)
