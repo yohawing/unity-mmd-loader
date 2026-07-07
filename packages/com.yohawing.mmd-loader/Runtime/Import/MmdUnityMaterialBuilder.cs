@@ -69,6 +69,12 @@ namespace Mmd.UnityIntegration
                 textureResolution.Diagnostics,
                 "_ToonMap",
                 "toon");
+
+            if (IsUrpLitShader(shader))
+            {
+                ApplyUrpLitDefaults(materials);
+            }
+
             return materials;
         }
 
@@ -691,6 +697,43 @@ namespace Mmd.UnityIntegration
             }
 
             return null;
+        }
+
+        private static bool IsUrpLitShader(Shader shader)
+        {
+            return shader != null &&
+                string.Equals(shader.name, UrpLitShaderName, StringComparison.Ordinal);
+        }
+
+        private static void ApplyUrpLitDefaults(Material[] materials)
+        {
+            foreach (Material material in materials)
+            {
+                if (material.HasProperty("_Metallic"))
+                {
+                    material.SetFloat("_Metallic", 0.0f);
+                }
+
+                if (material.HasProperty("_Smoothness"))
+                {
+                    material.SetFloat("_Smoothness", 0.5f);
+                }
+
+                if (material.HasProperty("_SpecularHighlights"))
+                {
+                    material.SetFloat("_SpecularHighlights", 1.0f);
+                }
+
+                if (material.HasProperty("_EnvironmentReflections"))
+                {
+                    material.SetFloat("_EnvironmentReflections", 1.0f);
+                }
+
+                if (material.HasProperty("_Cutoff"))
+                {
+                    material.SetFloat("_Cutoff", AlphaClipThreshold);
+                }
+            }
         }
 
         private static void ApplyMaterialColors(Material material, MmdMaterialDescriptor source)

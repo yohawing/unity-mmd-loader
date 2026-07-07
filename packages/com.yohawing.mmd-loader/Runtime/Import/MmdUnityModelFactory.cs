@@ -25,13 +25,32 @@ namespace Mmd.UnityIntegration
 
         public static MmdUnityModelInstance CreateStaticModel(MmdModelDefinition model, string? sourcePath, float importScale)
         {
-            return CreateStaticModel(model, sourcePath, importScale, includeSelfShadowTarget: true);
+            return CreateStaticModel(model, sourcePath, importScale, MmdMaterialPreset.MmdToon);
+        }
+
+        public static MmdUnityModelInstance CreateStaticModel(
+            MmdModelDefinition model,
+            string? sourcePath,
+            float importScale,
+            MmdMaterialPreset preset)
+        {
+            return CreateStaticModel(model, sourcePath, importScale, preset, includeSelfShadowTarget: true);
         }
 
         internal static MmdUnityModelInstance CreateStaticModel(
             MmdModelDefinition model,
             string? sourcePath,
             float importScale,
+            bool includeSelfShadowTarget)
+        {
+            return CreateStaticModel(model, sourcePath, importScale, MmdMaterialPreset.MmdToon, includeSelfShadowTarget);
+        }
+
+        internal static MmdUnityModelInstance CreateStaticModel(
+            MmdModelDefinition model,
+            string? sourcePath,
+            float importScale,
+            MmdMaterialPreset preset,
             bool includeSelfShadowTarget)
         {
             if (model == null)
@@ -41,7 +60,7 @@ namespace Mmd.UnityIntegration
 
             float scale = NormalizeImportScale(importScale);
             return CreateStaticModel(
-                BuildRuntimeRenderingDescriptor(model),
+                BuildRuntimeRenderingDescriptor(model, preset),
                 model.name,
                 model.bones,
                 model.physics,
@@ -74,13 +93,32 @@ namespace Mmd.UnityIntegration
 
         public static MmdUnityModelInstance CreateSkinnedModel(MmdModelDefinition model, string? sourcePath, float importScale)
         {
-            return CreateSkinnedModel(model, sourcePath, importScale, includeSelfShadowTarget: true);
+            return CreateSkinnedModel(model, sourcePath, importScale, MmdMaterialPreset.MmdToon);
+        }
+
+        public static MmdUnityModelInstance CreateSkinnedModel(
+            MmdModelDefinition model,
+            string? sourcePath,
+            float importScale,
+            MmdMaterialPreset preset)
+        {
+            return CreateSkinnedModel(model, sourcePath, importScale, preset, includeSelfShadowTarget: true);
         }
 
         internal static MmdUnityModelInstance CreateSkinnedModel(
             MmdModelDefinition model,
             string? sourcePath,
             float importScale,
+            bool includeSelfShadowTarget)
+        {
+            return CreateSkinnedModel(model, sourcePath, importScale, MmdMaterialPreset.MmdToon, includeSelfShadowTarget);
+        }
+
+        internal static MmdUnityModelInstance CreateSkinnedModel(
+            MmdModelDefinition model,
+            string? sourcePath,
+            float importScale,
+            MmdMaterialPreset preset,
             bool includeSelfShadowTarget)
         {
             if (model == null)
@@ -95,7 +133,7 @@ namespace Mmd.UnityIntegration
 
             float scale = NormalizeImportScale(importScale);
             return CreateSkinnedModel(
-                BuildRuntimeRenderingDescriptor(model),
+                BuildRuntimeRenderingDescriptor(model, preset),
                 model.name,
                 model.bones,
                 model.physics,
@@ -199,9 +237,11 @@ namespace Mmd.UnityIntegration
                 scale);
         }
 
-        private static MmdRenderingDescriptor BuildRuntimeRenderingDescriptor(MmdModelDefinition model)
+        private static MmdRenderingDescriptor BuildRuntimeRenderingDescriptor(
+            MmdModelDefinition model,
+            MmdMaterialPreset preset = MmdMaterialPreset.MmdToon)
         {
-            return MmdRenderingMeshSplitter.SplitBySubmesh(MmdRenderingDescriptorBuilder.Build(model)).rendering;
+            return MmdRenderingMeshSplitter.SplitBySubmesh(MmdRenderingDescriptorBuilder.Build(model, preset)).rendering;
         }
 
         private static MmdUnityModelInstance CreateStaticModel(

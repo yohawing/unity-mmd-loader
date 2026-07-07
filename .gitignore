@@ -37,6 +37,9 @@ packages/**/Runtime/Plugins/**/*.exp.meta
 **/__pycache__/
 *.py[cod]
 
+# Terminal session logs
+terminals/
+
 # AI development logs and instruction files
 AGENTS.md
 CLAUDE.md
