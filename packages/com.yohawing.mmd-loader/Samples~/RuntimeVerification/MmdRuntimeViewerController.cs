@@ -13,6 +13,25 @@ using UnityEngine.Networking;
 
 namespace Mmd.Samples.RuntimeVerification
 {
+    [System.Serializable]
+    internal sealed class MmdRecentEntry
+    {
+        public string name = string.Empty;
+        public string pmxPath = string.Empty;
+        public string vmdPath = string.Empty;
+        public string cameraPath = string.Empty;
+        public string audioPath = string.Empty;
+        public string backgroundPath = string.Empty;
+        public float audioOffsetFrame;
+        public long timestamp;
+    }
+
+    [System.Serializable]
+    internal sealed class MmdRecentEntryList
+    {
+        public List<MmdRecentEntry> entries = new();
+    }
+
     public sealed class MmdRuntimeViewerController : MonoBehaviour
     {
         public static Func<string, string, string>? BrowseFileOverride;
@@ -38,6 +57,10 @@ namespace Mmd.Samples.RuntimeVerification
         private AudioSource? audioSource;
         private float audioOffsetFrame;
         private GameObject? backgroundRoot;
+        private const int MaxRecentEntries = 16;
+        private const string RecentsFileName = "mmd-viewer-recents.json";
+        private MmdRecentEntryList recentEntries = new();
+        private Vector2 recentsScroll;
 
         public void Initialize(MmdRuntimeVerificationArguments viewerArguments)
         {
@@ -53,6 +76,7 @@ namespace Mmd.Samples.RuntimeVerification
             }
 
             ReloadCases();
+            LoadRecents();
             if (cases.Length > 0)
             {
                 SelectCase(0);
@@ -275,6 +299,49 @@ namespace Mmd.Samples.RuntimeVerification
             }
 
             GUILayout.EndScrollView();
+
+            if (recentEntries.entries.Count > 0)
+            {
+                GUILayout.Space(6.0f);
+                GUILayout.BeginHorizontal();
+                GUILayout.Label("Recents");
+                if (GUILayout.Button("Clear", GUILayout.Width(50.0f)))
+                {
+                    recentEntries.entries.Clear();
+                    SaveRecents();
+                }
+
+                GUILayout.EndHorizontal();
+                recentsScroll = GUILayout.BeginScrollView(recentsScroll, GUILayout.Height(Mathf.Min(120.0f, recentEntries.entries.Count * 22.0f)));
+                for (int i = 0; i < recentEntries.entries.Count; i++)
+                {
+                    MmdRecentEntry entry = recentEntries.entries[i];
+                    if (!File.Exists(entry.pmxPath))
+                    {
+                        GUI.enabled = false;
+                    }
+
+                    if (GUILayout.Button(entry.name))
+                    {
+                        try
+                        {
+                            selectedIndex = -1;
+                            StartPlayback(entry.pmxPath, entry.vmdPath, entry.name,
+                                entry.cameraPath, entry.audioPath, entry.backgroundPath, entry.audioOffsetFrame);
+                            AddStatus("Playing (recent): " + entry.name);
+                        }
+                        catch (Exception ex)
+                        {
+                            ClearPlayback();
+                            AddStatus("Load failed: " + ex.GetType().Name + ": " + ex.Message);
+                        }
+                    }
+
+                    GUI.enabled = true;
+                }
+
+                GUILayout.EndScrollView();
+            }
 
             GUILayout.Space(6.0f);
             DrawSelectedCase();
@@ -533,6 +600,8 @@ namespace Mmd.Samples.RuntimeVerification
             {
                 LoadBackground(backgroundPath);
             }
+
+            AddRecent(displayName, pmxPath, vmdPath, cameraPath, audioPath, backgroundPath, audioOffset);
         }
 
         private void AutoCenterCamera()
@@ -732,6 +801,83 @@ namespace Mmd.Samples.RuntimeVerification
             }
 
             Debug.Log("[RuntimeViewer] " + line);
+        }
+
+        private string GetRecentsFilePath()
+        {
+            return Path.Combine(Application.persistentDataPath, RecentsFileName);
+        }
+
+        private void LoadRecents()
+        {
+            string path = GetRecentsFilePath();
+            if (!File.Exists(path))
+            {
+                recentEntries = new MmdRecentEntryList();
+                return;
+            }
+
+            try
+            {
+                string json = File.ReadAllText(path);
+                recentEntries = JsonUtility.FromJson<MmdRecentEntryList>(json) ?? new MmdRecentEntryList();
+            }
+            catch (Exception)
+            {
+                recentEntries = new MmdRecentEntryList();
+            }
+        }
+
+        private void SaveRecents()
+        {
+            try
+            {
+                string json = JsonUtility.ToJson(recentEntries, prettyPrint: true);
+                string path = GetRecentsFilePath();
+                string? directory = Path.GetDirectoryName(path);
+                if (directory != null && !Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                File.WriteAllText(path, json);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[RuntimeViewer] Failed to save recents: " + ex.Message);
+            }
+        }
+
+        private void AddRecent(string name, string pmxPath, string vmdPath,
+            string cameraPath = "", string audioPath = "", string backgroundPath = "", float audioOffset = 0.0f)
+        {
+            recentEntries.entries.RemoveAll(e =>
+                string.Equals(e.pmxPath, pmxPath, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(e.vmdPath, vmdPath, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(e.cameraPath, cameraPath, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(e.audioPath, audioPath, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(e.backgroundPath, backgroundPath, StringComparison.OrdinalIgnoreCase));
+
+            var entry = new MmdRecentEntry
+            {
+                name = name,
+                pmxPath = pmxPath,
+                vmdPath = vmdPath,
+                cameraPath = cameraPath,
+                audioPath = audioPath,
+                backgroundPath = backgroundPath,
+                audioOffsetFrame = audioOffset,
+                timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+            };
+
+            recentEntries.entries.Insert(0, entry);
+
+            if (recentEntries.entries.Count > MaxRecentEntries)
+            {
+                recentEntries.entries.RemoveRange(MaxRecentEntries, recentEntries.entries.Count - MaxRecentEntries);
+            }
+
+            SaveRecents();
         }
     }
 }
