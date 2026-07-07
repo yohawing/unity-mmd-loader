@@ -1217,25 +1217,13 @@ namespace Mmd.Tests
         [Test]
         public void PlaybackBindingAppliesVertexMorphWeightsToSkinnedMeshWithoutAccumulation()
         {
-            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
-            model.morphs.Add(new MmdMorphDefinition
-            {
-                index = 0,
-                name = "blink",
-                type = "vertex",
-                panel = "eye",
-                vertexOffsets =
-                {
-                    new MmdVertexMorphOffsetDefinition
-                    {
-                        vertexIndex = 1,
-                        positionDelta = new[] { 0.0f, 2.0f, 0.0f }
-                    }
-                }
-            });
-
-            MmdUnityPlaybackBinding binding = MmdUnityPlaybackBinding.CreateSkinned(model, CreateBlinkMorphMotion(), "morph-model.pmx", "blink.vmd");
-            using var bindingScope = new MmdTestInstanceScope(binding.Instance);
+            (MmdModelDefinition model, MmdMotionDefinition motion) = LoadVertexMorphFixturePair();
+            MmdUnityPlaybackBinding binding = MmdUnityPlaybackBinding.CreateSkinned(
+                model,
+                motion,
+                "test_vertex_morph.pmx",
+                "test_vertex_morph_motion.vmd");
+            using var scope = new MmdTestInstanceScope(binding.Instance);
 
             Assert.That(binding.Instance.SkinnedMeshRenderer, Is.Not.Null);
             SkinnedMeshRenderer renderer = binding.Instance.SkinnedMeshRenderer!;
@@ -2185,26 +2173,12 @@ namespace Mmd.Tests
             return (model, motion);
         }
 
-        private static MmdMotionDefinition CreateBlinkMorphMotion()
+        private static (MmdModelDefinition Model, MmdMotionDefinition Motion) LoadVertexMorphFixturePair()
         {
-            var motion = new MmdMotionDefinition
-            {
-                targetModelName = "minimal-static-triangle",
-                maxFrame = 10
-            };
-            motion.morphKeyframes.Add(new MmdMorphKeyframeDefinition
-            {
-                morphName = "blink",
-                frame = 0,
-                weight = 0.0f
-            });
-            motion.morphKeyframes.Add(new MmdMorphKeyframeDefinition
-            {
-                morphName = "blink",
-                frame = 10,
-                weight = 1.0f
-            });
-            return motion;
+            var parser = new NativeMmdParser();
+            MmdModelDefinition model = parser.LoadModel(MmdTestFixtures.ReadFixtureAssetBytes("test_vertex_morph.pmx"));
+            MmdMotionDefinition motion = parser.LoadMotion(MmdTestFixtures.ReadFixtureAssetBytes("test_vertex_morph_motion.vmd"));
+            return (model, motion);
         }
 
         private static MmdBoneInterpolationDefinition LinearInterpolation()
