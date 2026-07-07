@@ -18,7 +18,7 @@ namespace Mmd.Mme
             new(@"^\s*#define\s+(\w+)\s+(\d+)", RegexOptions.Compiled);
 
         private static readonly Regex FloatVarRegex =
-            new(@"^\s*(?:static\s+)?(?:const\s+)?float\s+(\w+)\s*=\s*([\d.eE+\-]+)\s*;",
+            new(@"^\s*(?:static\s+)?(?:const\s+)?float\s+(\w+)\s*=\s*([-+]?(?:(?:\d+\.?\d*)|(?:\.\d+))(?:[eE][-+]?\d+)?)[fF]?\s*;",
                 RegexOptions.Compiled);
 
         private static readonly Regex IncludeRegex =
@@ -161,6 +161,8 @@ namespace Mmd.Mme
                 return;
             }
 
+            UpsertFloatParameter(descriptor, name, value);
+
             switch (name)
             {
                 case "NormalMapResolution":
@@ -179,6 +181,25 @@ namespace Mmd.Mme
                     descriptor.metalness = value;
                     break;
             }
+        }
+
+        private static void UpsertFloatParameter(MmeFxEffectDescriptor descriptor, string name, float value)
+        {
+            for (int i = 0; i < descriptor.floatParameters.Count; i++)
+            {
+                MmeFxFloatParameter parameter = descriptor.floatParameters[i];
+                if (string.Equals(parameter.name, name, StringComparison.Ordinal))
+                {
+                    parameter.value = value;
+                    return;
+                }
+            }
+
+            descriptor.floatParameters.Add(new MmeFxFloatParameter
+            {
+                name = name,
+                value = value
+            });
         }
 
         private static void ParseInclude(string line, MmeFxEffectDescriptor descriptor)

@@ -132,6 +132,31 @@ static const float metalness = 0.0;
         }
 
         [Test]
+        public void TryParse_PreservesExtendedFloatParameters()
+        {
+            string content = @"float IBL_SkyIntensity = 1.25f;
+static const float RimLightPower = .5;
+float Rim_Intensity = 2;
+float SpecularLight_Strength = 0.75;
+float Subsurface_Scale = 0.125;
+float Toon_RampOffset = -1.5e-1;
+float Alpha_Threshold = 0.02;
+#include ""AlternativeFull.fxsub""
+";
+
+            MmeFxEffectDescriptor? result = MmeFxParser.TryParse(content, "fx/body.fx");
+
+            Assert.That(result, Is.Not.Null);
+            AssertFloatParameter(result!, "IBL_SkyIntensity", 1.25f);
+            AssertFloatParameter(result, "RimLightPower", 0.5f);
+            AssertFloatParameter(result, "Rim_Intensity", 2.0f);
+            AssertFloatParameter(result, "SpecularLight_Strength", 0.75f);
+            AssertFloatParameter(result, "Subsurface_Scale", 0.125f);
+            AssertFloatParameter(result, "Toon_RampOffset", -0.15f);
+            AssertFloatParameter(result, "Alpha_Threshold", 0.02f);
+        }
+
+        [Test]
         public void TryParse_EmptyContent_ReturnsNull()
         {
             MmeFxEffectDescriptor? result = MmeFxParser.TryParse("", "test.fx");
@@ -182,6 +207,15 @@ float SoftShadowParam = 2;
             Assert.That(result!.useNormalMap, Is.False);
             Assert.That(result.useSoftShadow, Is.False);
             Assert.That(result.maxAnisotropy, Is.EqualTo(0));
+        }
+
+        private static void AssertFloatParameter(
+            MmeFxEffectDescriptor descriptor,
+            string name,
+            float expected)
+        {
+            Assert.That(descriptor.TryGetFloatParameter(name, out float value), Is.True);
+            Assert.That(value, Is.EqualTo(expected).Within(1e-6f));
         }
     }
 }
