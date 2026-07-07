@@ -1235,26 +1235,34 @@ namespace Mmd.Tests
             MmdUnityPlaybackBinding? binding = null;
             try
             {
+                (MmdModelDefinition model, MmdMotionDefinition motion) = LoadPlaybackFixturePair();
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    CreateMinimalTriangleModel(),
-                    CreateRootTranslationMotion(),
-                    "synthetic.pmx",
-                    "synthetic.vmd");
+                    model,
+                    motion,
+                    "test_1bone_cube.pmx",
+                    "test_1bone_cube_motion.vmd");
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f);
                 // controller start/tick test is about PlayOnStart + frame advance + evaluated pose, not Live physics frame-0 sequencing
                 controller.SetPhysicsMode(MmdPhysicsMode.Off);
 
+                const int frame = 9;
+                float[] expectedMmdLocalRotation = { -0.3826833665f, 0.0f, 0.0f, 0.9238795638f };
+                Quaternion expectedLocalRotation = binding.Instance.BindLocalRotations[0]
+                    * ToUnityRotation(expectedMmdLocalRotation);
+
                 Assert.That(controller.PlayOnStart, Is.True);
                 Assert.That(controller.IsPlaying, Is.False);
 
                 controller.StartPlaybackIfRequested();
-                controller.Tick(10.0f / 30.0f);
+                controller.Tick(frame / 30.0f);
 
                 Assert.That(controller.IsPlaying, Is.True);
-                Assert.That(controller.CurrentFrame, Is.EqualTo(10));
+                Assert.That(controller.CurrentFrame, Is.EqualTo(frame));
                 Assert.That(controller.LastSnapshot, Is.Not.Null);
-                Assert.That(binding.Instance.BoneTransforms[0].localPosition, Is.EqualTo(new Vector3(-2.0f, 0.0f, 0.0f)));
+                Assert.That(
+                    Quaternion.Angle(binding.Instance.BoneTransforms[0].localRotation, expectedLocalRotation),
+                    Is.LessThan(0.001f));
             }
             finally
             {
@@ -1710,17 +1718,32 @@ namespace Mmd.Tests
             MmdUnityPlaybackBinding? binding = null;
             try
             {
+                (MmdModelDefinition model, MmdMotionDefinition motion) = LoadAppendFixturePair();
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    CreateMinimalTriangleModel(),
-                    CreateRootTranslationMotion(),
-                    "synthetic.pmx",
-                    "synthetic.vmd");
+                    model,
+                    motion,
+                    "test_append_bone.pmx",
+                    "test_append_bone.vmd");
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f);
                 // arbitrary EditMode evaluation (non-zero ApplyFrame to reach non-bind state), not normal Live forward playback
                 controller.SetPhysicsMode(MmdPhysicsMode.Off);
 
-                controller.ApplyFrame(10);
+                int translatedBoneIndex = model.bones.FindIndex(bone => bone.name == "A親");
+                Assert.That(translatedBoneIndex, Is.Not.EqualTo(-1));
+                const int nonBindFrame = 5;
+                float[] expectedMmdLocalPosition = { -1.0f, 0.0f, 0.0f };
+                float[] expectedMmdLocalRotation = { 0.3826833665f, 0.0f, 0.0f, 0.9238795638f };
+                Vector3 expectedNonBindLocalPosition = binding.Instance.BindLocalPositions[translatedBoneIndex]
+                    + ToUnityPosition(expectedMmdLocalPosition);
+                Quaternion expectedNonBindLocalRotation = binding.Instance.BindLocalRotations[translatedBoneIndex]
+                    * ToUnityRotation(expectedMmdLocalRotation);
+
+                controller.ApplyFrame(nonBindFrame);
+                Assert.That(binding.Instance.BoneTransforms[translatedBoneIndex].localPosition, Is.EqualTo(expectedNonBindLocalPosition));
+                Assert.That(
+                    Quaternion.Angle(binding.Instance.BoneTransforms[translatedBoneIndex].localRotation, expectedNonBindLocalRotation),
+                    Is.LessThan(0.001f));
                 controller.Play();
                 controller.Stop();
 
@@ -1728,7 +1751,14 @@ namespace Mmd.Tests
                 Assert.That(controller.CurrentFrame, Is.EqualTo(0));
                 Assert.That(controller.LastSnapshot, Is.Not.Null);
                 Assert.That(controller.LastSnapshot!.frame.frame, Is.EqualTo(0));
-                Assert.That(binding.Instance.BoneTransforms[0].localPosition, Is.EqualTo(Vector3.zero));
+                Assert.That(
+                    binding.Instance.BoneTransforms[translatedBoneIndex].localPosition,
+                    Is.EqualTo(binding.Instance.BindLocalPositions[translatedBoneIndex]));
+                Assert.That(
+                    Quaternion.Angle(
+                        binding.Instance.BoneTransforms[translatedBoneIndex].localRotation,
+                        binding.Instance.BindLocalRotations[translatedBoneIndex]),
+                    Is.LessThan(0.001f));
             }
             finally
             {
@@ -1979,6 +2009,14 @@ namespace Mmd.Tests
             var parser = new NativeMmdParser();
             MmdModelDefinition model = parser.LoadModel(MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube.pmx"));
             MmdMotionDefinition motion = parser.LoadMotion(MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube_motion.vmd"));
+            return (model, motion);
+        }
+
+        private static (MmdModelDefinition Model, MmdMotionDefinition Motion) LoadAppendFixturePair()
+        {
+            var parser = new NativeMmdParser();
+            MmdModelDefinition model = parser.LoadModel(MmdTestFixtures.ReadFixtureAssetBytes("test_append_bone.pmx"));
+            MmdMotionDefinition motion = parser.LoadMotion(MmdTestFixtures.ReadFixtureAssetBytes("test_append_bone.vmd"));
             return (model, motion);
         }
 
