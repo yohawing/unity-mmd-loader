@@ -66,7 +66,8 @@ namespace Mmd.Editor
                         model,
                         sourcePath,
                         importScale,
-                        MmdPmxModelPresetPolicy.AllowsAutomaticSelfShadowTarget(pmxAsset.ModelPreset)));
+                        MmdPmxModelPresetPolicy.AllowsAutomaticSelfShadowTarget(pmxAsset.ModelPreset),
+                        pmxAsset.MaterialOverrideAsset));
                 // Apply material remaps on the Slice B path (consistent with UseImportedPmxAssetReferences).
                 instance = ApplyMaterialRemapsToInstance(instance, pmxAsset);
             }

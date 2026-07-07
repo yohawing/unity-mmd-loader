@@ -264,6 +264,500 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void MmdToonMaterialOverrideByIndexAppliesMaterialMorphWriteSet()
+        {
+            MmdModelDefinition model = CreateTwoMaterialModel();
+            MmdMaterialOverrideAsset? overrideAsset = null;
+            MmdUnityModelInstance? instance = null;
+
+            try
+            {
+                overrideAsset = ScriptableObject.CreateInstance<MmdMaterialOverrideAsset>();
+                overrideAsset.entries = new[]
+                {
+                    new MmdMaterialOverrideEntry
+                    {
+                        materialIndex = 0,
+                        hasBaseColor = true,
+                        baseColor = new Color(0.2f, 0.4f, 0.6f, 0.45f),
+                        hasColor = true,
+                        color = new Color(0.9f, 0.8f, 0.7f, 0.45f),
+                        hasAlpha = true,
+                        alpha = 0.45f,
+                        hasAmbientColor = true,
+                        ambientColor = new Color(0.1f, 0.2f, 0.3f, 1.0f),
+                        hasOutlineColor = true,
+                        outlineColor = new Color(0.7f, 0.6f, 0.5f, 0.4f),
+                        hasOutlineWidth = true,
+                        outlineWidth = 1.75f
+                    }
+                };
+
+                instance = MmdUnityModelFactory.CreateStaticModel(
+                    model,
+                    sourcePath: null,
+                    importScale: 1.0f,
+                    preset: MmdMaterialPreset.MmdToon,
+                    materialOverride: overrideAsset);
+
+                Material material = instance.Materials[0];
+                AssertMaterialColor(material, MmdMaterialPropertyNames.BaseColor, new Color(0.2f, 0.4f, 0.6f, 0.45f));
+                AssertMaterialColor(material, MmdMaterialPropertyNames.Color, new Color(0.9f, 0.8f, 0.7f, 0.45f));
+                AssertMaterialColor(material, MmdMaterialPropertyNames.AmbientColor, new Color(0.1f, 0.2f, 0.3f, 1.0f));
+                AssertMaterialColor(material, MmdMaterialPropertyNames.OutlineColor, new Color(0.7f, 0.6f, 0.5f, 0.4f));
+                Assert.That(ReadMaterialFloat(material, MmdMaterialPropertyNames.OutlineWidth), Is.EqualTo(1.75f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(material, MmdMaterialPropertyNames.OutlineVisible), Is.EqualTo(1.0f).Within(0.00001f));
+                MmdUrpMaterialBindingDescriptor binding = instance.RenderingDescriptor.urpMaterialBindings[0];
+                Assert.That(binding.diffuseColor[0], Is.EqualTo(0.2f).Within(0.00001f));
+                Assert.That(binding.diffuseColor[1], Is.EqualTo(0.4f).Within(0.00001f));
+                Assert.That(binding.diffuseColor[2], Is.EqualTo(0.6f).Within(0.00001f));
+                Assert.That(binding.alpha, Is.EqualTo(0.45f).Within(0.00001f));
+                Assert.That(binding.ambientColor[0], Is.EqualTo(0.1f).Within(0.00001f));
+                Assert.That(binding.ambientColor[1], Is.EqualTo(0.2f).Within(0.00001f));
+                Assert.That(binding.ambientColor[2], Is.EqualTo(0.3f).Within(0.00001f));
+                Assert.That(binding.edgeColor[0], Is.EqualTo(0.7f).Within(0.00001f));
+                Assert.That(binding.edgeColor[1], Is.EqualTo(0.6f).Within(0.00001f));
+                Assert.That(binding.edgeColor[2], Is.EqualTo(0.5f).Within(0.00001f));
+                Assert.That(binding.edgeColor[3], Is.EqualTo(0.4f).Within(0.00001f));
+                Assert.That(binding.edgeSize, Is.EqualTo(1.75f).Within(0.00001f));
+                Assert.That(binding.drawEdgeFlag, Is.True);
+                Assert.That(binding.isTransparent, Is.True);
+                Assert.That(binding.transparencyMode, Is.EqualTo("alphaBlend"));
+            }
+            finally
+            {
+                DestroyInstance(instance);
+                if (overrideAsset != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(overrideAsset);
+                }
+            }
+        }
+
+        [Test]
+        public void UrpLitMaterialOverrideAppliesAlphaClipAndAlphaBlendSurfaceState()
+        {
+            MmdModelDefinition model = CreateTwoMaterialModel();
+            MmdMaterialOverrideAsset? overrideAsset = null;
+            MmdUnityModelInstance? instance = null;
+
+            try
+            {
+                overrideAsset = ScriptableObject.CreateInstance<MmdMaterialOverrideAsset>();
+                overrideAsset.entries = new[]
+                {
+                    new MmdMaterialOverrideEntry
+                    {
+                        materialIndex = 0,
+                        hasBaseColor = true,
+                        baseColor = new Color(0.2f, 0.4f, 0.6f, 0.45f),
+                        hasColor = true,
+                        color = new Color(0.9f, 0.8f, 0.7f, 0.45f),
+                        hasAlpha = true,
+                        alpha = 0.45f,
+                        hasAlphaClipThreshold = true,
+                        alphaClipThreshold = 0.35f,
+                        hasSurfaceMode = true,
+                        surfaceMode = MmdMaterialOverrideSurfaceMode.AlphaBlend
+                    }
+                };
+
+                instance = MmdUnityModelFactory.CreateStaticModel(
+                    model,
+                    sourcePath: null,
+                    importScale: 1.0f,
+                    preset: MmdMaterialPreset.UrpLit,
+                    materialOverride: overrideAsset);
+
+                Material material = instance.Materials[0];
+                AssertMaterialColor(material, MmdMaterialPropertyNames.BaseColor, new Color(0.2f, 0.4f, 0.6f, 0.45f));
+                AssertMaterialColor(material, MmdMaterialPropertyNames.Color, new Color(0.9f, 0.8f, 0.7f, 0.45f));
+                Assert.That(ReadMaterialFloat(material, MmdMaterialPropertyNames.Cutoff), Is.EqualTo(0.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(material, "_Surface"), Is.EqualTo(1.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(material, "_SrcBlend"), Is.EqualTo((float)UnityEngine.Rendering.BlendMode.SrcAlpha).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(material, "_DstBlend"), Is.EqualTo((float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha).Within(0.00001f));
+                Assert.That(material.renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
+                MmdUrpMaterialBindingDescriptor binding = instance.RenderingDescriptor.urpMaterialBindings[0];
+                Assert.That(binding.alpha, Is.EqualTo(0.45f).Within(0.00001f));
+                Assert.That(binding.isTransparent, Is.True);
+                Assert.That(binding.transparencyMode, Is.EqualTo("alphaBlend"));
+                Assert.That(binding.renderOrderBucket, Is.EqualTo("alphaBlend"));
+            }
+            finally
+            {
+                DestroyInstance(instance);
+                if (overrideAsset != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(overrideAsset);
+                }
+            }
+        }
+
+        [Test]
+        public void MmdToonAlphaOnlyOverridePreservesExistingAlphaBlendSurfacePolicy()
+        {
+            MmdModelDefinition model = CreateTwoMaterialModel();
+            MmdMaterialOverrideAsset? overrideAsset = null;
+            MmdUnityModelInstance? instance = null;
+
+            try
+            {
+                overrideAsset = ScriptableObject.CreateInstance<MmdMaterialOverrideAsset>();
+                overrideAsset.entries = new[]
+                {
+                    new MmdMaterialOverrideEntry
+                    {
+                        materialIndex = 0,
+                        hasAlphaClipThreshold = true,
+                        alphaClipThreshold = 0.35f,
+                        hasSurfaceMode = true,
+                        surfaceMode = MmdMaterialOverrideSurfaceMode.AlphaBlend
+                    },
+                    new MmdMaterialOverrideEntry
+                    {
+                        materialIndex = 0,
+                        hasAlpha = true,
+                        alpha = 1.0f
+                    }
+                };
+
+                instance = MmdUnityModelFactory.CreateStaticModel(
+                    model,
+                    sourcePath: null,
+                    importScale: 1.0f,
+                    preset: MmdMaterialPreset.MmdToon,
+                    materialOverride: overrideAsset);
+
+                Material material = instance.Materials[0];
+                Assert.That(ReadMaterialFloat(material, MmdMaterialPropertyNames.Alpha), Is.EqualTo(1.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(material, MmdMaterialPropertyNames.AlphaClipThreshold), Is.EqualTo(0.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(material, MmdMaterialPropertyNames.ShadowAlphaClipThreshold), Is.EqualTo(0.35f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(material, MmdMaterialPropertyNames.TextureAlphaOutputWeight), Is.EqualTo(1.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(material, "_SrcBlend"), Is.EqualTo((float)UnityEngine.Rendering.BlendMode.SrcAlpha).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(material, "_DstBlend"), Is.EqualTo((float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha).Within(0.00001f));
+                Assert.That(material.renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
+                MmdUrpMaterialBindingDescriptor binding = instance.RenderingDescriptor.urpMaterialBindings[0];
+                Assert.That(binding.alpha, Is.EqualTo(1.0f).Within(0.00001f));
+                Assert.That(binding.isTransparent, Is.True);
+                Assert.That(binding.transparencyMode, Is.EqualTo("alphaBlend"));
+                Assert.That(binding.renderOrderBucket, Is.EqualTo("alphaBlend"));
+            }
+            finally
+            {
+                DestroyInstance(instance);
+                if (overrideAsset != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(overrideAsset);
+                }
+            }
+        }
+
+        [Test]
+        public void MmdToonAlphaOnlyOverridePreservesExistingOpaqueSurfacePolicy()
+        {
+            MmdModelDefinition model = CreateTwoMaterialModel();
+            MmdMaterialOverrideAsset? overrideAsset = null;
+            MmdUnityModelInstance? instance = null;
+
+            try
+            {
+                overrideAsset = ScriptableObject.CreateInstance<MmdMaterialOverrideAsset>();
+                overrideAsset.entries = new[]
+                {
+                    new MmdMaterialOverrideEntry
+                    {
+                        materialIndex = 0,
+                        hasSurfaceMode = true,
+                        surfaceMode = MmdMaterialOverrideSurfaceMode.Opaque
+                    },
+                    new MmdMaterialOverrideEntry
+                    {
+                        materialIndex = 0,
+                        hasAlpha = true,
+                        alpha = 0.45f
+                    }
+                };
+
+                instance = MmdUnityModelFactory.CreateStaticModel(
+                    model,
+                    sourcePath: null,
+                    importScale: 1.0f,
+                    preset: MmdMaterialPreset.MmdToon,
+                    materialOverride: overrideAsset);
+
+                Material material = instance.Materials[0];
+                Assert.That(ReadMaterialFloat(material, MmdMaterialPropertyNames.Alpha), Is.EqualTo(0.45f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(material, MmdMaterialPropertyNames.TextureAlphaOutputWeight), Is.EqualTo(0.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(material, "_SrcBlend"), Is.EqualTo((float)UnityEngine.Rendering.BlendMode.One).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(material, "_DstBlend"), Is.EqualTo((float)UnityEngine.Rendering.BlendMode.Zero).Within(0.00001f));
+                Assert.That(material.renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Geometry));
+                MmdUrpMaterialBindingDescriptor binding = instance.RenderingDescriptor.urpMaterialBindings[0];
+                Assert.That(binding.alpha, Is.EqualTo(0.45f).Within(0.00001f));
+                Assert.That(binding.isTransparent, Is.False);
+                Assert.That(binding.transparencyMode, Is.EqualTo("opaque"));
+                Assert.That(binding.renderOrderBucket, Is.EqualTo("opaque"));
+            }
+            finally
+            {
+                DestroyInstance(instance);
+                if (overrideAsset != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(overrideAsset);
+                }
+            }
+        }
+
+        [Test]
+        public void MmdToonAlphaResetOverridePreservesAutoAlphaBlendSurfacePolicy()
+        {
+            MmdModelDefinition model = CreateTwoMaterialModel();
+            MmdMaterialOverrideAsset? overrideAsset = null;
+            MmdUnityModelInstance? instance = null;
+
+            try
+            {
+                overrideAsset = ScriptableObject.CreateInstance<MmdMaterialOverrideAsset>();
+                overrideAsset.entries = new[]
+                {
+                    new MmdMaterialOverrideEntry
+                    {
+                        materialIndex = 0,
+                        hasAlpha = true,
+                        alpha = 0.45f
+                    },
+                    new MmdMaterialOverrideEntry
+                    {
+                        materialIndex = 0,
+                        hasAlpha = true,
+                        alpha = 1.0f
+                    }
+                };
+
+                instance = MmdUnityModelFactory.CreateStaticModel(
+                    model,
+                    sourcePath: null,
+                    importScale: 1.0f,
+                    preset: MmdMaterialPreset.MmdToon,
+                    materialOverride: overrideAsset);
+
+                Material material = instance.Materials[0];
+                Assert.That(ReadMaterialFloat(material, MmdMaterialPropertyNames.Alpha), Is.EqualTo(1.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(material, MmdMaterialPropertyNames.TextureAlphaOutputWeight), Is.EqualTo(1.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(material, "_SrcBlend"), Is.EqualTo((float)UnityEngine.Rendering.BlendMode.SrcAlpha).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(material, "_DstBlend"), Is.EqualTo((float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha).Within(0.00001f));
+                Assert.That(material.renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
+                MmdUrpMaterialBindingDescriptor binding = instance.RenderingDescriptor.urpMaterialBindings[0];
+                Assert.That(binding.alpha, Is.EqualTo(1.0f).Within(0.00001f));
+                Assert.That(binding.isTransparent, Is.True);
+                Assert.That(binding.transparencyMode, Is.EqualTo("alphaBlend"));
+                Assert.That(binding.renderOrderBucket, Is.EqualTo("alphaBlend"));
+            }
+            finally
+            {
+                DestroyInstance(instance);
+                if (overrideAsset != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(overrideAsset);
+                }
+            }
+        }
+
+        [Test]
+        public void MmdToonSurfacePreserveOverrideDoesNotReclassifyAlpha()
+        {
+            MmdModelDefinition model = CreateTwoMaterialModel();
+            MmdMaterialOverrideAsset? overrideAsset = null;
+            MmdUnityModelInstance? instance = null;
+
+            try
+            {
+                overrideAsset = ScriptableObject.CreateInstance<MmdMaterialOverrideAsset>();
+                overrideAsset.entries = new[]
+                {
+                    new MmdMaterialOverrideEntry
+                    {
+                        materialIndex = 0,
+                        hasAlpha = true,
+                        alpha = 0.45f,
+                        hasSurfaceMode = true,
+                        surfaceMode = MmdMaterialOverrideSurfaceMode.Preserve
+                    }
+                };
+
+                instance = MmdUnityModelFactory.CreateStaticModel(
+                    model,
+                    sourcePath: null,
+                    importScale: 1.0f,
+                    preset: MmdMaterialPreset.MmdToon,
+                    materialOverride: overrideAsset);
+
+                Material material = instance.Materials[0];
+                Assert.That(ReadMaterialFloat(material, MmdMaterialPropertyNames.Alpha), Is.EqualTo(0.45f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(material, MmdMaterialPropertyNames.TextureAlphaOutputWeight), Is.EqualTo(1.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(material, "_SrcBlend"), Is.EqualTo((float)UnityEngine.Rendering.BlendMode.SrcAlpha).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(material, "_DstBlend"), Is.EqualTo((float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha).Within(0.00001f));
+                Assert.That(material.renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
+                MmdUrpMaterialBindingDescriptor binding = instance.RenderingDescriptor.urpMaterialBindings[0];
+                Assert.That(binding.alpha, Is.EqualTo(0.45f).Within(0.00001f));
+                Assert.That(binding.isTransparent, Is.False);
+                Assert.That(binding.transparencyMode, Is.EqualTo("opaque"));
+                Assert.That(binding.renderOrderBucket, Is.EqualTo("opaque"));
+            }
+            finally
+            {
+                DestroyInstance(instance);
+                if (overrideAsset != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(overrideAsset);
+                }
+            }
+        }
+
+        [Test]
+        public void MmdToonAlphaClipOnlyOverrideClassifiesDescriptorAndMaterialAsAlphaTest()
+        {
+            MmdModelDefinition model = CreateTwoMaterialModel();
+            MmdMaterialOverrideAsset? overrideAsset = null;
+            MmdUnityModelInstance? instance = null;
+
+            try
+            {
+                overrideAsset = ScriptableObject.CreateInstance<MmdMaterialOverrideAsset>();
+                overrideAsset.entries = new[]
+                {
+                    new MmdMaterialOverrideEntry
+                    {
+                        materialIndex = 0,
+                        hasAlphaClipThreshold = true,
+                        alphaClipThreshold = 0.35f
+                    }
+                };
+
+                instance = MmdUnityModelFactory.CreateStaticModel(
+                    model,
+                    sourcePath: null,
+                    importScale: 1.0f,
+                    preset: MmdMaterialPreset.MmdToon,
+                    materialOverride: overrideAsset);
+
+                Material material = instance.Materials[0];
+                Assert.That(ReadMaterialFloat(material, MmdMaterialPropertyNames.AlphaClipThreshold), Is.EqualTo(0.35f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(material, MmdMaterialPropertyNames.ShadowAlphaClipThreshold), Is.EqualTo(0.35f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(material, MmdMaterialPropertyNames.TextureAlphaOutputWeight), Is.EqualTo(0.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(material, "_SrcBlend"), Is.EqualTo((float)UnityEngine.Rendering.BlendMode.One).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(material, "_DstBlend"), Is.EqualTo((float)UnityEngine.Rendering.BlendMode.Zero).Within(0.00001f));
+                Assert.That(material.renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Geometry));
+                MmdUrpMaterialBindingDescriptor binding = instance.RenderingDescriptor.urpMaterialBindings[0];
+                Assert.That(binding.alpha, Is.EqualTo(1.0f).Within(0.00001f));
+                Assert.That(binding.isTransparent, Is.False);
+                Assert.That(binding.transparencyMode, Is.EqualTo("alphaTest"));
+                Assert.That(binding.renderOrderBucket, Is.EqualTo("opaque"));
+            }
+            finally
+            {
+                DestroyInstance(instance);
+                if (overrideAsset != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(overrideAsset);
+                }
+            }
+        }
+
+        [Test]
+        public void MmdToonAlphaClipOnlyOverrideClassifiesExistingTransparentMaterialAsAlphaTest()
+        {
+            MmdModelDefinition model = CreateTwoMaterialModel();
+            model.materials[0].alpha = 0.45f;
+            MmdMaterialOverrideAsset? overrideAsset = null;
+            MmdUnityModelInstance? instance = null;
+
+            try
+            {
+                overrideAsset = ScriptableObject.CreateInstance<MmdMaterialOverrideAsset>();
+                overrideAsset.entries = new[]
+                {
+                    new MmdMaterialOverrideEntry
+                    {
+                        materialIndex = 0,
+                        hasAlphaClipThreshold = true,
+                        alphaClipThreshold = 0.35f
+                    }
+                };
+
+                instance = MmdUnityModelFactory.CreateStaticModel(
+                    model,
+                    sourcePath: null,
+                    importScale: 1.0f,
+                    preset: MmdMaterialPreset.MmdToon,
+                    materialOverride: overrideAsset);
+
+                Material material = instance.Materials[0];
+                Assert.That(ReadMaterialFloat(material, MmdMaterialPropertyNames.AlphaClipThreshold), Is.EqualTo(0.35f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(material, MmdMaterialPropertyNames.TextureAlphaOutputWeight), Is.EqualTo(0.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(material, "_SrcBlend"), Is.EqualTo((float)UnityEngine.Rendering.BlendMode.One).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(material, "_DstBlend"), Is.EqualTo((float)UnityEngine.Rendering.BlendMode.Zero).Within(0.00001f));
+                Assert.That(material.renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Geometry));
+                MmdUrpMaterialBindingDescriptor binding = instance.RenderingDescriptor.urpMaterialBindings[0];
+                Assert.That(binding.alpha, Is.EqualTo(0.45f).Within(0.00001f));
+                Assert.That(binding.isTransparent, Is.False);
+                Assert.That(binding.transparencyMode, Is.EqualTo("alphaTest"));
+                Assert.That(binding.renderOrderBucket, Is.EqualTo("opaque"));
+            }
+            finally
+            {
+                DestroyInstance(instance);
+                if (overrideAsset != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(overrideAsset);
+                }
+            }
+        }
+
+        [Test]
+        public void ImportedAssetCacheAppliesAlphaOverrideBeforeMaterialGeneration()
+        {
+            MmdModelDefinition model = CreateTwoMaterialModel();
+            MmdMaterialOverrideAsset? overrideAsset = null;
+            MmdUnityModelInstance? instance = null;
+
+            try
+            {
+                overrideAsset = ScriptableObject.CreateInstance<MmdMaterialOverrideAsset>();
+                overrideAsset.entries = new[]
+                {
+                    new MmdMaterialOverrideEntry
+                    {
+                        materialIndex = 0,
+                        hasBaseColor = true,
+                        baseColor = new Color(0.2f, 0.4f, 0.6f, 0.45f)
+                    }
+                };
+
+                instance = MmdPmxImportAssetCacheBuilder.CreateImportedAssetCache(
+                    model,
+                    importScale: 1.0f,
+                    includeSelfShadowTarget: true,
+                    preset: MmdMaterialPreset.MmdToon,
+                    materialOverride: overrideAsset);
+
+                Material material = instance.Materials[0];
+                AssertMaterialColor(material, MmdMaterialPropertyNames.BaseColor, new Color(0.2f, 0.4f, 0.6f, 0.45f));
+                Assert.That(ReadMaterialFloat(material, MmdMaterialPropertyNames.TextureAlphaOutputWeight), Is.EqualTo(1.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(material, "_SrcBlend"), Is.EqualTo((float)UnityEngine.Rendering.BlendMode.SrcAlpha).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(material, "_DstBlend"), Is.EqualTo((float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha).Within(0.00001f));
+                Assert.That(material.renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
+            }
+            finally
+            {
+                DestroyInstance(instance);
+                if (overrideAsset != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(overrideAsset);
+                }
+            }
+        }
+
+        [Test]
         public void MaterialNameMatchOnlyAppliesWhenMaterialIndexIsInvalid()
         {
             MmdModelDefinition model = CreateTwoMaterialModel();
@@ -348,6 +842,15 @@ namespace Mmd.Tests
         {
             Assert.That(material.HasProperty(propertyName), Is.True, propertyName);
             return material.GetColor(propertyName);
+        }
+
+        private static void AssertMaterialColor(Material material, string propertyName, Color expected)
+        {
+            Color actual = ReadMaterialColor(material, propertyName);
+            Assert.That(actual.r, Is.EqualTo(expected.r).Within(0.00001f), propertyName + ".r");
+            Assert.That(actual.g, Is.EqualTo(expected.g).Within(0.00001f), propertyName + ".g");
+            Assert.That(actual.b, Is.EqualTo(expected.b).Within(0.00001f), propertyName + ".b");
+            Assert.That(actual.a, Is.EqualTo(expected.a).Within(0.00001f), propertyName + ".a");
         }
 
         private static MmdModelDefinition CreateTwoMaterialModel()

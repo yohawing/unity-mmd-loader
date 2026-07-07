@@ -14,14 +14,16 @@ namespace Mmd.UnityIntegration
             GameObject importedRoot,
             MmdModelDefinition model,
             string? sourcePath,
-            float importScale)
+            float importScale,
+            MmdMaterialOverrideAsset? materialOverride = null)
         {
             return CreateFromImportedHierarchy(
                 importedRoot,
                 model,
                 sourcePath,
                 importScale,
-                includeSelfShadowTarget: true);
+                includeSelfShadowTarget: true,
+                materialOverride);
         }
 
         internal static MmdUnityModelInstance CreateFromImportedHierarchy(
@@ -29,7 +31,8 @@ namespace Mmd.UnityIntegration
             MmdModelDefinition model,
             string? sourcePath,
             float importScale,
-            bool includeSelfShadowTarget)
+            bool includeSelfShadowTarget,
+            MmdMaterialOverrideAsset? materialOverride = null)
         {
             if (importedRoot == null)
             {
@@ -55,7 +58,8 @@ namespace Mmd.UnityIntegration
                 model,
                 sourcePath,
                 importScale,
-                includeSelfShadowTarget);
+                includeSelfShadowTarget,
+                materialOverride);
         }
 
         internal static MmdUnityModelInstance CreateFromInstantiatedImportedHierarchy(
@@ -63,7 +67,8 @@ namespace Mmd.UnityIntegration
             MmdModelDefinition model,
             string? sourcePath,
             float importScale,
-            bool includeSelfShadowTarget = true)
+            bool includeSelfShadowTarget = true,
+            MmdMaterialOverrideAsset? materialOverride = null)
         {
             if (instanceRoot == null)
             {
@@ -79,6 +84,7 @@ namespace Mmd.UnityIntegration
             ClearNonSceneHideFlags(instanceRoot.transform);
 
             MmdRenderingDescriptor descriptor = BuildRuntimeRenderingDescriptor(model);
+            MmdMaterialOverrideApplier.ApplyToRenderingDescriptor(materialOverride, descriptor);
             ValidateDescriptor(descriptor);
 
             if (model.bones != null && model.bones.Count > 0)
@@ -89,7 +95,8 @@ namespace Mmd.UnityIntegration
                     descriptor,
                     sourcePath,
                     scale,
-                    includeSelfShadowTarget);
+                    includeSelfShadowTarget,
+                    materialOverride);
             }
 
             return CreateFromImportedStaticHierarchy(
@@ -98,7 +105,8 @@ namespace Mmd.UnityIntegration
                 descriptor,
                 sourcePath,
                 scale,
-                includeSelfShadowTarget);
+                includeSelfShadowTarget,
+                materialOverride);
         }
 
         private static MmdUnityModelInstance CreateFromImportedSkinnedHierarchy(
@@ -107,7 +115,8 @@ namespace Mmd.UnityIntegration
             MmdRenderingDescriptor descriptor,
             string? sourcePath,
             float scale,
-            bool includeSelfShadowTarget)
+            bool includeSelfShadowTarget,
+            MmdMaterialOverrideAsset? materialOverride)
         {
             Transform modelRoot = FindModelRoot(instanceRoot.transform);
             SkinnedMeshRenderer renderer = modelRoot.GetComponent<SkinnedMeshRenderer>()
@@ -126,6 +135,9 @@ namespace Mmd.UnityIntegration
                 throw new InvalidOperationException(
                     "Imported PMX SkinnedMeshRenderer material slots do not match the PMX material descriptor.");
             }
+            materials = CloneMaterialsForOverride(materials, materialOverride);
+            renderer.sharedMaterials = materials;
+            MmdMaterialOverrideApplier.Apply(materialOverride, materials);
 
             Transform[] boneTransforms = renderer.bones;
             IReadOnlyList<MmdBoneDefinition> orderedBones = CreateOrderedBones(model.bones);
@@ -164,7 +176,8 @@ namespace Mmd.UnityIntegration
             MmdRenderingDescriptor descriptor,
             string? sourcePath,
             float scale,
-            bool includeSelfShadowTarget)
+            bool includeSelfShadowTarget,
+            MmdMaterialOverrideAsset? materialOverride)
         {
             Transform modelRoot = FindModelRoot(instanceRoot.transform);
             MeshRenderer meshRenderer = modelRoot.GetComponent<MeshRenderer>()
@@ -184,6 +197,9 @@ namespace Mmd.UnityIntegration
                 throw new InvalidOperationException(
                     "Imported PMX MeshRenderer material slots do not match the PMX material descriptor.");
             }
+            materials = CloneMaterialsForOverride(materials, materialOverride);
+            meshRenderer.sharedMaterials = materials;
+            MmdMaterialOverrideApplier.Apply(materialOverride, materials);
 
             MmdShaderBindingDiagnostics shaderDiagnostics = BuildMeshRendererShaderDiagnostics(meshRenderer);
             ApplySelfShadowTargetPolicy(instanceRoot, modelRoot, includeSelfShadowTarget);

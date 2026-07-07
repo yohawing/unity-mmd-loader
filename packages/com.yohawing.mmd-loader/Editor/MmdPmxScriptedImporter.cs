@@ -42,7 +42,7 @@ namespace Mmd.Editor
         UrpLit = 1
     }
 
-    [ScriptedImporter(23, "pmx")]
+    [ScriptedImporter(24, "pmx")]
     public sealed class MmdPmxScriptedImporter : ScriptedImporter
     {
         [SerializeField] private float importScale = MmdPmxAsset.DefaultImportScale;
@@ -109,7 +109,8 @@ namespace Mmd.Editor
                     model,
                     ImportScale,
                     MmdPmxModelPresetAutoDetector.IsCharacter(effectiveModelPreset),
-                    MapMaterialPreset(shaderPreset));
+                    MapMaterialPreset(shaderPreset),
+                    materialOverrideAsset);
                 Mesh importedMesh = generatedAssets.Mesh;
                 Material[] importedMaterials = generatedAssets.Materials;
 
@@ -135,7 +136,8 @@ namespace Mmd.Editor
                     parseSummary,
                     generatedAssets,
                     materialRemaps,
-                    animationType.ToString());
+                    animationType.ToString(),
+                    materialOverrideAsset);
                 asset.ApplyProjectTextureBindingSummary(
                     textureBindingSummary.ResolvedReferenceCount,
                     textureBindingSummary.MissingReferenceCount,

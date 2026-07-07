@@ -10,6 +10,7 @@ using Mmd.Native;
 using Mmd.Parser;
 using Mmd.Physics;
 using Mmd.Pose;
+using Mmd.Rendering;
 using UnityEngine;
 
 namespace Mmd.UnityIntegration
@@ -91,7 +92,8 @@ namespace Mmd.UnityIntegration
                 string.IsNullOrWhiteSpace(modelAsset.SourceId) ? modelAsset.name : modelAsset.SourceId,
                 string.IsNullOrWhiteSpace(motionAsset.SourceId) ? motionAsset.name : motionAsset.SourceId,
                 string.IsNullOrWhiteSpace(modelAsset.SourcePath) ? null : modelAsset.SourcePath,
-                importScale);
+                importScale,
+                modelAsset.MaterialOverrideAsset);
         }
 
         public static MmdUnityPlaybackBinding CreateSkinned(
@@ -140,6 +142,7 @@ namespace Mmd.UnityIntegration
             MmdModelDefinition model = modelAsset.LoadModel(parser);
             MmdModelValidator.ThrowIfInvalid(model);
             MmdMotionValidator.ThrowIfInvalid(motion);
+            ApplyMaterialOverrideToSuppliedInstance(instance, modelAsset.MaterialOverrideAsset, modelAsset.MaterialRemaps);
             var session = new MmdRuntimeSession(
                 model,
                 motion,
@@ -189,6 +192,93 @@ namespace Mmd.UnityIntegration
             return new MmdUnityPlaybackBinding(instance, session, model, resolvedModelId, resolvedMotionId);
         }
 
+        private static void ApplyMaterialOverrideToSuppliedInstance(
+            MmdUnityModelInstance instance,
+            MmdMaterialOverrideAsset? materialOverride,
+            Material[]? materialRemaps)
+        {
+            if (materialOverride == null)
+            {
+                return;
+            }
+
+            bool[] excludedMaterialSlots = BuildMaterialOverrideExclusionSlots(materialRemaps, instance.Materials.Length);
+            Material[] sceneMaterials = CloneMaterialsForOverride(instance.Materials, excludedMaterialSlots);
+            for (int i = 0; i < sceneMaterials.Length; i++)
+            {
+                instance.Materials[i] = sceneMaterials[i];
+            }
+
+            MmdMaterialOverrideApplier.ApplyToRenderingDescriptor(materialOverride, instance.RenderingDescriptor, excludedMaterialSlots);
+            MmdMaterialOverrideApplier.Apply(materialOverride, sceneMaterials, excludedMaterialSlots);
+            if (instance.SkinnedMeshRenderer != null)
+            {
+                instance.SkinnedMeshRenderer.sharedMaterials = sceneMaterials;
+            }
+            else if (instance.MeshRenderer != null)
+            {
+                instance.MeshRenderer.sharedMaterials = sceneMaterials;
+            }
+
+            instance.RefreshMaterialBindingDiagnostics();
+        }
+
+        private static Material[] CloneMaterialsForOverride(Material[] materials, bool[] excludedMaterialSlots)
+        {
+            if (materials == null || materials.Length == 0)
+            {
+                return Array.Empty<Material>();
+            }
+
+            var clones = new Material[materials.Length];
+            for (int i = 0; i < materials.Length; i++)
+            {
+                Material source = materials[i];
+                if (source == null)
+                {
+                    continue;
+                }
+
+                if (IsExcludedMaterialSlot(i, excludedMaterialSlots))
+                {
+                    clones[i] = source;
+                    continue;
+                }
+
+                Material clone = new Material(source)
+                {
+                    name = source.name
+                };
+                clones[i] = clone;
+            }
+
+            return clones;
+        }
+
+        private static bool[] BuildMaterialOverrideExclusionSlots(Material[]? materialRemaps, int materialSlotCount)
+        {
+            var excluded = new bool[Math.Max(0, materialSlotCount)];
+            if (materialRemaps == null)
+            {
+                return excluded;
+            }
+
+            int count = Math.Min(excluded.Length, materialRemaps.Length);
+            for (int i = 0; i < count; i++)
+            {
+                excluded[i] = materialRemaps[i] != null;
+            }
+
+            return excluded;
+        }
+
+        private static bool IsExcludedMaterialSlot(int materialSlot, bool[] excludedMaterialSlots)
+        {
+            return materialSlot >= 0 &&
+                materialSlot < excludedMaterialSlots.Length &&
+                excludedMaterialSlots[materialSlot];
+        }
+
         public static MmdUnityPlaybackBinding CreateSkinnedFromExistingSceneModel(
             GameObject root,
             MmdPmxAsset modelAsset,
@@ -225,7 +315,8 @@ namespace Mmd.UnityIntegration
                 model,
                 string.IsNullOrWhiteSpace(modelAsset.SourcePath) ? null : modelAsset.SourcePath,
                 importScale,
-                MmdPmxModelPresetPolicy.AllowsAutomaticSelfShadowTarget(modelAsset.ModelPreset));
+                MmdPmxModelPresetPolicy.AllowsAutomaticSelfShadowTarget(modelAsset.ModelPreset),
+                modelAsset.MaterialOverrideAsset);
             var session = new MmdRuntimeSession(
                 model,
                 motion,
@@ -266,7 +357,8 @@ namespace Mmd.UnityIntegration
                 model,
                 string.IsNullOrWhiteSpace(modelAsset.SourcePath) ? null : modelAsset.SourcePath,
                 importScale,
-                MmdPmxModelPresetPolicy.AllowsAutomaticSelfShadowTarget(modelAsset.ModelPreset));
+                MmdPmxModelPresetPolicy.AllowsAutomaticSelfShadowTarget(modelAsset.ModelPreset),
+                modelAsset.MaterialOverrideAsset);
             string resolvedModelId = string.IsNullOrWhiteSpace(modelAsset.SourceId) ? modelAsset.name : modelAsset.SourceId;
             string resolvedMotionId = string.IsNullOrWhiteSpace(motionId) ? "humanoid-physics" : motionId;
             var session = new MmdRuntimeSession(model, restMotion, resolvedModelId, resolvedMotionId);
@@ -330,7 +422,8 @@ namespace Mmd.UnityIntegration
             string modelId,
             string motionId,
             string? sourcePath,
-            float importScale)
+            float importScale,
+            MmdMaterialOverrideAsset? materialOverride = null)
         {
             if (model == null)
             {
@@ -343,7 +436,12 @@ namespace Mmd.UnityIntegration
             }
 
             float scale = (float.IsFinite(importScale) && importScale > 0.0f) ? importScale : 1.0f;
-            MmdUnityModelInstance instance = MmdUnityModelFactory.CreateSkinnedModel(model, sourcePath, scale);
+            MmdUnityModelInstance instance = MmdUnityModelFactory.CreateSkinnedModel(
+                model,
+                sourcePath,
+                scale,
+                MmdMaterialPreset.MmdToon,
+                materialOverride);
             var session = new MmdRuntimeSession(model, motion, modelId, motionId);
             return new MmdUnityPlaybackBinding(instance, session, model, modelId, motionId);
         }

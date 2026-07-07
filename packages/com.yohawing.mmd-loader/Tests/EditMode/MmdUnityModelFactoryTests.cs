@@ -3077,6 +3077,212 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void MaterialOverrideWriteSetBecomesMaterialMorphBaseAndRestoresOnZeroWeight()
+        {
+            MmdModelDefinition model = CreateMaterialMorphMultiplyModel();
+            MmdMaterialOverrideAsset? overrideAsset = null;
+
+            try
+            {
+                overrideAsset = ScriptableObject.CreateInstance<MmdMaterialOverrideAsset>();
+                overrideAsset.entries = new[]
+                {
+                    new MmdMaterialOverrideEntry
+                    {
+                        materialIndex = 0,
+                        hasBaseColor = true,
+                        baseColor = new Color(0.2f, 0.4f, 0.6f, 0.5f),
+                        hasAmbientColor = true,
+                        ambientColor = new Color(0.3f, 0.2f, 0.1f, 1.0f),
+                        hasOutlineColor = true,
+                        outlineColor = new Color(0.6f, 0.5f, 0.4f, 0.3f),
+                        hasOutlineWidth = true,
+                        outlineWidth = 1.25f
+                    }
+                };
+
+                using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(
+                    model,
+                    sourcePath: null,
+                    importScale: 1.0f,
+                    preset: MmdMaterialPreset.MmdToon,
+                    materialOverride: overrideAsset));
+                MmdUnityModelInstance instance = scope.Instance;
+
+                Color overrideBaseColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
+                Assert.That(overrideBaseColor.r, Is.EqualTo(0.2f).Within(0.00001f));
+                Assert.That(overrideBaseColor.g, Is.EqualTo(0.4f).Within(0.00001f));
+                Assert.That(overrideBaseColor.b, Is.EqualTo(0.6f).Within(0.00001f));
+                Assert.That(overrideBaseColor.a, Is.EqualTo(0.5f).Within(0.00001f));
+                Color overrideAmbient = ReadMaterialColor(instance.Materials[0], "_AmbientColor");
+                Assert.That(overrideAmbient.r, Is.EqualTo(0.3f).Within(0.00001f));
+                Assert.That(overrideAmbient.g, Is.EqualTo(0.2f).Within(0.00001f));
+                Assert.That(overrideAmbient.b, Is.EqualTo(0.1f).Within(0.00001f));
+                Assert.That(overrideAmbient.a, Is.EqualTo(1.0f).Within(0.00001f));
+                Color overrideOutline = ReadMaterialColor(instance.Materials[0], "_OutlineColor");
+                Assert.That(overrideOutline.r, Is.EqualTo(0.6f).Within(0.00001f));
+                Assert.That(overrideOutline.g, Is.EqualTo(0.5f).Within(0.00001f));
+                Assert.That(overrideOutline.b, Is.EqualTo(0.4f).Within(0.00001f));
+                Assert.That(overrideOutline.a, Is.EqualTo(0.3f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_OutlineWidth"), Is.EqualTo(1.25f).Within(0.00001f));
+
+                MmdEvaluatedFrame frame1 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+                frame1.morphs.Add(new MmdEvaluatedMorphWeight { name = "multiply-change", weight = 1.0f });
+                MmdUnityFrameApplier.ApplyFrame(instance, frame1);
+
+                Color morphedColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
+                Assert.That(morphedColor.r, Is.EqualTo(0.1f).Within(0.00001f));
+                Assert.That(morphedColor.g, Is.EqualTo(0.8f).Within(0.00001f));
+                Assert.That(morphedColor.b, Is.EqualTo(0.45f).Within(0.00001f));
+                Assert.That(morphedColor.a, Is.EqualTo(0.25f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_OutlineWidth"), Is.EqualTo(2.5f).Within(0.00001f));
+
+                MmdEvaluatedFrame frame0 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+                frame0.morphs.Add(new MmdEvaluatedMorphWeight { name = "multiply-change", weight = 0.0f });
+                MmdUnityFrameApplier.ApplyFrame(instance, frame0);
+
+                Color restoredColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
+                Assert.That(restoredColor.r, Is.EqualTo(0.2f).Within(0.00001f));
+                Assert.That(restoredColor.g, Is.EqualTo(0.4f).Within(0.00001f));
+                Assert.That(restoredColor.b, Is.EqualTo(0.6f).Within(0.00001f));
+                Assert.That(restoredColor.a, Is.EqualTo(0.5f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], "_OutlineWidth"), Is.EqualTo(1.25f).Within(0.00001f));
+            }
+            finally
+            {
+                if (overrideAsset != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(overrideAsset);
+                }
+            }
+        }
+
+        [Test]
+        public void ExistingSkinnedModelRebindAppliesMaterialOverrideWriteSetToMaterialMorphBase()
+        {
+            MmdModelDefinition model = CreateMaterialMorphMultiplyModel();
+            MmdMaterialOverrideAsset? overrideAsset = null;
+            Material? reboundMaterial = null;
+
+            try
+            {
+                overrideAsset = ScriptableObject.CreateInstance<MmdMaterialOverrideAsset>();
+                overrideAsset.entries = new[]
+                {
+                    new MmdMaterialOverrideEntry
+                    {
+                        materialIndex = 0,
+                        hasBaseColor = true,
+                        baseColor = new Color(0.2f, 0.4f, 0.6f, 0.5f),
+                        hasAmbientColor = true,
+                        ambientColor = new Color(0.3f, 0.2f, 0.1f, 1.0f),
+                        hasOutlineColor = true,
+                        outlineColor = new Color(0.6f, 0.5f, 0.4f, 0.3f),
+                        hasOutlineWidth = true,
+                        outlineWidth = 1.25f
+                    }
+                };
+
+                using var sceneScope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(
+                    model,
+                    sourcePath: null,
+                    importScale: 1.0f,
+                    preset: MmdMaterialPreset.MmdToon));
+                Material originalMaterial = sceneScope.Instance.Materials[0];
+                MmdUnityModelInstance reboundInstance = MmdUnityModelFactory.CreateExistingSkinnedModelInstance(
+                    sceneScope.Instance.Root,
+                    model,
+                    sourcePath: null,
+                    importScale: 1.0f,
+                    includeSelfShadowTarget: true,
+                    materialOverride: overrideAsset);
+                reboundMaterial = reboundInstance.Materials[0];
+
+                Color initialColor = ReadMaterialColor(reboundInstance.Materials[0], "_BaseColor");
+                Assert.That(reboundInstance.Materials[0], Is.Not.SameAs(originalMaterial));
+                Assert.That(ReadMaterialColor(originalMaterial, "_BaseColor").a, Is.EqualTo(1.0f).Within(0.00001f));
+                Assert.That(initialColor.r, Is.EqualTo(0.2f).Within(0.00001f));
+                Assert.That(initialColor.g, Is.EqualTo(0.4f).Within(0.00001f));
+                Assert.That(initialColor.b, Is.EqualTo(0.6f).Within(0.00001f));
+                Assert.That(initialColor.a, Is.EqualTo(0.5f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(reboundInstance.Materials[0], "_OutlineWidth"), Is.EqualTo(1.25f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(reboundInstance.Materials[0], "_SrcBlend"), Is.EqualTo((float)UnityEngine.Rendering.BlendMode.SrcAlpha).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(reboundInstance.Materials[0], "_DstBlend"), Is.EqualTo((float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha).Within(0.00001f));
+                Assert.That(reboundInstance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
+
+                MmdEvaluatedFrame frame0 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+                frame0.morphs.Add(new MmdEvaluatedMorphWeight { name = "multiply-change", weight = 0.0f });
+                MmdUnityFrameApplier.ApplyFrame(reboundInstance, frame0);
+
+                Color restoredColor = ReadMaterialColor(reboundInstance.Materials[0], "_BaseColor");
+                Assert.That(restoredColor.r, Is.EqualTo(0.2f).Within(0.00001f));
+                Assert.That(restoredColor.g, Is.EqualTo(0.4f).Within(0.00001f));
+                Assert.That(restoredColor.b, Is.EqualTo(0.6f).Within(0.00001f));
+                Assert.That(restoredColor.a, Is.EqualTo(0.5f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(reboundInstance.Materials[0], "_OutlineWidth"), Is.EqualTo(1.25f).Within(0.00001f));
+            }
+            finally
+            {
+                if (overrideAsset != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(overrideAsset);
+                }
+
+                if (reboundMaterial != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(reboundMaterial);
+                }
+            }
+        }
+
+        [Test]
+        public void ExistingSkinnedModelRebindSkipsNullMaterialOverrideSlot()
+        {
+            MmdModelDefinition model = CreateMaterialMorphMultiplyModel();
+            MmdMaterialOverrideAsset? overrideAsset = null;
+
+            try
+            {
+                overrideAsset = ScriptableObject.CreateInstance<MmdMaterialOverrideAsset>();
+                overrideAsset.entries = new[]
+                {
+                    new MmdMaterialOverrideEntry
+                    {
+                        materialIndex = 0,
+                        hasBaseColor = true,
+                        baseColor = new Color(0.2f, 0.4f, 0.6f, 0.5f)
+                    }
+                };
+
+                using var sceneScope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(
+                    model,
+                    sourcePath: null,
+                    importScale: 1.0f,
+                    preset: MmdMaterialPreset.MmdToon));
+                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(sceneScope.Instance);
+                Material[] materials = renderer.sharedMaterials;
+                materials[0] = null;
+                renderer.sharedMaterials = materials;
+
+                Assert.DoesNotThrow(() =>
+                    MmdUnityModelFactory.CreateExistingSkinnedModelInstance(
+                        sceneScope.Instance.Root,
+                        model,
+                        sourcePath: null,
+                        importScale: 1.0f,
+                        includeSelfShadowTarget: true,
+                        materialOverride: overrideAsset));
+            }
+            finally
+            {
+                if (overrideAsset != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(overrideAsset);
+                }
+            }
+        }
+
+        [Test]
         public void ApplyMaterialMorphAllMaterialAddTargetMutatesAllMaterials()
         {
 

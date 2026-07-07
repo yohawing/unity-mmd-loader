@@ -199,7 +199,8 @@ namespace Mmd.UnityIntegration
             MmdModelDefinition model,
             string? sourcePath,
             float importScale,
-            bool includeSelfShadowTarget = true)
+            bool includeSelfShadowTarget = true,
+            MmdMaterialOverrideAsset? materialOverride = null)
         {
             if (root == null)
             {
@@ -219,6 +220,7 @@ namespace Mmd.UnityIntegration
             float scale = NormalizeImportScale(importScale);
             MmdRenderingDescriptor descriptor = BuildRuntimeRenderingDescriptor(model);
             ValidateDescriptor(descriptor);
+            MmdMaterialOverrideApplier.ApplyToRenderingDescriptor(materialOverride, descriptor);
 
             Transform modelRoot = FindExistingSkinnedModelRoot(root.transform);
             SkinnedMeshRenderer renderer = modelRoot.GetComponent<SkinnedMeshRenderer>()
@@ -230,6 +232,10 @@ namespace Mmd.UnityIntegration
             {
                 throw new InvalidOperationException("Existing PMX scene SkinnedMeshRenderer material slots do not match the PMX material descriptor.");
             }
+
+            materials = CloneMaterialsForOverride(materials, materialOverride);
+            renderer.sharedMaterials = materials;
+            MmdMaterialOverrideApplier.Apply(materialOverride, materials);
 
             Transform[] boneTransforms = renderer.bones;
             IReadOnlyList<MmdBoneDefinition> orderedBones = CreateOrderedBones(model.bones);
@@ -281,6 +287,31 @@ namespace Mmd.UnityIntegration
                 scale);
         }
 
+        private static Material[] CloneMaterialsForOverride(Material[] materials, MmdMaterialOverrideAsset? materialOverride)
+        {
+            if (materialOverride == null || materials == null || materials.Length == 0)
+            {
+                return materials ?? Array.Empty<Material>();
+            }
+
+            var clones = new Material[materials.Length];
+            for (int i = 0; i < materials.Length; i++)
+            {
+                Material source = materials[i];
+                if (source == null)
+                {
+                    continue;
+                }
+
+                clones[i] = new Material(source)
+                {
+                    name = source.name
+                };
+            }
+
+            return clones;
+        }
+
         private static MmdRenderingDescriptor BuildRuntimeRenderingDescriptor(
             MmdModelDefinition model,
             MmdMaterialPreset preset = MmdMaterialPreset.MmdToon)
@@ -304,6 +335,7 @@ namespace Mmd.UnityIntegration
             }
 
             ValidateDescriptor(descriptor);
+            MmdMaterialOverrideApplier.ApplyToRenderingDescriptor(materialOverride, descriptor);
 
             var root = new GameObject(ResolveModelName(modelName));
             Transform modelRoot = CreateModelRoot(root.transform);
@@ -349,6 +381,7 @@ namespace Mmd.UnityIntegration
             MmdMaterialOverrideAsset? materialOverride = null)
         {
             ValidateDescriptor(descriptor);
+            MmdMaterialOverrideApplier.ApplyToRenderingDescriptor(materialOverride, descriptor);
 
             var root = new GameObject(ResolveModelName(modelName));
             Transform modelRoot = CreateModelRoot(root.transform);

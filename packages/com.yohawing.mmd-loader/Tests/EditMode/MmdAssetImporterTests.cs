@@ -1107,6 +1107,61 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void ImportedHierarchyWrapperAppliesMaterialOverrideToDescriptor()
+        {
+            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+            Assert.That(pmxAsset, Is.Not.Null);
+            Assert.That(pmxAsset.ImportedRoot, Is.Not.Null);
+
+            GameObject sceneRoot = Object.Instantiate(pmxAsset.ImportedRoot!);
+            MmdMaterialOverrideAsset? overrideAsset = null;
+            MmdUnityModelInstance? instance = null;
+            try
+            {
+                overrideAsset = ScriptableObject.CreateInstance<MmdMaterialOverrideAsset>();
+                overrideAsset.entries = new[]
+                {
+                    new MmdMaterialOverrideEntry
+                    {
+                        materialIndex = 0,
+                        hasAlpha = true,
+                        alpha = 0.45f,
+                        hasSurfaceMode = true,
+                        surfaceMode = MmdMaterialOverrideSurfaceMode.AlphaBlend
+                    }
+                };
+
+                instance = MmdUnityModelFactory.CreateFromInstantiatedImportedHierarchy(
+                    sceneRoot,
+                    pmxAsset.LoadModel(),
+                    sourcePath: null,
+                    pmxAsset.ImportScale,
+                    includeSelfShadowTarget: true,
+                    materialOverride: overrideAsset);
+
+                Assert.That(instance.RenderingDescriptor.materials[0].alpha, Is.EqualTo(0.45f).Within(0.00001f));
+                Assert.That(instance.RenderingDescriptor.urpMaterialBindings[0].alpha, Is.EqualTo(0.45f).Within(0.00001f));
+                Assert.That(instance.RenderingDescriptor.urpMaterialBindings[0].isTransparent, Is.True);
+                Assert.That(instance.RenderingDescriptor.urpMaterialBindings[0].transparencyMode, Is.EqualTo("alphaBlend"));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], MmdMaterialPropertyNames.Alpha), Is.EqualTo(0.45f).Within(0.00001f));
+                Assert.That(instance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
+            }
+            finally
+            {
+                Object.DestroyImmediate(overrideAsset);
+                if (instance?.Root != null)
+                {
+                    Object.DestroyImmediate(instance.Root);
+                }
+                else if (sceneRoot != null)
+                {
+                    Object.DestroyImmediate(sceneRoot);
+                }
+            }
+        }
+
+        [Test]
         public void LoadPmxAssetIntoSceneImportedHierarchyPathDoesNotProduceSplitRuntimeMesh()
         {
             // Focused name check: verify the mesh name is the importer's (not "Split Runtime")

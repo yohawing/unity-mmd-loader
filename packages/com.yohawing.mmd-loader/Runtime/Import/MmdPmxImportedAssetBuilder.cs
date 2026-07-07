@@ -36,7 +36,8 @@ namespace Mmd.UnityIntegration
             MmdPmxParseSummary parseSummary,
             MmdUnityModelInstance generatedAssets,
             Material[] materialRemaps,
-            string animationType)
+            string animationType,
+            MmdMaterialOverrideAsset? materialOverrideAsset = null)
         {
             if (bytes == null || bytes.Length == 0)
             {
@@ -80,7 +81,8 @@ namespace Mmd.UnityIntegration
                 hierarchyDiagnostic,
                 rendererDiagnostic,
                 boneBindingDiagnostic,
-                animationType);
+                animationType,
+                materialOverrideAsset);
 
             return asset;
         }

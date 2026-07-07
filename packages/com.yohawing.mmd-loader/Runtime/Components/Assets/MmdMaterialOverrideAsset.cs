@@ -17,6 +17,14 @@ namespace Mmd
         TextureScan = 2
     }
 
+    public enum MmdMaterialOverrideSurfaceMode
+    {
+        Preserve = 0,
+        Opaque = 1,
+        AlphaTest = 2,
+        AlphaBlend = 3
+    }
+
     [Serializable]
     public sealed class MmdMaterialOverrideEntry
     {
@@ -40,9 +48,30 @@ namespace Mmd
         public bool hasEmissionColor;
         public Color emissionColor = Color.black;
 
-        // Material-morph write-set overrides (_BaseColor, _Color, _Alpha, _AmbientColor,
-        // _OutlineColor, _OutlineWidth) are deferred until Slice 6 frame-applier layering.
-        // Alpha cutoff and surface mode overrides are deferred to a surface slice with render policy.
+        public bool hasBaseColor;
+        public Color baseColor = Color.white;
+
+        public bool hasColor;
+        public Color color = Color.white;
+
+        public bool hasAlpha;
+        public float alpha = 1.0f;
+
+        public bool hasAmbientColor;
+        public Color ambientColor = new(0.25f, 0.25f, 0.25f, 1.0f);
+
+        public bool hasOutlineColor;
+        public Color outlineColor = Color.black;
+
+        public bool hasOutlineWidth;
+        public float outlineWidth;
+
+        public bool hasAlphaClipThreshold;
+        public float alphaClipThreshold = 0.01f;
+
+        public bool hasSurfaceMode;
+        public MmdMaterialOverrideSurfaceMode surfaceMode = MmdMaterialOverrideSurfaceMode.Preserve;
+
         public bool hasNormalMap;
         public Texture2D? normalMap;
 

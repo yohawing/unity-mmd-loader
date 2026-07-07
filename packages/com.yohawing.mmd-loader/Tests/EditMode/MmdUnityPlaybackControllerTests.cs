@@ -10,6 +10,7 @@ using UnityEngine;
 using Mmd.Editor;
 using Mmd.Parser;
 using Mmd.Physics;
+using Mmd.Rendering;
 using Mmd.UnityIntegration;
 using Object = UnityEngine.Object;
 
@@ -126,6 +127,145 @@ namespace Mmd.Tests
                 DestroyInstance(previewInstance);
                 Object.DestroyImmediate(pmxAsset);
                 Object.DestroyImmediate(vmdAsset);
+            }
+        }
+
+        [Test]
+        public void CreateSkinnedWithSuppliedInstanceAppliesPmxAssetMaterialOverride()
+        {
+            MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
+            MmdMaterialOverrideAsset? overrideAsset = null;
+            MmdUnityModelInstance? previewInstance = null;
+            MmdUnityPlaybackBinding? binding = null;
+            Material? originalMaterial = null;
+
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                byte[] pmxBytes = File.ReadAllBytes(pmxPath);
+                byte[] vmdBytes = File.ReadAllBytes(vmdPath);
+                var parser = new NativeMmdParser();
+                MmdModelDefinition model = parser.LoadModel(pmxBytes);
+                previewInstance = MmdUnityModelFactory.CreateSkinnedModel(model, pmxPath);
+                originalMaterial = previewInstance.Materials[0];
+
+                overrideAsset = ScriptableObject.CreateInstance<MmdMaterialOverrideAsset>();
+                overrideAsset.entries = new[]
+                {
+                    new MmdMaterialOverrideEntry
+                    {
+                        materialIndex = 0,
+                        hasAlpha = true,
+                        alpha = 0.45f
+                    }
+                };
+
+                pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                pmxAsset.Initialize(
+                    pmxBytes,
+                    "test_1bone_cube.pmx",
+                    pmxPath,
+                    assetImportScale: 1.0f,
+                    importedMaterialOverrideAsset: overrideAsset);
+                vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                vmdAsset.Initialize(vmdBytes, "test_1bone_cube_motion.vmd", vmdPath);
+
+                binding = MmdUnityPlaybackBinding.CreateSkinned(previewInstance, pmxAsset, vmdAsset);
+
+                Assert.That(binding.Instance, Is.SameAs(previewInstance));
+                Assert.That(binding.Instance.RenderingDescriptor.materials[0].alpha, Is.EqualTo(0.45f).Within(0.00001f));
+                Assert.That(binding.Instance.RenderingDescriptor.urpMaterialBindings[0].alpha, Is.EqualTo(0.45f).Within(0.00001f));
+                Assert.That(binding.Instance.RenderingDescriptor.urpMaterialBindings[0].isTransparent, Is.True);
+                Assert.That(binding.Instance.Materials[0], Is.Not.SameAs(originalMaterial));
+                Assert.That(ReadMaterialFloat(binding.Instance.Materials[0], MmdMaterialPropertyNames.Alpha), Is.EqualTo(0.45f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(originalMaterial!, MmdMaterialPropertyNames.Alpha), Is.EqualTo(1.0f).Within(0.00001f));
+                Assert.That(binding.Instance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
+                Assert.That(binding.Instance.MaterialBindingDiagnostics[0].isTransparent, Is.True);
+                Assert.That(binding.Instance.MaterialBindingDiagnostics[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
+            }
+            finally
+            {
+                binding?.Dispose();
+                DestroyInstance(previewInstance);
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+                Object.DestroyImmediate(overrideAsset);
+                if (originalMaterial != null)
+                {
+                    Object.DestroyImmediate(originalMaterial);
+                }
+            }
+        }
+
+        [Test]
+        public void CreateSkinnedWithSuppliedInstancePreservesMaterialRemapSlots()
+        {
+            MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
+            MmdMaterialOverrideAsset? overrideAsset = null;
+            MmdUnityModelInstance? previewInstance = null;
+            MmdUnityPlaybackBinding? binding = null;
+            Material? originalMaterial = null;
+
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                byte[] pmxBytes = File.ReadAllBytes(pmxPath);
+                byte[] vmdBytes = File.ReadAllBytes(vmdPath);
+                var parser = new NativeMmdParser();
+                MmdModelDefinition model = parser.LoadModel(pmxBytes);
+                previewInstance = MmdUnityModelFactory.CreateSkinnedModel(model, pmxPath);
+                originalMaterial = previewInstance.Materials[0];
+                Material remapMaterial = new Material(originalMaterial)
+                {
+                    name = "remapped_body"
+                };
+                remapMaterial.SetFloat(MmdMaterialPropertyNames.Alpha, 0.8f);
+                previewInstance.Materials[0] = remapMaterial;
+                previewInstance.SkinnedMeshRenderer!.sharedMaterials = previewInstance.Materials;
+
+                overrideAsset = ScriptableObject.CreateInstance<MmdMaterialOverrideAsset>();
+                overrideAsset.entries = new[]
+                {
+                    new MmdMaterialOverrideEntry
+                    {
+                        materialIndex = 0,
+                        hasAlpha = true,
+                        alpha = 0.45f
+                    }
+                };
+
+                pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                pmxAsset.Initialize(
+                    pmxBytes,
+                    "test_1bone_cube.pmx",
+                    pmxPath,
+                    assetImportScale: 1.0f,
+                    materialRemapAssets: new[] { remapMaterial },
+                    importedMaterialOverrideAsset: overrideAsset);
+                vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                vmdAsset.Initialize(vmdBytes, "test_1bone_cube_motion.vmd", vmdPath);
+
+                binding = MmdUnityPlaybackBinding.CreateSkinned(previewInstance, pmxAsset, vmdAsset);
+
+                Assert.That(binding.Instance.Materials[0], Is.SameAs(remapMaterial));
+                Assert.That(binding.Instance.SkinnedMeshRenderer!.sharedMaterials[0], Is.SameAs(remapMaterial));
+                Assert.That(ReadMaterialFloat(remapMaterial, MmdMaterialPropertyNames.Alpha), Is.EqualTo(0.8f).Within(0.00001f));
+            }
+            finally
+            {
+                binding?.Dispose();
+                DestroyInstance(previewInstance);
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+                Object.DestroyImmediate(overrideAsset);
+                if (originalMaterial != null)
+                {
+                    Object.DestroyImmediate(originalMaterial);
+                }
             }
         }
 
@@ -1761,6 +1901,12 @@ namespace Mmd.Tests
             {
                 Object.DestroyImmediate(texture);
             }
+        }
+
+        private static float ReadMaterialFloat(Material material, string propertyName)
+        {
+            Assert.That(material.HasProperty(propertyName), Is.True, $"Material should expose {propertyName}");
+            return material.GetFloat(propertyName);
         }
 
         private static void DestroyInstanceFromController(MmdUnityPlaybackController? controller)

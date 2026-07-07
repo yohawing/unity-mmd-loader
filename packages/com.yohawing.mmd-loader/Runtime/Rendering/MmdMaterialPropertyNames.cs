@@ -20,8 +20,15 @@ namespace Mmd.Rendering
         public const string OcclusionStrength = "_OcclusionStrength";
         public const string EmissionColor = "_EmissionColor";
         public const string EmissionMap = "_EmissionMap";
+        public const string Alpha = "_Alpha";
+        public const string AmbientColor = "_AmbientColor";
+        public const string OutlineColor = "_OutlineColor";
+        public const string OutlineWidth = "_OutlineWidth";
+        public const string OutlineVisible = "_OutlineVisible";
         public const string Cutoff = "_Cutoff";
         public const string AlphaClipThreshold = "_AlphaClipThreshold";
+        public const string ShadowAlphaClipThreshold = "_ShadowAlphaClipThreshold";
+        public const string TextureAlphaOutputWeight = "_TextureAlphaOutputWeight";
         public const string BumpMap = "_BumpMap";
         public const string BumpScale = "_BumpScale";
     }

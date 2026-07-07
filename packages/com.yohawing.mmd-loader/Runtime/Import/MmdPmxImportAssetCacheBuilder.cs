@@ -25,7 +25,8 @@ namespace Mmd.UnityIntegration
             MmdModelDefinition model,
             float importScale,
             bool includeSelfShadowTarget = true,
-            MmdMaterialPreset preset = MmdMaterialPreset.MmdToon)
+            MmdMaterialPreset preset = MmdMaterialPreset.MmdToon,
+            MmdMaterialOverrideAsset? materialOverride = null)
         {
             if (model == null)
             {
@@ -42,7 +43,8 @@ namespace Mmd.UnityIntegration
                     sourcePath: null,
                     scale,
                     preset,
-                    includeSelfShadowTarget);
+                    includeSelfShadowTarget,
+                    materialOverride);
             }
             else
             {
@@ -51,7 +53,8 @@ namespace Mmd.UnityIntegration
                     sourcePath: null,
                     scale,
                     preset,
-                    includeSelfShadowTarget);
+                    includeSelfShadowTarget,
+                    materialOverride);
             }
 
             PrepareImportedMeshAsset(generatedAssets.Mesh, model.name);
