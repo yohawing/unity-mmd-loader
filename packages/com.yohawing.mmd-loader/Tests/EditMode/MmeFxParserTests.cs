@@ -43,6 +43,16 @@ static const float metalness = 0.0;
 #include ""../../ray-mmd/Materials/material_common_2.0.fxsub""
 ";
 
+        private const string AbsoluteShadowSystemSample = @"#define ABSOLUTE_SHADOW
+#define SHADOWBUFSIZE 2048
+#define MIPMAP_ENABLE 1
+
+float3 LightDirVec : DIRECTION < string Object = ""Light""; >;
+float size1 : CONTROLOBJECT < string name = ""AbsoluteShadow.x""; string item = ""Si""; >;
+static float size = size1 * 15;
+float ShadowRate : CONTROLOBJECT < string name = ""AbsoluteShadow.x""; string item = ""Tr""; >;
+";
+
         [Test]
         public void TryParse_AlternativeFull_ExtractsEffectType()
         {
@@ -177,6 +187,15 @@ float Alpha_Threshold = 0.02;
 float SoftShadowParam = 2;
 ";
             MmeFxEffectDescriptor? result = MmeFxParser.TryParse(content, "test.fx");
+            Assert.That(result, Is.Null);
+        }
+
+        [Test]
+        public void TryParse_AbsoluteShadowSystemFx_ReturnsNull()
+        {
+            MmeFxEffectDescriptor? result = MmeFxParser.TryParse(
+                AbsoluteShadowSystemSample,
+                "AbsoluteShadowCommonSystem.fx");
             Assert.That(result, Is.Null);
         }
 
