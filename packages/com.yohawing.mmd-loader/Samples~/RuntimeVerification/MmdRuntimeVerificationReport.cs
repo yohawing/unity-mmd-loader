@@ -62,6 +62,15 @@ namespace Mmd.Samples.RuntimeVerification
         public bool isAllWhite;
         public float averageLuminance;
         public int uniqueColorCount;
+        public int foregroundPixelCount;
+        public float foregroundCoverage;
+        public bool hasContentBounds;
+        public int contentMinX = -1;
+        public int contentMinY = -1;
+        public int contentMaxX = -1;
+        public int contentMaxY = -1;
+        public bool touchesImageEdge;
+        public int outlinePixelCount;
         public string smokeStatus = "not-run";
     }
 

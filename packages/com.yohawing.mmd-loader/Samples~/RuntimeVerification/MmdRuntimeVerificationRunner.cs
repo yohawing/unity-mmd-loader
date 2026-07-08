@@ -668,6 +668,40 @@ namespace Mmd.Samples.RuntimeVerification
                             ", shaders=[" + string.Join(", ", result.materialShaders) + "].");
                     }
                 }
+                else if (string.Equals(feature, "timeline-drive", StringComparison.Ordinal))
+                {
+                    if (!string.Equals(result.playback.driver, "timeline", StringComparison.Ordinal))
+                    {
+                        result.status = "failed";
+                        AppendException(
+                            result,
+                            "Expected timeline playback driver, actual=" + result.playback.driver + ".");
+                    }
+                }
+                else if (string.Equals(feature, "visual-smoke", StringComparison.Ordinal))
+                {
+                    if (!string.Equals(result.visualSmoke.smokeStatus, "passed", StringComparison.Ordinal))
+                    {
+                        result.status = "failed";
+                        AppendException(
+                            result,
+                            "Expected visual smoke to pass, status=" + result.visualSmoke.smokeStatus +
+                            ", captured=" + result.visualSmoke.captured +
+                            ", foregroundPixels=" + result.visualSmoke.foregroundPixelCount +
+                            ", outlinePixels=" + result.visualSmoke.outlinePixelCount + ".");
+                    }
+                }
+                else if (string.Equals(feature, "outline-pixel", StringComparison.Ordinal))
+                {
+                    if (result.visualSmoke.outlinePixelCount <= 0)
+                    {
+                        result.status = "failed";
+                        AppendException(
+                            result,
+                            "Expected at least one outline pixel in visual smoke, outlinePixels=" +
+                            result.visualSmoke.outlinePixelCount + ".");
+                    }
+                }
             }
         }
 
@@ -793,6 +827,13 @@ namespace Mmd.Samples.RuntimeVerification
         private MmdRuntimeVerificationVisualSmoke CaptureAndAnalyzeSmoke(string caseName)
         {
             var smoke = new MmdRuntimeVerificationVisualSmoke();
+            GameObject? grid = GameObject.Find("MMD Runtime Verification Grid");
+            bool restoreGrid = grid != null && grid.activeSelf;
+            if (restoreGrid)
+            {
+                grid!.SetActive(false);
+            }
+
             Camera? camera = Camera.main;
             if (camera == null)
             {
@@ -802,49 +843,64 @@ namespace Mmd.Samples.RuntimeVerification
             if (camera == null)
             {
                 smoke.smokeStatus = "no-camera";
+                if (restoreGrid)
+                {
+                    grid!.SetActive(true);
+                }
+
                 return smoke;
             }
 
             const int width = 640;
             const int height = 480;
             var rt = RenderTexture.GetTemporary(width, height, 24, RenderTextureFormat.ARGB32);
-            RenderTexture previousTarget = camera.targetTexture;
-            camera.targetTexture = rt;
-            camera.Render();
-            camera.targetTexture = previousTarget;
-
-            RenderTexture previousActive = RenderTexture.active;
-            RenderTexture.active = rt;
             var texture = new Texture2D(width, height, TextureFormat.RGB24, mipChain: false);
-            texture.ReadPixels(new Rect(0, 0, width, height), 0, 0);
-            texture.Apply();
-            RenderTexture.active = previousActive;
-            RenderTexture.ReleaseTemporary(rt);
-
-            smoke.captured = true;
-            smoke.width = width;
-            smoke.height = height;
-
-            if (!string.IsNullOrWhiteSpace(arguments.ScreenshotDir))
+            RenderTexture previousTarget = camera.targetTexture;
+            RenderTexture previousActive = RenderTexture.active;
+            try
             {
-                try
+                camera.targetTexture = rt;
+                camera.Render();
+
+                RenderTexture.active = rt;
+                texture.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+                texture.Apply();
+
+                smoke.captured = true;
+                smoke.width = width;
+                smoke.height = height;
+
+                if (!string.IsNullOrWhiteSpace(arguments.ScreenshotDir))
                 {
-                    Directory.CreateDirectory(arguments.ScreenshotDir);
-                    string safeName = caseName.Replace('/', '_').Replace('\\', '_').Replace(':', '_');
-                    string path = Path.Combine(arguments.ScreenshotDir, safeName + ".png");
-                    byte[] png = texture.EncodeToPNG();
-                    File.WriteAllBytes(path, png);
-                    smoke.screenshotPath = path;
+                    try
+                    {
+                        Directory.CreateDirectory(arguments.ScreenshotDir);
+                        string safeName = caseName.Replace('/', '_').Replace('\\', '_').Replace(':', '_');
+                        string path = Path.Combine(arguments.ScreenshotDir, safeName + ".png");
+                        byte[] png = texture.EncodeToPNG();
+                        File.WriteAllBytes(path, png);
+                        smoke.screenshotPath = path;
+                    }
+                    catch (Exception ex)
+                    {
+                        smoke.screenshotPath = "write-failed: " + ex.Message;
+                    }
                 }
-                catch (Exception ex)
+
+                AnalyzePixels(texture, smoke);
+                return smoke;
+            }
+            finally
+            {
+                camera.targetTexture = previousTarget;
+                RenderTexture.active = previousActive;
+                RenderTexture.ReleaseTemporary(rt);
+                UnityEngine.Object.Destroy(texture);
+                if (restoreGrid)
                 {
-                    smoke.screenshotPath = "write-failed: " + ex.Message;
+                    grid!.SetActive(true);
                 }
             }
-
-            AnalyzePixels(texture, smoke);
-            UnityEngine.Object.Destroy(texture);
-            return smoke;
         }
 
         private static void AnalyzePixels(Texture2D texture, MmdRuntimeVerificationVisualSmoke smoke)
@@ -859,6 +915,12 @@ namespace Mmd.Samples.RuntimeVerification
             double luminanceSum = 0.0;
             int blackCount = 0;
             int whiteCount = 0;
+            int foregroundCount = 0;
+            int outlineCount = 0;
+            int minX = texture.width;
+            int minY = texture.height;
+            int maxX = -1;
+            int maxY = -1;
             Color32 firstPixel = pixels[0];
             bool allSame = true;
             var uniqueColors = new HashSet<int>();
@@ -870,6 +932,13 @@ namespace Mmd.Samples.RuntimeVerification
                 Color32 p = pixels[i];
                 float luminance = (0.2126f * p.r + 0.7152f * p.g + 0.0722f * p.b) / 255.0f;
                 luminanceSum += luminance;
+                int x = i % texture.width;
+                int y = i / texture.width;
+                int bgDelta =
+                    Math.Abs(p.r - firstPixel.r) +
+                    Math.Abs(p.g - firstPixel.g) +
+                    Math.Abs(p.b - firstPixel.b);
+                bool foreground = bgDelta > 24;
 
                 if (p.r < 5 && p.g < 5 && p.b < 5)
                 {
@@ -879,6 +948,20 @@ namespace Mmd.Samples.RuntimeVerification
                 if (p.r > 250 && p.g > 250 && p.b > 250)
                 {
                     whiteCount++;
+                }
+
+                if (foreground)
+                {
+                    foregroundCount++;
+                    if (x < minX) minX = x;
+                    if (y < minY) minY = y;
+                    if (x > maxX) maxX = x;
+                    if (y > maxY) maxY = y;
+
+                    if (luminance < 0.20f)
+                    {
+                        outlineCount++;
+                    }
                 }
 
                 if (allSame && (p.r != firstPixel.r || p.g != firstPixel.g || p.b != firstPixel.b))
@@ -902,8 +985,28 @@ namespace Mmd.Samples.RuntimeVerification
             smoke.isBlank = allSame;
             smoke.isAllBlack = blackRatio > 0.99f;
             smoke.isAllWhite = whiteRatio > 0.99f;
+            smoke.foregroundPixelCount = foregroundCount;
+            smoke.foregroundCoverage = (float)foregroundCount / pixels.Length;
+            smoke.hasContentBounds = foregroundCount > 0;
+            smoke.outlinePixelCount = outlineCount;
+            if (smoke.hasContentBounds)
+            {
+                smoke.contentMinX = minX;
+                smoke.contentMinY = minY;
+                smoke.contentMaxX = maxX;
+                smoke.contentMaxY = maxY;
+                smoke.touchesImageEdge =
+                    minX <= 0 ||
+                    minY <= 0 ||
+                    maxX >= texture.width - 1 ||
+                    maxY >= texture.height - 1;
+            }
 
-            if (smoke.isBlank || smoke.isAllBlack || smoke.isAllWhite)
+            if (smoke.isBlank ||
+                smoke.isAllBlack ||
+                smoke.isAllWhite ||
+                smoke.foregroundPixelCount == 0 ||
+                smoke.foregroundCoverage < 0.001f)
             {
                 smoke.smokeStatus = "failed";
             }

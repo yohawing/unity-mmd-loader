@@ -110,8 +110,13 @@ path, but this verification player only drives PMX + VMD playback for now.
 Cases with `skipReason` are skipped by the verification sweep while remaining
 available to the viewer descriptor list. Test-only fields such as oracle, watch
 bones, epsilon, and frame lists are ignored. A case may set `materialPreset` to
-`MmdToon` or `UrpLit`; `expectedFeatures` can include `urp-lit-preset` to fail
-the gate unless the report captured the URP Lit shader binding.
+`MmdToon` or `UrpLit`; `expectedFeatures` can include `visual-smoke` to require
+a captured nonblank/non-background screenshot, `outline-pixel` to require at
+least one dark foreground pixel, and `urp-lit-preset` to fail the gate unless
+the report captured the URP Lit shader binding.
+
+The repository gate script defaults to a one-second playback duration so the
+Timeline path advances before visual smoke is evaluated.
 
 Interactive runtime viewer:
 

@@ -66,6 +66,22 @@ if (Test-Path -LiteralPath $ProjectSamplePath) {
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $ProjectSamplePath) | Out-Null
 Copy-Item -LiteralPath $SamplePath -Destination $ProjectSamplePath -Recurse -Force
 
+$importLogFile = Join-Path $ArtifactsPath "build-player-import.log"
+Remove-Item -LiteralPath $importLogFile -Force -ErrorAction SilentlyContinue
+
+$importArgs = @(
+    "-batchmode",
+    "-quit",
+    "-projectPath", $ProjectPath,
+    "-logFile", $importLogFile
+)
+
+$importProcess = Start-Process -FilePath $Unity -ArgumentList (ConvertTo-ProcessArgumentList $importArgs) -Wait -PassThru -WindowStyle Hidden
+$importExitCode = $importProcess.ExitCode
+if ($importExitCode -ne 0) {
+    throw "Runtime verification sample import failed with exit code $importExitCode. log=$importLogFile"
+}
+
 $logFile = Join-Path $ArtifactsPath "build-player.log"
 Remove-Item -LiteralPath $logFile -Force -ErrorAction SilentlyContinue
 
