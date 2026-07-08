@@ -27,6 +27,8 @@ namespace Mmd.Tests
     /// </summary>
     public sealed class MmdLivePhysicsScrubResumeRegressionTests
     {
+        private const string Mode1ChainPmxId = "GeneratedPmx/bdef2-two-bone-strip.pmx";
+
         [Test]
         public void TimelineScrubSeekResumeKeepsHairPhysicsLive()
         {
@@ -43,9 +45,9 @@ namespace Mmd.Tests
                 // simulation freezes after a scrub the hair stays at the post-seek (bind) pose while the
                 // body animates away. test_hair_physics.pmx cannot be used here because its hair bind pose
                 // already equals the gravity equilibrium, so it shows no measurable movement.
-                MmdModelDefinition model = CreateMode1ChainModel();
-                MmdMotionDefinition motion = CreateBoneTranslationMotion(model, "root", frames: 30, endTranslationX: 40.0f);
-                binding = MmdUnityPlaybackBinding.CreateSkinned(model, motion, "mode1-chain.pmx", "translate-root");
+                MmdModelDefinition model = CreateMode1ChainModel(out string pmxPath);
+                MmdMotionDefinition motion = CreateBoneTranslationMotion(model, RootBoneName(model), frames: 30, endTranslationX: 40.0f);
+                binding = MmdUnityPlaybackBinding.CreateSkinned(model, motion, Mode1ChainPmxId, "translate-root", pmxPath);
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f, playOnStart: false);
                 controller.SetPhysicsMode(MmdPhysicsMode.Live);
@@ -157,9 +159,9 @@ namespace Mmd.Tests
             MmdUnityPlaybackBinding? binding = null;
             try
             {
-                MmdModelDefinition model = CreateMode1ChainModel();
-                MmdMotionDefinition motion = CreateBoneTranslationMotion(model, "root", frames: 30, endTranslationX: 40.0f);
-                binding = MmdUnityPlaybackBinding.CreateSkinned(model, motion, "mode1-chain.pmx", "translate-root");
+                MmdModelDefinition model = CreateMode1ChainModel(out string pmxPath);
+                MmdMotionDefinition motion = CreateBoneTranslationMotion(model, RootBoneName(model), frames: 30, endTranslationX: 40.0f);
+                binding = MmdUnityPlaybackBinding.CreateSkinned(model, motion, Mode1ChainPmxId, "translate-root", pmxPath);
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f, playOnStart: false);
                 controller.SetPhysicsMode(MmdPhysicsMode.Live);
@@ -227,9 +229,9 @@ namespace Mmd.Tests
             MmdUnityPlaybackBinding? binding = null;
             try
             {
-                MmdModelDefinition model = CreateMode1ChainModelWithFreeLinearJoint();
-                MmdMotionDefinition motion = CreateBoneTranslationMotion(model, "root", frames: 30, endTranslationX: 40.0f);
-                binding = MmdUnityPlaybackBinding.CreateSkinned(model, motion, "mode1-chain-free.pmx", "translate-root");
+                MmdModelDefinition model = CreateMode1ChainModelWithFreeLinearJoint(out string pmxPath);
+                MmdMotionDefinition motion = CreateBoneTranslationMotion(model, RootBoneName(model), frames: 30, endTranslationX: 40.0f);
+                binding = MmdUnityPlaybackBinding.CreateSkinned(model, motion, Mode1ChainPmxId, "translate-root", pmxPath);
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f, playOnStart: false);
                 controller.SetPhysicsMode(MmdPhysicsMode.Live);
@@ -299,9 +301,9 @@ namespace Mmd.Tests
             MmdUnityPlaybackBinding? binding = null;
             try
             {
-                MmdModelDefinition model = CreateMode1ChainModel();
-                MmdMotionDefinition motion = CreateBoneTranslationMotion(model, "root", frames: 30, endTranslationX: 40.0f);
-                binding = MmdUnityPlaybackBinding.CreateSkinned(model, motion, "mode1-chain.pmx", "translate-root");
+                MmdModelDefinition model = CreateMode1ChainModel(out string pmxPath);
+                MmdMotionDefinition motion = CreateBoneTranslationMotion(model, RootBoneName(model), frames: 30, endTranslationX: 40.0f);
+                binding = MmdUnityPlaybackBinding.CreateSkinned(model, motion, Mode1ChainPmxId, "translate-root", pmxPath);
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f, playOnStart: false);
                 controller.SetPhysicsMode(MmdPhysicsMode.Live);
@@ -416,9 +418,9 @@ namespace Mmd.Tests
             MmdUnityPlaybackBinding? binding = null;
             try
             {
-                MmdModelDefinition model = CreateMode1ChainModel();
-                MmdMotionDefinition motion = CreateBoneTranslationMotion(model, "root", frames: 30, endTranslationX: 40.0f);
-                binding = MmdUnityPlaybackBinding.CreateSkinned(model, motion, "mode1-chain.pmx", "translate-root");
+                MmdModelDefinition model = CreateMode1ChainModel(out string pmxPath);
+                MmdMotionDefinition motion = CreateBoneTranslationMotion(model, RootBoneName(model), frames: 30, endTranslationX: 40.0f);
+                binding = MmdUnityPlaybackBinding.CreateSkinned(model, motion, Mode1ChainPmxId, "translate-root", pmxPath);
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f, playOnStart: false);
                 controller.SetPhysicsMode(MmdPhysicsMode.Live);
@@ -577,79 +579,52 @@ namespace Mmd.Tests
         private static MmdMotionDefinition CreateBoneTranslationMotion(
             MmdModelDefinition model, string boneName, int frames, float endTranslationX)
         {
-            byte[] linear = { 20, 20, 107, 107 };
-            MmdBoneInterpolationDefinition Interp() => new MmdBoneInterpolationDefinition
-            {
-                translationX = linear, translationY = linear, translationZ = linear, rotation = linear
-            };
-
-            return new MmdMotionDefinition
-            {
-                targetModelName = model.name,
-                maxFrame = frames,
-                boneKeyframes = new List<MmdBoneKeyframeDefinition>
-                {
-                    new MmdBoneKeyframeDefinition
-                    {
-                        boneName = boneName, frame = 0,
-                        translation = new[] { 0.0f, 0.0f, 0.0f },
-                        rotation = new[] { 0.0f, 0.0f, 0.0f, 1.0f },
-                        interpolation = Interp()
-                    },
-                    new MmdBoneKeyframeDefinition
-                    {
-                        boneName = boneName, frame = frames,
-                        translation = new[] { endTranslationX, 0.0f, 0.0f },
-                        rotation = new[] { 0.0f, 0.0f, 0.0f, 1.0f },
-                        interpolation = Interp()
-                    }
-                },
-                morphKeyframes = new List<MmdMorphKeyframeDefinition>(),
-                modelKeyframes = new List<MmdModelKeyframeDefinition>()
-            };
+            return MmdTestFixtures.ParseGeneratedBoneTranslationMotion(
+                model.name,
+                boneName,
+                frames,
+                endTranslationX);
         }
 
         // Minimal two-bone model with a bone-follow (static) anchor on the root bone and a PMX mode-1
         // (pure dynamic) hair body on a child bone, joined by a ball joint. Used to verify that the
         // mode-1 hair (whose position is entirely physics-driven) follows the body when the root bone
         // animates, instead of staying at the bind pose.
-        private static MmdModelDefinition CreateMode1ChainModel()
+        private static MmdModelDefinition CreateMode1ChainModel(out string pmxPath)
         {
-            var model = new MmdModelDefinition { name = "mode1-chain" };
-            model.bones.Add(new MmdBoneDefinition
-            {
-                index = 0, name = "root", parentIndex = -1, transformOrder = 0,
-                origin = new[] { 0.0f, 0.0f, 0.0f }, isMovable = true, isRotatable = true
-            });
-            model.bones.Add(new MmdBoneDefinition
-            {
-                index = 1, name = "hair", parentIndex = 0, transformOrder = 1,
-                origin = new[] { 0.0f, -2.0f, 0.0f }, isMovable = true, isRotatable = true
-            });
-            model.vertices.Add(CreateVertex(0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0));
-            model.vertices.Add(CreateVertex(1, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0));
-            model.vertices.Add(CreateVertex(2, 0.0f, -2.0f, 0.0f, 0.0f, 1.0f, 1));
-            model.indices.AddRange(new[] { 0, 1, 2 });
-            model.materials.Add(new MmdMaterialDefinition { index = 0, name = "chain-material", vertexCount = 3 });
+            pmxPath = ResolvePackageFixture(Mode1ChainPmxId);
+            var parser = new NativeMmdParser();
+            MmdModelDefinition model = parser.LoadModel(File.ReadAllBytes(pmxPath));
+            Assert.That(model.bones, Has.Count.GreaterThanOrEqualTo(2),
+                Mode1ChainPmxId + " must provide a two-bone chain for live physics tests.");
+            int rootIndex = RootBoneIndex(model);
+            int hairIndex = HairBoneIndex(model);
+            string rootName = RootBoneName(model);
+            string hairName = HairBoneName(model);
+            Vector3 rootOrigin = ToVector3(model.bones[rootIndex].origin);
+            Vector3 hairOrigin = ToVector3(model.bones[hairIndex].origin);
+            Vector3 jointOrigin = (rootOrigin + hairOrigin) * 0.5f;
+            model.physics.rigidbodies.Clear();
+            model.physics.joints.Clear();
 
             model.physics.rigidbodies.Add(new MmdRigidbodyDefinition
             {
-                index = 0, name = "anchor", boneIndex = 0, boneName = "root", shapeType = "sphere",
-                size = new[] { 0.3f, 0.3f, 0.3f }, position = new[] { 0.0f, 0.0f, 0.0f },
+                index = 0, name = "anchor", boneIndex = rootIndex, boneName = rootName, shapeType = "sphere",
+                size = new[] { 0.3f, 0.3f, 0.3f }, position = ToArray(rootOrigin),
                 rotation = new[] { 0.0f, 0.0f, 0.0f }, mass = 0.0f, linearDamping = 0.0f, angularDamping = 0.0f,
                 friction = 0.5f, restitution = 0.0f, group = 0, mask = 0xffff, physicsKind = "static"
             });
             model.physics.rigidbodies.Add(new MmdRigidbodyDefinition
             {
-                index = 1, name = "hairBody", boneIndex = 1, boneName = "hair", shapeType = "sphere",
-                size = new[] { 0.3f, 0.3f, 0.3f }, position = new[] { 0.0f, -2.0f, 0.0f },
+                index = 1, name = "hairBody", boneIndex = hairIndex, boneName = hairName, shapeType = "sphere",
+                size = new[] { 0.3f, 0.3f, 0.3f }, position = ToArray(hairOrigin),
                 rotation = new[] { 0.0f, 0.0f, 0.0f }, mass = 1.0f, linearDamping = 0.0f, angularDamping = 0.0f,
                 friction = 0.5f, restitution = 0.0f, group = 0, mask = 0xffff, physicsKind = "dynamic"
             });
             model.physics.joints.Add(new MmdJointDefinition
             {
                 index = 0, name = "anchor-hair", rigidbodyAIndex = 0, rigidbodyBIndex = 1,
-                position = new[] { 0.0f, -1.0f, 0.0f }, rotation = new[] { 0.0f, 0.0f, 0.0f },
+                position = ToArray(jointOrigin), rotation = new[] { 0.0f, 0.0f, 0.0f },
                 linearLowerLimit = new[] { 0.0f, 0.0f, 0.0f }, linearUpperLimit = new[] { 0.0f, 0.0f, 0.0f },
                 angularLowerLimit = new[] { -3.1415927f, -3.1415927f, -3.1415927f },
                 angularUpperLimit = new[] { 3.1415927f, 3.1415927f, 3.1415927f },
@@ -661,7 +636,7 @@ namespace Mmd.Tests
         private static MmdModelDefinition CreateMode1ChainModel(float importScale)
         {
             Assert.That(float.IsFinite(importScale) && importScale > 0.0f, Is.True);
-            return CreateMode1ChainModel();
+            return CreateMode1ChainModel(out _);
         }
 
         private static Mode1ChainScaleSample RunMode1ChainForwardPlayback(float importScale)
@@ -670,7 +645,7 @@ namespace Mmd.Tests
             try
             {
                 MmdModelDefinition model = CreateMode1ChainModel(importScale);
-                MmdMotionDefinition motion = CreateBoneTranslationMotion(model, "root", frames: 30, endTranslationX: 40.0f);
+                MmdMotionDefinition motion = CreateBoneTranslationMotion(model, RootBoneName(model), frames: 30, endTranslationX: 40.0f);
                 binding = CreateMode1ChainBinding(model, motion, importScale);
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f, playOnStart: false);
@@ -702,9 +677,9 @@ namespace Mmd.Tests
             return MmdUnityPlaybackBinding.CreateSkinned(
                 model,
                 motion,
-                "mode1-chain.pmx",
+                Mode1ChainPmxId,
                 "translate-root",
-                sourcePath: null,
+                ResolvePackageFixture(Mode1ChainPmxId),
                 importScale);
         }
 
@@ -712,9 +687,9 @@ namespace Mmd.Tests
         // btGeneric6DofSpring2Constraint). The pure-dynamic hair body is then NOT linearly dragged toward
         // the anchor by the joint, so its horizontal position reflects only where the reset PLACED it —
         // exposing the origin-bind vs current-pose reset target that a rigid (linear-locked) joint masks.
-        private static MmdModelDefinition CreateMode1ChainModelWithFreeLinearJoint()
+        private static MmdModelDefinition CreateMode1ChainModelWithFreeLinearJoint(out string pmxPath)
         {
-            MmdModelDefinition model = CreateMode1ChainModel();
+            MmdModelDefinition model = CreateMode1ChainModel(out pmxPath);
             MmdJointDefinition joint = model.physics.joints[0];
             joint.linearLowerLimit = new[] { 1.0f, 1.0f, 1.0f };
             joint.linearUpperLimit = new[] { -1.0f, -1.0f, -1.0f };
@@ -748,14 +723,44 @@ namespace Mmd.Tests
 
         private static MmdMotionDefinition CreateRestPoseMotion(MmdModelDefinition model)
         {
-            return new MmdMotionDefinition
-            {
-                targetModelName = model.name,
-                maxFrame = 0,
-                boneKeyframes = new List<MmdBoneKeyframeDefinition>(),
-                morphKeyframes = new List<MmdMorphKeyframeDefinition>(),
-                modelKeyframes = new List<MmdModelKeyframeDefinition>()
-            };
+            return MmdTestFixtures.ParseGeneratedRestPoseMotion(model.name);
+        }
+
+        private static int RootBoneIndex(MmdModelDefinition model)
+        {
+            Assert.That(model.bones, Is.Not.Null.And.Not.Empty);
+            return model.bones[0].index;
+        }
+
+        private static int HairBoneIndex(MmdModelDefinition model)
+        {
+            Assert.That(model.bones, Has.Count.GreaterThanOrEqualTo(2));
+            return model.bones[1].index;
+        }
+
+        private static string RootBoneName(MmdModelDefinition model)
+        {
+            Assert.That(model.bones, Is.Not.Null.And.Not.Empty);
+            Assert.That(model.bones[0].name, Is.Not.Null.And.Not.Empty);
+            return model.bones[0].name;
+        }
+
+        private static string HairBoneName(MmdModelDefinition model)
+        {
+            Assert.That(model.bones, Has.Count.GreaterThanOrEqualTo(2));
+            Assert.That(model.bones[1].name, Is.Not.Null.And.Not.Empty);
+            return model.bones[1].name;
+        }
+
+        private static Vector3 ToVector3(float[] value)
+        {
+            Assert.That(value, Has.Length.EqualTo(3));
+            return new Vector3(value[0], value[1], value[2]);
+        }
+
+        private static float[] ToArray(Vector3 value)
+        {
+            return new[] { value.x, value.y, value.z };
         }
 
         private static void DestroyBinding(MmdUnityPlaybackBinding? binding)

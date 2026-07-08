@@ -23,6 +23,7 @@ namespace Mmd.Tests
         private const string PlaybackVmdId = "test_1bone_cube_motion.vmd";
         private const string ManualIkPmxId = "GeneratedPmx/bdef2-two-bone-strip.pmx";
         private const int EditableRigPlaybackFrame = 9;
+        private const int LivePhysicsPlaybackFrame = 10;
 
         [Test]
         public void ConfigureWithPlaybackConfigAppliesFrameRateAndPlayOnStart_ControllerPhysicsIsSourceOfTruth()
@@ -829,13 +830,15 @@ namespace Mmd.Tests
             MmdUnityPlaybackBinding? binding = null;
             try
             {
-                MmdModelDefinition model = MmdTestFixtures.CreateMinimalTriangleModel(SyntheticControllerModelName);
+                MmdModelDefinition model = LoadPhysicsFixtureModel();
+                int rootBoneIndex = RootBoneIndex(model);
+                string rootBoneName = RootBoneName(model);
                 model.physics.rigidbodies.Add(new MmdRigidbodyDefinition
                 {
                     index = 0,
                     name = "root pinned body",
-                    boneIndex = 0,
-                    boneName = "root",
+                    boneIndex = rootBoneIndex,
+                    boneName = rootBoneName,
                     shapeType = "sphere",
                     size = new[] { 0.25f, 0.25f, 0.25f },
                     position = new[] { 0.0f, 0.0f, 0.0f },
@@ -849,28 +852,24 @@ namespace Mmd.Tests
                     mask = 0,
                     physicsKind = "static"
                 });
-                binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    model,
-                    MmdTestFixtures.CreateRootTranslationMotion(SyntheticControllerModelName),
-                    "synthetic-pinned.pmx",
-                    "synthetic-pinned.vmd");
+                binding = CreatePhysicsPlaybackBinding(model, "pinned-root.vmd");
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f);
                 controller.SetPhysicsMode(MmdPhysicsMode.Live);
 
                 controller.ApplyFrame(0);
-                controller.ApplyFrame(10);
+                controller.ApplyFrame(LivePhysicsPlaybackFrame);
 
                 MmdLivePhysicsFrameDiagnostics? diagnostics = binding.LastLivePhysicsDiagnostics;
                 Assert.That(diagnostics, Is.Not.Null);
-                Assert.That(diagnostics!.frame, Is.EqualTo(10));
+                Assert.That(diagnostics!.frame, Is.EqualTo(LivePhysicsPlaybackFrame));
                 Assert.That(diagnostics.pinnedBodies.pinnedBodyCount, Is.EqualTo(1));
                 Assert.That(diagnostics.pinnedBodies.maxPinnedBodySyncDistance, Is.LessThan(0.0001f));
                 Assert.That(diagnostics.stepPhysicsMs, Is.GreaterThanOrEqualTo(0.0));
                 Assert.That(diagnostics.totalMs, Is.GreaterThanOrEqualTo(diagnostics.stepPhysicsMs));
                 Assert.That(binding.Instance.PhysicsBodies, Has.Length.EqualTo(1));
                 Assert.That(
-                    Vector3.Distance(binding.Instance.PhysicsBodies[0].transform.position, binding.Instance.BoneTransforms[0].position),
+                    Vector3.Distance(binding.Instance.PhysicsBodies[0].transform.position, binding.Instance.BoneTransforms[rootBoneIndex].position),
                     Is.LessThan(0.0001f));
             }
             finally
@@ -891,14 +890,16 @@ namespace Mmd.Tests
             MmdUnityPlaybackBinding? binding = null;
             try
             {
-                MmdModelDefinition model = MmdTestFixtures.CreateMinimalTriangleModel(SyntheticControllerModelName);
+                MmdModelDefinition model = LoadPhysicsFixtureModel();
+                int rootBoneIndex = RootBoneIndex(model);
+                string rootBoneName = RootBoneName(model);
                 // Static body on root bone
                 model.physics.rigidbodies.Add(new MmdRigidbodyDefinition
                 {
                     index = 0,
                     name = "static-root-body",
-                    boneIndex = 0,
-                    boneName = "root",
+                    boneIndex = rootBoneIndex,
+                    boneName = rootBoneName,
                     shapeType = "sphere",
                     size = new[] { 0.25f, 0.25f, 0.25f },
                     position = new[] { 0.0f, 0.0f, 0.0f },
@@ -917,8 +918,8 @@ namespace Mmd.Tests
                 {
                     index = 1,
                     name = "dynamic-orientation-root-body",
-                    boneIndex = 0,
-                    boneName = "root",
+                    boneIndex = rootBoneIndex,
+                    boneName = rootBoneName,
                     shapeType = "box",
                     size = new[] { 0.5f, 0.5f, 0.5f },
                     position = new[] { 0.5f, 0.0f, 0.0f },
@@ -932,11 +933,7 @@ namespace Mmd.Tests
                     mask = 0,
                     physicsKind = "dynamic-orientation"
                 });
-                binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    model,
-                    MmdTestFixtures.CreateRootTranslationMotion(SyntheticControllerModelName),
-                    "synthetic-body-diag.pmx",
-                    "synthetic-body-diag.vmd");
+                binding = CreatePhysicsPlaybackBinding(model, "body-diagnostics.vmd");
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f);
                 controller.SetPhysicsMode(MmdPhysicsMode.Live);
@@ -950,11 +947,11 @@ namespace Mmd.Tests
                 Assert.That(seedDiagnostics.pinnedBodies.dynamicOrientationPinnedBodyCount, Is.EqualTo(1),
                     "Mode-2 dynamic-orientation bodies are still seeded from the current bone pose on reset");
 
-                controller.ApplyFrame(10);
+                controller.ApplyFrame(LivePhysicsPlaybackFrame);
 
                 MmdLivePhysicsFrameDiagnostics? diagnostics = binding.LastLivePhysicsDiagnostics;
                 Assert.That(diagnostics, Is.Not.Null);
-                Assert.That(diagnostics!.frame, Is.EqualTo(10));
+                Assert.That(diagnostics!.frame, Is.EqualTo(LivePhysicsPlaybackFrame));
                 Assert.That(diagnostics.comparisonSpace, Is.EqualTo("runtime-forward-playback-diagnostics"));
                 Assert.That(diagnostics.importScale, Is.EqualTo(1.0f).Within(0.0001f));
                 Assert.That(diagnostics.pinnedBodies.pinnedBodyCount, Is.EqualTo(1));
@@ -968,8 +965,8 @@ namespace Mmd.Tests
                 MmdLivePhysicsBodyDiagnostics body0 = diagnostics.bodyDiagnostics[0];
                 Assert.That(body0.bodyIndex, Is.EqualTo(0));
                 Assert.That(body0.bodyName, Is.EqualTo("static-root-body"));
-                Assert.That(body0.boneIndex, Is.EqualTo(0));
-                Assert.That(body0.boneName, Is.EqualTo("root"));
+                Assert.That(body0.boneIndex, Is.EqualTo(rootBoneIndex));
+                Assert.That(body0.boneName, Is.EqualTo(rootBoneName));
                 Assert.That(body0.physicsKind, Is.EqualTo("static"));
                 Assert.That(body0.shapeType, Is.EqualTo("sphere"));
                 Assert.That(body0.mass, Is.EqualTo(0.0f));
@@ -984,8 +981,8 @@ namespace Mmd.Tests
                 MmdLivePhysicsBodyDiagnostics body1 = diagnostics.bodyDiagnostics[1];
                 Assert.That(body1.bodyIndex, Is.EqualTo(1));
                 Assert.That(body1.bodyName, Is.EqualTo("dynamic-orientation-root-body"));
-                Assert.That(body1.boneIndex, Is.EqualTo(0));
-                Assert.That(body1.boneName, Is.EqualTo("root"));
+                Assert.That(body1.boneIndex, Is.EqualTo(rootBoneIndex));
+                Assert.That(body1.boneName, Is.EqualTo(rootBoneName));
                 Assert.That(body1.physicsKind, Is.EqualTo("dynamic-orientation"));
                 Assert.That(body1.shapeType, Is.EqualTo("box"));
                 Assert.That(body1.mass, Is.EqualTo(1.0f));
@@ -1026,18 +1023,14 @@ namespace Mmd.Tests
             MmdUnityPlaybackBinding? binding = null;
             try
             {
-                MmdModelDefinition model = MmdTestFixtures.CreateMinimalTriangleModel(SyntheticControllerModelName);
+                MmdModelDefinition model = LoadPhysicsFixtureModel();
                 AddPinnedRootRigidbody(model);
-                binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    model,
-                    MmdTestFixtures.CreateRootTranslationMotion(SyntheticControllerModelName),
-                    "synthetic-serialized-live.pmx",
-                    "synthetic-serialized-live.vmd");
+                binding = CreatePhysicsPlaybackBinding(model, "serialized-live.vmd");
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f);
                 // arbitrary EditMode ApplyFrame(10) to setup pre-state for Live restart test; default Live forbids non-zero first, use Off here
                 controller.SetPhysicsMode(MmdPhysicsMode.Off);
-                controller.ApplyFrame(10);
+                controller.ApplyFrame(LivePhysicsPlaybackFrame);
 
                 var serializedObject = new SerializedObject(controller);
                 serializedObject.FindProperty("physicsMode").enumValueIndex = (int)MmdPhysicsMode.Live;
@@ -1073,13 +1066,9 @@ namespace Mmd.Tests
             MmdUnityPlaybackBinding? binding = null;
             try
             {
-                MmdModelDefinition model = MmdTestFixtures.CreateMinimalTriangleModel(SyntheticControllerModelName);
+                MmdModelDefinition model = LoadPhysicsFixtureModel();
                 AddPinnedRootRigidbody(model);
-                binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    model,
-                    MmdTestFixtures.CreateRootTranslationMotion(SyntheticControllerModelName),
-                    "synthetic-ctrl-diag.pmx",
-                    "synthetic-ctrl-diag.vmd");
+                binding = CreatePhysicsPlaybackBinding(model, "controller-diagnostics.vmd");
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f);
                 controller.SetPhysicsMode(MmdPhysicsMode.Live);
@@ -1091,11 +1080,11 @@ namespace Mmd.Tests
                 Assert.That(diagnostics.stepPhysicsMs, Is.GreaterThanOrEqualTo(0.0));
                 Assert.That(diagnostics.pinnedBodies.pinnedBodyCount, Is.EqualTo(1));
 
-                controller.ApplyFrame(10);
+                controller.ApplyFrame(LivePhysicsPlaybackFrame);
 
                 diagnostics = controller.LastLivePhysicsDiagnostics;
                 Assert.That(diagnostics, Is.Not.Null);
-                Assert.That(diagnostics!.frame, Is.EqualTo(10));
+                Assert.That(diagnostics!.frame, Is.EqualTo(LivePhysicsPlaybackFrame));
                 Assert.That(diagnostics.stepPhysicsMs, Is.GreaterThanOrEqualTo(0.0));
                 Assert.That(diagnostics.pinnedBodies.pinnedBodyCount, Is.EqualTo(1));
             }
@@ -1756,12 +1745,14 @@ namespace Mmd.Tests
 
         private static void AddPinnedRootRigidbody(MmdModelDefinition model)
         {
+            int rootBoneIndex = RootBoneIndex(model);
+            string rootBoneName = RootBoneName(model);
             model.physics.rigidbodies.Add(new MmdRigidbodyDefinition
             {
                 index = 0,
                 name = "root pinned body",
-                boneIndex = 0,
-                boneName = "root",
+                boneIndex = rootBoneIndex,
+                boneName = rootBoneName,
                 shapeType = "sphere",
                 size = new[] { 0.25f, 0.25f, 0.25f },
                 position = new[] { 0.0f, 0.0f, 0.0f },
@@ -1885,6 +1876,44 @@ namespace Mmd.Tests
         {
             (MmdModelDefinition model, MmdMotionDefinition motion) = LoadPlaybackFixturePair();
             return MmdUnityPlaybackBinding.CreateSkinned(model, motion, PlaybackPmxId, PlaybackVmdId);
+        }
+
+        private static MmdModelDefinition LoadPhysicsFixtureModel()
+        {
+            var parser = new NativeMmdParser();
+            return parser.LoadModel(MmdTestFixtures.ReadFixtureAssetBytes(PlaybackPmxId));
+        }
+
+        private static MmdUnityPlaybackBinding CreatePhysicsPlaybackBinding(
+            MmdModelDefinition model,
+            string motionId,
+            int maxFrame = LivePhysicsPlaybackFrame,
+            float endTranslationX = 2.0f)
+        {
+            MmdMotionDefinition motion = MmdTestFixtures.ParseGeneratedBoneTranslationMotion(
+                model.name,
+                RootBoneName(model),
+                maxFrame,
+                endTranslationX);
+            return MmdUnityPlaybackBinding.CreateSkinned(
+                model,
+                motion,
+                PlaybackPmxId,
+                motionId,
+                ResolvePackageFixture(PlaybackPmxId));
+        }
+
+        private static int RootBoneIndex(MmdModelDefinition model)
+        {
+            Assert.That(model.bones, Is.Not.Null.And.Not.Empty);
+            return model.bones[0].index;
+        }
+
+        private static string RootBoneName(MmdModelDefinition model)
+        {
+            Assert.That(model.bones, Is.Not.Null.And.Not.Empty);
+            Assert.That(model.bones[0].name, Is.Not.Null.And.Not.Empty);
+            return model.bones[0].name;
         }
 
         private static Quaternion ExpectedPlaybackLocalRotation(MmdUnityPlaybackBinding binding)
