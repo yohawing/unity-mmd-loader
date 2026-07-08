@@ -19,6 +19,10 @@ namespace Mmd.Tests
     public sealed class MmdUnityPlaybackControllerTests
     {
         private const string SyntheticControllerModelName = "minimal-controller-triangle";
+        private const string PlaybackPmxId = "test_1bone_cube.pmx";
+        private const string PlaybackVmdId = "test_1bone_cube_motion.vmd";
+        private const string ManualIkPmxId = "GeneratedPmx/bdef2-two-bone-strip.pmx";
+        private const int EditableRigPlaybackFrame = 9;
 
         [Test]
         public void ConfigureWithPlaybackConfigAppliesFrameRateAndPlayOnStart_ControllerPhysicsIsSourceOfTruth()
@@ -445,21 +449,20 @@ namespace Mmd.Tests
             MmdUnityPlaybackBinding? binding = null;
             try
             {
-                binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    MmdTestFixtures.CreateMinimalTriangleModel(SyntheticControllerModelName),
-                    MmdTestFixtures.CreateRootTranslationMotion(SyntheticControllerModelName),
-                    "synthetic.pmx",
-                    "synthetic.vmd");
+                binding = CreatePlaybackBinding();
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f);
                 // arbitrary EditMode evaluation (non-zero ApplyFrame for rig diagnostics), not normal Live forward playback
                 controller.SetPhysicsMode(MmdPhysicsMode.Off);
                 var layer = binding.Instance.Root.AddComponent<MmdEditableRigLayer>();
 
-                MmdPlaybackSnapshot snapshot = controller.ApplyFrame(10);
+                Quaternion expectedNativeLocalRotation = ExpectedPlaybackLocalRotation(binding);
 
-                Assert.That(snapshot.frame.frame, Is.EqualTo(10));
-                Assert.That(binding.Instance.BoneTransforms[0].localPosition, Is.EqualTo(new Vector3(-2.0f, 0.0f, 0.0f)));
+                MmdPlaybackSnapshot snapshot = controller.ApplyFrame(EditableRigPlaybackFrame);
+
+                Assert.That(snapshot.frame.frame, Is.EqualTo(EditableRigPlaybackFrame));
+                Assert.That(binding.Instance.BoneTransforms[0].localPosition, Is.EqualTo(binding.Instance.BindLocalPositions[0]));
+                Assert.That(Quaternion.Angle(binding.Instance.BoneTransforms[0].localRotation, expectedNativeLocalRotation), Is.LessThan(0.001f));
                 Assert.That(controller.LastEditableRigDiagnostics, Is.Not.Null);
                 Assert.That(controller.LastEditableRigDiagnostics!.layerFound, Is.True);
                 Assert.That(controller.LastEditableRigDiagnostics.editableRigEnabled, Is.False);
@@ -481,23 +484,22 @@ namespace Mmd.Tests
             MmdUnityPlaybackBinding? binding = null;
             try
             {
-                binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    MmdTestFixtures.CreateMinimalTriangleModel(SyntheticControllerModelName),
-                    MmdTestFixtures.CreateRootTranslationMotion(SyntheticControllerModelName),
-                    "synthetic.pmx",
-                    "synthetic.vmd");
+                binding = CreatePlaybackBinding();
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f);
                 // arbitrary EditMode evaluation (ApplyTime), not normal Live forward playback
                 controller.SetPhysicsMode(MmdPhysicsMode.Off);
                 binding.Instance.Root.AddComponent<MmdEditableRigLayer>();
 
-                controller.ApplyTime(10.25f / 30.0f);
+                Quaternion expectedNativeLocalRotation = ExpectedPlaybackLocalRotation(binding);
+
+                controller.ApplyTime(EditableRigPlaybackFrame / 30.0f);
 
                 Assert.That(controller.LastEditableRigDiagnostics, Is.Not.Null);
                 Assert.That(controller.LastEditableRigDiagnostics!.executionStage, Is.EqualTo("post-native-apply-time"));
                 Assert.That(controller.LastEditableRigDiagnostics.transformState, Is.EqualTo("native-only"));
-                Assert.That(binding.Instance.BoneTransforms[0].localPosition.x, Is.EqualTo(-2.0f).Within(0.00001f));
+                Assert.That(binding.Instance.BoneTransforms[0].localPosition.x, Is.EqualTo(binding.Instance.BindLocalPositions[0].x).Within(0.00001f));
+                Assert.That(Quaternion.Angle(binding.Instance.BoneTransforms[0].localRotation, expectedNativeLocalRotation), Is.LessThan(0.001f));
             }
             finally
             {
@@ -511,11 +513,7 @@ namespace Mmd.Tests
             MmdUnityPlaybackBinding? binding = null;
             try
             {
-                binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    MmdTestFixtures.CreateMinimalTriangleModel(SyntheticControllerModelName),
-                    MmdTestFixtures.CreateRootTranslationMotion(SyntheticControllerModelName),
-                    "synthetic.pmx",
-                    "synthetic.vmd");
+                binding = CreatePlaybackBinding();
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f);
                 // arbitrary EditMode evaluation (non-zero ApplyFrame for rig delta), not normal Live forward playback
@@ -531,14 +529,18 @@ namespace Mmd.Tests
                     localScaleDelta: new Vector3(0.0f, 0.0f, 0.4f),
                     weight: 0.5f);
 
-                controller.ApplyFrame(10);
+                Quaternion expectedNativeLocalRotation = ExpectedPlaybackLocalRotation(binding);
+                Quaternion expectedCorrectedLocalRotation =
+                    expectedNativeLocalRotation * Quaternion.AngleAxis(22.5f, Vector3.forward);
+
+                controller.ApplyFrame(EditableRigPlaybackFrame);
                 Vector3 firstPosition = binding.Instance.BoneTransforms[0].localPosition;
                 Quaternion firstRotation = binding.Instance.BoneTransforms[0].localRotation;
                 Vector3 firstScale = binding.Instance.BoneTransforms[0].localScale;
-                controller.ApplyFrame(10);
+                controller.ApplyFrame(EditableRigPlaybackFrame);
 
-                Assert.That(Vector3.Distance(firstPosition, new Vector3(-2.0f, 0.5f, 0.0f)), Is.LessThan(0.0001f));
-                Assert.That(Quaternion.Angle(Quaternion.identity, firstRotation), Is.EqualTo(22.5f).Within(0.0001f));
+                Assert.That(Vector3.Distance(firstPosition, binding.Instance.BindLocalPositions[0] + new Vector3(0.0f, 0.5f, 0.0f)), Is.LessThan(0.0001f));
+                Assert.That(Quaternion.Angle(expectedCorrectedLocalRotation, firstRotation), Is.LessThan(0.001f));
                 Assert.That(Vector3.Distance(firstScale, new Vector3(1.0f, 1.0f, 1.1f)), Is.LessThan(0.0001f));
                 Assert.That(Vector3.Distance(binding.Instance.BoneTransforms[0].localPosition, firstPosition), Is.LessThan(0.0001f));
                 Assert.That(Quaternion.Angle(binding.Instance.BoneTransforms[0].localRotation, firstRotation), Is.LessThan(0.0001f));
@@ -562,11 +564,7 @@ namespace Mmd.Tests
             MmdUnityPlaybackBinding? binding = null;
             try
             {
-                binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    MmdTestFixtures.CreateMinimalTriangleModel(SyntheticControllerModelName),
-                    MmdTestFixtures.CreateRootTranslationMotion(SyntheticControllerModelName),
-                    "synthetic.pmx",
-                    "synthetic.vmd");
+                binding = CreatePlaybackBinding();
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f);
                 // arbitrary EditMode evaluation (non-zero ApplyFrame for rig error cases), not normal Live forward playback
@@ -576,7 +574,7 @@ namespace Mmd.Tests
 
                 layer.AddBoneCorrection("missing", -1, Vector3.zero, Quaternion.identity, Vector3.zero);
                 Assert.That(
-                    () => controller.ApplyFrame(10),
+                    () => controller.ApplyFrame(EditableRigPlaybackFrame),
                     Throws.InvalidOperationException.With.Message.Contains("editable-rig-unknown-bone"));
 
                 layer.ClearBoneCorrections();
@@ -584,13 +582,13 @@ namespace Mmd.Tests
                 layer.AddBoneCorrection(boneName, -1, Vector3.zero, Quaternion.identity, Vector3.zero);
                 layer.AddBoneCorrection(boneName, -1, Vector3.zero, Quaternion.identity, Vector3.zero);
                 Assert.That(
-                    () => controller.ApplyFrame(10),
+                    () => controller.ApplyFrame(EditableRigPlaybackFrame),
                     Throws.InvalidOperationException.With.Message.Contains("editable-rig-duplicate-bone-correction"));
 
                 layer.ClearBoneCorrections();
                 layer.AddBoneCorrection(boneName, -1, Vector3.zero, Quaternion.identity, Vector3.zero, weight: 1.5f);
                 Assert.That(
-                    () => controller.ApplyFrame(10),
+                    () => controller.ApplyFrame(EditableRigPlaybackFrame),
                     Throws.InvalidOperationException.With.Message.Contains("weight must be finite and in [0, 1]"));
             }
             finally
@@ -606,30 +604,27 @@ namespace Mmd.Tests
             GameObject? target = null;
             try
             {
-                binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    CreateManualIkTwoBoneModel(),
-                    CreateStaticManualIkMotion(),
-                    "synthetic-ik.pmx",
-                    "synthetic-ik.vmd");
+                binding = CreateManualIkBinding();
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f);
                 target = new GameObject("manual-ik-target");
                 target.transform.position = new Vector3(0.7f, 0.7f, 0.0f);
-                float beforeDistance = Vector3.Distance(binding.Instance.BoneTransforms[1].position, target.transform.position);
+                (int chainIndex, int effectorIndex) = GetManualIkSlots(binding);
+                float beforeDistance = Vector3.Distance(binding.Instance.BoneTransforms[effectorIndex].position, target.transform.position);
                 var layer = binding.Instance.Root.AddComponent<MmdEditableRigLayer>();
                 layer.EditableRigEnabled = true;
                 layer.AddManualIkTarget(
                     target.transform,
-                    binding.Instance.BoneTransforms[1].name,
-                    effectorBoneIndex: 1,
-                    chainBoneNames: new[] { binding.Instance.BoneTransforms[0].name },
-                    chainBoneIndices: new[] { 0 },
+                    binding.Instance.BoneTransforms[effectorIndex].name,
+                    effectorBoneIndex: effectorIndex,
+                    chainBoneNames: new[] { binding.Instance.BoneTransforms[chainIndex].name },
+                    chainBoneIndices: new[] { chainIndex },
                     weight: 1.0f,
                     iterationLimit: 8);
 
                 controller.ApplyFrame(0);
 
-                float afterDistance = Vector3.Distance(binding.Instance.BoneTransforms[1].position, target.transform.position);
+                float afterDistance = Vector3.Distance(binding.Instance.BoneTransforms[effectorIndex].position, target.transform.position);
                 Assert.That(afterDistance, Is.LessThan(beforeDistance));
                 Assert.That(controller.LastEditableRigDiagnostics, Is.Not.Null);
                 Assert.That(controller.LastEditableRigDiagnostics!.solvedManualIkTargetCount, Is.EqualTo(1));
@@ -650,16 +645,13 @@ namespace Mmd.Tests
             GameObject? target = null;
             try
             {
-                binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    CreateManualIkTwoBoneModel(),
-                    CreateStaticManualIkMotion(),
-                    "synthetic-ik.pmx",
-                    "synthetic-ik.vmd");
+                binding = CreateManualIkBinding();
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f);
                 target = new GameObject("manual-ik-disabled-target");
                 target.transform.position = new Vector3(0.7f, 0.7f, 0.0f);
-                Vector3 beforePosition = binding.Instance.BoneTransforms[1].position;
+                (_, int effectorIndex) = GetManualIkSlots(binding);
+                Vector3 beforePosition = binding.Instance.BoneTransforms[effectorIndex].position;
                 var layer = binding.Instance.Root.AddComponent<MmdEditableRigLayer>();
                 layer.EditableRigEnabled = true;
                 layer.AddManualIkTarget(
@@ -674,7 +666,7 @@ namespace Mmd.Tests
 
                 controller.ApplyFrame(0);
 
-                Assert.That(binding.Instance.BoneTransforms[1].position, Is.EqualTo(beforePosition));
+                Assert.That(binding.Instance.BoneTransforms[effectorIndex].position, Is.EqualTo(beforePosition));
                 Assert.That(controller.LastEditableRigDiagnostics, Is.Not.Null);
                 Assert.That(controller.LastEditableRigDiagnostics!.solvedManualIkTargetCount, Is.EqualTo(0));
                 Assert.That(controller.LastEditableRigDiagnostics.skippedManualIkTargetCount, Is.EqualTo(1));
@@ -694,16 +686,13 @@ namespace Mmd.Tests
             GameObject? target = null;
             try
             {
-                binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    CreateManualIkTwoBoneModel(),
-                    CreateStaticManualIkMotion(),
-                    "synthetic-ik.pmx",
-                    "synthetic-ik.vmd");
+                binding = CreateManualIkBinding();
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f);
                 target = new GameObject("manual-ik-zero-weight-target");
                 target.transform.position = new Vector3(0.7f, 0.7f, 0.0f);
-                Vector3 beforePosition = binding.Instance.BoneTransforms[1].position;
+                (_, int effectorIndex) = GetManualIkSlots(binding);
+                Vector3 beforePosition = binding.Instance.BoneTransforms[effectorIndex].position;
                 var layer = binding.Instance.Root.AddComponent<MmdEditableRigLayer>();
                 layer.EditableRigEnabled = true;
                 layer.AddManualIkTarget(
@@ -717,7 +706,7 @@ namespace Mmd.Tests
 
                 controller.ApplyFrame(0);
 
-                Assert.That(binding.Instance.BoneTransforms[1].position, Is.EqualTo(beforePosition));
+                Assert.That(binding.Instance.BoneTransforms[effectorIndex].position, Is.EqualTo(beforePosition));
                 Assert.That(controller.LastEditableRigDiagnostics, Is.Not.Null);
                 Assert.That(controller.LastEditableRigDiagnostics!.solvedManualIkTargetCount, Is.EqualTo(0));
                 Assert.That(controller.LastEditableRigDiagnostics.skippedManualIkTargetCount, Is.EqualTo(1));
@@ -737,21 +726,18 @@ namespace Mmd.Tests
             GameObject? target = null;
             try
             {
-                binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    CreateManualIkTwoBoneModel(),
-                    CreateStaticManualIkMotion(),
-                    "synthetic-ik.pmx",
-                    "synthetic-ik.vmd");
+                binding = CreateManualIkBinding();
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f);
                 target = new GameObject("manual-ik-invalid-target");
                 target.transform.position = new Vector3(0.7f, 0.7f, 0.0f);
+                (int chainIndex, int effectorIndex) = GetManualIkSlots(binding);
                 var layer = binding.Instance.Root.AddComponent<MmdEditableRigLayer>();
                 layer.EditableRigEnabled = true;
                 layer.AddManualIkTarget(
                     target.transform,
-                    binding.Instance.BoneTransforms[1].name,
-                    effectorBoneIndex: 1,
+                    binding.Instance.BoneTransforms[effectorIndex].name,
+                    effectorBoneIndex: effectorIndex,
                     chainBoneNames: System.Array.Empty<string>(),
                     chainBoneIndices: System.Array.Empty<int>(),
                     weight: 1.0f,
@@ -764,10 +750,10 @@ namespace Mmd.Tests
                 layer.ClearManualIkTargets();
                 layer.AddManualIkTarget(
                     target.transform,
-                    binding.Instance.BoneTransforms[1].name,
-                    effectorBoneIndex: 1,
-                    chainBoneNames: new[] { binding.Instance.BoneTransforms[0].name, binding.Instance.BoneTransforms[1].name },
-                    chainBoneIndices: new[] { 0 },
+                    binding.Instance.BoneTransforms[effectorIndex].name,
+                    effectorBoneIndex: effectorIndex,
+                    chainBoneNames: new[] { binding.Instance.BoneTransforms[chainIndex].name, binding.Instance.BoneTransforms[effectorIndex].name },
+                    chainBoneIndices: new[] { chainIndex },
                     weight: 1.0f,
                     iterationLimit: 8);
 
@@ -778,18 +764,18 @@ namespace Mmd.Tests
                 layer.ClearManualIkTargets();
                 layer.AddManualIkTarget(
                     target.transform,
-                    binding.Instance.BoneTransforms[1].name,
-                    effectorBoneIndex: 1,
-                    chainBoneNames: new[] { binding.Instance.BoneTransforms[0].name },
-                    chainBoneIndices: new[] { 0 },
+                    binding.Instance.BoneTransforms[effectorIndex].name,
+                    effectorBoneIndex: effectorIndex,
+                    chainBoneNames: new[] { binding.Instance.BoneTransforms[chainIndex].name },
+                    chainBoneIndices: new[] { chainIndex },
                     weight: 1.0f,
                     iterationLimit: 8);
                 layer.AddManualIkTarget(
                     target.transform,
-                    binding.Instance.BoneTransforms[1].name,
-                    effectorBoneIndex: 1,
-                    chainBoneNames: new[] { binding.Instance.BoneTransforms[0].name },
-                    chainBoneIndices: new[] { 0 },
+                    binding.Instance.BoneTransforms[effectorIndex].name,
+                    effectorBoneIndex: effectorIndex,
+                    chainBoneNames: new[] { binding.Instance.BoneTransforms[chainIndex].name },
+                    chainBoneIndices: new[] { chainIndex },
                     weight: 1.0f,
                     iterationLimit: 8);
 
@@ -1890,9 +1876,43 @@ namespace Mmd.Tests
         private static (MmdModelDefinition Model, MmdMotionDefinition Motion) LoadPlaybackFixturePair()
         {
             var parser = new NativeMmdParser();
-            MmdModelDefinition model = parser.LoadModel(MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube.pmx"));
-            MmdMotionDefinition motion = parser.LoadMotion(MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube_motion.vmd"));
+            MmdModelDefinition model = parser.LoadModel(MmdTestFixtures.ReadFixtureAssetBytes(PlaybackPmxId));
+            MmdMotionDefinition motion = parser.LoadMotion(MmdTestFixtures.ReadFixtureAssetBytes(PlaybackVmdId));
             return (model, motion);
+        }
+
+        private static MmdUnityPlaybackBinding CreatePlaybackBinding()
+        {
+            (MmdModelDefinition model, MmdMotionDefinition motion) = LoadPlaybackFixturePair();
+            return MmdUnityPlaybackBinding.CreateSkinned(model, motion, PlaybackPmxId, PlaybackVmdId);
+        }
+
+        private static Quaternion ExpectedPlaybackLocalRotation(MmdUnityPlaybackBinding binding)
+        {
+            float[] expectedMmdLocalRotation = { -0.3826833665f, 0.0f, 0.0f, 0.9238795638f };
+            return binding.Instance.BindLocalRotations[0] * ToUnityRotation(expectedMmdLocalRotation);
+        }
+
+        private static (MmdModelDefinition Model, MmdMotionDefinition Motion) LoadManualIkFixturePair()
+        {
+            var parser = new NativeMmdParser();
+            MmdModelDefinition model = parser.LoadModel(MmdTestFixtures.ReadFixtureAssetBytes(ManualIkPmxId));
+            MmdMotionDefinition motion = parser.LoadMotion(MmdTestFixtures.ReadFixtureAssetBytes(PlaybackVmdId));
+            return (model, motion);
+        }
+
+        private static MmdUnityPlaybackBinding CreateManualIkBinding()
+        {
+            (MmdModelDefinition model, MmdMotionDefinition motion) = LoadManualIkFixturePair();
+            return MmdUnityPlaybackBinding.CreateSkinned(model, motion, ManualIkPmxId, PlaybackVmdId);
+        }
+
+        private static (int ChainIndex, int EffectorIndex) GetManualIkSlots(MmdUnityPlaybackBinding binding)
+        {
+            Assert.That(binding.Instance.BoneTransforms, Has.Length.GreaterThanOrEqualTo(2));
+            int effectorIndex = binding.Instance.BoneTransforms.Length - 1;
+            int chainIndex = Math.Max(0, effectorIndex - 1);
+            return (chainIndex, effectorIndex);
         }
 
         private static (MmdModelDefinition Model, MmdMotionDefinition Motion) LoadAppendFixturePair()
