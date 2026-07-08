@@ -18,7 +18,7 @@ namespace Mmd.Samples.RuntimeVerification
             ConfigureSceneView();
 
             MmdRuntimeVerificationArguments arguments =
-                MmdRuntimeVerificationArguments.Parse(Environment.GetCommandLineArgs());
+                MmdRuntimeVerificationArguments.Parse(GetCommandLineArgs());
             if (arguments.PhysicsMaxSubStepFixedStepSeconds > 0.0f)
             {
                 BulletMmdPhysicsBackend.SetMaxSubStepEstimateFixedTimeStepSecondsForDiagnostics(
@@ -66,6 +66,61 @@ namespace Mmd.Samples.RuntimeVerification
                 BulletMmdPhysicsBackend.ResetMaxSubStepEstimateFixedTimeStepSecondsForDiagnostics();
             }
         }
+
+        private static string[] GetCommandLineArgs()
+        {
+            string[] args = Environment.GetCommandLineArgs();
+#if UNITY_EDITOR
+            if (ShouldUseEditorViewerMode(args))
+            {
+                var editorArgs = new string[args.Length + 1];
+                Array.Copy(args, editorArgs, args.Length);
+                editorArgs[args.Length] = "--viewer";
+                return editorArgs;
+            }
+#endif
+            return args;
+        }
+
+#if UNITY_EDITOR
+        private static bool ShouldUseEditorViewerMode(string[] args)
+        {
+            if (!Application.isEditor || Application.isBatchMode)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < args.Length; i++)
+            {
+                string arg = args[i] ?? string.Empty;
+                int equals = arg.IndexOf('=');
+                string name = equals >= 0 ? arg.Substring(0, equals) : arg;
+                switch (name)
+                {
+                    case "--viewer":
+                    case "--pmx":
+                    case "--vmd":
+                    case "--dir":
+                    case "--fixture-manifest":
+                    case "--screenshot-dir":
+                    case "--material-preset":
+                    case "--out":
+                    case "--duration":
+                    case "--frame-rate":
+                    case "--sample-frames":
+                    case "--physics-max-substep-fixed-step":
+                    case "--dump-bones":
+                    case "--drive":
+                    case "--fast-runtime":
+                    case "--help":
+                    case "-h":
+                        return false;
+                }
+            }
+
+            return true;
+        }
+#endif
 
         private static void ConfigureSceneView()
         {

@@ -23,6 +23,15 @@ The script copies this sample into the ignored Unity consumer project path
 
 ## Run
 
+Inside the `unity-mmd` Editor project, use
+`Tools > MMDLoaderDevTools > Play Runtime Verification Viewer` to open
+`Assets/RuntimeVerification/RuntimeVerification.unity` and enter Play Mode.
+Editor Play Mode defaults to the interactive viewer when no RuntimeVerification
+command-line arguments are present, so the left panel can load PMX/VMD files
+through the file dialog. The viewer panel is implemented with runtime UI Toolkit
+(`UIDocument` + `Resources/MmdRuntimeViewer.uxml` / `.uss`); IMGUI is kept only
+as a fallback if those assets are unavailable.
+
 Single Timeline-driven runtime check:
 
 ```powershell

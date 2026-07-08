@@ -1,0 +1,124 @@
+.viewer-panel {
+    position: absolute;
+    left: 12px;
+    top: 12px;
+    width: 360px;
+    max-height: 96%;
+    padding: 10px;
+    background-color: rgba(24, 27, 31, 0.90);
+    border-left-width: 1px;
+    border-right-width: 1px;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+    border-left-color: rgba(255, 255, 255, 0.16);
+    border-right-color: rgba(255, 255, 255, 0.16);
+    border-top-color: rgba(255, 255, 255, 0.16);
+    border-bottom-color: rgba(255, 255, 255, 0.16);
+}
+
+.title {
+    font-size: 16px;
+    unity-font-style: bold;
+    color: rgb(244, 246, 248);
+    margin-bottom: 6px;
+}
+
+.icon-button {
+    width: 28px;
+    min-height: 24px;
+}
+
+.open-panel-button {
+    position: absolute;
+    left: 12px;
+    top: 12px;
+    width: 74px;
+    min-height: 26px;
+}
+
+.section-title {
+    color: rgb(226, 230, 234);
+    unity-font-style: bold;
+    margin-top: 6px;
+    margin-bottom: 3px;
+}
+
+.row {
+    flex-direction: row;
+}
+
+.split-row {
+    justify-content: space-between;
+    align-items: center;
+}
+
+.toolbar-button {
+    width: 88px;
+    margin-right: 5px;
+}
+
+.wide-button {
+    width: 120px;
+    margin-top: 4px;
+}
+
+.clear-button {
+    width: 54px;
+}
+
+.path-row {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 3px;
+}
+
+.path-field {
+    flex-grow: 1;
+    margin-right: 4px;
+}
+
+.browse-button {
+    width: 74px;
+}
+
+.frame-slider {
+    margin-top: 4px;
+}
+
+.list {
+    min-height: 80px;
+    max-height: 170px;
+}
+
+.recents-list {
+    max-height: 108px;
+}
+
+.list-button {
+    -unity-text-align: middle-left;
+    min-height: 21px;
+}
+
+.muted {
+    color: rgb(190, 196, 202);
+}
+
+.details {
+    white-space: normal;
+    color: rgb(218, 222, 226);
+    margin-top: 6px;
+}
+
+.status {
+    white-space: normal;
+    color: rgb(204, 213, 222);
+}
+
+.error-label {
+    white-space: normal;
+    color: rgb(255, 182, 146);
+}
+
+.loading-label {
+    color: rgb(155, 211, 255);
+}
