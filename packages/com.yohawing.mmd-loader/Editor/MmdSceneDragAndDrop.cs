@@ -13,7 +13,7 @@ using Object = UnityEngine.Object;
 namespace Mmd.Editor
 {
     [InitializeOnLoad]
-    public static class MmdSceneDragAndDrop
+    internal static class MmdSceneDragAndDrop
     {
         private static readonly MethodInfo? InstanceIdToObjectMethod = typeof(EditorUtility).GetMethod(
             "InstanceIDToObject",

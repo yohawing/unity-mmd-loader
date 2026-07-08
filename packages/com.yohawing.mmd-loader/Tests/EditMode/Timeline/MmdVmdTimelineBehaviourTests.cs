@@ -1,9 +1,7 @@
 #nullable enable
 
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.Playables;
@@ -18,6 +16,8 @@ namespace Mmd.Tests
 {
     public sealed class MmdVmdTimelineBehaviourTests
     {
+        private const string SyntheticTriangleModelName = "minimal-timeline-triangle";
+
         [Test]
         public void TimelineBehaviourUsesSharedTimePolicyForRepeatAndReverseSeek()
         {
@@ -25,8 +25,8 @@ namespace Mmd.Tests
             try
             {
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    CreateMinimalTriangleModel(),
-                    CreateRootTranslationMotion(),
+                    MmdTestFixtures.CreateMinimalTriangleModel(SyntheticTriangleModelName),
+                    MmdTestFixtures.CreateRootTranslationMotion(SyntheticTriangleModelName),
                     "timeline-synthetic.pmx",
                     "timeline-synthetic.vmd");
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
@@ -60,7 +60,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(binding?.Instance);
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
             }
         }
 
@@ -71,8 +71,8 @@ namespace Mmd.Tests
             try
             {
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    CreateMinimalTriangleModel(),
-                    CreateRootTranslationMotion(),
+                    MmdTestFixtures.CreateMinimalTriangleModel(SyntheticTriangleModelName),
+                    MmdTestFixtures.CreateRootTranslationMotion(SyntheticTriangleModelName),
                     "timeline-live-off-synthetic.pmx",
                     "timeline-live-off-synthetic.vmd");
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
@@ -93,7 +93,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(binding?.Instance);
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
             }
         }
 
@@ -106,8 +106,8 @@ namespace Mmd.Tests
             try
             {
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    CreateMinimalTriangleModel(),
-                    CreateRootTranslationMotion(),
+                    MmdTestFixtures.CreateMinimalTriangleModel(SyntheticTriangleModelName),
+                    MmdTestFixtures.CreateRootTranslationMotion(SyntheticTriangleModelName),
                     "timeline-serialized-live.pmx",
                     "timeline-serialized-live.vmd");
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
@@ -129,7 +129,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(binding?.Instance);
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
             }
         }
 
@@ -142,8 +142,8 @@ namespace Mmd.Tests
             try
             {
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    CreateMinimalTriangleModel(),
-                    CreateRootTranslationMotion(),
+                    MmdTestFixtures.CreateMinimalTriangleModel(SyntheticTriangleModelName),
+                    MmdTestFixtures.CreateRootTranslationMotion(SyntheticTriangleModelName),
                     "timeline-repeat-live.pmx",
                     "timeline-repeat-live.vmd");
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
@@ -178,7 +178,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(binding?.Instance);
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
             }
         }
 
@@ -243,7 +243,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
             }
         }
 
@@ -342,7 +342,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
                 Object.DestroyImmediate(vmdAsset);
             }
         }
@@ -391,7 +391,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
                 Object.DestroyImmediate(pmxAsset);
                 Object.DestroyImmediate(vmdAsset);
             }
@@ -435,7 +435,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
                 Object.DestroyImmediate(pmxAsset);
                 Object.DestroyImmediate(vmdAsset);
             }
@@ -482,8 +482,8 @@ namespace Mmd.Tests
             try
             {
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    CreateMinimalTriangleModel(),
-                    CreateRootTranslationMotion(),
+                    MmdTestFixtures.CreateMinimalTriangleModel(SyntheticTriangleModelName),
+                    MmdTestFixtures.CreateRootTranslationMotion(SyntheticTriangleModelName),
                     "timeline-director-synthetic.pmx",
                     "timeline-director-synthetic.vmd");
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
@@ -535,7 +535,7 @@ namespace Mmd.Tests
                     Object.DestroyImmediate(timelineAsset);
                 }
 
-                DestroyInstance(binding?.Instance);
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
             }
         }
 
@@ -548,8 +548,8 @@ namespace Mmd.Tests
             try
             {
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    CreateMinimalTriangleModel(),
-                    CreateRootTranslationMotion(),
+                    MmdTestFixtures.CreateMinimalTriangleModel(SyntheticTriangleModelName),
+                    MmdTestFixtures.CreateRootTranslationMotion(SyntheticTriangleModelName),
                     "timeline-editable-rig-synthetic.pmx",
                     "timeline-editable-rig-synthetic.vmd");
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
@@ -627,7 +627,7 @@ namespace Mmd.Tests
                     Object.DestroyImmediate(timelineAsset);
                 }
 
-                DestroyInstance(binding?.Instance);
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
             }
         }
 
@@ -832,92 +832,6 @@ namespace Mmd.Tests
             }
         }
 
-        private static MmdModelDefinition CreateMinimalTriangleModel()
-        {
-            var model = new MmdModelDefinition
-            {
-                name = "minimal-timeline-triangle"
-            };
-            model.bones.Add(new MmdBoneDefinition
-            {
-                index = 0,
-                name = "root",
-                parentIndex = -1,
-                transformOrder = 0,
-                origin = new[] { 0.0f, 0.0f, 0.0f },
-                isMovable = true,
-                isRotatable = true
-            });
-            model.vertices.Add(CreateVertex(0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f));
-            model.vertices.Add(CreateVertex(1, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f));
-            model.vertices.Add(CreateVertex(2, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f));
-            model.indices.AddRange(new[] { 0, 1, 2 });
-            model.materials.Add(new MmdMaterialDefinition
-            {
-                index = 0,
-                name = "triangle-material",
-                vertexCount = 3
-            });
-            return model;
-        }
-
-        private static MmdMotionDefinition CreateRootTranslationMotion()
-        {
-            var motion = new MmdMotionDefinition
-            {
-                targetModelName = "minimal-timeline-triangle",
-                maxFrame = 10
-            };
-            motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
-            {
-                boneName = "root",
-                frame = 0,
-                translation = new[] { 0.0f, 0.0f, 0.0f },
-                rotation = new[] { 0.0f, 0.0f, 0.0f, 1.0f },
-                interpolation = LinearInterpolation()
-            });
-            motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
-            {
-                boneName = "root",
-                frame = 10,
-                translation = new[] { 2.0f, 0.0f, 0.0f },
-                rotation = new[] { 0.0f, 0.0f, 0.0f, 1.0f },
-                interpolation = LinearInterpolation()
-            });
-            return motion;
-        }
-
-        private static MmdBoneInterpolationDefinition LinearInterpolation()
-        {
-            byte[] linear = { 20, 20, 107, 107 };
-            return new MmdBoneInterpolationDefinition
-            {
-                translationX = linear,
-                translationY = linear,
-                translationZ = linear,
-                rotation = linear
-            };
-        }
-
-        private static MmdVertexDefinition CreateVertex(
-            int index,
-            float x,
-            float y,
-            float z,
-            float u,
-            float v)
-        {
-            return new MmdVertexDefinition
-            {
-                index = index,
-                position = new[] { x, y, z },
-                normal = new[] { 0.0f, 0.0f, 1.0f },
-                uv = new[] { u, v },
-                boneIndices = new[] { 0 },
-                boneWeights = new[] { 1.0f }
-            };
-        }
-
         private static MmdPmxAsset CreatePmxAsset(string pmxPath)
         {
             var asset = ScriptableObject.CreateInstance<MmdPmxAsset>();
@@ -930,36 +844,6 @@ namespace Mmd.Tests
             var asset = ScriptableObject.CreateInstance<MmdVmdAsset>();
             asset.Initialize(File.ReadAllBytes(vmdPath), Path.GetFileName(vmdPath), vmdPath);
             return asset;
-        }
-
-        private static void DestroyInstance(MmdUnityModelInstance? instance)
-        {
-            if (instance == null)
-            {
-                return;
-            }
-
-            var roots = new List<Object>();
-            if (instance.Root != null)
-            {
-                roots.Add(instance.Root);
-            }
-
-            if (instance.Mesh != null)
-            {
-                roots.Add(instance.Mesh);
-            }
-
-            if (instance.Materials != null)
-            {
-                roots.AddRange(instance.Materials.Where(material => material != null).Distinct());
-            }
-
-            roots.AddRange(instance.OwnedTextures.Where(texture => texture != null).Distinct());
-            foreach (Object item in roots)
-            {
-                Object.DestroyImmediate(item);
-            }
         }
 
         private static string ResolvePackageFixture(string fileName)

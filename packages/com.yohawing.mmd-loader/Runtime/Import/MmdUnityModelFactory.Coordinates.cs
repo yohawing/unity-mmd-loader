@@ -14,7 +14,9 @@ namespace Mmd.UnityIntegration
         private static Vector3 ToUnityPosition(float[] position, float importScale)
         {
             float scale = NormalizeImportScale(importScale);
-            return new Vector3(-position[0], position[1], -position[2]) * scale;
+            return MmdCoordinateSpace.MmdToUnityPosition(
+                new Vector3(position[0], position[1], position[2]),
+                scale);
         }
 
         private static Vector3 ToUnityPosition(Vector3 position)
@@ -25,17 +27,17 @@ namespace Mmd.UnityIntegration
         private static Vector3 ToUnityPosition(Vector3 position, float importScale)
         {
             float scale = NormalizeImportScale(importScale);
-            return new Vector3(-position.x, position.y, -position.z) * scale;
+            return MmdCoordinateSpace.MmdToUnityPosition(position, scale);
         }
 
         private static Quaternion ToUnityModelRotation(Quaternion rotation)
         {
-            return new Quaternion(-rotation.x, rotation.y, -rotation.z, rotation.w);
+            return MmdCoordinateSpace.MmdToUnityRotation(rotation);
         }
 
         private static Vector3 ToUnityNormal(float[] normal)
         {
-            return new Vector3(-normal[0], normal[1], -normal[2]);
+            return MmdCoordinateSpace.MmdToUnityPosition(new Vector3(normal[0], normal[1], normal[2]));
         }
 
         private static Vector3 ToVector3(float[] values)

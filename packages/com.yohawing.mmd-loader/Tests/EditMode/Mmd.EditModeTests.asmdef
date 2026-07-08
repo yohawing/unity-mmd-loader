@@ -5,6 +5,7 @@
     "Mmd.Runtime",
     "Mmd.Timeline",
     "Mmd.Editor",
+    "Mmd.EditModeTestKit",
     "Unity.Timeline",
     "UnityEngine.TestRunner",
     "UnityEditor.TestRunner"

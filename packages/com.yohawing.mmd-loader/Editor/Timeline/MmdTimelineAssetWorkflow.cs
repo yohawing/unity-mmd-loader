@@ -12,7 +12,7 @@ using Mmd.UnityIntegration;
 
 namespace Mmd.Editor.Timeline
 {
-    public static class MmdTimelineAssetWorkflow
+    internal static class MmdTimelineAssetWorkflow
     {
         public const string DefaultTrackName = "MMD VMD";
 

@@ -1288,7 +1288,7 @@ namespace Mmd.Tests
                 AssetDatabase.DeleteAsset(assetsTempDir);
                 AssetDatabase.Refresh();
 
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(instance);
             }
         }
 
@@ -1335,7 +1335,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(instance);
             }
         }
 
@@ -1383,7 +1383,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(instance);
             }
         }
 
@@ -1732,7 +1732,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(instance);
             }
         }
 
@@ -2050,7 +2050,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(result?.Instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(result?.Instance);
             }
         }
 
@@ -2084,7 +2084,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(result?.Instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(result?.Instance);
             }
         }
 
@@ -2522,7 +2522,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(instance);
                 Object.DestroyImmediate(parent);
             }
         }
@@ -2557,7 +2557,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(instance);
             }
         }
 
@@ -2594,7 +2594,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(instance);
                 Object.DestroyImmediate(parent);
             }
         }
@@ -2626,7 +2626,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(instance);
             }
         }
 
@@ -2658,7 +2658,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(result?.Instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(result?.Instance);
                 Object.DestroyImmediate(parent);
             }
         }
@@ -2727,7 +2727,7 @@ namespace Mmd.Tests
                     Object.DestroyImmediate(replacementVmd);
                 }
 
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(instance);
             }
         }
 
@@ -2757,7 +2757,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(instance);
             }
         }
 
@@ -2789,7 +2789,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(instance);
             }
         }
 
@@ -2828,7 +2828,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(result?.Instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(result?.Instance);
                 Object.DestroyImmediate(parent);
             }
         }
@@ -3402,40 +3402,6 @@ namespace Mmd.Tests
             Assert.That(actual.z, Is.EqualTo(expected.z).Within(0.0001f));
         }
 
-        private static void DestroyInstance(MmdUnityModelInstance? instance)
-        {
-            if (instance == null)
-            {
-                return;
-            }
-
-            if (instance.Root != null)
-            {
-                Object.DestroyImmediate(instance.Root);
-            }
-
-            if (instance.Mesh != null && !AssetDatabase.Contains(instance.Mesh))
-            {
-                Object.DestroyImmediate(instance.Mesh);
-            }
-
-            foreach (Material material in instance.Materials)
-            {
-                if (material != null && !AssetDatabase.Contains(material))
-                {
-                    Object.DestroyImmediate(material);
-                }
-            }
-
-            foreach (Texture2D texture in instance.OwnedTextures)
-            {
-                if (texture != null && !AssetDatabase.Contains(texture))
-                {
-                    Object.DestroyImmediate(texture);
-                }
-            }
-        }
-
         private static Material CreateTestMaterial(string name)
         {
             Shader shader = Shader.Find("Universal Render Pipeline/Lit")
@@ -3465,9 +3431,9 @@ namespace Mmd.Tests
                 isMovable = true,
                 isRotatable = true
             });
-            model.vertices.Add(CreateVertex(0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f));
-            model.vertices.Add(CreateVertex(1, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f));
-            model.vertices.Add(CreateVertex(2, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f));
+            model.vertices.Add(MmdTestFixtures.CreateSyntheticVertex(0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f));
+            model.vertices.Add(MmdTestFixtures.CreateSyntheticVertex(1, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f));
+            model.vertices.Add(MmdTestFixtures.CreateSyntheticVertex(2, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f));
             model.indices.AddRange(new[] { 0, 1, 2 });
             model.materials.Add(new MmdMaterialDefinition
             {
@@ -3477,25 +3443,6 @@ namespace Mmd.Tests
                 vertexCount = 3
             });
             return model;
-        }
-
-        private static MmdVertexDefinition CreateVertex(
-            int index,
-            float x,
-            float y,
-            float z,
-            float u,
-            float v)
-        {
-            return new MmdVertexDefinition
-            {
-                index = index,
-                position = new[] { x, y, z },
-                normal = new[] { 0.0f, 0.0f, 1.0f },
-                uv = new[] { u, v },
-                boneIndices = new[] { 0 },
-                boneWeights = new[] { 1.0f }
-            };
         }
 
         private static string CreateTempDirectory()

@@ -81,9 +81,9 @@ namespace Mmd.UnityIntegration
                 targetUnity.z - offset.z) * scale;
 
             Vector3 look = cameraRotation * Vector3.forward;
-            Vector3 forwardUnity = new Vector3(-look.x, look.y, -look.z).normalized;
+            Vector3 forwardUnity = MmdCoordinateSpace.MmdToUnityPosition(look).normalized;
             Vector3 up = cameraRotation * Vector3.up;
-            Vector3 upUnity = new Vector3(-up.x, up.y, -up.z).normalized;
+            Vector3 upUnity = MmdCoordinateSpace.MmdToUnityPosition(up).normalized;
             Quaternion rotationUnity = Quaternion.LookRotation(forwardUnity, upUnity);
 
             float fieldOfView = float.IsFinite(state.ViewAngle)

@@ -3,6 +3,7 @@
 using System;
 using System.Linq;
 using Mmd.UnityIntegration;
+using UnityEditor;
 using UnityEngine;
 
 namespace Mmd.Tests
@@ -18,29 +19,71 @@ namespace Mmd.Tests
 
         public void Dispose()
         {
-            if (Instance.Root != null)
-            {
-                UnityEngine.Object.DestroyImmediate(Instance.Root);
-            }
+            DestroyInstance(Instance);
+        }
 
-            if (Instance.Mesh != null)
-            {
-                UnityEngine.Object.DestroyImmediate(Instance.Mesh);
-            }
-
-            if (Instance.Materials == null)
+        internal static void DestroyInstance(MmdUnityModelInstance? instance)
+        {
+            if (instance == null)
             {
                 return;
             }
 
-            foreach (Material material in Instance.Materials.Where(material => material != null).Distinct())
+            if (instance.Root != null)
             {
-                UnityEngine.Object.DestroyImmediate(material);
+                UnityEngine.Object.DestroyImmediate(instance.Root);
             }
 
-            foreach (Texture2D texture in Instance.OwnedTextures.Where(texture => texture != null).Distinct())
+            if (instance.Mesh != null)
+            {
+                UnityEngine.Object.DestroyImmediate(instance.Mesh);
+            }
+
+            if (instance.Materials != null)
+            {
+                foreach (Material material in instance.Materials.Where(material => material != null).Distinct())
+                {
+                    UnityEngine.Object.DestroyImmediate(material);
+                }
+            }
+
+            foreach (Texture2D texture in instance.OwnedTextures.Where(texture => texture != null).Distinct())
             {
                 UnityEngine.Object.DestroyImmediate(texture);
+            }
+        }
+
+        internal static void DestroyImporterCacheInstance(MmdUnityModelInstance? instance)
+        {
+            if (instance == null)
+            {
+                return;
+            }
+
+            if (instance.Root != null)
+            {
+                UnityEngine.Object.DestroyImmediate(instance.Root);
+            }
+
+            if (instance.Mesh != null && !AssetDatabase.Contains(instance.Mesh))
+            {
+                UnityEngine.Object.DestroyImmediate(instance.Mesh);
+            }
+
+            foreach (Material material in instance.Materials)
+            {
+                if (material != null && !AssetDatabase.Contains(material))
+                {
+                    UnityEngine.Object.DestroyImmediate(material);
+                }
+            }
+
+            foreach (Texture2D texture in instance.OwnedTextures)
+            {
+                if (texture != null && !AssetDatabase.Contains(texture))
+                {
+                    UnityEngine.Object.DestroyImmediate(texture);
+                }
             }
         }
     }

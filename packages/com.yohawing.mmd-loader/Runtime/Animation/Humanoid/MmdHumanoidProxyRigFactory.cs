@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using UnityEngine;
 using Mmd.Parser;
+using Mmd.UnityIntegration;
 
 namespace Mmd
 {
@@ -1019,7 +1020,7 @@ namespace Mmd
         {
             if (origin == null || origin.Length < 3)
                 return Vector3.zero;
-            return new Vector3(-origin[0], origin[1], -origin[2]);
+            return MmdCoordinateSpace.MmdToUnityPosition(new Vector3(origin[0], origin[1], origin[2]));
         }
 
         private static bool IsFiniteVector3(Vector3 value)
