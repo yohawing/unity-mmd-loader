@@ -70,12 +70,15 @@ The PMX importer generates materials for the `MMD Basic URP Toon` shader. Self-s
 
 If the model renders but MMD self-shadow does not appear, check these items in order:
 
-1. Confirm that **MmdSelfShadowRendererFeature** is added to the Renderer Data that is actually used by the current URP Asset and Quality level.
+1. Confirm that **MmdSelfShadowRendererFeature** is added to the Renderer Data that is actually used by the current URP Asset and Quality level. If multiple Renderer Data assets exist, the feature must be on the one rendering the MMD scene.
 2. Confirm that the placed PMX still uses generated `MMD Basic URP Toon` materials. Replaced materials need a `MmdSelfShadowCaster` pass, otherwise the render pass reports `NoCasterPass`.
-3. Confirm that the scene contains one active `MmdSceneEnvironmentBinding`. Multiple active bindings can make the self-shadow target report `AmbiguousEnvironment`.
+3. Confirm that the scene contains one active `MmdSceneEnvironmentBinding`. Multiple active bindings can make the hidden self-shadow target report `AmbiguousEnvironment`.
 4. Confirm that **Self Shadow Enabled** is on in `MmdSceneEnvironmentBinding`. The binding records VMD self-shadow state as MMD render state; it does not change Unity `Light.shadows`, `RenderSettings`, or `QualitySettings.shadowDistance`.
-5. If there is no VMD self-shadow track, the binding uses a default MMD self-shadow state. If the VMD self-shadow mode disables shadows, the diagnostic state is `ModeDisabled`.
-6. If the character has no visible renderer bounds, the render pass reports `NoBounds`. Check that the placed PMX hierarchy is active and visible.
+5. Treat binding-local `Active` as "self-shadow state was recorded", not as proof that the shadow map rendered. Target readiness, RendererFeature setup, bounds, and caster passes must also be valid.
+6. If there is no VMD self-shadow track, the binding uses a default MMD self-shadow state. If the VMD self-shadow mode disables shadows, the diagnostic state is `ModeDisabled`.
+7. If the character has no visible renderer bounds, the render pass reports `NoBounds`. Check that the placed PMX hierarchy is active and visible.
+
+For the diagnostic layer definitions, see `docs/MMD_SELF_SHADOW.md`.
 
 ## 7. Set up the Scene environment
 
