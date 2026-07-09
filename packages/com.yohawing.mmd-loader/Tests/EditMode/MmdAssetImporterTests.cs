@@ -7,12 +7,14 @@ using UnityEditor;
 using UnityEditor.AssetImporters;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using Mmd.Editor;
 using Mmd.Parser;
 using Mmd.Physics;
 using Mmd.Rendering;
+using Mmd.Rendering.Universal;
 using Mmd.UnityIntegration;
 using Object = UnityEngine.Object;
 
@@ -1862,6 +1864,68 @@ namespace Mmd.Tests
             {
                 Object.DestroyImmediate(pmxAsset);
             }
+        }
+
+        [Test]
+        public void SelfShadowRendererSetupReadinessReportsNoUrpAsset()
+        {
+            MmdSelfShadowRendererSetupReadiness readiness =
+                MmdAssetInspectorUtility.EvaluateMmdSelfShadowRendererSetup(null);
+
+            Assert.That(readiness.HasUrpAsset, Is.False);
+            Assert.That(readiness.RendererDataCount, Is.EqualTo(0));
+            Assert.That(readiness.FeatureCount, Is.EqualTo(0));
+            Assert.That(readiness.EnabledFeatureCount, Is.EqualTo(0));
+            Assert.That(readiness.FeaturePresentOnAnyRendererData, Is.False);
+            Assert.That(readiness.FeatureEnabledOnAnyRendererData, Is.False);
+        }
+
+        [Test]
+        public void SelfShadowRendererSetupReadinessReportsMissingFeature()
+        {
+            using var fixture = SelfShadowRendererSetupFixture.Create(includeFeature: false);
+
+            MmdSelfShadowRendererSetupReadiness readiness =
+                MmdAssetInspectorUtility.EvaluateMmdSelfShadowRendererSetup(fixture.Pipeline);
+
+            Assert.That(readiness.HasUrpAsset, Is.True);
+            Assert.That(readiness.RendererDataCount, Is.EqualTo(1));
+            Assert.That(readiness.FeatureCount, Is.EqualTo(0));
+            Assert.That(readiness.EnabledFeatureCount, Is.EqualTo(0));
+            Assert.That(readiness.FeaturePresentOnAnyRendererData, Is.False);
+            Assert.That(readiness.FeatureEnabledOnAnyRendererData, Is.False);
+        }
+
+        [Test]
+        public void SelfShadowRendererSetupReadinessDistinguishesDisabledFeature()
+        {
+            using var fixture = SelfShadowRendererSetupFixture.Create(includeFeature: true, featureEnabled: false);
+
+            MmdSelfShadowRendererSetupReadiness readiness =
+                MmdAssetInspectorUtility.EvaluateMmdSelfShadowRendererSetup(fixture.Pipeline);
+
+            Assert.That(readiness.HasUrpAsset, Is.True);
+            Assert.That(readiness.RendererDataCount, Is.EqualTo(1));
+            Assert.That(readiness.FeatureCount, Is.EqualTo(1));
+            Assert.That(readiness.EnabledFeatureCount, Is.EqualTo(0));
+            Assert.That(readiness.FeaturePresentOnAnyRendererData, Is.True);
+            Assert.That(readiness.FeatureEnabledOnAnyRendererData, Is.False);
+        }
+
+        [Test]
+        public void SelfShadowRendererSetupReadinessReportsEnabledFeature()
+        {
+            using var fixture = SelfShadowRendererSetupFixture.Create(includeFeature: true, featureEnabled: true);
+
+            MmdSelfShadowRendererSetupReadiness readiness =
+                MmdAssetInspectorUtility.EvaluateMmdSelfShadowRendererSetup(fixture.Pipeline);
+
+            Assert.That(readiness.HasUrpAsset, Is.True);
+            Assert.That(readiness.RendererDataCount, Is.EqualTo(1));
+            Assert.That(readiness.FeatureCount, Is.EqualTo(1));
+            Assert.That(readiness.EnabledFeatureCount, Is.EqualTo(1));
+            Assert.That(readiness.FeaturePresentOnAnyRendererData, Is.True);
+            Assert.That(readiness.FeatureEnabledOnAnyRendererData, Is.True);
         }
 
         [Test]
@@ -3958,6 +4022,63 @@ namespace Mmd.Tests
             foreach (Transform child in root.transform)
             {
                 AssertNoMissingScripts(child.gameObject);
+            }
+        }
+
+        private sealed class SelfShadowRendererSetupFixture : IDisposable
+        {
+            private SelfShadowRendererSetupFixture(
+                UniversalRenderPipelineAsset pipeline,
+                UniversalRendererData rendererData,
+                MmdSelfShadowRendererFeature? feature)
+            {
+                Pipeline = pipeline;
+                RendererData = rendererData;
+                Feature = feature;
+            }
+
+            public UniversalRenderPipelineAsset Pipeline { get; }
+
+            private UniversalRendererData RendererData { get; }
+
+            private MmdSelfShadowRendererFeature? Feature { get; }
+
+            public static SelfShadowRendererSetupFixture Create(bool includeFeature, bool featureEnabled = true)
+            {
+                var pipeline = ScriptableObject.CreateInstance<UniversalRenderPipelineAsset>();
+                var rendererData = ScriptableObject.CreateInstance<UniversalRendererData>();
+                MmdSelfShadowRendererFeature? feature = null;
+
+                if (includeFeature)
+                {
+                    feature = ScriptableObject.CreateInstance<MmdSelfShadowRendererFeature>();
+                    feature.SetActive(featureEnabled);
+
+                    var rendererDataSo = new SerializedObject(rendererData);
+                    var features = rendererDataSo.FindProperty("m_RendererFeatures");
+                    features.arraySize = 1;
+                    features.GetArrayElementAtIndex(0).objectReferenceValue = feature;
+                    rendererDataSo.ApplyModifiedPropertiesWithoutUndo();
+                }
+
+                var pipelineSo = new SerializedObject(pipeline);
+                var rendererDataList = pipelineSo.FindProperty("m_RendererDataList");
+                rendererDataList.arraySize = 1;
+                rendererDataList.GetArrayElementAtIndex(0).objectReferenceValue = rendererData;
+                pipelineSo.ApplyModifiedPropertiesWithoutUndo();
+
+                return new SelfShadowRendererSetupFixture(pipeline, rendererData, feature);
+            }
+
+            public void Dispose()
+            {
+                if (Feature != null)
+                {
+                    Object.DestroyImmediate(Feature);
+                }
+
+                Object.DestroyImmediate(RendererData);
+                Object.DestroyImmediate(Pipeline);
             }
         }
     }

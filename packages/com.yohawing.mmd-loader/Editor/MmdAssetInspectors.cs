@@ -625,6 +625,74 @@ namespace Mmd.Editor
             return false;
         }
 
+        internal static MmdSelfShadowRendererSetupReadiness EvaluateMmdSelfShadowRendererSetupForCurrentPipeline()
+        {
+            RenderPipelineAsset pipeline = QualitySettings.renderPipeline != null
+                ? QualitySettings.renderPipeline
+                : GraphicsSettings.currentRenderPipeline;
+            return EvaluateMmdSelfShadowRendererSetup(pipeline as UniversalRenderPipelineAsset);
+        }
+
+        internal static MmdSelfShadowRendererSetupReadiness EvaluateMmdSelfShadowRendererSetup(
+            UniversalRenderPipelineAsset? pipeline)
+        {
+            if (pipeline == null)
+            {
+                return MmdSelfShadowRendererSetupReadiness.NoUrpAsset;
+            }
+
+            var pipelineSo = new SerializedObject(pipeline);
+            var rendererDataList = pipelineSo.FindProperty("m_RendererDataList");
+            if (rendererDataList == null)
+            {
+                return new MmdSelfShadowRendererSetupReadiness(
+                    hasUrpAsset: true,
+                    rendererDataCount: 0,
+                    featureCount: 0,
+                    enabledFeatureCount: 0);
+            }
+
+            int rendererDataCount = 0;
+            int featureCount = 0;
+            int enabledFeatureCount = 0;
+            for (int i = 0; i < rendererDataList.arraySize; i++)
+            {
+                var rendererDataRef = rendererDataList.GetArrayElementAtIndex(i);
+                if (rendererDataRef.objectReferenceValue == null)
+                {
+                    continue;
+                }
+
+                rendererDataCount++;
+                var rendererDataSo = new SerializedObject(rendererDataRef.objectReferenceValue);
+                var features = rendererDataSo.FindProperty("m_RendererFeatures");
+                if (features == null)
+                {
+                    continue;
+                }
+
+                for (int j = 0; j < features.arraySize; j++)
+                {
+                    if (features.GetArrayElementAtIndex(j).objectReferenceValue is not MmdSelfShadowRendererFeature feature)
+                    {
+                        continue;
+                    }
+
+                    featureCount++;
+                    if (feature.isActive)
+                    {
+                        enabledFeatureCount++;
+                    }
+                }
+            }
+
+            return new MmdSelfShadowRendererSetupReadiness(
+                hasUrpAsset: true,
+                rendererDataCount,
+                featureCount,
+                enabledFeatureCount);
+        }
+
         public static void DrawHierarchyReadinessSummary(MmdPmxAsset asset)
         {
             EditorGUILayout.Space();
@@ -1010,6 +1078,36 @@ namespace Mmd.Editor
         public string ReleaseMode { get; }
 
         public string FinalVisualParity { get; }
+    }
+
+    internal readonly struct MmdSelfShadowRendererSetupReadiness
+    {
+        public static readonly MmdSelfShadowRendererSetupReadiness NoUrpAsset =
+            new MmdSelfShadowRendererSetupReadiness(false, 0, 0, 0);
+
+        public MmdSelfShadowRendererSetupReadiness(
+            bool hasUrpAsset,
+            int rendererDataCount,
+            int featureCount,
+            int enabledFeatureCount)
+        {
+            HasUrpAsset = hasUrpAsset;
+            RendererDataCount = Math.Max(0, rendererDataCount);
+            FeatureCount = Math.Max(0, featureCount);
+            EnabledFeatureCount = Math.Max(0, enabledFeatureCount);
+        }
+
+        public bool HasUrpAsset { get; }
+
+        public int RendererDataCount { get; }
+
+        public int FeatureCount { get; }
+
+        public int EnabledFeatureCount { get; }
+
+        public bool FeaturePresentOnAnyRendererData => FeatureCount > 0;
+
+        public bool FeatureEnabledOnAnyRendererData => EnabledFeatureCount > 0;
     }
 
     internal readonly struct MmdScaleAwarePhysicsReadiness
