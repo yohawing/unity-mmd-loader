@@ -284,6 +284,19 @@ namespace Mmd.Editor
                 vmdAsset,
                 asset);
             bool canCreateHumanoidClip = hasValidInputs && conversionPlan.CanCreateClipNow;
+            using (new EditorGUI.DisabledScope(true))
+            {
+                EditorGUILayout.TextField("Status", conversionPlan.Readiness);
+            }
+
+            if (!conversionPlan.PrerequisitesReady)
+            {
+                string compact = MmdAssetInspectorUtility.FormatCompactHumanoidClipConversionIssues(conversionPlan);
+                if (!string.IsNullOrEmpty(compact))
+                {
+                    EditorGUILayout.HelpBox(compact, MessageType.Info);
+                }
+            }
 
             using (new EditorGUI.DisabledScope(!canCreateHumanoidClip))
             {
@@ -934,6 +947,11 @@ namespace Mmd.Editor
         }
 
         internal static string FormatCompactVmdHumanoidIssues(MmdHumanoidClipConversionPlan plan)
+        {
+            return FormatCompactHumanoidClipConversionIssues(plan);
+        }
+
+        internal static string FormatCompactHumanoidClipConversionIssues(MmdHumanoidClipConversionPlan plan)
         {
             if (plan == null || plan.PrerequisitesReady)
             {
