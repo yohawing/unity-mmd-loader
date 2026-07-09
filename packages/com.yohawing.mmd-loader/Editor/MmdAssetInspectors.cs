@@ -443,6 +443,36 @@ namespace Mmd.Editor
         }
     }
 
+    [CustomEditor(typeof(MmdSceneEnvironmentBinding))]
+    public sealed class MmdSceneEnvironmentBindingEditor : UnityEditor.Editor
+    {
+        public override void OnInspectorGUI()
+        {
+            DrawDefaultInspector();
+
+            if (target is not MmdSceneEnvironmentBinding binding)
+            {
+                return;
+            }
+
+            if (!binding.SelfShadowEnabled)
+            {
+                return;
+            }
+
+            MmdSelfShadowRendererSetupReadiness readiness =
+                MmdAssetInspectorUtility.EvaluateMmdSelfShadowRendererSetupForCurrentPipeline(binding.TargetCamera);
+            string warning = MmdAssetInspectorUtility.GetSelfShadowRendererSetupWarning(binding, readiness);
+            if (string.IsNullOrEmpty(warning))
+            {
+                return;
+            }
+
+            EditorGUILayout.Space();
+            EditorGUILayout.HelpBox(warning, MessageType.Warning);
+        }
+    }
+
     internal static class MmdAssetInspectorUtility
     {
         public static void DrawSummary(string title, string sourceId, string sourcePath, int byteLength)
@@ -625,16 +655,18 @@ namespace Mmd.Editor
             return false;
         }
 
-        internal static MmdSelfShadowRendererSetupReadiness EvaluateMmdSelfShadowRendererSetupForCurrentPipeline()
+        internal static MmdSelfShadowRendererSetupReadiness EvaluateMmdSelfShadowRendererSetupForCurrentPipeline(
+            Camera? targetCamera = null)
         {
             RenderPipelineAsset pipeline = QualitySettings.renderPipeline != null
                 ? QualitySettings.renderPipeline
                 : GraphicsSettings.currentRenderPipeline;
-            return EvaluateMmdSelfShadowRendererSetup(pipeline as UniversalRenderPipelineAsset);
+            return EvaluateMmdSelfShadowRendererSetup(pipeline as UniversalRenderPipelineAsset, targetCamera);
         }
 
         internal static MmdSelfShadowRendererSetupReadiness EvaluateMmdSelfShadowRendererSetup(
-            UniversalRenderPipelineAsset? pipeline)
+            UniversalRenderPipelineAsset? pipeline,
+            Camera? targetCamera = null)
         {
             if (pipeline == null)
             {
@@ -649,12 +681,21 @@ namespace Mmd.Editor
                     hasUrpAsset: true,
                     rendererDataCount: 0,
                     featureCount: 0,
-                    enabledFeatureCount: 0);
+                    enabledFeatureCount: 0,
+                    activeRendererDataIndex: -1,
+                    activeFeatureCount: 0,
+                    activeEnabledFeatureCount: 0);
             }
 
+            int activeRendererDataIndex = GetMmdSelfShadowActiveRendererDataIndex(
+                pipelineSo,
+                rendererDataList,
+                targetCamera);
             int rendererDataCount = 0;
             int featureCount = 0;
             int enabledFeatureCount = 0;
+            int activeFeatureCount = 0;
+            int activeEnabledFeatureCount = 0;
             for (int i = 0; i < rendererDataList.arraySize; i++)
             {
                 var rendererDataRef = rendererDataList.GetArrayElementAtIndex(i);
@@ -679,9 +720,18 @@ namespace Mmd.Editor
                     }
 
                     featureCount++;
+                    if (i == activeRendererDataIndex)
+                    {
+                        activeFeatureCount++;
+                    }
+
                     if (feature.isActive)
                     {
                         enabledFeatureCount++;
+                        if (i == activeRendererDataIndex)
+                        {
+                            activeEnabledFeatureCount++;
+                        }
                     }
                 }
             }
@@ -690,7 +740,80 @@ namespace Mmd.Editor
                 hasUrpAsset: true,
                 rendererDataCount,
                 featureCount,
-                enabledFeatureCount);
+                enabledFeatureCount,
+                activeRendererDataIndex,
+                activeFeatureCount,
+                activeEnabledFeatureCount);
+        }
+
+        private static int GetMmdSelfShadowActiveRendererDataIndex(
+            SerializedObject pipelineSo,
+            SerializedProperty rendererDataList,
+            Camera? targetCamera)
+        {
+            int defaultIndex = 0;
+            var defaultIndexProperty = pipelineSo.FindProperty("m_DefaultRendererIndex");
+            if (defaultIndexProperty != null)
+            {
+                defaultIndex = defaultIndexProperty.intValue;
+            }
+
+            int requestedIndex = -1;
+            if (targetCamera != null &&
+                targetCamera.TryGetComponent<UniversalAdditionalCameraData>(out var additionalCameraData))
+            {
+                var cameraSo = new SerializedObject(additionalCameraData);
+                var rendererIndexProperty = cameraSo.FindProperty("m_RendererIndex");
+                if (rendererIndexProperty != null)
+                {
+                    requestedIndex = rendererIndexProperty.intValue;
+                }
+            }
+
+            int resolvedIndex = requestedIndex >= 0 ? requestedIndex : defaultIndex;
+            if (IsValidRendererDataIndex(rendererDataList, resolvedIndex))
+            {
+                return resolvedIndex;
+            }
+
+            return IsValidRendererDataIndex(rendererDataList, defaultIndex) ? defaultIndex : -1;
+        }
+
+        private static bool IsValidRendererDataIndex(SerializedProperty rendererDataList, int index)
+        {
+            return index >= 0 &&
+                   index < rendererDataList.arraySize &&
+                   rendererDataList.GetArrayElementAtIndex(index).objectReferenceValue != null;
+        }
+
+        internal static string GetSelfShadowRendererSetupWarning(
+            MmdSceneEnvironmentBinding? binding,
+            MmdSelfShadowRendererSetupReadiness readiness)
+        {
+            if (binding == null || !binding.SelfShadowEnabled)
+            {
+                return string.Empty;
+            }
+
+            if (!readiness.HasUrpAsset)
+            {
+                return "SelfShadow is enabled, but no active URP Asset is configured. " +
+                       "Assign a Universal Render Pipeline Asset before adding the MmdSelfShadowRendererFeature.";
+            }
+
+            if (!readiness.FeaturePresentOnActiveRendererData)
+            {
+                return "SelfShadow is enabled, but MmdSelfShadowRendererFeature is not configured on the Renderer Data " +
+                       "used by the target Camera or default renderer. Add or move the feature to that active Renderer Data.";
+            }
+
+            if (!readiness.FeatureEnabledOnActiveRendererData)
+            {
+                return "SelfShadow is enabled, but the MmdSelfShadowRendererFeature on the Renderer Data used by " +
+                       "the target Camera or default renderer is disabled. Enable the feature on that active Renderer Data.";
+            }
+
+            return string.Empty;
         }
 
         public static void DrawHierarchyReadinessSummary(MmdPmxAsset asset)
@@ -1089,12 +1212,19 @@ namespace Mmd.Editor
             bool hasUrpAsset,
             int rendererDataCount,
             int featureCount,
-            int enabledFeatureCount)
+            int enabledFeatureCount,
+            int activeRendererDataIndex = -1,
+            int activeFeatureCount = -1,
+            int activeEnabledFeatureCount = -1)
         {
             HasUrpAsset = hasUrpAsset;
             RendererDataCount = Math.Max(0, rendererDataCount);
             FeatureCount = Math.Max(0, featureCount);
             EnabledFeatureCount = Math.Max(0, enabledFeatureCount);
+            ActiveRendererDataIndex = activeRendererDataIndex;
+            ActiveFeatureCount = Math.Max(0, activeFeatureCount < 0 ? FeatureCount : activeFeatureCount);
+            ActiveEnabledFeatureCount = Math.Max(0,
+                activeEnabledFeatureCount < 0 ? EnabledFeatureCount : activeEnabledFeatureCount);
         }
 
         public bool HasUrpAsset { get; }
@@ -1105,9 +1235,19 @@ namespace Mmd.Editor
 
         public int EnabledFeatureCount { get; }
 
+        public int ActiveRendererDataIndex { get; }
+
+        public int ActiveFeatureCount { get; }
+
+        public int ActiveEnabledFeatureCount { get; }
+
         public bool FeaturePresentOnAnyRendererData => FeatureCount > 0;
 
         public bool FeatureEnabledOnAnyRendererData => EnabledFeatureCount > 0;
+
+        public bool FeaturePresentOnActiveRendererData => ActiveFeatureCount > 0;
+
+        public bool FeatureEnabledOnActiveRendererData => ActiveEnabledFeatureCount > 0;
     }
 
     internal readonly struct MmdScaleAwarePhysicsReadiness

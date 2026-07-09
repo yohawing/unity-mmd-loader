@@ -1929,6 +1929,84 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void SelfShadowRendererSetupReadinessUsesDefaultRendererDataForActiveFeature()
+        {
+            var pipeline = ScriptableObject.CreateInstance<UniversalRenderPipelineAsset>();
+            var defaultRendererData = ScriptableObject.CreateInstance<UniversalRendererData>();
+            var unusedRendererData = ScriptableObject.CreateInstance<UniversalRendererData>();
+            var feature = ScriptableObject.CreateInstance<MmdSelfShadowRendererFeature>();
+            var bindingGo = new GameObject("binding");
+            try
+            {
+                feature.SetActive(true);
+                AddSelfShadowFeature(unusedRendererData, feature);
+                SetRendererDataList(pipeline, 0, defaultRendererData, unusedRendererData);
+                MmdSceneEnvironmentBinding binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
+                binding.SelfShadowEnabled = true;
+
+                MmdSelfShadowRendererSetupReadiness readiness =
+                    MmdAssetInspectorUtility.EvaluateMmdSelfShadowRendererSetup(pipeline);
+                string warning = MmdAssetInspectorUtility.GetSelfShadowRendererSetupWarning(binding, readiness);
+
+                Assert.That(readiness.FeatureEnabledOnAnyRendererData, Is.True);
+                Assert.That(readiness.ActiveRendererDataIndex, Is.EqualTo(0));
+                Assert.That(readiness.FeatureEnabledOnActiveRendererData, Is.False);
+                Assert.That(warning, Does.Contain("MmdSelfShadowRendererFeature"));
+                Assert.That(warning, Does.Contain("not configured"));
+            }
+            finally
+            {
+                Object.DestroyImmediate(bindingGo);
+                Object.DestroyImmediate(feature);
+                Object.DestroyImmediate(unusedRendererData);
+                Object.DestroyImmediate(defaultRendererData);
+                Object.DestroyImmediate(pipeline);
+            }
+        }
+
+        [Test]
+        public void SelfShadowRendererSetupReadinessUsesTargetCameraRendererOverride()
+        {
+            var pipeline = ScriptableObject.CreateInstance<UniversalRenderPipelineAsset>();
+            var defaultRendererData = ScriptableObject.CreateInstance<UniversalRendererData>();
+            var cameraRendererData = ScriptableObject.CreateInstance<UniversalRendererData>();
+            var feature = ScriptableObject.CreateInstance<MmdSelfShadowRendererFeature>();
+            var bindingGo = new GameObject("binding");
+            var cameraGo = new GameObject("camera");
+            try
+            {
+                feature.SetActive(true);
+                AddSelfShadowFeature(defaultRendererData, feature);
+                SetRendererDataList(pipeline, 0, defaultRendererData, cameraRendererData);
+                Camera camera = cameraGo.AddComponent<Camera>();
+                var additionalCameraData = cameraGo.AddComponent<UniversalAdditionalCameraData>();
+                additionalCameraData.SetRenderer(1);
+                MmdSceneEnvironmentBinding binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
+                binding.SelfShadowEnabled = true;
+                binding.TargetCamera = camera;
+
+                MmdSelfShadowRendererSetupReadiness readiness =
+                    MmdAssetInspectorUtility.EvaluateMmdSelfShadowRendererSetup(pipeline, camera);
+                string warning = MmdAssetInspectorUtility.GetSelfShadowRendererSetupWarning(binding, readiness);
+
+                Assert.That(readiness.FeatureEnabledOnAnyRendererData, Is.True);
+                Assert.That(readiness.ActiveRendererDataIndex, Is.EqualTo(1));
+                Assert.That(readiness.FeatureEnabledOnActiveRendererData, Is.False);
+                Assert.That(warning, Does.Contain("MmdSelfShadowRendererFeature"));
+                Assert.That(warning, Does.Contain("not configured"));
+            }
+            finally
+            {
+                Object.DestroyImmediate(cameraGo);
+                Object.DestroyImmediate(bindingGo);
+                Object.DestroyImmediate(feature);
+                Object.DestroyImmediate(cameraRendererData);
+                Object.DestroyImmediate(defaultRendererData);
+                Object.DestroyImmediate(pipeline);
+            }
+        }
+
+        [Test]
         public void ImportedPmxAssetCarriesCachedPhysicsSummaryFromImporter()
         {
             CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
@@ -4025,6 +4103,35 @@ namespace Mmd.Tests
             }
         }
 
+        private static void AddSelfShadowFeature(
+            UniversalRendererData rendererData,
+            MmdSelfShadowRendererFeature feature)
+        {
+            var rendererDataSo = new SerializedObject(rendererData);
+            var features = rendererDataSo.FindProperty("m_RendererFeatures");
+            features.arraySize = 1;
+            features.GetArrayElementAtIndex(0).objectReferenceValue = feature;
+            rendererDataSo.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static void SetRendererDataList(
+            UniversalRenderPipelineAsset pipeline,
+            int defaultRendererIndex,
+            params UniversalRendererData[] rendererData)
+        {
+            var pipelineSo = new SerializedObject(pipeline);
+            var rendererDataList = pipelineSo.FindProperty("m_RendererDataList");
+            rendererDataList.arraySize = rendererData.Length;
+            for (int i = 0; i < rendererData.Length; i++)
+            {
+                rendererDataList.GetArrayElementAtIndex(i).objectReferenceValue = rendererData[i];
+            }
+
+            var defaultRendererIndexProperty = pipelineSo.FindProperty("m_DefaultRendererIndex");
+            defaultRendererIndexProperty.intValue = defaultRendererIndex;
+            pipelineSo.ApplyModifiedPropertiesWithoutUndo();
+        }
+
         private sealed class SelfShadowRendererSetupFixture : IDisposable
         {
             private SelfShadowRendererSetupFixture(
@@ -4053,19 +4160,10 @@ namespace Mmd.Tests
                 {
                     feature = ScriptableObject.CreateInstance<MmdSelfShadowRendererFeature>();
                     feature.SetActive(featureEnabled);
-
-                    var rendererDataSo = new SerializedObject(rendererData);
-                    var features = rendererDataSo.FindProperty("m_RendererFeatures");
-                    features.arraySize = 1;
-                    features.GetArrayElementAtIndex(0).objectReferenceValue = feature;
-                    rendererDataSo.ApplyModifiedPropertiesWithoutUndo();
+                    AddSelfShadowFeature(rendererData, feature);
                 }
 
-                var pipelineSo = new SerializedObject(pipeline);
-                var rendererDataList = pipelineSo.FindProperty("m_RendererDataList");
-                rendererDataList.arraySize = 1;
-                rendererDataList.GetArrayElementAtIndex(0).objectReferenceValue = rendererData;
-                pipelineSo.ApplyModifiedPropertiesWithoutUndo();
+                SetRendererDataList(pipeline, 0, rendererData);
 
                 return new SelfShadowRendererSetupFixture(pipeline, rendererData, feature);
             }
