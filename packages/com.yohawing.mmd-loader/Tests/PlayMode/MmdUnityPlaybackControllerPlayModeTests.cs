@@ -1595,6 +1595,75 @@ namespace Mmd.Tests
         }
 
         [UnityTest]
+        public IEnumerator BasicPlaybackSampleTimelineEvaluatesThroughPlayableDirector()
+        {
+            MmdUnityPlaybackBinding? binding = null;
+            TimelineAsset? timelineAsset = null;
+            GameObject? directorObject = null;
+            try
+            {
+                string pmxPath = ResolveBasicPlaybackSampleAsset("mmt_test_model.pmx");
+                string vmdPath = ResolveBasicPlaybackSampleAsset("mmt_test_model_test_motion.vmd");
+                var parser = new NativeMmdParser();
+                MmdModelDefinition model = parser.LoadModel(File.ReadAllBytes(pmxPath));
+                MmdMotionDefinition motion = parser.LoadMotion(File.ReadAllBytes(vmdPath));
+                Assert.That(model.vertices.Count, Is.GreaterThan(0), "BasicPlayback sample PMX must contain geometry.");
+                Assert.That(model.bones.Count, Is.GreaterThan(0), "BasicPlayback sample PMX must contain bones.");
+                Assert.That(motion.boneKeyframes.Count, Is.GreaterThan(0), "BasicPlayback sample VMD must contain bone keys.");
+
+                binding = MmdUnityPlaybackBinding.CreateSkinned(
+                    model,
+                    motion,
+                    pmxPath,
+                    vmdPath,
+                    pmxPath);
+                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.Configure(binding, 30.0f, playOnStart: false);
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+
+                timelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
+                MmdVmdTimelineTrack track = timelineAsset.CreateTrack<MmdVmdTimelineTrack>(null, "MMD VMD");
+                TimelineClip clip = track.CreateClip<MmdVmdTimelineClip>();
+                clip.start = 0.0;
+                clip.duration = 1.0;
+                var mmdClip = (MmdVmdTimelineClip)clip.asset;
+                mmdClip.MotionSourceId = vmdPath;
+                mmdClip.FrameRate = 30.0f;
+                mmdClip.MotionAsset = null;
+
+                directorObject = new GameObject("basic-playback-sample-director");
+                PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
+                director.playOnAwake = false;
+                director.playableAsset = timelineAsset;
+                director.SetGenericBinding(track, controller);
+
+                director.time = 10.0 / 30.0;
+                director.Evaluate();
+
+                Assert.That(controller.CurrentFrame, Is.EqualTo(10));
+                Assert.That(controller.LastSnapshot, Is.Not.Null, "Timeline evaluation must produce a playback snapshot.");
+                Assert.That(controller.LastSnapshot!.frame.bones, Is.Not.Empty);
+                Assert.That(binding.Instance.Root.GetComponentsInChildren<SkinnedMeshRenderer>(), Is.Not.Empty,
+                    "BasicPlayback sample PMX must create a placed skinned hierarchy.");
+                yield return null;
+            }
+            finally
+            {
+                if (directorObject != null)
+                {
+                    UnityEngine.Object.Destroy(directorObject);
+                }
+
+                if (timelineAsset != null)
+                {
+                    UnityEngine.Object.Destroy(timelineAsset);
+                }
+
+                MmdPlayModeTestInstanceScope.DestroyInstance(binding?.Instance);
+            }
+        }
+
+        [UnityTest]
         public IEnumerator TimelineForwardPlaybackEvaluationStepsLivePhysics()
         {
             MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
@@ -1827,6 +1896,18 @@ namespace Mmd.Tests
 
             string packageRoot = Path.GetFullPath(Path.Combine(projectRoot, "..", "packages", "com.yohawing.mmd-loader"));
             return Path.Combine(packageRoot, "Tests", "Fixtures", "Assets", fileName);
+        }
+
+        private static string ResolveBasicPlaybackSampleAsset(string fileName)
+        {
+            string? projectRoot = Path.GetDirectoryName(Application.dataPath);
+            if (string.IsNullOrWhiteSpace(projectRoot))
+            {
+                throw new InvalidOperationException("Unity project root could not be resolved from Application.dataPath.");
+            }
+
+            string packageRoot = Path.GetFullPath(Path.Combine(projectRoot, "..", "packages", "com.yohawing.mmd-loader"));
+            return Path.Combine(packageRoot, "Samples~", "BasicPlayback", "Assets", fileName);
         }
 
         private static HairPhysicsScaleSample RunHairPhysicsForwardPlayback(float importScale)
