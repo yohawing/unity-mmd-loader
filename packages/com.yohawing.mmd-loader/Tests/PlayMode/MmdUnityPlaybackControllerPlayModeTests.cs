@@ -5,6 +5,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.Animations;
@@ -482,14 +483,7 @@ namespace Mmd.Tests
                     Is.True,
                     "test_hair_physics.pmx must keep at least one pure world-anchor joint for this regression test");
 
-                var motion = new MmdMotionDefinition
-                {
-                    targetModelName = model.name,
-                    maxFrame = 0,
-                    boneKeyframes = new List<MmdBoneKeyframeDefinition>(),
-                    morphKeyframes = new List<MmdMorphKeyframeDefinition>(),
-                    modelKeyframes = new List<MmdModelKeyframeDefinition>()
-                };
+                MmdMotionDefinition motion = CreateRestPoseMotion(model);
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
                     model, motion, "test_hair_physics.pmx", "rest-pose", pmxPath);
 
@@ -543,14 +537,7 @@ namespace Mmd.Tests
                 // reported through backend diagnostics.
                 model.physics.joints.RemoveAll(j => j.rigidbodyAIndex < 0 && j.rigidbodyBIndex < 0);
 
-                var motion = new MmdMotionDefinition
-                {
-                    targetModelName = model.name,
-                    maxFrame = 0,
-                    boneKeyframes = new List<MmdBoneKeyframeDefinition>(),
-                    morphKeyframes = new List<MmdMorphKeyframeDefinition>(),
-                    modelKeyframes = new List<MmdModelKeyframeDefinition>()
-                };
+                MmdMotionDefinition motion = CreateRestPoseMotion(model);
 
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
                     model, motion, "test_hair_physics.pmx", "rest-pose", pmxPath);
@@ -1735,14 +1722,7 @@ namespace Mmd.Tests
                 // validator; drop them before binding (same as the non-Timeline hair test).
                 model.physics.joints.RemoveAll(j => j.rigidbodyAIndex < 0 && j.rigidbodyBIndex < 0);
 
-                var motion = new MmdMotionDefinition
-                {
-                    targetModelName = model.name,
-                    maxFrame = 0,
-                    boneKeyframes = new List<MmdBoneKeyframeDefinition>(),
-                    morphKeyframes = new List<MmdMorphKeyframeDefinition>(),
-                    modelKeyframes = new List<MmdModelKeyframeDefinition>()
-                };
+                MmdMotionDefinition motion = CreateRestPoseMotion(model);
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
                     model, motion, "test_hair_physics.pmx", "rest-pose", pmxPath);
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
@@ -2016,14 +1996,31 @@ namespace Mmd.Tests
 
         private static MmdMotionDefinition CreateRestPoseMotion(MmdModelDefinition model)
         {
-            return new MmdMotionDefinition
-            {
-                targetModelName = model.name,
-                maxFrame = 0,
-                boneKeyframes = new List<MmdBoneKeyframeDefinition>(),
-                morphKeyframes = new List<MmdMorphKeyframeDefinition>(),
-                modelKeyframes = new List<MmdModelKeyframeDefinition>()
-            };
+            var parser = new NativeMmdParser();
+            return parser.LoadMotion(CreateEmptyVmdBytes(model.name ?? string.Empty));
+        }
+
+        private static byte[] CreateEmptyVmdBytes(string modelName)
+        {
+            using var stream = new MemoryStream();
+            using var writer = new BinaryWriter(stream);
+            WriteFixedSjis(writer, "Vocaloid Motion Data 0002", 30);
+            WriteFixedSjis(writer, modelName, 20);
+            writer.Write(0u); // bone count
+            writer.Write(0u); // morph count
+            writer.Write(0u); // camera count
+            writer.Write(0u); // light count
+            writer.Write(0u); // self-shadow count
+            writer.Write(0u); // show/IK count
+            return stream.ToArray();
+        }
+
+        private static void WriteFixedSjis(BinaryWriter writer, string value, int byteCount)
+        {
+            byte[] buffer = new byte[byteCount];
+            byte[] encoded = Encoding.GetEncoding(932).GetBytes(value ?? string.Empty);
+            Array.Copy(encoded, 0, buffer, 0, Math.Min(encoded.Length, buffer.Length));
+            writer.Write(buffer);
         }
 
         private readonly struct HairPhysicsScaleSample
