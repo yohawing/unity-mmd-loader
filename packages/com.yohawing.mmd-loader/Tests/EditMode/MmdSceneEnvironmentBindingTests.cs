@@ -80,6 +80,33 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void BindingLocalSelfShadowActiveDoesNotImplyRenderPathReady()
+        {
+            MmdSelfShadowTarget.SetReceiverGateAvailableForRendering(false);
+            var bindingGo = new GameObject("binding");
+            var targetGo = new GameObject("target");
+            try
+            {
+                MmdSceneEnvironmentBinding binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
+                MmdSelfShadowTarget target = targetGo.AddComponent<MmdSelfShadowTarget>();
+                target.SceneEnvironment = binding;
+
+                Assert.That(binding.LastSelfShadowDiagnosticStatus,
+                    Is.EqualTo(MmdSceneSelfShadowDiagnosticStatus.Active));
+                Assert.That(binding.EvaluateSelfShadowDiagnosticStatus(),
+                    Is.EqualTo(MmdSceneSelfShadowDiagnosticStatus.Active));
+                Assert.That(target.EvaluateSelfShadowDiagnosticStatus(),
+                    Is.EqualTo(MmdSceneSelfShadowDiagnosticStatus.NoRendererFeature));
+            }
+            finally
+            {
+                MmdSelfShadowTarget.DisableAllReceiverGates();
+                Object.DestroyImmediate(targetGo);
+                Object.DestroyImmediate(bindingGo);
+            }
+        }
+
+        [Test]
         public void ApplyCameraStateDrivesBoundCameraToConvertedPose()
         {
             var go = new GameObject("binding");

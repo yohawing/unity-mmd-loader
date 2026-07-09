@@ -317,7 +317,9 @@ namespace Mmd.UnityIntegration
             }
         }
 
-        /// <summary>The most recent self-shadow diagnostic status for authoring and render-path UI.</summary>
+        /// <summary>
+        /// The most recent binding-local self-shadow state diagnostic. This does not imply target or render-path readiness.
+        /// </summary>
         public MmdSceneSelfShadowDiagnosticStatus LastSelfShadowDiagnosticStatus
         {
             get
