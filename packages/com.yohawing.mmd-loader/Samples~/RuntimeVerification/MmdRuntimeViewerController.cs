@@ -178,6 +178,7 @@ namespace Mmd.Samples.RuntimeVerification
                 {
                     orbitDragging = false;
                     panDragging = false;
+                    RefreshRuntimeUi();
                     return;
                 }
 
@@ -185,6 +186,7 @@ namespace Mmd.Samples.RuntimeVerification
                 {
                     orbitDragging = false;
                     panDragging = false;
+                    RefreshRuntimeUi();
                     return;
                 }
 

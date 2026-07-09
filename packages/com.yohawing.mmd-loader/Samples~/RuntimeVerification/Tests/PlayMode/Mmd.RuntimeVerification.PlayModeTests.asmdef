@@ -1,0 +1,22 @@
+{
+  "name": "Mmd.RuntimeVerification.PlayModeTests",
+  "rootNamespace": "Mmd.Samples.RuntimeVerification.Tests",
+  "references": [
+    "Mmd.Runtime",
+    "Mmd.RuntimeVerification",
+    "UnityEngine.TestRunner"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "nunit.framework.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
