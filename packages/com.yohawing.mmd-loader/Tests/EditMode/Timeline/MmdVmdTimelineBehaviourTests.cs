@@ -20,6 +20,52 @@ namespace Mmd.Tests
         private const string PlaybackVmdId = "test_1bone_cube_motion.vmd";
 
         [Test]
+        public void TimelineClipDoesNotAdvertiseBlendCaps()
+        {
+            var clip = new MmdVmdTimelineClip();
+
+            Assert.That(clip.clipCaps, Is.EqualTo(ClipCaps.None));
+        }
+
+        [Test]
+        public void ProcessFrameWithZeroEffectiveWeightDoesNotApplyPose()
+        {
+            MmdUnityPlaybackBinding? binding = null;
+            int processFrameCallbackCount = 0;
+            void OnProcessFrame(double _)
+            {
+                processFrameCallbackCount++;
+            }
+
+            try
+            {
+                binding = CreatePlaybackBinding();
+                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.Configure(binding, 30.0f);
+                var behaviour = new MmdVmdTimelineBehaviour
+                {
+                    FrameRate = 30.0f
+                };
+                MmdPlaybackSnapshot frameNine = behaviour.EvaluateAtLocalTime(controller, 9.25 / 30.0);
+                Quaternion beforeRotation = binding.Instance.BoneTransforms[0].localRotation;
+
+                MmdVmdTimelineBehaviour.ProcessFrameEvaluated += OnProcessFrame;
+                behaviour.ProcessFrame(default, default, controller);
+
+                Assert.That(frameNine.frame.frame, Is.EqualTo(9));
+                Assert.That(controller.CurrentFrame, Is.EqualTo(9));
+                Assert.That(controller.LastSnapshot, Is.SameAs(frameNine));
+                Assert.That(Quaternion.Angle(binding.Instance.BoneTransforms[0].localRotation, beforeRotation), Is.LessThan(0.001f));
+                Assert.That(processFrameCallbackCount, Is.EqualTo(0));
+            }
+            finally
+            {
+                MmdVmdTimelineBehaviour.ProcessFrameEvaluated -= OnProcessFrame;
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
+            }
+        }
+
+        [Test]
         public void TimelineBehaviourUsesSharedTimePolicyForRepeatAndReverseSeek()
         {
             MmdUnityPlaybackBinding? binding = null;
