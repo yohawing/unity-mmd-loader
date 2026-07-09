@@ -75,6 +75,7 @@ Physics max-substep A/B diagnostic:
   --out F:\Develop\MMDDev\unity-mmd-loader\artifacts\runtime-verification\physics-candidate.json `
   --sample-frames 0,30,60,90 `
   --dump-bones `
+  --dump-physics-bodies `
   --drive controller `
   --physics-max-substep-fixed-step 1/120
 ```
@@ -141,5 +142,7 @@ object includes:
 - `model` / `motion`: direct native parser count summaries.
 - `playback`: controller configuration, final frame, and fast-runtime state.
 - `physics`: Live physics diagnostics summary when available.
-- `sampledFrames[]`: reserved for later oracle comparisons.
+- `sampledFrames[]`: optional oracle comparison samples. Use `--dump-bones`
+  for post-physics bone matrices and `--dump-physics-bodies` for focused live
+  physics body diagnostics.
 - `status` and `exitCode`: aggregate result.

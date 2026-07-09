@@ -532,6 +532,9 @@ namespace Mmd.Samples.RuntimeVerification
                 fastRuntimeEnabled = controller.IsFastRuntimeEnabled,
                 physicsDiagnosticsAvailable = controller.LastLivePhysicsDiagnostics != null,
                 bones = arguments.DumpBones ? BuildBoneSamples(controller) : null,
+                bodyDiagnostics = arguments.DumpPhysicsBodies
+                    ? BuildBodyDiagnosticSamples(controller)
+                    : Array.Empty<MmdRuntimeVerificationBodyDiagnosticSample>(),
                 matrixSpace = "mmd-model",
                 matrixLayout = "column-major",
                 importScale = ResolveImportScale(controller)
@@ -584,6 +587,36 @@ namespace Mmd.Samples.RuntimeVerification
             }
 
             return bones;
+        }
+
+        private static MmdRuntimeVerificationBodyDiagnosticSample[] BuildBodyDiagnosticSamples(
+            MmdUnityPlaybackController controller)
+        {
+            MmdLivePhysicsBodyDiagnostics[]? bodies =
+                controller.LastLivePhysicsDiagnostics?.bodyDiagnostics;
+            if (bodies == null || bodies.Length == 0)
+            {
+                return Array.Empty<MmdRuntimeVerificationBodyDiagnosticSample>();
+            }
+
+            var samples = new MmdRuntimeVerificationBodyDiagnosticSample[bodies.Length];
+            for (int i = 0; i < bodies.Length; i++)
+            {
+                MmdLivePhysicsBodyDiagnostics body = bodies[i];
+                samples[i] = new MmdRuntimeVerificationBodyDiagnosticSample
+                {
+                    bodyIndex = body.bodyIndex,
+                    bodyName = body.bodyName ?? string.Empty,
+                    boneIndex = body.boneIndex,
+                    boneName = body.boneName ?? string.Empty,
+                    physicsKind = body.physicsKind ?? string.Empty,
+                    shapeType = body.shapeType ?? string.Empty,
+                    readbackMmdPosition = body.readbackMmdPosition,
+                    readbackMmdRotation = body.readbackMmdRotation
+                };
+            }
+
+            return samples;
         }
 
         private static float[] CopyWorldMatrix(float[]? worldMatrix)

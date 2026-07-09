@@ -25,6 +25,7 @@ namespace Mmd.Samples.RuntimeVerification
         public float FrameRate { get; private set; } = 30.0f;
         public int[] SampleFrames { get; private set; } = Array.Empty<int>();
         public bool DumpBones { get; private set; }
+        public bool DumpPhysicsBodies { get; private set; }
         public string ScreenshotDir { get; private set; } = string.Empty;
         public MmdMaterialPreset MaterialPreset { get; private set; } = MmdMaterialPreset.MmdToon;
         public bool ViewerMode { get; private set; }
@@ -240,6 +241,9 @@ namespace Mmd.Samples.RuntimeVerification
                     break;
                 case "--dump-bones":
                     DumpBones = true;
+                    break;
+                case "--dump-physics-bodies":
+                    DumpPhysicsBodies = true;
                     break;
                 case "--viewer":
                     ViewerMode = true;

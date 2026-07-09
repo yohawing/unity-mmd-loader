@@ -143,6 +143,8 @@ namespace Mmd.Samples.RuntimeVerification
         public bool fastRuntimeEnabled;
         public bool physicsDiagnosticsAvailable;
         public MmdRuntimeVerificationBoneSample[]? bones;
+        public MmdRuntimeVerificationBodyDiagnosticSample[] bodyDiagnostics =
+            Array.Empty<MmdRuntimeVerificationBodyDiagnosticSample>();
         public string matrixSpace = "mmd-model";
         public string matrixLayout = "column-major";
         public float importScale;
@@ -154,5 +156,18 @@ namespace Mmd.Samples.RuntimeVerification
         public int index;
         public string name = string.Empty;
         public float[] worldMatrix = Array.Empty<float>();
+    }
+
+    [Serializable]
+    public sealed class MmdRuntimeVerificationBodyDiagnosticSample
+    {
+        public int bodyIndex;
+        public string bodyName = string.Empty;
+        public int boneIndex = -1;
+        public string boneName = string.Empty;
+        public string physicsKind = string.Empty;
+        public string shapeType = string.Empty;
+        public Vector3 readbackMmdPosition;
+        public Quaternion readbackMmdRotation;
     }
 }
