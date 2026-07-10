@@ -185,10 +185,10 @@ Shader "MMD Basic URP Toon"
 
             float4x4 _MmdSelfShadowWorldToShadow;
             float4 _MmdSelfShadowParams;
-
-            UNITY_INSTANCING_BUFFER_START(MmdPerRenderer)
-                UNITY_DEFINE_INSTANCED_PROP(float, _MmdSelfShadowReceive)
-            UNITY_INSTANCING_BUFFER_END(MmdPerRenderer)
+            // MaterialPropertyBlock updates this per renderer. Keep it out of the instancing
+            // buffer: switching an active receiver from 1 to 0 at runtime corrupted subsequent
+            // draws on DX12, while the ordinary per-renderer uniform remains transition-safe.
+            half _MmdSelfShadowReceive;
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _BaseMap_ST;
@@ -329,7 +329,7 @@ Shader "MMD Basic URP Toon"
                 half3 lightDirection = dot(_MmdLightDirection.xyz, _MmdLightDirection.xyz) > 0.0h
                     ? normalize(_MmdLightDirection.xyz)
                     : mainLight.direction;
-                half selfShadowReceive = (half)UNITY_ACCESS_INSTANCED_PROP(MmdPerRenderer, _MmdSelfShadowReceive);
+                half selfShadowReceive = _MmdSelfShadowReceive;
                 half selfShadowVisibility = SampleMmdSelfShadow(input.positionWS, selfShadowReceive);
 
                 half3 normalWS;

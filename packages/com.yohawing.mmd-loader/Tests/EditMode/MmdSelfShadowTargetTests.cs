@@ -1142,9 +1142,10 @@ namespace Mmd.Tests
             Assert.That(shader, Does.Not.Contain("_MmdReceiveShadows"));
             Assert.That(shader, Does.Not.Contain("_MmdSuppressStandardShadows"));
             Assert.That(shader, Does.Contain("#pragma multi_compile_instancing"));
-            Assert.That(shader, Does.Contain("UNITY_INSTANCING_BUFFER_START(MmdPerRenderer)"));
-            Assert.That(shader, Does.Contain("UNITY_DEFINE_INSTANCED_PROP(float, _MmdSelfShadowReceive)"));
-            Assert.That(shader, Does.Contain("UNITY_ACCESS_INSTANCED_PROP(MmdPerRenderer, _MmdSelfShadowReceive)"));
+            Assert.That(shader, Does.Contain("half _MmdSelfShadowReceive;"));
+            Assert.That(shader, Does.Contain("half selfShadowReceive = _MmdSelfShadowReceive;"));
+            Assert.That(shader, Does.Not.Contain("UNITY_DEFINE_INSTANCED_PROP(float, _MmdSelfShadowReceive)"));
+            Assert.That(shader, Does.Not.Contain("UNITY_ACCESS_INSTANCED_PROP(MmdPerRenderer, _MmdSelfShadowReceive)"));
             Assert.That(shader, Does.Not.Contain("_MAIN_LIGHT_SHADOWS"));
             Assert.That(shader, Does.Not.Contain("_SHADOWS_SOFT"));
             Assert.That(shader, Does.Contain("URP standard shadows are only for casting MMD characters onto the scene/environment."));
