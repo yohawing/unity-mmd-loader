@@ -21,6 +21,13 @@ namespace Mmd.Timeline
         public static event Action<double>? ProcessFrameEvaluated;
 #endif
 
+        /// <summary>
+        /// When true, this behaviour is owned by <see cref="MmdVmdTimelineMixerBehaviour"/> and must
+        /// not apply pose from its own <see cref="ProcessFrame"/>. Direct non-track usage leaves
+        /// this false so existing ProcessFrame compatibility is preserved.
+        /// </summary>
+        internal bool IsTrackManaged { get; set; }
+
         public MmdUnityPlaybackController? Controller { get; set; }
 
         public MmdVmdAsset? MotionAsset { get; set; }
@@ -39,11 +46,27 @@ namespace Mmd.Timeline
 
         public override void ProcessFrame(Playable playable, FrameData info, object playerData)
         {
+            // Track-managed clips are applied only by MmdVmdTimelineMixerBehaviour so overlapping
+            // inputs cannot last-write or double-step Live physics.
+            if (IsTrackManaged)
+            {
+                return;
+            }
+
             if (info.effectiveWeight <= 0.0f)
             {
                 return;
             }
 
+            ApplyTimelineEvaluation(playable, playerData);
+        }
+
+        /// <summary>
+        /// Applies this clip's full pose at the playable local time. Used by direct ProcessFrame
+        /// (non-track) and by the track mixer after single-winner arbitration. Does not scale by weight.
+        /// </summary>
+        internal void ApplyTimelineEvaluation(Playable playable, object playerData)
+        {
             MmdUnityPlaybackController? target = playerData as MmdUnityPlaybackController ?? Controller;
             if (target == null)
             {
