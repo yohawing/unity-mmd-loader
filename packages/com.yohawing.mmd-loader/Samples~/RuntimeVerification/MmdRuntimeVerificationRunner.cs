@@ -546,7 +546,7 @@ namespace Mmd.Samples.RuntimeVerification
             var frames = new List<MmdRuntimeVerificationSampledFrame>(result.sampledFrames);
             MmdRuntimeVerificationBoneSample[]? bones = null;
             string matrixSpace = "mmd-model";
-            string matrixLayout = "column-major";
+            string matrixLayout = "row-major";
             if (arguments.DumpBones)
             {
                 bones = BuildBoneSamples(controller, out matrixSpace, out matrixLayout);
@@ -560,6 +560,7 @@ namespace Mmd.Samples.RuntimeVerification
                 fastRuntimeEnabled = controller.IsFastRuntimeEnabled,
                 physicsDiagnosticsAvailable = controller.LastLivePhysicsDiagnostics != null,
                 bones = bones,
+                morphs = arguments.DumpMorphs ? BuildMorphSamples(controller) : null,
                 bodyDiagnostics = arguments.DumpPhysicsBodies
                     ? BuildBodyDiagnosticSamples(controller)
                     : Array.Empty<MmdRuntimeVerificationBodyDiagnosticSample>(),
@@ -599,7 +600,7 @@ namespace Mmd.Samples.RuntimeVerification
             out string matrixLayout)
         {
             matrixSpace = "mmd-model";
-            matrixLayout = "column-major";
+            matrixLayout = "row-major";
             MmdPlaybackSnapshot? snapshot = controller.LastSnapshot;
             if (snapshot?.frame?.bones != null && snapshot.frame.bones.Count > 0)
             {
@@ -646,6 +647,29 @@ namespace Mmd.Samples.RuntimeVerification
             }
 
             return transformBones;
+        }
+
+        private static MmdRuntimeVerificationMorphSample[] BuildMorphSamples(
+            MmdUnityPlaybackController controller)
+        {
+            List<MmdEvaluatedMorphWeight>? morphs = controller.LastSnapshot?.frame?.morphs;
+            if (morphs == null || morphs.Count == 0)
+            {
+                return Array.Empty<MmdRuntimeVerificationMorphSample>();
+            }
+
+            var samples = new MmdRuntimeVerificationMorphSample[morphs.Count];
+            for (int i = 0; i < morphs.Count; i++)
+            {
+                samples[i] = new MmdRuntimeVerificationMorphSample
+                {
+                    index = i,
+                    name = morphs[i].name ?? string.Empty,
+                    weight = morphs[i].weight
+                };
+            }
+
+            return samples;
         }
 
         private static MmdRuntimeVerificationBodyDiagnosticSample[] BuildBodyDiagnosticSamples(

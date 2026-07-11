@@ -111,6 +111,7 @@ namespace Mmd.Samples.RuntimeVerification
                     case "--sample-mode":
                     case "--physics-max-substep-fixed-step":
                     case "--dump-bones":
+                    case "--dump-morphs":
                     case "--dump-physics-bodies":
                     case "--drive":
                     case "--fast-runtime":

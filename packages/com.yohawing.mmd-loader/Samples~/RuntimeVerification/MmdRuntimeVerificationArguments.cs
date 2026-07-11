@@ -33,6 +33,7 @@ namespace Mmd.Samples.RuntimeVerification
         public MmdRuntimeVerificationSampleMode SampleMode { get; private set; } =
             MmdRuntimeVerificationSampleMode.Forward;
         public bool DumpBones { get; private set; }
+        public bool DumpMorphs { get; private set; }
         public bool DumpPhysicsBodies { get; private set; }
         public string ScreenshotDir { get; private set; } = string.Empty;
         public MmdMaterialPreset MaterialPreset { get; private set; } = MmdMaterialPreset.MmdToon;
@@ -263,6 +264,9 @@ namespace Mmd.Samples.RuntimeVerification
                     break;
                 case "--dump-bones":
                     DumpBones = true;
+                    break;
+                case "--dump-morphs":
+                    DumpMorphs = true;
                     break;
                 case "--dump-physics-bodies":
                     DumpPhysicsBodies = true;

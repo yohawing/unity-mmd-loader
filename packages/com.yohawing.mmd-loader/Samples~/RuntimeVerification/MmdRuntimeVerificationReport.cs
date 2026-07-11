@@ -144,6 +144,7 @@ namespace Mmd.Samples.RuntimeVerification
         public bool fastRuntimeEnabled;
         public bool physicsDiagnosticsAvailable;
         public MmdRuntimeVerificationBoneSample[]? bones;
+        public MmdRuntimeVerificationMorphSample[]? morphs;
         public MmdRuntimeVerificationBodyDiagnosticSample[] bodyDiagnostics =
             Array.Empty<MmdRuntimeVerificationBodyDiagnosticSample>();
         public string matrixSpace = "mmd-model";
@@ -157,6 +158,14 @@ namespace Mmd.Samples.RuntimeVerification
         public int index;
         public string name = string.Empty;
         public float[] worldMatrix = Array.Empty<float>();
+    }
+
+    [Serializable]
+    public sealed class MmdRuntimeVerificationMorphSample
+    {
+        public int index;
+        public string name = string.Empty;
+        public float weight;
     }
 
     [Serializable]
