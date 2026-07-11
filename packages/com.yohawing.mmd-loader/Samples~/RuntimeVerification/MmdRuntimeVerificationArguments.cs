@@ -14,6 +14,12 @@ namespace Mmd.Samples.RuntimeVerification
         Timeline = 1
     }
 
+    public enum MmdRuntimeVerificationSampleMode
+    {
+        Forward = 0,
+        RandomAccess = 1
+    }
+
     public sealed class MmdRuntimeVerificationArguments
     {
         public string PmxPath { get; private set; } = string.Empty;
@@ -24,6 +30,8 @@ namespace Mmd.Samples.RuntimeVerification
         public float DurationSeconds { get; private set; } = 3.0f;
         public float FrameRate { get; private set; } = 30.0f;
         public int[] SampleFrames { get; private set; } = Array.Empty<int>();
+        public MmdRuntimeVerificationSampleMode SampleMode { get; private set; } =
+            MmdRuntimeVerificationSampleMode.Forward;
         public bool DumpBones { get; private set; }
         public bool DumpPhysicsBodies { get; private set; }
         public string ScreenshotDir { get; private set; } = string.Empty;
@@ -62,7 +70,7 @@ namespace Mmd.Samples.RuntimeVerification
                 bool requiresValue = name is "--pmx" or "--vmd" or "--dir" or "--out" or
                     "--duration" or "--frame-rate" or "--drive" or "--fast-runtime" or
                     "--fixture-manifest" or "--screenshot-dir" or
-                    "--sample-frames" or "--physics-max-substep-fixed-step" or
+                    "--sample-frames" or "--sample-mode" or "--physics-max-substep-fixed-step" or
                     "--material-preset";
                 if (requiresValue && value == null)
                 {
@@ -228,6 +236,20 @@ namespace Mmd.Samples.RuntimeVerification
                     break;
                 case "--sample-frames":
                     SampleFrames = ParseSampleFrames(value, Errors);
+                    break;
+                case "--sample-mode":
+                    if (string.Equals(value, "forward", StringComparison.OrdinalIgnoreCase))
+                    {
+                        SampleMode = MmdRuntimeVerificationSampleMode.Forward;
+                    }
+                    else if (string.Equals(value, "random-access", StringComparison.OrdinalIgnoreCase))
+                    {
+                        SampleMode = MmdRuntimeVerificationSampleMode.RandomAccess;
+                    }
+                    else
+                    {
+                        Errors.Add("Invalid --sample-mode value: " + value + ". Expected forward or random-access.");
+                    }
                     break;
                 case "--physics-max-substep-fixed-step":
                     if (TryParsePositiveFloatOrFraction(value, out float fixedStepSeconds))

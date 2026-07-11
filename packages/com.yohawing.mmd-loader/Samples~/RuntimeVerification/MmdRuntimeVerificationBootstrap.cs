@@ -108,6 +108,7 @@ namespace Mmd.Samples.RuntimeVerification
                     case "--duration":
                     case "--frame-rate":
                     case "--sample-frames":
+                    case "--sample-mode":
                     case "--physics-max-substep-fixed-step":
                     case "--dump-bones":
                     case "--dump-physics-bodies":

@@ -47,6 +47,9 @@ namespace Mmd.Samples.RuntimeVerification
                 fastRuntimeRequested = arguments.FastRuntimeEnabled,
                 requestedDurationSeconds = arguments.DurationSeconds,
                 requestedFrameRate = arguments.FrameRate,
+                requestedSampleMode = arguments.SampleMode == MmdRuntimeVerificationSampleMode.RandomAccess
+                    ? "random-access"
+                    : "forward",
                 startedAtUtc = DateTime.UtcNow.ToString("O")
             };
 
@@ -432,7 +435,9 @@ namespace Mmd.Samples.RuntimeVerification
             var importer = holder.AddComponent<MmdRuntimeImporterComponent>();
             controller = holder.AddComponent<MmdUnityPlaybackController>();
             controller.SetPlayOnStart(false);
-            controller.SetPhysicsMode(MmdPhysicsMode.Live);
+            controller.SetPhysicsMode(arguments.SampleMode == MmdRuntimeVerificationSampleMode.RandomAccess
+                ? MmdPhysicsMode.Off
+                : MmdPhysicsMode.Live);
             importer.ConfigurePaths(
                 verificationCase.PmxPath,
                 verificationCase.VmdPath,
@@ -447,7 +452,9 @@ namespace Mmd.Samples.RuntimeVerification
                 allowRuntimeFallback: true,
                 materialPreset: verificationCase.MaterialPreset);
 
-            controller.SetPhysicsMode(MmdPhysicsMode.Live);
+            controller.SetPhysicsMode(arguments.SampleMode == MmdRuntimeVerificationSampleMode.RandomAccess
+                ? MmdPhysicsMode.Off
+                : MmdPhysicsMode.Live);
             if (!arguments.FastRuntimeEnabled)
             {
                 controller.DisableFastRuntime();
@@ -487,6 +494,19 @@ namespace Mmd.Samples.RuntimeVerification
         {
             if (arguments.SampleFrames.Length > 0)
             {
+                if (arguments.SampleMode == MmdRuntimeVerificationSampleMode.RandomAccess)
+                {
+                    for (int i = 0; i < arguments.SampleFrames.Length; i++)
+                    {
+                        int frame = arguments.SampleFrames[i];
+                        controller.ApplyFrame(frame);
+                        AddSample(result, controller, Time.realtimeSinceStartup - (frame / arguments.FrameRate), frame);
+                        yield return null;
+                    }
+
+                    yield break;
+                }
+
                 int sampleIndex = 0;
                 int maxFrame = arguments.SampleFrames[arguments.SampleFrames.Length - 1];
                 for (int frame = 0; frame <= maxFrame; frame++)
@@ -524,6 +544,14 @@ namespace Mmd.Samples.RuntimeVerification
             int? frameOverride = null)
         {
             var frames = new List<MmdRuntimeVerificationSampledFrame>(result.sampledFrames);
+            MmdRuntimeVerificationBoneSample[]? bones = null;
+            string matrixSpace = "mmd-model";
+            string matrixLayout = "column-major";
+            if (arguments.DumpBones)
+            {
+                bones = BuildBoneSamples(controller, out matrixSpace, out matrixLayout);
+            }
+
             frames.Add(new MmdRuntimeVerificationSampledFrame
             {
                 timeSeconds = Math.Max(0.0f, Time.realtimeSinceStartup - startTime),
@@ -531,12 +559,12 @@ namespace Mmd.Samples.RuntimeVerification
                 configured = controller.IsConfigured,
                 fastRuntimeEnabled = controller.IsFastRuntimeEnabled,
                 physicsDiagnosticsAvailable = controller.LastLivePhysicsDiagnostics != null,
-                bones = arguments.DumpBones ? BuildBoneSamples(controller) : null,
+                bones = bones,
                 bodyDiagnostics = arguments.DumpPhysicsBodies
                     ? BuildBodyDiagnosticSamples(controller)
                     : Array.Empty<MmdRuntimeVerificationBodyDiagnosticSample>(),
-                matrixSpace = "mmd-model",
-                matrixLayout = "column-major",
+                matrixSpace = matrixSpace,
+                matrixLayout = matrixLayout,
                 importScale = ResolveImportScale(controller)
             });
             result.sampledFrames = frames.ToArray();
@@ -566,27 +594,58 @@ namespace Mmd.Samples.RuntimeVerification
         }
 
         private static MmdRuntimeVerificationBoneSample[] BuildBoneSamples(
-            MmdUnityPlaybackController controller)
+            MmdUnityPlaybackController controller,
+            out string matrixSpace,
+            out string matrixLayout)
         {
+            matrixSpace = "mmd-model";
+            matrixLayout = "column-major";
             MmdPlaybackSnapshot? snapshot = controller.LastSnapshot;
-            if (snapshot?.frame?.bones == null || snapshot.frame.bones.Count == 0)
+            if (snapshot?.frame?.bones != null && snapshot.frame.bones.Count > 0)
+            {
+                var bones = new MmdRuntimeVerificationBoneSample[snapshot.frame.bones.Count];
+                for (int i = 0; i < snapshot.frame.bones.Count; i++)
+                {
+                    MmdEvaluatedBonePose bone = snapshot.frame.bones[i];
+                    bones[i] = new MmdRuntimeVerificationBoneSample
+                    {
+                        index = bone.index,
+                        name = bone.name ?? string.Empty,
+                        worldMatrix = CopyWorldMatrix(bone.worldMatrix)
+                    };
+                }
+
+                return bones;
+            }
+
+            if (PlaybackBindingField?.GetValue(controller) is not MmdUnityPlaybackBinding binding)
             {
                 return Array.Empty<MmdRuntimeVerificationBoneSample>();
             }
 
-            var bones = new MmdRuntimeVerificationBoneSample[snapshot.frame.bones.Count];
-            for (int i = 0; i < snapshot.frame.bones.Count; i++)
+            matrixSpace = "unity-world";
+            matrixLayout = "row-major";
+            Transform[] transforms = binding.Instance.BoneTransforms;
+            var transformBones = new MmdRuntimeVerificationBoneSample[transforms.Length];
+            for (int i = 0; i < transforms.Length; i++)
             {
-                MmdEvaluatedBonePose bone = snapshot.frame.bones[i];
-                bones[i] = new MmdRuntimeVerificationBoneSample
+                Transform bone = transforms[i];
+                Matrix4x4 matrix = bone.localToWorldMatrix;
+                transformBones[i] = new MmdRuntimeVerificationBoneSample
                 {
-                    index = bone.index,
-                    name = bone.name ?? string.Empty,
-                    worldMatrix = CopyWorldMatrix(bone.worldMatrix)
+                    index = i,
+                    name = bone.name,
+                    worldMatrix = new[]
+                    {
+                        matrix.m00, matrix.m01, matrix.m02, matrix.m03,
+                        matrix.m10, matrix.m11, matrix.m12, matrix.m13,
+                        matrix.m20, matrix.m21, matrix.m22, matrix.m23,
+                        matrix.m30, matrix.m31, matrix.m32, matrix.m33
+                    }
                 };
             }
 
-            return bones;
+            return transformBones;
         }
 
         private static MmdRuntimeVerificationBodyDiagnosticSample[] BuildBodyDiagnosticSamples(

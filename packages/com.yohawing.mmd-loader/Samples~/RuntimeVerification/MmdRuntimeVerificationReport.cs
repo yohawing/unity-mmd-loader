@@ -14,6 +14,7 @@ namespace Mmd.Samples.RuntimeVerification
         public bool fastRuntimeRequested = true;
         public float requestedDurationSeconds;
         public float requestedFrameRate;
+        public string requestedSampleMode = "forward";
         public float physicsMaxSubStepFixedStepSeconds;
         public string startedAtUtc = string.Empty;
         public string finishedAtUtc = string.Empty;
