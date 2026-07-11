@@ -234,6 +234,7 @@ namespace Mmd.Editor
             }
 
             var mappedBones = new List<(Transform ProxyTransform, string SourceBoneName)>();
+            Avatar? proxyAvatar = null;
             try
             {
                 var usedHumanBones = new HashSet<HumanBodyBones>();
@@ -275,26 +276,28 @@ namespace Mmd.Editor
                 int frameCount = effectiveEndFrame - startFrame + 1;
                 float sampleFrameToTimeFactor = 1.0f / frameRate;
 
-                foreach ((Transform proxyTransform, string sourceBoneName) in mappedBones)
+                MmdHumanoidAvatarBuildResult avatarResult =
+                    MmdHumanoidProxyRigFactory.BuildAvatar(proxyRigResult);
+                diagnostics.AddRange(avatarResult.Diagnostics);
+                proxyAvatar = avatarResult.Avatar;
+                if (proxyAvatar == null || !proxyAvatar.isValid || !proxyAvatar.isHuman)
                 {
-                    IReadOnlyList<MmdBoneKeyframeDefinition> keyframes = SelectBoneKeyframes(
-                        boneKeyframesByName,
-                        sourceBoneName);
-
-                    string transformPath = AnimationUtility.CalculateTransformPath(
-                        proxyTransform,
-                        proxyRigResult.ProxyRoot.transform);
-                    AddRotationCurvesToClip(
-                        clip,
-                        transformPath,
-                        keyframes,
-                        startFrame,
-                        effectiveEndFrame,
-                        frameCount,
-                        sampleFrameToTimeFactor,
-                        diagnostics,
-                        sourceBoneName);
+                    UnityEngine.Object.DestroyImmediate(clip);
+                    diagnostics.Add("validation: temporary proxy Avatar is not a valid Humanoid Avatar.");
+                    return new MmdHumanoidClipConversionWriterResult(null, plan, diagnostics);
                 }
+
+                AddMuscleCurvesToClip(
+                    clip,
+                    proxyRigResult.ProxyRoot,
+                    proxyAvatar,
+                    mappedBones,
+                    boneKeyframesByName,
+                    startFrame,
+                    effectiveEndFrame,
+                    frameCount,
+                    sampleFrameToTimeFactor,
+                    diagnostics);
 
                 return new MmdHumanoidClipConversionWriterResult(clip, plan, diagnostics);
             }
@@ -305,6 +308,11 @@ namespace Mmd.Editor
             }
             finally
             {
+                if (proxyAvatar != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(proxyAvatar);
+                }
+
                 if (proxyRigResult.ProxyRoot != null)
                 {
                     UnityEngine.Object.DestroyImmediate(proxyRigResult.ProxyRoot);
@@ -357,68 +365,75 @@ namespace Mmd.Editor
             return keyframes;
         }
 
-        private static void AddRotationCurvesToClip(
+        private static void AddMuscleCurvesToClip(
             AnimationClip clip,
-            string relativeTransformPath,
-            IReadOnlyList<MmdBoneKeyframeDefinition> boneKeyframes,
+            GameObject proxyRoot,
+            Avatar proxyAvatar,
+            IReadOnlyList<(Transform ProxyTransform, string SourceBoneName)> mappedBones,
+            Dictionary<string, List<MmdBoneKeyframeDefinition>> boneKeyframesByName,
             int startFrame,
             int endFrame,
             int frameCount,
             float sampleFrameToTimeFactor,
-            List<string> diagnostics,
-            string sourceBoneName)
+            List<string> diagnostics)
         {
-            var keyX = new Keyframe[frameCount];
-            var keyY = new Keyframe[frameCount];
-            var keyZ = new Keyframe[frameCount];
-            var keyW = new Keyframe[frameCount];
-
-            int sampleIndex = 0;
-            for (int frame = startFrame; frame <= endFrame; frame++)
+            int muscleCount = HumanTrait.MuscleCount;
+            var muscleKeys = new Keyframe[muscleCount][];
+            for (int muscleIndex = 0; muscleIndex < muscleCount; muscleIndex++)
             {
-                float time = (frame - startFrame) * sampleFrameToTimeFactor;
-
-                float[] rotated = VmdBoneSampler.SampleSortedPose(
-                    boneKeyframes,
-                    sourceBoneName,
-                    frame).Rotation;
-                var rotation = new Quaternion(
-                    -rotated[0],
-                    rotated[1],
-                    -rotated[2],
-                    rotated[3]);
-
-                keyX[sampleIndex] = new Keyframe(time, rotation.x);
-                keyY[sampleIndex] = new Keyframe(time, rotation.y);
-                keyZ[sampleIndex] = new Keyframe(time, rotation.z);
-                keyW[sampleIndex] = new Keyframe(time, rotation.w);
-
-                sampleIndex++;
+                muscleKeys[muscleIndex] = new Keyframe[frameCount];
             }
 
-            var xBinding = EditorCurveBinding.FloatCurve(
-                relativeTransformPath,
-                typeof(Transform),
-                "m_LocalRotation.x");
-            var yBinding = EditorCurveBinding.FloatCurve(
-                relativeTransformPath,
-                typeof(Transform),
-                "m_LocalRotation.y");
-            var zBinding = EditorCurveBinding.FloatCurve(
-                relativeTransformPath,
-                typeof(Transform),
-                "m_LocalRotation.z");
-            var wBinding = EditorCurveBinding.FloatCurve(
-                relativeTransformPath,
-                typeof(Transform),
-                "m_LocalRotation.w");
+            var baseRotations = new Quaternion[mappedBones.Count];
+            for (int boneIndex = 0; boneIndex < mappedBones.Count; boneIndex++)
+            {
+                baseRotations[boneIndex] = mappedBones[boneIndex].ProxyTransform.localRotation;
+            }
 
-            AnimationUtility.SetEditorCurve(clip, xBinding, new AnimationCurve(keyX));
-            AnimationUtility.SetEditorCurve(clip, yBinding, new AnimationCurve(keyY));
-            AnimationUtility.SetEditorCurve(clip, zBinding, new AnimationCurve(keyZ));
-            AnimationUtility.SetEditorCurve(clip, wBinding, new AnimationCurve(keyW));
+            using (var poseHandler = new HumanPoseHandler(proxyAvatar, proxyRoot.transform))
+            {
+                var pose = new HumanPose { muscles = new float[muscleCount] };
+                int sampleIndex = 0;
+                for (int frame = startFrame; frame <= endFrame; frame++)
+                {
+                    float time = (frame - startFrame) * sampleFrameToTimeFactor;
+                    for (int boneIndex = 0; boneIndex < mappedBones.Count; boneIndex++)
+                    {
+                        (Transform proxyTransform, string sourceBoneName) = mappedBones[boneIndex];
+                        IReadOnlyList<MmdBoneKeyframeDefinition> keyframes = SelectBoneKeyframes(
+                            boneKeyframesByName,
+                            sourceBoneName);
+                        float[] rotated = VmdBoneSampler.SampleSortedPose(
+                            keyframes,
+                            sourceBoneName,
+                            frame).Rotation;
+                        var rotationDelta = new Quaternion(
+                            -rotated[0],
+                            rotated[1],
+                            -rotated[2],
+                            rotated[3]);
+                        proxyTransform.localRotation = baseRotations[boneIndex] * rotationDelta;
+                    }
 
-            diagnostics.Add("writer: wrote rotation curves for " + sourceBoneName);
+                    poseHandler.GetHumanPose(ref pose);
+                    for (int muscleIndex = 0; muscleIndex < muscleCount; muscleIndex++)
+                    {
+                        muscleKeys[muscleIndex][sampleIndex] =
+                            new Keyframe(time, pose.muscles[muscleIndex]);
+                    }
+
+                    sampleIndex++;
+                }
+            }
+
+            for (int muscleIndex = 0; muscleIndex < muscleCount; muscleIndex++)
+            {
+                string muscleName = HumanTrait.MuscleName[muscleIndex];
+                var binding = EditorCurveBinding.FloatCurve(string.Empty, typeof(Animator), muscleName);
+                AnimationUtility.SetEditorCurve(clip, binding, new AnimationCurve(muscleKeys[muscleIndex]));
+            }
+
+            diagnostics.Add("writer: wrote " + muscleCount + " Humanoid muscle curves.");
         }
 
         private static string NormalizeIdentifier(string value)
