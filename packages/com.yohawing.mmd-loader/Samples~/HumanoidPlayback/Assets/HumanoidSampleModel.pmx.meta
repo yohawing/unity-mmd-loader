@@ -1,0 +1,28 @@
+fileFormatVersion: 2
+guid: e39efa8fccd5384478c1541b5cccb418
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: fb2638297b0cb9847997eb94e8615e91, type: 3}
+  importScale: 0.1
+  modelPreset: 1
+  modelPresetAutoAssigned: 1
+  meshGenerationMode: 0
+  materialTexturePolicy: 0
+  animationType: 2
+  shaderPreset: 0
+  materialOverrideAsset: {instanceID: 0}
+  materialRemaps: []
+  humanoidBoneMappingOverrides: []
+  upperArmTwist: 0.5
+  lowerArmTwist: 0.5
+  upperLegTwist: 0.5
+  lowerLegTwist: 0.5
+  armStretch: 0.05
+  legStretch: 0.05
+  feetSpacing: 0
+  hasTranslationDoF: 0

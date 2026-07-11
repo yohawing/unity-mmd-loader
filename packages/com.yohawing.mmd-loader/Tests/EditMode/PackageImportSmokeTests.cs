@@ -42,6 +42,41 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void HumanoidPlaybackSampleBundlesSourceAndGeneratedWorkflow()
+        {
+            string sampleRoot = Path.Combine(MmdTestFixtures.PackageRoot, "Samples~", "HumanoidPlayback");
+            string assetsRoot = Path.Combine(sampleRoot, "Assets");
+            string pmxPath = Path.Combine(assetsRoot, "HumanoidSampleModel.pmx");
+            string vmdPath = Path.Combine(assetsRoot, "HumanoidSampleMotion.vmd");
+            string pmxMetaPath = pmxPath + ".meta";
+            string setupPath = Path.Combine(assetsRoot, "HumanoidSampleSetup.asset");
+            string clipPath = Path.Combine(assetsRoot, "HumanoidSampleMotion.anim");
+            string timelinePath = Path.Combine(assetsRoot, "HumanoidSampleTimeline.playable");
+            string scenePath = Path.Combine(assetsRoot, "HumanoidPlayback.unity");
+
+            Assert.That(Path.Combine(sampleRoot, "README.md"), Does.Exist, "Humanoid sample README");
+            Assert.That(pmxPath, Does.Exist, "Humanoid sample PMX source");
+            Assert.That(vmdPath, Does.Exist, "Humanoid sample VMD source");
+            Assert.That(setupPath, Does.Exist, "Humanoid Setup Asset");
+            Assert.That(clipPath, Does.Exist, "baked Humanoid AnimationClip");
+            Assert.That(timelinePath, Does.Exist, "Humanoid Timeline Asset");
+            Assert.That(scenePath, Does.Exist, "ready-to-play Humanoid scene");
+            Assert.That(File.ReadAllText(pmxMetaPath), Does.Contain("animationType: 2"),
+                "sample PMX importer metadata must request Humanoid");
+            Assert.That(File.ReadAllText(timelinePath), Does.Contain("humanoidSampleProxyAnimator"),
+                "Timeline must retain its proxy Animator ExposedReference");
+            Assert.That(File.ReadAllText(scenePath), Does.Contain("Humanoid Timeline"),
+                "scene must retain the Timeline director object");
+
+            var parser = new NativeMmdParser();
+            MmdModelDefinition model = parser.LoadModel(File.ReadAllBytes(pmxPath));
+            MmdMotionDefinition motion = parser.LoadMotion(File.ReadAllBytes(vmdPath));
+            Assert.That(model.vertices.Count, Is.GreaterThan(0), "Humanoid sample PMX vertices");
+            Assert.That(model.bones.Count, Is.GreaterThan(0), "Humanoid sample PMX bones");
+            Assert.That(motion.boneKeyframes.Count, Is.GreaterThan(0), "Humanoid sample VMD bone keys");
+        }
+
+        [Test]
         public void ActualTraceDumperCreatesSchemaVersionOneJson()
         {
             MmdTrace trace = MmdActualTraceDumper.CreateTrace("minimal.pmx", "minimal.vmd");

@@ -24,9 +24,15 @@
       "path": "Samples~/BasicPlayback"
     },
     {
+      "displayName": "Humanoid Playback",
+      "description": "Ready-to-play Humanoid PMX/VMD bake sample with a valid Avatar, Setup Asset, generated Humanoid AnimationClip, Timeline binding, and redistributable source assets.",
+      "path": "Samples~/HumanoidPlayback"
+    },
+    {
       "displayName": "Runtime Verification",
       "description": "Standalone runtime verification player for direct PMX/VMD parse, playback, Timeline drive, and JSON diagnostics using local assets.",
       "path": "Samples~/RuntimeVerification"
     }
   ]
 }
+

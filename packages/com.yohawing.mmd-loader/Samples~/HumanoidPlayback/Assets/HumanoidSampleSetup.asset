@@ -1,0 +1,343 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 954e97ec9101f0c49bba3077496fe31f, type: 3}
+  m_Name: HumanoidSampleSetup
+  m_EditorClassIdentifier: Mmd.Runtime::Mmd.MmdHumanoidSetupAsset
+  pmxAsset: {fileID: 8726424099701051381, guid: e39efa8fccd5384478c1541b5cccb418, type: 3}
+  setupPreset: 0
+  pmxBoneCount: 114
+  mappingReadiness: Ready
+  mappingInputSource: ImportedHierarchy
+  requiredMappedBoneCount: 16
+  optionalMappedBoneCount: 7
+  missingRequiredBoneCount: 0
+  ambiguousMappingCount: 8
+  ignoredHelperBoneCount: 23
+  mappingDiagnostics:
+  - 'readiness: Ready'
+  - 'counts: required=16/16 optional=7/7 finger=38 missingRequired=0 ambiguous=8
+    ignoredHelper=23'
+  - "ambiguous: LeftIndexDistal <- \u5DE6\u4EBA\u6307\uFF13#86, \u5DE6\u4EBA\u6307\u5148#87"
+  - "ambiguous: RightIndexDistal <- \u53F3\u4EBA\u6307\uFF13#49, \u53F3\u4EBA\u6307\u5148#50"
+  - "ambiguous: LeftMiddleDistal <- \u5DE6\u4E2D\u6307\uFF13#82, \u5DE6\u4E2D\u6307\u5148#83"
+  - "ambiguous: RightMiddleDistal <- \u53F3\u4E2D\u6307\uFF13#45, \u53F3\u4E2D\u6307\u5148#46"
+  - "ambiguous: LeftRingDistal <- \u5DE6\u85AC\u6307\uFF13#78, \u5DE6\u85AC\u6307\u5148#79"
+  - "ambiguous: RightRingDistal <- \u53F3\u85AC\u6307\uFF13#41, \u53F3\u85AC\u6307\u5148#42"
+  - "ambiguous: LeftLittleDistal <- \u5DE6\u5C0F\u6307\uFF13#74, \u5DE6\u5C0F\u6307\u5148#75"
+  - "ambiguous: RightLittleDistal <- \u53F3\u5C0F\u6307\uFF13#37, \u53F3\u5C0F\u6307\u5148#38"
+  nativePlaybackImpact: None
+  mappingEntries:
+  - humanBone: 0
+    mmdBoneName: "\u4E0B\u534A\u8EAB"
+    mmdBoneIndex: 13
+    required: 1
+    category: Required
+  - humanBone: 7
+    mmdBoneName: "\u4E0A\u534A\u8EAB"
+    mmdBoneIndex: 11
+    required: 1
+    category: Required
+  - humanBone: 9
+    mmdBoneName: "\u9996"
+    mmdBoneIndex: 88
+    required: 1
+    category: Required
+  - humanBone: 10
+    mmdBoneName: "\u982D"
+    mmdBoneIndex: 89
+    required: 1
+    category: Required
+  - humanBone: 1
+    mmdBoneName: "\u5DE6\u8DB3"
+    mmdBoneIndex: 100
+    required: 1
+    category: Required
+  - humanBone: 3
+    mmdBoneName: "\u5DE6\u3072\u3056"
+    mmdBoneIndex: 101
+    required: 1
+    category: Required
+  - humanBone: 5
+    mmdBoneName: "\u5DE6\u8DB3\u9996"
+    mmdBoneIndex: 102
+    required: 1
+    category: Required
+  - humanBone: 2
+    mmdBoneName: "\u53F3\u8DB3"
+    mmdBoneIndex: 96
+    required: 1
+    category: Required
+  - humanBone: 4
+    mmdBoneName: "\u53F3\u3072\u3056"
+    mmdBoneIndex: 97
+    required: 1
+    category: Required
+  - humanBone: 6
+    mmdBoneName: "\u53F3\u8DB3\u9996"
+    mmdBoneIndex: 98
+    required: 1
+    category: Required
+  - humanBone: 13
+    mmdBoneName: "\u5DE6\u8155"
+    mmdBoneIndex: 54
+    required: 1
+    category: Required
+  - humanBone: 15
+    mmdBoneName: "\u5DE6\u3072\u3058"
+    mmdBoneIndex: 59
+    required: 1
+    category: Required
+  - humanBone: 17
+    mmdBoneName: "\u5DE6\u624B\u9996"
+    mmdBoneIndex: 65
+    required: 1
+    category: Required
+  - humanBone: 14
+    mmdBoneName: "\u53F3\u8155"
+    mmdBoneIndex: 17
+    required: 1
+    category: Required
+  - humanBone: 16
+    mmdBoneName: "\u53F3\u3072\u3058"
+    mmdBoneIndex: 22
+    required: 1
+    category: Required
+  - humanBone: 18
+    mmdBoneName: "\u53F3\u624B\u9996"
+    mmdBoneIndex: 28
+    required: 1
+    category: Required
+  - humanBone: 8
+    mmdBoneName: "\u4E0A\u534A\u8EAB2"
+    mmdBoneIndex: 12
+    required: 0
+    category: Optional
+  - humanBone: 11
+    mmdBoneName: "\u5DE6\u80A9"
+    mmdBoneIndex: 52
+    required: 0
+    category: Optional
+  - humanBone: 12
+    mmdBoneName: "\u53F3\u80A9"
+    mmdBoneIndex: 15
+    required: 0
+    category: Optional
+  - humanBone: 19
+    mmdBoneName: "\u5DE6\u3064\u307E\u5148"
+    mmdBoneIndex: 104
+    required: 0
+    category: Optional
+  - humanBone: 20
+    mmdBoneName: "\u53F3\u3064\u307E\u5148"
+    mmdBoneIndex: 103
+    required: 0
+    category: Optional
+  - humanBone: 21
+    mmdBoneName: "\u5DE6\u76EE"
+    mmdBoneIndex: 93
+    required: 0
+    category: Optional
+  - humanBone: 22
+    mmdBoneName: "\u53F3\u76EE"
+    mmdBoneIndex: 91
+    required: 0
+    category: Optional
+  - humanBone: 24
+    mmdBoneName: "\u5DE6\u89AA\u6307\uFF11"
+    mmdBoneIndex: 69
+    required: 0
+    category: Finger
+  - humanBone: 25
+    mmdBoneName: "\u5DE6\u89AA\u6307\uFF12"
+    mmdBoneIndex: 70
+    required: 0
+    category: Finger
+  - humanBone: 26
+    mmdBoneName: "\u5DE6\u89AA\u6307\u5148"
+    mmdBoneIndex: 71
+    required: 0
+    category: Finger
+  - humanBone: 39
+    mmdBoneName: "\u53F3\u89AA\u6307\uFF11"
+    mmdBoneIndex: 32
+    required: 0
+    category: Finger
+  - humanBone: 40
+    mmdBoneName: "\u53F3\u89AA\u6307\uFF12"
+    mmdBoneIndex: 33
+    required: 0
+    category: Finger
+  - humanBone: 41
+    mmdBoneName: "\u53F3\u89AA\u6307\u5148"
+    mmdBoneIndex: 34
+    required: 0
+    category: Finger
+  - humanBone: 27
+    mmdBoneName: "\u5DE6\u4EBA\u6307\uFF11"
+    mmdBoneIndex: 84
+    required: 0
+    category: Finger
+  - humanBone: 28
+    mmdBoneName: "\u5DE6\u4EBA\u6307\uFF12"
+    mmdBoneIndex: 85
+    required: 0
+    category: Finger
+  - humanBone: 29
+    mmdBoneName: "\u5DE6\u4EBA\u6307\uFF13"
+    mmdBoneIndex: 86
+    required: 0
+    category: Finger
+  - humanBone: 29
+    mmdBoneName: "\u5DE6\u4EBA\u6307\u5148"
+    mmdBoneIndex: 87
+    required: 0
+    category: Finger
+  - humanBone: 42
+    mmdBoneName: "\u53F3\u4EBA\u6307\uFF11"
+    mmdBoneIndex: 47
+    required: 0
+    category: Finger
+  - humanBone: 43
+    mmdBoneName: "\u53F3\u4EBA\u6307\uFF12"
+    mmdBoneIndex: 48
+    required: 0
+    category: Finger
+  - humanBone: 44
+    mmdBoneName: "\u53F3\u4EBA\u6307\uFF13"
+    mmdBoneIndex: 49
+    required: 0
+    category: Finger
+  - humanBone: 44
+    mmdBoneName: "\u53F3\u4EBA\u6307\u5148"
+    mmdBoneIndex: 50
+    required: 0
+    category: Finger
+  - humanBone: 30
+    mmdBoneName: "\u5DE6\u4E2D\u6307\uFF11"
+    mmdBoneIndex: 80
+    required: 0
+    category: Finger
+  - humanBone: 31
+    mmdBoneName: "\u5DE6\u4E2D\u6307\uFF12"
+    mmdBoneIndex: 81
+    required: 0
+    category: Finger
+  - humanBone: 32
+    mmdBoneName: "\u5DE6\u4E2D\u6307\uFF13"
+    mmdBoneIndex: 82
+    required: 0
+    category: Finger
+  - humanBone: 32
+    mmdBoneName: "\u5DE6\u4E2D\u6307\u5148"
+    mmdBoneIndex: 83
+    required: 0
+    category: Finger
+  - humanBone: 45
+    mmdBoneName: "\u53F3\u4E2D\u6307\uFF11"
+    mmdBoneIndex: 43
+    required: 0
+    category: Finger
+  - humanBone: 46
+    mmdBoneName: "\u53F3\u4E2D\u6307\uFF12"
+    mmdBoneIndex: 44
+    required: 0
+    category: Finger
+  - humanBone: 47
+    mmdBoneName: "\u53F3\u4E2D\u6307\uFF13"
+    mmdBoneIndex: 45
+    required: 0
+    category: Finger
+  - humanBone: 47
+    mmdBoneName: "\u53F3\u4E2D\u6307\u5148"
+    mmdBoneIndex: 46
+    required: 0
+    category: Finger
+  - humanBone: 33
+    mmdBoneName: "\u5DE6\u85AC\u6307\uFF11"
+    mmdBoneIndex: 76
+    required: 0
+    category: Finger
+  - humanBone: 34
+    mmdBoneName: "\u5DE6\u85AC\u6307\uFF12"
+    mmdBoneIndex: 77
+    required: 0
+    category: Finger
+  - humanBone: 35
+    mmdBoneName: "\u5DE6\u85AC\u6307\uFF13"
+    mmdBoneIndex: 78
+    required: 0
+    category: Finger
+  - humanBone: 35
+    mmdBoneName: "\u5DE6\u85AC\u6307\u5148"
+    mmdBoneIndex: 79
+    required: 0
+    category: Finger
+  - humanBone: 48
+    mmdBoneName: "\u53F3\u85AC\u6307\uFF11"
+    mmdBoneIndex: 39
+    required: 0
+    category: Finger
+  - humanBone: 49
+    mmdBoneName: "\u53F3\u85AC\u6307\uFF12"
+    mmdBoneIndex: 40
+    required: 0
+    category: Finger
+  - humanBone: 50
+    mmdBoneName: "\u53F3\u85AC\u6307\uFF13"
+    mmdBoneIndex: 41
+    required: 0
+    category: Finger
+  - humanBone: 50
+    mmdBoneName: "\u53F3\u85AC\u6307\u5148"
+    mmdBoneIndex: 42
+    required: 0
+    category: Finger
+  - humanBone: 36
+    mmdBoneName: "\u5DE6\u5C0F\u6307\uFF11"
+    mmdBoneIndex: 72
+    required: 0
+    category: Finger
+  - humanBone: 37
+    mmdBoneName: "\u5DE6\u5C0F\u6307\uFF12"
+    mmdBoneIndex: 73
+    required: 0
+    category: Finger
+  - humanBone: 38
+    mmdBoneName: "\u5DE6\u5C0F\u6307\uFF13"
+    mmdBoneIndex: 74
+    required: 0
+    category: Finger
+  - humanBone: 38
+    mmdBoneName: "\u5DE6\u5C0F\u6307\u5148"
+    mmdBoneIndex: 75
+    required: 0
+    category: Finger
+  - humanBone: 51
+    mmdBoneName: "\u53F3\u5C0F\u6307\uFF11"
+    mmdBoneIndex: 35
+    required: 0
+    category: Finger
+  - humanBone: 52
+    mmdBoneName: "\u53F3\u5C0F\u6307\uFF12"
+    mmdBoneIndex: 36
+    required: 0
+    category: Finger
+  - humanBone: 53
+    mmdBoneName: "\u53F3\u5C0F\u6307\uFF13"
+    mmdBoneIndex: 37
+    required: 0
+    category: Finger
+  - humanBone: 53
+    mmdBoneName: "\u53F3\u5C0F\u6307\u5148"
+    mmdBoneIndex: 38
+    required: 0
+    category: Finger
