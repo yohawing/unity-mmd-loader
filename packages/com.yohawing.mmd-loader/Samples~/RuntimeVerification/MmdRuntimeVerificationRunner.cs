@@ -29,6 +29,11 @@ namespace Mmd.Samples.RuntimeVerification
                 "binding",
                 BindingFlags.Instance | BindingFlags.NonPublic);
 
+        private static readonly FieldInfo? FastWorldMatricesField =
+            typeof(MmdUnityPlaybackBinding).GetField(
+                "fastWorldMatrices",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+
         private readonly MmdRuntimeVerificationArguments arguments;
 
         public MmdRuntimeVerificationRunner(MmdRuntimeVerificationArguments arguments)
@@ -624,9 +629,30 @@ namespace Mmd.Samples.RuntimeVerification
                 return Array.Empty<MmdRuntimeVerificationBoneSample>();
             }
 
+            Transform[] transforms = binding.Instance.BoneTransforms;
+            if (FastWorldMatricesField?.GetValue(binding) is float[] fastWorldMatrices &&
+                fastWorldMatrices.Length >= transforms.Length * 16)
+            {
+                matrixSpace = "mmd-model";
+                matrixLayout = "column-major";
+                var nativeBones = new MmdRuntimeVerificationBoneSample[transforms.Length];
+                for (int i = 0; i < transforms.Length; i++)
+                {
+                    var matrix = new float[16];
+                    Array.Copy(fastWorldMatrices, i * 16, matrix, 0, matrix.Length);
+                    nativeBones[i] = new MmdRuntimeVerificationBoneSample
+                    {
+                        index = i,
+                        name = transforms[i].name,
+                        worldMatrix = matrix
+                    };
+                }
+
+                return nativeBones;
+            }
+
             matrixSpace = "unity-world";
             matrixLayout = "row-major";
-            Transform[] transforms = binding.Instance.BoneTransforms;
             var transformBones = new MmdRuntimeVerificationBoneSample[transforms.Length];
             for (int i = 0; i < transforms.Length; i++)
             {

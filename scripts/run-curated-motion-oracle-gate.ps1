@@ -1,12 +1,13 @@
 <#
 .SYNOPSIS
-Compares three curated PMX/VMD cases with authoritative local MMD-space oracles.
+Compares provenance-verified PMX/VMD cases with local MMD-space oracles.
 
 .DESCRIPTION
-The player is forced to managed, physics-off random access so sampled matrices
-stay in MMD model space. Raw reports and oracle paths remain under data-local;
-the artifact contains hashes and numeric deltas only. This command never writes
-or updates baselines.
+The player uses native, physics-off random access and samples the native MMD
+model-space matrices before Unity conversion. Raw reports and oracle paths
+remain under data-local; the artifact contains hashes and numeric deltas only.
+This command never writes or updates baselines. Local oracles without source
+hashes are report-only because matching paths do not prove source freshness.
 #>
 param(
     [string] $FixtureManifest = "",
@@ -32,6 +33,8 @@ $curatedNames = @(
     "tda-miku-togenrenka",
     "sour-miku-rabbithole"
 )
+$minimumTrustedCases = 3
+$repoFixtureTrustedCases = @("repo-test-1bone-cube-native-nanoem")
 
 function Get-Value([object] $Object, [string] $Name) {
     if ($null -eq $Object) { return $null }
@@ -113,6 +116,19 @@ try {
             [IO.Path]::GetFullPath([string]$oracle.sourcePaths.motion).Equals($vmdPath, [StringComparison]::OrdinalIgnoreCase)
         if (-not $sourceMatches) { throw "Curated oracle source paths do not match the manifest case: $curatedName" }
 
+        $sourceHashes = Get-Value $oracle "sourceHashes"
+        $expectedModelHash = [string](Get-Value $sourceHashes "modelSha256")
+        $expectedMotionHash = [string](Get-Value $sourceHashes "motionSha256")
+        $hasVerifiedHashes = -not [string]::IsNullOrWhiteSpace($expectedModelHash) -and
+            -not [string]::IsNullOrWhiteSpace($expectedMotionHash) -and
+            $expectedModelHash.Equals((Get-FileHash -LiteralPath $pmxPath -Algorithm SHA256).Hash, [StringComparison]::OrdinalIgnoreCase) -and
+            $expectedMotionHash.Equals((Get-FileHash -LiteralPath $vmdPath -Algorithm SHA256).Hash, [StringComparison]::OrdinalIgnoreCase)
+        $isRepoFixture = $repoFixtureTrustedCases -contains $curatedName
+        if (-not $hasVerifiedHashes -and -not $isRepoFixture) {
+            $reportOnlyCases.Add([ordered]@{ caseHash = Get-StableHash $curatedName; reason = "unverified-source-freshness" })
+            continue
+        }
+
         $frames = @($oracle.frames | ForEach-Object { [int]$_.frame } | Sort-Object -Unique)
         $caseHash = Get-StableHash $curatedName
         $caseTemp = Join-Path $tempRoot $caseHash.Substring(0, 12)
@@ -123,7 +139,7 @@ try {
             "-batchmode", "--pmx", $pmxPath, "--vmd", $vmdPath,
             "--drive", "controller", "--sample-mode", "random-access",
             "--sample-frames", ($frames -join ','), "--dump-bones", "--dump-morphs",
-            "--fast-runtime", "off", "--duration", "0", "--out", $rawReport, "-logFile", $rawLog
+            "--fast-runtime", "on", "--duration", "0", "--out", $rawReport, "-logFile", $rawLog
         )
         $argumentLine = ($args | ForEach-Object { ConvertTo-ProcessArgument $_ }) -join ' '
         $process = Start-Process -FilePath $PlayerPath -ArgumentList $argumentLine -PassThru -WindowStyle Hidden
@@ -138,6 +154,10 @@ try {
         $runtime = @($raw.caseResults)[0]
         if ($runtime.parseStatus -ne "passed" -or $runtime.playbackStatus -ne "passed" -or $runtime.consoleErrorCount -ne 0) {
             $results.Add([ordered]@{ caseHash = $caseHash; status = "failed"; reason = "runtime-case-failed" })
+            continue
+        }
+        if (-not $runtime.playback.fastRuntimeEnabled) {
+            $results.Add([ordered]@{ caseHash = $caseHash; status = "failed"; reason = "native-runtime-unavailable" })
             continue
         }
 
@@ -155,7 +175,8 @@ try {
         $comparedMorphWeights = 0
         $matrixEpsilon = if ($null -ne $case.matrixEpsilon) { [double]$case.matrixEpsilon } else { 0.0001 }
         $morphEpsilon = if ($null -ne $case.morphEpsilon) { [double]$case.morphEpsilon } else { 0.0001 }
-        $positionRuntimeIndices = @(3, 7, 11)
+        $positionRuntimeRowMajorIndices = @(3, 7, 11)
+        $positionRuntimeColumnMajorIndices = @(12, 13, 14)
         $positionOracleIndices = @(12, 13, 14)
         $positionLabels = @("x", "y", "z")
         $rotationRuntimeIndices = @(0, 1, 2, 4, 5, 6, 8, 9, 10)
@@ -168,6 +189,7 @@ try {
             $stageName = if ([string]::IsNullOrWhiteSpace([string]$case.stage)) { "physics" } else { [string]$case.stage }
             $stage = Get-Value $oracleFrame.stages $stageName
             $oracleMatrices = @($stage.worldMatricesColumnMajor)
+            $runtimeColumnMajor = [string]::Equals([string]$sample.matrixLayout, "column-major", [StringComparison]::OrdinalIgnoreCase)
             $runtimeBonesByName = @{}
             foreach ($bone in @($sample.bones)) { $runtimeBonesByName[[string]$bone.name] = $bone }
 
@@ -181,8 +203,8 @@ try {
                 }
                 $offset = [int]$oracleBone.index * 16
                 $targetHash = Get-StableHash ([string]$boneName)
-                for ($i = 0; $i -lt $positionRuntimeIndices.Count; $i++) {
-                    $runtimeIndex = $positionRuntimeIndices[$i]
+                for ($i = 0; $i -lt $positionRuntimeRowMajorIndices.Count; $i++) {
+                    $runtimeIndex = if ($runtimeColumnMajor) { $positionRuntimeColumnMajorIndices[$i] } else { $positionRuntimeRowMajorIndices[$i] }
                     $oracleIndex = $positionOracleIndices[$i]
                     $delta = [Math]::Abs([double]$runtimeBone.worldMatrix[$runtimeIndex] - [double]$oracleMatrices[$offset + $oracleIndex])
                     $comparedBoneComponents++
@@ -191,7 +213,7 @@ try {
                 }
                 for ($i = 0; $i -lt $rotationRuntimeIndices.Count; $i++) {
                     $runtimeIndex = $rotationRuntimeIndices[$i]
-                    $oracleIndex = $rotationOracleIndices[$i]
+                    $oracleIndex = if ($runtimeColumnMajor) { $rotationRuntimeIndices[$i] } else { $rotationOracleIndices[$i] }
                     $delta = [Math]::Abs([double]$runtimeBone.worldMatrix[$runtimeIndex] - [double]$oracleMatrices[$offset + $oracleIndex])
                     $comparedBoneComponents++
                     if ($delta -gt $matrixEpsilon) { $rotationMismatchCount++ }
@@ -242,14 +264,16 @@ finally {
 }
 
 $failed = @($results | Where-Object status -eq "failed").Count
+$trustedCaseShortfall = $results.Count -lt $minimumTrustedCases
 $summary = [ordered]@{
     schemaVersion = 1
-    status = if ($failed -eq 0) { "passed" } else { "failed" }
+    status = if ($failed -gt 0) { "failed" } elseif ($trustedCaseShortfall) { "incomplete" } else { "passed" }
     baselineUpdateMode = "explicit-only"
     baselineUpdated = $false
     manifestHash = (Get-FileHash -LiteralPath $FixtureManifest -Algorithm SHA256).Hash.ToLowerInvariant()
     playerHash = (Get-FileHash -LiteralPath $PlayerPath -Algorithm SHA256).Hash.ToLowerInvariant()
     caseCount = $results.Count
+    minimumTrustedCases = $minimumTrustedCases
     passedCases = $results.Count - $failed
     failedCases = $failed
     cases = @($results)
@@ -258,5 +282,5 @@ $summary = [ordered]@{
 }
 $summary | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $reportPath -Encoding UTF8
 Write-Host ("{0} curated-oracle: cases={1}, passed={2}, failed={3}, report={4}" -f $summary.status.ToUpperInvariant(), $summary.caseCount, $summary.passedCases, $summary.failedCases, $reportPath)
-if ($failed -gt 0) { exit 1 }
+if ($failed -gt 0 -or $trustedCaseShortfall) { exit 1 }
 exit 0
