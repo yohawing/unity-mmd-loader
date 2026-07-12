@@ -9,14 +9,11 @@ It provides a native-feel PMX importer, a Timeline-integrated VMD importer, and 
 
 [日本語](https://github.com/yohawing/unity-mmd-loader/blob/main/docs/README.ja.md) / [Detailed guide](https://github.com/yohawing/unity-mmd-loader/blob/main/docs/HOW_TO_USE.md)
 
-## Quick start
+## Features
 
-1. Install the package and import the `Basic Playback` sample from Package Manager.
-2. Import a `.pmx` and its referenced textures, then drag the imported PMX asset into the Scene or Hierarchy.
-3. Import a `.vmd` and add it to an `MmdVmdTimelineTrack` bound to the placed playback object.
-4. Scrub Timeline in Edit Mode for animation-only preview. Physics is intentionally off while editing.
-5. Enter Play Mode and play Timeline forward to run Live physics.
-6. If a Unity Humanoid clip is needed, set the PMX Rig to Humanoid and add the animation from an `MMD Humanoid Animation Track`.
+- **Treat MMD files as ordinary Unity assets** — PMX / VMD go through Unity's import pipeline instead of a dedicated viewer. Just drop a `.pmx` into the project and it becomes a prefab, with materials and textures set up automatically.
+- **Edit VMD on the Timeline** — VMD motion is handled as Timeline clips. In addition to Humanoid motion, camera and light VMD are also supported.
+- **MMD-style toon rendering** — A URP-based MMD shader brings edges, alpha, and textures closer to the MMD look.
 
 ## Requirements and support
 

@@ -5,18 +5,15 @@
 > クレジット — モデル: [Sour](https://bowlroll.net/file/146103) ／ モーション: [mobiusP](https://www.nicovideo.jp/watch/sm42576784) ／ カメラモーション: [koko](https://bowlroll.net/file/305434) ／ 背景: [とじる](https://seiga.nicovideo.jp/seiga/im11796453)
 
 unity-mmd-loader は、PMX / VMD を Unity に取り込むためのプラグインです。
-自然なPMXインポーターとTimeline統合されたVMDインポーターと、URPをカスタムしたMMDシェーダーも提供します。
+自然なPMXインポーターとTimeline統合されたVMDインポーターと、URPをカスタムしたMMDシェーダーを提供します。
 
 [English](../README.md) / [詳しい使い方（英語）](./HOW_TO_USE.md)
 
-## クイックスタート
+## 特徴
 
-1. パッケージを導入し、Package Managerから`Basic Playback` sampleをインポートします。
-2. `.pmx`と参照テクスチャをインポートし、PMXアセットをSceneまたはHierarchyへドラッグします。
-3. `.vmd`をインポートし、配置した再生オブジェクトへbindした`MmdVmdTimelineTrack`に追加します。
-4. Edit ModeではTimelineをスクラブしてanimation-only previewを確認します。編集中の物理は意図的にoffです。
-5. Play Modeに入り、Timelineをforward再生するとLive physicsが動作します。
-6. Unity Humanoid clipが必要な場合はPMX RigをHumanoidに設定し、`MMD Humanoid Animation Track` からアニメーションを追加してください。 
+- **MMDファイルをUnity標準アセットとして扱える** — PMX/VMDをUnityのインポートパイプラインに乗せます。`.pmx`をプロジェクトに入れるだけでプレハブ化され、マテリアルとテクスチャも自動でセットアップされます。
+- **VMDをTimelineで編集** — VMDモーションを Timeline クリップとして扱えます。 Humanoidモーションに加え、カメラ・ライトのVMDにも対応。
+- **MMDらしいトゥーン表現** — URPベースのMMDシェーダーで、エッジやアルファ、テクスチャ周りをMMDらしい見た目に近づけます。
 
 ## 要件と対応状況
 
