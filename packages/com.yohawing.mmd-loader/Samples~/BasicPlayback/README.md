@@ -7,6 +7,8 @@
 
 - `Assets/mmt_test_model.pmx`
 - `Assets/mmt_test_model_test_motion.vmd`
+- `Assets/BasicSampleTimeline.playable`
+- `Assets/BasicPlayback.unity`
 
 これらは `maya_mmd_tools` のテスト用に作成された再配布可能な小型モデル/モーションです。
 一般の MMD モデル、モーション、テクスチャ、PMM は同梱していません。
@@ -23,11 +25,13 @@ PMX/VMD golden path を次の順序で確認します。
 
 ## Steps
 
-1. Package Manager から `Basic Playback` sample を import します。
-2. Project ウィンドウで `mmt_test_model.pmx` をシーンにドラッグして配置します。
-3. `mmt_test_model_test_motion.vmd` を Timeline の MMD VMD track に配置し、配置済み PMX の `MmdUnityPlaybackController` を track binding に設定します。
-4. Play Mode で PMX/VMD playback を確認します。
-5. Humanoid 化している場合だけ、必要に応じて Humanoid Clip bake を試します。
+1. Package Manager から `Basic Playback` sample を importします。
+2. `Assets/BasicPlayback.unity` を開きます。
+3. `Basic Timeline` の Timeline をスクラブするか、Play Mode で PMX/VMD playback を確認します。
+
+シーンには PMX モデル、VMD clip入りTimeline Asset、`MmdUnityPlaybackController` への
+track bindingが設定済みです。手動の golden path を確認する場合は、新規シーンで
+`mmt_test_model.pmx` を配置し、`mmt_test_model_test_motion.vmd` をTimelineへ追加してください。
 
 このサンプルは最小の release visual baseline です。
 外部 MMD 資産の再現性や最終 shading parity を保証するものではありません。

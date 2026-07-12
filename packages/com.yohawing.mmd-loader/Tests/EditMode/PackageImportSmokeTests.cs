@@ -28,8 +28,18 @@ namespace Mmd.Tests
             string sampleRoot = Path.Combine(MmdTestFixtures.PackageRoot, "Samples~", "BasicPlayback", "Assets");
             string pmxPath = Path.Combine(sampleRoot, "mmt_test_model.pmx");
             string vmdPath = Path.Combine(sampleRoot, "mmt_test_model_test_motion.vmd");
+            string timelinePath = Path.Combine(sampleRoot, "BasicSampleTimeline.playable");
+            string scenePath = Path.Combine(sampleRoot, "BasicPlayback.unity");
             Assert.That(pmxPath, Does.Exist, "BasicPlayback sample PMX must be bundled.");
             Assert.That(vmdPath, Does.Exist, "BasicPlayback sample VMD must be bundled.");
+            Assert.That(timelinePath, Does.Exist, "BasicPlayback sample Timeline must be bundled.");
+            Assert.That(scenePath, Does.Exist, "ready-to-play BasicPlayback scene must be bundled.");
+            Assert.That(File.ReadAllText(timelinePath), Does.Contain("MMT Test Motion (VMD)"),
+                "BasicPlayback Timeline must contain the bundled VMD motion.");
+            Assert.That(File.ReadAllText(scenePath), Does.Contain("Basic Timeline"),
+                "BasicPlayback scene must retain the Timeline director object.");
+            Assert.That(File.ReadAllText(scenePath), Does.Contain("m_InitialState: 1"),
+                "BasicPlayback Timeline must play automatically when the scene starts.");
 
             var parser = new NativeMmdParser();
             MmdModelDefinition model = parser.LoadModel(File.ReadAllBytes(pmxPath));
@@ -47,33 +57,32 @@ namespace Mmd.Tests
             string sampleRoot = Path.Combine(MmdTestFixtures.PackageRoot, "Samples~", "HumanoidPlayback");
             string assetsRoot = Path.Combine(sampleRoot, "Assets");
             string pmxPath = Path.Combine(assetsRoot, "HumanoidSampleModel.pmx");
-            string vmdPath = Path.Combine(assetsRoot, "HumanoidSampleMotion.vmd");
+            string fbxPath = Path.Combine(assetsRoot, "TaisouMocap.fbx");
+            string fbxMetaPath = fbxPath + ".meta";
             string pmxMetaPath = pmxPath + ".meta";
-            string setupPath = Path.Combine(assetsRoot, "HumanoidSampleSetup.asset");
-            string clipPath = Path.Combine(assetsRoot, "HumanoidSampleMotion.anim");
             string timelinePath = Path.Combine(assetsRoot, "HumanoidSampleTimeline.playable");
             string scenePath = Path.Combine(assetsRoot, "HumanoidPlayback.unity");
 
             Assert.That(Path.Combine(sampleRoot, "README.md"), Does.Exist, "Humanoid sample README");
             Assert.That(pmxPath, Does.Exist, "Humanoid sample PMX source");
-            Assert.That(vmdPath, Does.Exist, "Humanoid sample VMD source");
-            Assert.That(setupPath, Does.Exist, "Humanoid Setup Asset");
-            Assert.That(clipPath, Does.Exist, "baked Humanoid AnimationClip");
+            Assert.That(fbxPath, Does.Exist, "Humanoid sample FBX motion");
             Assert.That(timelinePath, Does.Exist, "Humanoid Timeline Asset");
             Assert.That(scenePath, Does.Exist, "ready-to-play Humanoid scene");
             Assert.That(File.ReadAllText(pmxMetaPath), Does.Contain("animationType: 2"),
                 "sample PMX importer metadata must request Humanoid");
-            Assert.That(File.ReadAllText(timelinePath), Does.Contain("humanoidSampleProxyAnimator"),
-                "Timeline must retain its proxy Animator ExposedReference");
+            Assert.That(File.ReadAllText(fbxMetaPath), Does.Contain("animationType: 3"),
+                "sample FBX importer metadata must request Humanoid animation");
+            Assert.That(File.ReadAllText(timelinePath), Does.Contain("Taisou Mocap (FBX)"),
+                "Timeline must use the practical FBX motion rather than the short VMD fixture bake");
+            Assert.That(File.ReadAllText(timelinePath), Does.Not.Contain("proxyAnimator:"),
+                "Humanoid Timeline clips must derive their Animator from the track-bound playback controller");
             Assert.That(File.ReadAllText(scenePath), Does.Contain("Humanoid Timeline"),
                 "scene must retain the Timeline director object");
 
             var parser = new NativeMmdParser();
             MmdModelDefinition model = parser.LoadModel(File.ReadAllBytes(pmxPath));
-            MmdMotionDefinition motion = parser.LoadMotion(File.ReadAllBytes(vmdPath));
             Assert.That(model.vertices.Count, Is.GreaterThan(0), "Humanoid sample PMX vertices");
             Assert.That(model.bones.Count, Is.GreaterThan(0), "Humanoid sample PMX bones");
-            Assert.That(motion.boneKeyframes.Count, Is.GreaterThan(0), "Humanoid sample VMD bone keys");
         }
 
         [Test]

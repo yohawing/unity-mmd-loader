@@ -6,6 +6,7 @@ using UnityEngine;
 using UnityEngine.Animations;
 using UnityEngine.Playables;
 using UnityEngine.Timeline;
+using Mmd.UnityIntegration;
 
 namespace Mmd.Timeline
 {
@@ -13,8 +14,6 @@ namespace Mmd.Timeline
     public sealed class MmdHumanoidAnimationClip : PlayableAsset, ITimelineClipAsset
     {
         public AnimationClip? clip;
-
-        public ExposedReference<Animator> proxyAnimator;
 
         public ClipCaps clipCaps => ClipCaps.None;
 
@@ -26,17 +25,24 @@ namespace Mmd.Timeline
             }
 
             PlayableDirector? director = owner.GetComponent<PlayableDirector>();
-            var resolver = director as IExposedPropertyTable;
-            Animator? animator = resolver != null ? proxyAnimator.Resolve(resolver) : null;
+            Animator? animator = director != null ? ResolveProxyAnimator(director) : null;
             if (animator == null)
             {
                 return Playable.Null;
             }
 
+            if (!Application.isPlaying)
+            {
+                ScriptPlayable<MmdHumanoidEditModeSampleBehaviour> editModePlayable =
+                    ScriptPlayable<MmdHumanoidEditModeSampleBehaviour>.Create(graph, 0);
+                editModePlayable.GetBehaviour().Initialize(animator, clip);
+                return editModePlayable;
+            }
+
             AnimationClipPlayable clipPlayable = AnimationClipPlayable.Create(graph, clip);
             ScriptPlayable<MmdHumanoidAnimationRootMotionGuardBehaviour> guardPlayable =
                 ScriptPlayable<MmdHumanoidAnimationRootMotionGuardBehaviour>.Create(graph, 1);
-            guardPlayable.GetBehaviour().Initialize(animator, Application.isPlaying, director);
+            guardPlayable.GetBehaviour().Initialize(animator, animator.applyRootMotion, director);
             graph.Connect(clipPlayable, 0, guardPlayable, 0);
             guardPlayable.SetInputWeight(0, 1.0f);
             guardPlayable.SetPropagateSetTime(true);
@@ -50,6 +56,119 @@ namespace Mmd.Timeline
             output.SetWeight(1.0f);
 
             return guardPlayable;
+        }
+
+        private Animator? ResolveProxyAnimator(PlayableDirector director)
+        {
+            if (director == null)
+            {
+                return null;
+            }
+
+            if (director.playableAsset is not TimelineAsset timelineAsset)
+            {
+                return null;
+            }
+
+            foreach (TrackAsset track in timelineAsset.GetOutputTracks())
+            {
+                bool ownsThisClip = false;
+                foreach (TimelineClip timelineClip in track.GetClips())
+                {
+                    if (ReferenceEquals(timelineClip.asset, this))
+                    {
+                        ownsThisClip = true;
+                        break;
+                    }
+                }
+
+                if (!ownsThisClip)
+                {
+                    continue;
+                }
+
+                MmdUnityPlaybackController? controller =
+                    director.GetGenericBinding(track) as MmdUnityPlaybackController;
+                return controller != null ? controller.GetComponent<Animator>() : null;
+            }
+
+            return null;
+        }
+    }
+
+    internal sealed class MmdHumanoidEditModeSampleBehaviour : PlayableBehaviour
+    {
+        private Animator? animator;
+        private AnimationClip? clip;
+        private Vector3 baselinePosition;
+        private Quaternion baselineRotation = Quaternion.identity;
+        private bool initialized;
+#if UNITY_EDITOR
+        private bool ownsAnimationMode;
+#endif
+
+        public void Initialize(Animator targetAnimator, AnimationClip animationClip)
+        {
+            animator = targetAnimator;
+            clip = animationClip;
+            baselinePosition = targetAnimator.transform.position;
+            baselineRotation = targetAnimator.transform.rotation;
+            initialized = true;
+        }
+
+        public override void PrepareFrame(Playable playable, FrameData info)
+        {
+            if (animator == null || clip == null)
+            {
+                return;
+            }
+
+#if UNITY_EDITOR
+            if (!UnityEditor.AnimationMode.InAnimationMode())
+            {
+                UnityEditor.AnimationMode.StartAnimationMode();
+                ownsAnimationMode = true;
+            }
+            UnityEditor.AnimationMode.SampleAnimationClip(
+                animator.gameObject,
+                clip,
+                (float)playable.GetTime());
+#else
+            clip.SampleAnimation(animator.gameObject, (float)playable.GetTime());
+#endif
+        }
+
+        public override void OnGraphStop(Playable playable)
+        {
+            RestoreBaseline();
+        }
+
+        public override void OnBehaviourPause(Playable playable, FrameData info)
+        {
+            RestoreBaseline();
+        }
+
+        public override void OnPlayableDestroy(Playable playable)
+        {
+            RestoreBaseline();
+        }
+
+        private void RestoreBaseline()
+        {
+            if (!initialized || animator == null)
+            {
+                return;
+            }
+
+#if UNITY_EDITOR
+            if (ownsAnimationMode && UnityEditor.AnimationMode.InAnimationMode())
+            {
+                UnityEditor.AnimationMode.StopAnimationMode();
+            }
+            ownsAnimationMode = false;
+#endif
+            initialized = false;
+            animator.transform.SetPositionAndRotation(baselinePosition, baselineRotation);
         }
     }
 

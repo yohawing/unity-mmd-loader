@@ -311,6 +311,7 @@ namespace Mmd.Editor
             animator.avatar = importedAnimationType == MmdPmxAnimationType.Humanoid
                 ? humanoidAvatar
                 : genericAvatar;
+            animator.applyRootMotion = importedAnimationType == MmdPmxAnimationType.Humanoid;
             return animator;
         }
 

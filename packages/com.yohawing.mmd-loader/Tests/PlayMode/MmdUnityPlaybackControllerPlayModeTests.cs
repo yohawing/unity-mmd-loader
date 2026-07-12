@@ -1136,18 +1136,14 @@ namespace Mmd.Tests
                 humanoidClip.duration = 0.5;
                 var humanoidClipAsset = (MmdHumanoidAnimationClip)humanoidClip.asset;
                 humanoidClipAsset.clip = muscleClip;
-                humanoidClipAsset.proxyAnimator.exposedName =
-                    "mmdHumanoidProxyAnimator_" + Guid.NewGuid().ToString("N");
 
                 directorObject = new GameObject("humanoid-animation-track-single-director");
                 PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
                 director.playOnAwake = false;
                 director.playableAsset = timelineAsset;
-                // SINGLE generic binding (controller, for the retarget ProcessFrame). The proxy
-                // Animator that the clip poses is supplied via an ExposedReference; setup/authoring
-                // sets this automatically since the Animator is on the controller's GameObject.
+                // SINGLE generic binding: both the retarget controller and its co-located Animator
+                // are derived from this source of truth.
                 director.SetGenericBinding(humanoidTrack, controller);
-                director.SetReferenceValue(humanoidClipAsset.proxyAnimator.exposedName, animator);
 
                 Assert.That(controller.IsConfigured, Is.False,
                     "The single humanoid track may only create a physics-only binding, never a VMD playback binding.");
@@ -1243,14 +1239,11 @@ namespace Mmd.Tests
             return string.Empty;
         }
 
-        // Regression: the single MmdHumanoidAnimationTrack must enable applyRootMotion on the proxy
-        // Animator so a Humanoid clip's root motion (RootT/RootQ) travels the model the way a standard
-        // AnimationTrack did. Without it the model only does in-place body sway (the "腰の移動" /
-        // center travel is dropped). We assert the track flips applyRootMotion on at graph build; that
-        // the resulting root curves actually translate the model is Unity's AnimationPlayableOutput
-        // behavior (verified on the real dance clip in-editor).
+        // Regression: the single MmdHumanoidAnimationTrack preserves the proxy Animator's serialized
+        // root-motion setting. Humanoid PMX import enables it by default, while an explicit user opt-out
+        // must not be overridden by Timeline graph construction.
         [UnityTest]
-        public IEnumerator HumanoidAnimationTrackEnablesRootMotionOnProxyAnimator()
+        public IEnumerator HumanoidAnimationTrackPreservesRootMotionOnProxyAnimator()
         {
             GameObject? root = null;
             Avatar? avatar = null;
@@ -1274,7 +1267,7 @@ namespace Mmd.Tests
 
                 Animator animator = root.AddComponent<Animator>();
                 animator.avatar = avatar;
-                animator.applyRootMotion = false;
+                animator.applyRootMotion = true;
 
                 MmdUnityPlaybackController controller = root.AddComponent<MmdUnityPlaybackController>();
                 controller.SetPhysicsMode(MmdPhysicsMode.Off);
@@ -1309,24 +1302,21 @@ namespace Mmd.Tests
                 humanoidClip.duration = 1.0;
                 var humanoidClipAsset = (MmdHumanoidAnimationClip)humanoidClip.asset;
                 humanoidClipAsset.clip = muscleClip;
-                humanoidClipAsset.proxyAnimator.exposedName =
-                    "mmdHumanoidRootMotionAnimator_" + Guid.NewGuid().ToString("N");
 
                 directorObject = new GameObject("humanoid-rootmotion-director");
                 PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
                 director.playOnAwake = false;
                 director.playableAsset = timelineAsset;
                 director.SetGenericBinding(humanoidTrack, controller);
-                director.SetReferenceValue(humanoidClipAsset.proxyAnimator.exposedName, animator);
 
-                Assert.That(animator.applyRootMotion, Is.False, "precondition: root motion starts disabled");
+                Assert.That(animator.applyRootMotion, Is.True, "precondition: imported Humanoid root motion starts enabled");
 
                 director.time = 0.0;
                 director.Evaluate();
                 yield return null;
 
                 Assert.That(animator.applyRootMotion, Is.True,
-                    "the single humanoid track must enable applyRootMotion so the clip's root motion travels the model");
+                    "the single humanoid track must preserve applyRootMotion so the clip's root motion travels the model");
             }
             finally
             {

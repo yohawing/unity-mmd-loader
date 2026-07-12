@@ -180,6 +180,8 @@ namespace Mmd.Tests
             Animator animator = root.GetComponent<Animator>();
             Assert.That(animator, Is.Not.Null);
             Assert.That(animator.runtimeAnimatorController, Is.Null);
+            Assert.That(animator.applyRootMotion, Is.True,
+                "Humanoid PMX imports must enable root motion by default for ordinary Unity clips.");
             Assert.That(animator.avatar, Is.Not.Null);
             Assert.That(animator.avatar.isValid, Is.True);
             Assert.That(animator.avatar.isHuman, Is.False);
@@ -417,6 +419,16 @@ namespace Mmd.Tests
             Assert.That(controller.HumanoidProxyRoot, Is.SameAs(proxyRoot));
             Assert.That(controller.HumanoidRetargetEntries, Is.Not.Empty);
             Assert.That(controller.HumanoidAppendEntries, Is.Not.Null);
+            AssertUpperArmBindPointsHorizontally(
+                controller.HumanoidRetargetEntries,
+                HumanBodyBones.LeftUpperArm,
+                HumanBodyBones.LeftLowerArm,
+                Vector3.left);
+            AssertUpperArmBindPointsHorizontally(
+                controller.HumanoidRetargetEntries,
+                HumanBodyBones.RightUpperArm,
+                HumanBodyBones.RightLowerArm,
+                Vector3.right);
             foreach (MmdHumanoidRetargetBinding entry in controller.HumanoidRetargetEntries)
             {
                 Assert.That(entry.ProxyTransform, Is.Not.Null, entry.HumanBone + " proxy transform");
@@ -4092,6 +4104,47 @@ namespace Mmd.Tests
             bool resultWithNull = (bool)method.Invoke(null, new object[] { null! });
             Assert.That(resultWithNull, Is.False,
                 "ContainsMmdAssetReference must return false for null");
+        }
+
+        private static void AssertUpperArmBindPointsHorizontally(
+            System.Collections.Generic.IReadOnlyList<MmdHumanoidRetargetBinding> entries,
+            HumanBodyBones upperArmBone,
+            HumanBodyBones lowerArmBone,
+            Vector3 expectedDirection)
+        {
+            MmdHumanoidRetargetBinding? upperArm = null;
+            MmdHumanoidRetargetBinding? lowerArm = null;
+            foreach (MmdHumanoidRetargetBinding entry in entries)
+            {
+                if (entry.HumanBone == upperArmBone)
+                {
+                    upperArm = entry;
+                }
+                else if (entry.HumanBone == lowerArmBone)
+                {
+                    lowerArm = entry;
+                }
+            }
+
+            Assert.That(upperArm, Is.Not.Null, upperArmBone + " binding");
+            Assert.That(lowerArm, Is.Not.Null, lowerArmBone + " binding");
+            Assert.That(upperArm!.NativeTransform, Is.Not.Null);
+            Assert.That(lowerArm!.NativeTransform, Is.Not.Null);
+
+            Transform upperTransform = upperArm.NativeTransform!;
+            Transform lowerTransform = lowerArm.NativeTransform!;
+            Quaternion originalRotation = upperTransform.localRotation;
+            try
+            {
+                upperTransform.localRotation = upperArm.NativeBindLocalRotation;
+                Vector3 direction = (lowerTransform.position - upperTransform.position).normalized;
+                Assert.That(Vector3.Dot(direction, expectedDirection), Is.GreaterThan(0.999f),
+                    upperArmBone + " native retarget bind must use the same geometric T-pose baseline as the proxy Avatar.");
+            }
+            finally
+            {
+                upperTransform.localRotation = originalRotation;
+            }
         }
 
         private static void AssertNoMissingScripts(GameObject root)
