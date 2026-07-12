@@ -52,60 +52,6 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void RuntimeVerificationSampleSceneDoesNotSerializeSampleScriptGuid()
-        {
-            string sampleRoot = Path.Combine(MmdTestFixtures.PackageRoot, "Samples~", "RuntimeVerification");
-            string scenePath = Path.Combine(sampleRoot, "RuntimeVerification.unity");
-            string bootstrapPath = Path.Combine(sampleRoot, "MmdRuntimeVerificationBootstrap.cs");
-            string controllerPath = Path.Combine(sampleRoot, "MmdRuntimeViewerController.cs");
-            string editorBridgePath = Path.Combine(sampleRoot, "Editor", "MmdRuntimeViewerEditorBridge.cs");
-            string themePath = Path.Combine(sampleRoot, "Resources", "MmdRuntimeViewerTheme.tss");
-            Assert.That(scenePath, Does.Exist, "RuntimeVerification sample scene must be bundled.");
-            Assert.That(bootstrapPath, Does.Exist, "RuntimeVerification bootstrap must be bundled.");
-            Assert.That(controllerPath, Does.Exist, "RuntimeVerification viewer controller must be bundled.");
-            Assert.That(editorBridgePath, Does.Exist, "RuntimeVerification editor bridge must be bundled.");
-            Assert.That(themePath, Does.Exist, "RuntimeVerification runtime theme must be bundled.");
-
-            string sceneYaml = File.ReadAllText(scenePath);
-            Assert.That(sceneYaml, Does.Not.Contain("!u!114"),
-                "Imported samples receive new script GUIDs, so the scene must not serialize a sample MonoBehaviour reference.");
-            Assert.That(sceneYaml, Does.Not.Contain("m_Script:"),
-                "RuntimeVerification bootstrap must remain independent of imported sample script GUIDs.");
-
-            string bootstrapSource = File.ReadAllText(bootstrapPath);
-            Assert.That(bootstrapSource, Does.Contain("RuntimeInitializeOnLoadMethod"),
-                "RuntimeVerification must attach its bootstrap at runtime after sample import.");
-            Assert.That(bootstrapSource, Does.Contain("SceneName = \"RuntimeVerification\""),
-                "Runtime bootstrap must be scoped to the RuntimeVerification scene.");
-
-            string controllerSource = File.ReadAllText(controllerPath);
-            Assert.That(controllerSource, Does.Contain("Resources.Load<ThemeStyleSheet>(\"MmdRuntimeViewerTheme\")"),
-                "Runtime-created PanelSettings must use Unity's standard runtime theme.");
-            Assert.That(controllerSource, Does.Contain("ConfigureEditorPreviewOwnership"),
-                "The viewer controller must expose explicit ownership for non-persistent Edit Mode content.");
-            Assert.That(controllerSource, Does.Contain("ApplyEditorPreviewOwnership(holder)"),
-                "Viewer-created playback roots must inherit non-persistent Edit Mode ownership.");
-            Assert.That(controllerSource, Does.Contain("ApplyEditorPreviewOwnership(backgroundRoot)"),
-                "Viewer-created background roots must inherit non-persistent Edit Mode ownership.");
-            Assert.That(controllerSource, Does.Contain("if (Application.isPlaying)"),
-                "Viewer loading must retain its coroutine path in Play Mode.");
-            Assert.That(controllerSource, Does.Contain("CompletePlaybackLoad("),
-                "Edit Mode viewer loading must use a synchronous completion path instead of a stalled coroutine.");
-            Assert.That(controllerSource, Does.Contain("Audio preview requires Play Mode."),
-                "Edit Mode must diagnose its intentionally Play-only audio coroutine.");
-
-            string editorBridgeSource = File.ReadAllText(editorBridgePath);
-            Assert.That(editorBridgeSource, Does.Contain("EditorSceneManager.sceneOpened"),
-                "Opening the RuntimeVerification scene in Edit Mode must queue its viewer preview.");
-            Assert.That(editorBridgeSource, Does.Contain("HideFlags.HideAndDontSave"),
-                "The Edit Mode viewer preview must not become serialized sample scene state.");
-            Assert.That(editorBridgeSource, Does.Contain("EditorApplication.playModeStateChanged"),
-                "The Edit Mode preview must be removed before runtime bootstrap initialization.");
-            Assert.That(editorBridgeSource, Does.Contain("controller.ConfigureEditorPreviewOwnership(host.transform)"),
-                "The Edit Mode bridge must configure preview ownership before viewer initialization.");
-        }
-
-        [Test]
         public void HumanoidPlaybackSampleBundlesSourceAndGeneratedWorkflow()
         {
             string sampleRoot = Path.Combine(MmdTestFixtures.PackageRoot, "Samples~", "HumanoidPlayback");

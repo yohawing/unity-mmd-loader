@@ -6,9 +6,8 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 
 ### Added
 
-- Release Gate v2 with Runtime Verification golden-path, visual smoke, local-asset preflight, and packaged-native parity reporting.
+- Release Gate v2 with golden-path coverage, local-asset preflight, and packaged-native parity reporting.
 - URP Lit material conversion with per-material PBR overrides, MME `.fx` / `.emd` mapping, and conventional normal/roughness/metallic/AO texture discovery.
-- Runtime Verification viewer transport, camera controls, local file loading, and recent-file persistence.
 - Basic Playback Timeline smoke coverage and explicit Humanoid clip-bake readiness diagnostics.
 
 ### Changed
@@ -22,7 +21,6 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 
 - DX12 SelfShadow receiver toggling no longer corrupts instancing-buffer rendering.
 - PlayMode fixtures provide the native PMX/VMD source bytes required by current runtime evaluation.
-- Runtime Verification no longer imports with a missing Bootstrap script and now shows its viewer UI in Edit Mode as well as Play Mode.
 
 ### Known Limitations
 

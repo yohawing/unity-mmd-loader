@@ -31,10 +31,6 @@ The sample contains redistributable PMX/VMD assets. See the [step-by-step guide]
 | Rendering | URP MMD Toon and URP Lit presets, textures, outline, transparent material order, optional SelfShadow |
 | Humanoid | Rig mapping and Avatar import, explicit Humanoid Setup Asset and AnimationClip bake |
 
-## Runtime Verification sample
-
-`Runtime Verification` is a standalone local-asset viewer and CLI verification player. Use it to load PMX/VMD, test seek/playback, camera VMD, audio/background references, and produce JSON or screenshot artifacts. It is a diagnostics sample, not the primary Unity authoring workflow, and licensed local assets remain outside the repository.
-
 ## Known limitations
 
 - Overlapping VMD clips use deterministic single-winner hard cuts. Weighted pose blending is not advertised.
