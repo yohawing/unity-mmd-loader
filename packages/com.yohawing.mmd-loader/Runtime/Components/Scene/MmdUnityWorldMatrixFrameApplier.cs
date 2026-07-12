@@ -57,12 +57,12 @@ namespace Mmd.UnityIntegration
 
         private static Vector3 ToUnityModelPosition(Vector3 position)
         {
-            return new Vector3(-position.x, position.y, -position.z);
+            return MmdCoordinateSpace.MmdToUnityPosition(position);
         }
 
         private static Quaternion ToUnityModelRotation(Quaternion rotation)
         {
-            return new Quaternion(-rotation.x, rotation.y, -rotation.z, rotation.w);
+            return MmdCoordinateSpace.MmdToUnityRotation(rotation);
         }
 
         private static float NormalizeImportScale(float importScale)

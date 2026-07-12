@@ -89,10 +89,10 @@ namespace Mmd.Tests
                 MmdSceneEnvironmentBinding binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
                 binding.TargetCamera = camera;
 
-                List<MmdCameraKeyframeDefinition> keyframes = TwoKeyframeTrack();
+                byte[] vmdBytes = BuildCameraVmdBytes();
                 var behaviour = new MmdVmdCameraBehaviour
                 {
-                    CameraKeyframes = keyframes,
+                    MotionBytes = vmdBytes,
                     FrameRate = 30f,
                     ImportScale = 1.0f
                 };
@@ -100,7 +100,7 @@ namespace Mmd.Tests
                 // localTime 0.5s at 30fps -> frame 15 (midway between keyframes 0 and 30).
                 MmdSceneCameraApplyStatus status = behaviour.EvaluateAtLocalTime(binding, 0.5);
 
-                MmdCameraState expectedState = VmdCameraSampler.Sample(keyframes, 15f);
+                MmdCameraState expectedState = SampleNativeCamera(vmdBytes, 15f);
                 MmdUnityCameraPose expectedPose = MmdCameraStateToUnity.Convert(expectedState);
 
                 Assert.That(status, Is.EqualTo(MmdSceneCameraApplyStatus.Applied));
@@ -126,17 +126,17 @@ namespace Mmd.Tests
                 MmdSceneEnvironmentBinding binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
                 binding.TargetCamera = camera;
 
-                List<MmdCameraKeyframeDefinition> keyframes = TwoKeyframeTrack();
+                byte[] vmdBytes = BuildCameraVmdBytes();
                 var behaviour = new MmdVmdCameraBehaviour
                 {
-                    CameraKeyframes = keyframes,
+                    MotionBytes = vmdBytes,
                     FrameRate = 30f,
                     ImportScale = 0.1f
                 };
 
                 MmdSceneCameraApplyStatus status = behaviour.EvaluateAtLocalTime(binding, 0.5);
 
-                MmdCameraState expectedState = VmdCameraSampler.Sample(keyframes, 15f);
+                MmdCameraState expectedState = SampleNativeCamera(vmdBytes, 15f);
                 MmdUnityCameraPose scaleOnePose = MmdCameraStateToUnity.Convert(expectedState, importScale: 1.0f);
                 MmdUnityCameraPose expectedPose = MmdCameraStateToUnity.Convert(expectedState, importScale: 0.1f);
 
@@ -156,7 +156,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void EvaluateAtLocalTimeFallsBackToManagedSamplerWhenNativeCameraTrackUnavailable()
+        public void InvalidMotionBytesCameraNotApplied()
         {
             var bindingGo = new GameObject("binding");
             var cameraGo = new GameObject("camera");
@@ -165,11 +165,10 @@ namespace Mmd.Tests
                 var binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
                 Camera camera = cameraGo.AddComponent<Camera>();
                 binding.TargetCamera = camera;
+                Vector3 before = camera.transform.position;
 
-                List<MmdCameraKeyframeDefinition> keyframes = TwoKeyframeTrack();
                 var behaviour = new MmdVmdCameraBehaviour
                 {
-                    CameraKeyframes = keyframes,
                     MotionBytes = new byte[] { 0, 1, 2, 3 },
                     FrameRate = 30f,
                     ImportScale = 1.0f
@@ -177,11 +176,8 @@ namespace Mmd.Tests
 
                 MmdSceneCameraApplyStatus status = behaviour.EvaluateAtLocalTime(binding, 0.5);
 
-                MmdUnityCameraPose expectedPose = MmdCameraStateToUnity.Convert(VmdCameraSampler.Sample(keyframes, 15f));
-                Assert.That(status, Is.EqualTo(MmdSceneCameraApplyStatus.Applied));
-                Assert.That(camera.transform.position.x, Is.EqualTo(expectedPose.Position.x).Within(0.0001f));
-                Assert.That(camera.transform.position.y, Is.EqualTo(expectedPose.Position.y).Within(0.0001f));
-                Assert.That(camera.transform.position.z, Is.EqualTo(expectedPose.Position.z).Within(0.0001f));
+                Assert.That(status, Is.EqualTo(MmdSceneCameraApplyStatus.NotApplied));
+                Assert.That(camera.transform.position, Is.EqualTo(before));
             }
             finally
             {
@@ -205,12 +201,10 @@ namespace Mmd.Tests
                 binding.TargetCamera = camera;
                 binding.TargetLight = light;
 
-                List<MmdCameraKeyframeDefinition> cameraKeyframes = TwoKeyframeTrack();
-                List<MmdLightKeyframeDefinition> lightKeyframes = LightKeyframes();
+                byte[] vmdBytes = BuildCameraAndLightVmdBytes();
                 var behaviour = new MmdVmdCameraBehaviour
                 {
-                    CameraKeyframes = cameraKeyframes,
-                    LightKeyframes = lightKeyframes,
+                    MotionBytes = vmdBytes,
                     FrameRate = 30f,
                     ImportScale = 1.0f
                 };
@@ -218,7 +212,7 @@ namespace Mmd.Tests
                 MmdSceneCameraApplyStatus status = behaviour.EvaluateAtLocalTime(binding, 0.5);
                 MmdSceneLightApplyStatus lightStatus = binding.LastLightApplyStatus;
 
-                MmdLightState expectedLight = VmdLightSampler.Sample(lightKeyframes, 15f);
+                MmdLightState expectedLight = SampleNativeLight(vmdBytes, 15f);
                 Assert.That(status, Is.EqualTo(MmdSceneCameraApplyStatus.Applied));
                 Assert.That(lightStatus, Is.EqualTo(MmdSceneLightApplyStatus.Applied));
                 Assert.That(light.color.r, Is.EqualTo(expectedLight.Color[0]).Within(0.001f));
@@ -250,18 +244,17 @@ namespace Mmd.Tests
                 binding.TargetCamera = camera;
                 binding.TargetLight = light;
 
-                List<MmdLightKeyframeDefinition> lightKeyframes = LightKeyframes();
+                byte[] vmdBytes = BuildLightOnlyVmdBytes();
                 var behaviour = new MmdVmdCameraBehaviour
                 {
-                    CameraKeyframes = Array.Empty<MmdCameraKeyframeDefinition>(),
-                    LightKeyframes = lightKeyframes,
+                    MotionBytes = vmdBytes,
                     FrameRate = 30f,
                     ImportScale = 1.0f
                 };
 
                 MmdSceneCameraApplyStatus status = behaviour.EvaluateAtLocalTime(binding, 0.5);
 
-                MmdLightState expectedLight = VmdLightSampler.Sample(lightKeyframes, 15f);
+                MmdLightState expectedLight = SampleNativeLight(vmdBytes, 15f);
                 Assert.That(status, Is.EqualTo(MmdSceneCameraApplyStatus.NotApplied));
                 Assert.That(binding.LastLightApplyStatus, Is.EqualTo(MmdSceneLightApplyStatus.Applied));
                 Assert.That(light.color.r, Is.EqualTo(expectedLight.Color[0]).Within(0.001f));
@@ -332,11 +325,9 @@ namespace Mmd.Tests
                 binding.TargetCamera = camera;
                 binding.TargetLight = light;
 
-                List<MmdCameraKeyframeDefinition> cameraKeyframes = TwoKeyframeTrack();
                 var behaviour = new MmdVmdCameraBehaviour
                 {
-                    CameraKeyframes = cameraKeyframes,
-                    LightKeyframes = Array.Empty<MmdLightKeyframeDefinition>(),
+                    MotionBytes = BuildCameraVmdBytes(),
                     FrameRate = 30f,
                     ImportScale = 1.0f
                 };
@@ -533,10 +524,10 @@ namespace Mmd.Tests
                 MmdSceneEnvironmentBinding binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
                 binding.TargetCamera = camera;
 
-                List<MmdCameraKeyframeDefinition> keyframes = TwoKeyframeTrack();
+                byte[] vmdBytes = BuildCameraVmdBytes();
                 var behaviour = new MmdVmdCameraBehaviour
                 {
-                    CameraKeyframes = keyframes,
+                    MotionBytes = vmdBytes,
                     FrameRate = 30f,
                     StartOffsetSeconds = 0.5f, // +15 frames
                     ImportScale = 1.0f
@@ -545,7 +536,7 @@ namespace Mmd.Tests
                 // localTime 0 + 0.5s offset = frame 15, same as the midpoint above.
                 behaviour.EvaluateAtLocalTime(binding, 0.0);
 
-                MmdUnityCameraPose expectedPose = MmdCameraStateToUnity.Convert(VmdCameraSampler.Sample(keyframes, 15f));
+                MmdUnityCameraPose expectedPose = MmdCameraStateToUnity.Convert(SampleNativeCamera(vmdBytes, 15f));
                 Assert.That(Vector3.Distance(camera.transform.position, expectedPose.Position), Is.LessThan(0.001f));
             }
             finally
@@ -669,6 +660,44 @@ namespace Mmd.Tests
             }
         }
 
+        private static byte[] BuildCameraVmdBytes()
+        {
+            using var stream = new MemoryStream();
+            using var writer = new BinaryWriter(stream);
+
+            WriteFixedAscii(writer, "Vocaloid Motion Data 0002", 30);
+            WriteFixedAscii(writer, "camera_test", 20);
+            writer.Write(0u); // bone frames
+            writer.Write(0u); // morph frames
+            writer.Write(2u); // camera frames
+            WriteCameraFrame(writer, 0u, -40f, 0f, 10f, 0f, 0f, 0f, 0f, 20u, 0);
+            WriteCameraFrame(writer, 30u, -20f, 2f, 20f, -4f, 0.1f, 0.2f, 0.1f, 40u, 0);
+            writer.Write(0u); // light frames
+            writer.Write(0u); // self-shadow frames
+            writer.Write(0u); // property frames
+            return stream.ToArray();
+        }
+
+        private static byte[] BuildCameraAndLightVmdBytes()
+        {
+            using var stream = new MemoryStream();
+            using var writer = new BinaryWriter(stream);
+
+            WriteFixedAscii(writer, "Vocaloid Motion Data 0002", 30);
+            WriteFixedAscii(writer, "camera_light", 20);
+            writer.Write(0u); // bone frames
+            writer.Write(0u); // morph frames
+            writer.Write(2u); // camera frames
+            WriteCameraFrame(writer, 0u, -40f, 0f, 10f, 0f, 0f, 0f, 0f, 20u, 0);
+            WriteCameraFrame(writer, 30u, -20f, 2f, 20f, -4f, 0.1f, 0.2f, 0.1f, 40u, 0);
+            writer.Write(2u); // light frames
+            WriteLightFrame(writer, 0u, 0.2f, 0.2f, 0.2f, -0.5f, -1f, 0.5f);
+            WriteLightFrame(writer, 30u, 0.8f, 0.8f, 0.8f, 0f, -1f, 0f);
+            writer.Write(0u); // self-shadow frames
+            writer.Write(0u); // property frames
+            return stream.ToArray();
+        }
+
         private static byte[] BuildLightOnlyVmdBytes()
         {
             using var stream = new MemoryStream();
@@ -685,6 +714,28 @@ namespace Mmd.Tests
             writer.Write(0u); // self-shadow frames
             writer.Write(0u); // property frames
             return stream.ToArray();
+        }
+
+        private static void WriteCameraFrame(
+            BinaryWriter writer,
+            uint frame,
+            float distance,
+            float posX, float posY, float posZ,
+            float rotX, float rotY, float rotZ,
+            uint viewAngle,
+            byte perspective)
+        {
+            writer.Write(frame);
+            writer.Write(distance);
+            writer.Write(posX);
+            writer.Write(posY);
+            writer.Write(posZ);
+            writer.Write(rotX);
+            writer.Write(rotY);
+            writer.Write(rotZ);
+            writer.Write(new byte[24]); // interpolation
+            writer.Write(viewAngle);
+            writer.Write(perspective);
         }
 
         private static void WriteLightFrame(
@@ -704,6 +755,40 @@ namespace Mmd.Tests
             writer.Write(x);
             writer.Write(y);
             writer.Write(z);
+        }
+
+        private static MmdCameraState SampleNativeCamera(byte[] vmdBytes, float frame)
+        {
+            if (!NativeVmdCameraTrackSampler.TryCreate(vmdBytes, out var sampler))
+            {
+                Assert.Fail("Failed to create camera track sampler");
+            }
+
+            using (sampler)
+            {
+                Assert.That(
+                    sampler!.TrySample(frame, out MmdCameraState state),
+                    Is.True,
+                    $"Native camera sample failed at frame {frame}");
+                return state;
+            }
+        }
+
+        private static MmdLightState SampleNativeLight(byte[] vmdBytes, float frame)
+        {
+            if (!NativeVmdLightTrackSampler.TryCreate(vmdBytes, out var sampler))
+            {
+                Assert.Fail("Failed to create light track sampler");
+            }
+
+            using (sampler)
+            {
+                Assert.That(
+                    sampler!.TrySample(frame, out MmdLightState state),
+                    Is.True,
+                    $"Native light sample failed at frame {frame}");
+                return state;
+            }
         }
 
         private static void WriteFixedAscii(BinaryWriter writer, string text, int byteLength)

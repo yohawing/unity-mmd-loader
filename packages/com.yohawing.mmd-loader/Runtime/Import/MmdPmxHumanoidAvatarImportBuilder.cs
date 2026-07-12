@@ -149,6 +149,15 @@ namespace Mmd.UnityIntegration
                 ? smr.bones
                 : System.Array.Empty<Transform>();
 
+            var nativeTransformByHumanBone = new Dictionary<HumanBodyBones, Transform>();
+            foreach (MmdHumanoidBoneMappingMatch match in proxyRig.Matches)
+            {
+                if (match.MmdBoneIndex >= 0 && match.MmdBoneIndex < nativeBones.Length)
+                {
+                    nativeTransformByHumanBone[match.HumanBone] = nativeBones[match.MmdBoneIndex];
+                }
+            }
+
             var bindings = new List<MmdHumanoidRetargetBinding>(proxyRig.Matches.Count);
             foreach (MmdHumanoidBoneMappingMatch match in proxyRig.Matches)
             {
@@ -175,16 +184,67 @@ namespace Mmd.UnityIntegration
                     continue;
                 }
 
+                Quaternion nativeBindLocalRotation = nativeTransform != null
+                    ? ResolveNativeHumanoidBindLocalRotation(
+                        match.HumanBone,
+                        nativeTransform,
+                        nativeTransformByHumanBone)
+                    : Quaternion.identity;
                 bindings.Add(new MmdHumanoidRetargetBinding(
                     match.HumanBone,
                     match.MmdBoneIndex,
                     proxyTransform,
                     nativeTransform,
                     proxyTransform != null ? proxyTransform.localRotation : Quaternion.identity,
-                    nativeTransform != null ? nativeTransform.localRotation : Quaternion.identity));
+                    nativeBindLocalRotation));
             }
 
             return bindings;
+        }
+
+        private static Quaternion ResolveNativeHumanoidBindLocalRotation(
+            HumanBodyBones humanBone,
+            Transform nativeTransform,
+            IReadOnlyDictionary<HumanBodyBones, Transform> nativeTransformByHumanBone)
+        {
+            HumanBodyBones childBone;
+            Vector3 targetWorldDirection;
+            switch (humanBone)
+            {
+                case HumanBodyBones.LeftUpperArm:
+                    childBone = HumanBodyBones.LeftLowerArm;
+                    targetWorldDirection = Vector3.left;
+                    break;
+                case HumanBodyBones.RightUpperArm:
+                    childBone = HumanBodyBones.RightLowerArm;
+                    targetWorldDirection = Vector3.right;
+                    break;
+                default:
+                    return nativeTransform.localRotation;
+            }
+
+            if (!nativeTransformByHumanBone.TryGetValue(childBone, out Transform childTransform))
+            {
+                return nativeTransform.localRotation;
+            }
+
+            Vector3 currentDirection = childTransform.position - nativeTransform.position;
+            if (!float.IsFinite(currentDirection.x) ||
+                !float.IsFinite(currentDirection.y) ||
+                !float.IsFinite(currentDirection.z) ||
+                currentDirection.sqrMagnitude < 1e-8f)
+            {
+                return nativeTransform.localRotation;
+            }
+
+            Quaternion deltaWorld = Quaternion.FromToRotation(
+                currentDirection.normalized,
+                targetWorldDirection);
+            Quaternion targetWorldRotation = deltaWorld * nativeTransform.rotation;
+            Transform? parent = nativeTransform.parent;
+            return parent != null
+                ? Quaternion.Inverse(parent.rotation) * targetWorldRotation
+                : targetWorldRotation;
         }
 
         internal static IReadOnlyList<MmdHumanoidAppendTransformBinding> BuildRuntimeAppendTransformBindings(

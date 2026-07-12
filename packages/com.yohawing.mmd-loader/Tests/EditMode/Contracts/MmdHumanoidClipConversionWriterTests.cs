@@ -120,7 +120,7 @@ namespace Mmd.Tests
                 Assert.That(AssetDatabase.Contains(result.Clip), Is.True);
                 Assert.That(AssetDatabase.GetAssetPath(result.Clip), Does.StartWith(tempFolder));
                 Assert.That(AssetDatabase.FindAssets("t:AnimationClip").Length, Is.EqualTo(clipCountBefore + 1));
-                AssertClipHasRotationBindings(result.Clip!);
+                AssertHumanoidClipHasMuscleBindings(result.Clip!);
             }
             finally
             {
@@ -252,7 +252,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void CreateInMemoryClipWritesRotationCurvesWithoutSavingAnimationClipAsset()
+        public void CreateInMemoryClipWritesHumanoidMuscleCurvesWithoutSavingAnimationClipAsset()
         {
             MmdPmxAsset pmxAsset = null!;
             MmdVmdAsset? vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(FixtureVmdPath);
@@ -285,19 +285,9 @@ namespace Mmd.Tests
                 Assert.That(result.Diagnostics, Is.Not.Empty);
 
                 EditorCurveBinding[] bindings = AnimationUtility.GetCurveBindings(result.Clip);
-                bool hasHipsRotationX = bindings.Any(
-                    b => b.propertyName == "m_LocalRotation.x" && IsProxyPathForHipsOrAtLeastOneBone(b.path));
-                bool hasHipsRotationY = bindings.Any(
-                    b => b.propertyName == "m_LocalRotation.y" && IsProxyPathForHipsOrAtLeastOneBone(b.path));
-                bool hasHipsRotationZ = bindings.Any(
-                    b => b.propertyName == "m_LocalRotation.z" && IsProxyPathForHipsOrAtLeastOneBone(b.path));
-                bool hasHipsRotationW = bindings.Any(
-                    b => b.propertyName == "m_LocalRotation.w" && IsProxyPathForHipsOrAtLeastOneBone(b.path));
-
-                Assert.That(hasHipsRotationX, Is.True);
-                Assert.That(hasHipsRotationY, Is.True);
-                Assert.That(hasHipsRotationZ, Is.True);
-                Assert.That(hasHipsRotationW, Is.True);
+                Assert.That(result.Clip.humanMotion, Is.True);
+                Assert.That(bindings.Any(b => b.type == typeof(Animator) && string.IsNullOrEmpty(b.path)), Is.True);
+                Assert.That(bindings.Any(b => b.propertyName == "m_LocalRotation.x"), Is.False);
             }
             finally
             {
@@ -394,10 +384,8 @@ namespace Mmd.Tests
                 Assert.That(result.Clip, Is.Not.Null);
 
                 EditorCurveBinding binding = AnimationUtility.GetCurveBindings(result.Clip!)
-                    .FirstOrDefault(
-                        b => b.propertyName == "m_LocalRotation.x"
-                             && IsProxyPathForHipsOrAtLeastOneBone(b.path));
-                Assert.That(binding.propertyName, Is.EqualTo("m_LocalRotation.x"));
+                    .FirstOrDefault(b => b.type == typeof(Animator) && string.IsNullOrEmpty(b.path));
+                Assert.That(binding.propertyName, Is.Not.Empty);
 
                 AnimationCurve curve = AnimationUtility.GetEditorCurve(result.Clip!, binding);
                 Assert.That(curve, Is.Not.Null);
@@ -492,32 +480,12 @@ namespace Mmd.Tests
             ownedObjects.Add(mesh);
         }
 
-        private static bool IsProxyPathForHipsOrAtLeastOneBone(string path)
-        {
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return false;
-            }
-
-            return path == "Hips" || path.EndsWith("/Hips", StringComparison.Ordinal);
-        }
-
-        private static void AssertClipHasRotationBindings(AnimationClip clip)
+        private static void AssertHumanoidClipHasMuscleBindings(AnimationClip clip)
         {
             EditorCurveBinding[] bindings = AnimationUtility.GetCurveBindings(clip);
-            bool hasRotationX = bindings.Any(
-                b => b.propertyName == "m_LocalRotation.x" && IsProxyPathForHipsOrAtLeastOneBone(b.path));
-            bool hasRotationY = bindings.Any(
-                b => b.propertyName == "m_LocalRotation.y" && IsProxyPathForHipsOrAtLeastOneBone(b.path));
-            bool hasRotationZ = bindings.Any(
-                b => b.propertyName == "m_LocalRotation.z" && IsProxyPathForHipsOrAtLeastOneBone(b.path));
-            bool hasRotationW = bindings.Any(
-                b => b.propertyName == "m_LocalRotation.w" && IsProxyPathForHipsOrAtLeastOneBone(b.path));
-
-            Assert.That(hasRotationX, Is.True);
-            Assert.That(hasRotationY, Is.True);
-            Assert.That(hasRotationZ, Is.True);
-            Assert.That(hasRotationW, Is.True);
+            Assert.That(clip.humanMotion, Is.True);
+            Assert.That(bindings.Any(b => b.type == typeof(Animator) && string.IsNullOrEmpty(b.path)), Is.True);
+            Assert.That(bindings.Any(b => b.propertyName == "m_LocalRotation.x"), Is.False);
         }
 
         private static void CreateFolderIfMissing(string folderPath)

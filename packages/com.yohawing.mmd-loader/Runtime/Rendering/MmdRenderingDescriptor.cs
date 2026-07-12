@@ -29,6 +29,11 @@ namespace Mmd.Rendering
     {
         public static MmdRenderingDescriptor Build(MmdModelDefinition model)
         {
+            return Build(model, MmdMaterialPreset.MmdToon);
+        }
+
+        public static MmdRenderingDescriptor Build(MmdModelDefinition model, MmdMaterialPreset preset)
+        {
             if (model == null)
             {
                 throw new ArgumentNullException(nameof(model));
@@ -44,7 +49,7 @@ namespace Mmd.Rendering
                 skinning = MmdSkinningDescriptorBuilder.Build(model).ToList(),
                 materials = materials,
                 submeshes = MmdSubmeshDescriptorBuilder.Build(materials).ToList(),
-                urpMaterialBindings = MmdUrpMaterialBindingDescriptorBuilder.Build(materials).ToList(),
+                urpMaterialBindings = MmdUrpMaterialBindingDescriptorBuilder.Build(materials, preset).ToList(),
                 vertexMorphs = MmdMorphDescriptorBuilder.BuildVertexMorphs(model).ToList(),
                 groupMorphs = MmdMorphDescriptorBuilder.BuildGroupMorphs(model).ToList(),
                 uvMorphs = MmdMorphDescriptorBuilder.BuildUvMorphs(model).ToList(),

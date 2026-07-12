@@ -3,6 +3,7 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
+using Mmd.Editor;
 using Mmd.Motion;
 using Mmd.Parser;
 using Mmd.UnityIntegration;
@@ -72,6 +73,160 @@ namespace Mmd.Tests
                 Assert.That(binding.LastSelfShadowProjectionState.Scope, Is.EqualTo(MmdSelfShadowProjectionScope.CharacterOnly));
                 Assert.That(binding.LastSelfShadowDiagnosticStatus, Is.EqualTo(MmdSceneSelfShadowDiagnosticStatus.Active));
                 Assert.That(binding.EvaluateSelfShadowDiagnosticStatus(), Is.EqualTo(MmdSceneSelfShadowDiagnosticStatus.Active));
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void BindingLocalSelfShadowActiveDoesNotImplyRenderPathReady()
+        {
+            MmdSelfShadowTarget.SetReceiverGateAvailableForRendering(false);
+            var bindingGo = new GameObject("binding");
+            var targetGo = new GameObject("target");
+            try
+            {
+                MmdSceneEnvironmentBinding binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
+                MmdSelfShadowTarget target = targetGo.AddComponent<MmdSelfShadowTarget>();
+                target.SceneEnvironment = binding;
+
+                Assert.That(binding.LastSelfShadowDiagnosticStatus,
+                    Is.EqualTo(MmdSceneSelfShadowDiagnosticStatus.Active));
+                Assert.That(binding.EvaluateSelfShadowDiagnosticStatus(),
+                    Is.EqualTo(MmdSceneSelfShadowDiagnosticStatus.Active));
+                Assert.That(target.EvaluateSelfShadowDiagnosticStatus(),
+                    Is.EqualTo(MmdSceneSelfShadowDiagnosticStatus.NoRendererFeature));
+            }
+            finally
+            {
+                MmdSelfShadowTarget.DisableAllReceiverGates();
+                Object.DestroyImmediate(targetGo);
+                Object.DestroyImmediate(bindingGo);
+            }
+        }
+
+        [Test]
+        public void SelfShadowRendererSetupWarningIgnoresNullBinding()
+        {
+            string warning = MmdAssetInspectorUtility.GetSelfShadowRendererSetupWarning(
+                null,
+                MmdSelfShadowRendererSetupReadiness.NoUrpAsset);
+
+            Assert.That(warning, Is.Empty);
+        }
+
+        [Test]
+        public void SelfShadowRendererSetupWarningIgnoresDisabledBinding()
+        {
+            var go = new GameObject("binding");
+            try
+            {
+                MmdSceneEnvironmentBinding binding = go.AddComponent<MmdSceneEnvironmentBinding>();
+                binding.SelfShadowEnabled = false;
+
+                string warning = MmdAssetInspectorUtility.GetSelfShadowRendererSetupWarning(
+                    binding,
+                    MmdSelfShadowRendererSetupReadiness.NoUrpAsset);
+
+                Assert.That(warning, Is.Empty);
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void SelfShadowRendererSetupWarningReportsMissingUrpAssetWhenEnabled()
+        {
+            var go = new GameObject("binding");
+            try
+            {
+                MmdSceneEnvironmentBinding binding = go.AddComponent<MmdSceneEnvironmentBinding>();
+                binding.SelfShadowEnabled = true;
+
+                string warning = MmdAssetInspectorUtility.GetSelfShadowRendererSetupWarning(
+                    binding,
+                    MmdSelfShadowRendererSetupReadiness.NoUrpAsset);
+
+                Assert.That(warning, Does.Contain("SelfShadow is enabled"));
+                Assert.That(warning, Does.Contain("URP Asset"));
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void SelfShadowRendererSetupWarningReportsMissingRendererFeatureWhenEnabled()
+        {
+            var go = new GameObject("binding");
+            try
+            {
+                MmdSceneEnvironmentBinding binding = go.AddComponent<MmdSceneEnvironmentBinding>();
+                binding.SelfShadowEnabled = true;
+                var readiness = new MmdSelfShadowRendererSetupReadiness(
+                    hasUrpAsset: true,
+                    rendererDataCount: 1,
+                    featureCount: 0,
+                    enabledFeatureCount: 0);
+
+                string warning = MmdAssetInspectorUtility.GetSelfShadowRendererSetupWarning(binding, readiness);
+
+                Assert.That(warning, Does.Contain("MmdSelfShadowRendererFeature"));
+                Assert.That(warning, Does.Contain("not configured"));
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void SelfShadowRendererSetupWarningReportsDisabledRendererFeatureWhenEnabled()
+        {
+            var go = new GameObject("binding");
+            try
+            {
+                MmdSceneEnvironmentBinding binding = go.AddComponent<MmdSceneEnvironmentBinding>();
+                binding.SelfShadowEnabled = true;
+                var readiness = new MmdSelfShadowRendererSetupReadiness(
+                    hasUrpAsset: true,
+                    rendererDataCount: 1,
+                    featureCount: 1,
+                    enabledFeatureCount: 0);
+
+                string warning = MmdAssetInspectorUtility.GetSelfShadowRendererSetupWarning(binding, readiness);
+
+                Assert.That(warning, Does.Contain("MmdSelfShadowRendererFeature"));
+                Assert.That(warning, Does.Contain("disabled"));
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void SelfShadowRendererSetupWarningIsEmptyWhenRendererFeatureEnabled()
+        {
+            var go = new GameObject("binding");
+            try
+            {
+                MmdSceneEnvironmentBinding binding = go.AddComponent<MmdSceneEnvironmentBinding>();
+                binding.SelfShadowEnabled = true;
+                var readiness = new MmdSelfShadowRendererSetupReadiness(
+                    hasUrpAsset: true,
+                    rendererDataCount: 1,
+                    featureCount: 1,
+                    enabledFeatureCount: 1);
+
+                string warning = MmdAssetInspectorUtility.GetSelfShadowRendererSetupWarning(binding, readiness);
+
+                Assert.That(warning, Is.Empty);
             }
             finally
             {

@@ -37,6 +37,9 @@ packages/**/Runtime/Plugins/**/*.exp.meta
 **/__pycache__/
 *.py[cod]
 
+# Terminal session logs
+terminals/
+
 # AI development logs and instruction files
 AGENTS.md
 CLAUDE.md
@@ -56,3 +59,6 @@ docs/*
 !docs/HOW_TO_USE.md
 !docs/assets/
 !docs/assets/**
+
+# Deferred local-only Runtime Verification workspace
+/packages/com.yohawing.mmd-loader/Samples~/RuntimeVerification/

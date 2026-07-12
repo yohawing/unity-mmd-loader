@@ -2,6 +2,32 @@
 
 All notable changes to `com.yohawing.mmd-loader` are documented here.
 
+## [0.1.3] - 2026-07-11
+
+### Added
+
+- Release Gate v2 with golden-path coverage, local-asset preflight, and packaged-native parity reporting.
+- URP Lit material conversion with per-material PBR overrides, MME `.fx` / `.emd` mapping, and conventional normal/roughness/metallic/AO texture discovery.
+- Basic Playback Timeline smoke coverage and explicit Humanoid clip-bake readiness diagnostics.
+
+### Changed
+
+- Native runtime package binary and submodule are aligned with `mmd-anim` remote `main` commit `d82a022` while retaining runtime ABI version 2.
+- VMD Timeline overlaps use deterministic single-winner arbitration; weighted pose blending is not advertised.
+- Runtime, Timeline, editable-rig, morph, and Live-physics tests now use native-backed fixtures across the release path.
+- SelfShadow setup diagnostics and troubleshooting now distinguish static RendererFeature readiness from runtime binding/pass state.
+
+### Fixed
+
+- DX12 SelfShadow receiver toggling no longer corrupts instancing-buffer rendering.
+- PlayMode fixtures provide the native PMX/VMD source bytes required by current runtime evaluation.
+
+### Known Limitations
+
+- macOS and Linux native binaries are not distributed in the package.
+- Timeline random access keeps physics off; Live physics is limited to Play Mode forward playback.
+- Raw VMD Timeline clips use deterministic hard-cut selection rather than weighted blending.
+
 ## [0.1.2] - 2026-07-04
 
 ### Added

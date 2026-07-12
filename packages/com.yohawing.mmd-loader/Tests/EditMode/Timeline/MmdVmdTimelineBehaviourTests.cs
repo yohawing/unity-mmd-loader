@@ -1,9 +1,7 @@
 #nullable enable
 
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.Playables;
@@ -18,49 +16,123 @@ namespace Mmd.Tests
 {
     public sealed class MmdVmdTimelineBehaviourTests
     {
+        private const string PlaybackPmxId = "test_1bone_cube.pmx";
+        private const string PlaybackVmdId = "test_1bone_cube_motion.vmd";
+
+        [Test]
+        public void TimelineClipDoesNotAdvertiseBlendCaps()
+        {
+            var clip = new MmdVmdTimelineClip();
+
+            Assert.That(clip.clipCaps, Is.EqualTo(ClipCaps.None));
+        }
+
+        [Test]
+        public void TrackCreatesSingleWinnerMixerPlayable()
+        {
+            PlayableGraph graph = PlayableGraph.Create("mmd-vmd-track-mixer-test");
+            MmdVmdTimelineTrack? track = null;
+            try
+            {
+                track = ScriptableObject.CreateInstance<MmdVmdTimelineTrack>();
+                Playable mixerPlayable = track.CreateTrackMixer(graph, go: null!, inputCount: 2);
+
+                Assert.That(mixerPlayable.IsValid(), Is.True);
+                Assert.That(mixerPlayable.GetPlayableType(), Is.EqualTo(typeof(MmdVmdTimelineMixerBehaviour)));
+                Assert.That(mixerPlayable.GetInputCount(), Is.EqualTo(2));
+            }
+            finally
+            {
+                if (graph.IsValid())
+                {
+                    graph.Destroy();
+                }
+
+                if (track != null)
+                {
+                    Object.DestroyImmediate(track);
+                }
+            }
+        }
+
+        [Test]
+        public void ProcessFrameWithZeroEffectiveWeightDoesNotApplyPose()
+        {
+            MmdUnityPlaybackBinding? binding = null;
+            int processFrameCallbackCount = 0;
+            void OnProcessFrame(double _)
+            {
+                processFrameCallbackCount++;
+            }
+
+            try
+            {
+                binding = CreatePlaybackBinding();
+                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.Configure(binding, 30.0f);
+                var behaviour = new MmdVmdTimelineBehaviour
+                {
+                    FrameRate = 30.0f
+                };
+                MmdPlaybackSnapshot frameNine = behaviour.EvaluateAtLocalTime(controller, 9.25 / 30.0);
+                Quaternion beforeRotation = binding.Instance.BoneTransforms[0].localRotation;
+
+                MmdVmdTimelineBehaviour.ProcessFrameEvaluated += OnProcessFrame;
+                behaviour.ProcessFrame(default, default, controller);
+
+                Assert.That(frameNine.frame.frame, Is.EqualTo(9));
+                Assert.That(controller.CurrentFrame, Is.EqualTo(9));
+                Assert.That(controller.LastSnapshot, Is.SameAs(frameNine));
+                Assert.That(Quaternion.Angle(binding.Instance.BoneTransforms[0].localRotation, beforeRotation), Is.LessThan(0.001f));
+                Assert.That(processFrameCallbackCount, Is.EqualTo(0));
+            }
+            finally
+            {
+                MmdVmdTimelineBehaviour.ProcessFrameEvaluated -= OnProcessFrame;
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
+            }
+        }
+
         [Test]
         public void TimelineBehaviourUsesSharedTimePolicyForRepeatAndReverseSeek()
         {
             MmdUnityPlaybackBinding? binding = null;
             try
             {
-                binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    CreateMinimalTriangleModel(),
-                    CreateRootTranslationMotion(),
-                    "timeline-synthetic.pmx",
-                    "timeline-synthetic.vmd");
+                binding = CreatePlaybackBinding();
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 24.0f);
                 var behaviour = new MmdVmdTimelineBehaviour
                 {
-                    ModelSourceId = "timeline-synthetic.pmx",
-                    MotionSourceId = "timeline-synthetic.vmd",
+                    ModelSourceId = PlaybackPmxId,
+                    MotionSourceId = PlaybackVmdId,
                     FrameRate = 30.0f,
                     LoopPolicy = MmdVmdTimelineLoopPolicy.None
                 };
 
-                MmdPlaybackSnapshot frameTen = behaviour.EvaluateAtLocalTime(controller, 10.25 / 30.0);
-                Vector3 frameTenPosition = binding.Instance.BoneTransforms[0].localPosition;
-                MmdPlaybackSnapshot repeatedFrameTen = behaviour.EvaluateAtLocalTime(controller, 10.25 / 30.0);
-                Vector3 repeatedFrameTenPosition = binding.Instance.BoneTransforms[0].localPosition;
-                MmdPlaybackSnapshot frameThree = behaviour.EvaluateAtLocalTime(controller, 3.0 / 30.0);
+                MmdPlaybackSnapshot frameNine = behaviour.EvaluateAtLocalTime(controller, 9.25 / 30.0);
+                Quaternion frameNineRotation = binding.Instance.BoneTransforms[0].localRotation;
+                MmdPlaybackSnapshot repeatedFrameNine = behaviour.EvaluateAtLocalTime(controller, 9.25 / 30.0);
+                Quaternion repeatedFrameNineRotation = binding.Instance.BoneTransforms[0].localRotation;
+                MmdPlaybackSnapshot frameZero = behaviour.EvaluateAtLocalTime(controller, 0.0);
 
                 Assert.That(behaviour.PhysicsOffByDefault, Is.True);
-                Assert.That(behaviour.ModelSourceId, Is.EqualTo("timeline-synthetic.pmx"));
-                Assert.That(behaviour.MotionSourceId, Is.EqualTo("timeline-synthetic.vmd"));
+                Assert.That(behaviour.ModelSourceId, Is.EqualTo(PlaybackPmxId));
+                Assert.That(behaviour.MotionSourceId, Is.EqualTo(PlaybackVmdId));
                 Assert.That(behaviour.LoopPolicy, Is.EqualTo(MmdVmdTimelineLoopPolicy.None));
-                Assert.That(frameTen.frame.frame, Is.EqualTo(10));
-                Assert.That(repeatedFrameTen.frame.frame, Is.EqualTo(10));
-                Assert.That(frameThree.frame.frame, Is.EqualTo(3));
-                Assert.That(repeatedFrameTenPosition, Is.EqualTo(frameTenPosition));
-                Assert.That(controller.CurrentFrame, Is.EqualTo(3));
+                Assert.That(frameNine.frame.frame, Is.EqualTo(9));
+                Assert.That(repeatedFrameNine.frame.frame, Is.EqualTo(9));
+                Assert.That(frameZero.frame.frame, Is.EqualTo(0));
+                Assert.That(Quaternion.Angle(repeatedFrameNineRotation, frameNineRotation), Is.LessThan(0.001f));
+                Assert.That(controller.CurrentFrame, Is.EqualTo(0));
                 Assert.That(controller.LastSnapshot, Is.Not.Null);
-                Assert.That(controller.LastSnapshot!.frame.time, Is.EqualTo(3.0f / 30.0f).Within(0.00001f));
-                Assert.That(binding.Instance.BoneTransforms[0].localPosition.x, Is.EqualTo(-0.6f).Within(0.00001f));
+                Assert.That(controller.LastSnapshot!.frame.time, Is.EqualTo(0.0f).Within(0.00001f));
+                Assert.That(Quaternion.Angle(frameNineRotation, ExpectedFrameNineUnityRotation(binding)), Is.LessThan(0.001f));
+                Assert.That(Quaternion.Angle(binding.Instance.BoneTransforms[0].localRotation, binding.Instance.BindLocalRotations[0]), Is.LessThan(0.001f));
             }
             finally
             {
-                DestroyInstance(binding?.Instance);
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
             }
         }
 
@@ -70,11 +142,7 @@ namespace Mmd.Tests
             MmdUnityPlaybackBinding? binding = null;
             try
             {
-                binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    CreateMinimalTriangleModel(),
-                    CreateRootTranslationMotion(),
-                    "timeline-live-off-synthetic.pmx",
-                    "timeline-live-off-synthetic.vmd");
+                binding = CreatePlaybackBinding();
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f);
                 controller.SetPhysicsMode(MmdPhysicsMode.Live);
@@ -93,7 +161,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(binding?.Instance);
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
             }
         }
 
@@ -105,11 +173,7 @@ namespace Mmd.Tests
             MmdUnityPlaybackBinding? binding = null;
             try
             {
-                binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    CreateMinimalTriangleModel(),
-                    CreateRootTranslationMotion(),
-                    "timeline-serialized-live.pmx",
-                    "timeline-serialized-live.vmd");
+                binding = CreatePlaybackBinding();
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f);
                 // Do NOT call SetPhysicsMode(Live) explicitly — rely on the serialized default (Live).
@@ -129,7 +193,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(binding?.Instance);
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
             }
         }
 
@@ -141,11 +205,7 @@ namespace Mmd.Tests
             MmdUnityPlaybackBinding? binding = null;
             try
             {
-                binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    CreateMinimalTriangleModel(),
-                    CreateRootTranslationMotion(),
-                    "timeline-repeat-live.pmx",
-                    "timeline-repeat-live.vmd");
+                binding = CreatePlaybackBinding();
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f);
                 controller.SetPhysicsMode(MmdPhysicsMode.Live);
@@ -178,7 +238,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(binding?.Instance);
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
             }
         }
 
@@ -243,7 +303,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
             }
         }
 
@@ -342,7 +402,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
                 Object.DestroyImmediate(vmdAsset);
             }
         }
@@ -391,7 +451,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
                 Object.DestroyImmediate(pmxAsset);
                 Object.DestroyImmediate(vmdAsset);
             }
@@ -435,7 +495,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
                 Object.DestroyImmediate(pmxAsset);
                 Object.DestroyImmediate(vmdAsset);
             }
@@ -481,11 +541,7 @@ namespace Mmd.Tests
 
             try
             {
-                binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    CreateMinimalTriangleModel(),
-                    CreateRootTranslationMotion(),
-                    "timeline-director-synthetic.pmx",
-                    "timeline-director-synthetic.vmd");
+                binding = CreatePlaybackBinding();
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f);
 
@@ -496,7 +552,7 @@ namespace Mmd.Tests
                 clip.duration = 1.0;
                 var mmdClip = (MmdVmdTimelineClip)clip.asset;
                 mmdClip.FrameRate = 30.0f;
-                mmdClip.MotionSourceId = "timeline-director-synthetic.vmd";
+                mmdClip.MotionSourceId = PlaybackVmdId;
 
                 directorObject = new GameObject("timeline-director");
                 PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
@@ -504,18 +560,18 @@ namespace Mmd.Tests
                 director.SetGenericBinding(track, controller);
 
                 MmdVmdTimelineBehaviour.ProcessFrameEvaluated += OnProcessFrame;
-                director.time = 10.25 / 30.0;
+                director.time = 9.25 / 30.0;
                 director.Evaluate();
-                Vector3 frameTenPosition = binding.Instance.BoneTransforms[0].localPosition;
+                Quaternion frameNineRotation = binding.Instance.BoneTransforms[0].localRotation;
 
-                director.time = 3.0 / 30.0;
+                director.time = 0.0;
                 director.Evaluate();
 
-                Assert.That(controller.CurrentFrame, Is.EqualTo(3));
-                Assert.That(frameTenPosition.x, Is.EqualTo(-2.0f).Within(0.00001f));
-                Assert.That(binding.Instance.BoneTransforms[0].localPosition.x, Is.EqualTo(-0.6f).Within(0.00001f));
+                Assert.That(controller.CurrentFrame, Is.EqualTo(0));
+                Assert.That(Quaternion.Angle(frameNineRotation, ExpectedFrameNineUnityRotation(binding)), Is.LessThan(0.001f));
+                Assert.That(Quaternion.Angle(binding.Instance.BoneTransforms[0].localRotation, binding.Instance.BindLocalRotations[0]), Is.LessThan(0.001f));
                 Assert.That(controller.LastSnapshot, Is.Not.Null);
-                Assert.That(controller.LastSnapshot!.frame.time, Is.EqualTo(3.0f / 30.0f).Within(0.00001f));
+                Assert.That(controller.LastSnapshot!.frame.time, Is.EqualTo(0.0f).Within(0.00001f));
                 Assert.That(processFrameCallbackCount, Is.EqualTo(2));
                 // Outside Play Mode (Application.isPlaying == false), a real PlayableDirector evaluation
                 // routes through animation-only ApplyTimelineTime and must NOT step Live physics.
@@ -535,7 +591,7 @@ namespace Mmd.Tests
                     Object.DestroyImmediate(timelineAsset);
                 }
 
-                DestroyInstance(binding?.Instance);
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
             }
         }
 
@@ -547,11 +603,7 @@ namespace Mmd.Tests
             TimelineAsset? timelineAsset = null;
             try
             {
-                binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    CreateMinimalTriangleModel(),
-                    CreateRootTranslationMotion(),
-                    "timeline-editable-rig-synthetic.pmx",
-                    "timeline-editable-rig-synthetic.vmd");
+                binding = CreatePlaybackBinding();
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f);
                 var layer = binding.Instance.Root.AddComponent<MmdEditableRigLayer>();
@@ -569,7 +621,7 @@ namespace Mmd.Tests
                 clip.duration = 1.0;
                 var mmdClip = (MmdVmdTimelineClip)clip.asset;
                 mmdClip.FrameRate = 30.0f;
-                mmdClip.MotionSourceId = "timeline-editable-rig-synthetic.vmd";
+                mmdClip.MotionSourceId = PlaybackVmdId;
 
                 directorObject = new GameObject("timeline-editable-rig-director");
                 PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
@@ -577,9 +629,10 @@ namespace Mmd.Tests
                 director.SetGenericBinding(track, controller);
 
                 layer.EditableRigEnabled = false;
-                director.time = 10.25 / 30.0;
+                director.time = 9.25 / 30.0;
                 director.Evaluate();
-                Assert.That(binding.Instance.BoneTransforms[0].localPosition, Is.EqualTo(new Vector3(-2.0f, 0.0f, 0.0f)));
+                Assert.That(binding.Instance.BoneTransforms[0].localPosition, Is.EqualTo(Vector3.zero));
+                Assert.That(Quaternion.Angle(binding.Instance.BoneTransforms[0].localRotation, ExpectedFrameNineUnityRotation(binding)), Is.LessThan(0.001f));
                 Assert.That(controller.LastEditableRigDiagnostics, Is.Not.Null);
                 Assert.That(controller.LastEditableRigDiagnostics!.transformState, Is.EqualTo("native-only"));
 
@@ -587,7 +640,7 @@ namespace Mmd.Tests
                 layer.LayerWeight = 1.0f;
                 director.Evaluate();
                 Vector3 enabledPosition = binding.Instance.BoneTransforms[0].localPosition;
-                Assert.That(enabledPosition, Is.EqualTo(new Vector3(-2.0f, 0.5f, 0.0f)));
+                Assert.That(enabledPosition, Is.EqualTo(new Vector3(0.0f, 0.5f, 0.0f)));
                 Assert.That(controller.LastEditableRigDiagnostics, Is.Not.Null);
                 Assert.That(controller.LastEditableRigDiagnostics!.executionStage, Is.EqualTo("post-native-apply-time"));
                 Assert.That(controller.LastEditableRigDiagnostics.transformState, Is.EqualTo("post-editable-rig"));
@@ -598,7 +651,7 @@ namespace Mmd.Tests
 
                 layer.LayerWeight = 0.0f;
                 director.Evaluate();
-                Assert.That(binding.Instance.BoneTransforms[0].localPosition, Is.EqualTo(new Vector3(-2.0f, 0.0f, 0.0f)));
+                Assert.That(binding.Instance.BoneTransforms[0].localPosition, Is.EqualTo(Vector3.zero));
                 Assert.That(controller.LastEditableRigDiagnostics, Is.Not.Null);
                 Assert.That(controller.LastEditableRigDiagnostics!.transformState, Is.EqualTo("native-only"));
                 Assert.That(controller.LastEditableRigDiagnostics.noOpReason, Is.EqualTo("zero-weight"));
@@ -627,7 +680,264 @@ namespace Mmd.Tests
                     Object.DestroyImmediate(timelineAsset);
                 }
 
-                DestroyInstance(binding?.Instance);
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
+            }
+        }
+
+        [Test]
+        public void OverlappingTrackClipsApplySingleWinnerOncePerEvaluate()
+        {
+            // Equal positive weights (ClipCaps.None overlap) resolve to the later input index.
+            // Only the winner applies, once — no last-writer double evaluation.
+            MmdUnityPlaybackBinding? binding = null;
+            GameObject? directorObject = null;
+            TimelineAsset? timelineAsset = null;
+            int processFrameCallbackCount = 0;
+            void OnProcessFrame(double _)
+            {
+                processFrameCallbackCount++;
+            }
+
+            try
+            {
+                binding = CreatePlaybackBinding();
+                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.Configure(binding, 30.0f);
+
+                timelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
+                MmdVmdTimelineTrack track = timelineAsset.CreateTrack<MmdVmdTimelineTrack>(null, "MMD VMD");
+
+                TimelineClip earlyClip = track.CreateClip<MmdVmdTimelineClip>();
+                earlyClip.start = 0.0;
+                earlyClip.duration = 1.0;
+                var earlyAsset = (MmdVmdTimelineClip)earlyClip.asset;
+                earlyAsset.FrameRate = 30.0f;
+                earlyAsset.MotionSourceId = PlaybackVmdId;
+                earlyAsset.StartOffsetSeconds = 0.0f;
+
+                TimelineClip laterClip = track.CreateClip<MmdVmdTimelineClip>();
+                laterClip.start = 0.0;
+                laterClip.duration = 1.0;
+                var laterAsset = (MmdVmdTimelineClip)laterClip.asset;
+                laterAsset.FrameRate = 30.0f;
+                laterAsset.MotionSourceId = PlaybackVmdId;
+                // Later input wins on equal weight: apply frame 9 at director.time 0.
+                laterAsset.StartOffsetSeconds = 9.25f / 30.0f;
+
+                directorObject = new GameObject("timeline-single-winner-director");
+                PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
+                director.playableAsset = timelineAsset;
+                director.SetGenericBinding(track, controller);
+
+                MmdVmdTimelineBehaviour.ProcessFrameEvaluated += OnProcessFrame;
+                director.time = 0.0;
+                director.Evaluate();
+
+                Assert.That(processFrameCallbackCount, Is.EqualTo(1),
+                    "Track mixer must evaluate the controller once per frame, not once per overlapping clip");
+                Assert.That(controller.CurrentFrame, Is.EqualTo(9),
+                    "Equal weights resolve to later input index (StartOffset frame 9)");
+                Assert.That(
+                    Quaternion.Angle(binding.Instance.BoneTransforms[0].localRotation, ExpectedFrameNineUnityRotation(binding)),
+                    Is.LessThan(0.001f));
+            }
+            finally
+            {
+                MmdVmdTimelineBehaviour.ProcessFrameEvaluated -= OnProcessFrame;
+                if (directorObject != null)
+                {
+                    Object.DestroyImmediate(directorObject);
+                }
+
+                if (timelineAsset != null)
+                {
+                    Object.DestroyImmediate(timelineAsset);
+                }
+
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
+            }
+        }
+
+        [Test]
+        public void MixerSelectsHighestPositiveWeightInputWithoutScalingPose()
+        {
+            MmdUnityPlaybackBinding? binding = null;
+            PlayableGraph graph = default;
+            try
+            {
+                binding = CreatePlaybackBinding();
+                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.Configure(binding, 30.0f);
+
+                graph = PlayableGraph.Create("mmd-vmd-weight-winner-test");
+                ScriptPlayable<MmdVmdTimelineMixerBehaviour> mixer =
+                    ScriptPlayable<MmdVmdTimelineMixerBehaviour>.Create(graph, 2);
+                ScriptPlayable<MmdVmdTimelineBehaviour> lowWeight =
+                    ScriptPlayable<MmdVmdTimelineBehaviour>.Create(graph);
+                ScriptPlayable<MmdVmdTimelineBehaviour> highWeight =
+                    ScriptPlayable<MmdVmdTimelineBehaviour>.Create(graph);
+
+                MmdVmdTimelineBehaviour lowBehaviour = lowWeight.GetBehaviour();
+                lowBehaviour.FrameRate = 30.0f;
+                lowBehaviour.StartOffsetSeconds = 9.25f / 30.0f;
+                lowWeight.SetTime(0.0);
+
+                MmdVmdTimelineBehaviour highBehaviour = highWeight.GetBehaviour();
+                highBehaviour.FrameRate = 30.0f;
+                highBehaviour.StartOffsetSeconds = 0.0f;
+                highWeight.SetTime(0.0);
+
+                graph.Connect(lowWeight, 0, mixer, 0);
+                graph.Connect(highWeight, 0, mixer, 1);
+                mixer.SetInputWeight(0, 0.25f);
+                mixer.SetInputWeight(1, 0.75f);
+
+                MmdVmdTimelineMixerBehaviour mixerBehaviour = mixer.GetBehaviour();
+                mixerBehaviour.PrepareFrame(mixer, default);
+                mixerBehaviour.ProcessFrame(mixer, default, controller);
+
+                // Highest weight is input 1 (frame 0), full pose — not weight-scaled.
+                Assert.That(controller.CurrentFrame, Is.EqualTo(0));
+                Assert.That(
+                    Quaternion.Angle(binding.Instance.BoneTransforms[0].localRotation, binding.Instance.BindLocalRotations[0]),
+                    Is.LessThan(0.001f));
+            }
+            finally
+            {
+                if (graph.IsValid())
+                {
+                    graph.Destroy();
+                }
+
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
+            }
+        }
+
+        [Test]
+        public void MixerIgnoresZeroWeightInputsAndAllZeroAppliesNoPose()
+        {
+            MmdUnityPlaybackBinding? binding = null;
+            PlayableGraph graph = default;
+            int processFrameCallbackCount = 0;
+            void OnProcessFrame(double _)
+            {
+                processFrameCallbackCount++;
+            }
+
+            try
+            {
+                binding = CreatePlaybackBinding();
+                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.Configure(binding, 30.0f);
+
+                // Seed a known pose at frame 9, then prove all-zero mixer inputs leave it untouched.
+                var seed = new MmdVmdTimelineBehaviour { FrameRate = 30.0f };
+                seed.EvaluateAtLocalTime(controller, 9.25 / 30.0);
+                Quaternion beforeRotation = binding.Instance.BoneTransforms[0].localRotation;
+                int beforeFrame = controller.CurrentFrame;
+
+                graph = PlayableGraph.Create("mmd-vmd-zero-weight-mixer-test");
+                ScriptPlayable<MmdVmdTimelineMixerBehaviour> mixer =
+                    ScriptPlayable<MmdVmdTimelineMixerBehaviour>.Create(graph, 2);
+                ScriptPlayable<MmdVmdTimelineBehaviour> first =
+                    ScriptPlayable<MmdVmdTimelineBehaviour>.Create(graph);
+                ScriptPlayable<MmdVmdTimelineBehaviour> second =
+                    ScriptPlayable<MmdVmdTimelineBehaviour>.Create(graph);
+
+                first.GetBehaviour().FrameRate = 30.0f;
+                first.GetBehaviour().StartOffsetSeconds = 0.0f;
+                first.SetTime(0.0);
+                second.GetBehaviour().FrameRate = 30.0f;
+                second.GetBehaviour().StartOffsetSeconds = 0.0f;
+                second.SetTime(0.0);
+
+                graph.Connect(first, 0, mixer, 0);
+                graph.Connect(second, 0, mixer, 1);
+                mixer.SetInputWeight(0, 0.0f);
+                mixer.SetInputWeight(1, 0.0f);
+
+                MmdVmdTimelineBehaviour.ProcessFrameEvaluated += OnProcessFrame;
+                MmdVmdTimelineMixerBehaviour mixerBehaviour = mixer.GetBehaviour();
+                mixerBehaviour.PrepareFrame(mixer, default);
+                mixerBehaviour.ProcessFrame(mixer, default, controller);
+
+                Assert.That(processFrameCallbackCount, Is.EqualTo(0));
+                Assert.That(controller.CurrentFrame, Is.EqualTo(beforeFrame));
+                Assert.That(
+                    Quaternion.Angle(binding.Instance.BoneTransforms[0].localRotation, beforeRotation),
+                    Is.LessThan(0.001f));
+
+                // Positive weight on input 0 only must select that winner; zero-weight input is ignored.
+                mixer.SetInputWeight(0, 1.0f);
+                mixer.SetInputWeight(1, 0.0f);
+                first.GetBehaviour().StartOffsetSeconds = 0.0f;
+                second.GetBehaviour().StartOffsetSeconds = 9.25f / 30.0f;
+                mixerBehaviour.ProcessFrame(mixer, default, controller);
+
+                Assert.That(processFrameCallbackCount, Is.EqualTo(1));
+                Assert.That(controller.CurrentFrame, Is.EqualTo(0));
+            }
+            finally
+            {
+                MmdVmdTimelineBehaviour.ProcessFrameEvaluated -= OnProcessFrame;
+                if (graph.IsValid())
+                {
+                    graph.Destroy();
+                }
+
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
+            }
+        }
+
+        [Test]
+        public void DirectProcessFrameStillAppliesWhenNotTrackManaged()
+        {
+            // Compatibility path: a behaviour not owned by MmdVmdTimelineTrack/mixer still applies pose
+            // from its own ProcessFrame during graph evaluation.
+            MmdUnityPlaybackBinding? binding = null;
+            PlayableGraph graph = default;
+            int processFrameCallbackCount = 0;
+            void OnProcessFrame(double _)
+            {
+                processFrameCallbackCount++;
+            }
+
+            try
+            {
+                binding = CreatePlaybackBinding();
+                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.Configure(binding, 30.0f);
+
+                graph = PlayableGraph.Create("mmd-vmd-direct-process-frame");
+                ScriptPlayable<MmdVmdTimelineBehaviour> playable =
+                    ScriptPlayable<MmdVmdTimelineBehaviour>.Create(graph);
+                MmdVmdTimelineBehaviour behaviour = playable.GetBehaviour();
+                behaviour.Controller = controller;
+                behaviour.FrameRate = 30.0f;
+                playable.SetTime(9.25 / 30.0);
+
+                ScriptPlayableOutput output = ScriptPlayableOutput.Create(graph, "mmd-vmd-direct");
+                output.SetSourcePlayable(playable);
+                output.SetUserData(controller);
+
+                MmdVmdTimelineBehaviour.ProcessFrameEvaluated += OnProcessFrame;
+                graph.Evaluate();
+
+                Assert.That(processFrameCallbackCount, Is.EqualTo(1));
+                Assert.That(controller.CurrentFrame, Is.EqualTo(9));
+                Assert.That(
+                    Quaternion.Angle(binding.Instance.BoneTransforms[0].localRotation, ExpectedFrameNineUnityRotation(binding)),
+                    Is.LessThan(0.001f));
+            }
+            finally
+            {
+                MmdVmdTimelineBehaviour.ProcessFrameEvaluated -= OnProcessFrame;
+                if (graph.IsValid())
+                {
+                    graph.Destroy();
+                }
+
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
             }
         }
 
@@ -832,92 +1142,6 @@ namespace Mmd.Tests
             }
         }
 
-        private static MmdModelDefinition CreateMinimalTriangleModel()
-        {
-            var model = new MmdModelDefinition
-            {
-                name = "minimal-timeline-triangle"
-            };
-            model.bones.Add(new MmdBoneDefinition
-            {
-                index = 0,
-                name = "root",
-                parentIndex = -1,
-                transformOrder = 0,
-                origin = new[] { 0.0f, 0.0f, 0.0f },
-                isMovable = true,
-                isRotatable = true
-            });
-            model.vertices.Add(CreateVertex(0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f));
-            model.vertices.Add(CreateVertex(1, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f));
-            model.vertices.Add(CreateVertex(2, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f));
-            model.indices.AddRange(new[] { 0, 1, 2 });
-            model.materials.Add(new MmdMaterialDefinition
-            {
-                index = 0,
-                name = "triangle-material",
-                vertexCount = 3
-            });
-            return model;
-        }
-
-        private static MmdMotionDefinition CreateRootTranslationMotion()
-        {
-            var motion = new MmdMotionDefinition
-            {
-                targetModelName = "minimal-timeline-triangle",
-                maxFrame = 10
-            };
-            motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
-            {
-                boneName = "root",
-                frame = 0,
-                translation = new[] { 0.0f, 0.0f, 0.0f },
-                rotation = new[] { 0.0f, 0.0f, 0.0f, 1.0f },
-                interpolation = LinearInterpolation()
-            });
-            motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
-            {
-                boneName = "root",
-                frame = 10,
-                translation = new[] { 2.0f, 0.0f, 0.0f },
-                rotation = new[] { 0.0f, 0.0f, 0.0f, 1.0f },
-                interpolation = LinearInterpolation()
-            });
-            return motion;
-        }
-
-        private static MmdBoneInterpolationDefinition LinearInterpolation()
-        {
-            byte[] linear = { 20, 20, 107, 107 };
-            return new MmdBoneInterpolationDefinition
-            {
-                translationX = linear,
-                translationY = linear,
-                translationZ = linear,
-                rotation = linear
-            };
-        }
-
-        private static MmdVertexDefinition CreateVertex(
-            int index,
-            float x,
-            float y,
-            float z,
-            float u,
-            float v)
-        {
-            return new MmdVertexDefinition
-            {
-                index = index,
-                position = new[] { x, y, z },
-                normal = new[] { 0.0f, 0.0f, 1.0f },
-                uv = new[] { u, v },
-                boneIndices = new[] { 0 },
-                boneWeights = new[] { 1.0f }
-            };
-        }
-
         private static MmdPmxAsset CreatePmxAsset(string pmxPath)
         {
             var asset = ScriptableObject.CreateInstance<MmdPmxAsset>();
@@ -932,34 +1156,23 @@ namespace Mmd.Tests
             return asset;
         }
 
-        private static void DestroyInstance(MmdUnityModelInstance? instance)
+        private static MmdUnityPlaybackBinding CreatePlaybackBinding()
         {
-            if (instance == null)
-            {
-                return;
-            }
+            var parser = new NativeMmdParser();
+            MmdModelDefinition model = parser.LoadModel(MmdTestFixtures.ReadFixtureAssetBytes(PlaybackPmxId));
+            MmdMotionDefinition motion = parser.LoadMotion(MmdTestFixtures.ReadFixtureAssetBytes(PlaybackVmdId));
+            return MmdUnityPlaybackBinding.CreateSkinned(model, motion, PlaybackPmxId, PlaybackVmdId);
+        }
 
-            var roots = new List<Object>();
-            if (instance.Root != null)
-            {
-                roots.Add(instance.Root);
-            }
+        private static Quaternion ExpectedFrameNineUnityRotation(MmdUnityPlaybackBinding binding)
+        {
+            float[] expectedMmdLocalRotation = { -0.3826833665f, 0.0f, 0.0f, 0.9238795638f };
+            return binding.Instance.BindLocalRotations[0] * ToUnityRotation(expectedMmdLocalRotation);
+        }
 
-            if (instance.Mesh != null)
-            {
-                roots.Add(instance.Mesh);
-            }
-
-            if (instance.Materials != null)
-            {
-                roots.AddRange(instance.Materials.Where(material => material != null).Distinct());
-            }
-
-            roots.AddRange(instance.OwnedTextures.Where(texture => texture != null).Distinct());
-            foreach (Object item in roots)
-            {
-                Object.DestroyImmediate(item);
-            }
+        private static Quaternion ToUnityRotation(float[] rotation)
+        {
+            return new Quaternion(-rotation[0], rotation[1], -rotation[2], rotation[3]);
         }
 
         private static string ResolvePackageFixture(string fileName)

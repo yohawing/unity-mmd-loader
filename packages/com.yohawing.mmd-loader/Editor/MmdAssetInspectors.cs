@@ -16,6 +16,8 @@ namespace Mmd.Editor
     [CustomEditor(typeof(MmdPmxAsset))]
     public sealed class MmdPmxAssetEditor : UnityEditor.Editor
     {
+        private bool showReadinessDiagnostics;
+
         public override void OnInspectorGUI()
         {
             if (target is not MmdPmxAsset asset)
@@ -32,13 +34,6 @@ namespace Mmd.Editor
                 asset.ShaderPreset);
             MmdAssetInspectorUtility.DrawModelSummary(asset);
             MmdAssetInspectorUtility.DrawParseSummary(asset);
-            MmdAssetInspectorUtility.DrawMaterialSummary(asset);
-            DrawMissingTextureActions(asset);
-            MmdAssetInspectorUtility.DrawOutlineSummary(asset);
-            MmdAssetInspectorUtility.DrawHierarchyReadinessSummary(asset);
-            MmdAssetInspectorUtility.DrawPhysicsSummary(asset);
-            MmdAssetInspectorUtility.DrawHumanoidSummary(asset);
-            MmdAssetInspectorUtility.DrawAnimationTimelineSummary(asset);
 
             using (new EditorGUI.DisabledScope(asset.ByteLength == 0))
             {
@@ -60,6 +55,19 @@ namespace Mmd.Editor
                     Selection.activeObject = setup;
                     EditorGUIUtility.PingObject(setup);
                 }
+            }
+
+            DrawMissingTextureActions(asset);
+
+            showReadinessDiagnostics = EditorGUILayout.Foldout(showReadinessDiagnostics, "Readiness Diagnostics", true);
+            if (showReadinessDiagnostics)
+            {
+                MmdAssetInspectorUtility.DrawMaterialSummary(asset);
+                MmdAssetInspectorUtility.DrawOutlineSummary(asset);
+                MmdAssetInspectorUtility.DrawHierarchyReadinessSummary(asset);
+                MmdAssetInspectorUtility.DrawPhysicsSummary(asset);
+                MmdAssetInspectorUtility.DrawHumanoidSummary(asset);
+                MmdAssetInspectorUtility.DrawAnimationTimelineSummary(asset);
             }
         }
 
@@ -105,6 +113,7 @@ namespace Mmd.Editor
     [CustomEditor(typeof(MmdVmdAsset))]
     public sealed class MmdVmdAssetEditor : UnityEditor.Editor
     {
+        private bool showReadinessDiagnostics;
         private IReadOnlyList<string>? lastStructuralDiagnostics;
 
         // Non-persistent preview references for Humanoid Clip Readiness (per Inspector lifetime).
@@ -127,31 +136,35 @@ namespace Mmd.Editor
                 MmdAssetInspectorUtility.DrawVmdMotionSummary(asset);
 
                 EditorGUILayout.Space();
-                // Initialize from import-time cached structural diagnostics.
-                // Do NOT call LoadMotion / Refresh on mere asset selection or inspector open.
-                if (lastStructuralDiagnostics == null)
-                {
-                    lastStructuralDiagnostics = asset.StructuralDiagnostics;
-                }
-
-                MmdAssetInspectorUtility.DrawVmdStructuralDiagnostics(lastStructuralDiagnostics);
-
-                EditorGUILayout.Space();
-                MmdAssetInspectorUtility.DrawVmdTimelineReadiness(asset);
-
-                EditorGUILayout.Space();
-                MmdAssetInspectorUtility.DrawVmdHumanoidClipReadinessSection(
-                    asset,
-                    ref previewPmxAsset,
-                    ref previewSetupAsset);
-
-                EditorGUILayout.Space();
                 using (new EditorGUI.DisabledScope(false))
                 {
                     if (GUILayout.Button("Run VMD Diagnostics"))
                     {
                         RefreshDiagnostics(asset, repaint: true);
                     }
+                }
+
+                showReadinessDiagnostics = EditorGUILayout.Foldout(showReadinessDiagnostics, "Readiness Diagnostics", true);
+                if (showReadinessDiagnostics)
+                {
+                    // Initialize from import-time cached structural diagnostics.
+                    // Do NOT call LoadMotion / Refresh on mere asset selection or inspector open.
+                    if (lastStructuralDiagnostics == null)
+                    {
+                        lastStructuralDiagnostics = asset.StructuralDiagnostics;
+                    }
+
+                    EditorGUILayout.Space();
+                    MmdAssetInspectorUtility.DrawVmdStructuralDiagnostics(lastStructuralDiagnostics);
+
+                    EditorGUILayout.Space();
+                    MmdAssetInspectorUtility.DrawVmdTimelineReadiness(asset);
+
+                    EditorGUILayout.Space();
+                    MmdAssetInspectorUtility.DrawVmdHumanoidClipReadinessSection(
+                        asset,
+                        ref previewPmxAsset,
+                        ref previewSetupAsset);
                 }
             }
             else
@@ -271,6 +284,19 @@ namespace Mmd.Editor
                 vmdAsset,
                 asset);
             bool canCreateHumanoidClip = hasValidInputs && conversionPlan.CanCreateClipNow;
+            using (new EditorGUI.DisabledScope(true))
+            {
+                EditorGUILayout.TextField("Status", conversionPlan.Readiness);
+            }
+
+            if (!conversionPlan.PrerequisitesReady)
+            {
+                string compact = MmdAssetInspectorUtility.FormatCompactHumanoidClipConversionIssues(conversionPlan);
+                if (!string.IsNullOrEmpty(compact))
+                {
+                    EditorGUILayout.HelpBox(compact, MessageType.Info);
+                }
+            }
 
             using (new EditorGUI.DisabledScope(!canCreateHumanoidClip))
             {
@@ -417,6 +443,36 @@ namespace Mmd.Editor
         }
     }
 
+    [CustomEditor(typeof(MmdSceneEnvironmentBinding))]
+    public sealed class MmdSceneEnvironmentBindingEditor : UnityEditor.Editor
+    {
+        public override void OnInspectorGUI()
+        {
+            DrawDefaultInspector();
+
+            if (target is not MmdSceneEnvironmentBinding binding)
+            {
+                return;
+            }
+
+            if (!binding.SelfShadowEnabled)
+            {
+                return;
+            }
+
+            MmdSelfShadowRendererSetupReadiness readiness =
+                MmdAssetInspectorUtility.EvaluateMmdSelfShadowRendererSetupForCurrentPipeline(binding.TargetCamera);
+            string warning = MmdAssetInspectorUtility.GetSelfShadowRendererSetupWarning(binding, readiness);
+            if (string.IsNullOrEmpty(warning))
+            {
+                return;
+            }
+
+            EditorGUILayout.Space();
+            EditorGUILayout.HelpBox(warning, MessageType.Warning);
+        }
+    }
+
     internal static class MmdAssetInspectorUtility
     {
         public static void DrawSummary(string title, string sourceId, string sourcePath, int byteLength)
@@ -482,10 +538,6 @@ namespace Mmd.Editor
                 EditorGUILayout.Vector3Field("MMD Bounds Size", asset.BoundsSize);
                 EditorGUILayout.TextField("Unity Conversion", "[-x, y, -z] at instantiation");
             }
-
-            EditorGUILayout.HelpBox(
-                "Bounds are cached in unscaled MMD model space. Import Scale and MMD-to-Unity basis conversion are applied only at Unity instantiation/export boundaries.",
-                MessageType.Info);
         }
 
         public static void DrawParseSummary(MmdPmxAsset asset)
@@ -603,6 +655,167 @@ namespace Mmd.Editor
             return false;
         }
 
+        internal static MmdSelfShadowRendererSetupReadiness EvaluateMmdSelfShadowRendererSetupForCurrentPipeline(
+            Camera? targetCamera = null)
+        {
+            RenderPipelineAsset pipeline = QualitySettings.renderPipeline != null
+                ? QualitySettings.renderPipeline
+                : GraphicsSettings.currentRenderPipeline;
+            return EvaluateMmdSelfShadowRendererSetup(pipeline as UniversalRenderPipelineAsset, targetCamera);
+        }
+
+        internal static MmdSelfShadowRendererSetupReadiness EvaluateMmdSelfShadowRendererSetup(
+            UniversalRenderPipelineAsset? pipeline,
+            Camera? targetCamera = null)
+        {
+            if (pipeline == null)
+            {
+                return MmdSelfShadowRendererSetupReadiness.NoUrpAsset;
+            }
+
+            var pipelineSo = new SerializedObject(pipeline);
+            var rendererDataList = pipelineSo.FindProperty("m_RendererDataList");
+            if (rendererDataList == null)
+            {
+                return new MmdSelfShadowRendererSetupReadiness(
+                    hasUrpAsset: true,
+                    rendererDataCount: 0,
+                    featureCount: 0,
+                    enabledFeatureCount: 0,
+                    activeRendererDataIndex: -1,
+                    activeFeatureCount: 0,
+                    activeEnabledFeatureCount: 0);
+            }
+
+            int activeRendererDataIndex = GetMmdSelfShadowActiveRendererDataIndex(
+                pipelineSo,
+                rendererDataList,
+                targetCamera);
+            int rendererDataCount = 0;
+            int featureCount = 0;
+            int enabledFeatureCount = 0;
+            int activeFeatureCount = 0;
+            int activeEnabledFeatureCount = 0;
+            for (int i = 0; i < rendererDataList.arraySize; i++)
+            {
+                var rendererDataRef = rendererDataList.GetArrayElementAtIndex(i);
+                if (rendererDataRef.objectReferenceValue == null)
+                {
+                    continue;
+                }
+
+                rendererDataCount++;
+                var rendererDataSo = new SerializedObject(rendererDataRef.objectReferenceValue);
+                var features = rendererDataSo.FindProperty("m_RendererFeatures");
+                if (features == null)
+                {
+                    continue;
+                }
+
+                for (int j = 0; j < features.arraySize; j++)
+                {
+                    if (features.GetArrayElementAtIndex(j).objectReferenceValue is not MmdSelfShadowRendererFeature feature)
+                    {
+                        continue;
+                    }
+
+                    featureCount++;
+                    if (i == activeRendererDataIndex)
+                    {
+                        activeFeatureCount++;
+                    }
+
+                    if (feature.isActive)
+                    {
+                        enabledFeatureCount++;
+                        if (i == activeRendererDataIndex)
+                        {
+                            activeEnabledFeatureCount++;
+                        }
+                    }
+                }
+            }
+
+            return new MmdSelfShadowRendererSetupReadiness(
+                hasUrpAsset: true,
+                rendererDataCount,
+                featureCount,
+                enabledFeatureCount,
+                activeRendererDataIndex,
+                activeFeatureCount,
+                activeEnabledFeatureCount);
+        }
+
+        private static int GetMmdSelfShadowActiveRendererDataIndex(
+            SerializedObject pipelineSo,
+            SerializedProperty rendererDataList,
+            Camera? targetCamera)
+        {
+            int defaultIndex = 0;
+            var defaultIndexProperty = pipelineSo.FindProperty("m_DefaultRendererIndex");
+            if (defaultIndexProperty != null)
+            {
+                defaultIndex = defaultIndexProperty.intValue;
+            }
+
+            int requestedIndex = -1;
+            if (targetCamera != null &&
+                targetCamera.TryGetComponent<UniversalAdditionalCameraData>(out var additionalCameraData))
+            {
+                var cameraSo = new SerializedObject(additionalCameraData);
+                var rendererIndexProperty = cameraSo.FindProperty("m_RendererIndex");
+                if (rendererIndexProperty != null)
+                {
+                    requestedIndex = rendererIndexProperty.intValue;
+                }
+            }
+
+            int resolvedIndex = requestedIndex >= 0 ? requestedIndex : defaultIndex;
+            if (IsValidRendererDataIndex(rendererDataList, resolvedIndex))
+            {
+                return resolvedIndex;
+            }
+
+            return IsValidRendererDataIndex(rendererDataList, defaultIndex) ? defaultIndex : -1;
+        }
+
+        private static bool IsValidRendererDataIndex(SerializedProperty rendererDataList, int index)
+        {
+            return index >= 0 &&
+                   index < rendererDataList.arraySize &&
+                   rendererDataList.GetArrayElementAtIndex(index).objectReferenceValue != null;
+        }
+
+        internal static string GetSelfShadowRendererSetupWarning(
+            MmdSceneEnvironmentBinding? binding,
+            MmdSelfShadowRendererSetupReadiness readiness)
+        {
+            if (binding == null || !binding.SelfShadowEnabled)
+            {
+                return string.Empty;
+            }
+
+            if (!readiness.HasUrpAsset)
+            {
+                return "SelfShadow is enabled, but no active URP Asset is configured. " +
+                       "Assign a Universal Render Pipeline Asset before adding the MmdSelfShadowRendererFeature.";
+            }
+
+            if (!readiness.FeaturePresentOnActiveRendererData)
+            {
+                return "SelfShadow is enabled, but MmdSelfShadowRendererFeature is not configured on the Renderer Data " +
+                       "used by the target Camera or default renderer. Add or move the feature to that active Renderer Data.";
+            }
+
+            if (!readiness.FeatureEnabledOnActiveRendererData)
+            {
+                return "SelfShadow is enabled, but the MmdSelfShadowRendererFeature on the Renderer Data used by " +
+                       "the target Camera or default renderer is disabled. Enable the feature on that active Renderer Data.";
+            }
+
+            return string.Empty;
+        }
+
         public static void DrawHierarchyReadinessSummary(MmdPmxAsset asset)
         {
             EditorGUILayout.Space();
@@ -634,10 +847,6 @@ namespace Mmd.Editor
                 EditorGUILayout.TextField("Scale-Aware Handoff", readiness.ScaleAwareHandoffReadiness);
                 EditorGUILayout.TextField("Required Smoke", readiness.RequiredSmoke);
             }
-
-            EditorGUILayout.HelpBox(
-                "Import Scale is stored as import metadata. Runtime playback and live physics apply scale at Unity/MMD boundaries while cached PMX summaries stay in MMD space.",
-                MessageType.Info);
         }
 
         internal static MmdScaleAwarePhysicsReadiness GetScaleAwarePhysicsReadiness(MmdPmxAsset? asset)
@@ -675,10 +884,6 @@ namespace Mmd.Editor
                 EditorGUILayout.TextField("Humanoid Setup Asset", "Explicit asset workflow");
                 EditorGUILayout.TextField("Native Playback Impact", "None");
             }
-
-            EditorGUILayout.HelpBox(
-                "Create Humanoid Setup Asset stores PMX source and H1 readiness metadata only. It does not create Avatar, proxy rig, or mapping assets.",
-                MessageType.Info);
         }
 
         public static void DrawAnimationTimelineSummary(MmdPmxAsset asset)
@@ -692,10 +897,6 @@ namespace Mmd.Editor
                 EditorGUILayout.TextField("VMD Drop Readiness", readiness.VmdDropReadiness);
                 EditorGUILayout.TextField("Playback Source", readiness.PlaybackSource);
             }
-
-            EditorGUILayout.HelpBox(
-                "PMX import does not auto-create scene playback objects. Use Load PMX Into Scene to create a controller root that can receive VMD clips or playback sources.",
-                MessageType.Info);
         }
 
         internal static MmdAnimationTimelineReadiness GetAnimationTimelineReadiness(MmdPmxAsset? asset)
@@ -938,6 +1139,11 @@ namespace Mmd.Editor
 
         internal static string FormatCompactVmdHumanoidIssues(MmdHumanoidClipConversionPlan plan)
         {
+            return FormatCompactHumanoidClipConversionIssues(plan);
+        }
+
+        internal static string FormatCompactHumanoidClipConversionIssues(MmdHumanoidClipConversionPlan plan)
+        {
             if (plan == null || plan.PrerequisitesReady)
             {
                 return string.Empty;
@@ -995,6 +1201,53 @@ namespace Mmd.Editor
         public string ReleaseMode { get; }
 
         public string FinalVisualParity { get; }
+    }
+
+    internal readonly struct MmdSelfShadowRendererSetupReadiness
+    {
+        public static readonly MmdSelfShadowRendererSetupReadiness NoUrpAsset =
+            new MmdSelfShadowRendererSetupReadiness(false, 0, 0, 0);
+
+        public MmdSelfShadowRendererSetupReadiness(
+            bool hasUrpAsset,
+            int rendererDataCount,
+            int featureCount,
+            int enabledFeatureCount,
+            int activeRendererDataIndex = -1,
+            int activeFeatureCount = -1,
+            int activeEnabledFeatureCount = -1)
+        {
+            HasUrpAsset = hasUrpAsset;
+            RendererDataCount = Math.Max(0, rendererDataCount);
+            FeatureCount = Math.Max(0, featureCount);
+            EnabledFeatureCount = Math.Max(0, enabledFeatureCount);
+            ActiveRendererDataIndex = activeRendererDataIndex;
+            ActiveFeatureCount = Math.Max(0, activeFeatureCount < 0 ? FeatureCount : activeFeatureCount);
+            ActiveEnabledFeatureCount = Math.Max(0,
+                activeEnabledFeatureCount < 0 ? EnabledFeatureCount : activeEnabledFeatureCount);
+        }
+
+        public bool HasUrpAsset { get; }
+
+        public int RendererDataCount { get; }
+
+        public int FeatureCount { get; }
+
+        public int EnabledFeatureCount { get; }
+
+        public int ActiveRendererDataIndex { get; }
+
+        public int ActiveFeatureCount { get; }
+
+        public int ActiveEnabledFeatureCount { get; }
+
+        public bool FeaturePresentOnAnyRendererData => FeatureCount > 0;
+
+        public bool FeatureEnabledOnAnyRendererData => EnabledFeatureCount > 0;
+
+        public bool FeaturePresentOnActiveRendererData => ActiveFeatureCount > 0;
+
+        public bool FeatureEnabledOnActiveRendererData => ActiveEnabledFeatureCount > 0;
     }
 
     internal readonly struct MmdScaleAwarePhysicsReadiness

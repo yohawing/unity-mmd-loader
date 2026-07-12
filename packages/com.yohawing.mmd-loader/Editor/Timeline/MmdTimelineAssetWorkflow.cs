@@ -12,7 +12,7 @@ using Mmd.UnityIntegration;
 
 namespace Mmd.Editor.Timeline
 {
-    public static class MmdTimelineAssetWorkflow
+    internal static class MmdTimelineAssetWorkflow
     {
         public const string DefaultTrackName = "MMD VMD";
 
@@ -115,13 +115,6 @@ namespace Mmd.Editor.Timeline
             var humanoidClip = (MmdHumanoidAnimationClip)clip.asset;
             humanoidClip.clip = animationClip;
 
-            var exposedName = new PropertyName(Guid.NewGuid().ToString("N"));
-            humanoidClip.proxyAnimator = new ExposedReference<Animator>
-            {
-                exposedName = exposedName,
-                defaultValue = animator
-            };
-            director.SetReferenceValue(exposedName, animator);
             director.playableAsset = null;
             director.playableAsset = track.timelineAsset;
             director.RebuildGraph();

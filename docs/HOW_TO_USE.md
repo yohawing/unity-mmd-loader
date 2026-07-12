@@ -2,7 +2,18 @@
 
 This guide is for users who have added `com.yohawing.mmd-loader` to a Unity project as a UPM package.
 
-## 1. Add the package
+## Contents
+
+- [How To Install](#add-the-package)
+- [Import a PMX](#import-a-pmx)
+- [Place it in the Scene](#place-it-in-the-scene)
+- [Import a VMD](#import-a-vmd)
+- [Set up Humanoid](#set-up-humanoid)
+- [Set up rendering in URP](#set-up-rendering-in-urp)
+- [Set up the Camera / Light Motion](#set-up-the-camera--light-motion)
+- [Credits](#credits)
+
+## How To Install
 
 ![howtouse1](./assets/howtouse1.png)
 
@@ -12,15 +23,9 @@ Open **Window > Package Manager** in Unity, and enter the following into **Add p
 https://github.com/yohawing/unity-mmd-loader.git?path=packages/com.yohawing.mmd-loader
 ```
 
-The supported Unity version is 6000.4 or newer.
+The release target is Unity 6000.4 with URP 17 on Windows x86_64.
 
-## 2. Optional: import the Basic Playback sample
-
-In Package Manager, open the MMD Loader package and import the **Basic Playback** sample from the **Samples** section.
-
-The sample includes a small redistributable PMX/VMD pair that is useful for checking the release golden path before using third-party MMD assets.
-
-## 3. Import a PMX
+## Import a PMX
 
 ![howtouse2](./assets/howtouse2.png)
 
@@ -28,7 +33,7 @@ Add a `.pmx` file, along with its texture files, under your Unity project's `Ass
 
 A PMX is imported as a model file, just like an FBX. You can adjust the import settings in the Inspector.
 
-## 4. Place it in the Scene
+## Place it in the Scene
 
 ![howtouse3](./assets/howtouse3.png)
 
@@ -36,7 +41,7 @@ Drag the PMX asset from the Project window into the Scene or Hierarchy.
 
 This creates a playback object in the scene. Even when only a PMX is placed, the playback controller is kept, so you can add a VMD to the Timeline later.
 
-## 5. Import a VMD
+## Import a VMD
 
 ![howtouse4](./assets/howtouse4.png)
 
@@ -52,7 +57,25 @@ The available editor actions may change between package versions, but the basic 
 - A VMD asset is referenced from a Timeline clip.
 - A Timeline clip does not bake the VMD into an AnimationClip right away; it passes the playback time to MMD's runtime evaluation.
 
-## 6. Set up rendering in URP
+## Set up Humanoid
+
+Retarget the motion onto a standard Unity Humanoid rig.
+
+**1. Set the PMX Rig to Humanoid, Apply, then place it in the Scene.**
+
+![howtouse7](./assets/howtouse7.png)
+
+In the PMX Import Settings, open the **Rig** tab, set **Animation Type** to **Humanoid**, and click **Apply**. Then drag the PMX into the Scene.
+
+**2. Add an MMD Humanoid Animation Track to the Timeline and bind it.**
+
+![howtouse8](./assets/howtouse8.png)
+
+Add an **MMD Humanoid Animation Track** and bind it to the scene's `MmdUnityPlaybackController`.
+
+> **Note:** Complex rigs are not supported. Models that rely on arm IK and similar setups will not retarget to a correct pose.
+
+## Set up rendering in URP
 
 MMD Loader expects a URP project. If your project uses multiple URP assets or quality levels, check the Renderer Data that is actually used by the Game View or build target.
 
@@ -64,19 +87,21 @@ MMD Loader expects a URP project. If your project uses multiple URP assets or qu
 4. Keep the feature enabled. The default shadow map size and bias are intended to be usable as a first setup.
 5. If you use multiple Renderer Data assets, add the feature to each renderer that can render the MMD scene.
 
-The PMX importer generates materials for the `MMD Basic URP Toon` shader. Self-shadow rendering requires those generated materials, because they include the dedicated MMD self-shadow caster pass. If you replace materials manually, make sure the replacement shader is intended for this package's MMD rendering path.
+## Set up the Camera / Light Motion
 
-## 7. Set up the Scene environment
+Play the VMD camera and light motion on its own Timeline lane.
 
-The scene needs the playback object from the PMX placement step and a scene environment binding for camera, light, and self-shadow state.
-
+**1. Bind the target Camera and Light to `MmdSceneEnvironmentBinding`.**
 
 ![howtouse6](./assets/howtouse6.png)
 
-1. Place the PMX in the Scene so the MMD playback object and `MmdUnityPlaybackController` exist.
-2. Add `MmdSceneEnvironmentBinding` to a scene GameObject. A small empty GameObject such as `MMD Scene Environment` is fine.
-3. Assign **Target Camera** to the Camera that VMD camera motion should drive.
-4. Assign **Target Light** to a Directional Light if the VMD light track should drive scene light color and direction.
+Add `MmdSceneEnvironmentBinding` to a scene GameObject, then assign **Target Camera** and **Target Light**.
+
+**2. Add an MMD VMD Camera Track and drive it with a camera VMD.**
+
+![howtouse9](./assets/howtouse9.png)
+
+Add an **MMD VMD Camera Track** to the Timeline, bind it to the `MmdSceneEnvironmentBinding`, then add a clip and assign the camera **VMD Asset**. Its camera, light, and self-shadow keyframes drive the assigned targets.
 
 ## Credits
 

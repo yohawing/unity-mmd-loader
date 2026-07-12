@@ -96,6 +96,7 @@ namespace Mmd.UnityIntegration
             }
 
             mesh.RecalculateBounds();
+            mesh.RecalculateTangents();
             return mesh;
         }
 

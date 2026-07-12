@@ -29,8 +29,30 @@ namespace Mmd.Timeline
                 return;
             }
 
+            GameObject controllerObject = controller.gameObject;
+            driver.AddFromName<Transform>(controllerObject, "m_LocalPosition.x");
+            driver.AddFromName<Transform>(controllerObject, "m_LocalPosition.y");
+            driver.AddFromName<Transform>(controllerObject, "m_LocalPosition.z");
+            driver.AddFromName<Transform>(controllerObject, "m_LocalRotation.x");
+            driver.AddFromName<Transform>(controllerObject, "m_LocalRotation.y");
+            driver.AddFromName<Transform>(controllerObject, "m_LocalRotation.z");
+            driver.AddFromName<Transform>(controllerObject, "m_LocalRotation.w");
+
             foreach (MmdHumanoidRetargetBinding entry in controller.HumanoidRetargetEntries)
             {
+                Transform? proxyTransform = entry.ProxyTransform;
+                if (proxyTransform != null)
+                {
+                    GameObject proxyObject = proxyTransform.gameObject;
+                    driver.AddFromName<Transform>(proxyObject, "m_LocalPosition.x");
+                    driver.AddFromName<Transform>(proxyObject, "m_LocalPosition.y");
+                    driver.AddFromName<Transform>(proxyObject, "m_LocalPosition.z");
+                    driver.AddFromName<Transform>(proxyObject, "m_LocalRotation.x");
+                    driver.AddFromName<Transform>(proxyObject, "m_LocalRotation.y");
+                    driver.AddFromName<Transform>(proxyObject, "m_LocalRotation.z");
+                    driver.AddFromName<Transform>(proxyObject, "m_LocalRotation.w");
+                }
+
                 Transform? nativeTransform = entry.NativeTransform;
                 if (nativeTransform != null)
                 {

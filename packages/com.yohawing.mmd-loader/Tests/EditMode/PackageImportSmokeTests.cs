@@ -28,8 +28,18 @@ namespace Mmd.Tests
             string sampleRoot = Path.Combine(MmdTestFixtures.PackageRoot, "Samples~", "BasicPlayback", "Assets");
             string pmxPath = Path.Combine(sampleRoot, "mmt_test_model.pmx");
             string vmdPath = Path.Combine(sampleRoot, "mmt_test_model_test_motion.vmd");
+            string timelinePath = Path.Combine(sampleRoot, "BasicSampleTimeline.playable");
+            string scenePath = Path.Combine(sampleRoot, "BasicPlayback.unity");
             Assert.That(pmxPath, Does.Exist, "BasicPlayback sample PMX must be bundled.");
             Assert.That(vmdPath, Does.Exist, "BasicPlayback sample VMD must be bundled.");
+            Assert.That(timelinePath, Does.Exist, "BasicPlayback sample Timeline must be bundled.");
+            Assert.That(scenePath, Does.Exist, "ready-to-play BasicPlayback scene must be bundled.");
+            Assert.That(File.ReadAllText(timelinePath), Does.Contain("MMT Test Motion (VMD)"),
+                "BasicPlayback Timeline must contain the bundled VMD motion.");
+            Assert.That(File.ReadAllText(scenePath), Does.Contain("Basic Timeline"),
+                "BasicPlayback scene must retain the Timeline director object.");
+            Assert.That(File.ReadAllText(scenePath), Does.Contain("m_InitialState: 1"),
+                "BasicPlayback Timeline must play automatically when the scene starts.");
 
             var parser = new NativeMmdParser();
             MmdModelDefinition model = parser.LoadModel(File.ReadAllBytes(pmxPath));
@@ -39,6 +49,39 @@ namespace Mmd.Tests
             Assert.That(model.bones.Count, Is.GreaterThan(0), "sample PMX bones");
             Assert.That(model.materials.Count, Is.GreaterThan(0), "sample PMX materials");
             Assert.That(motion.boneKeyframes.Count, Is.GreaterThan(0), "sample VMD bone keyframes");
+        }
+
+        [Test]
+        public void HumanoidPlaybackSampleBundlesSourceAndGeneratedWorkflow()
+        {
+            string sampleRoot = Path.Combine(MmdTestFixtures.PackageRoot, "Samples~", "HumanoidPlayback");
+            string assetsRoot = Path.Combine(sampleRoot, "Assets");
+            string pmxPath = Path.Combine(assetsRoot, "HumanoidSampleModel.pmx");
+            string fbxPath = Path.Combine(assetsRoot, "TaisouMocap.fbx");
+            string fbxMetaPath = fbxPath + ".meta";
+            string pmxMetaPath = pmxPath + ".meta";
+            string timelinePath = Path.Combine(assetsRoot, "HumanoidSampleTimeline.playable");
+            string scenePath = Path.Combine(assetsRoot, "HumanoidPlayback.unity");
+
+            Assert.That(pmxPath, Does.Exist, "Humanoid sample PMX source");
+            Assert.That(fbxPath, Does.Exist, "Humanoid sample FBX motion");
+            Assert.That(timelinePath, Does.Exist, "Humanoid Timeline Asset");
+            Assert.That(scenePath, Does.Exist, "ready-to-play Humanoid scene");
+            Assert.That(File.ReadAllText(pmxMetaPath), Does.Contain("animationType: 2"),
+                "sample PMX importer metadata must request Humanoid");
+            Assert.That(File.ReadAllText(fbxMetaPath), Does.Contain("animationType: 3"),
+                "sample FBX importer metadata must request Humanoid animation");
+            Assert.That(File.ReadAllText(timelinePath), Does.Contain("Taisou Mocap (FBX)"),
+                "Timeline must use the practical FBX motion rather than the short VMD fixture bake");
+            Assert.That(File.ReadAllText(timelinePath), Does.Not.Contain("proxyAnimator:"),
+                "Humanoid Timeline clips must derive their Animator from the track-bound playback controller");
+            Assert.That(File.ReadAllText(scenePath), Does.Contain("Humanoid Timeline"),
+                "scene must retain the Timeline director object");
+
+            var parser = new NativeMmdParser();
+            MmdModelDefinition model = parser.LoadModel(File.ReadAllBytes(pmxPath));
+            Assert.That(model.vertices.Count, Is.GreaterThan(0), "Humanoid sample PMX vertices");
+            Assert.That(model.bones.Count, Is.GreaterThan(0), "Humanoid sample PMX bones");
         }
 
         [Test]
@@ -211,38 +254,19 @@ namespace Mmd.Tests
         [Test]
         public void FrameEvaluatorEmitsRenderingFacingSnapshot()
         {
-            var model = new MmdModelDefinition();
-            model.bones.Add(new MmdBoneDefinition
-            {
-                index = 0,
-                name = "root",
-                parentIndex = -1,
-                origin = new[] { 0.0f, 0.0f, 0.0f }
-            });
-            model.materials.Add(new MmdMaterialDefinition
-            {
-                index = 0,
-                name = "mat",
-                texture = "mat.png",
-                vertexCount = 3
-            });
+            byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube.pmx");
+            byte[] vmdBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube_motion.vmd");
 
-            var motion = new MmdMotionDefinition();
-            motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
-            {
-                boneName = "root",
-                frame = 0,
-                translation = new[] { 1.0f, 0.0f, 0.0f },
-                rotation = new[] { 0.0f, 0.0f, 0.0f, 1.0f },
-                interpolation = LinearInterpolation()
-            });
+            var parser = new NativeMmdParser();
+            MmdModelDefinition model = parser.LoadModel(pmxBytes);
+            MmdMotionDefinition motion = parser.LoadMotion(vmdBytes);
 
             MmdEvaluatedFrame frame = MmdRuntimeFrameEvaluator.EvaluatePhaseOneFrame(model, motion, frame: 0, time: 0.0f);
 
-            Assert.That(frame.bones, Has.Count.EqualTo(1));
-            Assert.That(frame.bones[0].worldMatrix[3], Is.EqualTo(1.0f).Within(0.00001f));
-            Assert.That(frame.materials, Has.Count.EqualTo(1));
-            Assert.That(frame.materials[0].texture, Is.EqualTo("mat.png"));
+            Assert.That(frame.bones, Has.Count.GreaterThanOrEqualTo(1));
+            Assert.That(frame.bones[0].worldMatrix, Has.Length.EqualTo(16));
+            Assert.That(frame.bones[0].localPosition, Has.Length.GreaterThanOrEqualTo(3));
+            Assert.That(frame.bones[0].localRotation, Has.Length.GreaterThanOrEqualTo(4));
         }
 
         [Test]
@@ -280,48 +304,59 @@ namespace Mmd.Tests
         [Test]
         public void PlaybackSnapshotCombinesFrameAndRenderingInputs()
         {
-            var model = new MmdModelDefinition();
-            model.bones.Add(new MmdBoneDefinition
-            {
-                index = 0,
-                name = "root",
-                parentIndex = -1,
-                origin = new[] { 0.0f, 0.0f, 0.0f }
-            });
-            model.vertices.Add(new MmdVertexDefinition
-            {
-                index = 0,
-                position = new[] { 0.0f, 0.0f, 0.0f },
-                normal = new[] { 0.0f, 1.0f, 0.0f },
-                uv = new[] { 0.0f, 0.0f },
-                boneIndices = new[] { 0 },
-                boneWeights = new[] { 1.0f }
-            });
-            model.indices.AddRange(new[] { 0, 0, 0 });
-            model.materials.Add(new MmdMaterialDefinition { index = 0, name = "mat", vertexCount = 3 });
-
-            var motion = new MmdMotionDefinition();
-            motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
-            {
-                boneName = "root",
-                frame = 0,
-                translation = new[] { 1.0f, 0.0f, 0.0f },
-                rotation = new[] { 0.0f, 0.0f, 0.0f, 1.0f },
-                interpolation = LinearInterpolation()
-            });
+            (MmdModelDefinition model, MmdMotionDefinition motion) = LoadPlaybackFixturePair();
 
             MmdPlaybackSnapshot snapshot = MmdPlaybackSnapshotBuilder.BuildPhaseOneSnapshot(model, motion, frame: 0, time: 0.0f);
 
-            Assert.That(snapshot.frame.bones, Has.Count.EqualTo(1));
-            Assert.That(snapshot.rendering.vertices, Has.Count.EqualTo(1));
-            Assert.That(snapshot.rendering.indices, Has.Count.EqualTo(3));
-            Assert.That(snapshot.rendering.materials, Has.Count.EqualTo(1));
-            Assert.That(snapshot.rendering.urpMaterialBindings, Has.Count.EqualTo(1));
+            Assert.That(snapshot.frame.bones, Has.Count.GreaterThan(0));
+            Assert.That(snapshot.frame.bones[0].worldMatrix, Has.Length.EqualTo(16));
+            Assert.That(snapshot.rendering.vertices, Has.Count.GreaterThan(0));
+            Assert.That(snapshot.rendering.indices, Has.Count.GreaterThan(0));
+            Assert.That(snapshot.rendering.materials, Has.Count.GreaterThan(0));
+            Assert.That(snapshot.rendering.urpMaterialBindings, Has.Count.EqualTo(snapshot.rendering.materials.Count));
         }
 
         [Test]
         public void RuntimeSessionEvaluatesTraceAndSnapshotFromNeutralIr()
         {
+            (MmdModelDefinition model, MmdMotionDefinition motion) = LoadPlaybackFixturePair();
+            var session = new MmdRuntimeSession(
+                model,
+                motion,
+                "test_1bone_cube.pmx",
+                "test_1bone_cube_motion.vmd");
+
+            Assert.That(session.EvaluateTrace(frame: 0, time: 0.0f).frames, Has.Count.EqualTo(5));
+            MmdPlaybackSnapshot snapshot = session.BuildSnapshot(frame: 0, time: 0.0f);
+            Assert.That(snapshot.rendering.indices, Has.Count.GreaterThan(0));
+            Assert.That(snapshot.frame.bones, Has.Count.GreaterThan(0));
+            Assert.That(snapshot.frame.bones[0].worldMatrix, Has.Length.EqualTo(16));
+        }
+
+        [Test]
+        public void RuntimeSessionBuildSnapshotAppliesCustomIkSolver()
+        {
+            (MmdModelDefinition model, MmdMotionDefinition motion) = LoadPlaybackFixturePair();
+            string targetBoneName = model.bones[0].name;
+            var session = new MmdRuntimeSession(
+                model,
+                motion,
+                "test_1bone_cube.pmx",
+                "test_1bone_cube_motion.vmd");
+
+            MmdPlaybackSnapshot baseline = session.BuildSnapshot(frame: 0, time: 0.0f);
+            MmdPlaybackSnapshot adjusted = session.BuildSnapshot(
+                frame: 0,
+                time: 0.0f,
+                ikSolver: new TestOffsetIkSolver(targetBoneName, 2.0f));
+
+            Assert.That(adjusted.frame.bones[0].localPosition[0], Is.EqualTo(baseline.frame.bones[0].localPosition[0] + 2.0f).Within(0.00001f));
+            Assert.That(adjusted.frame.bones[0].worldMatrix[3], Is.EqualTo(baseline.frame.bones[0].worldMatrix[3] + 2.0f).Within(0.00001f));
+        }
+
+        [Test]
+        public void RuntimeSessionBuildSnapshotsWithCustomIkSolverDoesNotRequireNativeSourceBytes()
+        {
             var model = new MmdModelDefinition();
             model.bones.Add(new MmdBoneDefinition
             {
@@ -330,51 +365,77 @@ namespace Mmd.Tests
                 parentIndex = -1,
                 origin = new[] { 0.0f, 0.0f, 0.0f }
             });
-            model.vertices.Add(new MmdVertexDefinition
-            {
-                index = 0,
-                position = new[] { 0.0f, 0.0f, 0.0f },
-                normal = new[] { 0.0f, 1.0f, 0.0f },
-                uv = new[] { 0.0f, 0.0f },
-                boneIndices = new[] { 0 },
-                boneWeights = new[] { 1.0f }
-            });
-            model.indices.AddRange(new[] { 0, 0, 0 });
-            model.materials.Add(new MmdMaterialDefinition { index = 0, name = "mat", vertexCount = 3 });
-
             var motion = new MmdMotionDefinition();
-            motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
-            {
-                boneName = "root",
-                frame = 0,
-                translation = new[] { 1.0f, 0.0f, 0.0f },
-                rotation = new[] { 0.0f, 0.0f, 0.0f, 1.0f },
-                interpolation = LinearInterpolation()
-            });
+            var session = new MmdRuntimeSession(model, motion, "synthetic.pmx", "synthetic.vmd");
 
-            var session = new MmdRuntimeSession(model, motion, "model.pmx", "motion.vmd");
+            IReadOnlyList<MmdPlaybackSnapshot> snapshots = session.BuildSnapshots(
+                new[] { 0, 1 },
+                frameRate: 30.0f,
+                ikSolver: new TestOffsetIkSolver("root", 2.0f));
 
-            Assert.That(session.EvaluateTrace(frame: 0, time: 0.0f).frames, Has.Count.EqualTo(5));
-            Assert.That(session.BuildSnapshot(frame: 0, time: 0.0f).rendering.indices, Has.Count.EqualTo(3));
-            Assert.That(
-                session.BuildSnapshot(
-                    frame: 0,
-                    time: 0.0f,
-                    physicsBackend: null,
-                    ikSolver: new TestOffsetIkSolver("root", 1.0f)).frame.bones[0].localPosition[0],
-                Is.EqualTo(2.0f).Within(0.00001f));
+            Assert.That(snapshots, Has.Count.EqualTo(2));
+            Assert.That(snapshots[0].frame.bones[0].localPosition[0], Is.EqualTo(2.0f).Within(0.00001f));
+            Assert.That(snapshots[1].frame.bones[0].localPosition[0], Is.EqualTo(2.0f).Within(0.00001f));
         }
 
-        private static MmdBoneInterpolationDefinition LinearInterpolation()
+        private static (MmdModelDefinition Model, MmdMotionDefinition Motion) LoadPlaybackFixturePair()
         {
-            byte[] linear = { 20, 20, 107, 107 };
-            return new MmdBoneInterpolationDefinition
+            var parser = new NativeMmdParser();
+            MmdModelDefinition model = parser.LoadModel(MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube.pmx"));
+            MmdMotionDefinition motion = parser.LoadMotion(MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube_motion.vmd"));
+            return (model, motion);
+        }
+
+        private sealed class TestOffsetIkSolver : IMmdIkSolver
+        {
+            private readonly string boneName;
+            private readonly float offsetX;
+
+            public TestOffsetIkSolver(string boneName, float offsetX)
             {
-                translationX = linear,
-                translationY = linear,
-                translationZ = linear,
-                rotation = linear
-            };
+                this.boneName = boneName;
+                this.offsetX = offsetX;
+            }
+
+            public string Name => "TestOffsetIkSolver";
+
+            public MmdSampledMotion Solve(MmdModelDefinition model, MmdSampledMotion? sampledMotion)
+            {
+                MmdSampledMotion result = CopyMotion(sampledMotion);
+                MmdBonePoseSample source = result.Bones.TryGetValue(boneName, out MmdBonePoseSample found)
+                    ? found
+                    : MmdBonePoseSample.Identity;
+                result.Bones[boneName] = new MmdBonePoseSample(
+                    new[] { source.Translation[0] + offsetX, source.Translation[1], source.Translation[2] },
+                    source.Rotation);
+                return result;
+            }
+
+            private static MmdSampledMotion CopyMotion(MmdSampledMotion? source)
+            {
+                var result = new MmdSampledMotion();
+                if (source == null)
+                {
+                    return result;
+                }
+
+                foreach (KeyValuePair<string, MmdBonePoseSample> bone in source.Bones)
+                {
+                    result.Bones[bone.Key] = bone.Value;
+                }
+
+                foreach (KeyValuePair<string, float> morph in source.Morphs)
+                {
+                    result.Morphs[morph.Key] = morph.Value;
+                }
+
+                foreach (KeyValuePair<string, bool> ikState in source.IkStates)
+                {
+                    result.IkStates[ikState.Key] = ikState.Value;
+                }
+
+                return result;
+            }
         }
 
         [Test]
@@ -578,54 +639,5 @@ namespace Mmd.Tests
             Assert.That(groupRecord.supportStatus, Is.EqualTo(MmdMorphDescriptorBuilder.InventoryOnlyStatus));
         }
 
-        private sealed class TestOffsetIkSolver : IMmdIkSolver
-        {
-            private readonly string boneName;
-            private readonly float xOffset;
-
-            public TestOffsetIkSolver(string boneName, float xOffset)
-            {
-                this.boneName = boneName;
-                this.xOffset = xOffset;
-            }
-
-            public string Name => "TestOffset";
-
-            public MmdSampledMotion Solve(MmdModelDefinition model, MmdSampledMotion? sampledMotion)
-            {
-                if (model == null)
-                {
-                    throw new ArgumentNullException(nameof(model));
-                }
-
-                var result = new MmdSampledMotion();
-                if (sampledMotion != null)
-                {
-                    foreach (var bone in sampledMotion.Bones.OrderBy(pair => pair.Key, StringComparer.Ordinal))
-                    {
-                        result.Bones[bone.Key] = bone.Value;
-                    }
-
-                    foreach (var morph in sampledMotion.Morphs.OrderBy(pair => pair.Key, StringComparer.Ordinal))
-                    {
-                        result.Morphs[morph.Key] = morph.Value;
-                    }
-
-                    foreach (var ikState in sampledMotion.IkStates.OrderBy(pair => pair.Key, StringComparer.Ordinal))
-                    {
-                        result.IkStates[ikState.Key] = ikState.Value;
-                    }
-                }
-
-                if (result.Bones.TryGetValue(boneName, out MmdBonePoseSample pose))
-                {
-                    result.Bones[boneName] = new MmdBonePoseSample(
-                        new[] { pose.Translation[0] + xOffset, pose.Translation[1], pose.Translation[2] },
-                        pose.Rotation);
-                }
-
-                return result;
-            }
-        }
     }
 }

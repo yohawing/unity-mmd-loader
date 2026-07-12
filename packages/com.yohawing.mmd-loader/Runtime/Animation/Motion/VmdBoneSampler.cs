@@ -12,20 +12,7 @@ namespace Mmd.Motion
 
         public static MmdBonePoseSample SamplePose(IReadOnlyList<MmdBoneKeyframeDefinition>? keyframes, string boneName, float frame)
         {
-            if (keyframes == null)
-            {
-                throw new ArgumentNullException(nameof(keyframes));
-            }
-
-            if (string.IsNullOrWhiteSpace(boneName))
-            {
-                throw new ArgumentException("Bone name is required.", nameof(boneName));
-            }
-
-            if (float.IsNaN(frame) || float.IsInfinity(frame))
-            {
-                throw new ArgumentOutOfRangeException(nameof(frame), "Frame must be finite.");
-            }
+            ValidateInputs(keyframes, boneName, frame);
 
             MmdBoneKeyframeDefinition? previous = null;
             MmdBoneKeyframeDefinition? next = null;
@@ -49,38 +36,31 @@ namespace Mmd.Motion
                 }
             }
 
-            if (previous == null && next == null)
-            {
-                return MmdBonePoseSample.Identity;
-            }
-
-            if (previous == null)
-            {
-                return FromKeyframe(next!);
-            }
-
-            if (next == null || previous.frame == next.frame)
-            {
-                return FromKeyframe(previous);
-            }
-
-            float span = next.frame - previous.frame;
-            float normalizedFrame = (frame - previous.frame) / span;
-
-            return new MmdBonePoseSample(
-                new[]
-                {
-                    Lerp(Component(previous.translation, 0), Component(next.translation, 0), Interpolate(next.interpolation.translationX, normalizedFrame)),
-                    Lerp(Component(previous.translation, 1), Component(next.translation, 1), Interpolate(next.interpolation.translationY, normalizedFrame)),
-                    Lerp(Component(previous.translation, 2), Component(next.translation, 2), Interpolate(next.interpolation.translationZ, normalizedFrame))
-                },
-                Slerp(
-                    QuaternionOrIdentity(previous.rotation),
-                    QuaternionOrIdentity(next.rotation),
-                    Interpolate(next.interpolation.rotation, normalizedFrame)));
+            return SampleBetween(previous, next, frame);
         }
 
         public static MmdBonePoseSample SampleSortedPose(IReadOnlyList<MmdBoneKeyframeDefinition>? keyframes, string boneName, float frame)
+        {
+            ValidateInputs(keyframes, boneName, frame);
+
+            int nextIndex = LowerBoundFrame(keyframes, frame);
+            int previousIndex = nextIndex;
+            while (previousIndex < keyframes.Count && keyframes[previousIndex].frame <= frame)
+            {
+                previousIndex++;
+            }
+
+            previousIndex--;
+            MmdBoneKeyframeDefinition? previous = previousIndex >= 0 ? keyframes[previousIndex] : null;
+            MmdBoneKeyframeDefinition? next = nextIndex < keyframes.Count ? keyframes[nextIndex] : null;
+
+            return SampleBetween(previous, next, frame);
+        }
+
+        private static void ValidateInputs(
+            IReadOnlyList<MmdBoneKeyframeDefinition>? keyframes,
+            string boneName,
+            float frame)
         {
             if (keyframes == null)
             {
@@ -96,18 +76,13 @@ namespace Mmd.Motion
             {
                 throw new ArgumentOutOfRangeException(nameof(frame), "Frame must be finite.");
             }
+        }
 
-            int nextIndex = LowerBoundFrame(keyframes, frame);
-            int previousIndex = nextIndex;
-            while (previousIndex < keyframes.Count && keyframes[previousIndex].frame <= frame)
-            {
-                previousIndex++;
-            }
-
-            previousIndex--;
-            MmdBoneKeyframeDefinition? previous = previousIndex >= 0 ? keyframes[previousIndex] : null;
-            MmdBoneKeyframeDefinition? next = nextIndex < keyframes.Count ? keyframes[nextIndex] : null;
-
+        private static MmdBonePoseSample SampleBetween(
+            MmdBoneKeyframeDefinition? previous,
+            MmdBoneKeyframeDefinition? next,
+            float frame)
+        {
             if (previous == null && next == null)
             {
                 return MmdBonePoseSample.Identity;

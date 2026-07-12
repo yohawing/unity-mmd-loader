@@ -382,6 +382,10 @@ namespace Mmd.Tests
                 Assert.That(plan.CanCreateClipNow, Is.False);
                 string joined = string.Join("\n", plan.Diagnostics);
                 Assert.That(joined, Does.Contain("pmx asset is null").Or.Contain("humanoid setup asset is null"));
+
+                string compact = MmdAssetInspectorUtility.FormatCompactHumanoidClipConversionIssues(plan);
+                Assert.That(compact, Does.Contain("pmx asset is null"));
+                Assert.That(compact, Does.Contain("humanoid setup asset is null"));
             }
             finally
             {
@@ -426,6 +430,10 @@ namespace Mmd.Tests
 
                 string issues = MmdAssetInspectorUtility.FormatCompactVmdHumanoidIssues(plan);
                 Assert.That(issues, Is.Empty, "Ready plan must format to no issues string.");
+                Assert.That(
+                    MmdAssetInspectorUtility.FormatCompactHumanoidClipConversionIssues(plan),
+                    Is.Empty,
+                    "Ready plan must format to no issues string on the setup asset Inspector too.");
 
                 // Missing one side still not ready (actionable).
                 MmdHumanoidClipConversionPlan partial = MmdAssetInspectorUtility.ComputeHumanoidClipReadinessForVmd(vmd, pmx, null);

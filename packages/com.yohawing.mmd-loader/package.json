@@ -1,6 +1,6 @@
 {
   "name": "com.yohawing.mmd-loader",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "displayName": "MMD Loader",
   "description": "Unity package for importing, placing, and playing PMX/VMD assets through standard Unity workflows.",
   "unity": "6000.4",
@@ -24,9 +24,9 @@
       "path": "Samples~/BasicPlayback"
     },
     {
-      "displayName": "Runtime Verification",
-      "description": "Standalone runtime verification player for direct PMX/VMD parse, playback, Timeline drive, and JSON diagnostics using local assets.",
-      "path": "Samples~/RuntimeVerification"
+      "displayName": "Humanoid Playback",
+      "description": "Ready-to-play Humanoid PMX/VMD bake sample with a valid Avatar, Setup Asset, generated Humanoid AnimationClip, Timeline binding, and redistributable source assets.",
+      "path": "Samples~/HumanoidPlayback"
     }
   ]
 }

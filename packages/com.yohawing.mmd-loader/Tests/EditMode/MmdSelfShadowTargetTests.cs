@@ -1118,7 +1118,7 @@ namespace Mmd.Tests
             Assert.That(pass, Does.Not.Contain("debugVisibilityPreview"));
             Assert.That(pass, Does.Not.Contain("debugDepthPreview"));
             Assert.That(pass, Does.Contain("NormalizeShadowDepthBias(shadowDepthBias, far - near)"));
-            Assert.That(pass, Does.Contain("parameters = new Vector4(1.0f, normalizedShadowDepthBias, 0.0f, 0.0f)"));
+            Assert.That(pass, Does.Contain("parameters = new Vector4(1.0f, normalizedShadowDepthBias, pcfTapCount, uvRadius)"));
             Assert.That(pass, Does.Not.Contain("1.0f / Mathf.Max(1, shadowMapSize)"));
             Assert.That(pass, Does.Not.Contain("0.0025f"));
             Assert.That(pass, Does.Contain("SystemInfo.usesReversedZBuffer"));
@@ -1142,9 +1142,10 @@ namespace Mmd.Tests
             Assert.That(shader, Does.Not.Contain("_MmdReceiveShadows"));
             Assert.That(shader, Does.Not.Contain("_MmdSuppressStandardShadows"));
             Assert.That(shader, Does.Contain("#pragma multi_compile_instancing"));
-            Assert.That(shader, Does.Contain("UNITY_INSTANCING_BUFFER_START(MmdPerRenderer)"));
-            Assert.That(shader, Does.Contain("UNITY_DEFINE_INSTANCED_PROP(float, _MmdSelfShadowReceive)"));
-            Assert.That(shader, Does.Contain("UNITY_ACCESS_INSTANCED_PROP(MmdPerRenderer, _MmdSelfShadowReceive)"));
+            Assert.That(shader, Does.Contain("half _MmdSelfShadowReceive;"));
+            Assert.That(shader, Does.Contain("half selfShadowReceive = _MmdSelfShadowReceive;"));
+            Assert.That(shader, Does.Not.Contain("UNITY_DEFINE_INSTANCED_PROP(float, _MmdSelfShadowReceive)"));
+            Assert.That(shader, Does.Not.Contain("UNITY_ACCESS_INSTANCED_PROP(MmdPerRenderer, _MmdSelfShadowReceive)"));
             Assert.That(shader, Does.Not.Contain("_MAIN_LIGHT_SHADOWS"));
             Assert.That(shader, Does.Not.Contain("_SHADOWS_SOFT"));
             Assert.That(shader, Does.Contain("URP standard shadows are only for casting MMD characters onto the scene/environment."));

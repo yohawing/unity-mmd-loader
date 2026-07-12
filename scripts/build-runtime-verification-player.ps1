@@ -20,6 +20,22 @@ function Resolve-AbsolutePath {
     return [System.IO.Path]::GetFullPath((Join-Path (Get-Location) $Path))
 }
 
+function ConvertTo-ProcessArgument {
+    param([Parameter(Mandatory = $true)][string] $Argument)
+
+    if ($Argument -notmatch '[\s"]') {
+        return $Argument
+    }
+
+    return '"' + ($Argument -replace '"', '\"') + '"'
+}
+
+function ConvertTo-ProcessArgumentList {
+    param([Parameter(Mandatory = $true)][string[]] $Arguments)
+
+    return (($Arguments | ForEach-Object { ConvertTo-ProcessArgument $_ }) -join ' ')
+}
+
 $ProjectPath = Resolve-AbsolutePath $ProjectPath
 $SamplePath = Resolve-AbsolutePath $SamplePath
 $ProjectSamplePath = Resolve-AbsolutePath $ProjectSamplePath
@@ -50,6 +66,22 @@ if (Test-Path -LiteralPath $ProjectSamplePath) {
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $ProjectSamplePath) | Out-Null
 Copy-Item -LiteralPath $SamplePath -Destination $ProjectSamplePath -Recurse -Force
 
+$importLogFile = Join-Path $ArtifactsPath "build-player-import.log"
+Remove-Item -LiteralPath $importLogFile -Force -ErrorAction SilentlyContinue
+
+$importArgs = @(
+    "-batchmode",
+    "-quit",
+    "-projectPath", $ProjectPath,
+    "-logFile", $importLogFile
+)
+
+$importProcess = Start-Process -FilePath $Unity -ArgumentList (ConvertTo-ProcessArgumentList $importArgs) -Wait -PassThru -WindowStyle Hidden
+$importExitCode = $importProcess.ExitCode
+if ($importExitCode -ne 0) {
+    throw "Runtime verification sample import failed with exit code $importExitCode. log=$importLogFile"
+}
+
 $logFile = Join-Path $ArtifactsPath "build-player.log"
 Remove-Item -LiteralPath $logFile -Force -ErrorAction SilentlyContinue
 
@@ -67,8 +99,8 @@ if ($Development) {
     $unityArgs += "--development"
 }
 
-& $Unity @unityArgs
-$exitCode = if ($null -eq $LASTEXITCODE) { 0 } else { $LASTEXITCODE }
+$process = Start-Process -FilePath $Unity -ArgumentList (ConvertTo-ProcessArgumentList $unityArgs) -Wait -PassThru -WindowStyle Hidden
+$exitCode = $process.ExitCode
 if ($exitCode -ne 0) {
     throw "Runtime verification player build failed with exit code $exitCode. log=$logFile"
 }

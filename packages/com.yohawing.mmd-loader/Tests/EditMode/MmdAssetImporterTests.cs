@@ -7,11 +7,14 @@ using UnityEditor;
 using UnityEditor.AssetImporters;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using Mmd.Editor;
 using Mmd.Parser;
 using Mmd.Physics;
+using Mmd.Rendering;
+using Mmd.Rendering.Universal;
 using Mmd.UnityIntegration;
 using Object = UnityEngine.Object;
 
@@ -29,6 +32,8 @@ namespace Mmd.Tests
         private const string TempPrefabPath = TempDirectory + "/test_1bone_cube.prefab";
         private const string TempScenePath = TempDirectory + "/test_1bone_cube_scene.unity";
         private const string TempRemapMaterialPath = TempDirectory + "/remapped_body.mat";
+        private const string TempMaterialOverridePath = TempDirectory + "/material_override.asset";
+        private const string TempNormalMapPath = TempDirectory + "/normal_map.png";
         private const int TestOneBoneCubeVertexCount = 14;
 
         [SetUp]
@@ -175,6 +180,8 @@ namespace Mmd.Tests
             Animator animator = root.GetComponent<Animator>();
             Assert.That(animator, Is.Not.Null);
             Assert.That(animator.runtimeAnimatorController, Is.Null);
+            Assert.That(animator.applyRootMotion, Is.True,
+                "Imported animation roots must enable root motion by default for ordinary Unity clips.");
             Assert.That(animator.avatar, Is.Not.Null);
             Assert.That(animator.avatar.isValid, Is.True);
             Assert.That(animator.avatar.isHuman, Is.False);
@@ -203,7 +210,6 @@ namespace Mmd.Tests
             serializedImporter.FindProperty("meshGenerationMode").enumValueIndex = (int)MmdPmxMeshGenerationMode.SplitByMaterial;
             serializedImporter.FindProperty("materialTexturePolicy").enumValueIndex = (int)MmdPmxMaterialTexturePolicy.ResolveReferencesOnly;
             serializedImporter.FindProperty("animationType").enumValueIndex = (int)MmdPmxAnimationType.Humanoid;
-            // This enum currently has one value; add a non-default round-trip assertion when a second preset exists.
             serializedImporter.FindProperty("shaderPreset").enumValueIndex = (int)MmdPmxShaderPreset.MmdBasicUrpToon;
             serializedImporter.ApplyModifiedPropertiesWithoutUndo();
             importer!.SaveAndReimport();
@@ -247,6 +253,90 @@ namespace Mmd.Tests
                     Object.DestroyImmediate(loadInstance.Root);
                 }
             }
+        }
+
+        [Test]
+        public void PmxImporterUrpLitShaderPresetGeneratesUrpLitMaterials()
+        {
+            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            var importer = AssetImporter.GetAtPath(TempPmxPath) as MmdPmxScriptedImporter;
+            Assert.That(importer, Is.Not.Null);
+
+            var serializedImporter = new SerializedObject(importer!);
+            serializedImporter.FindProperty("shaderPreset").enumValueIndex = (int)MmdPmxShaderPreset.UrpLit;
+            serializedImporter.ApplyModifiedPropertiesWithoutUndo();
+            importer!.SaveAndReimport();
+
+            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+
+            Assert.That(pmxAsset.ShaderPreset, Is.EqualTo(nameof(MmdPmxShaderPreset.UrpLit)));
+            Assert.That(pmxAsset.ImportedMaterials, Is.Not.Null.And.Not.Empty);
+            Assert.That(pmxAsset.ImportedMaterials[0].shader, Is.Not.Null);
+            Assert.That(pmxAsset.ImportedMaterials[0].shader.name,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName));
+        }
+
+        [Test]
+        public void PmxImporterAppliesPersistentMaterialOverrideAssetAfterTextureBinding()
+        {
+            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            string normalMapPath = Path.Combine(ProjectRoot, TempNormalMapPath);
+            WritePng(normalMapPath, new Color(0.2f, 0.3f, 0.4f, 1.0f));
+            AssetDatabase.ImportAsset(TempNormalMapPath, ImportAssetOptions.ForceUpdate);
+            Texture2D? normalMap = AssetDatabase.LoadAssetAtPath<Texture2D>(TempNormalMapPath);
+            Assert.That(normalMap, Is.Not.Null);
+
+            MmdMaterialOverrideAsset overrideAsset = ScriptableObject.CreateInstance<MmdMaterialOverrideAsset>();
+            overrideAsset.entries = new[]
+            {
+                new MmdMaterialOverrideEntry
+                {
+                    materialIndex = 0,
+                    hasMetallic = true,
+                    metallic = 0.72f,
+                    hasSmoothness = true,
+                    smoothness = 0.18f,
+                    hasNormalMap = true,
+                    normalMap = normalMap,
+                    hasNormalScale = true,
+                    normalScale = 0.33f
+                }
+            };
+            AssetDatabase.CreateAsset(overrideAsset, TempMaterialOverridePath);
+            AssetDatabase.ImportAsset(TempMaterialOverridePath, ImportAssetOptions.ForceUpdate);
+            MmdMaterialOverrideAsset persistedOverride =
+                AssetDatabase.LoadAssetAtPath<MmdMaterialOverrideAsset>(TempMaterialOverridePath);
+
+            var importer = AssetImporter.GetAtPath(TempPmxPath) as MmdPmxScriptedImporter;
+            Assert.That(importer, Is.Not.Null);
+            Assert.That(persistedOverride, Is.Not.Null);
+
+            var serializedImporter = new SerializedObject(importer!);
+            serializedImporter.FindProperty("shaderPreset").enumValueIndex = (int)MmdPmxShaderPreset.UrpLit;
+            serializedImporter.FindProperty("materialOverrideAsset").objectReferenceValue = persistedOverride;
+            serializedImporter.ApplyModifiedPropertiesWithoutUndo();
+            importer!.SaveAndReimport();
+
+            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+
+            Assert.That(pmxAsset.ShaderPreset, Is.EqualTo(nameof(MmdPmxShaderPreset.UrpLit)));
+            Assert.That(pmxAsset.ImportedMaterials, Is.Not.Null.And.Not.Empty);
+            Material importedMaterial = pmxAsset.ImportedMaterials[0];
+            Assert.That(importedMaterial.shader, Is.Not.Null);
+            Assert.That(importedMaterial.shader.name,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName));
+            Assert.That(importedMaterial.HasProperty(MmdMaterialPropertyNames.Metallic), Is.True);
+            Assert.That(importedMaterial.HasProperty(MmdMaterialPropertyNames.Smoothness), Is.True);
+            Assert.That(importedMaterial.HasProperty(MmdMaterialPropertyNames.BumpMap), Is.True);
+            Assert.That(importedMaterial.HasProperty(MmdMaterialPropertyNames.BumpScale), Is.True);
+            Assert.That(importedMaterial.GetFloat(MmdMaterialPropertyNames.Metallic),
+                Is.EqualTo(0.72f).Within(0.00001f));
+            Assert.That(importedMaterial.GetFloat(MmdMaterialPropertyNames.Smoothness),
+                Is.EqualTo(0.18f).Within(0.00001f));
+            Assert.That(importedMaterial.GetTexture(MmdMaterialPropertyNames.BumpMap), Is.SameAs(normalMap));
+            Assert.That(importedMaterial.IsKeywordEnabled("_NORMALMAP"), Is.True);
+            Assert.That(importedMaterial.GetFloat(MmdMaterialPropertyNames.BumpScale),
+                Is.EqualTo(0.33f).Within(0.00001f));
         }
 
         [Test]
@@ -329,6 +419,16 @@ namespace Mmd.Tests
             Assert.That(controller.HumanoidProxyRoot, Is.SameAs(proxyRoot));
             Assert.That(controller.HumanoidRetargetEntries, Is.Not.Empty);
             Assert.That(controller.HumanoidAppendEntries, Is.Not.Null);
+            AssertUpperArmBindPointsHorizontally(
+                controller.HumanoidRetargetEntries,
+                HumanBodyBones.LeftUpperArm,
+                HumanBodyBones.LeftLowerArm,
+                Vector3.left);
+            AssertUpperArmBindPointsHorizontally(
+                controller.HumanoidRetargetEntries,
+                HumanBodyBones.RightUpperArm,
+                HumanBodyBones.RightLowerArm,
+                Vector3.right);
             foreach (MmdHumanoidRetargetBinding entry in controller.HumanoidRetargetEntries)
             {
                 Assert.That(entry.ProxyTransform, Is.Not.Null, entry.HumanBone + " proxy transform");
@@ -337,9 +437,13 @@ namespace Mmd.Tests
                 Assert.That(Quaternion.Angle(entry.ProxyBindLocalRotation, entry.ProxyTransform!.localRotation),
                     Is.LessThan(0.001f),
                     entry.HumanBone + " proxy bind rotation must be captured after Avatar T-pose.");
-                Assert.That(Quaternion.Angle(entry.NativeBindLocalRotation, entry.NativeTransform!.localRotation),
-                    Is.LessThan(0.001f),
-                    entry.HumanBone + " native bind rotation must be captured from the imported hierarchy.");
+                if (entry.HumanBone != HumanBodyBones.LeftUpperArm &&
+                    entry.HumanBone != HumanBodyBones.RightUpperArm)
+                {
+                    Assert.That(Quaternion.Angle(entry.NativeBindLocalRotation, entry.NativeTransform!.localRotation),
+                        Is.LessThan(0.001f),
+                        entry.HumanBone + " native bind rotation must be captured from the imported hierarchy.");
+                }
             }
 
             foreach (MmdHumanoidAppendTransformBinding entry in controller.HumanoidAppendEntries)
@@ -381,7 +485,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void PmxScriptedImporterVersionIsTwentyThreeForModelPresetSelfShadowPolicy()
+        public void PmxScriptedImporterVersionIsTwentyFiveForPbrTextureScanPolicy()
         {
             object[] attributes = typeof(MmdPmxScriptedImporter).GetCustomAttributes(
                 typeof(ScriptedImporterAttribute),
@@ -389,8 +493,8 @@ namespace Mmd.Tests
 
             Assert.That(attributes, Has.Length.EqualTo(1));
             var attribute = (ScriptedImporterAttribute)attributes[0];
-            Assert.That(attribute.version, Is.EqualTo(23),
-                "PMX importer version must force reimport for auto model preset assignment and self-shadow target policy.");
+            Assert.That(attribute.version, Is.EqualTo(25),
+                "PMX importer version must force reimport for URP Lit PBR texture convention scan outputs and dependencies.");
         }
 
         [Test]
@@ -519,6 +623,9 @@ namespace Mmd.Tests
             Assert.That(pmxAsset.ImportedMaterials[0], Is.Not.Null);
             Assert.That(AssetDatabase.Contains(pmxAsset.ImportedMaterials[0]), Is.True);
             Assert.That(AssetDatabase.GetAssetPath(pmxAsset.ImportedMaterials[0]), Is.EqualTo(TempPmxPath));
+            Assert.That(pmxAsset.ImportedMaterials[0].shader, Is.Not.Null);
+            Assert.That(pmxAsset.ImportedMaterials[0].shader.name,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName));
         }
 
         [Test]
@@ -1018,6 +1125,61 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void ImportedHierarchyWrapperAppliesMaterialOverrideToDescriptor()
+        {
+            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+            Assert.That(pmxAsset, Is.Not.Null);
+            Assert.That(pmxAsset.ImportedRoot, Is.Not.Null);
+
+            GameObject sceneRoot = Object.Instantiate(pmxAsset.ImportedRoot!);
+            MmdMaterialOverrideAsset? overrideAsset = null;
+            MmdUnityModelInstance? instance = null;
+            try
+            {
+                overrideAsset = ScriptableObject.CreateInstance<MmdMaterialOverrideAsset>();
+                overrideAsset.entries = new[]
+                {
+                    new MmdMaterialOverrideEntry
+                    {
+                        materialIndex = 0,
+                        hasAlpha = true,
+                        alpha = 0.45f,
+                        hasSurfaceMode = true,
+                        surfaceMode = MmdMaterialOverrideSurfaceMode.AlphaBlend
+                    }
+                };
+
+                instance = MmdUnityModelFactory.CreateFromInstantiatedImportedHierarchy(
+                    sceneRoot,
+                    pmxAsset.LoadModel(),
+                    sourcePath: null,
+                    pmxAsset.ImportScale,
+                    includeSelfShadowTarget: true,
+                    materialOverride: overrideAsset);
+
+                Assert.That(instance.RenderingDescriptor.materials[0].alpha, Is.EqualTo(0.45f).Within(0.00001f));
+                Assert.That(instance.RenderingDescriptor.urpMaterialBindings[0].alpha, Is.EqualTo(0.45f).Within(0.00001f));
+                Assert.That(instance.RenderingDescriptor.urpMaterialBindings[0].isTransparent, Is.True);
+                Assert.That(instance.RenderingDescriptor.urpMaterialBindings[0].transparencyMode, Is.EqualTo("alphaBlend"));
+                Assert.That(ReadMaterialFloat(instance.Materials[0], MmdMaterialPropertyNames.Alpha), Is.EqualTo(0.45f).Within(0.00001f));
+                Assert.That(instance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
+            }
+            finally
+            {
+                Object.DestroyImmediate(overrideAsset);
+                if (instance?.Root != null)
+                {
+                    Object.DestroyImmediate(instance.Root);
+                }
+                else if (sceneRoot != null)
+                {
+                    Object.DestroyImmediate(sceneRoot);
+                }
+            }
+        }
+
+        [Test]
         public void LoadPmxAssetIntoSceneImportedHierarchyPathDoesNotProduceSplitRuntimeMesh()
         {
             // Focused name check: verify the mesh name is the importer's (not "Split Runtime")
@@ -1144,7 +1306,7 @@ namespace Mmd.Tests
                 AssetDatabase.DeleteAsset(assetsTempDir);
                 AssetDatabase.Refresh();
 
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(instance);
             }
         }
 
@@ -1191,7 +1353,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(instance);
             }
         }
 
@@ -1239,7 +1401,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(instance);
             }
         }
 
@@ -1588,7 +1750,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(instance);
             }
         }
 
@@ -1717,6 +1879,146 @@ namespace Mmd.Tests
             finally
             {
                 Object.DestroyImmediate(pmxAsset);
+            }
+        }
+
+        [Test]
+        public void SelfShadowRendererSetupReadinessReportsNoUrpAsset()
+        {
+            MmdSelfShadowRendererSetupReadiness readiness =
+                MmdAssetInspectorUtility.EvaluateMmdSelfShadowRendererSetup(null);
+
+            Assert.That(readiness.HasUrpAsset, Is.False);
+            Assert.That(readiness.RendererDataCount, Is.EqualTo(0));
+            Assert.That(readiness.FeatureCount, Is.EqualTo(0));
+            Assert.That(readiness.EnabledFeatureCount, Is.EqualTo(0));
+            Assert.That(readiness.FeaturePresentOnAnyRendererData, Is.False);
+            Assert.That(readiness.FeatureEnabledOnAnyRendererData, Is.False);
+        }
+
+        [Test]
+        public void SelfShadowRendererSetupReadinessReportsMissingFeature()
+        {
+            using var fixture = SelfShadowRendererSetupFixture.Create(includeFeature: false);
+
+            MmdSelfShadowRendererSetupReadiness readiness =
+                MmdAssetInspectorUtility.EvaluateMmdSelfShadowRendererSetup(fixture.Pipeline);
+
+            Assert.That(readiness.HasUrpAsset, Is.True);
+            Assert.That(readiness.RendererDataCount, Is.EqualTo(1));
+            Assert.That(readiness.FeatureCount, Is.EqualTo(0));
+            Assert.That(readiness.EnabledFeatureCount, Is.EqualTo(0));
+            Assert.That(readiness.FeaturePresentOnAnyRendererData, Is.False);
+            Assert.That(readiness.FeatureEnabledOnAnyRendererData, Is.False);
+        }
+
+        [Test]
+        public void SelfShadowRendererSetupReadinessDistinguishesDisabledFeature()
+        {
+            using var fixture = SelfShadowRendererSetupFixture.Create(includeFeature: true, featureEnabled: false);
+
+            MmdSelfShadowRendererSetupReadiness readiness =
+                MmdAssetInspectorUtility.EvaluateMmdSelfShadowRendererSetup(fixture.Pipeline);
+
+            Assert.That(readiness.HasUrpAsset, Is.True);
+            Assert.That(readiness.RendererDataCount, Is.EqualTo(1));
+            Assert.That(readiness.FeatureCount, Is.EqualTo(1));
+            Assert.That(readiness.EnabledFeatureCount, Is.EqualTo(0));
+            Assert.That(readiness.FeaturePresentOnAnyRendererData, Is.True);
+            Assert.That(readiness.FeatureEnabledOnAnyRendererData, Is.False);
+        }
+
+        [Test]
+        public void SelfShadowRendererSetupReadinessReportsEnabledFeature()
+        {
+            using var fixture = SelfShadowRendererSetupFixture.Create(includeFeature: true, featureEnabled: true);
+
+            MmdSelfShadowRendererSetupReadiness readiness =
+                MmdAssetInspectorUtility.EvaluateMmdSelfShadowRendererSetup(fixture.Pipeline);
+
+            Assert.That(readiness.HasUrpAsset, Is.True);
+            Assert.That(readiness.RendererDataCount, Is.EqualTo(1));
+            Assert.That(readiness.FeatureCount, Is.EqualTo(1));
+            Assert.That(readiness.EnabledFeatureCount, Is.EqualTo(1));
+            Assert.That(readiness.FeaturePresentOnAnyRendererData, Is.True);
+            Assert.That(readiness.FeatureEnabledOnAnyRendererData, Is.True);
+        }
+
+        [Test]
+        public void SelfShadowRendererSetupReadinessUsesDefaultRendererDataForActiveFeature()
+        {
+            var pipeline = ScriptableObject.CreateInstance<UniversalRenderPipelineAsset>();
+            var defaultRendererData = ScriptableObject.CreateInstance<UniversalRendererData>();
+            var unusedRendererData = ScriptableObject.CreateInstance<UniversalRendererData>();
+            var feature = ScriptableObject.CreateInstance<MmdSelfShadowRendererFeature>();
+            var bindingGo = new GameObject("binding");
+            try
+            {
+                feature.SetActive(true);
+                AddSelfShadowFeature(unusedRendererData, feature);
+                SetRendererDataList(pipeline, 0, defaultRendererData, unusedRendererData);
+                MmdSceneEnvironmentBinding binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
+                binding.SelfShadowEnabled = true;
+
+                MmdSelfShadowRendererSetupReadiness readiness =
+                    MmdAssetInspectorUtility.EvaluateMmdSelfShadowRendererSetup(pipeline);
+                string warning = MmdAssetInspectorUtility.GetSelfShadowRendererSetupWarning(binding, readiness);
+
+                Assert.That(readiness.FeatureEnabledOnAnyRendererData, Is.True);
+                Assert.That(readiness.ActiveRendererDataIndex, Is.EqualTo(0));
+                Assert.That(readiness.FeatureEnabledOnActiveRendererData, Is.False);
+                Assert.That(warning, Does.Contain("MmdSelfShadowRendererFeature"));
+                Assert.That(warning, Does.Contain("not configured"));
+            }
+            finally
+            {
+                Object.DestroyImmediate(bindingGo);
+                Object.DestroyImmediate(feature);
+                Object.DestroyImmediate(unusedRendererData);
+                Object.DestroyImmediate(defaultRendererData);
+                Object.DestroyImmediate(pipeline);
+            }
+        }
+
+        [Test]
+        public void SelfShadowRendererSetupReadinessUsesTargetCameraRendererOverride()
+        {
+            var pipeline = ScriptableObject.CreateInstance<UniversalRenderPipelineAsset>();
+            var defaultRendererData = ScriptableObject.CreateInstance<UniversalRendererData>();
+            var cameraRendererData = ScriptableObject.CreateInstance<UniversalRendererData>();
+            var feature = ScriptableObject.CreateInstance<MmdSelfShadowRendererFeature>();
+            var bindingGo = new GameObject("binding");
+            var cameraGo = new GameObject("camera");
+            try
+            {
+                feature.SetActive(true);
+                AddSelfShadowFeature(defaultRendererData, feature);
+                SetRendererDataList(pipeline, 0, defaultRendererData, cameraRendererData);
+                Camera camera = cameraGo.AddComponent<Camera>();
+                var additionalCameraData = cameraGo.AddComponent<UniversalAdditionalCameraData>();
+                additionalCameraData.SetRenderer(1);
+                MmdSceneEnvironmentBinding binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
+                binding.SelfShadowEnabled = true;
+                binding.TargetCamera = camera;
+
+                MmdSelfShadowRendererSetupReadiness readiness =
+                    MmdAssetInspectorUtility.EvaluateMmdSelfShadowRendererSetup(pipeline, camera);
+                string warning = MmdAssetInspectorUtility.GetSelfShadowRendererSetupWarning(binding, readiness);
+
+                Assert.That(readiness.FeatureEnabledOnAnyRendererData, Is.True);
+                Assert.That(readiness.ActiveRendererDataIndex, Is.EqualTo(1));
+                Assert.That(readiness.FeatureEnabledOnActiveRendererData, Is.False);
+                Assert.That(warning, Does.Contain("MmdSelfShadowRendererFeature"));
+                Assert.That(warning, Does.Contain("not configured"));
+            }
+            finally
+            {
+                Object.DestroyImmediate(cameraGo);
+                Object.DestroyImmediate(bindingGo);
+                Object.DestroyImmediate(feature);
+                Object.DestroyImmediate(cameraRendererData);
+                Object.DestroyImmediate(defaultRendererData);
+                Object.DestroyImmediate(pipeline);
             }
         }
 
@@ -1906,7 +2208,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(result?.Instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(result?.Instance);
             }
         }
 
@@ -1940,7 +2242,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(result?.Instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(result?.Instance);
             }
         }
 
@@ -2378,7 +2680,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(instance);
                 Object.DestroyImmediate(parent);
             }
         }
@@ -2413,7 +2715,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(instance);
             }
         }
 
@@ -2450,7 +2752,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(instance);
                 Object.DestroyImmediate(parent);
             }
         }
@@ -2482,7 +2784,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(instance);
             }
         }
 
@@ -2514,7 +2816,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(result?.Instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(result?.Instance);
                 Object.DestroyImmediate(parent);
             }
         }
@@ -2583,7 +2885,7 @@ namespace Mmd.Tests
                     Object.DestroyImmediate(replacementVmd);
                 }
 
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(instance);
             }
         }
 
@@ -2613,7 +2915,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(instance);
             }
         }
 
@@ -2645,7 +2947,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(instance);
             }
         }
 
@@ -2684,7 +2986,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(result?.Instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(result?.Instance);
                 Object.DestroyImmediate(parent);
             }
         }
@@ -3258,40 +3560,6 @@ namespace Mmd.Tests
             Assert.That(actual.z, Is.EqualTo(expected.z).Within(0.0001f));
         }
 
-        private static void DestroyInstance(MmdUnityModelInstance? instance)
-        {
-            if (instance == null)
-            {
-                return;
-            }
-
-            if (instance.Root != null)
-            {
-                Object.DestroyImmediate(instance.Root);
-            }
-
-            if (instance.Mesh != null && !AssetDatabase.Contains(instance.Mesh))
-            {
-                Object.DestroyImmediate(instance.Mesh);
-            }
-
-            foreach (Material material in instance.Materials)
-            {
-                if (material != null && !AssetDatabase.Contains(material))
-                {
-                    Object.DestroyImmediate(material);
-                }
-            }
-
-            foreach (Texture2D texture in instance.OwnedTextures)
-            {
-                if (texture != null && !AssetDatabase.Contains(texture))
-                {
-                    Object.DestroyImmediate(texture);
-                }
-            }
-        }
-
         private static Material CreateTestMaterial(string name)
         {
             Shader shader = Shader.Find("Universal Render Pipeline/Lit")
@@ -3321,9 +3589,9 @@ namespace Mmd.Tests
                 isMovable = true,
                 isRotatable = true
             });
-            model.vertices.Add(CreateVertex(0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f));
-            model.vertices.Add(CreateVertex(1, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f));
-            model.vertices.Add(CreateVertex(2, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f));
+            model.vertices.Add(MmdTestFixtures.CreateSyntheticVertex(0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f));
+            model.vertices.Add(MmdTestFixtures.CreateSyntheticVertex(1, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f));
+            model.vertices.Add(MmdTestFixtures.CreateSyntheticVertex(2, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f));
             model.indices.AddRange(new[] { 0, 1, 2 });
             model.materials.Add(new MmdMaterialDefinition
             {
@@ -3333,25 +3601,6 @@ namespace Mmd.Tests
                 vertexCount = 3
             });
             return model;
-        }
-
-        private static MmdVertexDefinition CreateVertex(
-            int index,
-            float x,
-            float y,
-            float z,
-            float u,
-            float v)
-        {
-            return new MmdVertexDefinition
-            {
-                index = index,
-                position = new[] { x, y, z },
-                normal = new[] { 0.0f, 0.0f, 1.0f },
-                uv = new[] { u, v },
-                boneIndices = new[] { 0 },
-                boneWeights = new[] { 1.0f }
-            };
         }
 
         private static string CreateTempDirectory()
@@ -3861,12 +4110,130 @@ namespace Mmd.Tests
                 "ContainsMmdAssetReference must return false for null");
         }
 
+        private static void AssertUpperArmBindPointsHorizontally(
+            System.Collections.Generic.IReadOnlyList<MmdHumanoidRetargetBinding> entries,
+            HumanBodyBones upperArmBone,
+            HumanBodyBones lowerArmBone,
+            Vector3 expectedDirection)
+        {
+            MmdHumanoidRetargetBinding? upperArm = null;
+            MmdHumanoidRetargetBinding? lowerArm = null;
+            foreach (MmdHumanoidRetargetBinding entry in entries)
+            {
+                if (entry.HumanBone == upperArmBone)
+                {
+                    upperArm = entry;
+                }
+                else if (entry.HumanBone == lowerArmBone)
+                {
+                    lowerArm = entry;
+                }
+            }
+
+            Assert.That(upperArm, Is.Not.Null, upperArmBone + " binding");
+            Assert.That(lowerArm, Is.Not.Null, lowerArmBone + " binding");
+            Assert.That(upperArm!.NativeTransform, Is.Not.Null);
+            Assert.That(lowerArm!.NativeTransform, Is.Not.Null);
+
+            Transform upperTransform = upperArm.NativeTransform!;
+            Transform lowerTransform = lowerArm.NativeTransform!;
+            Quaternion originalRotation = upperTransform.localRotation;
+            try
+            {
+                upperTransform.localRotation = upperArm.NativeBindLocalRotation;
+                Vector3 direction = (lowerTransform.position - upperTransform.position).normalized;
+                Assert.That(Vector3.Dot(direction, expectedDirection), Is.GreaterThan(0.999f),
+                    upperArmBone + " native retarget bind must use the same geometric T-pose baseline as the proxy Avatar.");
+            }
+            finally
+            {
+                upperTransform.localRotation = originalRotation;
+            }
+        }
+
         private static void AssertNoMissingScripts(GameObject root)
         {
             Assert.That(GameObjectUtility.GetMonoBehavioursWithMissingScriptCount(root), Is.EqualTo(0), root.name);
             foreach (Transform child in root.transform)
             {
                 AssertNoMissingScripts(child.gameObject);
+            }
+        }
+
+        private static void AddSelfShadowFeature(
+            UniversalRendererData rendererData,
+            MmdSelfShadowRendererFeature feature)
+        {
+            var rendererDataSo = new SerializedObject(rendererData);
+            var features = rendererDataSo.FindProperty("m_RendererFeatures");
+            features.arraySize = 1;
+            features.GetArrayElementAtIndex(0).objectReferenceValue = feature;
+            rendererDataSo.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static void SetRendererDataList(
+            UniversalRenderPipelineAsset pipeline,
+            int defaultRendererIndex,
+            params UniversalRendererData[] rendererData)
+        {
+            var pipelineSo = new SerializedObject(pipeline);
+            var rendererDataList = pipelineSo.FindProperty("m_RendererDataList");
+            rendererDataList.arraySize = rendererData.Length;
+            for (int i = 0; i < rendererData.Length; i++)
+            {
+                rendererDataList.GetArrayElementAtIndex(i).objectReferenceValue = rendererData[i];
+            }
+
+            var defaultRendererIndexProperty = pipelineSo.FindProperty("m_DefaultRendererIndex");
+            defaultRendererIndexProperty.intValue = defaultRendererIndex;
+            pipelineSo.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private sealed class SelfShadowRendererSetupFixture : IDisposable
+        {
+            private SelfShadowRendererSetupFixture(
+                UniversalRenderPipelineAsset pipeline,
+                UniversalRendererData rendererData,
+                MmdSelfShadowRendererFeature? feature)
+            {
+                Pipeline = pipeline;
+                RendererData = rendererData;
+                Feature = feature;
+            }
+
+            public UniversalRenderPipelineAsset Pipeline { get; }
+
+            private UniversalRendererData RendererData { get; }
+
+            private MmdSelfShadowRendererFeature? Feature { get; }
+
+            public static SelfShadowRendererSetupFixture Create(bool includeFeature, bool featureEnabled = true)
+            {
+                var pipeline = ScriptableObject.CreateInstance<UniversalRenderPipelineAsset>();
+                var rendererData = ScriptableObject.CreateInstance<UniversalRendererData>();
+                MmdSelfShadowRendererFeature? feature = null;
+
+                if (includeFeature)
+                {
+                    feature = ScriptableObject.CreateInstance<MmdSelfShadowRendererFeature>();
+                    feature.SetActive(featureEnabled);
+                    AddSelfShadowFeature(rendererData, feature);
+                }
+
+                SetRendererDataList(pipeline, 0, rendererData);
+
+                return new SelfShadowRendererSetupFixture(pipeline, rendererData, feature);
+            }
+
+            public void Dispose()
+            {
+                if (Feature != null)
+                {
+                    Object.DestroyImmediate(Feature);
+                }
+
+                Object.DestroyImmediate(RendererData);
+                Object.DestroyImmediate(Pipeline);
             }
         }
     }

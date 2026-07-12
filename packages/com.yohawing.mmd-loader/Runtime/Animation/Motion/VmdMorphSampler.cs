@@ -10,20 +10,7 @@ namespace Mmd.Motion
     {
         public static float SampleWeight(IReadOnlyList<MmdMorphKeyframeDefinition>? keyframes, string morphName, float frame)
         {
-            if (keyframes == null)
-            {
-                throw new ArgumentNullException(nameof(keyframes));
-            }
-
-            if (string.IsNullOrWhiteSpace(morphName))
-            {
-                throw new ArgumentException("Morph name is required.", nameof(morphName));
-            }
-
-            if (float.IsNaN(frame) || float.IsInfinity(frame))
-            {
-                throw new ArgumentOutOfRangeException(nameof(frame), "Frame must be finite.");
-            }
+            ValidateInputs(keyframes, morphName, frame);
 
             MmdMorphKeyframeDefinition? previous = null;
             MmdMorphKeyframeDefinition? next = null;
@@ -47,27 +34,31 @@ namespace Mmd.Motion
                 }
             }
 
-            if (previous == null && next == null)
-            {
-                return 0.0f;
-            }
-
-            if (previous == null)
-            {
-                return next!.weight;
-            }
-
-            if (next == null || previous.frame == next.frame)
-            {
-                return previous.weight;
-            }
-
-            float span = next.frame - previous.frame;
-            float t = (frame - previous.frame) / span;
-            return previous.weight + (next.weight - previous.weight) * t;
+            return SampleBetween(previous, next, frame);
         }
 
         public static float SampleSortedWeight(IReadOnlyList<MmdMorphKeyframeDefinition>? keyframes, string morphName, float frame)
+        {
+            ValidateInputs(keyframes, morphName, frame);
+
+            int nextIndex = LowerBoundFrame(keyframes, frame);
+            int previousIndex = nextIndex;
+            while (previousIndex < keyframes.Count && keyframes[previousIndex].frame <= frame)
+            {
+                previousIndex++;
+            }
+
+            previousIndex--;
+            MmdMorphKeyframeDefinition? previous = previousIndex >= 0 ? keyframes[previousIndex] : null;
+            MmdMorphKeyframeDefinition? next = nextIndex < keyframes.Count ? keyframes[nextIndex] : null;
+
+            return SampleBetween(previous, next, frame);
+        }
+
+        private static void ValidateInputs(
+            IReadOnlyList<MmdMorphKeyframeDefinition>? keyframes,
+            string morphName,
+            float frame)
         {
             if (keyframes == null)
             {
@@ -83,18 +74,13 @@ namespace Mmd.Motion
             {
                 throw new ArgumentOutOfRangeException(nameof(frame), "Frame must be finite.");
             }
+        }
 
-            int nextIndex = LowerBoundFrame(keyframes, frame);
-            int previousIndex = nextIndex;
-            while (previousIndex < keyframes.Count && keyframes[previousIndex].frame <= frame)
-            {
-                previousIndex++;
-            }
-
-            previousIndex--;
-            MmdMorphKeyframeDefinition? previous = previousIndex >= 0 ? keyframes[previousIndex] : null;
-            MmdMorphKeyframeDefinition? next = nextIndex < keyframes.Count ? keyframes[nextIndex] : null;
-
+        private static float SampleBetween(
+            MmdMorphKeyframeDefinition? previous,
+            MmdMorphKeyframeDefinition? next,
+            float frame)
+        {
             if (previous == null && next == null)
             {
                 return 0.0f;

@@ -14,6 +14,7 @@ namespace Mmd.Editor
         private SerializedProperty? modelPresetProperty;
         private SerializedProperty? materialTexturePolicyProperty;
         private SerializedProperty? shaderPresetProperty;
+        private SerializedProperty? materialOverrideAssetProperty;
         private SerializedProperty? materialRemapsProperty;
         private SerializedProperty? animationTypeProperty;
         private SerializedProperty? humanoidBoneMappingOverridesProperty;
@@ -43,6 +44,7 @@ namespace Mmd.Editor
             modelPresetProperty = serializedObject.FindProperty("modelPreset");
             materialTexturePolicyProperty = serializedObject.FindProperty("materialTexturePolicy");
             shaderPresetProperty = serializedObject.FindProperty("shaderPreset");
+            materialOverrideAssetProperty = serializedObject.FindProperty("materialOverrideAsset");
             materialRemapsProperty = serializedObject.FindProperty("materialRemaps");
             animationTypeProperty = serializedObject.FindProperty("animationType");
             humanoidBoneMappingOverridesProperty = serializedObject.FindProperty("humanoidBoneMappingOverrides");
@@ -128,6 +130,15 @@ namespace Mmd.Editor
                 EditorGUILayout.HelpBox("Apply import settings to refresh material data.", MessageType.Warning);
             }
 
+            if (materialOverrideAssetProperty != null)
+            {
+                EditorGUILayout.PropertyField(
+                    materialOverrideAssetProperty,
+                    new GUIContent(
+                        "Material Override",
+                        "Applies per-material PBR overrides after PMX texture binding."));
+            }
+
             // Minimal Toon Shader Settings surface. Shader Preset is an importer setting; diagnostics stay out of the normal UI.
             toonShaderSettingsExpanded = EditorGUILayout.Foldout(
                 toonShaderSettingsExpanded, "Toon Shader Settings", toggleOnLabelClick: true);
@@ -139,7 +150,7 @@ namespace Mmd.Editor
                         shaderPresetProperty,
                         new GUIContent(
                             "Shader Preset",
-                            "Selects the target shader family for material generation and Toon settings handoff. Only MmdBasicUrpToon is available in this slice. The value is an importer setting; it is summarized on the imported asset after Apply/Reimport. This UI is not a full Material Editor and does not mutate generated materials."));
+                            "Selects the target shader family for material generation. Available presets are MMD Basic URP Toon and URP Lit. The value is an importer setting; it is summarized on the imported asset after Apply/Reimport. This UI is not a full Material Editor and does not mutate generated materials."));
                 }
             }
 

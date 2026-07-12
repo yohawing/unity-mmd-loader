@@ -8,7 +8,7 @@ using Mmd.Rendering;
 
 namespace Mmd.UnityIntegration
 {
-    public static class MmdUnityFrameApplier
+    internal static class MmdUnityFrameApplier
     {
         public static void ApplyFrame(MmdUnityModelInstance instance, MmdEvaluatedFrame frame)
         {
@@ -640,12 +640,15 @@ namespace Mmd.UnityIntegration
         private static Vector3 ToUnityPosition(float[] position, float importScale)
         {
             float scale = (float.IsFinite(importScale) && importScale > 0.0f) ? importScale : 1.0f;
-            return new Vector3(-position[0], position[1], -position[2]) * scale;
+            return MmdCoordinateSpace.MmdToUnityPosition(
+                new Vector3(position[0], position[1], position[2]),
+                scale);
         }
 
         private static Quaternion ToUnityRotation(float[] rotation)
         {
-            return new Quaternion(-rotation[0], rotation[1], -rotation[2], rotation[3]);
+            return MmdCoordinateSpace.MmdToUnityRotation(
+                new Quaternion(rotation[0], rotation[1], rotation[2], rotation[3]));
         }
 
         private static Vector3 ToUnityScale(float[] scale)

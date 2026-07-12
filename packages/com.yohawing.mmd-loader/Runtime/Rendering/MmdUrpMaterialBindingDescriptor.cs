@@ -37,6 +37,15 @@ namespace Mmd.Rendering
     public static class MmdUrpMaterialBindingDescriptorBuilder
     {
         public const string DefaultShaderName = "MMD Basic URP Toon";
+        public const string UrpLitShaderName = "Universal Render Pipeline/Lit";
+
+        public static IReadOnlyList<MmdUrpMaterialBindingDescriptor> Build(
+            IReadOnlyList<MmdMaterialDescriptor> materials,
+            MmdMaterialPreset preset)
+        {
+            string shaderName = preset == MmdMaterialPreset.UrpLit ? UrpLitShaderName : DefaultShaderName;
+            return Build(materials, shaderName);
+        }
 
         public static IReadOnlyList<MmdUrpMaterialBindingDescriptor> Build(
             IReadOnlyList<MmdMaterialDescriptor> materials,

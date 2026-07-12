@@ -51,6 +51,7 @@ namespace Mmd.Tests
 
                 Animator animator = root.AddComponent<Animator>();
                 animator.avatar = avatar;
+                animator.applyRootMotion = true;
 
                 MmdUnityPlaybackController controller = root.AddComponent<MmdUnityPlaybackController>();
 
@@ -80,6 +81,21 @@ namespace Mmd.Tests
                     typeof(Animator),
                     spineMuscleName,
                     AnimationCurve.Linear(0.0f, 0.0f, 1.0f, 0.9f));
+                muscleClip.SetCurve(
+                    string.Empty,
+                    typeof(Animator),
+                    "RootT.x",
+                    AnimationCurve.Linear(0.0f, 0.0f, 1.0f, 1.0f));
+                muscleClip.SetCurve(
+                    string.Empty,
+                    typeof(Animator),
+                    "RootT.y",
+                    AnimationCurve.Constant(0.0f, 1.0f, 0.0f));
+                muscleClip.SetCurve(
+                    string.Empty,
+                    typeof(Animator),
+                    "RootT.z",
+                    AnimationCurve.Constant(0.0f, 1.0f, 0.0f));
 
                 timeline = ScriptableObject.CreateInstance<TimelineAsset>();
                 MmdHumanoidAnimationTrack track =
@@ -89,18 +105,17 @@ namespace Mmd.Tests
                 clip.duration = 1.0;
                 var clipAsset = (MmdHumanoidAnimationClip)clip.asset;
                 clipAsset.clip = muscleClip;
-                clipAsset.proxyAnimator.exposedName = "editScrubProxyAnimator_" + Guid.NewGuid().ToString("N");
 
                 directorObject = new GameObject("edit-scrub-director");
                 PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
                 director.playOnAwake = false;
                 director.playableAsset = timeline;
                 director.SetGenericBinding(track, controller);
-                director.SetReferenceValue(clipAsset.proxyAnimator.exposedName, animator);
 
                 AnimationMode.StartAnimationMode();
                 animationModeStarted = true;
                 director.RebuildGraph();
+                Vector3 baselineRootPosition = root.transform.position;
 
                 // Scrub to 0.5s and re-evaluate at the same time to settle the accepted 1-eval lag.
                 director.time = 0.5;
@@ -129,6 +144,26 @@ namespace Mmd.Tests
                 float nativeSettled = Quaternion.Angle(nativeSpineBind, nativeSpine.localRotation);
                 Assert.That(Mathf.Abs(proxySettled - nativeSettled), Is.LessThan(0.5f),
                     "native should converge to the proxy on same-time re-evaluation");
+
+                // (d) Edit Mode root motion is random-access, not a delta accumulated from the
+                // previous scrub position. Re-visiting 0.8s after 0.2s must produce the same root.
+                director.time = 0.8;
+                director.Evaluate();
+                Vector3 firstRootAtPointEight = root.transform.position;
+                director.time = 0.2;
+                director.Evaluate();
+                director.time = 0.8;
+                director.Evaluate();
+                Vector3 secondRootAtPointEight = root.transform.position;
+                Assert.That(Vector3.Distance(firstRootAtPointEight, baselineRootPosition), Is.GreaterThan(0.01f),
+                    "RootT curve must visibly move the root during Edit Mode preview.");
+                Assert.That(Vector3.Distance(firstRootAtPointEight, secondRootAtPointEight), Is.LessThan(1e-5f),
+                    "Edit Mode 0.8 -> 0.2 -> 0.8 scrub must not accumulate root-motion deltas.");
+
+                director.playableAsset = null;
+                director.RebuildGraph();
+                Assert.That(Vector3.Distance(root.transform.position, baselineRootPosition), Is.LessThan(1e-5f),
+                    "destroying the Edit Mode preview graph must restore the root baseline.");
             }
             finally
             {

@@ -41,14 +41,8 @@ namespace Mmd.Native
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_camera_track_sample", CallingConvention = CallingConvention.Cdecl)]
         internal static extern byte VmdCameraTrackSample(IntPtr track, float frame, [Out] float[] outF32, IntPtr outF32Len);
 
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_sample_camera", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern byte VmdSampleCamera(byte[] data, IntPtr len, float frame, [Out] float[] outF32, IntPtr outF32Len);
-
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_light_track_sample", CallingConvention = CallingConvention.Cdecl)]
         internal static extern byte VmdLightTrackSample(IntPtr track, float frame, [Out] float[] outF32, IntPtr outF32Len);
-
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_sample_light", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern byte VmdSampleLight(byte[] data, IntPtr len, float frame, [Out] float[] outF32, IntPtr outF32Len);
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_light_track_create_from_vmd_bytes", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr VmdLightTrackCreateFromVmdBytes(byte[] data, IntPtr len);
@@ -62,8 +56,14 @@ namespace Mmd.Native
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_self_shadow_track_sample", CallingConvention = CallingConvention.Cdecl)]
         internal static extern byte VmdSelfShadowTrackSample(IntPtr track, float frame, [Out] float[] outF32, IntPtr outF32Len);
 
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_sample_self_shadow", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern byte VmdSampleSelfShadow(byte[] data, IntPtr len, float frame, [Out] float[] outF32, IntPtr outF32Len);
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_self_shadow_track_create_from_vmd_bytes", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr VmdSelfShadowTrackCreateFromVmdBytes(byte[] data, IntPtr len);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_self_shadow_track_frame_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr VmdSelfShadowTrackFrameCount(IntPtr track);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_self_shadow_track_free", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void VmdSelfShadowTrackFree(IntPtr track);
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_camera_track_free", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void VmdCameraTrackFree(IntPtr track);
@@ -260,30 +260,8 @@ namespace Mmd.Native
                 throw new ArgumentOutOfRangeException(nameof(frame), "Frame must be a non-negative finite value.");
             }
 
-            IntPtr model = IntPtr.Zero;
-            IntPtr clip = IntPtr.Zero;
-            IntPtr instance = IntPtr.Zero;
-            try
+            return WithSession(pmxBytes, vmdBytes, (model, clip, instance, abiVersion) =>
             {
-                uint abiVersion = MmdRuntimeFfiMethods.ValidateAbiVersion();
-                model = MmdRuntimeFfiMethods.ModelCreateFromPmxBytes(pmxBytes, new IntPtr(pmxBytes.Length));
-                if (model == IntPtr.Zero)
-                {
-                    throw new InvalidOperationException("mmd-runtime PMX import returned a null model.");
-                }
-
-                clip = MmdRuntimeFfiMethods.ClipCreateFromVmdBytesForModel(model, vmdBytes, new IntPtr(vmdBytes.Length));
-                if (clip == IntPtr.Zero)
-                {
-                    throw new InvalidOperationException("mmd-runtime VMD import returned a null clip.");
-                }
-
-                instance = MmdRuntimeFfiMethods.InstanceCreateForModel(model);
-                if (instance == IntPtr.Zero)
-                {
-                    throw new InvalidOperationException("mmd-runtime instance creation returned null.");
-                }
-
                 if (MmdRuntimeFfiMethods.InstanceEvaluateClipFrame(instance, clip, frame) == 0)
                 {
                     throw new InvalidOperationException("mmd-runtime clip frame evaluation returned false.");
@@ -341,24 +319,7 @@ namespace Mmd.Native
                     clipLastFrame = hasClipRange ? lastFrame : 0,
                     unsupportedReason = string.Empty
                 };
-            }
-            finally
-            {
-                if (instance != IntPtr.Zero)
-                {
-                    MmdRuntimeFfiMethods.InstanceFree(instance);
-                }
-
-                if (clip != IntPtr.Zero)
-                {
-                    MmdRuntimeFfiMethods.ClipFree(clip);
-                }
-
-                if (model != IntPtr.Zero)
-                {
-                    MmdRuntimeFfiMethods.ModelFree(model);
-                }
-            }
+            });
         }
 
         public static MmdRuntimeFfiBenchmarkReport Benchmark(byte[] pmxBytes, byte[] vmdBytes, int startFrame, int frameCount, int repetitions)
@@ -388,30 +349,8 @@ namespace Mmd.Native
                 throw new ArgumentOutOfRangeException(nameof(repetitions), "Repetitions must be positive.");
             }
 
-            IntPtr model = IntPtr.Zero;
-            IntPtr clip = IntPtr.Zero;
-            IntPtr instance = IntPtr.Zero;
-            try
+            return WithSession(pmxBytes, vmdBytes, (model, clip, instance, abiVersion) =>
             {
-                uint abiVersion = MmdRuntimeFfiMethods.ValidateAbiVersion();
-                model = MmdRuntimeFfiMethods.ModelCreateFromPmxBytes(pmxBytes, new IntPtr(pmxBytes.Length));
-                if (model == IntPtr.Zero)
-                {
-                    throw new InvalidOperationException("mmd-runtime PMX import returned a null model.");
-                }
-
-                clip = MmdRuntimeFfiMethods.ClipCreateFromVmdBytesForModel(model, vmdBytes, new IntPtr(vmdBytes.Length));
-                if (clip == IntPtr.Zero)
-                {
-                    throw new InvalidOperationException("mmd-runtime VMD import returned a null clip.");
-                }
-
-                instance = MmdRuntimeFfiMethods.InstanceCreateForModel(model);
-                if (instance == IntPtr.Zero)
-                {
-                    throw new InvalidOperationException("mmd-runtime instance creation returned null.");
-                }
-
                 int worldMatrixFloatCount = CheckedIntPtrToInt(MmdRuntimeFfiMethods.InstanceWorldMatrixF32Len(instance), "world matrix float count");
                 int morphWeightCount = CheckedIntPtrToInt(MmdRuntimeFfiMethods.InstanceMorphWeightLen(instance), "morph weight count");
                 int ikEnabledCount = CheckedIntPtrToInt(MmdRuntimeFfiMethods.InstanceIkEnabledLen(instance), "IK enabled count");
@@ -467,24 +406,7 @@ namespace Mmd.Native
                     clipLastFrame = hasClipRange ? lastFrame : 0,
                     unsupportedReason = string.Empty
                 };
-            }
-            finally
-            {
-                if (instance != IntPtr.Zero)
-                {
-                    MmdRuntimeFfiMethods.InstanceFree(instance);
-                }
-
-                if (clip != IntPtr.Zero)
-                {
-                    MmdRuntimeFfiMethods.ClipFree(clip);
-                }
-
-                if (model != IntPtr.Zero)
-                {
-                    MmdRuntimeFfiMethods.ModelFree(model);
-                }
-            }
+            });
         }
 
         public static MmdRuntimeFfiSmokeReport Unavailable(Exception exception)
@@ -580,6 +502,53 @@ namespace Mmd.Native
             }
 
             return (int)raw;
+        }
+
+        private static T WithSession<T>(byte[] pmxBytes, byte[] vmdBytes, Func<IntPtr, IntPtr, IntPtr, uint, T> action)
+        {
+            uint abiVersion = MmdRuntimeFfiMethods.ValidateAbiVersion();
+            IntPtr model = IntPtr.Zero;
+            IntPtr clip = IntPtr.Zero;
+            IntPtr instance = IntPtr.Zero;
+            try
+            {
+                model = MmdRuntimeFfiMethods.ModelCreateFromPmxBytes(pmxBytes, new IntPtr(pmxBytes.Length));
+                if (model == IntPtr.Zero)
+                {
+                    throw new InvalidOperationException("mmd-runtime PMX import returned a null model.");
+                }
+
+                clip = MmdRuntimeFfiMethods.ClipCreateFromVmdBytesForModel(model, vmdBytes, new IntPtr(vmdBytes.Length));
+                if (clip == IntPtr.Zero)
+                {
+                    throw new InvalidOperationException("mmd-runtime VMD import returned a null clip.");
+                }
+
+                instance = MmdRuntimeFfiMethods.InstanceCreateForModel(model);
+                if (instance == IntPtr.Zero)
+                {
+                    throw new InvalidOperationException("mmd-runtime instance creation returned null.");
+                }
+
+                return action(model, clip, instance, abiVersion);
+            }
+            finally
+            {
+                if (instance != IntPtr.Zero)
+                {
+                    MmdRuntimeFfiMethods.InstanceFree(instance);
+                }
+
+                if (clip != IntPtr.Zero)
+                {
+                    MmdRuntimeFfiMethods.ClipFree(clip);
+                }
+
+                if (model != IntPtr.Zero)
+                {
+                    MmdRuntimeFfiMethods.ModelFree(model);
+                }
+            }
         }
 
         private static int CountNonZero(float[] values)

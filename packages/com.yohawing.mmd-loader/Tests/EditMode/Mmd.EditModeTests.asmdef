@@ -4,8 +4,11 @@
   "references": [
     "Mmd.Runtime",
     "Mmd.Timeline",
+    "Mmd.Rendering.Universal",
     "Mmd.Editor",
+    "Mmd.EditModeTestKit",
     "Unity.Timeline",
+    "Unity.RenderPipelines.Universal.Runtime",
     "UnityEngine.TestRunner",
     "UnityEditor.TestRunner"
   ],

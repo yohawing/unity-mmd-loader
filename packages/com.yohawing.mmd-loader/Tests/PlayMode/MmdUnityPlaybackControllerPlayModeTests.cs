@@ -5,6 +5,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.Animations;
@@ -21,6 +22,8 @@ namespace Mmd.Tests
 {
     public sealed class MmdUnityPlaybackControllerPlayModeTests
     {
+        private const string SyntheticPlayModeModelName = MmdPlayModeTestFixtures.MinimalTriangleModelName;
+
         private static PlaybackSmokeReport? s_smokeReport;
         private static bool s_playOnStartForwardPlayback;
         private static bool s_stopReturnedToBindFrame;
@@ -48,8 +51,8 @@ namespace Mmd.Tests
             try
             {
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    CreateMinimalTriangleModel(),
-                    CreateRootTranslationMotion(),
+                    MmdPlayModeTestFixtures.CreateMinimalTriangleModel(SyntheticPlayModeModelName),
+                    MmdPlayModeTestFixtures.CreateRootTranslationMotion(SyntheticPlayModeModelName),
                     "playmode-synthetic.pmx",
                     "playmode-synthetic.vmd");
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
@@ -70,7 +73,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(binding?.Instance);
+                MmdPlayModeTestInstanceScope.DestroyInstance(binding?.Instance);
             }
         }
 
@@ -81,8 +84,8 @@ namespace Mmd.Tests
             try
             {
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    CreateMinimalTriangleModel(),
-                    CreateRootTranslationMotion(),
+                    MmdPlayModeTestFixtures.CreateMinimalTriangleModel(SyntheticPlayModeModelName),
+                    MmdPlayModeTestFixtures.CreateRootTranslationMotion(SyntheticPlayModeModelName),
                     "playmode-editable-rig-synthetic.pmx",
                     "playmode-editable-rig-synthetic.vmd");
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
@@ -129,7 +132,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(binding?.Instance);
+                MmdPlayModeTestInstanceScope.DestroyInstance(binding?.Instance);
             }
         }
 
@@ -140,8 +143,8 @@ namespace Mmd.Tests
             try
             {
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    CreateMinimalTriangleModel(),
-                    CreateRootTranslationMotion(),
+                    MmdPlayModeTestFixtures.CreateMinimalTriangleModel(SyntheticPlayModeModelName),
+                    MmdPlayModeTestFixtures.CreateRootTranslationMotion(SyntheticPlayModeModelName),
                     "playmode-synthetic.pmx",
                     "playmode-synthetic.vmd");
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
@@ -161,7 +164,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(binding?.Instance);
+                MmdPlayModeTestInstanceScope.DestroyInstance(binding?.Instance);
             }
         }
 
@@ -172,8 +175,8 @@ namespace Mmd.Tests
             try
             {
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    CreateMinimalTriangleModel(),
-                    CreateRootTranslationMotion(),
+                    MmdPlayModeTestFixtures.CreateMinimalTriangleModel(SyntheticPlayModeModelName),
+                    MmdPlayModeTestFixtures.CreateRootTranslationMotion(SyntheticPlayModeModelName),
                     "playmode-synthetic.pmx",
                     "playmode-synthetic.vmd");
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
@@ -195,7 +198,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(binding?.Instance);
+                MmdPlayModeTestInstanceScope.DestroyInstance(binding?.Instance);
             }
         }
 
@@ -271,35 +274,6 @@ namespace Mmd.Tests
             Assert.That(frameTenNumber, Is.EqualTo(10));
             Assert.That(controller.CurrentFrame, Is.EqualTo(10));
             WriteNativeSceneSmokeArtifactIfRequested(frameTen, frameTenApplied);
-        }
-
-        private static MmdModelDefinition CreateMinimalTriangleModel()
-        {
-            var model = new MmdModelDefinition
-            {
-                name = "minimal-playmode-triangle"
-            };
-            model.bones.Add(new MmdBoneDefinition
-            {
-                index = 0,
-                name = "root",
-                parentIndex = -1,
-                transformOrder = 0,
-                origin = new[] { 0.0f, 0.0f, 0.0f },
-                isMovable = true,
-                isRotatable = true
-            });
-            model.vertices.Add(CreateVertex(0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f));
-            model.vertices.Add(CreateVertex(1, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f));
-            model.vertices.Add(CreateVertex(2, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f));
-            model.indices.AddRange(new[] { 0, 1, 2 });
-            model.materials.Add(new MmdMaterialDefinition
-            {
-                index = 0,
-                name = "triangle-material",
-                vertexCount = 3
-            });
-            return model;
         }
 
         private static void AddPinnedRootRigidbody(MmdModelDefinition model)
@@ -487,63 +461,6 @@ namespace Mmd.Tests
             }
         }
 
-        private static MmdMotionDefinition CreateRootTranslationMotion()
-        {
-            var motion = new MmdMotionDefinition
-            {
-                targetModelName = "minimal-playmode-triangle",
-                maxFrame = 10
-            };
-            motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
-            {
-                boneName = "root",
-                frame = 0,
-                translation = new[] { 0.0f, 0.0f, 0.0f },
-                rotation = new[] { 0.0f, 0.0f, 0.0f, 1.0f },
-                interpolation = LinearInterpolation()
-            });
-            motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
-            {
-                boneName = "root",
-                frame = 10,
-                translation = new[] { 2.0f, 0.0f, 0.0f },
-                rotation = new[] { 0.0f, 0.0f, 0.0f, 1.0f },
-                interpolation = LinearInterpolation()
-            });
-            return motion;
-        }
-
-        private static MmdBoneInterpolationDefinition LinearInterpolation()
-        {
-            byte[] linear = { 20, 20, 107, 107 };
-            return new MmdBoneInterpolationDefinition
-            {
-                translationX = linear,
-                translationY = linear,
-                translationZ = linear,
-                rotation = linear
-            };
-        }
-
-        private static MmdVertexDefinition CreateVertex(
-            int index,
-            float x,
-            float y,
-            float z,
-            float u,
-            float v)
-        {
-            return new MmdVertexDefinition
-            {
-                index = index,
-                position = new[] { x, y, z },
-                normal = new[] { 0.0f, 0.0f, 1.0f },
-                uv = new[] { u, v },
-                boneIndices = new[] { 0 },
-                boneWeights = new[] { 1.0f }
-            };
-        }
-
         [UnityTest]
         public IEnumerator HairPhysicsFixtureWithPureWorldAnchorJointsIsRejectedByLivePhysics()
         {
@@ -566,14 +483,7 @@ namespace Mmd.Tests
                     Is.True,
                     "test_hair_physics.pmx must keep at least one pure world-anchor joint for this regression test");
 
-                var motion = new MmdMotionDefinition
-                {
-                    targetModelName = model.name,
-                    maxFrame = 0,
-                    boneKeyframes = new List<MmdBoneKeyframeDefinition>(),
-                    morphKeyframes = new List<MmdMorphKeyframeDefinition>(),
-                    modelKeyframes = new List<MmdModelKeyframeDefinition>()
-                };
+                MmdMotionDefinition motion = CreateRestPoseMotion(model);
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
                     model, motion, "test_hair_physics.pmx", "rest-pose", pmxPath);
 
@@ -590,7 +500,7 @@ namespace Mmd.Tests
             {
                 if (binding?.Instance?.Root != null)
                 {
-                    DestroyInstance(binding.Instance);
+                    MmdPlayModeTestInstanceScope.DestroyInstance(binding.Instance);
                 }
                 else
                 {
@@ -627,14 +537,7 @@ namespace Mmd.Tests
                 // reported through backend diagnostics.
                 model.physics.joints.RemoveAll(j => j.rigidbodyAIndex < 0 && j.rigidbodyBIndex < 0);
 
-                var motion = new MmdMotionDefinition
-                {
-                    targetModelName = model.name,
-                    maxFrame = 0,
-                    boneKeyframes = new List<MmdBoneKeyframeDefinition>(),
-                    morphKeyframes = new List<MmdMorphKeyframeDefinition>(),
-                    modelKeyframes = new List<MmdModelKeyframeDefinition>()
-                };
+                MmdMotionDefinition motion = CreateRestPoseMotion(model);
 
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
                     model, motion, "test_hair_physics.pmx", "rest-pose", pmxPath);
@@ -781,7 +684,7 @@ namespace Mmd.Tests
                 if (binding?.Instance?.Root != null)
                 {
                     // DestroyInstance destroys Root (and thus the controller via OnDestroy -> binding.Dispose).
-                    DestroyInstance(binding.Instance);
+                    MmdPlayModeTestInstanceScope.DestroyInstance(binding.Instance);
                 }
                 else
                 {
@@ -970,7 +873,7 @@ namespace Mmd.Tests
                     UnityEngine.Object.Destroy(pmxAsset);
                 }
 
-                DestroyInstance(instance);
+                MmdPlayModeTestInstanceScope.DestroyInstance(instance);
             }
         }
 
@@ -1124,206 +1027,7 @@ namespace Mmd.Tests
                     UnityEngine.Object.Destroy(pmxAsset);
                 }
 
-                DestroyInstance(instance);
-            }
-        }
-
-        [UnityTest]
-        public IEnumerator HumanoidRetargetTimelineTrackCreatesModelOnlyPhysicsBindingAndStepsLivePhysics()
-        {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-                yield break;
-            }
-
-            MmdUnityModelInstance? instance = null;
-            MmdPmxAsset? pmxAsset = null;
-            MmdHumanoidProxyRigResult? proxyRig = null;
-            Avatar? avatar = null;
-            TimelineAsset? timelineAsset = null;
-            AnimationClip? proxyAnimationClip = null;
-            GameObject? directorObject = null;
-            try
-            {
-                string pmxPath = ResolvePackageFixture("test_hair_physics.pmx");
-                byte[] pmxBytes = File.ReadAllBytes(pmxPath);
-                MmdModelDefinition model = LoadHairPhysicsModelForLive(pmxPath);
-                instance = MmdUnityModelFactory.CreateSkinnedModel(
-                    model,
-                    pmxPath,
-                    MmdPmxAsset.DefaultImportScale);
-                pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
-                pmxAsset.Initialize(
-                    pmxBytes,
-                    "test_hair_physics.pmx",
-                    pmxPath,
-                    MmdPmxAsset.DefaultImportScale,
-                    parseSummary: MmdPmxParseSummary.FromModel(model));
-
-                MmdUnityPlaybackController controller = instance.Root.AddComponent<MmdUnityPlaybackController>();
-                controller.ConfigureModelAsset(pmxAsset);
-                controller.SetPhysicsMode(MmdPhysicsMode.Live);
-
-                int drivenBoneIndex = FindFirstValidStaticPhysicsBone(model, instance);
-                Assert.That(drivenBoneIndex, Is.GreaterThanOrEqualTo(0),
-                    "test_hair_physics.pmx must expose a valid static/bone-driven body for humanoid physics seeding");
-
-                proxyRig = MmdHumanoidProxyRigFactory.CreateProxyRig(CreateHumanoidMappingModelWithOriginsForLivePhysics());
-                Assert.That(proxyRig.ProxyRoot, Is.Not.Null);
-                proxyRig.ProxyRoot!.transform.SetParent(instance.Root.transform, worldPositionStays: false);
-                proxyRig.ProxyRoot.SetActive(true);
-                MmdHumanoidAvatarBuildResult avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(proxyRig);
-                Assert.That(avatarResult.IsValidHumanAvatar, Is.True, string.Join("\n", avatarResult.Diagnostics));
-                avatar = avatarResult.Avatar;
-
-                Animator animator = instance.Root.AddComponent<Animator>();
-                animator.avatar = avatar;
-
-                Transform proxyHips = proxyRig.BoneMap[HumanBodyBones.Hips];
-                Transform drivenBone = instance.BoneTransforms[drivenBoneIndex];
-                Vector3 proxyBindPosition = proxyHips.localPosition;
-                Vector3 drivenBindPosition = drivenBone.localPosition;
-                controller.ConfigureHumanoidRetarget(
-                    proxyRig.ProxyRoot.transform,
-                    new[]
-                    {
-                        new MmdHumanoidRetargetBinding(
-                            HumanBodyBones.Hips,
-                            drivenBoneIndex,
-                            proxyHips,
-                            drivenBone,
-                            proxyHips.localRotation,
-                            drivenBone.localRotation,
-                            copyLocalPosition: true,
-                            translationTargetTransform: drivenBone,
-                            translationTargetMmdBoneIndex: drivenBoneIndex,
-                            proxyBindLocalPosition: proxyBindPosition,
-                            translationTargetBindLocalPosition: drivenBindPosition)
-                    },
-                    Array.Empty<MmdHumanoidAppendTransformBinding>());
-
-                timelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
-                AnimationTrack animationTrack = timelineAsset.CreateTrack<AnimationTrack>(null, "Proxy Animator");
-                TimelineClip animationClip = animationTrack.CreateClip<AnimationPlayableAsset>();
-                animationClip.start = 0.0;
-                animationClip.duration = 1.0;
-                proxyAnimationClip = new AnimationClip();
-                ((AnimationPlayableAsset)animationClip.asset).clip = proxyAnimationClip;
-
-                // Intentionally exercises the deprecated dual-track path (regression coverage until removal).
-#pragma warning disable 618
-                MmdHumanoidRetargetTrack retargetTrack =
-                    timelineAsset.CreateTrack<MmdHumanoidRetargetTrack>(null, "MMD Humanoid Retarget");
-                TimelineClip retargetClip = retargetTrack.CreateClip<MmdHumanoidRetargetClip>();
-#pragma warning restore 618
-                retargetClip.start = 0.0;
-                retargetClip.duration = 1.0;
-
-                directorObject = new GameObject("humanoid-retarget-timeline-live-director");
-                PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
-                director.playOnAwake = false;
-                director.playableAsset = timelineAsset;
-                director.SetGenericBinding(animationTrack, animator);
-                director.SetGenericBinding(retargetTrack, controller);
-
-                Assert.That(controller.IsConfigured, Is.False,
-                    "The regression must start with no VMD playback binding; the Timeline retarget track may only create a physics-only binding.");
-                Assert.That(controller.HasHumanoidPhysicsBinding, Is.False);
-
-                proxyHips.localPosition = proxyBindPosition + new Vector3(0.05f, 0.0f, 0.0f);
-                proxyHips.localRotation = Quaternion.Euler(0.0f, 4.0f, 0.0f);
-                director.time = 0.0;
-                director.Evaluate();
-                yield return null;
-
-                Assert.That(controller.LastHumanoidRetargetGate, Is.EqualTo(MmdHumanoidRetargetGate.Ready));
-                Assert.That(controller.LastHumanoidRetargetResult, Is.Not.Null);
-                Assert.That(controller.LastHumanoidRetargetResult!.CopiedBoneCount, Is.EqualTo(1));
-                Assert.That(controller.IsConfigured, Is.False,
-                    "Timeline retarget Live physics must not configure the VMD playback binding; otherwise Update/Tick would call ApplyFrame on a physics-only binding.");
-                Assert.That(controller.HasHumanoidPhysicsBinding, Is.True,
-                    "Timeline retarget Live physics should lazily create a model-only physics binding from ModelAssetSource.");
-                Assert.That(controller.LastLivePhysicsDiagnostics, Is.Not.Null,
-                    "Timeline retarget track ProcessFrame must step Live physics in Play Mode.");
-                Assert.That(controller.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(0));
-                Assert.That(controller.LastLivePhysicsDiagnostics.deltaTime, Is.EqualTo(0.0f));
-                Assert.That(controller.LastSnapshot, Is.Null,
-                    "Model-only humanoid Timeline physics must not create a VMD playback snapshot.");
-
-                HashSet<int> hairBoneSlots = CollectNonStaticPhysicsBoneSlots(model, instance);
-                Assert.That(hairBoneSlots.Count, Is.GreaterThan(0),
-                    "Expected at least one non-static rigidbody linked to a hair bone");
-                var frameZeroPositions = new Dictionary<int, Vector3>();
-                var frameZeroRotations = new Dictionary<int, Quaternion>();
-                foreach (int slot in hairBoneSlots)
-                {
-                    frameZeroPositions[slot] = instance.BoneTransforms[slot].localPosition;
-                    frameZeroRotations[slot] = instance.BoneTransforms[slot].localRotation;
-                }
-
-                for (int i = 1; i <= 5; i++)
-                {
-                    proxyHips.localPosition = proxyBindPosition + new Vector3(0.05f + 0.01f * i, 0.0f, 0.0f);
-                    proxyHips.localRotation = Quaternion.Euler(0.0f, 4.0f + i, 0.0f);
-                    director.time = i / 30.0;
-                    director.Evaluate();
-                    yield return null;
-                }
-
-                Assert.That(controller.LastLivePhysicsDiagnostics, Is.Not.Null);
-                Assert.That(controller.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(5));
-                Assert.That(controller.LastLivePhysicsDiagnostics.deltaTime, Is.GreaterThan(0.0f));
-                Assert.That(controller.LastLivePhysicsDiagnostics.stepPhysicsMs, Is.GreaterThan(0.0));
-
-                bool anyHairBoneChanged = false;
-                foreach (int slot in hairBoneSlots)
-                {
-                    Transform bone = instance.BoneTransforms[slot];
-                    if ((bone.localPosition - frameZeroPositions[slot]).sqrMagnitude > 0.0001f ||
-                        Quaternion.Angle(frameZeroRotations[slot], bone.localRotation) > 0.01f)
-                    {
-                        anyHairBoneChanged = true;
-                    }
-                }
-
-                Assert.That(anyHairBoneChanged, Is.True,
-                    "Expected the MmdHumanoidRetargetTrack path to feed Live physics readback into at least one non-static hair bone");
-            }
-            finally
-            {
-                if (directorObject != null)
-                {
-                    UnityEngine.Object.Destroy(directorObject);
-                }
-
-                if (timelineAsset != null)
-                {
-                    UnityEngine.Object.Destroy(timelineAsset);
-                }
-
-                if (proxyAnimationClip != null)
-                {
-                    UnityEngine.Object.Destroy(proxyAnimationClip);
-                }
-
-                if (avatar != null)
-                {
-                    UnityEngine.Object.Destroy(avatar);
-                }
-
-                if (proxyRig?.ProxyRoot != null)
-                {
-                    UnityEngine.Object.Destroy(proxyRig.ProxyRoot);
-                }
-
-                if (pmxAsset != null)
-                {
-                    UnityEngine.Object.Destroy(pmxAsset);
-                }
-
-                DestroyInstance(instance);
+                MmdPlayModeTestInstanceScope.DestroyInstance(instance);
             }
         }
 
@@ -1432,18 +1136,14 @@ namespace Mmd.Tests
                 humanoidClip.duration = 0.5;
                 var humanoidClipAsset = (MmdHumanoidAnimationClip)humanoidClip.asset;
                 humanoidClipAsset.clip = muscleClip;
-                humanoidClipAsset.proxyAnimator.exposedName =
-                    "mmdHumanoidProxyAnimator_" + Guid.NewGuid().ToString("N");
 
                 directorObject = new GameObject("humanoid-animation-track-single-director");
                 PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
                 director.playOnAwake = false;
                 director.playableAsset = timelineAsset;
-                // SINGLE generic binding (controller, for the retarget ProcessFrame). The proxy
-                // Animator that the clip poses is supplied via an ExposedReference; setup/authoring
-                // sets this automatically since the Animator is on the controller's GameObject.
+                // SINGLE generic binding: both the retarget controller and its co-located Animator
+                // are derived from this source of truth.
                 director.SetGenericBinding(humanoidTrack, controller);
-                director.SetReferenceValue(humanoidClipAsset.proxyAnimator.exposedName, animator);
 
                 Assert.That(controller.IsConfigured, Is.False,
                     "The single humanoid track may only create a physics-only binding, never a VMD playback binding.");
@@ -1521,7 +1221,7 @@ namespace Mmd.Tests
                     UnityEngine.Object.Destroy(pmxAsset);
                 }
 
-                DestroyInstance(instance);
+                MmdPlayModeTestInstanceScope.DestroyInstance(instance);
             }
         }
 
@@ -1539,14 +1239,11 @@ namespace Mmd.Tests
             return string.Empty;
         }
 
-        // Regression: the single MmdHumanoidAnimationTrack must enable applyRootMotion on the proxy
-        // Animator so a Humanoid clip's root motion (RootT/RootQ) travels the model the way a standard
-        // AnimationTrack did. Without it the model only does in-place body sway (the "腰の移動" /
-        // center travel is dropped). We assert the track flips applyRootMotion on at graph build; that
-        // the resulting root curves actually translate the model is Unity's AnimationPlayableOutput
-        // behavior (verified on the real dance clip in-editor).
+        // Regression: the single MmdHumanoidAnimationTrack preserves the proxy Animator's serialized
+        // root-motion setting. Humanoid PMX import enables it by default, while an explicit user opt-out
+        // must not be overridden by Timeline graph construction.
         [UnityTest]
-        public IEnumerator HumanoidAnimationTrackEnablesRootMotionOnProxyAnimator()
+        public IEnumerator HumanoidAnimationTrackPreservesRootMotionOnProxyAnimator()
         {
             GameObject? root = null;
             Avatar? avatar = null;
@@ -1570,7 +1267,7 @@ namespace Mmd.Tests
 
                 Animator animator = root.AddComponent<Animator>();
                 animator.avatar = avatar;
-                animator.applyRootMotion = false;
+                animator.applyRootMotion = true;
 
                 MmdUnityPlaybackController controller = root.AddComponent<MmdUnityPlaybackController>();
                 controller.SetPhysicsMode(MmdPhysicsMode.Off);
@@ -1605,24 +1302,21 @@ namespace Mmd.Tests
                 humanoidClip.duration = 1.0;
                 var humanoidClipAsset = (MmdHumanoidAnimationClip)humanoidClip.asset;
                 humanoidClipAsset.clip = muscleClip;
-                humanoidClipAsset.proxyAnimator.exposedName =
-                    "mmdHumanoidRootMotionAnimator_" + Guid.NewGuid().ToString("N");
 
                 directorObject = new GameObject("humanoid-rootmotion-director");
                 PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
                 director.playOnAwake = false;
                 director.playableAsset = timelineAsset;
                 director.SetGenericBinding(humanoidTrack, controller);
-                director.SetReferenceValue(humanoidClipAsset.proxyAnimator.exposedName, animator);
 
-                Assert.That(animator.applyRootMotion, Is.False, "precondition: root motion starts disabled");
+                Assert.That(animator.applyRootMotion, Is.True, "precondition: imported Humanoid root motion starts enabled");
 
                 director.time = 0.0;
                 director.Evaluate();
                 yield return null;
 
                 Assert.That(animator.applyRootMotion, Is.True,
-                    "the single humanoid track must enable applyRootMotion so the clip's root motion travels the model");
+                    "the single humanoid track must preserve applyRootMotion so the clip's root motion travels the model");
             }
             finally
             {
@@ -1668,8 +1362,8 @@ namespace Mmd.Tests
             try
             {
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    CreateMinimalTriangleModel(),
-                    CreateRootTranslationMotion(),
+                    MmdPlayModeTestFixtures.CreateMinimalTriangleModel(SyntheticPlayModeModelName),
+                    MmdPlayModeTestFixtures.CreateRootTranslationMotion(SyntheticPlayModeModelName),
                     "humanoid-retarget-physics-off.pmx",
                     "humanoid-retarget-physics-off.vmd");
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
@@ -1728,7 +1422,7 @@ namespace Mmd.Tests
                     UnityEngine.Object.Destroy(proxyRig.ProxyRoot);
                 }
 
-                DestroyInstance(binding?.Instance);
+                MmdPlayModeTestInstanceScope.DestroyInstance(binding?.Instance);
             }
         }
 
@@ -1738,11 +1432,11 @@ namespace Mmd.Tests
             MmdUnityPlaybackBinding? binding = null;
             try
             {
-                MmdModelDefinition model = CreateMinimalTriangleModel();
+                MmdModelDefinition model = MmdPlayModeTestFixtures.CreateMinimalTriangleModel(SyntheticPlayModeModelName);
                 AddPinnedRootRigidbody(model);
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
                     model,
-                    CreateRootTranslationMotion(),
+                    MmdPlayModeTestFixtures.CreateRootTranslationMotion(SyntheticPlayModeModelName),
                     "controller-playmode-live.pmx",
                     "controller-playmode-live.vmd");
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
@@ -1765,7 +1459,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(binding?.Instance);
+                MmdPlayModeTestInstanceScope.DestroyInstance(binding?.Instance);
             }
         }
 
@@ -1792,11 +1486,11 @@ namespace Mmd.Tests
             GameObject? directorObject = null;
             try
             {
-                MmdModelDefinition model = CreateMinimalTriangleModel();
+                MmdModelDefinition model = MmdPlayModeTestFixtures.CreateMinimalTriangleModel(SyntheticPlayModeModelName);
                 AddPinnedRootRigidbody(model);
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
                     model,
-                    CreateRootTranslationMotion(),
+                    MmdPlayModeTestFixtures.CreateRootTranslationMotion(SyntheticPlayModeModelName),
                     "timeline-playmode-director-live.pmx",
                     "timeline-playmode-director-live.vmd");
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
@@ -1841,7 +1535,7 @@ namespace Mmd.Tests
                     UnityEngine.Object.Destroy(timelineAsset);
                 }
 
-                DestroyInstance(binding?.Instance);
+                MmdPlayModeTestInstanceScope.DestroyInstance(binding?.Instance);
             }
         }
 
@@ -1858,11 +1552,11 @@ namespace Mmd.Tests
             MmdUnityPlaybackBinding? binding = null;
             try
             {
-                MmdModelDefinition model = CreateMinimalTriangleModel();
+                MmdModelDefinition model = MmdPlayModeTestFixtures.CreateMinimalTriangleModel(SyntheticPlayModeModelName);
                 AddPinnedRootRigidbody(model);
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
                     model,
-                    CreateRootTranslationMotion(),
+                    MmdPlayModeTestFixtures.CreateRootTranslationMotion(SyntheticPlayModeModelName),
                     "timeline-forward-arbitrary-start.pmx",
                     "timeline-forward-arbitrary-start.vmd");
                 binding.SetPhysicsMode(MmdPhysicsMode.Live);
@@ -1886,7 +1580,76 @@ namespace Mmd.Tests
             finally
             {
                 binding?.Dispose();
-                DestroyInstance(binding?.Instance);
+                MmdPlayModeTestInstanceScope.DestroyInstance(binding?.Instance);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator BasicPlaybackSampleTimelineEvaluatesThroughPlayableDirector()
+        {
+            MmdUnityPlaybackBinding? binding = null;
+            TimelineAsset? timelineAsset = null;
+            GameObject? directorObject = null;
+            try
+            {
+                string pmxPath = ResolveBasicPlaybackSampleAsset("mmt_test_model.pmx");
+                string vmdPath = ResolveBasicPlaybackSampleAsset("mmt_test_model_test_motion.vmd");
+                var parser = new NativeMmdParser();
+                MmdModelDefinition model = parser.LoadModel(File.ReadAllBytes(pmxPath));
+                MmdMotionDefinition motion = parser.LoadMotion(File.ReadAllBytes(vmdPath));
+                Assert.That(model.vertices.Count, Is.GreaterThan(0), "BasicPlayback sample PMX must contain geometry.");
+                Assert.That(model.bones.Count, Is.GreaterThan(0), "BasicPlayback sample PMX must contain bones.");
+                Assert.That(motion.boneKeyframes.Count, Is.GreaterThan(0), "BasicPlayback sample VMD must contain bone keys.");
+
+                binding = MmdUnityPlaybackBinding.CreateSkinned(
+                    model,
+                    motion,
+                    pmxPath,
+                    vmdPath,
+                    pmxPath);
+                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.Configure(binding, 30.0f, playOnStart: false);
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+
+                timelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
+                MmdVmdTimelineTrack track = timelineAsset.CreateTrack<MmdVmdTimelineTrack>(null, "MMD VMD");
+                TimelineClip clip = track.CreateClip<MmdVmdTimelineClip>();
+                clip.start = 0.0;
+                clip.duration = 1.0;
+                var mmdClip = (MmdVmdTimelineClip)clip.asset;
+                mmdClip.MotionSourceId = vmdPath;
+                mmdClip.FrameRate = 30.0f;
+                mmdClip.MotionAsset = null;
+
+                directorObject = new GameObject("basic-playback-sample-director");
+                PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
+                director.playOnAwake = false;
+                director.playableAsset = timelineAsset;
+                director.SetGenericBinding(track, controller);
+
+                director.time = 10.0 / 30.0;
+                director.Evaluate();
+
+                Assert.That(controller.CurrentFrame, Is.EqualTo(10));
+                Assert.That(controller.LastSnapshot, Is.Not.Null, "Timeline evaluation must produce a playback snapshot.");
+                Assert.That(controller.LastSnapshot!.frame.bones, Is.Not.Empty);
+                Assert.That(binding.Instance.Root.GetComponentsInChildren<SkinnedMeshRenderer>(), Is.Not.Empty,
+                    "BasicPlayback sample PMX must create a placed skinned hierarchy.");
+                yield return null;
+            }
+            finally
+            {
+                if (directorObject != null)
+                {
+                    UnityEngine.Object.Destroy(directorObject);
+                }
+
+                if (timelineAsset != null)
+                {
+                    UnityEngine.Object.Destroy(timelineAsset);
+                }
+
+                MmdPlayModeTestInstanceScope.DestroyInstance(binding?.Instance);
             }
         }
 
@@ -1903,11 +1666,11 @@ namespace Mmd.Tests
             MmdUnityPlaybackBinding? binding = null;
             try
             {
-                MmdModelDefinition model = CreateMinimalTriangleModel();
+                MmdModelDefinition model = MmdPlayModeTestFixtures.CreateMinimalTriangleModel(SyntheticPlayModeModelName);
                 AddPinnedRootRigidbody(model);
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
                     model,
-                    CreateRootTranslationMotion(),
+                    MmdPlayModeTestFixtures.CreateRootTranslationMotion(SyntheticPlayModeModelName),
                     "timeline-forward-live.pmx",
                     "timeline-forward-live.vmd");
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
@@ -1936,7 +1699,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(binding?.Instance);
+                MmdPlayModeTestInstanceScope.DestroyInstance(binding?.Instance);
             }
         }
 
@@ -1953,11 +1716,11 @@ namespace Mmd.Tests
             MmdUnityPlaybackBinding? binding = null;
             try
             {
-                MmdModelDefinition model = CreateMinimalTriangleModel();
+                MmdModelDefinition model = MmdPlayModeTestFixtures.CreateMinimalTriangleModel(SyntheticPlayModeModelName);
                 AddPinnedRootRigidbody(model);
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
                     model,
-                    CreateRootTranslationMotion(),
+                    MmdPlayModeTestFixtures.CreateRootTranslationMotion(SyntheticPlayModeModelName),
                     "timeline-scrub-resume.pmx",
                     "timeline-scrub-resume.vmd");
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
@@ -1991,7 +1754,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(binding?.Instance);
+                MmdPlayModeTestInstanceScope.DestroyInstance(binding?.Instance);
             }
         }
 
@@ -2018,14 +1781,7 @@ namespace Mmd.Tests
                 // validator; drop them before binding (same as the non-Timeline hair test).
                 model.physics.joints.RemoveAll(j => j.rigidbodyAIndex < 0 && j.rigidbodyBIndex < 0);
 
-                var motion = new MmdMotionDefinition
-                {
-                    targetModelName = model.name,
-                    maxFrame = 0,
-                    boneKeyframes = new List<MmdBoneKeyframeDefinition>(),
-                    morphKeyframes = new List<MmdMorphKeyframeDefinition>(),
-                    modelKeyframes = new List<MmdModelKeyframeDefinition>()
-                };
+                MmdMotionDefinition motion = CreateRestPoseMotion(model);
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
                     model, motion, "test_hair_physics.pmx", "rest-pose", pmxPath);
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
@@ -2102,7 +1858,7 @@ namespace Mmd.Tests
             {
                 if (binding?.Instance?.Root != null)
                 {
-                    DestroyInstance(binding.Instance);
+                    MmdPlayModeTestInstanceScope.DestroyInstance(binding.Instance);
                 }
                 else
                 {
@@ -2120,39 +1876,6 @@ namespace Mmd.Tests
         // TimelineScrubSuspendsLivePhysicsAndResumeReseeds, and TimelineForwardPlaybackPropagatesHairPhysicsToBones
         // (via the runLivePhysics flag); the FrameData.evaluationType == Playback gate itself is computed
         // in MmdVmdTimelineBehaviour.ProcessFrame and was verified via Editor.log instrumentation.
-        private static void DestroyInstance(MmdUnityModelInstance? instance)
-        {
-            if (instance == null)
-            {
-                return;
-            }
-
-            if (instance.Root != null)
-            {
-                UnityEngine.Object.Destroy(instance.Root);
-            }
-
-            if (instance.Mesh != null)
-            {
-                UnityEngine.Object.Destroy(instance.Mesh);
-            }
-
-            if (instance.Materials == null)
-            {
-                return;
-            }
-
-            foreach (Material material in instance.Materials.Where(material => material != null).Distinct())
-            {
-                UnityEngine.Object.Destroy(material);
-            }
-
-            foreach (Texture2D texture in instance.OwnedTextures.Where(texture => texture != null).Distinct())
-            {
-                UnityEngine.Object.Destroy(texture);
-            }
-        }
-
         private static string ResolvePackageFixture(string fileName)
         {
             string? projectRoot = Path.GetDirectoryName(Application.dataPath);
@@ -2163,6 +1886,18 @@ namespace Mmd.Tests
 
             string packageRoot = Path.GetFullPath(Path.Combine(projectRoot, "..", "packages", "com.yohawing.mmd-loader"));
             return Path.Combine(packageRoot, "Tests", "Fixtures", "Assets", fileName);
+        }
+
+        private static string ResolveBasicPlaybackSampleAsset(string fileName)
+        {
+            string? projectRoot = Path.GetDirectoryName(Application.dataPath);
+            if (string.IsNullOrWhiteSpace(projectRoot))
+            {
+                throw new InvalidOperationException("Unity project root could not be resolved from Application.dataPath.");
+            }
+
+            string packageRoot = Path.GetFullPath(Path.Combine(projectRoot, "..", "packages", "com.yohawing.mmd-loader"));
+            return Path.Combine(packageRoot, "Samples~", "BasicPlayback", "Assets", fileName);
         }
 
         private static HairPhysicsScaleSample RunHairPhysicsForwardPlayback(float importScale)
@@ -2201,7 +1936,7 @@ namespace Mmd.Tests
             {
                 if (binding?.Instance?.Root != null)
                 {
-                    DestroyInstance(binding.Instance);
+                    MmdPlayModeTestInstanceScope.DestroyInstance(binding.Instance);
                 }
                 else
                 {
@@ -2332,14 +2067,31 @@ namespace Mmd.Tests
 
         private static MmdMotionDefinition CreateRestPoseMotion(MmdModelDefinition model)
         {
-            return new MmdMotionDefinition
-            {
-                targetModelName = model.name,
-                maxFrame = 0,
-                boneKeyframes = new List<MmdBoneKeyframeDefinition>(),
-                morphKeyframes = new List<MmdMorphKeyframeDefinition>(),
-                modelKeyframes = new List<MmdModelKeyframeDefinition>()
-            };
+            var parser = new NativeMmdParser();
+            return parser.LoadMotion(CreateEmptyVmdBytes(model.name ?? string.Empty));
+        }
+
+        private static byte[] CreateEmptyVmdBytes(string modelName)
+        {
+            using var stream = new MemoryStream();
+            using var writer = new BinaryWriter(stream);
+            WriteFixedSjis(writer, "Vocaloid Motion Data 0002", 30);
+            WriteFixedSjis(writer, modelName, 20);
+            writer.Write(0u); // bone count
+            writer.Write(0u); // morph count
+            writer.Write(0u); // camera count
+            writer.Write(0u); // light count
+            writer.Write(0u); // self-shadow count
+            writer.Write(0u); // show/IK count
+            return stream.ToArray();
+        }
+
+        private static void WriteFixedSjis(BinaryWriter writer, string value, int byteCount)
+        {
+            byte[] buffer = new byte[byteCount];
+            byte[] encoded = Encoding.GetEncoding(932).GetBytes(value ?? string.Empty);
+            Array.Copy(encoded, 0, buffer, 0, Math.Min(encoded.Length, buffer.Length));
+            writer.Write(buffer);
         }
 
         private readonly struct HairPhysicsScaleSample

@@ -30,6 +30,8 @@ Shader "MMD Basic URP Toon"
         _BaseMapBound ("Base Map Bound", Float) = 0
         _TextureFlatLightingWeight ("Texture Flat Lighting Weight", Float) = 0
         _TextureFlatLightingValue ("Texture Flat Lighting Value", Float) = 2.12
+        _MmdNormalMap ("Normal Map", 2D) = "bump" {}
+        _MmdNormalMapBound ("Normal Map Bound", Float) = 0
         _AlphaClipThreshold ("Alpha Clip Threshold", Range(0, 1)) = 0
         _ShadowAlphaClipThreshold ("Shadow Alpha Clip Threshold", Range(0, 1)) = 0
         _Cull ("Cull", Float) = 2
@@ -96,6 +98,7 @@ Shader "MMD Basic URP Toon"
                 half _AlphaClipThreshold;
                 half _ShadowAlphaClipThreshold;
                 half _GammaTarget;
+                half _MmdNormalMapBound;
             CBUFFER_END
 
             struct Attributes
@@ -177,13 +180,15 @@ Shader "MMD Basic URP Toon"
             SAMPLER(sampler_ToonMap);
             TEXTURE2D(_MmdSelfShadowMap);
             SAMPLER(sampler_MmdSelfShadowMap);
+            TEXTURE2D(_MmdNormalMap);
+            SAMPLER(sampler_MmdNormalMap);
 
             float4x4 _MmdSelfShadowWorldToShadow;
             float4 _MmdSelfShadowParams;
-
-            UNITY_INSTANCING_BUFFER_START(MmdPerRenderer)
-                UNITY_DEFINE_INSTANCED_PROP(float, _MmdSelfShadowReceive)
-            UNITY_INSTANCING_BUFFER_END(MmdPerRenderer)
+            // MaterialPropertyBlock updates this per renderer. Keep it out of the instancing
+            // buffer: switching an active receiver from 1 to 0 at runtime corrupted subsequent
+            // draws on DX12, while the ordinary per-renderer uniform remains transition-safe.
+            half _MmdSelfShadowReceive;
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _BaseMap_ST;
@@ -209,12 +214,14 @@ Shader "MMD Basic URP Toon"
                 half _AlphaClipThreshold;
                 half _ShadowAlphaClipThreshold;
                 half _GammaTarget;
+                half _MmdNormalMapBound;
             CBUFFER_END
 
             struct Attributes
             {
                 float4 positionOS : POSITION;
                 float3 normalOS : NORMAL;
+                float4 tangentOS : TANGENT;
                 float2 uv : TEXCOORD0;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
@@ -225,6 +232,8 @@ Shader "MMD Basic URP Toon"
                 float3 normalWS : TEXCOORD0;
                 float2 uv : TEXCOORD1;
                 float3 positionWS : TEXCOORD2;
+                float3 tangentWS : TEXCOORD3;
+                float3 bitangentWS : TEXCOORD4;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -238,6 +247,9 @@ Shader "MMD Basic URP Toon"
                 output.positionWS = positionWS;
                 output.normalWS = normalize(TransformObjectToWorldNormal(input.normalOS));
                 output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
+                float3 tangentWS = normalize(TransformObjectToWorldDir(input.tangentOS.xyz));
+                output.tangentWS = tangentWS;
+                output.bitangentWS = cross(output.normalWS, tangentWS) * input.tangentOS.w;
                 return output;
             }
 
@@ -256,6 +268,17 @@ Shader "MMD Basic URP Toon"
                 return 1.0h - saturate(occluderDepthDelta * 1500.0h - 0.3h);
             }
 
+            static const float2 PoissonDisk[8] = {
+                float2(-0.7071, 0.7071),
+                float2( 0.0,   -1.0),
+                float2( 0.7071, 0.7071),
+                float2(-1.0,    0.0),
+                float2( 0.3536,-0.3536),
+                float2(-0.3536,-0.3536),
+                float2( 0.3536, 0.3536),
+                float2(-0.3536, 0.3536)
+            };
+
             half SampleMmdSelfShadow(float3 positionWS, half selfShadowReceive)
             {
                 if (_MmdSelfShadowParams.x <= 0.5 || selfShadowReceive <= 0.5h)
@@ -270,8 +293,27 @@ Shader "MMD Basic URP Toon"
                     return 1.0h;
                 }
 
-                half sampledDepth = SAMPLE_TEXTURE2D(_MmdSelfShadowMap, sampler_MmdSelfShadowMap, shadowCoord.xy).r;
-                return ComputeMmdSelfShadowVisibility(shadowCoord.z, sampledDepth);
+                if (_MmdSelfShadowParams.z <= 1.5)
+                {
+                    half sampledDepth = SAMPLE_TEXTURE2D(_MmdSelfShadowMap, sampler_MmdSelfShadowMap, shadowCoord.xy).r;
+                    return ComputeMmdSelfShadowVisibility(shadowCoord.z, sampledDepth);
+                }
+
+                int tapCount = _MmdSelfShadowParams.z <= 4.5 ? 4 : 8;
+                half visibility = 0.0h;
+                for (int i = 0; i < tapCount; i++)
+                {
+                    float2 sampleUv = shadowCoord.xy + PoissonDisk[i] * _MmdSelfShadowParams.w;
+                    if (any(sampleUv < 0.0) || any(sampleUv > 1.0))
+                    {
+                        visibility += 1.0h;
+                        continue;
+                    }
+                    half sampledDepth = SAMPLE_TEXTURE2D(_MmdSelfShadowMap, sampler_MmdSelfShadowMap, sampleUv).r;
+                    visibility += ComputeMmdSelfShadowVisibility(shadowCoord.z, sampledDepth);
+                }
+
+                return visibility / tapCount;
             }
 
             half4 ForwardFragment(Varyings input) : SV_Target
@@ -287,10 +329,22 @@ Shader "MMD Basic URP Toon"
                 half3 lightDirection = dot(_MmdLightDirection.xyz, _MmdLightDirection.xyz) > 0.0h
                     ? normalize(_MmdLightDirection.xyz)
                     : mainLight.direction;
-                half selfShadowReceive = (half)UNITY_ACCESS_INSTANCED_PROP(MmdPerRenderer, _MmdSelfShadowReceive);
+                half selfShadowReceive = _MmdSelfShadowReceive;
                 half selfShadowVisibility = SampleMmdSelfShadow(input.positionWS, selfShadowReceive);
 
-                half3 normalWS = normalize(input.normalWS);
+                half3 normalWS;
+                if (_MmdNormalMapBound > 0.5h)
+                {
+                    half3 normalTS = UnpackNormal(SAMPLE_TEXTURE2D(_MmdNormalMap, sampler_MmdNormalMap, input.uv));
+                    float3 T = normalize(input.tangentWS);
+                    float3 B = normalize(input.bitangentWS);
+                    float3 N = normalize(input.normalWS);
+                    normalWS = normalize(T * normalTS.x + B * normalTS.y + N * normalTS.z);
+                }
+                else
+                {
+                    normalWS = normalize(input.normalWS);
+                }
                 half ndotl = saturate(dot(normalWS, lightDirection));
                 half lightVisibility = saturate(dot(normalWS, lightDirection) * 3.0h);
                 half toonVisibility = min(selfShadowVisibility, lightVisibility);
@@ -392,6 +446,7 @@ Shader "MMD Basic URP Toon"
                 half _AlphaClipThreshold;
                 half _ShadowAlphaClipThreshold;
                 half _GammaTarget;
+                half _MmdNormalMapBound;
             CBUFFER_END
 
             struct MmdSelfShadowAttributes
@@ -476,6 +531,7 @@ Shader "MMD Basic URP Toon"
                 half _AlphaClipThreshold;
                 half _ShadowAlphaClipThreshold;
                 half _GammaTarget;
+                half _MmdNormalMapBound;
             CBUFFER_END
 
             struct Attributes

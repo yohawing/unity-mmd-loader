@@ -55,8 +55,6 @@ namespace Mmd.Tests
                 var clipAsset = (MmdHumanoidAnimationClip)clip.asset;
 
                 Assert.That(clipAsset.clip, Is.SameAs(muscleClip), "the AnimationClip must be assigned to the clip asset");
-                Assert.That(clipAsset.proxyAnimator.Resolve(director), Is.SameAs(animator),
-                    "the proxy Animator ExposedReference must auto-resolve to the controller's Animator");
                 Assert.That(clip.duration, Is.EqualTo((double)muscleClip.length).Within(0.01),
                     "the clip duration should match the AnimationClip length");
             }
@@ -140,7 +138,76 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void HumanoidAnimationClipDisablesRootMotionDuringEditModeTimelineEvaluation()
+        public void HumanoidAnimationClipAutoResolvesProxyAnimatorFromTrackBinding()
+        {
+            GameObject? root = null;
+            GameObject? directorObject = null;
+            TimelineAsset? timeline = null;
+            AnimationClip? animationClip = null;
+            PlayableGraph graph = default;
+            try
+            {
+                root = new GameObject("workflow-auto-proxy-root");
+                Animator animator = root.AddComponent<Animator>();
+                MmdUnityPlaybackController controller = root.AddComponent<MmdUnityPlaybackController>();
+
+                timeline = ScriptableObject.CreateInstance<TimelineAsset>();
+                MmdHumanoidAnimationTrack track =
+                    timeline.CreateTrack<MmdHumanoidAnimationTrack>(null, "MMD Humanoid");
+                TimelineClip clip = track.CreateClip<MmdHumanoidAnimationClip>();
+                var clipAsset = (MmdHumanoidAnimationClip)clip.asset;
+                animationClip = new AnimationClip();
+                clipAsset.clip = animationClip;
+                directorObject = new GameObject("workflow-auto-proxy-director");
+                PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
+                director.playableAsset = timeline;
+                director.SetGenericBinding(track, controller);
+
+                graph = PlayableGraph.Create();
+                Playable playable = clipAsset.CreatePlayable(graph, directorObject);
+                Assert.That(playable.IsValid(), Is.True,
+                    "clip must derive the proxy Animator from its track-bound playback controller instead of returning Playable.Null");
+            }
+            finally
+            {
+                if (graph.IsValid())
+                {
+                    graph.Destroy();
+                }
+
+                if (directorObject != null)
+                {
+                    Object.DestroyImmediate(directorObject);
+                }
+
+                if (timeline != null)
+                {
+                    Object.DestroyImmediate(timeline);
+                }
+
+                if (animationClip != null)
+                {
+                    Object.DestroyImmediate(animationClip);
+                }
+
+                if (root != null)
+                {
+                    Object.DestroyImmediate(root);
+                }
+            }
+        }
+
+        [Test]
+        public void HumanoidAnimationClipHasNoIndependentProxyAnimatorSourceOfTruth()
+        {
+            Assert.That(
+                typeof(MmdHumanoidAnimationClip).GetField("proxyAnimator"),
+                Is.Null,
+                "Humanoid clips must derive the Animator exclusively from the track-bound playback controller.");
+        }
+
+        [Test]
+        public void HumanoidAnimationClipPreservesRootMotionDuringEditModeTimelineEvaluation()
         {
             GameObject? root = null;
             GameObject? directorObject = null;
@@ -167,29 +234,22 @@ namespace Mmd.Tests
                 TimelineClip clip = track.CreateClip<MmdHumanoidAnimationClip>();
                 var clipAsset = (MmdHumanoidAnimationClip)clip.asset;
                 clipAsset.clip = muscleClip;
-                clipAsset.proxyAnimator.exposedName =
-                    "editModeRootMotionAnimator_" + Guid.NewGuid().ToString("N");
                 TimelineClip secondClip = track.CreateClip<MmdHumanoidAnimationClip>();
                 secondClip.start = 1.0;
                 var secondClipAsset = (MmdHumanoidAnimationClip)secondClip.asset;
                 secondClipAsset.clip = muscleClip;
-                secondClipAsset.proxyAnimator.exposedName =
-                    "editModeRootMotionAnimator_" + Guid.NewGuid().ToString("N");
 
                 directorObject = new GameObject("workflow-edit-rootmotion-director");
                 PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
                 director.playOnAwake = false;
                 director.playableAsset = timeline;
                 director.SetGenericBinding(track, controller);
-                director.SetReferenceValue(clipAsset.proxyAnimator.exposedName, animator);
-                director.SetReferenceValue(secondClipAsset.proxyAnimator.exposedName, animator);
 
                 director.time = 0.0;
                 director.Evaluate();
 
-                Assert.That(animator.applyRootMotion, Is.False,
-                    "Edit Mode Timeline evaluation must not auto-enable applyRootMotion; " +
-                    "root motion deltas would accumulate across same-time scrub/click evaluation.");
+                Assert.That(animator.applyRootMotion, Is.True,
+                    "Edit Mode Timeline evaluation must preserve the Animator's serialized root-motion setting.");
 
                 director.Stop();
 

@@ -129,14 +129,14 @@ namespace Mmd.Tests
             AssertRuntimeFfiSignature("VmdCameraTrackCreateFromVmdBytes", typeof(IntPtr), typeof(byte[]), typeof(IntPtr));
             AssertRuntimeFfiSignature("VmdCameraTrackFrameCount", typeof(IntPtr), typeof(IntPtr));
             AssertRuntimeFfiSignature("VmdCameraTrackSample", typeof(byte), typeof(IntPtr), typeof(float), typeof(float[]), typeof(IntPtr));
-            AssertRuntimeFfiSignature("VmdSampleCamera", typeof(byte), typeof(byte[]), typeof(IntPtr), typeof(float), typeof(float[]), typeof(IntPtr));
             AssertRuntimeFfiSignature("VmdLightTrackCreateFromVmdBytes", typeof(IntPtr), typeof(byte[]), typeof(IntPtr));
             AssertRuntimeFfiSignature("VmdLightTrackFrameCount", typeof(IntPtr), typeof(IntPtr));
             AssertRuntimeFfiSignature("VmdLightTrackSample", typeof(byte), typeof(IntPtr), typeof(float), typeof(float[]), typeof(IntPtr));
-            AssertRuntimeFfiSignature("VmdSampleLight", typeof(byte), typeof(byte[]), typeof(IntPtr), typeof(float), typeof(float[]), typeof(IntPtr));
             AssertRuntimeFfiSignature("VmdLightTrackFree", typeof(void), typeof(IntPtr));
+            AssertRuntimeFfiSignature("VmdSelfShadowTrackCreateFromVmdBytes", typeof(IntPtr), typeof(byte[]), typeof(IntPtr));
+            AssertRuntimeFfiSignature("VmdSelfShadowTrackFrameCount", typeof(IntPtr), typeof(IntPtr));
             AssertRuntimeFfiSignature("VmdSelfShadowTrackSample", typeof(byte), typeof(IntPtr), typeof(float), typeof(float[]), typeof(IntPtr));
-            AssertRuntimeFfiSignature("VmdSampleSelfShadow", typeof(byte), typeof(byte[]), typeof(IntPtr), typeof(float), typeof(float[]), typeof(IntPtr));
+            AssertRuntimeFfiSignature("VmdSelfShadowTrackFree", typeof(void), typeof(IntPtr));
             AssertRuntimeFfiSignature("VmdCameraTrackFree", typeof(void), typeof(IntPtr));
         }
 
@@ -156,12 +156,6 @@ namespace Mmd.Tests
 
             byte[] vmdBytes = File.ReadAllBytes(fixturePath);
             float[] values = new float[9];
-
-            Assert.That(
-                MmdRuntimeFfiMethods.VmdSampleCamera(vmdBytes, new IntPtr(vmdBytes.Length), 22.5f, values, new IntPtr(values.Length)),
-                Is.Not.Zero,
-                "one-shot camera sample");
-            AssertCameraSample(values);
 
             IntPtr track = MmdRuntimeFfiMethods.VmdCameraTrackCreateFromVmdBytes(vmdBytes, new IntPtr(vmdBytes.Length));
             Assert.That(track, Is.Not.EqualTo(IntPtr.Zero));
@@ -189,14 +183,8 @@ namespace Mmd.Tests
         [Test]
         public void RuntimeFfiSamplesVmdLightIntoCallerOwnedBuffer()
         {
-            byte[] vmdBytes = BuildLightOnlyVmdBytes();
+            byte[] vmdBytes = BuildSceneTrackVmdBytes();
             float[] values = new float[6];
-
-            Assert.That(
-                MmdRuntimeFfiMethods.VmdSampleLight(vmdBytes, new IntPtr(vmdBytes.Length), 20.0f, values, new IntPtr(values.Length)),
-                Is.Not.Zero,
-                "one-shot light sample");
-            AssertLightSample(values);
 
             IntPtr track = MmdRuntimeFfiMethods.VmdLightTrackCreateFromVmdBytes(vmdBytes, new IntPtr(vmdBytes.Length));
             Assert.That(track, Is.Not.EqualTo(IntPtr.Zero));
@@ -219,6 +207,37 @@ namespace Mmd.Tests
             finally
             {
                 MmdRuntimeFfiMethods.VmdLightTrackFree(track);
+            }
+        }
+
+        [Test]
+        public void RuntimeFfiSamplesVmdSelfShadowIntoCallerOwnedBuffer()
+        {
+            byte[] vmdBytes = BuildSceneTrackVmdBytes();
+            float[] values = new float[2];
+
+            IntPtr track = MmdRuntimeFfiMethods.VmdSelfShadowTrackCreateFromVmdBytes(vmdBytes, new IntPtr(vmdBytes.Length));
+            Assert.That(track, Is.Not.EqualTo(IntPtr.Zero));
+            try
+            {
+                Assert.That(MmdRuntimeFfiMethods.VmdSelfShadowTrackFrameCount(track).ToInt64(), Is.EqualTo(2));
+                Array.Clear(values, 0, values.Length);
+                Assert.That(
+                    MmdRuntimeFfiMethods.VmdSelfShadowTrackSample(track, 20.0f, values, new IntPtr(values.Length)),
+                    Is.Not.Zero,
+                    "track self-shadow sample");
+                Assert.That(values[0], Is.EqualTo(1.0f).Within(0.0001f), "mode");
+                Assert.That(values[1], Is.EqualTo(0.3f).Within(0.0001f), "distance");
+
+                float[] shortBuffer = new float[1];
+                Assert.That(
+                    MmdRuntimeFfiMethods.VmdSelfShadowTrackSample(track, 20.0f, shortBuffer, new IntPtr(shortBuffer.Length)),
+                    Is.Zero,
+                    "short buffer must be rejected");
+            }
+            finally
+            {
+                MmdRuntimeFfiMethods.VmdSelfShadowTrackFree(track);
             }
         }
 
@@ -296,7 +315,7 @@ namespace Mmd.Tests
             Assert.That(values[5], Is.EqualTo(0.0f).Within(0.0001f), "direction.z");
         }
 
-        private static byte[] BuildLightOnlyVmdBytes()
+        private static byte[] BuildSceneTrackVmdBytes()
         {
             using var stream = new MemoryStream();
             using var writer = new BinaryWriter(stream);
@@ -309,7 +328,9 @@ namespace Mmd.Tests
             writer.Write(2u); // light frames
             WriteLightFrame(writer, 10u, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f);
             WriteLightFrame(writer, 30u, 1.0f, 0.5f, 0.0f, 0.0f, -1.0f, 0.0f);
-            writer.Write(0u); // self-shadow frames
+            writer.Write(2u); // self-shadow frames
+            WriteSelfShadowFrame(writer, 10u, 1, 0.2f);
+            WriteSelfShadowFrame(writer, 30u, 2, 0.4f);
             writer.Write(0u); // property frames
             return stream.ToArray();
         }
@@ -331,6 +352,13 @@ namespace Mmd.Tests
             writer.Write(x);
             writer.Write(y);
             writer.Write(z);
+        }
+
+        private static void WriteSelfShadowFrame(BinaryWriter writer, uint frame, byte mode, float distance)
+        {
+            writer.Write(frame);
+            writer.Write(mode);
+            writer.Write(distance);
         }
 
         private static void WriteFixedAscii(BinaryWriter writer, string text, int byteLength)

@@ -20,6 +20,8 @@ namespace Mmd.Parser
         public List<MmdIkDefinition> ik = new();
         public MmdPhysicsDefinition physics = new();
 
+        [NonSerialized] internal byte[]? sourceBytes;
+
         public bool HasDeformAfterPhysicsBones
         {
             get

@@ -7,6 +7,13 @@ using UnityEngine.Rendering.Universal;
 
 namespace Mmd.Rendering.Universal
 {
+    public enum MmdSelfShadowPcfSamples
+    {
+        One = 1,
+        Four = 4,
+        Eight = 8
+    }
+
     public sealed class MmdSelfShadowRendererFeature : ScriptableRendererFeature
     {
         internal const float DefaultShadowDepthBias = 0.02f;
@@ -23,6 +30,15 @@ namespace Mmd.Rendering.Universal
         [SerializeField]
         [Tooltip("World-space MMD self-shadow depth bias in meters. The render pass normalizes this by the fitted character depth range.")]
         private float shadowDepthBias = DefaultShadowDepthBias;
+
+        [SerializeField]
+        [Tooltip("Number of PCF shadow samples. One = MMD real-machine parity (default). Higher values soften shadow edges.")]
+        private MmdSelfShadowPcfSamples pcfSamples = MmdSelfShadowPcfSamples.One;
+
+        [SerializeField]
+        [Range(0f, 8f)]
+        [Tooltip("PCF soft shadow radius in texels. 0 = sharp (default).")]
+        private float softShadowRadius = 0f;
 
         private MmdSelfShadowRenderPass? selfShadowPass;
 
@@ -42,6 +58,18 @@ namespace Mmd.Rendering.Universal
         {
             get => SanitizeShadowDepthBias(shadowDepthBias);
             set => shadowDepthBias = SanitizeShadowDepthBias(value);
+        }
+
+        public MmdSelfShadowPcfSamples PcfSamples
+        {
+            get => pcfSamples;
+            set => pcfSamples = value;
+        }
+
+        public float SoftShadowRadius
+        {
+            get => softShadowRadius;
+            set => softShadowRadius = Mathf.Clamp(value, 0f, 8f);
         }
 
         public override void Create()
@@ -68,7 +96,9 @@ namespace Mmd.Rendering.Universal
             if (pass.Setup(
                 shadowMapSize,
                 shadowDirection,
-                ShadowDepthBias))
+                ShadowDepthBias,
+                (int)pcfSamples,
+                softShadowRadius))
             {
                 MmdSelfShadowTarget.SetReceiverGateAvailableForRendering(true);
                 renderer.EnqueuePass(pass);

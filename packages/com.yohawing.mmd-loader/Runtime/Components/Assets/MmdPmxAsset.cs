@@ -316,6 +316,7 @@ namespace Mmd
         [SerializeField] private Mesh? importedMesh;
         [SerializeField] private Material[] importedMaterials = Array.Empty<Material>();
         [SerializeField] private Material[] materialRemaps = Array.Empty<Material>();
+        [SerializeField] private MmdMaterialOverrideAsset? materialOverrideAsset;
         [SerializeField] private GameObject? importedRoot;
         [SerializeField] private MmdImportReadiness hierarchyReadiness = MmdImportReadiness.NotEvaluated;
         [SerializeField] private MmdImportReadiness rendererReadiness = MmdImportReadiness.NotEvaluated;
@@ -407,6 +408,8 @@ namespace Mmd
 
         public Material[] MaterialRemaps => materialRemaps;
 
+        public MmdMaterialOverrideAsset? MaterialOverrideAsset => materialOverrideAsset;
+
         public MmdImportReadiness HierarchyReadiness => hierarchyReadiness;
         public MmdImportReadiness RendererReadiness => rendererReadiness;
         public MmdImportReadiness BoneBindingReadiness => boneBindingReadiness;
@@ -436,7 +439,8 @@ namespace Mmd
             string? hierarchyReadinessDiagnosticValue = null,
             string? rendererReadinessDiagnosticValue = null,
             string? boneBindingReadinessDiagnosticValue = null,
-            string assetAnimationType = "Generic")
+            string assetAnimationType = "Generic",
+            MmdMaterialOverrideAsset? importedMaterialOverrideAsset = null)
         {
             if (bytes == null || bytes.Length == 0)
             {
@@ -467,6 +471,7 @@ namespace Mmd
             materialRemaps = materialRemapAssets != null
                 ? (Material[])materialRemapAssets.Clone()
                 : Array.Empty<Material>();
+            materialOverrideAsset = importedMaterialOverrideAsset;
             importedRoot = importedRootAsset;
             hierarchyReadiness = hierarchyReadinessValue;
             rendererReadiness = rendererReadinessValue;

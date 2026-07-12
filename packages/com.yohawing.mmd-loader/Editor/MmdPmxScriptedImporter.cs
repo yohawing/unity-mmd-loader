@@ -6,6 +6,7 @@ using UnityEditor;
 using UnityEditor.AssetImporters;
 using Mmd.Parser;
 using Mmd.UnityIntegration;
+using Mmd.Rendering;
 using Mmd;
 
 namespace Mmd.Editor
@@ -37,10 +38,11 @@ namespace Mmd.Editor
 
     public enum MmdPmxShaderPreset
     {
-        MmdBasicUrpToon = 0
+        MmdBasicUrpToon = 0,
+        UrpLit = 1
     }
 
-    [ScriptedImporter(23, "pmx")]
+    [ScriptedImporter(25, "pmx")]
     public sealed class MmdPmxScriptedImporter : ScriptedImporter
     {
         [SerializeField] private float importScale = MmdPmxAsset.DefaultImportScale;
@@ -50,6 +52,7 @@ namespace Mmd.Editor
         [SerializeField] private MmdPmxMaterialTexturePolicy materialTexturePolicy = MmdPmxMaterialTexturePolicy.ResolveReferencesOnly;
         [SerializeField] private MmdPmxAnimationType animationType = MmdPmxAnimationType.Generic;
         [SerializeField] private MmdPmxShaderPreset shaderPreset = MmdPmxShaderPreset.MmdBasicUrpToon;
+        [SerializeField] private MmdMaterialOverrideAsset? materialOverrideAsset;
         [SerializeField] private Material[] materialRemaps = System.Array.Empty<Material>();
         [SerializeField] private MmdHumanoidBoneMappingOverride[] humanoidBoneMappingOverrides =
             System.Array.Empty<MmdHumanoidBoneMappingOverride>();
@@ -105,7 +108,9 @@ namespace Mmd.Editor
                 generatedAssets = MmdPmxImportAssetCacheBuilder.CreateImportedAssetCache(
                     model,
                     ImportScale,
-                    MmdPmxModelPresetAutoDetector.IsCharacter(effectiveModelPreset));
+                    MmdPmxModelPresetAutoDetector.IsCharacter(effectiveModelPreset),
+                    MapMaterialPreset(shaderPreset),
+                    materialOverrideAsset);
                 Mesh importedMesh = generatedAssets.Mesh;
                 Material[] importedMaterials = generatedAssets.Materials;
 
@@ -116,6 +121,17 @@ namespace Mmd.Editor
                         importedMaterials,
                         generatedAssets.RenderingDescriptor,
                         ctx);
+
+                if (shaderPreset == MmdPmxShaderPreset.UrpLit)
+                {
+                    MmdPbrTextureConventionScanner.ApplyScannedMaterialOverrides(
+                        ctx,
+                        model,
+                        ctx.assetPath,
+                        importedMaterials);
+                }
+
+                ApplyMaterialOverrideAsset(ctx, importedMaterials);
 
                 MmdPmxAsset asset = MmdPmxImportedAssetBuilder.CreateAndInitializeImportedAsset(
                     bytes,
@@ -129,7 +145,8 @@ namespace Mmd.Editor
                     parseSummary,
                     generatedAssets,
                     materialRemaps,
-                    animationType.ToString());
+                    animationType.ToString(),
+                    materialOverrideAsset);
                 asset.ApplyProjectTextureBindingSummary(
                     textureBindingSummary.ResolvedReferenceCount,
                     textureBindingSummary.MissingReferenceCount,
@@ -235,6 +252,33 @@ namespace Mmd.Editor
             return float.IsFinite(value) && value > 0.0f ? value : MmdPmxAsset.DefaultImportScale;
         }
 
+        private static MmdMaterialPreset MapMaterialPreset(MmdPmxShaderPreset value)
+        {
+            return value switch
+            {
+                MmdPmxShaderPreset.MmdBasicUrpToon => MmdMaterialPreset.MmdToon,
+                MmdPmxShaderPreset.UrpLit => MmdMaterialPreset.UrpLit,
+                _ => MmdMaterialPreset.MmdToon
+            };
+        }
+
+        private void ApplyMaterialOverrideAsset(AssetImportContext ctx, Material[] importedMaterials)
+        {
+            if (materialOverrideAsset == null)
+            {
+                return;
+            }
+
+            string overrideAssetPath = AssetDatabase.GetAssetPath(materialOverrideAsset);
+            if (string.IsNullOrEmpty(overrideAssetPath))
+            {
+                return;
+            }
+
+            ctx.DependsOnSourceAsset(overrideAssetPath);
+            MmdMaterialOverrideApplier.Apply(materialOverrideAsset, importedMaterials);
+        }
+
         private MmdPmxModelPreset ResolveModelPresetForImport(MmdModelDefinition model)
         {
             if (!modelPresetAutoAssigned && modelPreset == MmdPmxModelPreset.Custom)
@@ -267,6 +311,7 @@ namespace Mmd.Editor
             animator.avatar = importedAnimationType == MmdPmxAnimationType.Humanoid
                 ? humanoidAvatar
                 : genericAvatar;
+            animator.applyRootMotion = true;
             return animator;
         }
 

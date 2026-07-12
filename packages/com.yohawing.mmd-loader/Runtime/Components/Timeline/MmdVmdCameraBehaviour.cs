@@ -128,12 +128,6 @@ namespace Mmd.Timeline
                 return true;
             }
 
-            if (CameraKeyframes != null && CameraKeyframes.Count > 0)
-            {
-                state = VmdCameraSampler.Sample(CameraKeyframes, frame);
-                return true;
-            }
-
             state = MmdCameraState.Default;
             return false;
         }
@@ -171,12 +165,6 @@ namespace Mmd.Timeline
         {
             if (TrySampleNativeLight(frame, out state))
             {
-                return true;
-            }
-
-            if (LightKeyframes != null && LightKeyframes.Count > 0)
-            {
-                state = VmdLightSampler.Sample(LightKeyframes, frame);
                 return true;
             }
 
