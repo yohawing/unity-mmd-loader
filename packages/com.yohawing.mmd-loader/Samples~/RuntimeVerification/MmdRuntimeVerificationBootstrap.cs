@@ -4,14 +4,53 @@ using System;
 using System.Collections;
 using System.IO;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using Mmd.Physics;
 
 namespace Mmd.Samples.RuntimeVerification
 {
     public sealed class MmdRuntimeVerificationBootstrap : MonoBehaviour
     {
+        private const string SceneName = "RuntimeVerification";
+        private const string SceneRootName = "Runtime Verification";
         private const string ViewRootName = "MMD Runtime Verification View";
         private const string GridObjectName = "MMD Runtime Verification Grid";
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void RegisterSceneBootstrap()
+        {
+            SceneManager.sceneLoaded -= AttachBootstrap;
+            SceneManager.sceneLoaded += AttachBootstrap;
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void AttachInitialSceneBootstrap()
+        {
+            AttachBootstrap(SceneManager.GetActiveScene(), LoadSceneMode.Single);
+        }
+
+        private static void AttachBootstrap(Scene scene, LoadSceneMode _)
+        {
+            if (!scene.IsValid() || scene.name != SceneName)
+            {
+                return;
+            }
+
+            foreach (GameObject root in scene.GetRootGameObjects())
+            {
+                if (root.name != SceneRootName)
+                {
+                    continue;
+                }
+
+                if (root.GetComponent<MmdRuntimeVerificationBootstrap>() == null)
+                {
+                    root.AddComponent<MmdRuntimeVerificationBootstrap>();
+                }
+
+                return;
+            }
+        }
 
         private IEnumerator Start()
         {

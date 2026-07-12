@@ -70,6 +70,7 @@ namespace Mmd.Samples.RuntimeVerification
         private bool isLoading;
         private string loadingLabel = string.Empty;
         private UIDocument? uiDocument;
+        private PanelSettings? ownedPanelSettings;
         private VisualElement? uiRoot;
         private Label? errorLabel;
         private Label? loadingStatusLabel;
@@ -90,6 +91,15 @@ namespace Mmd.Samples.RuntimeVerification
         private bool runtimeUiReady;
         private bool suppressFrameSliderChange;
         private bool panelCollapsed;
+        private Transform? editorPreviewOwnershipRoot;
+
+        public void ConfigureEditorPreviewOwnership(Transform ownershipRoot)
+        {
+            editorPreviewOwnershipRoot = ownershipRoot != null
+                ? ownershipRoot
+                : throw new ArgumentNullException(nameof(ownershipRoot));
+            ApplyEditorPreviewOwnership(ownershipRoot.gameObject);
+        }
 
         public void Initialize(MmdRuntimeVerificationArguments viewerArguments)
         {
@@ -122,6 +132,20 @@ namespace Mmd.Samples.RuntimeVerification
         private void OnDestroy()
         {
             ClearPlayback();
+            if (ownedPanelSettings != null)
+            {
+                if (Application.isPlaying)
+                {
+                    Destroy(ownedPanelSettings);
+                }
+                else
+                {
+                    DestroyImmediate(ownedPanelSettings);
+                }
+
+                ownedPanelSettings = null;
+            }
+
             BulletMmdPhysicsBackend.ResetMaxSubStepEstimateFixedTimeStepSecondsForDiagnostics();
         }
 
@@ -255,7 +279,9 @@ namespace Mmd.Samples.RuntimeVerification
                     PanelSettings panelSettings = ScriptableObject.CreateInstance<PanelSettings>();
                     panelSettings.name = "MMD Runtime Viewer Panel Settings";
                     panelSettings.hideFlags = HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild;
+                    panelSettings.themeStyleSheet = Resources.Load<ThemeStyleSheet>("MmdRuntimeViewerTheme");
                     uiDocument.panelSettings = panelSettings;
+                    ownedPanelSettings = panelSettings;
                 }
 
                 uiRoot = uiDocument.rootVisualElement;
@@ -1127,16 +1153,32 @@ namespace Mmd.Samples.RuntimeVerification
             isLoading = true;
             loadingLabel = "Loading: " + displayName;
             AddStatus(loadingLabel);
-            StartCoroutine(LoadPlaybackAfterUiFrame(
-                pmxPath,
-                vmdPath,
-                displayName,
-                successStatus,
-                cameraPath,
-                audioPath,
-                backgroundPath,
-                audioOffset,
-                materialPreset));
+            if (Application.isPlaying)
+            {
+                StartCoroutine(LoadPlaybackAfterUiFrame(
+                    pmxPath,
+                    vmdPath,
+                    displayName,
+                    successStatus,
+                    cameraPath,
+                    audioPath,
+                    backgroundPath,
+                    audioOffset,
+                    materialPreset));
+            }
+            else
+            {
+                CompletePlaybackLoad(
+                    pmxPath,
+                    vmdPath,
+                    displayName,
+                    successStatus,
+                    cameraPath,
+                    audioPath,
+                    backgroundPath,
+                    audioOffset,
+                    materialPreset);
+            }
         }
 
         private IEnumerator LoadPlaybackAfterUiFrame(
@@ -1152,6 +1194,29 @@ namespace Mmd.Samples.RuntimeVerification
         {
             yield return null;
 
+            CompletePlaybackLoad(
+                pmxPath,
+                vmdPath,
+                displayName,
+                successStatus,
+                cameraPath,
+                audioPath,
+                backgroundPath,
+                audioOffset,
+                materialPreset);
+        }
+
+        private void CompletePlaybackLoad(
+            string pmxPath,
+            string vmdPath,
+            string displayName,
+            string successStatus,
+            string cameraPath,
+            string audioPath,
+            string backgroundPath,
+            float audioOffset,
+            MmdMaterialPreset materialPreset)
+        {
             try
             {
                 StartPlayback(
@@ -1194,6 +1259,7 @@ namespace Mmd.Samples.RuntimeVerification
 
             ClearPlayback();
             var holder = new GameObject(ViewerCaseRootPrefix + displayName);
+            ApplyEditorPreviewOwnership(holder);
             playbackRoot = holder;
             playbackRoots.Add(holder);
             var importer = holder.AddComponent<MmdRuntimeImporterComponent>();
@@ -1213,6 +1279,7 @@ namespace Mmd.Samples.RuntimeVerification
                 allowRuntimeFallback: true,
                 materialPreset: materialPreset);
             AdoptConfiguredInstanceRoot(holder, playbackController.ConfiguredInstanceRoot);
+            ApplyEditorPreviewOwnership(holder);
             playbackController.SetPhysicsMode(MmdPhysicsMode.Live);
             if (!arguments.FastRuntimeEnabled)
             {
@@ -1245,7 +1312,14 @@ namespace Mmd.Samples.RuntimeVerification
             audioOffsetFrame = audioOffset;
             if (!string.IsNullOrWhiteSpace(audioPath) && File.Exists(audioPath))
             {
-                StartCoroutine(LoadAudioClip(audioPath));
+                if (Application.isPlaying)
+                {
+                    StartCoroutine(LoadAudioClip(audioPath));
+                }
+                else
+                {
+                    AddStatus("Audio preview requires Play Mode.");
+                }
             }
 
             if (backgroundRoot != null)
@@ -1402,9 +1476,11 @@ namespace Mmd.Samples.RuntimeVerification
                     var parser = new NativeMmdParser();
                     MmdModelDefinition model = parser.LoadModel(pmxBytes);
                     backgroundRoot = new GameObject("MMD Background: " + Path.GetFileName(path));
+                    ApplyEditorPreviewOwnership(backgroundRoot);
                     playbackRoots.Add(backgroundRoot);
                     MmdUnityModelInstance instance = MmdUnityModelFactory.CreateSkinnedModel(model, path, importScale: 0.1f);
                     instance.Root.transform.SetParent(backgroundRoot.transform, worldPositionStays: false);
+                    ApplyEditorPreviewOwnership(backgroundRoot);
                     AddStatus("Background loaded: " + Path.GetFileName(path));
                 }
             }
@@ -1575,6 +1651,33 @@ namespace Mmd.Samples.RuntimeVerification
             }
 
             configuredRoot.transform.SetParent(holder.transform, worldPositionStays: true);
+        }
+
+        private void ApplyEditorPreviewOwnership(GameObject root)
+        {
+            if (editorPreviewOwnershipRoot == null || root == null)
+            {
+                return;
+            }
+
+            if (root.transform != editorPreviewOwnershipRoot && root.transform.parent != editorPreviewOwnershipRoot)
+            {
+                root.transform.SetParent(editorPreviewOwnershipRoot, worldPositionStays: true);
+            }
+
+            Transform[] hierarchy = root.GetComponentsInChildren<Transform>(includeInactive: true);
+            foreach (Transform item in hierarchy)
+            {
+                item.gameObject.hideFlags = HideFlags.HideAndDontSave;
+                Component[] components = item.GetComponents<Component>();
+                foreach (Component component in components)
+                {
+                    if (component != null)
+                    {
+                        component.hideFlags = HideFlags.HideAndDontSave;
+                    }
+                }
+            }
         }
 
         private static void DestroyOrphanedViewerRoots()

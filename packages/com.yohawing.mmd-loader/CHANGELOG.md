@@ -22,6 +22,7 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 
 - DX12 SelfShadow receiver toggling no longer corrupts instancing-buffer rendering.
 - PlayMode fixtures provide the native PMX/VMD source bytes required by current runtime evaluation.
+- Runtime Verification no longer imports with a missing Bootstrap script and now shows its viewer UI in Edit Mode as well as Play Mode.
 
 ### Known Limitations
 
