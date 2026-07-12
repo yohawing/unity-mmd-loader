@@ -63,7 +63,6 @@ namespace Mmd.Tests
             string timelinePath = Path.Combine(assetsRoot, "HumanoidSampleTimeline.playable");
             string scenePath = Path.Combine(assetsRoot, "HumanoidPlayback.unity");
 
-            Assert.That(Path.Combine(sampleRoot, "README.md"), Does.Exist, "Humanoid sample README");
             Assert.That(pmxPath, Does.Exist, "Humanoid sample PMX source");
             Assert.That(fbxPath, Does.Exist, "Humanoid sample FBX motion");
             Assert.That(timelinePath, Does.Exist, "Humanoid Timeline Asset");

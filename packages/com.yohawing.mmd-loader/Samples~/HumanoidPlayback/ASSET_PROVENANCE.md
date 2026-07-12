@@ -1,4 +1,4 @@
-# Bundled motion provenance
+# Bundled asset provenance
 
 ## `Assets/TaisouMocap.fbx`
 
@@ -9,4 +9,10 @@
 - Permission: the provider explicitly confirmed that this already-captured motion is free material and may be redistributed with this package sample
 - Use in this sample: imported as a Unity Humanoid animation and played through `MmdHumanoidAnimationTrack`
 
-This record applies only to the bundled FBX file. The PMX/VMD fixture provenance remains documented in the sample README.
+## `Assets/HumanoidSampleModel.pmx`
+
+The PMX is copied from the self-generated, redistributable `maya_mmd_tools` test
+fixture used by the Basic Playback sample. It is not a third-party licensed MMD
+asset.
+
+This record applies only to the bundled assets named above.

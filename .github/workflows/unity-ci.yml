@@ -39,13 +39,13 @@ permissions:
 jobs:
   release-submodule-latest:
     if: github.event_name == 'workflow_dispatch' && inputs.release_gate
-    name: Release Submodule Latest Tag Check
+    name: Release Submodule Remote Main Check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Check mmd-anim submodule points at latest release tag
+      - name: Check mmd-anim submodule points at remote main
         shell: bash
         run: |
           set -euo pipefail
@@ -54,26 +54,20 @@ jobs:
           url="$(git config -f .gitmodules --get "submodule.${path}.url")"
           current="$(git ls-tree HEAD "$path" | awk '{print $3}')"
 
-          refs="$(git ls-remote --tags --sort=-v:refname "$url" 'v[0-9]*')"
-          latest_tag="$(printf '%s\n' "$refs" | awk '{print $2}' | sed 's#refs/tags/##; s#\^{}##' | head -n 1)"
-          if [ -z "$latest_tag" ]; then
-            echo "::error::No v* tags found for $url"
-            exit 1
-          fi
-
-          latest="$(git ls-remote "$url" "refs/tags/${latest_tag}^{}" | awk '{print $1}' | head -n 1)"
+          latest="$(git ls-remote "$url" refs/heads/main | awk '{print $1}' | head -n 1)"
           if [ -z "$latest" ]; then
-            latest="$(git ls-remote "$url" "refs/tags/${latest_tag}" | awk '{print $1}' | head -n 1)"
+            echo "::error::No refs/heads/main found for $url"
+            exit 1
           fi
 
           echo "submodule=$path"
           echo "url=$url"
           echo "current=$current"
-          echo "latest_tag=$latest_tag"
+          echo "remote_ref=refs/heads/main"
           echo "latest=$latest"
 
           if [ "$current" != "$latest" ]; then
-            echo "::error::${path} points at ${current}, but latest ${latest_tag} is ${latest}"
+            echo "::error::${path} points at ${current}, but remote main is ${latest}"
             exit 1
           fi
 

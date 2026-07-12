@@ -12,7 +12,7 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 
 ### Changed
 
-- Native runtime package binary and submodule are aligned with `mmd-anim` v0.2.0 while retaining runtime ABI version 2.
+- Native runtime package binary and submodule are aligned with `mmd-anim` remote `main` commit `d82a022` while retaining runtime ABI version 2.
 - VMD Timeline overlaps use deterministic single-winner arbitration; weighted pose blending is not advertised.
 - Runtime, Timeline, editable-rig, morph, and Live-physics tests now use native-backed fixtures across the release path.
 - SelfShadow setup diagnostics and troubleshooting now distinguish static RendererFeature readiness from runtime binding/pass state.
