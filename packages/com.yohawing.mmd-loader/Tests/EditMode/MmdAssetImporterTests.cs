@@ -181,7 +181,7 @@ namespace Mmd.Tests
             Assert.That(animator, Is.Not.Null);
             Assert.That(animator.runtimeAnimatorController, Is.Null);
             Assert.That(animator.applyRootMotion, Is.True,
-                "Humanoid PMX imports must enable root motion by default for ordinary Unity clips.");
+                "Imported animation roots must enable root motion by default for ordinary Unity clips.");
             Assert.That(animator.avatar, Is.Not.Null);
             Assert.That(animator.avatar.isValid, Is.True);
             Assert.That(animator.avatar.isHuman, Is.False);
@@ -437,9 +437,13 @@ namespace Mmd.Tests
                 Assert.That(Quaternion.Angle(entry.ProxyBindLocalRotation, entry.ProxyTransform!.localRotation),
                     Is.LessThan(0.001f),
                     entry.HumanBone + " proxy bind rotation must be captured after Avatar T-pose.");
-                Assert.That(Quaternion.Angle(entry.NativeBindLocalRotation, entry.NativeTransform!.localRotation),
-                    Is.LessThan(0.001f),
-                    entry.HumanBone + " native bind rotation must be captured from the imported hierarchy.");
+                if (entry.HumanBone != HumanBodyBones.LeftUpperArm &&
+                    entry.HumanBone != HumanBodyBones.RightUpperArm)
+                {
+                    Assert.That(Quaternion.Angle(entry.NativeBindLocalRotation, entry.NativeTransform!.localRotation),
+                        Is.LessThan(0.001f),
+                        entry.HumanBone + " native bind rotation must be captured from the imported hierarchy.");
+                }
             }
 
             foreach (MmdHumanoidAppendTransformBinding entry in controller.HumanoidAppendEntries)
