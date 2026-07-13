@@ -425,6 +425,10 @@ namespace Mmd.UnityIntegration
             instance.Root.transform.localPosition = transform.localPosition;
             instance.Root.transform.localRotation = transform.localRotation;
             instance.Root.transform.localScale = transform.localScale;
+            MmdTransientRuntimeInstanceMarker marker =
+                instance.Root.GetComponent<MmdTransientRuntimeInstanceMarker>() ??
+                instance.Root.AddComponent<MmdTransientRuntimeInstanceMarker>();
+            marker.Initialize(this, instance);
         }
 
         private bool TryCreateExistingSceneBinding(

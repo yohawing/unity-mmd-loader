@@ -434,6 +434,16 @@ namespace Mmd.UnityIntegration
             IsPlaying = false;
         }
 
+        internal void PrepareForAssemblyReload()
+        {
+            DisposeHumanoidPhysicsBinding();
+            binding?.Dispose();
+            binding = null;
+            LastSnapshot = null;
+            LastEditableRigDiagnostics = null;
+            IsPlaying = false;
+        }
+
         private void OnDisable()
         {
             DisposeHumanoidPhysicsBinding();
