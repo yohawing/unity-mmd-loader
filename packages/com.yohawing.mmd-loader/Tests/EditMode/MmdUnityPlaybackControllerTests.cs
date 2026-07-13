@@ -166,7 +166,19 @@ namespace Mmd.Tests
                 var parser = new NativeMmdParser();
                 MmdModelDefinition model = parser.LoadModel(pmxBytes);
                 previewInstance = MmdUnityModelFactory.CreateSkinnedModel(model, pmxPath);
+                previewInstance.RenderingDescriptor.urpMaterialBindings[0].shaderName = "Custom Borrowed Shader";
                 originalMaterial = previewInstance.Materials[0];
+                SkinnedMeshRenderer renderer = previewInstance.SkinnedMeshRenderer!;
+                Mesh originalMesh = renderer.sharedMesh!;
+                Transform borrowedBone = previewInstance.BoneTransforms[0];
+                borrowedBone.localPosition += new Vector3(1.0f, 2.0f, 3.0f);
+                borrowedBone.localRotation = Quaternion.Euler(0.0f, 45.0f, 0.0f);
+                borrowedBone.localScale = new Vector3(1.2f, 0.8f, 1.1f);
+                Vector3 originalBonePosition = borrowedBone.localPosition;
+                Quaternion originalBoneRotation = borrowedBone.localRotation;
+                Vector3 originalBoneScale = borrowedBone.localScale;
+                Transform? originalRootBone = renderer.rootBone;
+                Bounds originalLocalBounds = renderer.localBounds;
 
                 overrideAsset = ScriptableObject.CreateInstance<MmdMaterialOverrideAsset>();
                 overrideAsset.entries = new[]
@@ -190,17 +202,41 @@ namespace Mmd.Tests
                 vmdAsset.Initialize(vmdBytes, "test_1bone_cube_motion.vmd", vmdPath);
 
                 binding = MmdUnityPlaybackBinding.CreateSkinned(previewInstance, pmxAsset, vmdAsset);
+                binding.SetPhysicsMode(MmdPhysicsMode.Off);
 
                 Assert.That(binding.Instance, Is.SameAs(previewInstance));
-                Assert.That(binding.Instance.RenderingDescriptor.materials[0].alpha, Is.EqualTo(0.45f).Within(0.00001f));
-                Assert.That(binding.Instance.RenderingDescriptor.urpMaterialBindings[0].alpha, Is.EqualTo(0.45f).Within(0.00001f));
-                Assert.That(binding.Instance.RenderingDescriptor.urpMaterialBindings[0].isTransparent, Is.True);
-                Assert.That(binding.Instance.Materials[0], Is.Not.SameAs(originalMaterial));
-                Assert.That(ReadMaterialFloat(binding.Instance.Materials[0], MmdMaterialPropertyNames.Alpha), Is.EqualTo(0.45f).Within(0.00001f));
+                Assert.That(binding.PlaybackInstance, Is.Not.SameAs(previewInstance));
+                Assert.That(binding.Instance.Root, Is.SameAs(previewInstance.Root));
+                Assert.That(binding.PlaybackInstance.Mesh, Is.Not.SameAs(originalMesh));
+                Assert.That(renderer.sharedMesh, Is.SameAs(binding.PlaybackInstance.Mesh));
+                Assert.That(binding.PlaybackInstance.BindLocalPositions, Is.EqualTo(previewInstance.BindLocalPositions));
+                Assert.That(binding.PlaybackInstance.BindLocalRotations, Is.EqualTo(previewInstance.BindLocalRotations));
+                Assert.That(binding.PlaybackInstance.RenderingDescriptor.materials[0].alpha, Is.EqualTo(0.45f).Within(0.00001f));
+                Assert.That(binding.PlaybackInstance.RenderingDescriptor.urpMaterialBindings[0].alpha, Is.EqualTo(0.45f).Within(0.00001f));
+                Assert.That(binding.PlaybackInstance.RenderingDescriptor.urpMaterialBindings[0].isTransparent, Is.True);
+                Assert.That(binding.PlaybackInstance.RenderingDescriptor.urpMaterialBindings[0].shaderName, Is.EqualTo("Custom Borrowed Shader"));
+                Assert.That(previewInstance.RenderingDescriptor.urpMaterialBindings[0].shaderName, Is.EqualTo("Custom Borrowed Shader"));
+                Assert.That(previewInstance.RenderingDescriptor.urpMaterialBindings[0].alpha, Is.EqualTo(1.0f).Within(0.00001f));
+                Assert.That(binding.PlaybackInstance.Materials[0], Is.Not.SameAs(originalMaterial));
+                Assert.That(ReadMaterialFloat(binding.PlaybackInstance.Materials[0], MmdMaterialPropertyNames.Alpha), Is.EqualTo(0.45f).Within(0.00001f));
                 Assert.That(ReadMaterialFloat(originalMaterial!, MmdMaterialPropertyNames.Alpha), Is.EqualTo(1.0f).Within(0.00001f));
-                Assert.That(binding.Instance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
-                Assert.That(binding.Instance.MaterialBindingDiagnostics[0].isTransparent, Is.True);
-                Assert.That(binding.Instance.MaterialBindingDiagnostics[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
+                Assert.That(binding.PlaybackInstance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
+                Assert.That(binding.PlaybackInstance.MaterialBindingDiagnostics[0].isTransparent, Is.True);
+                Assert.That(binding.PlaybackInstance.MaterialBindingDiagnostics[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
+                binding.ApplyFrame(9, 30.0f);
+                Assert.That(Quaternion.Angle(borrowedBone.localRotation, originalBoneRotation), Is.GreaterThan(0.1f));
+
+                binding.Dispose();
+                Assert.That(binding.Instance, Is.SameAs(previewInstance));
+                Assert.That(binding.PlaybackInstance, Is.SameAs(previewInstance));
+                Assert.That(renderer.sharedMesh, Is.SameAs(originalMesh));
+                Assert.That(renderer.sharedMaterials[0], Is.SameAs(originalMaterial));
+                Assert.That(renderer.rootBone, Is.SameAs(originalRootBone));
+                Assert.That(renderer.localBounds, Is.EqualTo(originalLocalBounds));
+                Assert.That(borrowedBone.localPosition, Is.EqualTo(originalBonePosition));
+                Assert.That(borrowedBone.localRotation, Is.EqualTo(originalBoneRotation));
+                Assert.That(borrowedBone.localScale, Is.EqualTo(originalBoneScale));
+                binding = null;
             }
             finally
             {
@@ -209,10 +245,6 @@ namespace Mmd.Tests
                 Object.DestroyImmediate(pmxAsset);
                 Object.DestroyImmediate(vmdAsset);
                 Object.DestroyImmediate(overrideAsset);
-                if (originalMaterial != null)
-                {
-                    Object.DestroyImmediate(originalMaterial);
-                }
             }
         }
 
@@ -267,10 +299,18 @@ namespace Mmd.Tests
                 vmdAsset.Initialize(vmdBytes, "test_1bone_cube_motion.vmd", vmdPath);
 
                 binding = MmdUnityPlaybackBinding.CreateSkinned(previewInstance, pmxAsset, vmdAsset);
+                binding.SetPhysicsMode(MmdPhysicsMode.Off);
 
-                Assert.That(binding.Instance.Materials[0], Is.SameAs(remapMaterial));
-                Assert.That(binding.Instance.SkinnedMeshRenderer!.sharedMaterials[0], Is.SameAs(remapMaterial));
+                Assert.That(binding.Instance, Is.SameAs(previewInstance));
+                Assert.That(binding.PlaybackInstance.Materials[0], Is.Not.SameAs(remapMaterial));
+                Assert.That(binding.PlaybackInstance.SkinnedMeshRenderer!.sharedMaterials[0], Is.SameAs(binding.PlaybackInstance.Materials[0]));
+                Assert.That(ReadMaterialFloat(binding.PlaybackInstance.Materials[0], MmdMaterialPropertyNames.Alpha), Is.EqualTo(0.8f).Within(0.00001f));
                 Assert.That(ReadMaterialFloat(remapMaterial, MmdMaterialPropertyNames.Alpha), Is.EqualTo(0.8f).Within(0.00001f));
+
+                binding.Dispose();
+                Assert.That(binding.Instance, Is.SameAs(previewInstance));
+                Assert.That(previewInstance.SkinnedMeshRenderer!.sharedMaterials[0], Is.SameAs(remapMaterial));
+                binding = null;
             }
             finally
             {
@@ -283,6 +323,103 @@ namespace Mmd.Tests
                 {
                     Object.DestroyImmediate(originalMaterial);
                 }
+            }
+        }
+
+        [Test]
+        public void ReconfigureBorrowedInstanceReleasesPreviousPlaybackClonesAndRestoresAuthoredResources()
+        {
+            MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
+            MmdUnityModelInstance? previewInstance = null;
+            MmdUnityPlaybackController? controller = null;
+
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                byte[] pmxBytes = File.ReadAllBytes(pmxPath);
+                byte[] vmdBytes = File.ReadAllBytes(vmdPath);
+                var parser = new NativeMmdParser();
+                previewInstance = MmdUnityModelFactory.CreateSkinnedModel(parser.LoadModel(pmxBytes), pmxPath);
+                SkinnedMeshRenderer renderer = previewInstance.SkinnedMeshRenderer!;
+                Mesh authoredMesh = renderer.sharedMesh!;
+                Material authoredMaterial = renderer.sharedMaterials[0];
+                controller = previewInstance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+
+                pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                pmxAsset.Initialize(pmxBytes, "test_1bone_cube.pmx", pmxPath);
+                vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                vmdAsset.Initialize(vmdBytes, "test_1bone_cube_motion.vmd", vmdPath);
+
+                Mesh? previousPlaybackMesh = null;
+                for (int i = 0; i < 20; i++)
+                {
+                    MmdUnityPlaybackBinding next = MmdUnityPlaybackBinding.CreateSkinned(previewInstance, pmxAsset, vmdAsset);
+                    controller.Configure(next, 30.0f, playOnStart: false);
+
+                    if (i > 0)
+                    {
+                        Assert.That(previousPlaybackMesh == null, Is.True, $"reconfigure {i} must destroy the previous playback Mesh clone");
+                    }
+
+                    previousPlaybackMesh = renderer.sharedMesh;
+                    Assert.That(previousPlaybackMesh, Is.Not.SameAs(authoredMesh));
+                    Assert.That(renderer.sharedMaterials[0], Is.Not.SameAs(authoredMaterial));
+                }
+
+                controller.PrepareForAssemblyReload();
+                Assert.That(renderer.sharedMesh, Is.SameAs(authoredMesh));
+                Assert.That(renderer.sharedMaterials[0], Is.SameAs(authoredMaterial));
+                Object.DestroyImmediate(controller);
+                controller = null;
+            }
+            finally
+            {
+                if (controller != null)
+                {
+                    Object.DestroyImmediate(controller);
+                }
+
+                MmdTestInstanceScope.DestroyInstance(previewInstance);
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+            }
+        }
+
+        [Test]
+        public void BorrowedMutationLeaseRestoresPhysicsBodyReadbackState()
+        {
+            MmdUnityModelInstance? previewInstance = null;
+            MmdBorrowedSceneMutationLease? lease = null;
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_hair_physics.pmx");
+                var parser = new NativeMmdParser();
+                MmdModelDefinition model = parser.LoadModel(File.ReadAllBytes(pmxPath));
+                previewInstance = MmdUnityModelFactory.CreateSkinnedModel(model, pmxPath);
+                Assert.That(previewInstance.PhysicsBodies, Is.Not.Empty);
+                MmdUnityPhysicsBody body = previewInstance.PhysicsBodies[0];
+                Assert.That(body.HasNativeTransform, Is.False);
+
+                lease = new MmdBorrowedSceneMutationLease(previewInstance);
+                lease.Activate();
+                body.RecordNativeTransform(
+                    new[] { 1.0f, 2.0f, 3.0f },
+                    new[] { 0.0f, 0.0f, 0.0f, 1.0f });
+                Assert.That(body.HasNativeTransform, Is.True);
+
+                lease.Dispose();
+                lease = null;
+                Assert.That(body.HasNativeTransform, Is.False);
+                Assert.That(body.NativePosition, Is.EqualTo(Vector3.zero));
+                Assert.That(body.NativeRotation, Is.EqualTo(Quaternion.identity));
+            }
+            finally
+            {
+                lease?.Dispose();
+                MmdTestInstanceScope.DestroyInstance(previewInstance);
             }
         }
 

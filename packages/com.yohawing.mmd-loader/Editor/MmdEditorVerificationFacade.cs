@@ -143,7 +143,7 @@ namespace Mmd.Editor
                 MmdPlaybackSnapshot snapshot = RunStage(
                     RuntimeApplyFrameStage,
                     () => controller.ApplyFrame(initialFrame));
-                return new MmdEditorPlaybackSceneLoadResult(binding.Instance, binding, controller, model, motion, fullPmxPath, fullVmdPath, snapshot);
+                return new MmdEditorPlaybackSceneLoadResult(placedInstance, binding, controller, model, motion, fullPmxPath, fullVmdPath, snapshot);
             }
             catch
             {

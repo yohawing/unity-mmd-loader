@@ -150,13 +150,13 @@ namespace Mmd.UnityIntegration
         {
             float time = MmdPlaybackTime.ToTime(frame, frameRate);
             fastSession!.EvaluateAndCopy(frame, fastWorldMatrices!, fastMorphWeights!, fastIkEnabled!);
-            MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(Instance, fastWorldMatrices!);
+            MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(playbackInstance, fastWorldMatrices!);
             ApplyFastMorphWeights();
             // Lightweight snapshot: no managed session.EvaluateFrame call.
             // fastMorphFrame is reused in-place; frame/time are updated each call.
             // bones is empty because world matrices are applied directly to Unity transforms.
             // morphs reflects the last-applied fast weights (mutated on subsequent calls).
-            // rendering is the stable Instance.RenderingDescriptor reference.
+            // rendering is the active playback descriptor reference.
             // See runtime-session contract "fast-runtime binding snapshot mode".
             fastMorphFrame!.frame = frame;
             fastMorphFrame.time = time;
@@ -165,7 +165,7 @@ namespace Mmd.UnityIntegration
                 model = modelId,
                 motion = motionId,
                 frame = fastMorphFrame,
-                rendering = Instance.RenderingDescriptor
+                rendering = playbackInstance.RenderingDescriptor
             };
             return fastSnapshot;
         }
@@ -174,7 +174,7 @@ namespace Mmd.UnityIntegration
         {
             int frame = MmdPlaybackTime.ToFrame(time, frameRate);
             fastSession!.EvaluateAndCopy(frame, fastWorldMatrices!, fastMorphWeights!, fastIkEnabled!);
-            MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(Instance, fastWorldMatrices!);
+            MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(playbackInstance, fastWorldMatrices!);
             ApplyFastMorphWeights();
             fastMorphFrame!.frame = frame;
             fastMorphFrame.time = time;
@@ -183,7 +183,7 @@ namespace Mmd.UnityIntegration
                 model = modelId,
                 motion = motionId,
                 frame = fastMorphFrame,
-                rendering = Instance.RenderingDescriptor
+                rendering = playbackInstance.RenderingDescriptor
             };
             return fastSnapshot;
         }
@@ -207,7 +207,7 @@ namespace Mmd.UnityIntegration
             // array. Re-running group resolution here would distribute that residual group weight a SECOND
             // time and over-drive (roughly double) the member blend shapes. Flip morphs are NOT expanded by
             // the native runtime, so the applier still resolves those.
-            MmdUnityFrameApplier.ApplyMorphs(Instance, fastMorphFrame!, groupMorphsResolvedExternally: true);
+            MmdUnityFrameApplier.ApplyMorphs(playbackInstance, fastMorphFrame!, groupMorphsResolvedExternally: true);
             Array.Copy(fastMorphWeights!, fastLastAppliedMorphWeights!, fastMorphWeights!.Length);
             fastMorphApplied = hasNonZero;
             fastMorphCacheValid = true;

@@ -45,6 +45,8 @@ namespace Mmd.UnityIntegration
         private bool fastMorphCacheValid;
         private MmdPlaybackSnapshot? fastSnapshot;
         private readonly MmdUnityModelInstanceOwnership instanceOwnership;
+        private readonly MmdBorrowedSceneMutationLease? borrowedMutationLease;
+        private MmdUnityModelInstance playbackInstance;
         private bool disposed;
 
         private MmdUnityPlaybackBinding(
@@ -53,17 +55,22 @@ namespace Mmd.UnityIntegration
             MmdModelDefinition model,
             string modelId,
             string motionId,
-            MmdUnityModelInstanceOwnership instanceOwnership)
+            MmdUnityModelInstanceOwnership instanceOwnership,
+            MmdBorrowedSceneMutationLease? borrowedMutationLease = null)
         {
             Instance = instance;
+            playbackInstance = instance;
             this.session = session;
             this.model = model;
             this.modelId = modelId;
             this.motionId = motionId;
             this.instanceOwnership = instanceOwnership;
+            this.borrowedMutationLease = borrowedMutationLease;
         }
 
         public MmdUnityModelInstance Instance { get; }
+
+        internal MmdUnityModelInstance PlaybackInstance => playbackInstance;
 
         public string MotionId => motionId;
 
@@ -151,19 +158,23 @@ namespace Mmd.UnityIntegration
             MmdModelDefinition model = modelAsset.LoadModel(parser);
             MmdModelValidator.ThrowIfInvalid(model);
             MmdMotionValidator.ThrowIfInvalid(motion);
-            ApplyMaterialOverrideToSuppliedInstance(instance, modelAsset.MaterialOverrideAsset, modelAsset.MaterialRemaps);
             var session = new MmdRuntimeSession(
                 model,
                 motion,
                 string.IsNullOrWhiteSpace(modelAsset.SourceId) ? modelAsset.name : modelAsset.SourceId,
                 string.IsNullOrWhiteSpace(motionAsset.SourceId) ? motionAsset.name : motionAsset.SourceId);
+            var lease = new MmdBorrowedSceneMutationLease(
+                instance,
+                modelAsset.MaterialOverrideAsset,
+                modelAsset.MaterialRemaps);
             return new MmdUnityPlaybackBinding(
                 instance,
                 session,
                 model,
                 string.IsNullOrWhiteSpace(modelAsset.SourceId) ? modelAsset.name : modelAsset.SourceId,
                 string.IsNullOrWhiteSpace(motionAsset.SourceId) ? motionAsset.name : motionAsset.SourceId,
-                MmdUnityModelInstanceOwnership.Borrowed);
+                MmdUnityModelInstanceOwnership.Borrowed,
+                lease);
         }
 
         public static MmdUnityPlaybackBinding CreateSkinned(
@@ -199,13 +210,15 @@ namespace Mmd.UnityIntegration
             string resolvedModelId = string.IsNullOrWhiteSpace(modelId) ? "PMX" : modelId;
             string resolvedMotionId = string.IsNullOrWhiteSpace(motionAsset.SourceId) ? motionAsset.name : motionAsset.SourceId;
             var session = new MmdRuntimeSession(model, motion, resolvedModelId, resolvedMotionId);
+            var lease = new MmdBorrowedSceneMutationLease(instance);
             return new MmdUnityPlaybackBinding(
                 instance,
                 session,
                 model,
                 resolvedModelId,
                 resolvedMotionId,
-                MmdUnityModelInstanceOwnership.Borrowed);
+                MmdUnityModelInstanceOwnership.Borrowed,
+                lease);
         }
 
         internal static MmdUnityPlaybackBinding CreateSkinnedFromSuppliedInstance(
@@ -235,100 +248,15 @@ namespace Mmd.UnityIntegration
             string resolvedModelId = string.IsNullOrWhiteSpace(modelId) ? "PMX" : modelId;
             string resolvedMotionId = string.IsNullOrWhiteSpace(motionId) ? "VMD" : motionId;
             var session = new MmdRuntimeSession(model, motion, resolvedModelId, resolvedMotionId);
+            var lease = new MmdBorrowedSceneMutationLease(instance);
             return new MmdUnityPlaybackBinding(
                 instance,
                 session,
                 model,
                 resolvedModelId,
                 resolvedMotionId,
-                MmdUnityModelInstanceOwnership.Borrowed);
-        }
-
-        private static void ApplyMaterialOverrideToSuppliedInstance(
-            MmdUnityModelInstance instance,
-            MmdMaterialOverrideAsset? materialOverride,
-            Material[]? materialRemaps)
-        {
-            if (materialOverride == null)
-            {
-                return;
-            }
-
-            bool[] excludedMaterialSlots = BuildMaterialOverrideExclusionSlots(materialRemaps, instance.Materials.Length);
-            Material[] sceneMaterials = CloneMaterialsForOverride(instance.Materials, excludedMaterialSlots);
-            for (int i = 0; i < sceneMaterials.Length; i++)
-            {
-                instance.Materials[i] = sceneMaterials[i];
-            }
-
-            MmdMaterialOverrideApplier.ApplyToRenderingDescriptor(materialOverride, instance.RenderingDescriptor, excludedMaterialSlots);
-            MmdMaterialOverrideApplier.Apply(materialOverride, sceneMaterials, excludedMaterialSlots);
-            if (instance.SkinnedMeshRenderer != null)
-            {
-                instance.SkinnedMeshRenderer.sharedMaterials = sceneMaterials;
-            }
-            else if (instance.MeshRenderer != null)
-            {
-                instance.MeshRenderer.sharedMaterials = sceneMaterials;
-            }
-
-            instance.RefreshMaterialBindingDiagnostics();
-        }
-
-        private static Material[] CloneMaterialsForOverride(Material[] materials, bool[] excludedMaterialSlots)
-        {
-            if (materials == null || materials.Length == 0)
-            {
-                return Array.Empty<Material>();
-            }
-
-            var clones = new Material[materials.Length];
-            for (int i = 0; i < materials.Length; i++)
-            {
-                Material source = materials[i];
-                if (source == null)
-                {
-                    continue;
-                }
-
-                if (IsExcludedMaterialSlot(i, excludedMaterialSlots))
-                {
-                    clones[i] = source;
-                    continue;
-                }
-
-                Material clone = new Material(source)
-                {
-                    name = source.name
-                };
-                clones[i] = clone;
-            }
-
-            return clones;
-        }
-
-        private static bool[] BuildMaterialOverrideExclusionSlots(Material[]? materialRemaps, int materialSlotCount)
-        {
-            var excluded = new bool[Math.Max(0, materialSlotCount)];
-            if (materialRemaps == null)
-            {
-                return excluded;
-            }
-
-            int count = Math.Min(excluded.Length, materialRemaps.Length);
-            for (int i = 0; i < count; i++)
-            {
-                excluded[i] = materialRemaps[i] != null;
-            }
-
-            return excluded;
-        }
-
-        private static bool IsExcludedMaterialSlot(int materialSlot, bool[] excludedMaterialSlots)
-        {
-            return materialSlot >= 0 &&
-                materialSlot < excludedMaterialSlots.Length &&
-                excludedMaterialSlots[materialSlot];
+                MmdUnityModelInstanceOwnership.Borrowed,
+                lease);
         }
 
         public static MmdUnityPlaybackBinding CreateSkinnedFromExistingSceneModel(
@@ -542,6 +470,7 @@ namespace Mmd.UnityIntegration
                     throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unknown physics mode.");
             }
 
+            EnsureBorrowedMutationActive();
             physicsMode = mode;
             ResetLivePhysics();
         }
@@ -550,6 +479,7 @@ namespace Mmd.UnityIntegration
         {
             MmdPlaybackTime.ValidateFrame(frame);
             MmdPlaybackTime.ValidateFrameRate(frameRate);
+            EnsureBorrowedMutationActive();
             if (physicsMode == MmdPhysicsMode.Live)
             {
                 return ApplyLivePhysicsFrame(frame, frameRate, allowArbitraryStart: false);
@@ -561,8 +491,8 @@ namespace Mmd.UnityIntegration
             }
 
             MmdEvaluatedFrame evaluatedFrame = session.EvaluateFrame(frame, MmdPlaybackTime.ToTime(frame, frameRate));
-            MmdUnityFrameApplier.ApplyFrame(Instance, evaluatedFrame);
-            return session.BuildSnapshotFromEvaluatedFrame(evaluatedFrame, Instance.RenderingDescriptor);
+            MmdUnityFrameApplier.ApplyFrame(playbackInstance, evaluatedFrame);
+            return session.BuildSnapshotFromEvaluatedFrame(evaluatedFrame, playbackInstance.RenderingDescriptor);
         }
 
         public MmdPlaybackSnapshot ApplyTime(float time, float frameRate)
@@ -574,15 +504,16 @@ namespace Mmd.UnityIntegration
                 throw new InvalidOperationException("Physics Live does not support random-access time evaluation. Use forward playback Tick/ApplyFrame.");
             }
 
+            EnsureBorrowedMutationActive();
             if (fastSession != null)
             {
                 return ApplyFastTime(time, frameRate);
             }
 
             MmdEvaluatedFrame evaluatedFrame = session.EvaluateFrameAtTime(time, frameRate);
-            MmdUnityFrameApplier.ApplyFrame(Instance, evaluatedFrame);
+            MmdUnityFrameApplier.ApplyFrame(playbackInstance, evaluatedFrame);
             InvalidateFastMorphCache();
-            return session.BuildSnapshotFromEvaluatedFrame(evaluatedFrame, Instance.RenderingDescriptor);
+            return session.BuildSnapshotFromEvaluatedFrame(evaluatedFrame, playbackInstance.RenderingDescriptor);
         }
 
         public void Dispose()
@@ -602,8 +533,21 @@ namespace Mmd.UnityIntegration
             {
                 if (instanceOwnership == MmdUnityModelInstanceOwnership.Owned)
                 {
-                    DestroyOwnedInstance(Instance);
+                    DestroyOwnedInstance(playbackInstance);
                 }
+                else
+                {
+                    borrowedMutationLease?.Dispose();
+                    playbackInstance = Instance;
+                }
+            }
+        }
+
+        private void EnsureBorrowedMutationActive()
+        {
+            if (borrowedMutationLease != null && !borrowedMutationLease.IsActive)
+            {
+                playbackInstance = borrowedMutationLease.Activate();
             }
         }
 

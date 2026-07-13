@@ -485,19 +485,23 @@ namespace Mmd.Tests
                 Assert.That(loadResult.Controller, Is.Not.Null);
                 Assert.That(loadResult.Controller.IsConfigured, Is.True);
 
-                // Must use importer sub-assets for materials (not freshly CreateSkinned runtime mats).
+                // The authored Scene instance keeps importer sub-assets while active playback mutates clones.
                 Material[] placedMats = loadResult.Instance.Materials;
                 Assert.That(placedMats, Is.Not.Null.And.Not.Empty);
                 Assert.That(placedMats[0], Is.SameAs(pmxAsset.ImportedMaterials[0]), "playback asset load must bind over importer Material sub-asset, not runtime-generated material");
 
                 SkinnedMeshRenderer? smr = loadResult.Instance.SkinnedMeshRenderer;
                 Assert.That(smr, Is.Not.Null);
-                Assert.That(smr!.sharedMaterials[0], Is.SameAs(pmxAsset.ImportedMaterials[0]));
+                Assert.That(smr!.sharedMaterials[0], Is.Not.SameAs(pmxAsset.ImportedMaterials[0]));
+                Assert.That(smr.sharedMaterials[0].name, Does.StartWith(pmxAsset.ImportedMaterials[0].name));
                 Assert.That(loadResult.Instance.Root.GetComponent<MmdSelfShadowTarget>(), Is.Null,
                     "Stage preset PMX+VMD asset scene load must not register a character self-shadow target.");
 
                 Assert.That(loadResult.Controller.ModelAssetSource, Is.SameAs(pmxAsset));
                 Assert.That(loadResult.Controller.MotionAssetSource, Is.SameAs(vmdAsset));
+
+                loadResult.Binding.Dispose();
+                Assert.That(smr.sharedMaterials[0], Is.SameAs(pmxAsset.ImportedMaterials[0]));
             }
             finally
             {
