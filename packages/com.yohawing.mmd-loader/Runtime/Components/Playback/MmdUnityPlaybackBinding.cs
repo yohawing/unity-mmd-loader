@@ -14,6 +14,12 @@ using UnityEngine;
 
 namespace Mmd.UnityIntegration
 {
+    internal enum MmdUnityModelInstanceOwnership
+    {
+        Borrowed = 0,
+        Owned = 1
+    }
+
     public sealed partial class MmdUnityPlaybackBinding : IDisposable
     {
         private readonly MmdRuntimeSession session;
@@ -38,19 +44,23 @@ namespace Mmd.UnityIntegration
         private bool fastMorphApplied;
         private bool fastMorphCacheValid;
         private MmdPlaybackSnapshot? fastSnapshot;
+        private readonly MmdUnityModelInstanceOwnership instanceOwnership;
+        private bool disposed;
 
         private MmdUnityPlaybackBinding(
             MmdUnityModelInstance instance,
             MmdRuntimeSession session,
             MmdModelDefinition model,
             string modelId,
-            string motionId)
+            string motionId,
+            MmdUnityModelInstanceOwnership instanceOwnership)
         {
             Instance = instance;
             this.session = session;
             this.model = model;
             this.modelId = modelId;
             this.motionId = motionId;
+            this.instanceOwnership = instanceOwnership;
         }
 
         public MmdUnityModelInstance Instance { get; }
@@ -152,7 +162,8 @@ namespace Mmd.UnityIntegration
                 session,
                 model,
                 string.IsNullOrWhiteSpace(modelAsset.SourceId) ? modelAsset.name : modelAsset.SourceId,
-                string.IsNullOrWhiteSpace(motionAsset.SourceId) ? motionAsset.name : motionAsset.SourceId);
+                string.IsNullOrWhiteSpace(motionAsset.SourceId) ? motionAsset.name : motionAsset.SourceId,
+                MmdUnityModelInstanceOwnership.Borrowed);
         }
 
         public static MmdUnityPlaybackBinding CreateSkinned(
@@ -188,7 +199,13 @@ namespace Mmd.UnityIntegration
             string resolvedModelId = string.IsNullOrWhiteSpace(modelId) ? "PMX" : modelId;
             string resolvedMotionId = string.IsNullOrWhiteSpace(motionAsset.SourceId) ? motionAsset.name : motionAsset.SourceId;
             var session = new MmdRuntimeSession(model, motion, resolvedModelId, resolvedMotionId);
-            return new MmdUnityPlaybackBinding(instance, session, model, resolvedModelId, resolvedMotionId);
+            return new MmdUnityPlaybackBinding(
+                instance,
+                session,
+                model,
+                resolvedModelId,
+                resolvedMotionId,
+                MmdUnityModelInstanceOwnership.Borrowed);
         }
 
         private static void ApplyMaterialOverrideToSuppliedInstance(
@@ -326,7 +343,8 @@ namespace Mmd.UnityIntegration
                 session,
                 model,
                 string.IsNullOrWhiteSpace(modelAsset.SourceId) ? modelAsset.name : modelAsset.SourceId,
-                string.IsNullOrWhiteSpace(motionAsset.SourceId) ? motionAsset.name : motionAsset.SourceId);
+                string.IsNullOrWhiteSpace(motionAsset.SourceId) ? motionAsset.name : motionAsset.SourceId,
+                MmdUnityModelInstanceOwnership.Borrowed);
         }
 
         internal static MmdUnityPlaybackBinding CreateSkinnedForModelOnlyPhysicsFromExistingSceneModel(
@@ -361,7 +379,13 @@ namespace Mmd.UnityIntegration
             string resolvedModelId = string.IsNullOrWhiteSpace(modelAsset.SourceId) ? modelAsset.name : modelAsset.SourceId;
             string resolvedMotionId = string.IsNullOrWhiteSpace(motionId) ? "humanoid-physics" : motionId;
             var session = new MmdRuntimeSession(model, restMotion, resolvedModelId, resolvedMotionId);
-            return new MmdUnityPlaybackBinding(instance, session, model, resolvedModelId, resolvedMotionId);
+            return new MmdUnityPlaybackBinding(
+                instance,
+                session,
+                model,
+                resolvedModelId,
+                resolvedMotionId,
+                MmdUnityModelInstanceOwnership.Borrowed);
         }
 
         private static void RemoveModelOnlyUnsupportedPureWorldAnchorJoints(MmdModelDefinition model)
@@ -392,8 +416,7 @@ namespace Mmd.UnityIntegration
                 sourcePath,
                 importScale: 1.0f,
                 materialPreset);
-            var session = new MmdRuntimeSession(model, motion, modelId, motionId);
-            return new MmdUnityPlaybackBinding(instance, session, model, modelId, motionId);
+            return CreateOwnedBinding(instance, model, motion, modelId, motionId);
         }
 
         private static MmdMotionDefinition CreateModelOnlyRestMotion(MmdModelDefinition model)
@@ -467,8 +490,7 @@ namespace Mmd.UnityIntegration
                 scale,
                 materialPreset,
                 materialOverride);
-            var session = new MmdRuntimeSession(model, motion, modelId, motionId);
-            return new MmdUnityPlaybackBinding(instance, session, model, modelId, motionId);
+            return CreateOwnedBinding(instance, model, motion, modelId, motionId);
         }
 
         public void SetPhysicsMode(MmdPhysicsMode mode)
@@ -529,8 +551,93 @@ namespace Mmd.UnityIntegration
 
         public void Dispose()
         {
-            DisableFastRuntime();
-            ResetLivePhysics();
+            if (disposed)
+            {
+                return;
+            }
+
+            disposed = true;
+            try
+            {
+                DisableFastRuntime();
+                ResetLivePhysics();
+            }
+            finally
+            {
+                if (instanceOwnership == MmdUnityModelInstanceOwnership.Owned)
+                {
+                    DestroyOwnedInstance(Instance);
+                }
+            }
+        }
+
+        private static MmdUnityPlaybackBinding CreateOwnedBinding(
+            MmdUnityModelInstance instance,
+            MmdModelDefinition model,
+            MmdMotionDefinition motion,
+            string modelId,
+            string motionId)
+        {
+            try
+            {
+                var session = new MmdRuntimeSession(model, motion, modelId, motionId);
+                return new MmdUnityPlaybackBinding(
+                    instance,
+                    session,
+                    model,
+                    modelId,
+                    motionId,
+                    MmdUnityModelInstanceOwnership.Owned);
+            }
+            catch
+            {
+                DestroyOwnedInstance(instance);
+                throw;
+            }
+        }
+
+        private static void DestroyOwnedInstance(MmdUnityModelInstance instance)
+        {
+            if (instance.SkinnedMeshRenderer != null)
+            {
+                instance.SkinnedMeshRenderer.sharedMesh = null;
+                instance.SkinnedMeshRenderer.sharedMaterials = Array.Empty<Material>();
+            }
+            else if (instance.MeshRenderer != null)
+            {
+                instance.MeshRenderer.sharedMaterials = Array.Empty<Material>();
+            }
+
+            var destroyedIds = new HashSet<int>();
+            foreach (Material material in instance.Materials)
+            {
+                DestroyOwnedObjectOnce(material, destroyedIds);
+            }
+
+            foreach (Texture2D texture in instance.OwnedTextures)
+            {
+                DestroyOwnedObjectOnce(texture, destroyedIds);
+            }
+
+            DestroyOwnedObjectOnce(instance.Mesh, destroyedIds);
+            DestroyOwnedObjectOnce(instance.Root, destroyedIds);
+        }
+
+        private static void DestroyOwnedObjectOnce(UnityEngine.Object? value, HashSet<int> destroyedIds)
+        {
+            if (value == null || !destroyedIds.Add(value.GetInstanceID()))
+            {
+                return;
+            }
+
+            if (Application.isPlaying)
+            {
+                UnityEngine.Object.Destroy(value);
+            }
+            else
+            {
+                UnityEngine.Object.DestroyImmediate(value);
+            }
         }
     }
 }
