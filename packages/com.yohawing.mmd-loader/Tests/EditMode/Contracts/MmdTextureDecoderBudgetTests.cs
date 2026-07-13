@@ -177,6 +177,100 @@ namespace Mmd.Tests
             }
         }
 
+        [TestCase(16, 6, 0, "bit depth 16")]
+        [TestCase(8, 3, 0, "color type 3")]
+        [TestCase(8, 6, 1, "interlace")]
+        public void UnsupportedPngModesAreRejectedBeforeInflation(
+            byte bitDepth,
+            byte colorType,
+            byte interlace,
+            string expectedMessage)
+        {
+            byte[] png = CreatePng(1, 1, new byte[] { 0, 1, 2, 3, 4 }, bitDepth: bitDepth, colorType: colorType, interlace: interlace);
+            NotSupportedException error = Assert.Throws<NotSupportedException>(() => MmdPngDecoder.Decode(png, "unsupported-png"))!;
+            Assert.That(error.Message, Does.Contain(expectedMessage));
+        }
+
+        [Test]
+        public void MalformedPngChunkLengthAndMissingEndAreRejected()
+        {
+            byte[] invalidLength = new byte[20];
+            new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }.CopyTo(invalidLength, 0);
+            invalidLength[8] = 0xff;
+            invalidLength[9] = 0xff;
+            invalidLength[10] = 0xff;
+            invalidLength[11] = 0xff;
+            invalidLength[12] = (byte)'I';
+            invalidLength[13] = (byte)'H';
+            invalidLength[14] = (byte)'D';
+            invalidLength[15] = (byte)'R';
+            Assert.That(
+                Assert.Throws<ArgumentException>(() => MmdPngDecoder.Decode(invalidLength, "bad-length"))!.Message,
+                Does.Contain("chunk length"));
+
+            byte[] complete = CreatePng(1, 1, new byte[] { 0, 1, 2, 3, 4 });
+            Array.Resize(ref complete, complete.Length - 12);
+            Assert.That(
+                Assert.Throws<ArgumentException>(() => MmdPngDecoder.Decode(complete, "missing-end"))!.Message,
+                Does.Contain("missing required"));
+        }
+
+        [Test]
+        public void IndexedBmpWithoutPaletteIsRejected()
+        {
+            byte[] bmp = CreateBmpHeader(1, 1, 8);
+            Array.Resize(ref bmp, 58);
+            Assert.That(
+                Assert.Throws<ArgumentException>(() => MmdBmpDecoder.Decode(bmp, "indexed-bmp"))!.Message,
+                Does.Contain("palette data is truncated"));
+        }
+
+        [TestCase("DXT1")]
+        [TestCase("DXT3")]
+        [TestCase("DXT5")]
+        public void DdsCompressedFormatsRejectTruncatedBlocks(string fourCc)
+        {
+            byte[] dds = CreateDdsHeader(4, 4, fourCc);
+            Assert.That(
+                Assert.Throws<ArgumentException>(() => MmdDdsDecoder.Decode(dds, "dds-truncated"))!.Message,
+                Does.Contain("truncated"));
+        }
+
+        [Test]
+        public void TgaRlePacketsRejectRunOverflowAndTruncation()
+        {
+            byte[] overflow = CreateTgaHeader(1, 1, 24);
+            overflow[2] = 10;
+            Array.Resize(ref overflow, 22);
+            overflow[18] = 0x81;
+            Assert.That(
+                Assert.Throws<ArgumentException>(() => MmdTgaDecoder.Decode(overflow, "tga-overflow"))!.Message,
+                Does.Contain("exceeds the expected pixel count"));
+
+            byte[] truncated = CreateTgaHeader(1, 1, 24);
+            truncated[2] = 10;
+            Array.Resize(ref truncated, 19);
+            truncated[18] = 0x80;
+            Assert.That(
+                Assert.Throws<ArgumentException>(() => MmdTgaDecoder.Decode(truncated, "tga-truncated"))!.Message,
+                Does.Contain("pixel data is truncated"));
+        }
+
+        [Test]
+        public void RuntimeDecodeEntryContainsAdversarialDecoderFailures()
+        {
+            byte[] pngBomb = CreatePng(1, 1, new byte[1024]);
+            byte[] tgaOverflow = CreateTgaHeader(1, 1, 24);
+            tgaOverflow[2] = 10;
+            Array.Resize(ref tgaOverflow, 22);
+            tgaOverflow[18] = 0x81;
+
+            Assert.That(MmdRuntimeTextureResolver.DecodeTextureBytes(pngBomb, ".png", "png-bomb"), Is.Null);
+            Assert.That(MmdRuntimeTextureResolver.DecodeTextureBytes(CreateBmpHeader(1, 1, 8), ".bmp", "bmp-palette"), Is.Null);
+            Assert.That(MmdRuntimeTextureResolver.DecodeTextureBytes(CreateDdsHeader(4, 4, "DXT5"), ".dds", "dds-short"), Is.Null);
+            Assert.That(MmdRuntimeTextureResolver.DecodeTextureBytes(tgaOverflow, ".tga", "tga-overflow"), Is.Null);
+        }
+
         private static MmdTextureDecodeBudget TinyBudget(int maxChunks) => new(
             maxInputBytes: 4096,
             maxDimension: 16,
@@ -184,7 +278,14 @@ namespace Mmd.Tests
             maxExpandedBytes: 1024,
             maxPngChunkCount: maxChunks);
 
-        private static byte[] CreatePng(int width, int height, byte[] inflated, int ancillaryChunks = 0)
+        private static byte[] CreatePng(
+            int width,
+            int height,
+            byte[] inflated,
+            int ancillaryChunks = 0,
+            byte bitDepth = 8,
+            byte colorType = 6,
+            byte interlace = 0)
         {
             using var stream = new MemoryStream();
             stream.Write(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }, 0, 8);
@@ -192,11 +293,11 @@ namespace Mmd.Tests
             {
                 WriteInt32BigEndian(header, width);
                 WriteInt32BigEndian(header, height);
-                header.WriteByte(8);
-                header.WriteByte(6);
+                header.WriteByte(bitDepth);
+                header.WriteByte(colorType);
                 header.WriteByte(0);
                 header.WriteByte(0);
-                header.WriteByte(0);
+                header.WriteByte(interlace);
                 WriteChunk(stream, "IHDR", header.ToArray());
             }
 
@@ -225,7 +326,7 @@ namespace Mmd.Tests
             return bytes;
         }
 
-        private static byte[] CreateDdsHeader(int width, int height)
+        private static byte[] CreateDdsHeader(int width, int height, string fourCc = "DXT1")
         {
             var bytes = new byte[128];
             bytes[0] = (byte)'D';
@@ -236,10 +337,10 @@ namespace Mmd.Tests
             WriteInt32LittleEndian(bytes, 12, height);
             WriteInt32LittleEndian(bytes, 16, width);
             WriteInt32LittleEndian(bytes, 76, 32);
-            bytes[84] = (byte)'D';
-            bytes[85] = (byte)'X';
-            bytes[86] = (byte)'T';
-            bytes[87] = (byte)'1';
+            bytes[84] = (byte)fourCc[0];
+            bytes[85] = (byte)fourCc[1];
+            bytes[86] = (byte)fourCc[2];
+            bytes[87] = (byte)fourCc[3];
             return bytes;
         }
 
