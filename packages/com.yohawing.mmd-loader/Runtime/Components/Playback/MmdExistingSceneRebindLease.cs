@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Mmd.Motion;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -11,6 +12,7 @@ namespace Mmd.UnityIntegration
     internal sealed class MmdExistingSceneRebindLease : IDisposable
     {
         private readonly SkinnedMeshRenderer renderer;
+        private readonly GameObject root;
         private readonly Mesh? originalMesh;
         private readonly Material[] originalMaterials;
         private readonly Transform? originalRootBone;
@@ -20,6 +22,13 @@ namespace Mmd.UnityIntegration
         private readonly Quaternion[] originalBoneRotations;
         private readonly Vector3[] originalBoneScales;
         private readonly float[] originalBlendShapeWeights;
+        private readonly MmdSelfShadowTarget? originalSelfShadowTarget;
+        private readonly bool originalSelfShadowComponentEnabled;
+        private readonly bool originalSelfShadowEnabled;
+        private readonly Transform? originalSelfShadowBoundsRoot;
+        private readonly MmdSelfShadowProjectionPolicy originalSelfShadowProjectionPolicy;
+        private readonly MmdSceneEnvironmentBinding? originalSelfShadowEnvironment;
+        private readonly HideFlags originalSelfShadowHideFlags;
         private Mesh? ownedMesh;
         private Material[] ownedMaterials = Array.Empty<Material>();
         private bool disposed;
@@ -31,6 +40,7 @@ namespace Mmd.UnityIntegration
                 throw new ArgumentNullException(nameof(root));
             }
 
+            this.root = root;
             renderer = MmdUnityModelFactory.ResolveExistingSkinnedMeshRenderer(root);
             originalMesh = renderer.sharedMesh;
             originalMaterials = renderer.sharedMaterials;
@@ -57,6 +67,17 @@ namespace Mmd.UnityIntegration
             for (int i = 0; i < originalBlendShapeWeights.Length; i++)
             {
                 originalBlendShapeWeights[i] = renderer.GetBlendShapeWeight(i);
+            }
+
+            originalSelfShadowTarget = root.GetComponent<MmdSelfShadowTarget>();
+            if (originalSelfShadowTarget != null)
+            {
+                originalSelfShadowComponentEnabled = originalSelfShadowTarget.enabled;
+                originalSelfShadowEnabled = originalSelfShadowTarget.SelfShadowEnabled;
+                originalSelfShadowBoundsRoot = originalSelfShadowTarget.ConfiguredBoundsRoot;
+                originalSelfShadowProjectionPolicy = originalSelfShadowTarget.ProjectionPolicy;
+                originalSelfShadowEnvironment = originalSelfShadowTarget.SceneEnvironment;
+                originalSelfShadowHideFlags = originalSelfShadowTarget.hideFlags;
             }
         }
 
@@ -125,7 +146,31 @@ namespace Mmd.UnityIntegration
                 RestoreBones();
             }
 
+            RestoreSelfShadowTarget();
             DestroyOwnedResources();
+        }
+
+        private void RestoreSelfShadowTarget()
+        {
+            MmdSelfShadowTarget? current = root != null ? root.GetComponent<MmdSelfShadowTarget>() : null;
+            if (originalSelfShadowTarget == null)
+            {
+                DestroyOnce(current, new HashSet<int>());
+                return;
+            }
+
+            if (current == null || !ReferenceEquals(current, originalSelfShadowTarget))
+            {
+                return;
+            }
+
+            current.enabled = false;
+            current.SelfShadowEnabled = originalSelfShadowEnabled;
+            current.BoundsRoot = originalSelfShadowBoundsRoot!;
+            current.ProjectionPolicy = originalSelfShadowProjectionPolicy;
+            current.SceneEnvironment = originalSelfShadowEnvironment;
+            current.enabled = originalSelfShadowComponentEnabled;
+            current.hideFlags = originalSelfShadowHideFlags;
         }
 
         private void RestoreBlendShapeWeights()

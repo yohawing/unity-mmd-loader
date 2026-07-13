@@ -81,6 +81,8 @@ namespace Mmd.UnityIntegration
             }
         }
 
+        internal Transform? ConfiguredBoundsRoot => boundsRoot;
+
         public MmdSelfShadowProjectionPolicy ProjectionPolicy
         {
             get => projectionPolicy;

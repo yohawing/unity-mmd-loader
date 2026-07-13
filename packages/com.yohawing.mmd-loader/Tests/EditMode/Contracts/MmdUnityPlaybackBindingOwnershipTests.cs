@@ -284,6 +284,13 @@ namespace Mmd.Tests
                 originalBonePosition = bone.localPosition;
                 originalBoneRotation = bone.localRotation;
                 originalBoneScale = bone.localScale;
+                MmdSelfShadowTarget selfShadowTarget =
+                    sceneInstance.Root.GetComponent<MmdSelfShadowTarget>() ??
+                    sceneInstance.Root.AddComponent<MmdSelfShadowTarget>();
+                selfShadowTarget.hideFlags = HideFlags.None;
+                selfShadowTarget.SelfShadowEnabled = false;
+                selfShadowTarget.BoundsRoot = bone;
+                selfShadowTarget.enabled = true;
                 renderer.rootBone = null;
                 originalRootBone = renderer.rootBone;
                 renderer.localBounds = new Bounds(new Vector3(3.0f, 4.0f, 5.0f), new Vector3(6.0f, 7.0f, 8.0f));
@@ -310,6 +317,8 @@ namespace Mmd.Tests
                 Material[] generatedMaterials = renderer.sharedMaterials;
                 Assert.That(generatedMesh, Is.Not.SameAs(borrowedMesh));
                 Assert.That(generatedMaterials[0], Is.Not.SameAs(originalMaterials[0]));
+                Assert.That(sceneInstance.Root.GetComponent<MmdSelfShadowTarget>(), Is.SameAs(selfShadowTarget));
+                Assert.That(selfShadowTarget.enabled, Is.False);
 
                 binding.Dispose();
                 binding = null;
@@ -323,6 +332,11 @@ namespace Mmd.Tests
                 Assert.That(bone.localScale, Is.EqualTo(originalBoneScale));
                 Assert.That(generatedMesh == null, Is.True);
                 Assert.That(generatedMaterials.All(material => material == null), Is.True);
+                Assert.That(sceneInstance.Root.GetComponent<MmdSelfShadowTarget>(), Is.SameAs(selfShadowTarget));
+                Assert.That(selfShadowTarget.enabled, Is.True);
+                Assert.That(selfShadowTarget.SelfShadowEnabled, Is.False);
+                Assert.That(selfShadowTarget.BoundsRoot, Is.SameAs(bone));
+                Assert.That(selfShadowTarget.hideFlags, Is.EqualTo(HideFlags.None));
                 Assert.That(CaptureNonPersistentObjectIds(), Is.EquivalentTo(before));
             }
             finally
@@ -348,6 +362,34 @@ namespace Mmd.Tests
                 Object.DestroyImmediate(motionAsset);
                 Object.DestroyImmediate(overrideAsset);
                 Object.DestroyImmediate(borrowedMesh);
+                MmdTestInstanceScope.DestroyInstance(sceneInstance);
+            }
+        }
+
+        [Test]
+        public void ExistingSceneRebindLeaseRemovesGeneratedSelfShadowTarget()
+        {
+            (MmdModelDefinition model, _) = LoadFixturePair();
+            MmdUnityModelInstance? sceneInstance = null;
+            MmdExistingSceneRebindLease? lease = null;
+            try
+            {
+                sceneInstance = MmdUnityModelFactory.CreateSkinnedModel(model);
+                MmdSelfShadowTarget? existing = sceneInstance.Root.GetComponent<MmdSelfShadowTarget>();
+                Object.DestroyImmediate(existing);
+                Assert.That(sceneInstance.Root.GetComponent<MmdSelfShadowTarget>(), Is.Null);
+
+                lease = new MmdExistingSceneRebindLease(sceneInstance.Root);
+                MmdSelfShadowTarget.EnsureHiddenTarget(sceneInstance.Root);
+                Assert.That(sceneInstance.Root.GetComponent<MmdSelfShadowTarget>(), Is.Not.Null);
+
+                lease.Dispose();
+                lease = null;
+                Assert.That(sceneInstance.Root.GetComponent<MmdSelfShadowTarget>(), Is.Null);
+            }
+            finally
+            {
+                lease?.Dispose();
                 MmdTestInstanceScope.DestroyInstance(sceneInstance);
             }
         }

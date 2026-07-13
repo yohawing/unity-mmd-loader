@@ -303,7 +303,8 @@ namespace Mmd.UnityIntegration
                     string.IsNullOrWhiteSpace(modelAsset.SourcePath) ? null : modelAsset.SourcePath,
                     importScale,
                     MmdPmxModelPresetPolicy.AllowsAutomaticSelfShadowTarget(modelAsset.ModelPreset),
-                    materialOverride: null);
+                    materialOverride: null,
+                    preserveExistingSelfShadowTarget: true);
                 sourceMutation.AdoptFactoryResult(instance);
                 var session = new MmdRuntimeSession(
                     model,
@@ -368,7 +369,8 @@ namespace Mmd.UnityIntegration
                     sourcePath,
                     importScale,
                     includeSelfShadowTarget,
-                    materialOverride: null);
+                    materialOverride: null,
+                    preserveExistingSelfShadowTarget: true);
                 sourceMutation.AdoptFactoryResult(instance);
                 var session = new MmdRuntimeSession(model, motion, resolvedModelId, resolvedMotionId);
                 var playbackMutation = new MmdBorrowedSceneMutationLease(instance);
@@ -431,7 +433,8 @@ namespace Mmd.UnityIntegration
                     string.IsNullOrWhiteSpace(modelAsset.SourcePath) ? null : modelAsset.SourcePath,
                     importScale,
                     MmdPmxModelPresetPolicy.AllowsAutomaticSelfShadowTarget(modelAsset.ModelPreset),
-                    materialOverride: null);
+                    materialOverride: null,
+                    preserveExistingSelfShadowTarget: true);
                 sourceMutation.AdoptFactoryResult(instance);
                 var session = new MmdRuntimeSession(model, restMotion, resolvedModelId, resolvedMotionId);
                 var playbackMutation = new MmdBorrowedSceneMutationLease(

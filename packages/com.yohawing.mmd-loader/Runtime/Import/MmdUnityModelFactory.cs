@@ -201,7 +201,8 @@ namespace Mmd.UnityIntegration
             string? sourcePath,
             float importScale,
             bool includeSelfShadowTarget = true,
-            MmdMaterialOverrideAsset? materialOverride = null)
+            MmdMaterialOverrideAsset? materialOverride = null,
+            bool preserveExistingSelfShadowTarget = false)
         {
             if (root == null)
             {
@@ -269,7 +270,7 @@ namespace Mmd.UnityIntegration
                 renderer.sharedMesh = mesh;
             }
             MmdShaderBindingDiagnostics shaderDiagnostics = MmdUnityMaterialBuilder.BuildExistingShaderDiagnostics(renderer);
-            ApplySelfShadowTargetPolicy(root, modelRoot, includeSelfShadowTarget);
+            ApplySelfShadowTargetPolicy(root, modelRoot, includeSelfShadowTarget, preserveExistingSelfShadowTarget);
 
             MmdUnityPhysicsBody[] physicsBodies = root.GetComponentsInChildren<MmdUnityPhysicsBody>(includeInactive: true);
             var instance = new MmdUnityModelInstance(
@@ -525,7 +526,11 @@ namespace Mmd.UnityIntegration
             renderer.receiveShadows = true;
         }
 
-        private static void ApplySelfShadowTargetPolicy(GameObject root, Transform modelRoot, bool includeSelfShadowTarget)
+        private static void ApplySelfShadowTargetPolicy(
+            GameObject root,
+            Transform modelRoot,
+            bool includeSelfShadowTarget,
+            bool preserveExistingTarget = false)
         {
             if (includeSelfShadowTarget)
             {
@@ -540,6 +545,11 @@ namespace Mmd.UnityIntegration
             }
 
             existingTarget.enabled = false;
+            if (preserveExistingTarget)
+            {
+                return;
+            }
+
             if (Application.isPlaying)
             {
                 UnityEngine.Object.Destroy(existingTarget);
