@@ -1,7 +1,6 @@
 #nullable enable
 
 using System;
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace Mmd.Native
@@ -130,12 +129,12 @@ namespace Mmd.Native
             this.clip = clip;
             this.instance = instance;
             AbiVersion = MmdRuntimeFfiMethods.ExpectedAbiVersion;
-            BoneCount = MmdRuntimeFfiSmoke.CheckedIntPtrToInt(MmdRuntimeFfiMethods.ModelBoneCount(model), "bone count");
-            MorphCount = MmdRuntimeFfiSmoke.CheckedIntPtrToInt(MmdRuntimeFfiMethods.ModelMorphCount(model), "morph count");
-            IkCount = MmdRuntimeFfiSmoke.CheckedIntPtrToInt(MmdRuntimeFfiMethods.ModelIkCount(model), "IK count");
-            WorldMatrixFloatCount = MmdRuntimeFfiSmoke.CheckedIntPtrToInt(MmdRuntimeFfiMethods.InstanceWorldMatrixF32Len(instance), "world matrix float count");
-            MorphWeightCount = MmdRuntimeFfiSmoke.CheckedIntPtrToInt(MmdRuntimeFfiMethods.InstanceMorphWeightLen(instance), "morph weight count");
-            IkEnabledCount = MmdRuntimeFfiSmoke.CheckedIntPtrToInt(MmdRuntimeFfiMethods.InstanceIkEnabledLen(instance), "IK enabled count");
+            BoneCount = MmdFfiMarshal.CheckedIntPtrToInt(MmdRuntimeFfiMethods.ModelBoneCount(model), "bone count");
+            MorphCount = MmdFfiMarshal.CheckedIntPtrToInt(MmdRuntimeFfiMethods.ModelMorphCount(model), "morph count");
+            IkCount = MmdFfiMarshal.CheckedIntPtrToInt(MmdRuntimeFfiMethods.ModelIkCount(model), "IK count");
+            WorldMatrixFloatCount = MmdFfiMarshal.CheckedIntPtrToInt(MmdRuntimeFfiMethods.InstanceWorldMatrixF32Len(instance), "world matrix float count");
+            MorphWeightCount = MmdFfiMarshal.CheckedIntPtrToInt(MmdRuntimeFfiMethods.InstanceMorphWeightLen(instance), "morph weight count");
+            IkEnabledCount = MmdFfiMarshal.CheckedIntPtrToInt(MmdRuntimeFfiMethods.InstanceIkEnabledLen(instance), "IK enabled count");
         }
 
         public uint AbiVersion { get; }
@@ -243,192 +242,6 @@ namespace Mmd.Native
 
     internal static class MmdRuntimeFfiSmoke
     {
-        public static MmdRuntimeFfiSmokeReport Evaluate(byte[] pmxBytes, byte[] vmdBytes, float frame)
-        {
-            if (pmxBytes == null || pmxBytes.Length == 0)
-            {
-                throw new ArgumentException("PMX bytes are required.", nameof(pmxBytes));
-            }
-
-            if (vmdBytes == null || vmdBytes.Length == 0)
-            {
-                throw new ArgumentException("VMD bytes are required.", nameof(vmdBytes));
-            }
-
-            if (float.IsNaN(frame) || float.IsInfinity(frame) || frame < 0.0f)
-            {
-                throw new ArgumentOutOfRangeException(nameof(frame), "Frame must be a non-negative finite value.");
-            }
-
-            return WithSession(pmxBytes, vmdBytes, (model, clip, instance, abiVersion) =>
-            {
-                if (MmdRuntimeFfiMethods.InstanceEvaluateClipFrame(instance, clip, frame) == 0)
-                {
-                    throw new InvalidOperationException("mmd-runtime clip frame evaluation returned false.");
-                }
-
-                int worldMatrixFloatCount = CheckedIntPtrToInt(MmdRuntimeFfiMethods.InstanceWorldMatrixF32Len(instance), "world matrix float count");
-                float[] worldMatrices = new float[worldMatrixFloatCount];
-                if (worldMatrices.Length > 0 &&
-                    MmdRuntimeFfiMethods.InstanceCopyWorldMatrices(instance, worldMatrices, new IntPtr(worldMatrices.Length)) == 0)
-                {
-                    throw new InvalidOperationException("mmd-runtime world matrix copy returned false.");
-                }
-
-                int morphWeightCount = CheckedIntPtrToInt(MmdRuntimeFfiMethods.InstanceMorphWeightLen(instance), "morph weight count");
-                float[] morphWeights = new float[morphWeightCount];
-                if (morphWeights.Length > 0 &&
-                    MmdRuntimeFfiMethods.InstanceCopyMorphWeights(instance, morphWeights, new IntPtr(morphWeights.Length)) == 0)
-                {
-                    throw new InvalidOperationException("mmd-runtime morph weight copy returned false.");
-                }
-
-                int ikEnabledCount = CheckedIntPtrToInt(MmdRuntimeFfiMethods.InstanceIkEnabledLen(instance), "IK enabled count");
-                byte[] ikEnabled = new byte[ikEnabledCount];
-                if (ikEnabled.Length > 0 &&
-                    MmdRuntimeFfiMethods.InstanceCopyIkEnabled(instance, ikEnabled, new IntPtr(ikEnabled.Length)) == 0)
-                {
-                    throw new InvalidOperationException("mmd-runtime IK enabled copy returned false.");
-                }
-
-                uint firstFrame = 0;
-                uint lastFrame = 0;
-                bool hasClipRange = MmdRuntimeFfiMethods.ClipFrameRange(clip, out firstFrame, out lastFrame) != 0;
-                int boneCount = CheckedIntPtrToInt(MmdRuntimeFfiMethods.ModelBoneCount(model), "bone count");
-
-                return new MmdRuntimeFfiSmokeReport
-                {
-                    available = true,
-                    libraryName = MmdRuntimeFfiMethods.LibraryName,
-                    abiVersion = abiVersion,
-                    frame = frame,
-                    boneCount = boneCount,
-                    morphCount = CheckedIntPtrToInt(MmdRuntimeFfiMethods.ModelMorphCount(model), "morph count"),
-                    ikCount = CheckedIntPtrToInt(MmdRuntimeFfiMethods.ModelIkCount(model), "IK count"),
-                    worldMatrixFloatCount = worldMatrixFloatCount,
-                    worldMatrixBoneCount = worldMatrixFloatCount / 16,
-                    morphWeightCount = morphWeightCount,
-                    ikEnabledCount = ikEnabledCount,
-                    nonZeroMorphWeightCount = CountNonZero(morphWeights),
-                    enabledIkCount = CountEnabled(ikEnabled),
-                    worldMatrixChecksum = Checksum(worldMatrices),
-                    morphWeightChecksum = Checksum(morphWeights),
-                    ikEnabledChecksum = Checksum(ikEnabled),
-                    clipRangeAvailable = hasClipRange,
-                    clipFirstFrame = hasClipRange ? firstFrame : 0,
-                    clipLastFrame = hasClipRange ? lastFrame : 0,
-                    unsupportedReason = string.Empty
-                };
-            });
-        }
-
-        public static MmdRuntimeFfiBenchmarkReport Benchmark(byte[] pmxBytes, byte[] vmdBytes, int startFrame, int frameCount, int repetitions)
-        {
-            if (pmxBytes == null || pmxBytes.Length == 0)
-            {
-                throw new ArgumentException("PMX bytes are required.", nameof(pmxBytes));
-            }
-
-            if (vmdBytes == null || vmdBytes.Length == 0)
-            {
-                throw new ArgumentException("VMD bytes are required.", nameof(vmdBytes));
-            }
-
-            if (startFrame < 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(startFrame), "Start frame must be non-negative.");
-            }
-
-            if (frameCount <= 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(frameCount), "Frame count must be positive.");
-            }
-
-            if (repetitions <= 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(repetitions), "Repetitions must be positive.");
-            }
-
-            return WithSession(pmxBytes, vmdBytes, (model, clip, instance, abiVersion) =>
-            {
-                int worldMatrixFloatCount = CheckedIntPtrToInt(MmdRuntimeFfiMethods.InstanceWorldMatrixF32Len(instance), "world matrix float count");
-                int morphWeightCount = CheckedIntPtrToInt(MmdRuntimeFfiMethods.InstanceMorphWeightLen(instance), "morph weight count");
-                int ikEnabledCount = CheckedIntPtrToInt(MmdRuntimeFfiMethods.InstanceIkEnabledLen(instance), "IK enabled count");
-                float[] worldMatrices = new float[worldMatrixFloatCount];
-                float[] morphWeights = new float[morphWeightCount];
-                byte[] ikEnabled = new byte[ikEnabledCount];
-
-                EvaluateAndCopy(instance, clip, startFrame, worldMatrices, morphWeights, ikEnabled);
-                GC.Collect();
-
-                long totalFrames = (long)frameCount * repetitions;
-                Stopwatch stopwatch = Stopwatch.StartNew();
-                for (int repetition = 0; repetition < repetitions; repetition++)
-                {
-                    for (int frameOffset = 0; frameOffset < frameCount; frameOffset++)
-                    {
-                        EvaluateAndCopy(instance, clip, startFrame + frameOffset, worldMatrices, morphWeights, ikEnabled);
-                    }
-                }
-
-                stopwatch.Stop();
-                double elapsedMs = stopwatch.Elapsed.TotalMilliseconds;
-                uint firstFrame = 0;
-                uint lastFrame = 0;
-                bool hasClipRange = MmdRuntimeFfiMethods.ClipFrameRange(clip, out firstFrame, out lastFrame) != 0;
-
-                return new MmdRuntimeFfiBenchmarkReport
-                {
-                    available = true,
-                    libraryName = MmdRuntimeFfiMethods.LibraryName,
-                    abiVersion = abiVersion,
-                    startFrame = startFrame,
-                    frameCount = frameCount,
-                    repetitions = repetitions,
-                    measuredFrames = totalFrames,
-                    elapsedMs = elapsedMs,
-                    measuredFps = elapsedMs > 0.0 ? totalFrames * 1000.0 / elapsedMs : 0.0,
-                    averageFrameMs = elapsedMs / totalFrames,
-                    boneCount = CheckedIntPtrToInt(MmdRuntimeFfiMethods.ModelBoneCount(model), "bone count"),
-                    morphCount = CheckedIntPtrToInt(MmdRuntimeFfiMethods.ModelMorphCount(model), "morph count"),
-                    ikCount = CheckedIntPtrToInt(MmdRuntimeFfiMethods.ModelIkCount(model), "IK count"),
-                    worldMatrixFloatCount = worldMatrixFloatCount,
-                    worldMatrixBoneCount = worldMatrixFloatCount / 16,
-                    morphWeightCount = morphWeightCount,
-                    ikEnabledCount = ikEnabledCount,
-                    nonZeroMorphWeightCount = CountNonZero(morphWeights),
-                    enabledIkCount = CountEnabled(ikEnabled),
-                    worldMatrixChecksum = Checksum(worldMatrices),
-                    morphWeightChecksum = Checksum(morphWeights),
-                    ikEnabledChecksum = Checksum(ikEnabled),
-                    clipRangeAvailable = hasClipRange,
-                    clipFirstFrame = hasClipRange ? firstFrame : 0,
-                    clipLastFrame = hasClipRange ? lastFrame : 0,
-                    unsupportedReason = string.Empty
-                };
-            });
-        }
-
-        public static MmdRuntimeFfiSmokeReport Unavailable(Exception exception)
-        {
-            return new MmdRuntimeFfiSmokeReport
-            {
-                available = false,
-                libraryName = MmdRuntimeFfiMethods.LibraryName,
-                unsupportedReason = exception.GetType().Name + ": " + exception.Message
-            };
-        }
-
-        public static MmdRuntimeFfiBenchmarkReport BenchmarkUnavailable(Exception exception)
-        {
-            return new MmdRuntimeFfiBenchmarkReport
-            {
-                available = false,
-                libraryName = MmdRuntimeFfiMethods.LibraryName,
-                unsupportedReason = exception.GetType().Name + ": " + exception.Message
-            };
-        }
-
         internal static void EvaluateAndCopy(
             IntPtr instance,
             IntPtr clip,
@@ -436,30 +249,7 @@ namespace Mmd.Native
             float[] worldMatrices,
             float[] morphWeights,
             byte[] ikEnabled)
-        {
-            if (MmdRuntimeFfiMethods.InstanceEvaluateClipFrame(instance, clip, frame) == 0)
-            {
-                throw new InvalidOperationException("mmd-runtime clip frame evaluation returned false.");
-            }
-
-            if (worldMatrices.Length > 0 &&
-                MmdRuntimeFfiMethods.InstanceCopyWorldMatrices(instance, worldMatrices, new IntPtr(worldMatrices.Length)) == 0)
-            {
-                throw new InvalidOperationException("mmd-runtime world matrix copy returned false.");
-            }
-
-            if (morphWeights.Length > 0 &&
-                MmdRuntimeFfiMethods.InstanceCopyMorphWeights(instance, morphWeights, new IntPtr(morphWeights.Length)) == 0)
-            {
-                throw new InvalidOperationException("mmd-runtime morph weight copy returned false.");
-            }
-
-            if (ikEnabled.Length > 0 &&
-                MmdRuntimeFfiMethods.InstanceCopyIkEnabled(instance, ikEnabled, new IntPtr(ikEnabled.Length)) == 0)
-            {
-                throw new InvalidOperationException("mmd-runtime IK enabled copy returned false.");
-            }
-        }
+            => EvaluateAndCopyCore(instance, clip, frame, worldMatrices, morphWeights, ikEnabled, useIk: true);
 
         internal static void EvaluateWithoutIkAndCopy(
             IntPtr instance,
@@ -468,10 +258,25 @@ namespace Mmd.Native
             float[] worldMatrices,
             float[] morphWeights,
             byte[] ikEnabled)
+            => EvaluateAndCopyCore(instance, clip, frame, worldMatrices, morphWeights, ikEnabled, useIk: false);
+
+        private static void EvaluateAndCopyCore(
+            IntPtr instance,
+            IntPtr clip,
+            float frame,
+            float[] worldMatrices,
+            float[] morphWeights,
+            byte[] ikEnabled,
+            bool useIk)
         {
-            if (MmdRuntimeFfiMethods.InstanceEvaluateClipFrameWithoutIk(instance, clip, frame) == 0)
+            byte evaluated = useIk
+                ? MmdRuntimeFfiMethods.InstanceEvaluateClipFrame(instance, clip, frame)
+                : MmdRuntimeFfiMethods.InstanceEvaluateClipFrameWithoutIk(instance, clip, frame);
+            if (evaluated == 0)
             {
-                throw new InvalidOperationException("mmd-runtime clip frame without IK evaluation returned false.");
+                throw new InvalidOperationException(useIk
+                    ? "mmd-runtime clip frame evaluation returned false."
+                    : "mmd-runtime clip frame without IK evaluation returned false.");
             }
 
             if (worldMatrices.Length > 0 &&
@@ -493,179 +298,6 @@ namespace Mmd.Native
             }
         }
 
-        internal static int CheckedIntPtrToInt(IntPtr value, string label)
-        {
-            long raw = value.ToInt64();
-            if (raw < 0 || raw > int.MaxValue)
-            {
-                throw new InvalidOperationException($"mmd-runtime {label} is out of range: {raw}");
-            }
-
-            return (int)raw;
-        }
-
-        private static T WithSession<T>(byte[] pmxBytes, byte[] vmdBytes, Func<IntPtr, IntPtr, IntPtr, uint, T> action)
-        {
-            uint abiVersion = MmdRuntimeFfiMethods.ValidateAbiVersion();
-            IntPtr model = IntPtr.Zero;
-            IntPtr clip = IntPtr.Zero;
-            IntPtr instance = IntPtr.Zero;
-            try
-            {
-                model = MmdRuntimeFfiMethods.ModelCreateFromPmxBytes(pmxBytes, new IntPtr(pmxBytes.Length));
-                if (model == IntPtr.Zero)
-                {
-                    throw new InvalidOperationException("mmd-runtime PMX import returned a null model.");
-                }
-
-                clip = MmdRuntimeFfiMethods.ClipCreateFromVmdBytesForModel(model, vmdBytes, new IntPtr(vmdBytes.Length));
-                if (clip == IntPtr.Zero)
-                {
-                    throw new InvalidOperationException("mmd-runtime VMD import returned a null clip.");
-                }
-
-                instance = MmdRuntimeFfiMethods.InstanceCreateForModel(model);
-                if (instance == IntPtr.Zero)
-                {
-                    throw new InvalidOperationException("mmd-runtime instance creation returned null.");
-                }
-
-                return action(model, clip, instance, abiVersion);
-            }
-            finally
-            {
-                if (instance != IntPtr.Zero)
-                {
-                    MmdRuntimeFfiMethods.InstanceFree(instance);
-                }
-
-                if (clip != IntPtr.Zero)
-                {
-                    MmdRuntimeFfiMethods.ClipFree(clip);
-                }
-
-                if (model != IntPtr.Zero)
-                {
-                    MmdRuntimeFfiMethods.ModelFree(model);
-                }
-            }
-        }
-
-        private static int CountNonZero(float[] values)
-        {
-            int count = 0;
-            for (int i = 0; i < values.Length; i++)
-            {
-                if (values[i] != 0.0f)
-                {
-                    count++;
-                }
-            }
-
-            return count;
-        }
-
-        private static int CountEnabled(byte[] values)
-        {
-            int count = 0;
-            for (int i = 0; i < values.Length; i++)
-            {
-                if (values[i] != 0)
-                {
-                    count++;
-                }
-            }
-
-            return count;
-        }
-
-        private static string Checksum(float[] values)
-        {
-            unchecked
-            {
-                uint hash = 2166136261u;
-                for (int i = 0; i < values.Length; i++)
-                {
-                    byte[] bytes = BitConverter.GetBytes(values[i]);
-                    for (int byteIndex = 0; byteIndex < bytes.Length; byteIndex++)
-                    {
-                        hash = (hash ^ bytes[byteIndex]) * 16777619u;
-                    }
-                }
-
-                return hash.ToString("x8", System.Globalization.CultureInfo.InvariantCulture);
-            }
-        }
-
-        private static string Checksum(byte[] values)
-        {
-            unchecked
-            {
-                uint hash = 2166136261u;
-                for (int i = 0; i < values.Length; i++)
-                {
-                    hash = (hash ^ values[i]) * 16777619u;
-                }
-
-                return hash.ToString("x8", System.Globalization.CultureInfo.InvariantCulture);
-            }
-        }
-    }
-
-    [Serializable]
-    internal sealed class MmdRuntimeFfiSmokeReport
-    {
-        public bool available;
-        public string libraryName = string.Empty;
-        public uint abiVersion;
-        public float frame;
-        public int boneCount;
-        public int morphCount;
-        public int ikCount;
-        public int worldMatrixFloatCount;
-        public int worldMatrixBoneCount;
-        public int morphWeightCount;
-        public int ikEnabledCount;
-        public int nonZeroMorphWeightCount;
-        public int enabledIkCount;
-        public string worldMatrixChecksum = string.Empty;
-        public string morphWeightChecksum = string.Empty;
-        public string ikEnabledChecksum = string.Empty;
-        public bool clipRangeAvailable;
-        public uint clipFirstFrame;
-        public uint clipLastFrame;
-        public string unsupportedReason = string.Empty;
-    }
-
-    [Serializable]
-    internal sealed class MmdRuntimeFfiBenchmarkReport
-    {
-        public bool available;
-        public string libraryName = string.Empty;
-        public uint abiVersion;
-        public int startFrame;
-        public int frameCount;
-        public int repetitions;
-        public long measuredFrames;
-        public double elapsedMs;
-        public double measuredFps;
-        public double averageFrameMs;
-        public int boneCount;
-        public int morphCount;
-        public int ikCount;
-        public int worldMatrixFloatCount;
-        public int worldMatrixBoneCount;
-        public int morphWeightCount;
-        public int ikEnabledCount;
-        public int nonZeroMorphWeightCount;
-        public int enabledIkCount;
-        public string worldMatrixChecksum = string.Empty;
-        public string morphWeightChecksum = string.Empty;
-        public string ikEnabledChecksum = string.Empty;
-        public bool clipRangeAvailable;
-        public uint clipFirstFrame;
-        public uint clipLastFrame;
-        public string unsupportedReason = string.Empty;
     }
 }
 

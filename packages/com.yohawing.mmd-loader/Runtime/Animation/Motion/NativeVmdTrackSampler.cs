@@ -50,7 +50,7 @@ namespace Mmd.Motion
                     return false;
                 }
 
-                int frameCount = MmdRuntimeFfiSmoke.CheckedIntPtrToInt(
+                int frameCount = MmdFfiMarshal.CheckedIntPtrToInt(
                     getFrameCount(track),
                     frameCountLabel);
                 sampler = createSampler(track, frameCount);

@@ -3,6 +3,7 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Text;
+using Mmd.Native;
 
 namespace Mmd.Parser
 {
@@ -136,38 +137,23 @@ namespace Mmd.Parser
             => ReadString(ParsePmxSkinningModesJsonBuffer(data, new IntPtr(data.Length)), "PMX skinning modes JSON");
 
         private static float[] ByteBufferToFloatArray(ByteBuffer buffer, string label)
-        {
-            try
-            {
-                int byteLength = CheckedIntPtrToInt(buffer.Length, label + " byte length");
-                if (buffer.Data == IntPtr.Zero || byteLength == 0)
-                    return System.Array.Empty<float>();
-                if (byteLength % 4 != 0)
-                    throw new InvalidOperationException($"mmd-runtime {label} byte length {byteLength} is not a multiple of 4.");
-                byte[] bytes = new byte[byteLength];
-                Marshal.Copy(buffer.Data, bytes, 0, byteLength);
-                float[] result = new float[byteLength / 4];
-                Buffer.BlockCopy(bytes, 0, result, 0, byteLength);
-                return result;
-            }
-            finally
-            {
-                ByteBufferFree(buffer);
-            }
-        }
+            => ByteBufferToArray4<float>(buffer, label);
 
         private static uint[] ByteBufferToUintArray(ByteBuffer buffer, string label)
+            => ByteBufferToArray4<uint>(buffer, label);
+
+        private static T[] ByteBufferToArray4<T>(ByteBuffer buffer, string label) where T : struct
         {
             try
             {
-                int byteLength = CheckedIntPtrToInt(buffer.Length, label + " byte length");
+                int byteLength = MmdFfiMarshal.CheckedIntPtrToInt(buffer.Length, label + " byte length");
                 if (buffer.Data == IntPtr.Zero || byteLength == 0)
-                    return System.Array.Empty<uint>();
+                    return System.Array.Empty<T>();
                 if (byteLength % 4 != 0)
                     throw new InvalidOperationException($"mmd-runtime {label} byte length {byteLength} is not a multiple of 4.");
                 byte[] bytes = new byte[byteLength];
                 Marshal.Copy(buffer.Data, bytes, 0, byteLength);
-                uint[] result = new uint[byteLength / 4];
+                T[] result = new T[byteLength / 4];
                 Buffer.BlockCopy(bytes, 0, result, 0, byteLength);
                 return result;
             }
@@ -181,7 +167,7 @@ namespace Mmd.Parser
         {
             try
             {
-                int byteLength = CheckedIntPtrToInt(buffer.Length, label + " byte length");
+                int byteLength = MmdFfiMarshal.CheckedIntPtrToInt(buffer.Length, label + " byte length");
                 if (buffer.Data == IntPtr.Zero || byteLength == 0)
                     return System.Array.Empty<bool>();
                 byte[] bytes = new byte[byteLength];
@@ -201,7 +187,7 @@ namespace Mmd.Parser
         {
             try
             {
-                int byteLength = CheckedIntPtrToInt(buffer.Length, label + " byte length");
+                int byteLength = MmdFfiMarshal.CheckedIntPtrToInt(buffer.Length, label + " byte length");
                 if (buffer.Data == IntPtr.Zero || byteLength == 0)
                 {
                     return string.Empty;
@@ -217,15 +203,5 @@ namespace Mmd.Parser
             }
         }
 
-        internal static int CheckedIntPtrToInt(IntPtr value, string label)
-        {
-            long raw = value.ToInt64();
-            if (raw < 0 || raw > int.MaxValue)
-            {
-                throw new InvalidOperationException($"mmd-runtime {label} is out of range: {raw}");
-            }
-
-            return (int)raw;
-        }
     }
 }
