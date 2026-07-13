@@ -88,6 +88,44 @@ namespace Mmd.Tests
             }
         }
 
+        [Test]
+        public void BmpMinimumSignedHeightIsRejectedBeforeAbsoluteValueOverflow()
+        {
+            byte[] bmp = CreateBmpHeader(width: 1, height: int.MinValue, bitsPerPixel: 24);
+            ArgumentException error = Assert.Throws<ArgumentException>(() => MmdBmpDecoder.Decode(bmp, "bmp-min-height"))!;
+            Assert.That(error.Message, Does.Contain("width and height"));
+        }
+
+        [Test]
+        public void DdsHugeDimensionsAreRejectedBeforeBlockArithmeticOrAllocation()
+        {
+            byte[] dds = CreateDdsHeader(width: int.MaxValue, height: 1);
+            ArgumentException error = Assert.Throws<ArgumentException>(() => MmdDdsDecoder.Decode(dds, "dds-huge"))!;
+            Assert.That(error.Message, Does.Contain("dimensions").And.Contain("decode budget"));
+        }
+
+        [Test]
+        public void TgaHugeDimensionsAreRejectedBeforePixelAllocation()
+        {
+            byte[] tga = CreateTgaHeader(width: ushort.MaxValue, height: ushort.MaxValue, bitsPerPixel: 32);
+            ArgumentException error = Assert.Throws<ArgumentException>(() => MmdTgaDecoder.Decode(tga, "tga-huge"))!;
+            Assert.That(error.Message, Does.Contain("dimensions").And.Contain("decode budget"));
+        }
+
+        [Test]
+        public void CustomDecodersRejectTruncatedPayloadsAfterBudgetValidation()
+        {
+            Assert.That(
+                Assert.Throws<ArgumentException>(() => MmdBmpDecoder.Decode(CreateBmpHeader(1, 1, 24), "bmp"))!.Message,
+                Does.Contain("truncated"));
+            Assert.That(
+                Assert.Throws<ArgumentException>(() => MmdDdsDecoder.Decode(CreateDdsHeader(4, 4), "dds"))!.Message,
+                Does.Contain("truncated"));
+            Assert.That(
+                Assert.Throws<ArgumentException>(() => MmdTgaDecoder.Decode(CreateTgaHeader(1, 1, 24), "tga"))!.Message,
+                Does.Contain("ended before"));
+        }
+
         private static MmdTextureDecodeBudget TinyBudget(int maxChunks) => new(
             maxInputBytes: 4096,
             maxDimension: 16,
@@ -119,6 +157,51 @@ namespace Mmd.Tests
             WriteChunk(stream, "IDAT", CreateZlib(inflated));
             WriteChunk(stream, "IEND", Array.Empty<byte>());
             return stream.ToArray();
+        }
+
+        private static byte[] CreateBmpHeader(int width, int height, ushort bitsPerPixel)
+        {
+            var bytes = new byte[54];
+            bytes[0] = (byte)'B';
+            bytes[1] = (byte)'M';
+            WriteInt32LittleEndian(bytes, 10, 54);
+            WriteInt32LittleEndian(bytes, 14, 40);
+            WriteInt32LittleEndian(bytes, 18, width);
+            WriteInt32LittleEndian(bytes, 22, height);
+            bytes[26] = 1;
+            bytes[28] = (byte)bitsPerPixel;
+            bytes[29] = (byte)(bitsPerPixel >> 8);
+            return bytes;
+        }
+
+        private static byte[] CreateDdsHeader(int width, int height)
+        {
+            var bytes = new byte[128];
+            bytes[0] = (byte)'D';
+            bytes[1] = (byte)'D';
+            bytes[2] = (byte)'S';
+            bytes[3] = (byte)' ';
+            WriteInt32LittleEndian(bytes, 4, 124);
+            WriteInt32LittleEndian(bytes, 12, height);
+            WriteInt32LittleEndian(bytes, 16, width);
+            WriteInt32LittleEndian(bytes, 76, 32);
+            bytes[84] = (byte)'D';
+            bytes[85] = (byte)'X';
+            bytes[86] = (byte)'T';
+            bytes[87] = (byte)'1';
+            return bytes;
+        }
+
+        private static byte[] CreateTgaHeader(ushort width, ushort height, byte bitsPerPixel)
+        {
+            var bytes = new byte[18];
+            bytes[2] = 2;
+            bytes[12] = (byte)width;
+            bytes[13] = (byte)(width >> 8);
+            bytes[14] = (byte)height;
+            bytes[15] = (byte)(height >> 8);
+            bytes[16] = bitsPerPixel;
+            return bytes;
         }
 
         private static byte[] CreateZlib(byte[] data)
@@ -164,6 +247,14 @@ namespace Mmd.Tests
             stream.WriteByte((byte)(value >> 16));
             stream.WriteByte((byte)(value >> 8));
             stream.WriteByte((byte)value);
+        }
+
+        private static void WriteInt32LittleEndian(byte[] bytes, int offset, int value)
+        {
+            bytes[offset] = (byte)value;
+            bytes[offset + 1] = (byte)(value >> 8);
+            bytes[offset + 2] = (byte)(value >> 16);
+            bytes[offset + 3] = (byte)(value >> 24);
         }
     }
 }

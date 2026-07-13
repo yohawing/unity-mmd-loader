@@ -55,6 +55,24 @@ namespace Mmd.UnityIntegration
 
         internal int ValidateImageAndGetPngInflatedLength(int width, int height, int sourceBytesPerPixel)
         {
+            ValidateImageAndGetPixelCount(width, height);
+            long rowBytes = checked((long)width * sourceBytesPerPixel);
+            long inflatedBytes = checked((rowBytes + 1L) * height);
+            if (inflatedBytes > MaxExpandedBytes)
+            {
+                throw new ArgumentException($"Texture expanded data exceeds the decode budget {MaxExpandedBytes} bytes.");
+            }
+
+            if (inflatedBytes > int.MaxValue)
+            {
+                throw new ArgumentException("Texture expanded data exceeds the managed array limit.");
+            }
+
+            return (int)inflatedBytes;
+        }
+
+        internal int ValidateImageAndGetPixelCount(int width, int height)
+        {
             if (width <= 0 || height <= 0)
             {
                 throw new ArgumentException("Texture width and height must be positive.");
@@ -72,19 +90,17 @@ namespace Mmd.UnityIntegration
             }
 
             long rgbaBytes = checked(pixels * 4L);
-            long rowBytes = checked((long)width * sourceBytesPerPixel);
-            long inflatedBytes = checked((rowBytes + 1L) * height);
-            if (rgbaBytes > MaxExpandedBytes || inflatedBytes > MaxExpandedBytes)
+            if (rgbaBytes > MaxExpandedBytes)
             {
                 throw new ArgumentException($"Texture expanded data exceeds the decode budget {MaxExpandedBytes} bytes.");
             }
 
-            if (inflatedBytes > int.MaxValue)
+            if (pixels > int.MaxValue)
             {
-                throw new ArgumentException("Texture expanded data exceeds the managed array limit.");
+                throw new ArgumentException("Texture pixel count exceeds the managed array limit.");
             }
 
-            return (int)inflatedBytes;
+            return (int)pixels;
         }
 
         internal byte[] ReadFileBytes(string path)
