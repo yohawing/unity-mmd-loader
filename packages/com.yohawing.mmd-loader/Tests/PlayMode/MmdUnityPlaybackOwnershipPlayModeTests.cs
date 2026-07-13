@@ -95,5 +95,55 @@ namespace Mmd.Tests
                 MmdPlayModeTestInstanceScope.DestroyInstance(instance);
             }
         }
+
+        [UnityTest]
+        public IEnumerator ControllerDestroyRestoresBorrowedPreviewRendererState()
+        {
+            const string modelName = "visibility-playmode-model";
+            MmdModelDefinition model = MmdPlayModeTestFixtures.CreateMinimalTriangleModel(modelName);
+            MmdMotionDefinition motion = MmdPlayModeTestFixtures.CreateRootTranslationMotion(modelName);
+            var holder = new GameObject("visibility-playback-holder");
+            var preview = new GameObject("Model");
+            preview.transform.SetParent(holder.transform, false);
+            MeshRenderer previewRenderer = preview.AddComponent<MeshRenderer>();
+            var accessory = new GameObject("Accessory");
+            accessory.transform.SetParent(holder.transform, false);
+            MeshRenderer accessoryRenderer = accessory.AddComponent<MeshRenderer>();
+            MmdUnityPlaybackBinding binding = MmdUnityPlaybackBinding.CreateSkinned(
+                model,
+                motion,
+                modelName,
+                "visibility-playmode-motion");
+            GameObject runtimeRoot = binding.Instance.Root;
+            try
+            {
+                MmdUnityPlaybackController controller = holder.AddComponent<MmdUnityPlaybackController>();
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+                MmdTransientRuntimeInstanceMarker marker = runtimeRoot.AddComponent<MmdTransientRuntimeInstanceMarker>();
+                marker.Initialize(controller, binding.Instance);
+                marker.CaptureAndDisableBorrowedRenderer(previewRenderer);
+                controller.Configure(binding, 30.0f, playOnStart: false);
+
+                Assert.That(previewRenderer.enabled, Is.False);
+                Assert.That(accessoryRenderer.enabled, Is.True);
+
+                Object.Destroy(controller);
+                yield return null;
+                yield return null;
+
+                Assert.That(previewRenderer.enabled, Is.True);
+                Assert.That(accessoryRenderer.enabled, Is.True);
+                Assert.That(runtimeRoot == null, Is.True);
+            }
+            finally
+            {
+                if (holder != null)
+                {
+                    Object.Destroy(holder);
+                }
+
+                binding.Dispose();
+            }
+        }
     }
 }

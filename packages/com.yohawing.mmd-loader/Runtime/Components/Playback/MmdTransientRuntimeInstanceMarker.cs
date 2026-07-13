@@ -12,11 +12,25 @@ namespace Mmd.UnityIntegration
     [DisallowMultipleComponent]
     public sealed class MmdTransientRuntimeInstanceMarker : MonoBehaviour
     {
+        [Serializable]
+        private struct BorrowedRendererState
+        {
+            internal BorrowedRendererState(Renderer renderer, bool wasEnabled)
+            {
+                this.renderer = renderer;
+                this.wasEnabled = wasEnabled;
+            }
+
+            [SerializeField] internal Renderer? renderer;
+            [SerializeField] internal bool wasEnabled;
+        }
+
         [SerializeField, HideInInspector] private int schemaVersion = 1;
         [SerializeField, HideInInspector] private MmdUnityPlaybackController? owner;
         [SerializeField, HideInInspector] private Mesh? ownedMesh;
         [SerializeField, HideInInspector] private Material[] ownedMaterials = Array.Empty<Material>();
         [SerializeField, HideInInspector] private Texture2D[] ownedTextures = Array.Empty<Texture2D>();
+        [SerializeField, HideInInspector] private BorrowedRendererState[] borrowedRendererStates = Array.Empty<BorrowedRendererState>();
 
         internal MmdUnityPlaybackController? Owner => owner;
 
@@ -50,6 +64,36 @@ namespace Mmd.UnityIntegration
             ownedTextures = instance.OwnedTextures.Where(texture => texture != null).Distinct().ToArray();
         }
 
+        internal void CaptureAndDisableBorrowedRenderer(Renderer renderer)
+        {
+            if (renderer == null)
+            {
+                throw new ArgumentNullException(nameof(renderer));
+            }
+
+            if (!renderer.enabled || borrowedRendererStates.Any(state => state.renderer == renderer))
+            {
+                return;
+            }
+
+            Array.Resize(ref borrowedRendererStates, borrowedRendererStates.Length + 1);
+            borrowedRendererStates[borrowedRendererStates.Length - 1] = new BorrowedRendererState(renderer, wasEnabled: true);
+            renderer.enabled = false;
+        }
+
+        internal void RestoreBorrowedRendererStates()
+        {
+            BorrowedRendererState[] states = borrowedRendererStates;
+            borrowedRendererStates = Array.Empty<BorrowedRendererState>();
+            foreach (BorrowedRendererState state in states)
+            {
+                if (state.renderer != null)
+                {
+                    state.renderer.enabled = state.wasEnabled;
+                }
+            }
+        }
+
         internal bool DestroyOwnedObjectsAndRoot()
         {
             if (!IsSafeTransientSibling)
@@ -62,6 +106,8 @@ namespace Mmd.UnityIntegration
             Material[] materials = ownedMaterials;
             Texture2D[] textures = ownedTextures;
             var destroyedIds = new HashSet<int>();
+
+            RestoreBorrowedRendererStates();
 
             SkinnedMeshRenderer? skinned = root.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true);
             if (skinned != null)
@@ -95,6 +141,11 @@ namespace Mmd.UnityIntegration
             }
 
             return true;
+        }
+
+        private void OnDestroy()
+        {
+            RestoreBorrowedRendererStates();
         }
 
         private static void DestroyObject(Object? value, HashSet<int> destroyedIds)

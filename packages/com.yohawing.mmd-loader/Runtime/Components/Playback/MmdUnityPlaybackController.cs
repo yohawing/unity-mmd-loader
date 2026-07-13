@@ -25,6 +25,7 @@ namespace Mmd.UnityIntegration
         HumanoidRetarget = 2
     }
 
+    [DisallowMultipleComponent]
     public sealed partial class MmdUnityPlaybackController : MonoBehaviour
     {
         private MmdUnityPlaybackBinding? binding;

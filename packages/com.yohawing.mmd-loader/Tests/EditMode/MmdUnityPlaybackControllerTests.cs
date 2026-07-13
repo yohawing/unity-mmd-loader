@@ -18,6 +18,14 @@ namespace Mmd.Tests
 {
     public sealed class MmdUnityPlaybackControllerTests
     {
+        [Test]
+        public void PlaybackControllerDisallowsMultipleComponentsOnOneGameObject()
+        {
+            Assert.That(
+                Attribute.IsDefined(typeof(MmdUnityPlaybackController), typeof(DisallowMultipleComponent)),
+                Is.True);
+        }
+
         private const string SyntheticControllerModelName = "minimal-controller-triangle";
         private const string PlaybackPmxId = "test_1bone_cube.pmx";
         private const string PlaybackVmdId = "test_1bone_cube_motion.vmd";
@@ -1716,6 +1724,64 @@ namespace Mmd.Tests
             finally
             {
                 DestroyInstanceFromController(controller);
+            }
+        }
+
+        [Test]
+        public void RuntimeFallbackHidesOnlyCanonicalModelRendererAndRestoresItOnReconfigureAndDestroy()
+        {
+            string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+            string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+            var holder = new GameObject("mmd-runtime-fallback-visibility");
+            var model = new GameObject("Model");
+            model.transform.SetParent(holder.transform, false);
+            MeshRenderer previewRenderer = model.AddComponent<MeshRenderer>();
+            var accessory = new GameObject("Accessory");
+            accessory.transform.SetParent(holder.transform, false);
+            MeshRenderer accessoryRenderer = accessory.AddComponent<MeshRenderer>();
+            var disabledAccessory = new GameObject("Disabled Accessory");
+            disabledAccessory.transform.SetParent(holder.transform, false);
+            MeshRenderer disabledAccessoryRenderer = disabledAccessory.AddComponent<MeshRenderer>();
+            disabledAccessoryRenderer.enabled = false;
+
+            MmdUnityPlaybackController? controller = null;
+            try
+            {
+                controller = holder.AddComponent<MmdUnityPlaybackController>();
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+                MmdRuntimeImporterComponent importer = holder.AddComponent<MmdRuntimeImporterComponent>();
+                importer.ConfigurePaths(pmxPath, vmdPath, shouldPlayOnStart: false);
+
+                Assert.That(importer.TryConfigureController(controller), Is.True);
+                Assert.That(previewRenderer.enabled, Is.False);
+                Assert.That(accessoryRenderer.enabled, Is.True);
+                Assert.That(disabledAccessoryRenderer.enabled, Is.False);
+
+                controller.ConfigureFromRuntimeImporterPaths(
+                    pmxPath,
+                    vmdPath,
+                    new MmdPlaybackConfig(30.0f, 0, playOnStart: false));
+                Assert.That(previewRenderer.enabled, Is.False);
+                Assert.That(accessoryRenderer.enabled, Is.True);
+                Assert.That(disabledAccessoryRenderer.enabled, Is.False);
+
+                controller.PrepareForAssemblyReload();
+                Assert.That(previewRenderer.enabled, Is.True);
+                Assert.That(accessoryRenderer.enabled, Is.True);
+                Assert.That(disabledAccessoryRenderer.enabled, Is.False);
+
+                Object.DestroyImmediate(importer);
+                Object.DestroyImmediate(controller);
+                controller = null;
+            }
+            finally
+            {
+                if (controller != null)
+                {
+                    Object.DestroyImmediate(controller);
+                }
+
+                Object.DestroyImmediate(holder);
             }
         }
 

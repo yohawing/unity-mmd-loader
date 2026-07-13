@@ -495,11 +495,12 @@ namespace Mmd.UnityIntegration
             AttachRestoredRuntimeInstance(fallbackBinding.Instance);
             configure(fallbackBinding);
             TryEnableFastRuntimeFromAssetBytesForDefaultPlayback(pmxAsset, vmdAsset);
-            HidePreviewRenderersIfFallbackVisible(fallbackBinding.Instance, ResolveAssetSourceId(pmxAsset));
             if (applyStartFrame.HasValue)
             {
                 ApplyFrame(applyStartFrame.Value);
             }
+
+            HidePreviewRenderersIfFallbackVisible(fallbackBinding.Instance, ResolveAssetSourceId(pmxAsset));
         }
 
         private void ThrowIfTimelineNativeClipUnavailable()
@@ -525,7 +526,6 @@ namespace Mmd.UnityIntegration
         private void HidePreviewRenderersIfFallbackVisible(MmdUnityModelInstance fallbackInstance, string reason)
         {
             int runtimeRendererCount = CountEnabledRenderers(fallbackInstance.Root);
-            Renderer[] renderers = GetComponentsInChildren<Renderer>(includeInactive: true);
             if (runtimeRendererCount <= 0)
             {
                 Debug.LogWarning(
@@ -534,24 +534,28 @@ namespace Mmd.UnityIntegration
                 return;
             }
 
-            int hiddenCount = 0;
-            Transform fallbackRoot = fallbackInstance.Root.transform;
-            foreach (Renderer renderer in renderers)
+            Transform? modelRoot = transform.Find("Model");
+            Renderer? previewRenderer = modelRoot != null
+                ? modelRoot.GetComponent<SkinnedMeshRenderer>()
+                : null;
+            if (previewRenderer == null && modelRoot != null)
             {
-                if (renderer == null || renderer.transform.IsChildOf(fallbackRoot))
-                {
-                    continue;
-                }
-
-                if (renderer.enabled)
-                {
-                    hiddenCount++;
-                }
-
-                renderer.enabled = false;
+                previewRenderer = modelRoot.GetComponent<MeshRenderer>();
+            }
+            if (previewRenderer == null)
+            {
+                Debug.LogWarning(
+                    "MMD restore kept Scene renderers enabled because no canonical package Model renderer was found. reason=" + reason,
+                    this);
+                return;
             }
 
-            Debug.Log("MMD restore used fallback runtime. preview-hidden=" + (hiddenCount > 0) + " hidden-count=" + hiddenCount + " runtime-renderer-count=" + runtimeRendererCount + " reason=" + reason, this);
+            MmdTransientRuntimeInstanceMarker marker =
+                fallbackInstance.Root.GetComponent<MmdTransientRuntimeInstanceMarker>() ??
+                throw new InvalidOperationException("Fallback runtime instance is missing its ownership marker.");
+            bool wasEnabled = previewRenderer.enabled;
+            marker.CaptureAndDisableBorrowedRenderer(previewRenderer);
+            Debug.Log("MMD restore used fallback runtime. preview-hidden=" + wasEnabled + " hidden-count=" + (wasEnabled ? 1 : 0) + " runtime-renderer-count=" + runtimeRendererCount + " reason=" + reason, this);
         }
 
         private static int CountEnabledRenderers(GameObject root)

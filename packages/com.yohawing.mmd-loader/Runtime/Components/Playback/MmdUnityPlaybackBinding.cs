@@ -634,6 +634,10 @@ namespace Mmd.UnityIntegration
 
         private static void DestroyOwnedInstance(MmdUnityModelInstance instance)
         {
+            MmdTransientRuntimeInstanceMarker? marker = instance.Root != null
+                ? instance.Root.GetComponent<MmdTransientRuntimeInstanceMarker>()
+                : null;
+            marker?.RestoreBorrowedRendererStates();
             if (instance.SkinnedMeshRenderer != null)
             {
                 instance.SkinnedMeshRenderer.sharedMesh = null;
