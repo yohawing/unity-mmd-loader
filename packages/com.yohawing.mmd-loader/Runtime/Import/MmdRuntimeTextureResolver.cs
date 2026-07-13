@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Security;
 using UnityEngine;
 using Mmd.Rendering;
 
@@ -286,6 +287,7 @@ namespace Mmd.UnityIntegration
             MmdTextureBindingDiagnostics diagnostics)
         {
             string textureReference = NormalizeTextureReference(rawTextureReference);
+            string diagnosticReference = GetDiagnosticReference(textureReference);
             if (textureReference.Length == 0)
             {
                 return null;
@@ -299,7 +301,7 @@ namespace Mmd.UnityIntegration
                 diagnostics.AddTextureReference(CreateReferenceDiagnostic(
                     materialIndex,
                     usage,
-                    textureReference,
+                    diagnosticReference,
                     resolvedPath: string.Empty,
                     status: "unsupported",
                     reason: reason));
@@ -307,17 +309,22 @@ namespace Mmd.UnityIntegration
                 return null;
             }
 
-            if (!TryResolveLocalTexturePath(sourceContext, textureReference, out string resolvedPath, out string failure))
+            if (!TryResolveLocalTexturePath(
+                    sourceContext,
+                    textureReference,
+                    out string resolvedPath,
+                    out string diagnosticPath,
+                    out string failure))
             {
                 diagnostics.UnsupportedTextureReferenceCount++;
                 diagnostics.AddTextureReference(CreateReferenceDiagnostic(
                     materialIndex,
                     usage,
-                    textureReference,
-                    resolvedPath,
+                    diagnosticReference,
+                    resolvedPath: string.Empty,
                     status: "unsupported",
                     reason: failure));
-                diagnostics.AddMessage($"Material {materialIndex} {usageLabel} texture '{textureReference}' skipped: {failure}");
+                diagnostics.AddMessage($"Material {materialIndex} {usageLabel} texture '{diagnosticReference}' skipped: {failure}");
                 return null;
             }
 
@@ -329,8 +336,8 @@ namespace Mmd.UnityIntegration
                 diagnostics.AddTextureReference(CreateReferenceDiagnostic(
                     materialIndex,
                     usage,
-                    textureReference,
-                    resolvedPath,
+                    diagnosticReference,
+                    diagnosticPath,
                     status: "unsupported",
                     reason: reason));
                 diagnostics.AddMessage($"Material {materialIndex} {usageLabel} texture '{textureReference}' has {reason}.");
@@ -343,11 +350,11 @@ namespace Mmd.UnityIntegration
                 diagnostics.AddTextureReference(CreateReferenceDiagnostic(
                     materialIndex,
                     usage,
-                    textureReference,
-                    resolvedPath,
+                    diagnosticReference,
+                    diagnosticPath,
                     status: "missing",
                     reason: "file not found"));
-                diagnostics.AddMessage($"Material {materialIndex} {usageLabel} texture file was not found: {resolvedPath}");
+                diagnostics.AddMessage($"Material {materialIndex} {usageLabel} texture '{diagnosticPath}' was not found.");
                 return null;
             }
 
@@ -363,11 +370,11 @@ namespace Mmd.UnityIntegration
                 diagnostics.AddTextureReference(CreateReferenceDiagnostic(
                     materialIndex,
                     usage,
-                    textureReference,
-                    resolvedPath,
+                    diagnosticReference,
+                    diagnosticPath,
                     status: "unsupported",
-                    reason: "decode failed: " + ex.Message));
-                diagnostics.AddMessage($"Material {materialIndex} {usageLabel} texture could not be decoded at runtime: {resolvedPath}; {ex.Message}");
+                    reason: "decode failed"));
+                diagnostics.AddMessage($"Material {materialIndex} {usageLabel} texture '{diagnosticPath}' could not be decoded at runtime.");
                 return null;
             }
 
@@ -377,11 +384,11 @@ namespace Mmd.UnityIntegration
                 diagnostics.AddTextureReference(CreateReferenceDiagnostic(
                     materialIndex,
                     usage,
-                    textureReference,
-                    resolvedPath,
+                    diagnosticReference,
+                    diagnosticPath,
                     status: "unsupported",
                     reason: "decode returned null"));
-                diagnostics.AddMessage($"Material {materialIndex} {usageLabel} texture could not be decoded at runtime: {resolvedPath}");
+                diagnostics.AddMessage($"Material {materialIndex} {usageLabel} texture '{diagnosticPath}' could not be decoded at runtime.");
                 return null;
             }
 
@@ -389,8 +396,8 @@ namespace Mmd.UnityIntegration
             diagnostics.AddTextureReference(CreateReferenceDiagnostic(
                 materialIndex,
                 usage,
-                textureReference,
-                resolvedPath,
+                diagnosticReference,
+                diagnosticPath,
                 status: "loaded",
                 reason: string.Empty));
             return new MmdResolvedTexture(materialIndex, usage, textureReference, resolvedPath, texture);
@@ -474,6 +481,30 @@ namespace Mmd.UnityIntegration
             return string.IsNullOrWhiteSpace(textureReference) ? string.Empty : textureReference.Trim();
         }
 
+        private static string GetDiagnosticReference(string textureReference)
+        {
+            return IsAbsoluteOrUriReference(textureReference)
+                ? "<redacted-path>"
+                : EscapeDiagnosticText(textureReference);
+        }
+
+        private static string EscapeDiagnosticText(string value)
+        {
+            const int maxLength = 256;
+            var characters = new List<char>(Math.Min(value.Length, maxLength));
+            foreach (char character in value)
+            {
+                if (characters.Count >= maxLength)
+                {
+                    break;
+                }
+
+                characters.Add(char.IsControl(character) ? '?' : character);
+            }
+
+            return new string(characters.ToArray());
+        }
+
         private static string GetUsageLabel(MmdTextureUsage usage)
         {
             return usage switch
@@ -489,31 +520,162 @@ namespace Mmd.UnityIntegration
             MmdUnityModelSourceContext sourceContext,
             string textureReference,
             out string resolvedPath,
+            out string diagnosticPath,
             out string failure)
         {
             resolvedPath = string.Empty;
+            diagnosticPath = string.Empty;
             failure = string.Empty;
 
-            if (Uri.TryCreate(textureReference, UriKind.Absolute, out Uri uri) && !uri.IsFile)
+            if (IsAbsoluteOrUriReference(textureReference))
             {
-                failure = "only local file texture references are supported";
+                failure = "absolute, UNC, device, and URI texture references require an explicitly allowed external root";
                 return false;
             }
 
-            string candidate = Path.IsPathRooted(textureReference)
-                ? textureReference
-                : Path.Combine(sourceContext.SourceDirectory, textureReference);
-            resolvedPath = Path.GetFullPath(candidate);
-
-            if (!Path.IsPathRooted(textureReference)
-                && textureReference.Contains("..")
-                && !IsUnderDirectory(resolvedPath, sourceContext.SourceDirectory))
+            if (HasInvalidRelativePathSyntax(textureReference))
             {
+                failure = "texture reference is not a valid relative path";
+                return false;
+            }
+
+            try
+            {
+                string platformReference = textureReference
+                    .Replace('\\', Path.DirectorySeparatorChar)
+                    .Replace('/', Path.DirectorySeparatorChar);
+                resolvedPath = Path.GetFullPath(Path.Combine(sourceContext.SourceDirectory, platformReference));
+            }
+            catch (Exception ex) when (ex is ArgumentException
+                || ex is NotSupportedException
+                || ex is PathTooLongException
+                || ex is SecurityException)
+            {
+                resolvedPath = string.Empty;
+                failure = "texture reference is not a valid relative path";
+                return false;
+            }
+
+            if (!IsUnderDirectory(resolvedPath, sourceContext.SourceDirectory))
+            {
+                resolvedPath = string.Empty;
                 failure = "relative texture path escapes the PMX source directory";
                 return false;
             }
 
+            diagnosticPath = Path.GetRelativePath(sourceContext.SourceDirectory, resolvedPath).Replace('\\', '/');
+            if (ContainsReparsePoint(sourceContext.SourceDirectory, resolvedPath))
+            {
+                resolvedPath = string.Empty;
+                diagnosticPath = string.Empty;
+                failure = "texture reference crosses a symbolic link or junction outside the trusted path boundary";
+                return false;
+            }
+
             return true;
+        }
+
+        private static bool IsAbsoluteOrUriReference(string textureReference)
+        {
+            if (Path.IsPathRooted(textureReference)
+                || textureReference.StartsWith("\\", StringComparison.Ordinal)
+                || textureReference.StartsWith("/", StringComparison.Ordinal)
+                || textureReference.StartsWith("\\\\", StringComparison.Ordinal)
+                || textureReference.StartsWith("//", StringComparison.Ordinal)
+                || (textureReference.Length >= 2
+                    && char.IsLetter(textureReference[0])
+                    && textureReference[1] == ':'))
+            {
+                return true;
+            }
+
+            return Uri.TryCreate(textureReference, UriKind.Absolute, out _);
+        }
+
+        private static bool HasInvalidRelativePathSyntax(string textureReference)
+        {
+            if (textureReference.IndexOf(':') >= 0)
+            {
+                return true;
+            }
+
+            string[] segments = textureReference.Split('\\', '/');
+            foreach (string segment in segments)
+            {
+                if (segment == "." || segment == "..")
+                {
+                    continue;
+                }
+
+                if (segment.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0
+                    || segment.Length > 0 && (segment[^1] == ' ' || segment[^1] == '.'))
+                {
+                    return true;
+                }
+
+                string baseName = segment.Split('.')[0];
+                if (IsReservedDosDeviceName(baseName))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsReservedDosDeviceName(string value)
+        {
+            if (value.Equals("CON", StringComparison.OrdinalIgnoreCase)
+                || value.Equals("PRN", StringComparison.OrdinalIgnoreCase)
+                || value.Equals("AUX", StringComparison.OrdinalIgnoreCase)
+                || value.Equals("NUL", StringComparison.OrdinalIgnoreCase)
+                || value.Equals("CLOCK$", StringComparison.OrdinalIgnoreCase)
+                || value.Equals("CONIN$", StringComparison.OrdinalIgnoreCase)
+                || value.Equals("CONOUT$", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return value.Length == 4
+                && (value.StartsWith("COM", StringComparison.OrdinalIgnoreCase)
+                    || value.StartsWith("LPT", StringComparison.OrdinalIgnoreCase))
+                && value[3] >= '1'
+                && value[3] <= '9';
+        }
+
+        private static bool ContainsReparsePoint(string rootDirectory, string path)
+        {
+            string relativePath = Path.GetRelativePath(rootDirectory, path);
+            string current = rootDirectory;
+            foreach (string component in relativePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+            {
+                if (component.Length == 0 || component == ".")
+                {
+                    continue;
+                }
+
+                current = Path.Combine(current, component);
+                if (!File.Exists(current) && !Directory.Exists(current))
+                {
+                    break;
+                }
+
+                try
+                {
+                    if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                    {
+                        return true;
+                    }
+                }
+                catch (Exception ex) when (ex is IOException
+                    || ex is UnauthorizedAccessException
+                    || ex is SecurityException)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static bool IsUnderDirectory(string path, string directory)
@@ -526,7 +688,10 @@ namespace Mmd.UnityIntegration
                 fullDirectory += Path.DirectorySeparatorChar;
             }
 
-            return fullPath.StartsWith(fullDirectory, StringComparison.OrdinalIgnoreCase);
+            StringComparison comparison = Path.DirectorySeparatorChar == '\\'
+                ? StringComparison.OrdinalIgnoreCase
+                : StringComparison.Ordinal;
+            return fullPath.StartsWith(fullDirectory, comparison);
         }
     }
 }

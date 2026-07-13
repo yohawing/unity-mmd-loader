@@ -149,7 +149,7 @@ namespace Mmd.Tests
                 Assert.That(resolution.Diagnostics.TextureReferences[0].materialIndex, Is.EqualTo(0));
                 Assert.That(resolution.Diagnostics.TextureReferences[0].usage, Is.EqualTo("sphere"));
                 Assert.That(resolution.Diagnostics.TextureReferences[0].reference, Is.EqualTo("h.spa"));
-                Assert.That(resolution.Diagnostics.TextureReferences[0].resolvedPath, Is.EqualTo(Path.GetFullPath(spherePath)));
+                Assert.That(resolution.Diagnostics.TextureReferences[0].resolvedPath, Is.EqualTo("h.spa"));
                 Assert.That(resolution.Diagnostics.TextureReferences[0].status, Is.EqualTo("loaded"));
                 Assert.That(resolution.SphereTextures[0].Texture.width, Is.EqualTo(1));
                 Assert.That(resolution.SphereTextures[0].Texture.height, Is.EqualTo(1));
