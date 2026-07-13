@@ -138,6 +138,54 @@ namespace Mmd.Tests
                 }
             }
         }
+
+        [Test]
+        public void ExistingSkinnedModelRebindValidatesBonesBeforeCommittingMaterialOverride()
+        {
+            MmdModelDefinition model = CreateMaterialMorphMultiplyModel();
+            MmdMaterialOverrideAsset? overrideAsset = null;
+
+            try
+            {
+                overrideAsset = ScriptableObject.CreateInstance<MmdMaterialOverrideAsset>();
+                overrideAsset.entries = new[]
+                {
+                    new MmdMaterialOverrideEntry
+                    {
+                        materialIndex = 0,
+                        hasBaseColor = true,
+                        baseColor = new Color(0.2f, 0.4f, 0.6f, 0.5f)
+                    }
+                };
+
+                using var sceneScope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(
+                    model,
+                    sourcePath: null,
+                    importScale: 1.0f,
+                    preset: MmdMaterialPreset.MmdToon));
+                SkinnedMeshRenderer renderer = RequireSkinnedRenderer(sceneScope.Instance);
+                Material originalMaterial = renderer.sharedMaterials[0];
+                renderer.bones = Array.Empty<Transform>();
+
+                Assert.Throws<InvalidOperationException>(() =>
+                    MmdUnityModelFactory.CreateExistingSkinnedModelInstance(
+                        sceneScope.Instance.Root,
+                        model,
+                        sourcePath: null,
+                        importScale: 1.0f,
+                        includeSelfShadowTarget: true,
+                        materialOverride: overrideAsset));
+
+                Assert.That(renderer.sharedMaterials[0], Is.SameAs(originalMaterial));
+            }
+            finally
+            {
+                if (overrideAsset != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(overrideAsset);
+                }
+            }
+        }
         [Test]
         public void ApplyMaterialMorphAllMaterialAddTargetMutatesAllMaterials()
         {

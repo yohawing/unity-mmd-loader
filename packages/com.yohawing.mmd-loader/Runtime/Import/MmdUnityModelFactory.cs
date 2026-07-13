@@ -233,16 +233,13 @@ namespace Mmd.UnityIntegration
                 throw new InvalidOperationException("Existing PMX scene SkinnedMeshRenderer material slots do not match the PMX material descriptor.");
             }
 
-            materials = CloneMaterialsForOverride(materials, materialOverride);
-            renderer.sharedMaterials = materials;
-            MmdMaterialOverrideApplier.Apply(materialOverride, materials);
-
             Transform[] boneTransforms = renderer.bones;
             IReadOnlyList<MmdBoneDefinition> orderedBones = CreateOrderedBones(model.bones);
-            if (boneTransforms == null || boneTransforms.Length != orderedBones.Count)
-            {
-                throw new InvalidOperationException("Existing PMX scene SkinnedMeshRenderer bones do not match the PMX bone descriptor.");
-            }
+            ValidateExistingBoneTransforms(orderedBones, boneTransforms);
+
+            materials = CloneMaterialsForOverride(materials, materialOverride);
+            MmdMaterialOverrideApplier.Apply(materialOverride, materials);
+            renderer.sharedMaterials = materials;
 
             ResetExistingBoneTransformsToBindPose(orderedBones, boneTransforms, scale);
             renderer.rootBone = boneTransforms.Length > 0 ? boneTransforms[0] : modelRoot;
@@ -285,6 +282,24 @@ namespace Mmd.UnityIntegration
                 new MmdTextureBindingDiagnostics(),
                 shaderDiagnostics,
                 scale);
+        }
+
+        private static void ValidateExistingBoneTransforms(
+            IReadOnlyList<MmdBoneDefinition> orderedBones,
+            Transform[]? boneTransforms)
+        {
+            if (boneTransforms == null || boneTransforms.Length != orderedBones.Count)
+            {
+                throw new InvalidOperationException("Existing PMX scene SkinnedMeshRenderer bones do not match the PMX bone descriptor.");
+            }
+
+            for (int i = 0; i < boneTransforms.Length; i++)
+            {
+                if (boneTransforms[i] == null)
+                {
+                    throw new InvalidOperationException($"Existing PMX scene bone at index {i} is missing.");
+                }
+            }
         }
 
         private static Material[] CloneMaterialsForOverride(Material[] materials, MmdMaterialOverrideAsset? materialOverride)
