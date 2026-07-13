@@ -243,32 +243,26 @@ namespace Mmd.Editor
 
         private static string NormalizePrefabPath(string prefabPath)
         {
-            if (string.IsNullOrWhiteSpace(prefabPath))
+            if (MmdAssetPathUtility.TryValidateProjectRelativeOutputPath(
+                    prefabPath,
+                    ".prefab",
+                    out string normalizedPrefabPath,
+                    out MmdOutputPathError error))
             {
-                throw new ArgumentException("Prefab path is required.", nameof(prefabPath));
+                return normalizedPrefabPath;
             }
 
-            if (Path.IsPathRooted(prefabPath))
+            switch (error)
             {
-                throw new ArgumentException("Prefab path must be a project-relative Assets/*.prefab path.", nameof(prefabPath));
+                case MmdOutputPathError.Empty:
+                    throw new ArgumentException("Prefab path is required.", nameof(prefabPath));
+                case MmdOutputPathError.Rooted:
+                    throw new ArgumentException("Prefab path must be a project-relative Assets/*.prefab path.", nameof(prefabPath));
+                case MmdOutputPathError.EscapesAssets:
+                    throw new ArgumentException("Prefab path must stay inside the Unity Assets directory.", nameof(prefabPath));
+                default:
+                    throw new ArgumentException("Prefab path must be an Assets/*.prefab path.", nameof(prefabPath));
             }
-
-            string normalized = prefabPath.Replace('\\', '/');
-            if (!normalized.StartsWith("Assets/", StringComparison.Ordinal) ||
-                !normalized.EndsWith(".prefab", StringComparison.OrdinalIgnoreCase))
-            {
-                throw new ArgumentException("Prefab path must be an Assets/*.prefab path.", nameof(prefabPath));
-            }
-
-            string fullProjectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-            string fullAssetsRoot = Path.GetFullPath(Application.dataPath);
-            string fullPath = Path.GetFullPath(Path.Combine(fullProjectRoot, normalized));
-            if (!fullPath.StartsWith(fullAssetsRoot, StringComparison.OrdinalIgnoreCase))
-            {
-                throw new ArgumentException("Prefab path must stay inside the Unity Assets directory.", nameof(prefabPath));
-            }
-
-            return normalized;
         }
 
         private static void EnsureAssetDirectory(string assetDirectory)

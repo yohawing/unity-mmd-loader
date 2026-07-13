@@ -106,56 +106,44 @@ namespace Mmd.Editor
             List<string> diagnostics,
             out string normalizedOutputPath)
         {
-            normalizedOutputPath = string.Empty;
-            if (string.IsNullOrWhiteSpace(outputPath))
+            if (MmdAssetPathUtility.TryValidateProjectRelativeOutputPath(
+                    outputPath,
+                    ".anim",
+                    out normalizedOutputPath,
+                    out MmdOutputPathError error))
             {
-                diagnostics.Add("validation: output path is required.");
-                return false;
+                return true;
             }
 
-            if (Path.IsPathRooted(outputPath))
+            switch (error)
             {
-                diagnostics.Add("validation: output path must be project-relative, not rooted.");
-                return false;
+                case MmdOutputPathError.Empty:
+                    diagnostics.Add("validation: output path is required.");
+                    break;
+                case MmdOutputPathError.Rooted:
+                    diagnostics.Add("validation: output path must be project-relative, not rooted.");
+                    break;
+                case MmdOutputPathError.NotUnderAssets:
+                    diagnostics.Add("validation: output path must start with Assets/.");
+                    break;
+                case MmdOutputPathError.WrongExtension:
+                    diagnostics.Add("validation: output path must end with .anim.");
+                    break;
+                case MmdOutputPathError.EmptyOrDotSegment:
+                    string[] segments = outputPath.Replace('\\', '/').Split('/');
+                    diagnostics.Add(Array.Exists(segments, string.IsNullOrWhiteSpace)
+                        ? "validation: output path must not contain empty segments."
+                        : "validation: output path must not contain '.' or '..' segments.");
+                    break;
+                case MmdOutputPathError.EscapesAssets:
+                    diagnostics.Add("validation: output path must stay inside the Unity Assets directory.");
+                    break;
+                default:
+                    diagnostics.Add("validation: output path must not be empty.");
+                    break;
             }
 
-            string path = outputPath.Replace('\\', '/');
-            if (!path.StartsWith("Assets/", StringComparison.Ordinal))
-            {
-                diagnostics.Add("validation: output path must start with Assets/.");
-                return false;
-            }
-
-            if (!path.EndsWith(".anim", StringComparison.OrdinalIgnoreCase))
-            {
-                diagnostics.Add("validation: output path must end with .anim.");
-                return false;
-            }
-
-            string[] segments = path.Split('/');
-            if (segments.Length == 0)
-            {
-                diagnostics.Add("validation: output path must not be empty.");
-                return false;
-            }
-
-            foreach (string segment in segments)
-            {
-                if (string.IsNullOrWhiteSpace(segment))
-                {
-                    diagnostics.Add("validation: output path must not contain empty segments.");
-                    return false;
-                }
-
-                if (segment == "." || segment == "..")
-                {
-                    diagnostics.Add("validation: output path must not contain '.' or '..' segments.");
-                    return false;
-                }
-            }
-
-            normalizedOutputPath = path;
-            return true;
+            return false;
         }
 
         public static MmdHumanoidClipConversionWriterResult CreateInMemoryClip(
