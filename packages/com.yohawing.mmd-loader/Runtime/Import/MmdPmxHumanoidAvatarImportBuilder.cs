@@ -88,11 +88,14 @@ namespace Mmd.UnityIntegration
             }
 
             bool keepProxyRoot = false;
+            Avatar? createdAvatar = null;
+            bool keepAvatar = false;
             try
             {
                 MmdHumanoidAvatarBuildResult avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(
                     proxyRig,
                     retargetQualitySettings);
+                createdAvatar = avatarResult.Avatar;
                 diagnostic = CombineDiagnostics(diagnostic, avatarResult.Diagnostics);
 
                 if (!avatarResult.IsValidHumanAvatar || avatarResult.Avatar == null)
@@ -115,6 +118,7 @@ namespace Mmd.UnityIntegration
                     BuildRuntimeAppendTransformBindings(model ?? asset.LoadModel(), asset.ImportedRoot);
                 readiness = MmdHumanoidSetupAsset.ReadyReadiness;
                 keepProxyRoot = true;
+                keepAvatar = true;
                 return new MmdPmxHumanoidAvatarImportResult(
                     avatar,
                     readiness,
@@ -129,6 +133,10 @@ namespace Mmd.UnityIntegration
                 if (!keepProxyRoot)
                 {
                     Object.DestroyImmediate(proxyRig.ProxyRoot);
+                }
+                if (!keepAvatar && createdAvatar != null)
+                {
+                    Object.DestroyImmediate(createdAvatar);
                 }
             }
         }

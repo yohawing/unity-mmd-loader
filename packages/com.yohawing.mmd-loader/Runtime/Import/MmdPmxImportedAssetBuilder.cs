@@ -61,30 +61,38 @@ namespace Mmd.UnityIntegration
                 out string boneBindingDiagnostic);
 
             MmdPmxAsset asset = MmdPmxAsset.CreateInstance<MmdPmxAsset>();
-            asset.Initialize(
-                bytes,
-                assetPath,
-                resolvedSourcePath,
-                importScale,
-                modelPreset,
-                meshGenerationMode,
-                materialTexturePolicy,
-                shaderPreset,
-                parseSummary,
-                generatedAssets.Mesh,
-                generatedAssets.Materials,
-                materialRemaps,
-                generatedAssets.Root,
-                hierarchyReadiness,
-                rendererReadiness,
-                boneBindingReadiness,
-                hierarchyDiagnostic,
-                rendererDiagnostic,
-                boneBindingDiagnostic,
-                animationType,
-                materialOverrideAsset);
+            try
+            {
+                asset.Initialize(
+                    bytes,
+                    assetPath,
+                    resolvedSourcePath,
+                    importScale,
+                    modelPreset,
+                    meshGenerationMode,
+                    materialTexturePolicy,
+                    shaderPreset,
+                    parseSummary,
+                    generatedAssets.Mesh,
+                    generatedAssets.Materials,
+                    materialRemaps,
+                    generatedAssets.Root,
+                    hierarchyReadiness,
+                    rendererReadiness,
+                    boneBindingReadiness,
+                    hierarchyDiagnostic,
+                    rendererDiagnostic,
+                    boneBindingDiagnostic,
+                    animationType,
+                    materialOverrideAsset);
 
-            return asset;
+                return asset;
+            }
+            catch
+            {
+                Object.DestroyImmediate(asset);
+                throw;
+            }
         }
     }
 }

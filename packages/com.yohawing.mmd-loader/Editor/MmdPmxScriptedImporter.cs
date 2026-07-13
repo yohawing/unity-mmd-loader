@@ -101,150 +101,178 @@ namespace Mmd.Editor
             MmdPmxParseSummary parseSummary = payload.ParseSummary;
             MmdPmxModelPreset effectiveModelPreset = ResolveModelPresetForImport(model);
 
-            MmdUnityModelInstance? generatedAssets = null;
-            bool hierarchyAdded = false;
-            try
+            using var transaction = new MmdImportObjectTransaction();
+            MmdUnityModelInstance generatedAssets = MmdPmxImportAssetCacheBuilder.CreateImportedAssetCache(
+                model,
+                ImportScale,
+                MmdPmxModelPresetAutoDetector.IsCharacter(effectiveModelPreset),
+                MapMaterialPreset(shaderPreset),
+                materialOverrideAsset);
+            transaction.Track(generatedAssets.Root, hierarchyRoot: true);
+            transaction.Track(generatedAssets.Mesh);
+            foreach (Material material in generatedAssets.Materials)
             {
-                generatedAssets = MmdPmxImportAssetCacheBuilder.CreateImportedAssetCache(
+                transaction.Track(material);
+            }
+            foreach (Texture2D texture in generatedAssets.OwnedTextures)
+            {
+                transaction.Track(texture);
+            }
+            MmdPmxImportFaultInjection.ThrowIfRequested(ctx.assetPath, MmdPmxImportStage.AssetCacheCreated);
+
+            Mesh importedMesh = generatedAssets.Mesh;
+            Material[] importedMaterials = generatedAssets.Materials;
+
+            MmdPmxProjectTextureBindingSummary textureBindingSummary =
+                MmdPmxProjectTextureBinder.BindProjectTextureAssetsToMaterials(
                     model,
-                    ImportScale,
-                    MmdPmxModelPresetAutoDetector.IsCharacter(effectiveModelPreset),
-                    MapMaterialPreset(shaderPreset),
-                    materialOverrideAsset);
-                Mesh importedMesh = generatedAssets.Mesh;
-                Material[] importedMaterials = generatedAssets.Materials;
-
-                MmdPmxProjectTextureBindingSummary textureBindingSummary =
-                    MmdPmxProjectTextureBinder.BindProjectTextureAssetsToMaterials(
-                        model,
-                        ctx.assetPath,
-                        importedMaterials,
-                        generatedAssets.RenderingDescriptor,
-                        ctx);
-
-                if (shaderPreset == MmdPmxShaderPreset.UrpLit)
-                {
-                    MmdPbrTextureConventionScanner.ApplyScannedMaterialOverrides(
-                        ctx,
-                        model,
-                        ctx.assetPath,
-                        importedMaterials);
-                }
-
-                ApplyMaterialOverrideAsset(ctx, importedMaterials);
-
-                MmdPmxAsset asset = MmdPmxImportedAssetBuilder.CreateAndInitializeImportedAsset(
-                    bytes,
                     ctx.assetPath,
-                    resolvedSourcePath,
-                    ImportScale,
-                    effectiveModelPreset.ToString(),
-                    meshGenerationMode.ToString(),
-                    materialTexturePolicy.ToString(),
-                    shaderPreset.ToString(),
-                    parseSummary,
-                    generatedAssets,
-                    materialRemaps,
-                    animationType.ToString(),
-                    materialOverrideAsset);
-                asset.ApplyProjectTextureBindingSummary(
-                    textureBindingSummary.ResolvedReferenceCount,
-                    textureBindingSummary.MissingReferenceCount,
-                    textureBindingSummary.MissingReferenceSample);
-
-                MmdPmxHumanoidAvatarImportBuilder.MmdPmxHumanoidAvatarImportResult avatarImport =
-                    MmdPmxHumanoidAvatarImportBuilder.TryBuildHumanoidAvatar(
-                        asset,
-                        model.name,
-                        shouldBuildHumanoid: animationType == MmdPmxAnimationType.Humanoid,
-                        animationTypeLabel: animationType.ToString(),
-                        mappingOverrides: humanoidBoneMappingOverrides,
-                        model: model,
-                        retargetQualitySettings: HumanoidRetargetQualitySettings);
-                Avatar? importedAvatar = avatarImport.Avatar;
-                GameObject? importedHumanoidProxyRoot = avatarImport.ProxyRoot;
-                string avatarReadiness = avatarImport.Readiness;
-                string avatarDiagnostic = avatarImport.Diagnostic;
-
-                if (animationType == MmdPmxAnimationType.Humanoid && importedHumanoidProxyRoot != null)
-                {
-                    importedHumanoidProxyRoot.transform.SetParent(
-                        generatedAssets.Root.transform,
-                        worldPositionStays: false);
-                    ClearImportHierarchyHideFlags(importedHumanoidProxyRoot.transform);
-                }
-
-                asset.ApplyHumanoidAvatarImportSummary(
-                    animationType.ToString(),
-                    importedAvatar,
-                    avatarReadiness,
-                    avatarDiagnostic,
-                    avatarImport.MappingDiagnostics);
-
-                MmdPmxGenericAvatarImportBuilder.MmdPmxGenericAvatarImportResult genericAvatarImport =
-                    MmdPmxGenericAvatarImportBuilder.TryBuildGenericAvatar(
-                        generatedAssets.Root,
-                        model.name,
-                        shouldBuildGeneric: animationType == MmdPmxAnimationType.Generic,
-                        animationTypeLabel: animationType.ToString(),
-                        rootMotionTransformName: string.Empty);
-                Avatar? genericAvatar = genericAvatarImport.Avatar;
-
-                ConfigureImportedAnimator(
-                    generatedAssets.Root,
-                    animationType,
-                    importedAvatar,
-                    genericAvatar);
-                ConfigureImportedPlaybackController(
-                    generatedAssets.Root,
-                    asset,
-                    animationType,
-                    importedAvatar,
-                    importedHumanoidProxyRoot,
-                    avatarReadiness,
-                    avatarImport.RetargetBindings,
-                    avatarImport.AppendBindings);
-
-                if (animationType == MmdPmxAnimationType.Generic && genericAvatar == null)
-                {
-                    ctx.LogImportWarning(genericAvatarImport.Diagnostic);
-                }
-
-                if (textureBindingSummary.MissingReferenceCount > 0)
-                {
-                    ctx.LogImportWarning(
-                        $"PMX import has {textureBindingSummary.MissingReferenceCount} unresolved texture reference(s). See the PMX asset Material Reference Summary for the first sample.");
-                }
-
-                ctx.AddObjectToAsset("PMX", asset);
-                ctx.AddObjectToAsset("Mesh", importedMesh);
-                for (int i = 0; i < importedMaterials.Length; i++)
-                {
-                    ctx.AddObjectToAsset("Material_" + i, importedMaterials[i]);
-                }
-                ctx.AddObjectToAsset("Hierarchy", generatedAssets.Root);
-
-                if (importedAvatar != null)
-                {
-                    ctx.AddObjectToAsset("Avatar", importedAvatar);
-                }
-
-                if (genericAvatar != null)
-                {
-                    ctx.AddObjectToAsset("GenericAvatar", genericAvatar);
-                }
-
-                ctx.SetMainObject(generatedAssets.Root);
-
-                hierarchyAdded = true;
-            }
-            finally
+                    importedMaterials,
+                    generatedAssets.RenderingDescriptor,
+                    ctx);
+            foreach (MmdPmxOwnedTextureSubAsset ownedTexture in textureBindingSummary.OwnedSubAssets)
             {
-                if (generatedAssets?.Root != null && !hierarchyAdded)
-                {
-                    Object.DestroyImmediate(generatedAssets.Root);
-                }
+                transaction.Track(ownedTexture.Texture);
             }
+            MmdPmxImportFaultInjection.ThrowIfRequested(ctx.assetPath, MmdPmxImportStage.ProjectTexturesBound);
+
+            if (shaderPreset == MmdPmxShaderPreset.UrpLit)
+            {
+                MmdPbrTextureConventionScanner.ApplyScannedMaterialOverrides(
+                    ctx,
+                    model,
+                    ctx.assetPath,
+                    importedMaterials);
+            }
+
+            ApplyMaterialOverrideAsset(ctx, importedMaterials);
+
+            MmdPmxAsset asset = MmdPmxImportedAssetBuilder.CreateAndInitializeImportedAsset(
+                bytes,
+                ctx.assetPath,
+                resolvedSourcePath,
+                ImportScale,
+                effectiveModelPreset.ToString(),
+                meshGenerationMode.ToString(),
+                materialTexturePolicy.ToString(),
+                shaderPreset.ToString(),
+                parseSummary,
+                generatedAssets,
+                materialRemaps,
+                animationType.ToString(),
+                materialOverrideAsset);
+            transaction.Track(asset);
+            MmdPmxImportFaultInjection.ThrowIfRequested(ctx.assetPath, MmdPmxImportStage.ImportedAssetCreated);
+            asset.ApplyProjectTextureBindingSummary(
+                textureBindingSummary.ResolvedReferenceCount,
+                textureBindingSummary.MissingReferenceCount,
+                textureBindingSummary.MissingReferenceSample);
+
+            MmdPmxHumanoidAvatarImportBuilder.MmdPmxHumanoidAvatarImportResult avatarImport =
+                MmdPmxHumanoidAvatarImportBuilder.TryBuildHumanoidAvatar(
+                    asset,
+                    model.name,
+                    shouldBuildHumanoid: animationType == MmdPmxAnimationType.Humanoid,
+                    animationTypeLabel: animationType.ToString(),
+                    mappingOverrides: humanoidBoneMappingOverrides,
+                    model: model,
+                    retargetQualitySettings: HumanoidRetargetQualitySettings);
+            Avatar? importedAvatar = avatarImport.Avatar;
+            GameObject? importedHumanoidProxyRoot = avatarImport.ProxyRoot;
+            transaction.Track(importedAvatar);
+            transaction.Track(importedHumanoidProxyRoot, hierarchyRoot: true);
+            MmdPmxImportFaultInjection.ThrowIfRequested(ctx.assetPath, MmdPmxImportStage.HumanoidAvatarCreated);
+            string avatarReadiness = avatarImport.Readiness;
+            string avatarDiagnostic = avatarImport.Diagnostic;
+
+            if (animationType == MmdPmxAnimationType.Humanoid && importedHumanoidProxyRoot != null)
+            {
+                importedHumanoidProxyRoot.transform.SetParent(
+                    generatedAssets.Root.transform,
+                    worldPositionStays: false);
+                ClearImportHierarchyHideFlags(importedHumanoidProxyRoot.transform);
+                transaction.AdoptIntoHierarchy(importedHumanoidProxyRoot);
+            }
+            MmdPmxImportFaultInjection.ThrowIfRequested(ctx.assetPath, MmdPmxImportStage.HumanoidProxyParented);
+
+            asset.ApplyHumanoidAvatarImportSummary(
+                animationType.ToString(),
+                importedAvatar,
+                avatarReadiness,
+                avatarDiagnostic,
+                avatarImport.MappingDiagnostics);
+
+            MmdPmxGenericAvatarImportBuilder.MmdPmxGenericAvatarImportResult genericAvatarImport =
+                MmdPmxGenericAvatarImportBuilder.TryBuildGenericAvatar(
+                    generatedAssets.Root,
+                    model.name,
+                    shouldBuildGeneric: animationType == MmdPmxAnimationType.Generic,
+                    animationTypeLabel: animationType.ToString(),
+                    rootMotionTransformName: string.Empty);
+            Avatar? genericAvatar = genericAvatarImport.Avatar;
+            transaction.Track(genericAvatar);
+            MmdPmxImportFaultInjection.ThrowIfRequested(ctx.assetPath, MmdPmxImportStage.GenericAvatarCreated);
+
+            ConfigureImportedAnimator(
+                generatedAssets.Root,
+                animationType,
+                importedAvatar,
+                genericAvatar);
+            ConfigureImportedPlaybackController(
+                generatedAssets.Root,
+                asset,
+                animationType,
+                importedAvatar,
+                importedHumanoidProxyRoot,
+                avatarReadiness,
+                avatarImport.RetargetBindings,
+                avatarImport.AppendBindings);
+            MmdPmxImportFaultInjection.ThrowIfRequested(ctx.assetPath, MmdPmxImportStage.HierarchyConfigured);
+
+            if (animationType == MmdPmxAnimationType.Generic && genericAvatar == null)
+            {
+                ctx.LogImportWarning(genericAvatarImport.Diagnostic);
+            }
+
+            if (textureBindingSummary.MissingReferenceCount > 0)
+            {
+                ctx.LogImportWarning(
+                    $"PMX import has {textureBindingSummary.MissingReferenceCount} unresolved texture reference(s). See the PMX asset Material Reference Summary for the first sample.");
+            }
+
+            MmdPmxImportFaultInjection.ThrowIfRequested(ctx.assetPath, MmdPmxImportStage.BeforeSubAssetRegistration);
+            transaction.TransferToContext(ctx, "PMX", asset);
+            MmdPmxImportFaultInjection.ThrowIfRequested(ctx.assetPath, MmdPmxImportStage.PmxSubAssetRegistered);
+            transaction.TransferToContext(ctx, "Mesh", importedMesh);
+            for (int i = 0; i < importedMaterials.Length; i++)
+            {
+                transaction.TransferToContext(ctx, "Material_" + i, importedMaterials[i]);
+            }
+            for (int i = 0; i < textureBindingSummary.OwnedSubAssets.Count; i++)
+            {
+                transaction.TransferToContext(
+                    ctx,
+                    textureBindingSummary.OwnedSubAssets[i].Identifier,
+                    textureBindingSummary.OwnedSubAssets[i].Texture);
+            }
+            MmdPmxImportFaultInjection.ThrowIfRequested(ctx.assetPath, MmdPmxImportStage.MaterialsRegistered);
+            transaction.TransferToContext(ctx, "Hierarchy", generatedAssets.Root);
+            MmdPmxImportFaultInjection.ThrowIfRequested(ctx.assetPath, MmdPmxImportStage.HierarchyRegistered);
+
+            if (importedAvatar != null)
+            {
+                transaction.TransferToContext(ctx, "Avatar", importedAvatar);
+            }
+
+            if (genericAvatar != null)
+            {
+                transaction.TransferToContext(ctx, "GenericAvatar", genericAvatar);
+            }
+
+            ctx.SetMainObject(generatedAssets.Root);
+            MmdPmxImportFaultInjection.ThrowIfRequested(ctx.assetPath, MmdPmxImportStage.MainObjectSet);
+
+            transaction.Complete();
         }
 
         private static float NormalizeImportScale(float value)

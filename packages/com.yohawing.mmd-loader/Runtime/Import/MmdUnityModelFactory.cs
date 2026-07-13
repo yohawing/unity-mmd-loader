@@ -430,36 +430,47 @@ namespace Mmd.UnityIntegration
             MmdMaterialOverrideApplier.ApplyToRenderingDescriptor(materialOverride, descriptor);
 
             var root = new GameObject(ResolveModelName(modelName));
-            Transform modelRoot = CreateModelRoot(root.transform);
-            var mesh = BuildMesh(descriptor, importScale);
-            MmdRuntimeTextureResolution textureResolution = MmdRuntimeTextureResolver.ResolveDiffuseTextures(descriptor, sourceContext);
-            Material[] materials = MmdUnityMaterialBuilder.BuildMaterials(descriptor, textureResolution, out MmdShaderBindingDiagnostics shaderDiagnostics);
-            MmdMaterialOverrideApplier.Apply(materialOverride, materials);
-            Transform[] boneTransforms = BuildBoneTransforms(modelRoot, bones, importScale);
-            MmdUnityPhysicsBody[] physicsBodies = BuildPhysicsBodies(modelRoot, bones, boneTransforms, physics, importScale);
+            Mesh? mesh = null;
+            Material[] materials = Array.Empty<Material>();
+            MmdRuntimeTextureResolution? textureResolution = null;
+            try
+            {
+                Transform modelRoot = CreateModelRoot(root.transform);
+                mesh = BuildMesh(descriptor, importScale);
+                textureResolution = MmdRuntimeTextureResolver.ResolveDiffuseTextures(descriptor, sourceContext);
+                materials = MmdUnityMaterialBuilder.BuildMaterials(descriptor, textureResolution, out MmdShaderBindingDiagnostics shaderDiagnostics);
+                MmdMaterialOverrideApplier.Apply(materialOverride, materials);
+                Transform[] boneTransforms = BuildBoneTransforms(modelRoot, bones, importScale);
+                MmdUnityPhysicsBody[] physicsBodies = BuildPhysicsBodies(modelRoot, bones, boneTransforms, physics, importScale);
 
-            var meshFilter = modelRoot.gameObject.AddComponent<MeshFilter>();
-            meshFilter.sharedMesh = mesh;
+                var meshFilter = modelRoot.gameObject.AddComponent<MeshFilter>();
+                meshFilter.sharedMesh = mesh;
 
-            var meshRenderer = modelRoot.gameObject.AddComponent<MeshRenderer>();
-            meshRenderer.sharedMaterials = materials;
-            ApplyRendererShadowPolicy(meshRenderer);
-            ApplySelfShadowTargetPolicy(root, modelRoot, includeSelfShadowTarget);
+                var meshRenderer = modelRoot.gameObject.AddComponent<MeshRenderer>();
+                meshRenderer.sharedMaterials = materials;
+                ApplyRendererShadowPolicy(meshRenderer);
+                ApplySelfShadowTargetPolicy(root, modelRoot, includeSelfShadowTarget);
 
-            return new MmdUnityModelInstance(
-                root,
-                mesh,
-                materials,
-                descriptor,
-                boneTransforms,
-                physicsBodies,
-                meshRenderer,
-                skinnedMeshRenderer: null,
-                sourceContext,
-                GetOwnedTextures(textureResolution),
-                textureResolution.Diagnostics,
-                shaderDiagnostics,
-                importScale);
+                return new MmdUnityModelInstance(
+                    root,
+                    mesh,
+                    materials,
+                    descriptor,
+                    boneTransforms,
+                    physicsBodies,
+                    meshRenderer,
+                    skinnedMeshRenderer: null,
+                    sourceContext,
+                    GetOwnedTextures(textureResolution),
+                    textureResolution.Diagnostics,
+                    shaderDiagnostics,
+                    importScale);
+            }
+            catch
+            {
+                DestroyGeneratedModelArtifacts(root, mesh, materials, textureResolution);
+                throw;
+            }
         }
 
         private static MmdUnityModelInstance CreateSkinnedModel(
@@ -476,38 +487,94 @@ namespace Mmd.UnityIntegration
             MmdMaterialOverrideApplier.ApplyToRenderingDescriptor(materialOverride, descriptor);
 
             var root = new GameObject(ResolveModelName(modelName));
-            Transform modelRoot = CreateModelRoot(root.transform);
-            Transform[] boneTransforms = BuildBoneTransforms(modelRoot, bones, importScale);
-            MmdUnityPhysicsBody[] physicsBodies = BuildPhysicsBodies(modelRoot, bones, boneTransforms, physics, importScale);
-            var mesh = BuildMesh(descriptor, importScale);
-            ApplySkinning(mesh, descriptor, bones, boneTransforms, modelRoot);
-            BakeVertexMorphBlendShapes(mesh, descriptor, importScale);
-            MmdRuntimeTextureResolution textureResolution = MmdRuntimeTextureResolver.ResolveDiffuseTextures(descriptor, sourceContext);
-            Material[] materials = MmdUnityMaterialBuilder.BuildMaterials(descriptor, textureResolution, out MmdShaderBindingDiagnostics shaderDiagnostics);
-            MmdMaterialOverrideApplier.Apply(materialOverride, materials);
+            Mesh? mesh = null;
+            Material[] materials = Array.Empty<Material>();
+            MmdRuntimeTextureResolution? textureResolution = null;
+            try
+            {
+                Transform modelRoot = CreateModelRoot(root.transform);
+                Transform[] boneTransforms = BuildBoneTransforms(modelRoot, bones, importScale);
+                MmdUnityPhysicsBody[] physicsBodies = BuildPhysicsBodies(modelRoot, bones, boneTransforms, physics, importScale);
+                mesh = BuildMesh(descriptor, importScale);
+                ApplySkinning(mesh, descriptor, bones, boneTransforms, modelRoot);
+                BakeVertexMorphBlendShapes(mesh, descriptor, importScale);
+                textureResolution = MmdRuntimeTextureResolver.ResolveDiffuseTextures(descriptor, sourceContext);
+                materials = MmdUnityMaterialBuilder.BuildMaterials(descriptor, textureResolution, out MmdShaderBindingDiagnostics shaderDiagnostics);
+                MmdMaterialOverrideApplier.Apply(materialOverride, materials);
 
-            var renderer = modelRoot.gameObject.AddComponent<SkinnedMeshRenderer>();
-            renderer.sharedMesh = mesh;
-            renderer.sharedMaterials = materials;
-            renderer.bones = boneTransforms;
-            renderer.rootBone = boneTransforms.Length > 0 ? boneTransforms[0] : modelRoot;
-            ApplyRendererShadowPolicy(renderer);
-            ApplySelfShadowTargetPolicy(root, modelRoot, includeSelfShadowTarget);
+                var renderer = modelRoot.gameObject.AddComponent<SkinnedMeshRenderer>();
+                renderer.sharedMesh = mesh;
+                renderer.sharedMaterials = materials;
+                renderer.bones = boneTransforms;
+                renderer.rootBone = boneTransforms.Length > 0 ? boneTransforms[0] : modelRoot;
+                ApplyRendererShadowPolicy(renderer);
+                ApplySelfShadowTargetPolicy(root, modelRoot, includeSelfShadowTarget);
 
-            return new MmdUnityModelInstance(
-                root,
-                mesh,
-                materials,
-                descriptor,
-                boneTransforms,
-                physicsBodies,
-                meshRenderer: null,
-                skinnedMeshRenderer: renderer,
-                sourceContext,
-                GetOwnedTextures(textureResolution),
-                textureResolution.Diagnostics,
-                shaderDiagnostics,
-                importScale);
+                return new MmdUnityModelInstance(
+                    root,
+                    mesh,
+                    materials,
+                    descriptor,
+                    boneTransforms,
+                    physicsBodies,
+                    meshRenderer: null,
+                    skinnedMeshRenderer: renderer,
+                    sourceContext,
+                    GetOwnedTextures(textureResolution),
+                    textureResolution.Diagnostics,
+                    shaderDiagnostics,
+                    importScale);
+            }
+            catch
+            {
+                DestroyGeneratedModelArtifacts(root, mesh, materials, textureResolution);
+                throw;
+            }
+        }
+
+        private static void DestroyGeneratedModelArtifacts(
+            GameObject root,
+            Mesh? mesh,
+            Material[] materials,
+            MmdRuntimeTextureResolution? textureResolution)
+        {
+            DestroyGeneratedObject(root);
+            DestroyGeneratedObject(mesh);
+            foreach (Material material in materials)
+            {
+                DestroyGeneratedObject(material);
+            }
+
+            if (textureResolution == null)
+            {
+                return;
+            }
+
+            var destroyedTextureIds = new HashSet<int>();
+            foreach (Texture2D texture in GetOwnedTextures(textureResolution))
+            {
+                if (texture != null && destroyedTextureIds.Add(texture.GetInstanceID()))
+                {
+                    DestroyGeneratedObject(texture);
+                }
+            }
+        }
+
+        private static void DestroyGeneratedObject(UnityEngine.Object? value)
+        {
+            if (value == null)
+            {
+                return;
+            }
+
+            if (Application.isPlaying)
+            {
+                UnityEngine.Object.Destroy(value);
+            }
+            else
+            {
+                UnityEngine.Object.DestroyImmediate(value);
+            }
         }
 
         private static Transform CreateModelRoot(Transform root)
