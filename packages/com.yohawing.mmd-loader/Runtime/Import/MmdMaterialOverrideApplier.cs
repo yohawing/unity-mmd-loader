@@ -222,6 +222,7 @@ namespace Mmd.UnityIntegration
             return -1;
         }
 
+        // has* flag を追加したら ApplyDescriptorEntry / ApplyUrpMaterialBindingEntry と MmdMaterialOverrideApplierSyncTests の inventory を同時に更新する（3 sink 同期契約）。
         private static void ApplyEntry(
             MmdMaterialOverrideEntry entry,
             Material material,
