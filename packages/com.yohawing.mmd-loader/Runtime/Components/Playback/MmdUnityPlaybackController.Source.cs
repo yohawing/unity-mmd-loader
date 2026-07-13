@@ -108,13 +108,18 @@ namespace Mmd.UnityIntegration
             MmdModelValidator.ThrowIfInvalid(model);
             MmdMotionDefinition motion = parser.LoadMotion(vmdBytes);
             MmdMotionValidator.ThrowIfInvalid(motion);
-            MmdUnityModelInstance? existingInstance = null;
+            MmdUnityPlaybackBinding? runtimeImporterBinding = null;
             bool reboundExisting = false;
             try
             {
-                existingInstance = MmdUnityModelFactory.CreateExistingSkinnedModelInstance(
+                MmdUnityModelFactory.ValidateExistingSkinnedModelCompatibility(gameObject, model);
+                ReleaseCurrentBindingBeforeSceneRebind();
+                runtimeImporterBinding = MmdUnityPlaybackBinding.CreateSkinnedFromExistingSceneModel(
                     gameObject,
                     model,
+                    motion,
+                    resolvedPmxPath,
+                    resolvedVmdPath,
                     resolvedPmxPath);
                 reboundExisting = true;
             }
@@ -125,35 +130,7 @@ namespace Mmd.UnityIntegration
             {
             }
 
-            MmdUnityPlaybackBinding runtimeImporterBinding;
-            if (reboundExisting && existingInstance != null)
-            {
-                MmdVmdAsset runtimeMotionAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
-                runtimeMotionAsset.Initialize(vmdBytes, Path.GetFileName(resolvedVmdPath), resolvedVmdPath);
-
-                try
-                {
-                    runtimeImporterBinding = MmdUnityPlaybackBinding.CreateSkinned(
-                        existingInstance,
-                        model,
-                        runtimeMotionAsset,
-                        motion,
-                        resolvedPmxPath,
-                        resolvedPmxPath);
-                }
-                finally
-                {
-                    if (Application.isPlaying)
-                    {
-                        UnityEngine.Object.Destroy(runtimeMotionAsset);
-                    }
-                    else
-                    {
-                        UnityEngine.Object.DestroyImmediate(runtimeMotionAsset);
-                    }
-                }
-            }
-            else
+            if (!reboundExisting || runtimeImporterBinding == null)
             {
                 if (!allowRuntimeFallback)
                 {
@@ -268,12 +245,19 @@ namespace Mmd.UnityIntegration
             MmdModelDefinition model = parser.LoadModel(File.ReadAllBytes(resolvedPmxPath));
             MmdModelValidator.ThrowIfInvalid(model);
 
-            MmdUnityModelInstance? existingInstance = null;
+            MmdUnityPlaybackBinding? pathBinding = null;
             bool reboundExisting = false;
             try
             {
-                existingInstance = MmdUnityModelFactory.CreateExistingSkinnedModelInstance(
-                    gameObject, model, resolvedPmxPath);
+                MmdUnityModelFactory.ValidateExistingSkinnedModelCompatibility(gameObject, model);
+                ReleaseCurrentBindingBeforeSceneRebind();
+                pathBinding = MmdUnityPlaybackBinding.CreateSkinnedFromExistingSceneModel(
+                    gameObject,
+                    model,
+                    motion,
+                    resolvedPmxPath,
+                    string.IsNullOrWhiteSpace(vmdAsset.SourceId) ? vmdAsset.name : vmdAsset.SourceId,
+                    resolvedPmxPath);
                 reboundExisting = true;
             }
             catch (MissingComponentException)
@@ -283,18 +267,7 @@ namespace Mmd.UnityIntegration
             {
             }
 
-            MmdUnityPlaybackBinding pathBinding;
-            if (reboundExisting && existingInstance != null)
-            {
-                pathBinding = MmdUnityPlaybackBinding.CreateSkinned(
-                    existingInstance,
-                    model,
-                    vmdAsset,
-                    motion,
-                    resolvedPmxPath,
-                    resolvedPmxPath);
-            }
-            else
+            if (!reboundExisting || pathBinding == null)
             {
                 if (!allowRuntimeFallback)
                 {
@@ -439,6 +412,10 @@ namespace Mmd.UnityIntegration
         {
             try
             {
+                var parser = new NativeMmdParser();
+                MmdModelDefinition model = pmxAsset.LoadModel(parser);
+                MmdUnityModelFactory.ValidateExistingSkinnedModelCompatibility(gameObject, model);
+                ReleaseCurrentBindingBeforeSceneRebind();
                 binding = MmdUnityPlaybackBinding.CreateSkinnedFromExistingSceneModel(
                     gameObject,
                     pmxAsset,
@@ -455,6 +432,22 @@ namespace Mmd.UnityIntegration
 
             binding = null!;
             return false;
+        }
+
+        private void ReleaseCurrentBindingBeforeSceneRebind()
+        {
+            DisposeHumanoidPhysicsBinding();
+            if (binding == null)
+            {
+                return;
+            }
+
+            binding.Dispose();
+            binding = null;
+            LastSnapshot = null;
+            LastEditableRigDiagnostics = null;
+            IsPlaying = false;
+            ResetLivePhysicsDriveSource();
         }
 
         private bool TryConfigureReboundAssetBinding(

@@ -5,6 +5,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using NUnit.Framework;
 using UnityEngine;
@@ -251,14 +252,16 @@ namespace Mmd.Tests
                 "scene SMR bone count must match pmxAsset.BoneCount");
             Assert.That(sceneSMR.rootBone, Is.Not.Null,
                 "scene SMR must have a valid rootBone");
-            Assert.That(sharedMesh, Is.SameAs(modelAsset.ImportedMesh),
-                "scene SMR sharedMesh must be the importer-owned Mesh sub-asset");
+            Assert.That(sharedMesh, Is.Not.SameAs(modelAsset.ImportedMesh),
+                "active playback must isolate mesh mutation from the importer-owned Mesh sub-asset");
+            Assert.That(sharedMesh.name, Does.StartWith(modelAsset.ImportedMesh.name));
             if (modelAsset.ImportedMaterials is { Length: > 0 } mats)
             {
                 Material[] smrMats = sceneSMR.sharedMaterials;
                 Assert.That(smrMats, Is.Not.Null.And.Not.Empty);
-                Assert.That(smrMats[0], Is.SameAs(mats[0]),
-                    "first scene SMR material must be the importer-owned Material sub-asset");
+                Assert.That(smrMats[0], Is.Not.SameAs(mats[0]),
+                    "active playback must isolate material mutation from the importer-owned Material sub-asset");
+                Assert.That(smrMats[0].name, Does.StartWith(mats[0].name));
             }
 
             controller.Pause();
@@ -731,6 +734,7 @@ namespace Mmd.Tests
 
             MmdUnityModelInstance? instance = null;
             MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
             MmdHumanoidProxyRigResult? proxyRig = null;
             Avatar? avatar = null;
             PlayableGraph graph = default;
@@ -750,6 +754,12 @@ namespace Mmd.Tests
                     pmxPath,
                     MmdPmxAsset.DefaultImportScale,
                     parseSummary: MmdPmxParseSummary.FromModel(model));
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
+                SkinnedMeshRenderer renderer = instance.SkinnedMeshRenderer!;
+                Mesh authoredMesh = renderer.sharedMesh;
+                Material authoredMaterial = renderer.sharedMaterials[0];
 
                 MmdUnityPlaybackController controller = instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.ConfigureModelAsset(pmxAsset);
@@ -850,6 +860,27 @@ namespace Mmd.Tests
 
                 Assert.That(anyHairBoneChanged, Is.True,
                     "Expected humanoid-retargeted body motion to drive live physics feedback into at least one non-static hair bone");
+
+                Mesh humanoidPlaybackMesh = renderer.sharedMesh;
+                FieldInfo? physicsModeField = typeof(MmdUnityPlaybackController).GetField(
+                    "physicsMode",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(physicsModeField, Is.Not.Null);
+                physicsModeField!.SetValue(controller, MmdPhysicsMode.Off);
+                controller.ConfigureFromAssets(pmxAsset, vmdAsset, 30.0f, startFrame: 0, playOnStart: false);
+                yield return null;
+                Assert.That(controller.HasHumanoidPhysicsBinding, Is.False);
+                Assert.That(controller.IsConfigured, Is.True);
+                Assert.That(humanoidPlaybackMesh == null, Is.True,
+                    "VMD rebind must release the previous Humanoid physics Mesh clone before capturing Scene state");
+                Mesh vmdPlaybackMesh = renderer.sharedMesh;
+                Assert.That(vmdPlaybackMesh, Is.Not.SameAs(authoredMesh));
+
+                controller.PrepareForAssemblyReload();
+                yield return null;
+                Assert.That(vmdPlaybackMesh == null, Is.True);
+                Assert.That(renderer.sharedMesh, Is.SameAs(authoredMesh));
+                Assert.That(renderer.sharedMaterials[0], Is.SameAs(authoredMaterial));
             }
             finally
             {
@@ -871,6 +902,11 @@ namespace Mmd.Tests
                 if (pmxAsset != null)
                 {
                     UnityEngine.Object.Destroy(pmxAsset);
+                }
+
+                if (vmdAsset != null)
+                {
+                    UnityEngine.Object.Destroy(vmdAsset);
                 }
 
                 MmdPlayModeTestInstanceScope.DestroyInstance(instance);

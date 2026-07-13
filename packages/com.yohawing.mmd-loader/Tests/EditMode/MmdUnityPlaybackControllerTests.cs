@@ -1603,20 +1603,100 @@ namespace Mmd.Tests
                 vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
                 MmdUnityPlaybackController controller = previewInstance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.SetPhysicsMode(MmdPhysicsMode.Off);
+                SkinnedMeshRenderer renderer = previewInstance.SkinnedMeshRenderer!;
+                Mesh authoredMesh = renderer.sharedMesh!;
+                Material authoredMaterial = renderer.sharedMaterials[0];
+                Transform? authoredRootBone = renderer.rootBone;
+                Bounds authoredBounds = renderer.localBounds;
+                Transform bone = previewInstance.BoneTransforms[0];
+                bone.localPosition += new Vector3(1.0f, 2.0f, 3.0f);
+                bone.localRotation = Quaternion.Euler(0.0f, 35.0f, 0.0f);
+                bone.localScale = new Vector3(1.2f, 0.8f, 1.1f);
+                Vector3 authoredPosition = bone.localPosition;
+                Quaternion authoredRotation = bone.localRotation;
+                Vector3 authoredScale = bone.localScale;
                 Quaternion expectedRotation = previewInstance.BindLocalRotations[0]
                     * ToUnityRotation(new[] { -0.3826833665f, 0.0f, 0.0f, 0.9238795638f });
 
                 controller.ConfigureFromAssets(pmxAsset, vmdAsset, 30.0f, startFrame: 9, playOnStart: false);
+                Mesh firstPlaybackMesh = renderer.sharedMesh;
 
                 Assert.That(controller.CurrentFrame, Is.EqualTo(9));
                 Assert.That(
                     Quaternion.Angle(previewInstance.BoneTransforms[0].localRotation, expectedRotation),
                     Is.LessThan(0.001f));
+
+                controller.ConfigureFromAssets(pmxAsset, vmdAsset, 30.0f, startFrame: 0, playOnStart: false);
+                Mesh secondPlaybackMesh = renderer.sharedMesh;
+                Assert.That(firstPlaybackMesh == null, Is.True, "reconfigure must destroy the first playback Mesh clone");
+                Assert.That(secondPlaybackMesh, Is.Not.SameAs(authoredMesh));
+
+                controller.PrepareForAssemblyReload();
+                Assert.That(secondPlaybackMesh == null, Is.True, "release must destroy the second playback Mesh clone");
+                Assert.That(renderer.sharedMesh, Is.SameAs(authoredMesh));
+                Assert.That(renderer.sharedMaterials[0], Is.SameAs(authoredMaterial));
+                Assert.That(renderer.rootBone, Is.SameAs(authoredRootBone));
+                Assert.That(renderer.localBounds, Is.EqualTo(authoredBounds));
+                Assert.That(bone.localPosition, Is.EqualTo(authoredPosition));
+                Assert.That(bone.localRotation, Is.EqualTo(authoredRotation));
+                Assert.That(bone.localScale, Is.EqualTo(authoredScale));
             }
             finally
             {
                 MmdTestInstanceScope.DestroyInstance(previewInstance);
                 Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+            }
+        }
+
+        [Test]
+        public void ConfigureFromAssetsCompatibilityFailurePreservesCurrentPlaybackBinding()
+        {
+            MmdPmxAsset? pmxAsset = null;
+            MmdPmxAsset? incompatibleAsset = null;
+            MmdVmdAsset? vmdAsset = null;
+            MmdUnityModelInstance? previewInstance = null;
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string incompatiblePath = ResolvePackageFixture("test_append_bone.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                byte[] pmxBytes = File.ReadAllBytes(pmxPath);
+                var parser = new NativeMmdParser();
+                previewInstance = MmdUnityModelFactory.CreateSkinnedModel(parser.LoadModel(pmxBytes), pmxPath);
+                pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                pmxAsset.Initialize(pmxBytes, "test_1bone_cube.pmx", pmxPath);
+                incompatibleAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                incompatibleAsset.Initialize(File.ReadAllBytes(incompatiblePath), "test_append_bone.pmx", incompatiblePath);
+                vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
+                MmdUnityPlaybackController controller = previewInstance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+                controller.ConfigureFromAssets(pmxAsset, vmdAsset, 30.0f, startFrame: 9, playOnStart: false);
+                SkinnedMeshRenderer renderer = previewInstance.SkinnedMeshRenderer!;
+                Mesh activePlaybackMesh = renderer.sharedMesh;
+                int revision = controller.ConfigurationRevision;
+
+                Assert.Throws<InvalidOperationException>(() =>
+                    controller.ConfigureFromAssets(
+                        incompatibleAsset,
+                        vmdAsset,
+                        30.0f,
+                        startFrame: 0,
+                        playOnStart: false,
+                        allowRuntimeFallback: false));
+
+                Assert.That(controller.IsConfigured, Is.True);
+                Assert.That(controller.ConfigurationRevision, Is.EqualTo(revision));
+                Assert.That(controller.CurrentFrame, Is.EqualTo(9));
+                Assert.That(renderer.sharedMesh, Is.SameAs(activePlaybackMesh));
+                Assert.That(activePlaybackMesh == null, Is.False);
+            }
+            finally
+            {
+                MmdTestInstanceScope.DestroyInstance(previewInstance);
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(incompatibleAsset);
                 Object.DestroyImmediate(vmdAsset);
             }
         }

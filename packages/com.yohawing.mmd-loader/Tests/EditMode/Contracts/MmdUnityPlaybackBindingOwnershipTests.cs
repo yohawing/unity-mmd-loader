@@ -156,6 +156,202 @@ namespace Mmd.Tests
             Assert.That(CaptureNonPersistentObjectIds(), Is.EquivalentTo(before));
         }
 
+        [Test]
+        public void ExistingSceneRebindLeaseRollbackRestoresBorrowedStateAndDestroysGeneratedResources()
+        {
+            (MmdModelDefinition model, _) = LoadFixturePair();
+            MmdUnityModelInstance? sceneInstance = null;
+            Mesh? borrowedMesh = null;
+            Mesh? generatedMesh = null;
+            Material? generatedMaterial = null;
+            SkinnedMeshRenderer? renderer = null;
+            Material[] originalMaterials = Array.Empty<Material>();
+            Transform[] originalBones = Array.Empty<Transform>();
+            Transform? originalRootBone = null;
+            Bounds originalLocalBounds = default;
+            Vector3 originalBonePosition = default;
+            Quaternion originalBoneRotation = default;
+            Vector3 originalBoneScale = default;
+            HashSet<int>? before = null;
+            MmdExistingSceneRebindLease? lease = null;
+
+            try
+            {
+                sceneInstance = MmdUnityModelFactory.CreateSkinnedModel(model);
+                renderer = sceneInstance.SkinnedMeshRenderer!;
+                originalMaterials = renderer.sharedMaterials;
+                originalBones = renderer.bones;
+                borrowedMesh = new Mesh { name = "borrowed-empty-mesh" };
+                renderer.sharedMesh = borrowedMesh;
+
+                Transform bone = originalBones[0];
+                bone.localPosition = new Vector3(1.0f, 2.0f, 3.0f);
+                bone.localRotation = Quaternion.Euler(10.0f, 20.0f, 30.0f);
+                bone.localScale = new Vector3(1.2f, 0.8f, 1.1f);
+                originalBonePosition = bone.localPosition;
+                originalBoneRotation = bone.localRotation;
+                originalBoneScale = bone.localScale;
+                renderer.rootBone = null;
+                originalRootBone = renderer.rootBone;
+                renderer.localBounds = new Bounds(new Vector3(3.0f, 4.0f, 5.0f), new Vector3(6.0f, 7.0f, 8.0f));
+                originalLocalBounds = renderer.localBounds;
+
+                before = CaptureNonPersistentObjectIds();
+                lease = new MmdExistingSceneRebindLease(sceneInstance.Root);
+                generatedMesh = new Mesh { name = "generated-rebind-mesh" };
+                generatedMaterial = new Material(originalMaterials[0]) { name = "generated-rebind-material" };
+                renderer.sharedMesh = generatedMesh;
+                renderer.sharedMaterials = new[] { generatedMaterial };
+                renderer.rootBone = bone;
+                renderer.localBounds = new Bounds(Vector3.one, Vector3.one * 2.0f);
+                bone.localPosition = Vector3.zero;
+                bone.localRotation = Quaternion.identity;
+                bone.localScale = Vector3.one;
+                lease.AdoptGeneratedMesh(generatedMesh);
+                lease.AdoptGeneratedMaterials(new[] { generatedMaterial });
+
+                lease.RollbackFactoryFailure();
+                lease = null;
+
+                Assert.That(renderer.sharedMesh, Is.SameAs(borrowedMesh));
+                Assert.That(renderer.sharedMaterials, Is.EqualTo(originalMaterials));
+                Assert.That(renderer.rootBone, Is.SameAs(originalRootBone));
+                Assert.That(renderer.localBounds, Is.EqualTo(originalLocalBounds));
+                Assert.That(bone.localPosition, Is.EqualTo(originalBonePosition));
+                Assert.That(Quaternion.Angle(bone.localRotation, originalBoneRotation), Is.LessThan(0.0001f));
+                Assert.That(bone.localScale, Is.EqualTo(originalBoneScale));
+                Assert.That(generatedMesh == null, Is.True);
+                Assert.That(generatedMaterial == null, Is.True);
+                Assert.That(CaptureNonPersistentObjectIds(), Is.EquivalentTo(before));
+            }
+            finally
+            {
+                lease?.Dispose();
+                if (renderer != null)
+                {
+                    renderer.sharedMesh = borrowedMesh;
+                    renderer.sharedMaterials = originalMaterials;
+                    renderer.bones = originalBones;
+                    renderer.rootBone = originalRootBone;
+                    renderer.localBounds = originalLocalBounds;
+                    if (originalBones.Length > 0 && originalBones[0] != null)
+                    {
+                        originalBones[0].localPosition = originalBonePosition;
+                        originalBones[0].localRotation = originalBoneRotation;
+                        originalBones[0].localScale = originalBoneScale;
+                    }
+                }
+
+                DestroyCreatedMeshesAndMaterials(before);
+                Object.DestroyImmediate(borrowedMesh);
+                MmdTestInstanceScope.DestroyInstance(sceneInstance);
+            }
+        }
+
+        [Test]
+        public void ExistingSceneBindingDisposeRestoresBorrowedStateAndDestroysGeneratedResources()
+        {
+            (MmdModelDefinition model, MmdMotionDefinition motion) = LoadFixturePair();
+            MmdUnityModelInstance? sceneInstance = null;
+            MmdPmxAsset? modelAsset = null;
+            MmdVmdAsset? motionAsset = null;
+            MmdMaterialOverrideAsset? overrideAsset = null;
+            MmdUnityPlaybackBinding? binding = null;
+            Mesh? borrowedMesh = null;
+            SkinnedMeshRenderer? renderer = null;
+            Material[] originalMaterials = Array.Empty<Material>();
+            Transform[] originalBones = Array.Empty<Transform>();
+            Transform? originalRootBone = null;
+            Bounds originalLocalBounds = default;
+            Vector3 originalBonePosition = default;
+            Quaternion originalBoneRotation = default;
+            Vector3 originalBoneScale = default;
+            HashSet<int>? before = null;
+
+            try
+            {
+                sceneInstance = MmdUnityModelFactory.CreateSkinnedModel(model);
+                renderer = sceneInstance.SkinnedMeshRenderer!;
+                originalMaterials = renderer.sharedMaterials;
+                originalBones = renderer.bones;
+                borrowedMesh = new Mesh { name = "borrowed-empty-mesh" };
+                renderer.sharedMesh = borrowedMesh;
+
+                Transform bone = originalBones[0];
+                bone.localPosition = new Vector3(1.0f, 2.0f, 3.0f);
+                bone.localRotation = Quaternion.Euler(10.0f, 20.0f, 30.0f);
+                bone.localScale = new Vector3(1.2f, 0.8f, 1.1f);
+                originalBonePosition = bone.localPosition;
+                originalBoneRotation = bone.localRotation;
+                originalBoneScale = bone.localScale;
+                renderer.rootBone = null;
+                originalRootBone = renderer.rootBone;
+                renderer.localBounds = new Bounds(new Vector3(3.0f, 4.0f, 5.0f), new Vector3(6.0f, 7.0f, 8.0f));
+                originalLocalBounds = renderer.localBounds;
+
+                overrideAsset = CreateAlphaOverride();
+                byte[] modelBytes = MmdTestFixtures.ReadFixtureAssetBytes(ModelFixture);
+                modelAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                modelAsset.Initialize(
+                    modelBytes,
+                    ModelFixture,
+                    MmdTestFixtures.FixtureAssetPath(ModelFixture),
+                    importedMaterialOverrideAsset: overrideAsset);
+                motionAsset = CreateMotionAsset();
+                before = CaptureNonPersistentObjectIds();
+
+                binding = MmdUnityPlaybackBinding.CreateSkinnedFromExistingSceneModel(
+                    sceneInstance.Root,
+                    modelAsset,
+                    motionAsset,
+                    motion);
+                binding.SetPhysicsMode(MmdPhysicsMode.Off);
+                Mesh generatedMesh = renderer.sharedMesh!;
+                Material[] generatedMaterials = renderer.sharedMaterials;
+                Assert.That(generatedMesh, Is.Not.SameAs(borrowedMesh));
+                Assert.That(generatedMaterials[0], Is.Not.SameAs(originalMaterials[0]));
+
+                binding.Dispose();
+                binding = null;
+
+                Assert.That(renderer.sharedMesh, Is.SameAs(borrowedMesh));
+                Assert.That(renderer.sharedMaterials, Is.EqualTo(originalMaterials));
+                Assert.That(renderer.rootBone, Is.SameAs(originalRootBone));
+                Assert.That(renderer.localBounds, Is.EqualTo(originalLocalBounds));
+                Assert.That(bone.localPosition, Is.EqualTo(originalBonePosition));
+                Assert.That(Quaternion.Angle(bone.localRotation, originalBoneRotation), Is.LessThan(0.0001f));
+                Assert.That(bone.localScale, Is.EqualTo(originalBoneScale));
+                Assert.That(generatedMesh == null, Is.True);
+                Assert.That(generatedMaterials.All(material => material == null), Is.True);
+                Assert.That(CaptureNonPersistentObjectIds(), Is.EquivalentTo(before));
+            }
+            finally
+            {
+                binding?.Dispose();
+                if (renderer != null)
+                {
+                    renderer.sharedMesh = borrowedMesh;
+                    renderer.sharedMaterials = originalMaterials;
+                    renderer.bones = originalBones;
+                    renderer.rootBone = originalRootBone;
+                    renderer.localBounds = originalLocalBounds;
+                    if (originalBones.Length > 0 && originalBones[0] != null)
+                    {
+                        originalBones[0].localPosition = originalBonePosition;
+                        originalBones[0].localRotation = originalBoneRotation;
+                        originalBones[0].localScale = originalBoneScale;
+                    }
+                }
+
+                DestroyCreatedMeshesAndMaterials(before);
+                Object.DestroyImmediate(modelAsset);
+                Object.DestroyImmediate(motionAsset);
+                Object.DestroyImmediate(overrideAsset);
+                Object.DestroyImmediate(borrowedMesh);
+                MmdTestInstanceScope.DestroyInstance(sceneInstance);
+            }
+        }
+
         private static (MmdModelDefinition Model, MmdMotionDefinition Motion) LoadFixturePair()
         {
             var parser = new NativeMmdParser();
@@ -170,6 +366,43 @@ namespace Mmd.Tests
             var asset = ScriptableObject.CreateInstance<MmdVmdAsset>();
             asset.Initialize(bytes, MotionFixture, MmdTestFixtures.FixtureAssetPath(MotionFixture));
             return asset;
+        }
+
+        private static MmdMaterialOverrideAsset CreateAlphaOverride()
+        {
+            var asset = ScriptableObject.CreateInstance<MmdMaterialOverrideAsset>();
+            asset.entries = new[]
+            {
+                new MmdMaterialOverrideEntry
+                {
+                    materialIndex = 0,
+                    hasAlpha = true,
+                    alpha = 0.45f
+                }
+            };
+            return asset;
+        }
+
+        private static void DestroyCreatedMeshesAndMaterials(HashSet<int>? before)
+        {
+            if (before == null)
+            {
+                return;
+            }
+
+            DestroyCreatedObjects<Mesh>(before);
+            DestroyCreatedObjects<Material>(before);
+        }
+
+        private static void DestroyCreatedObjects<T>(HashSet<int> before) where T : Object
+        {
+            foreach (T value in Resources.FindObjectsOfTypeAll<T>())
+            {
+                if (!EditorUtility.IsPersistent(value) && !before.Contains(value.GetInstanceID()))
+                {
+                    Object.DestroyImmediate(value);
+                }
+            }
         }
 
         private static HashSet<int> CaptureNonPersistentObjectIds()
