@@ -118,16 +118,20 @@ namespace Mmd.Editor
             RunStage(VmdValidationStage, () => MmdMotionValidator.ThrowIfInvalid(motion));
 
             MmdUnityPlaybackBinding? binding = null;
+            MmdUnityModelInstance? placedInstance = null;
             try
             {
+                placedInstance = RunStage(
+                    UnityInstantiationStage,
+                    () => MmdUnityModelFactory.CreateSkinnedModel(model, fullPmxPath));
                 binding = RunStage(
                     UnityInstantiationStage,
-                    () => MmdUnityPlaybackBinding.CreateSkinned(
+                    () => MmdUnityPlaybackBinding.CreateSkinnedFromSuppliedInstance(
+                        placedInstance,
                         model,
                         motion,
                         fullPmxPath,
-                        fullVmdPath,
-                        fullPmxPath));
+                        fullVmdPath));
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 // Editor verification/diagnostics arbitrary-frame snapshot path: force physics Off locally.
                 // Normal controller default remains Live for forward PlayMode playback; Live cannot support
@@ -143,7 +147,14 @@ namespace Mmd.Editor
             }
             catch
             {
-                DestroyBinding(binding);
+                if (binding != null)
+                {
+                    DestroyBinding(binding);
+                }
+                else
+                {
+                    DestroyInstance(placedInstance);
+                }
                 throw;
             }
         }
@@ -340,6 +351,16 @@ namespace Mmd.Editor
 
             MmdUnityModelInstance instance = binding.Instance;
             binding.Dispose();
+            DestroyInstance(instance);
+        }
+
+        private static void DestroyInstance(MmdUnityModelInstance? instance)
+        {
+            if (instance == null)
+            {
+                return;
+            }
+
             if (instance.Root != null)
             {
                 UnityEngine.Object.DestroyImmediate(instance.Root);

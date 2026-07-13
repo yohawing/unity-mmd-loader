@@ -467,6 +467,19 @@ namespace Mmd.Tests
                 Assert.That(result.InitialSnapshot.frame.frame, Is.EqualTo(0));
                 Assert.That(result.Instance.VertexCount, Is.GreaterThan(0));
                 Assert.That(result.Motion.maxFrame, Is.GreaterThan(0));
+
+                GameObject sceneRoot = result.Instance.Root;
+                Mesh sceneMesh = result.Instance.Mesh;
+                result.Controller.ConfigureFromRuntimeImporterPaths(
+                    fullPmxPath,
+                    fullVmdPath,
+                    new MmdPlaybackConfig(30.0f, 0, playOnStart: false),
+                    allowRuntimeFallback: false);
+
+                Assert.That(sceneRoot != null, Is.True, "Reconfiguration must not destroy the authored Scene root.");
+                Assert.That(sceneMesh != null, Is.True, "Reconfiguration must preserve the authored Scene mesh.");
+                Assert.That(result.Controller.gameObject, Is.SameAs(sceneRoot));
+                Assert.That(result.Controller.IsConfigured, Is.True);
             }
             finally
             {

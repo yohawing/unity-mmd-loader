@@ -208,6 +208,42 @@ namespace Mmd.UnityIntegration
                 MmdUnityModelInstanceOwnership.Borrowed);
         }
 
+        internal static MmdUnityPlaybackBinding CreateSkinnedFromSuppliedInstance(
+            MmdUnityModelInstance instance,
+            MmdModelDefinition model,
+            MmdMotionDefinition motion,
+            string modelId,
+            string motionId)
+        {
+            if (instance == null)
+            {
+                throw new ArgumentNullException(nameof(instance));
+            }
+
+            if (model == null)
+            {
+                throw new ArgumentNullException(nameof(model));
+            }
+
+            if (motion == null)
+            {
+                throw new ArgumentNullException(nameof(motion));
+            }
+
+            MmdModelValidator.ThrowIfInvalid(model);
+            MmdMotionValidator.ThrowIfInvalid(motion);
+            string resolvedModelId = string.IsNullOrWhiteSpace(modelId) ? "PMX" : modelId;
+            string resolvedMotionId = string.IsNullOrWhiteSpace(motionId) ? "VMD" : motionId;
+            var session = new MmdRuntimeSession(model, motion, resolvedModelId, resolvedMotionId);
+            return new MmdUnityPlaybackBinding(
+                instance,
+                session,
+                model,
+                resolvedModelId,
+                resolvedMotionId,
+                MmdUnityModelInstanceOwnership.Borrowed);
+        }
+
         private static void ApplyMaterialOverrideToSuppliedInstance(
             MmdUnityModelInstance instance,
             MmdMaterialOverrideAsset? materialOverride,
