@@ -56,6 +56,11 @@ namespace Mmd.Editor
                     EditorGUIUtility.PingObject(setup);
                 }
 
+                if (GUILayout.Button("Create Generic AnimationClip..."))
+                {
+                    MmdGenericAnimationClipBakeWindow.Open(asset);
+                }
+
             }
 
             DrawMissingTextureActions(asset);
