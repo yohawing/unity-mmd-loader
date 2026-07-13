@@ -5,6 +5,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 using Mmd.Motion;
 using Mmd.Parser;
 using Mmd.Physics;
@@ -62,21 +64,51 @@ namespace Mmd.Tests
             string pmxMetaPath = pmxPath + ".meta";
             string timelinePath = Path.Combine(assetsRoot, "HumanoidSampleTimeline.playable");
             string scenePath = Path.Combine(assetsRoot, "HumanoidPlayback.unity");
+            string readmePath = Path.Combine(sampleRoot, "README.md");
+            string provenancePath = Path.Combine(sampleRoot, "ASSET_PROVENANCE.md");
 
             Assert.That(pmxPath, Does.Exist, "Humanoid sample PMX source");
             Assert.That(fbxPath, Does.Exist, "Humanoid sample FBX motion");
             Assert.That(timelinePath, Does.Exist, "Humanoid Timeline Asset");
             Assert.That(scenePath, Does.Exist, "ready-to-play Humanoid scene");
+            Assert.That(readmePath, Does.Exist, "sample usage and quality boundary");
+            Assert.That(provenancePath, Does.Exist, "redistribution provenance");
+            const string expectedFbxSha256 = "972E72E6AF8B0C7D32B4762EB7180395BCF6BAC03ADCF5BE27EA95AE8B655753";
+            using (SHA256 sha256 = SHA256.Create())
+            using (FileStream stream = File.OpenRead(fbxPath))
+            {
+                string actualHash = BitConverter.ToString(sha256.ComputeHash(stream)).Replace("-", string.Empty);
+                Assert.That(actualHash, Is.EqualTo(expectedFbxSha256), "provenance must identify the bundled FBX bytes");
+            }
+            string provenance = Regex.Replace(File.ReadAllText(provenancePath), @"\s+", " ");
+            Assert.That(provenance, Does.Contain(expectedFbxSha256));
+            Assert.That(provenance, Does.Contain("39.733-second"));
+            Assert.That(provenance, Does.Contain("only for conversion-contract checks"));
+            Assert.That(provenance, Does.Contain("not evidence of natural motion quality"));
+            string readme = Regex.Replace(File.ReadAllText(readmePath), @"\s+", " ");
+            Assert.That(readme, Does.Contain("39.7-second `TaisouMocap.fbx`"));
+            Assert.That(readme, Does.Contain("only for conversion-contract checks"));
+            Assert.That(readme, Does.Contain("not a natural-motion quality example"));
             Assert.That(File.ReadAllText(pmxMetaPath), Does.Contain("animationType: 2"),
                 "sample PMX importer metadata must request Humanoid");
             Assert.That(File.ReadAllText(fbxMetaPath), Does.Contain("animationType: 3"),
                 "sample FBX importer metadata must request Humanoid animation");
-            Assert.That(File.ReadAllText(timelinePath), Does.Contain("Taisou Mocap (FBX)"),
+            string timeline = File.ReadAllText(timelinePath);
+            Assert.That(timeline, Does.Contain("m_Duration: 39.73333740234375"),
+                "Timeline must retain the full practical motion duration");
+            Assert.That(timeline, Does.Contain("Taisou Mocap (FBX)"),
                 "Timeline must use the practical FBX motion rather than the short VMD fixture bake");
-            Assert.That(File.ReadAllText(timelinePath), Does.Not.Contain("proxyAnimator:"),
+            Assert.That(timeline, Does.Contain("guid: f63f3dd549969bd4c89c90a26054020c"),
+                "Timeline clip must reference TaisouMocap.fbx");
+            Assert.That(timeline, Does.Not.Contain("proxyAnimator:"),
                 "Humanoid Timeline clips must derive their Animator from the track-bound playback controller");
-            Assert.That(File.ReadAllText(scenePath), Does.Contain("Humanoid Timeline"),
+            string scene = File.ReadAllText(scenePath);
+            Assert.That(scene, Does.Contain("Humanoid Timeline"),
                 "scene must retain the Timeline director object");
+            Assert.That(scene, Does.Contain("m_PlayableAsset: {fileID: 11400000, guid: 14448a896038bd649a6f42098dcdb42d, type: 2}"),
+                "scene director must reference the bundled Timeline");
+            Assert.That(scene, Does.Contain("m_InitialState: 1"),
+                "ready-to-play Timeline must start automatically");
 
             var parser = new NativeMmdParser();
             MmdModelDefinition model = parser.LoadModel(File.ReadAllBytes(pmxPath));
