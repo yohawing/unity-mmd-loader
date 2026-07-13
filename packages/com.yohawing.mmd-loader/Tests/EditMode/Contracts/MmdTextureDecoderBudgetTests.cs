@@ -126,6 +126,57 @@ namespace Mmd.Tests
                 Does.Contain("ended before"));
         }
 
+        [Test]
+        public void OversizedJpegFrameIsRejectedBeforeUnityImageDecode()
+        {
+            byte[] jpeg = CreateJpegFrameHeader(MmdTextureDecodeBudget.DefaultMaxDimension + 1, 1);
+            ArgumentException error = Assert.Throws<ArgumentException>(() =>
+                MmdJpegHeaderValidator.Validate(jpeg, MmdTextureDecodeBudget.Default))!;
+            Assert.That(error.Message, Does.Contain("dimensions").And.Contain("decode budget"));
+        }
+
+        [Test]
+        public void ValidJpegStillLoadsAfterHeaderPreflight()
+        {
+            var source = new Texture2D(2, 3, TextureFormat.RGBA32, mipChain: false);
+            Texture2D? decoded = null;
+            try
+            {
+                source.SetPixels(new[]
+                {
+                    Color.red, Color.green,
+                    Color.blue, Color.white,
+                    Color.black, Color.yellow
+                });
+                source.Apply();
+                decoded = MmdRuntimeTextureResolver.DecodeTextureBytes(source.EncodeToJPG(), ".jpg", "jpeg-valid");
+                Assert.That(decoded, Is.Not.Null);
+                Assert.That(decoded!.width, Is.EqualTo(2));
+                Assert.That(decoded.height, Is.EqualTo(3));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(source);
+                if (decoded != null) UnityEngine.Object.DestroyImmediate(decoded);
+            }
+        }
+
+        [Test]
+        public void UnknownExtensionDoesNotFallThroughToUnityImageDecoder()
+        {
+            var source = new Texture2D(1, 1, TextureFormat.RGBA32, mipChain: false);
+            try
+            {
+                source.SetPixel(0, 0, Color.white);
+                source.Apply();
+                Assert.That(MmdRuntimeTextureResolver.DecodeTextureBytes(source.EncodeToPNG(), ".gif", "unknown"), Is.Null);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(source);
+            }
+        }
+
         private static MmdTextureDecodeBudget TinyBudget(int maxChunks) => new(
             maxInputBytes: 4096,
             maxDimension: 16,
@@ -202,6 +253,32 @@ namespace Mmd.Tests
             bytes[15] = (byte)(height >> 8);
             bytes[16] = bitsPerPixel;
             return bytes;
+        }
+
+        private static byte[] CreateJpegFrameHeader(int width, int height)
+        {
+            using var stream = new MemoryStream();
+            stream.WriteByte(0xff);
+            stream.WriteByte(0xd8);
+            stream.WriteByte(0xff);
+            stream.WriteByte(0xc0);
+            stream.WriteByte(0x00);
+            stream.WriteByte(0x11);
+            stream.WriteByte(8);
+            stream.WriteByte((byte)(height >> 8));
+            stream.WriteByte((byte)height);
+            stream.WriteByte((byte)(width >> 8));
+            stream.WriteByte((byte)width);
+            stream.WriteByte(3);
+            for (int component = 1; component <= 3; component++)
+            {
+                stream.WriteByte((byte)component);
+                stream.WriteByte(0x11);
+                stream.WriteByte(0);
+            }
+            stream.WriteByte(0xff);
+            stream.WriteByte(0xd9);
+            return stream.ToArray();
         }
 
         private static byte[] CreateZlib(byte[] data)

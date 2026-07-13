@@ -444,18 +444,24 @@ namespace Mmd.UnityIntegration
                 return MmdDdsDecoder.Decode(bytes, textureName);
             }
 
-            var texture = new Texture2D(2, 2, TextureFormat.RGBA32, mipChain: true)
+            if (string.Equals(extension, ".jpg", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(extension, ".jpeg", StringComparison.OrdinalIgnoreCase))
             {
-                name = textureName
-            };
+                MmdJpegHeaderValidator.Validate(bytes, MmdTextureDecodeBudget.Default);
+                var jpegTexture = new Texture2D(2, 2, TextureFormat.RGBA32, mipChain: true)
+                {
+                    name = textureName
+                };
+                if (jpegTexture.LoadImage(bytes, markNonReadable: false))
+                {
+                    return jpegTexture;
+                }
 
-            if (texture.LoadImage(bytes, markNonReadable: false))
-            {
-                return texture;
+                UnityEngine.Object.DestroyImmediate(jpegTexture);
+                return null;
             }
 
-            UnityEngine.Object.DestroyImmediate(texture);
-            return null;
+            throw new NotSupportedException($"Texture extension '{extension}' is not supported for runtime decode.");
         }
 
         private static bool IsBmp(byte[] bytes)
