@@ -268,14 +268,14 @@ namespace Mmd.Editor
                     try
                     {
                         decoded = MmdRuntimeTextureResolver.DecodeTextureBytes(
-                            File.ReadAllBytes(absolutePath),
+                            MmdTextureDecodeBudget.Default.ReadFileBytes(absolutePath),
                             Path.GetExtension(absolutePath),
                             Path.GetFileNameWithoutExtension(absolutePath));
                         return decoded != null
                             ? new TexturePixelData(decoded.GetPixels32(), decoded.width, decoded.height)
                             : null;
                     }
-                    catch (IOException)
+                    catch (Exception ex) when (ex is IOException || ex is ArgumentException)
                     {
                         return null;
                     }

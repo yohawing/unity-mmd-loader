@@ -84,13 +84,13 @@ namespace Mmd.Editor
                         diffuseAssetPath = resolvedAssetPath;
                         try
                         {
-                            byte[] texBytes = System.IO.File.ReadAllBytes(resolvedAssetPath);
+                            byte[] texBytes = MmdTextureDecodeBudget.Default.ReadFileBytes(resolvedAssetPath);
                             decodedAlphaTexture = MmdRuntimeTextureResolver.DecodeTextureBytes(
                                 texBytes,
                                 System.IO.Path.GetExtension(resolvedAssetPath),
                                 System.IO.Path.GetFileNameWithoutExtension(resolvedAssetPath));
                         }
-                        catch (System.IO.IOException)
+                        catch (System.Exception ex) when (ex is System.IO.IOException || ex is System.ArgumentException)
                         {
                             decodedAlphaTexture = null;
                         }

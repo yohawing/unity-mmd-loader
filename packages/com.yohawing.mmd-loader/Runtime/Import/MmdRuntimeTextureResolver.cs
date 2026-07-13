@@ -351,10 +351,10 @@ namespace Mmd.UnityIntegration
                 return null;
             }
 
-            byte[] bytes = File.ReadAllBytes(resolvedPath);
             Texture2D? texture;
             try
             {
+                byte[] bytes = MmdTextureDecodeBudget.Default.ReadFileBytes(resolvedPath);
                 texture = LoadTextureBytes(bytes, extension, Path.GetFileNameWithoutExtension(resolvedPath));
             }
             catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException)
