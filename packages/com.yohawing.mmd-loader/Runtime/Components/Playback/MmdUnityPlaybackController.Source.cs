@@ -53,18 +53,22 @@ namespace Mmd.UnityIntegration
             ConfigureMotionAsset(vmdAsset);
             MmdMotionDefinition motion = vmdAsset.LoadMotion();
             MmdMotionValidator.ThrowIfInvalid(motion);
-            if (TryCreateExistingSceneBinding(pmxAsset, vmdAsset, motion, out MmdUnityPlaybackBinding reboundBinding))
+            if (TryConfigureReboundAssetBinding(
+                pmxAsset,
+                vmdAsset,
+                motion,
+                reboundBinding => Configure(reboundBinding, config),
+                requireNativeClip: false,
+                applyStartFrame: null))
             {
-                Configure(reboundBinding, config);
-                TryEnableFastRuntimeFromAssetBytesForDefaultPlayback(pmxAsset, vmdAsset);
                 return;
             }
 
-            MmdUnityPlaybackBinding fallbackBinding = MmdUnityPlaybackBinding.CreateSkinned(pmxAsset, vmdAsset);
-            AttachRestoredRuntimeInstance(fallbackBinding.Instance);
-            Configure(fallbackBinding, config);
-            TryEnableFastRuntimeFromAssetBytesForDefaultPlayback(pmxAsset, vmdAsset);
-            HidePreviewRenderersIfFallbackVisible(fallbackBinding.Instance, ResolveAssetSourceId(pmxAsset));
+            ConfigureFallbackAssetBinding(
+                pmxAsset,
+                vmdAsset,
+                fallbackBinding => Configure(fallbackBinding, config),
+                applyStartFrame: null);
         }
 
         public void ConfigureFromRuntimeImporterPaths(
@@ -225,16 +229,14 @@ namespace Mmd.UnityIntegration
 
             if (providerPmxAsset != null)
             {
-                if (TryCreateExistingSceneBinding(providerPmxAsset, vmdAsset, motion, out MmdUnityPlaybackBinding reboundBinding))
+                if (TryConfigureReboundAssetBinding(
+                    providerPmxAsset,
+                    vmdAsset,
+                    motion,
+                    reboundBinding => Configure(reboundBinding, playbackFrameRate, playOnStart),
+                    requireNativeClip: !allowRuntimeFallback,
+                    applyStartFrame: startFrame))
                 {
-                    Configure(reboundBinding, playbackFrameRate, playOnStart);
-                    TryEnableFastRuntimeFromAssetBytesForDefaultPlayback(providerPmxAsset, vmdAsset);
-                    if (!allowRuntimeFallback)
-                    {
-                        ThrowIfTimelineNativeClipUnavailable();
-                    }
-
-                    ApplyFrame(startFrame);
                     return;
                 }
 
@@ -247,12 +249,11 @@ namespace Mmd.UnityIntegration
                         ResolveAssetSourceId(providerPmxAsset) + ").");
                 }
 
-                MmdUnityPlaybackBinding fallbackBinding = MmdUnityPlaybackBinding.CreateSkinned(providerPmxAsset, vmdAsset);
-                AttachRestoredRuntimeInstance(fallbackBinding.Instance);
-                Configure(fallbackBinding, playbackFrameRate, playOnStart);
-                TryEnableFastRuntimeFromAssetBytesForDefaultPlayback(providerPmxAsset, vmdAsset);
-                HidePreviewRenderersIfFallbackVisible(fallbackBinding.Instance, ResolveAssetSourceId(providerPmxAsset));
-                ApplyFrame(startFrame);
+                ConfigureFallbackAssetBinding(
+                    providerPmxAsset,
+                    vmdAsset,
+                    fallbackBinding => Configure(fallbackBinding, playbackFrameRate, playOnStart),
+                    applyStartFrame: startFrame);
                 return;
             }
 
@@ -362,16 +363,14 @@ namespace Mmd.UnityIntegration
                 : vmdAsset.CreateNativeClipMotionHeader();
             MmdMotionValidator.ThrowIfInvalid(motion);
 
-            if (TryCreateExistingSceneBinding(pmxAsset, vmdAsset, motion, out MmdUnityPlaybackBinding reboundBinding))
+            if (TryConfigureReboundAssetBinding(
+                pmxAsset,
+                vmdAsset,
+                motion,
+                reboundBinding => Configure(reboundBinding, playbackFrameRate, playOnStart),
+                requireNativeClip: !allowRuntimeFallback,
+                applyStartFrame: startFrame))
             {
-                Configure(reboundBinding, playbackFrameRate, playOnStart);
-                TryEnableFastRuntimeFromAssetBytesForDefaultPlayback(pmxAsset, vmdAsset);
-                if (!allowRuntimeFallback)
-                {
-                    ThrowIfTimelineNativeClipUnavailable();
-                }
-
-                ApplyFrame(startFrame);
                 return;
             }
 
@@ -385,12 +384,11 @@ namespace Mmd.UnityIntegration
             }
 
             // Fallback to runtime generation (explicit, consistent with ConfigureFromPlaybackSource / ConfigureMotionFromProviderModelSource).
-            MmdUnityPlaybackBinding assetBinding = MmdUnityPlaybackBinding.CreateSkinned(pmxAsset, vmdAsset);
-            AttachRestoredRuntimeInstance(assetBinding.Instance);
-            Configure(assetBinding, playbackFrameRate, playOnStart);
-            TryEnableFastRuntimeFromAssetBytesForDefaultPlayback(pmxAsset, vmdAsset);
-            HidePreviewRenderersIfFallbackVisible(assetBinding.Instance, ResolveAssetSourceId(pmxAsset));
-            ApplyFrame(startFrame);
+            ConfigureFallbackAssetBinding(
+                pmxAsset,
+                vmdAsset,
+                assetBinding => Configure(assetBinding, playbackFrameRate, playOnStart),
+                applyStartFrame: startFrame);
         }
 
         public bool ConfigureFromPlaybackSourceIfAvailable(bool allowRuntimeFallback = true)
@@ -453,6 +451,51 @@ namespace Mmd.UnityIntegration
 
             binding = null!;
             return false;
+        }
+
+        private bool TryConfigureReboundAssetBinding(
+            MmdPmxAsset pmxAsset,
+            MmdVmdAsset vmdAsset,
+            MmdMotionDefinition motion,
+            Action<MmdUnityPlaybackBinding> configure,
+            bool requireNativeClip,
+            int? applyStartFrame)
+        {
+            if (!TryCreateExistingSceneBinding(pmxAsset, vmdAsset, motion, out MmdUnityPlaybackBinding reboundBinding))
+            {
+                return false;
+            }
+
+            configure(reboundBinding);
+            TryEnableFastRuntimeFromAssetBytesForDefaultPlayback(pmxAsset, vmdAsset);
+            if (requireNativeClip)
+            {
+                ThrowIfTimelineNativeClipUnavailable();
+            }
+
+            if (applyStartFrame.HasValue)
+            {
+                ApplyFrame(applyStartFrame.Value);
+            }
+
+            return true;
+        }
+
+        private void ConfigureFallbackAssetBinding(
+            MmdPmxAsset pmxAsset,
+            MmdVmdAsset vmdAsset,
+            Action<MmdUnityPlaybackBinding> configure,
+            int? applyStartFrame)
+        {
+            MmdUnityPlaybackBinding fallbackBinding = MmdUnityPlaybackBinding.CreateSkinned(pmxAsset, vmdAsset);
+            AttachRestoredRuntimeInstance(fallbackBinding.Instance);
+            configure(fallbackBinding);
+            TryEnableFastRuntimeFromAssetBytesForDefaultPlayback(pmxAsset, vmdAsset);
+            HidePreviewRenderersIfFallbackVisible(fallbackBinding.Instance, ResolveAssetSourceId(pmxAsset));
+            if (applyStartFrame.HasValue)
+            {
+                ApplyFrame(applyStartFrame.Value);
+            }
         }
 
         private void ThrowIfTimelineNativeClipUnavailable()
