@@ -189,7 +189,8 @@ namespace Mmd.Tests
             Assert.That(instance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
 
             Assert.That(ReadMaterialFloat(instance.Materials[1], "_Cull"), Is.EqualTo((float)UnityEngine.Rendering.CullMode.Back).Within(0.00001f));
-            Assert.That(ReadMaterialFloat(instance.Materials[1], "_OutlineVisible"), Is.EqualTo(0.0f).Within(0.00001f));
+            // Body sidedness must not override the independent PMX draw-edge flag.
+            Assert.That(ReadMaterialFloat(instance.Materials[1], "_OutlineVisible"), Is.EqualTo(1.0f).Within(0.00001f));
             Assert.That(instance.MaterialBindingDiagnostics[1].cull, Is.EqualTo((float)UnityEngine.Rendering.CullMode.Back).Within(0.00001f));
             Assert.That(instance.MaterialBindingDiagnostics[1].cullingPolicy, Is.EqualTo("backface-culling"));
             Assert.That(instance.Materials[1].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent + 1));

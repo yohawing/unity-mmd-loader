@@ -424,7 +424,7 @@ namespace Mmd.Tests
             }
         }
         [Test]
-        public void PmxScriptedImporterVersionIsTwentyFiveForPbrTextureScanPolicy()
+        public void PmxScriptedImporterVersionIsTwentySixForOutlineMaterialPolicy()
         {
             object[] attributes = typeof(MmdPmxScriptedImporter).GetCustomAttributes(
                 typeof(ScriptedImporterAttribute),
@@ -432,8 +432,8 @@ namespace Mmd.Tests
 
             Assert.That(attributes, Has.Length.EqualTo(1));
             var attribute = (ScriptedImporterAttribute)attributes[0];
-            Assert.That(attribute.version, Is.EqualTo(25),
-                "PMX importer version must force reimport for URP Lit PBR texture convention scan outputs and dependencies.");
+            Assert.That(attribute.version, Is.EqualTo(26),
+                "PMX importer version must force reimport for outline material policy changes.");
         }
         [Test]
         public void PmxImporterImportScaleZeroDotOneFlowsToAssetInstanceAndScalesMeshBounds()

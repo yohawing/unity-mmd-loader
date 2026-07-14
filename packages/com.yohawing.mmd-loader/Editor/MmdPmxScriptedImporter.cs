@@ -42,7 +42,7 @@ namespace Mmd.Editor
         UrpLit = 1
     }
 
-    [ScriptedImporter(25, "pmx")]
+    [ScriptedImporter(26, "pmx")]
     public sealed class MmdPmxScriptedImporter : ScriptedImporter
     {
         [SerializeField] private float importScale = MmdPmxAsset.DefaultImportScale;
