@@ -29,8 +29,6 @@ namespace Mmd.Editor
             MmdAssetInspectorUtility.DrawImportScaleSummary(asset.ImportScale);
             MmdAssetInspectorUtility.DrawImportSettingsSummary(
                 asset.ModelPreset,
-                asset.MeshGenerationMode,
-                asset.MaterialTexturePolicy,
                 asset.ShaderPreset);
             MmdAssetInspectorUtility.DrawModelSummary(asset);
             MmdAssetInspectorUtility.DrawParseSummary(asset);

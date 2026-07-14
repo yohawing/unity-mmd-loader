@@ -71,8 +71,6 @@ namespace Mmd.Tests
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
 
             Assert.That(pmxAsset.ModelPreset, Is.EqualTo(nameof(MmdPmxModelPreset.Stage)));
-            Assert.That(pmxAsset.MeshGenerationMode, Is.EqualTo(nameof(MmdPmxMeshGenerationMode.SingleMesh)));
-            Assert.That(pmxAsset.MaterialTexturePolicy, Is.EqualTo(nameof(MmdPmxMaterialTexturePolicy.ResolveReferencesOnly)));
             Assert.That(pmxAsset.AnimationType, Is.EqualTo(nameof(MmdPmxAnimationType.Generic)));
             Assert.That(pmxAsset.ShaderPreset, Is.EqualTo(nameof(MmdPmxShaderPreset.MmdBasicUrpToon)));
             Assert.That(pmxAsset.ImportedAvatar, Is.Null);
@@ -151,8 +149,6 @@ namespace Mmd.Tests
             var serializedImporter = new SerializedObject(importer!);
             serializedImporter.FindProperty("importScale").floatValue = 2.5f;
             serializedImporter.FindProperty("modelPreset").enumValueIndex = (int)MmdPmxModelPreset.Stage;
-            serializedImporter.FindProperty("meshGenerationMode").enumValueIndex = (int)MmdPmxMeshGenerationMode.SplitByMaterial;
-            serializedImporter.FindProperty("materialTexturePolicy").enumValueIndex = (int)MmdPmxMaterialTexturePolicy.ResolveReferencesOnly;
             serializedImporter.FindProperty("animationType").enumValueIndex = (int)MmdPmxAnimationType.Humanoid;
             serializedImporter.FindProperty("shaderPreset").enumValueIndex = (int)MmdPmxShaderPreset.MmdBasicUrpToon;
             serializedImporter.ApplyModifiedPropertiesWithoutUndo();
@@ -162,8 +158,6 @@ namespace Mmd.Tests
 
             Assert.That(pmxAsset.ImportScale, Is.EqualTo(2.5f).Within(0.0001f));
             Assert.That(pmxAsset.ModelPreset, Is.EqualTo(nameof(MmdPmxModelPreset.Stage)));
-            Assert.That(pmxAsset.MeshGenerationMode, Is.EqualTo(nameof(MmdPmxMeshGenerationMode.SplitByMaterial)));
-            Assert.That(pmxAsset.MaterialTexturePolicy, Is.EqualTo(nameof(MmdPmxMaterialTexturePolicy.ResolveReferencesOnly)));
             Assert.That(pmxAsset.AnimationType, Is.EqualTo(nameof(MmdPmxAnimationType.Humanoid)));
             Assert.That(pmxAsset.ShaderPreset, Is.EqualTo(nameof(MmdPmxShaderPreset.MmdBasicUrpToon)));
             Assert.That(pmxAsset.HumanoidAvatarReadiness, Is.Not.EqualTo("NotRequested"));

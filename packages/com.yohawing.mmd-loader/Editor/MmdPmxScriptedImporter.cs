@@ -48,8 +48,11 @@ namespace Mmd.Editor
         [SerializeField] private float importScale = MmdPmxAsset.DefaultImportScale;
         [SerializeField] private MmdPmxModelPreset modelPreset = MmdPmxModelPreset.Custom;
         [SerializeField] private bool modelPresetAutoAssigned;
-        [SerializeField] private MmdPmxMeshGenerationMode meshGenerationMode = MmdPmxMeshGenerationMode.SingleMesh;
-        [SerializeField] private MmdPmxMaterialTexturePolicy materialTexturePolicy = MmdPmxMaterialTexturePolicy.ResolveReferencesOnly;
+        // Migration-only fields retained so existing .pmx.meta files still deserialize cleanly.
+#pragma warning disable CS0414
+        [SerializeField, HideInInspector] private MmdPmxMeshGenerationMode meshGenerationMode = MmdPmxMeshGenerationMode.SingleMesh;
+        [SerializeField, HideInInspector] private MmdPmxMaterialTexturePolicy materialTexturePolicy = MmdPmxMaterialTexturePolicy.ResolveReferencesOnly;
+#pragma warning restore CS0414
         [SerializeField] private MmdPmxAnimationType animationType = MmdPmxAnimationType.Generic;
         [SerializeField] private MmdPmxShaderPreset shaderPreset = MmdPmxShaderPreset.MmdBasicUrpToon;
         [SerializeField] private MmdMaterialOverrideAsset? materialOverrideAsset;
@@ -69,9 +72,11 @@ namespace Mmd.Editor
 
         public MmdPmxModelPreset ModelPreset => modelPreset;
 
-        public MmdPmxMeshGenerationMode MeshGenerationMode => meshGenerationMode;
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public MmdPmxMeshGenerationMode MeshGenerationMode => MmdPmxMeshGenerationMode.SingleMesh;
 
-        public MmdPmxMaterialTexturePolicy MaterialTexturePolicy => materialTexturePolicy;
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public MmdPmxMaterialTexturePolicy MaterialTexturePolicy => MmdPmxMaterialTexturePolicy.ResolveReferencesOnly;
 
         public MmdPmxAnimationType AnimationType => animationType;
 
@@ -153,8 +158,6 @@ namespace Mmd.Editor
                 resolvedSourcePath,
                 ImportScale,
                 effectiveModelPreset.ToString(),
-                meshGenerationMode.ToString(),
-                materialTexturePolicy.ToString(),
                 shaderPreset.ToString(),
                 parseSummary,
                 generatedAssets,

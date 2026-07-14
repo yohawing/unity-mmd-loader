@@ -36,15 +36,11 @@ namespace Mmd.Editor
 
         public static void DrawImportSettingsSummary(
             string modelPreset,
-            string meshGenerationMode,
-            string materialTexturePolicy,
             string shaderPreset)
         {
             using (new EditorGUI.DisabledScope(true))
             {
                 EditorGUILayout.TextField("Model Preset (Summary)", modelPreset);
-                EditorGUILayout.TextField("Mesh Generation (Summary)", meshGenerationMode);
-                EditorGUILayout.TextField("Texture Policy (Summary)", materialTexturePolicy);
                 EditorGUILayout.TextField("Shader Preset (Summary)", shaderPreset);
             }
         }

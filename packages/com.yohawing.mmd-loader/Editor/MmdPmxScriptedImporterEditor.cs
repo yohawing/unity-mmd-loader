@@ -12,7 +12,6 @@ namespace Mmd.Editor
     {
         private SerializedProperty? importScaleProperty;
         private SerializedProperty? modelPresetProperty;
-        private SerializedProperty? materialTexturePolicyProperty;
         private SerializedProperty? shaderPresetProperty;
         private SerializedProperty? materialOverrideAssetProperty;
         private SerializedProperty? materialRemapsProperty;
@@ -42,7 +41,6 @@ namespace Mmd.Editor
             base.OnEnable();
             importScaleProperty = serializedObject.FindProperty("importScale");
             modelPresetProperty = serializedObject.FindProperty("modelPreset");
-            materialTexturePolicyProperty = serializedObject.FindProperty("materialTexturePolicy");
             shaderPresetProperty = serializedObject.FindProperty("shaderPreset");
             materialOverrideAssetProperty = serializedObject.FindProperty("materialOverrideAsset");
             materialRemapsProperty = serializedObject.FindProperty("materialRemaps");
