@@ -9,9 +9,35 @@ namespace Mmd.Native
     {
         internal const string LibraryName = "mmd_runtime_ffi";
         internal const uint ExpectedAbiVersion = 2;
+        internal const uint FeatureSplitPhysicsEvaluation = 1u << 0;
+        internal const uint FeaturePhysicsBulletNative = 1u << 1;
+        internal const uint PhysicsModeLive = 2;
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct PhysicsStepStats
+        {
+            internal float inputDtSeconds;
+            internal float clampedDtSeconds;
+            internal uint substeps;
+            internal float accumulatorSeconds;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct PhysicsWorldStepReport
+        {
+            internal PhysicsStepStats tick;
+            internal IntPtr kinematicRigidbodiesFed;
+            internal IntPtr bonesWrittenBack;
+        }
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_abi_version", CallingConvention = CallingConvention.Cdecl)]
         internal static extern uint AbiVersion();
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_feature_flags", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern uint FeatureFlags();
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_last_error_message", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr LastErrorMessage();
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_model_create_from_pmx_bytes", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr ModelCreateFromPmxBytes(byte[] data, IntPtr len);
@@ -78,6 +104,34 @@ namespace Mmd.Native
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_free", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void InstanceFree(IntPtr instance);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_set_physics_mode", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int InstanceSetPhysicsMode(IntPtr instance, uint mode);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_physics_world_create_from_pmx_bytes", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int PhysicsWorldCreateFromPmxBytes(byte[] data, IntPtr len, out IntPtr world);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_physics_world_free", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void PhysicsWorldFree(IntPtr world);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_physics_world_reset", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int PhysicsWorldReset(IntPtr world, IntPtr instance, out IntPtr seededRigidbodyCount);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_evaluate_clip_frame_before_physics", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int InstanceEvaluateClipFrameBeforePhysics(IntPtr instance, IntPtr clip, float frame);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_physics_world_step_runtime", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int PhysicsWorldStepRuntime(
+            IntPtr world,
+            IntPtr instance,
+            float deltaTime,
+            out PhysicsWorldStepReport outReport);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_physics_world_rigidbody_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int PhysicsWorldRigidbodyCount(IntPtr world, out IntPtr rigidbodyCount);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_physics_world_copy_rigidbody_states", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int PhysicsWorldCopyRigidbodyStates(IntPtr world, [Out] float[] outTransformsF32, IntPtr outTransformsF32Len);
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_evaluate_clip_frame", CallingConvention = CallingConvention.Cdecl)]
         internal static extern byte InstanceEvaluateClipFrame(IntPtr instance, IntPtr clip, float frame);

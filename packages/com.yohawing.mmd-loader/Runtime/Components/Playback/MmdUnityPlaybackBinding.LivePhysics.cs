@@ -72,7 +72,7 @@ namespace Mmd.UnityIntegration
 
             var totalWatch = Stopwatch.StartNew();
             var stageWatch = Stopwatch.StartNew();
-            BulletMmdPhysicsBackend backend = EnsureLivePhysicsBackend();
+            IMmdLivePhysicsBackend backend = EnsureLivePhysicsBackend(preferNativeAnimationClip: false);
             double ensureBackendMs = stageWatch.Elapsed.TotalMilliseconds;
             stageWatch.Restart();
             MmdLivePhysicsFrameDiagnostics diagnostics = StepLivePhysicsCore(
@@ -135,7 +135,7 @@ namespace Mmd.UnityIntegration
 
             var totalWatch = Stopwatch.StartNew();
             var stageWatch = Stopwatch.StartNew();
-            BulletMmdPhysicsBackend backend = EnsureLivePhysicsBackend();
+            IMmdLivePhysicsBackend backend = EnsureLivePhysicsBackend(preferNativeAnimationClip: true);
             double ensureBackendMs = stageWatch.Elapsed.TotalMilliseconds;
             stageWatch.Restart();
             float time = MmdPlaybackTime.ToTime(frame, frameRate);
@@ -182,7 +182,7 @@ namespace Mmd.UnityIntegration
         }
 
         private MmdLivePhysicsFrameDiagnostics StepLivePhysicsCore(
-            BulletMmdPhysicsBackend backend,
+            IMmdLivePhysicsBackend backend,
             int sequenceFrame,
             bool resetSeed,
             float deltaTime,
@@ -194,6 +194,7 @@ namespace Mmd.UnityIntegration
             out double refreshSnapshotFrameMs)
         {
             var stageWatch = Stopwatch.StartNew();
+            backend.SetAnimationFrame(sequenceFrame);
             MmdLivePhysicsPinnedBodyDiagnostics pinnedBodyDiagnostics;
             double syncBoneDrivenBodiesMs;
             double stepPhysicsMs;
@@ -231,6 +232,7 @@ namespace Mmd.UnityIntegration
             lastLivePhysicsDiagnostics = new MmdLivePhysicsFrameDiagnostics
             {
                 frame = sequenceFrame,
+                backendName = backend.Name,
                 deltaTime = deltaTime,
                 totalMs = totalWatch.Elapsed.TotalMilliseconds,
                 ensureBackendMs = ensureBackendMs,
@@ -320,18 +322,62 @@ namespace Mmd.UnityIntegration
             }
         }
 
-        private BulletMmdPhysicsBackend EnsureLivePhysicsBackend()
+        private IMmdLivePhysicsBackend EnsureLivePhysicsBackend(bool preferNativeAnimationClip)
         {
-            if (livePhysicsBackend != null)
+            bool hasNativeAnimationBackend = livePhysicsBackend is MmdAnimPhysicsBackend;
+            if (livePhysicsBackend != null && (preferNativeAnimationClip || !hasNativeAnimationBackend))
             {
                 return livePhysicsBackend;
             }
 
-            var backend = new BulletMmdPhysicsBackend(modelId, motionId);
-            backend.InitializeWorld(model);
-            backend.Reset();
-            livePhysicsBackend = backend;
-            return backend;
+            if (livePhysicsBackend != null)
+            {
+                livePhysicsBackend.Dispose();
+                livePhysicsBackend = null;
+                lastLiveFrame = -1;
+                lastLiveSnapshot = null;
+                lastLivePhysicsDiagnostics = null;
+            }
+
+            if (preferNativeAnimationClip &&
+                MmdAnimPhysicsBackend.TryCreate(
+                    model.sourceBytes,
+                    session.MotionSourceBytes,
+                    modelId,
+                    motionId,
+                    out MmdAnimPhysicsBackend? nativeBackend,
+                    out _))
+            {
+                try
+                {
+                    nativeBackend!.InitializeWorld(model);
+                    nativeBackend.Reset();
+                    livePhysicsBackend = nativeBackend;
+                    return nativeBackend;
+                }
+                catch (MmdPhysicsBackendException)
+                {
+                    nativeBackend?.Dispose();
+                }
+                catch (DllNotFoundException)
+                {
+                    nativeBackend?.Dispose();
+                }
+                catch (EntryPointNotFoundException)
+                {
+                    nativeBackend?.Dispose();
+                }
+                catch (BadImageFormatException)
+                {
+                    nativeBackend?.Dispose();
+                }
+            }
+
+            var fallback = new MmdLegacyBulletPhysicsBackendAdapter(modelId, motionId);
+            fallback.InitializeWorld(model);
+            fallback.Reset();
+            livePhysicsBackend = fallback;
+            return fallback;
         }
 
         // saba PMXModel::ResetPhysics settles the bodies at the current pose over a SINGLE short fixed step
@@ -359,7 +405,7 @@ namespace Mmd.UnityIntegration
         /// bind while the model is animated far away (the reported "揺れ骨が BindPose の場所に戻る" bug).
         /// </summary>
         private MmdLivePhysicsPinnedBodyDiagnostics SeedLivePhysics(
-            BulletMmdPhysicsBackend backend, int frame)
+            IMmdLivePhysicsBackend backend, int frame)
         {
             // 1. saba MMDRigidBody::ResetTransform: place EVERY body (including pure-dynamic mode-1) at its
             //    current bone-derived model-space pose, overriding the origin-bind that native Reset() set.
@@ -383,7 +429,7 @@ namespace Mmd.UnityIntegration
         }
 
         private MmdLivePhysicsPinnedBodyDiagnostics SyncBoneDrivenPhysicsBodies(
-            BulletMmdPhysicsBackend backend,
+            IMmdLivePhysicsBackend backend,
             bool includeDynamicBodies)
         {
             Transform root = playbackInstance.Root.transform;
@@ -464,7 +510,7 @@ namespace Mmd.UnityIntegration
             return diagnostics;
         }
 
-        private void ApplyPhysicsBodyTransforms(BulletMmdPhysicsBackend backend)
+        private void ApplyPhysicsBodyTransforms(IMmdLivePhysicsBackend backend)
         {
             float importScale = NormalizeImportScale(playbackInstance.ImportScale);
             for (int i = 0; i < model.physics.rigidbodies.Count; i++)
@@ -497,7 +543,7 @@ namespace Mmd.UnityIntegration
             }
         }
 
-        private void ApplyPhysicsBodyDebugTransforms(BulletMmdPhysicsBackend backend)
+        private void ApplyPhysicsBodyDebugTransforms(IMmdLivePhysicsBackend backend)
         {
             Dictionary<int, MmdUnityPhysicsBody> physicsBodiesByIndex = BuildPhysicsBodyIndexMap();
             if (physicsBodiesByIndex.Count == 0)
@@ -523,7 +569,7 @@ namespace Mmd.UnityIntegration
             }
         }
 
-        private MmdLivePhysicsBodyDiagnostics[] BuildBodyDiagnostics(BulletMmdPhysicsBackend backend)
+        private MmdLivePhysicsBodyDiagnostics[] BuildBodyDiagnostics(IMmdLivePhysicsBackend backend)
         {
             Transform root = playbackInstance.Root.transform;
             float importScale = NormalizeImportScale(playbackInstance.ImportScale);

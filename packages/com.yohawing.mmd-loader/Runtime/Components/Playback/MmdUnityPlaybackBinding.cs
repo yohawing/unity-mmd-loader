@@ -26,7 +26,7 @@ namespace Mmd.UnityIntegration
         private readonly MmdModelDefinition model;
         private readonly string modelId;
         private readonly string motionId;
-        private BulletMmdPhysicsBackend? livePhysicsBackend;
+        private IMmdLivePhysicsBackend? livePhysicsBackend;
         private int lastLiveFrame = -1;
         // Tracks the last frame seen by forward Timeline playback so a backward jump (scrub/seek) can be
         // distinguished from continuous forward play. Persists across ResetLivePhysics during a scrub so

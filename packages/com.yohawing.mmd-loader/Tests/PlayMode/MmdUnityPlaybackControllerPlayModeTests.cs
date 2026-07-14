@@ -554,6 +554,8 @@ namespace Mmd.Tests
                 Assert.That(controller.CurrentFrame, Is.EqualTo(0));
                 Assert.That(binding.LastLivePhysicsDiagnostics, Is.Not.Null);
                 Assert.That(binding.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(0));
+                Assert.That(binding.LastLivePhysicsDiagnostics.backendName, Is.EqualTo("mmd-anim-bullet-native"),
+                    "The migration fixture must exercise the mmd-anim Bullet host backend, not the legacy fallback.");
                 Assert.That(binding.LastLivePhysicsDiagnostics.stepPhysicsMs, Is.GreaterThanOrEqualTo(0.0));
                 Assert.That(binding.LastLivePhysicsDiagnostics.pinnedBodies.pinnedBodyCount, Is.GreaterThan(0));
                 Assert.That(binding.LastLivePhysicsDiagnostics.pinnedBodies.dynamicOrientationPinnedBodyCount, Is.GreaterThan(0),
