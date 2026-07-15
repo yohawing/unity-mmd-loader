@@ -365,27 +365,26 @@ namespace Mmd.Tests
         // --- VMD Inspector readiness helpers (cache-only, no LoadMotion, no global Selection) ---
 
         [Test]
-        public void ComputeHumanoidClipReadinessForVmd_MissingPmxAndSetup_ReturnsNotReadyWithActionableDiags()
+        public void ComputeHumanoidClipReadinessForVmd_MissingPmx_ReturnsNotReadyWithActionableDiags()
         {
             MmdVmdAsset vmd = ScriptableObject.CreateInstance<MmdVmdAsset>();
             try
             {
-                // Valid cache but missing pmx/setup -> planner reports nulls, UI helper surfaces short diags.
+                // Valid cache but missing PMX -> planner reports the actionable missing input.
                 byte[] bytes = new byte[] { 0x10 };
                 var summary = new MmdVmdParseSummary("t", 100, 10, 0, 0, 0, 0, 0, 0);
                 vmd.Initialize(bytes, "t.vmd", "t.vmd", summary, System.Array.Empty<string>());
 
                 MmdHumanoidClipConversionPlan plan =
-                    MmdAssetInspectorUtility.ComputeHumanoidClipReadinessForVmd(vmd, pmxAsset: null, setupAsset: null);
+                    MmdAssetInspectorUtility.ComputeHumanoidClipReadinessForVmd(vmd, pmxAsset: null);
 
                 Assert.That(plan.PrerequisitesReady, Is.False);
                 Assert.That(plan.CanCreateClipNow, Is.False);
                 string joined = string.Join("\n", plan.Diagnostics);
-                Assert.That(joined, Does.Contain("pmx asset is null").Or.Contain("humanoid setup asset is null"));
+                Assert.That(joined, Does.Contain("pmx asset is null"));
 
                 string compact = MmdAssetInspectorUtility.FormatCompactHumanoidClipConversionIssues(plan);
                 Assert.That(compact, Does.Contain("pmx asset is null"));
-                Assert.That(compact, Does.Contain("humanoid setup asset is null"));
             }
             finally
             {
@@ -393,117 +392,5 @@ namespace Mmd.Tests
             }
         }
 
-        [Test]
-        public void ComputeAndFormatVmdHumanoidReadiness_ReadySyntheticInputs_SucceedsWithoutLoadMotion()
-        {
-            MmdVmdAsset vmd = ScriptableObject.CreateInstance<MmdVmdAsset>();
-            MmdPmxAsset pmx = null!;
-            MmdHumanoidSetupAsset setup = ScriptableObject.CreateInstance<MmdHumanoidSetupAsset>();
-            var owned = new List<UnityEngine.Object> { vmd, setup };
-            GameObject? root = null;
-            Mesh? mesh = null;
-
-            try
-            {
-                // Garbage bytes + good injected cache for VMD (proves no LoadMotion attempted in readiness path).
-                byte[] garbage = new byte[] { 0xDE, 0xAD };
-                var goodVmdSummary = new MmdVmdParseSummary("synth-vmd", 77, 33, 2, 1, 0, 0, 0, 0);
-                vmd.Initialize(garbage, "synth.vmd", "synth.vmd", goodVmdSummary, System.Array.Empty<string>());
-
-                CreateSyntheticReadyPmxAndSetup(out pmx, setup, out root, out mesh, owned);
-
-                // Call the inspector-facing helper (testable, no IMGUI, delegates to planner cache path).
-                int clipCountBefore = AssetDatabase.FindAssets("t:AnimationClip").Length;
-
-                MmdHumanoidClipConversionPlan plan =
-                    MmdAssetInspectorUtility.ComputeHumanoidClipReadinessForVmd(vmd, pmx, setup);
-
-                int clipCountAfterFirst = AssetDatabase.FindAssets("t:AnimationClip").Length;
-                Assert.That(clipCountAfterFirst, Is.EqualTo(clipCountBefore),
-                    "VMD Inspector readiness preview (ComputeHumanoidClipReadinessForVmd) must not create AnimationClip assets.");
-
-                Assert.That(plan.PrerequisitesReady, Is.True);
-                Assert.That(plan.CanCreateClipNow, Is.True);
-                Assert.That(plan.Readiness, Is.EqualTo(MmdHumanoidClipConversionPlanner.ReadyReadiness));
-                Assert.That(plan.VmdMaxFrame, Is.EqualTo(77));
-                Assert.That(plan.VmdBoneKeyframeCount, Is.EqualTo(33));
-
-                string issues = MmdAssetInspectorUtility.FormatCompactVmdHumanoidIssues(plan);
-                Assert.That(issues, Is.Empty, "Ready plan must format to no issues string.");
-                Assert.That(
-                    MmdAssetInspectorUtility.FormatCompactHumanoidClipConversionIssues(plan),
-                    Is.Empty,
-                    "Ready plan must format to no issues string on the setup asset Inspector too.");
-
-                // Missing one side still not ready (actionable).
-                MmdHumanoidClipConversionPlan partial = MmdAssetInspectorUtility.ComputeHumanoidClipReadinessForVmd(vmd, pmx, null);
-                int clipCountAfterPartial = AssetDatabase.FindAssets("t:AnimationClip").Length;
-                Assert.That(clipCountAfterPartial, Is.EqualTo(clipCountBefore),
-                    "VMD Inspector readiness preview must not create AnimationClip assets even on partial inputs.");
-
-                Assert.That(partial.PrerequisitesReady, Is.False);
-                Assert.That(MmdAssetInspectorUtility.FormatCompactVmdHumanoidIssues(partial), Is.Not.Empty);
-            }
-            finally
-            {
-                foreach (var o in owned)
-                {
-                    if (o != null) Object.DestroyImmediate(o);
-                }
-                if (root != null) Object.DestroyImmediate(root);
-                if (mesh != null) Object.DestroyImmediate(mesh);
-            }
-        }
-
-        // Local synthetic ready builder (duplicated slim from planner contract test to keep edits bounded to allowed files only).
-        private static void CreateSyntheticReadyPmxAndSetup(
-            out MmdPmxAsset pmxAsset,
-            MmdHumanoidSetupAsset setupAsset,
-            out GameObject hierarchyRoot,
-            out Mesh mesh,
-            List<UnityEngine.Object> ownedObjects)
-        {
-            hierarchyRoot = new GameObject("VmdEdTestRoot");
-            var modelObject = new GameObject("Model");
-            modelObject.transform.SetParent(hierarchyRoot.transform, worldPositionStays: false);
-
-            SkinnedMeshRenderer smr = modelObject.AddComponent<SkinnedMeshRenderer>();
-            mesh = new Mesh { name = "VmdEdTestMesh" };
-            mesh.vertices = new Vector3[] { new Vector3(-0.5f, 0f, -0.5f), new Vector3(0.5f, 0f, -0.5f), new Vector3(0f, 1f, 0.5f) };
-            mesh.triangles = new int[] { 0, 1, 2 };
-            string[] boneNames = { "下半身", "上半身", "首", "頭", "左足", "左ひざ", "左足首", "右足", "右ひざ", "右足首", "左腕", "左ひじ", "左手首", "右腕", "右ひじ", "右手首" };
-            mesh.bindposes = new Matrix4x4[boneNames.Length];
-            smr.sharedMesh = mesh;
-
-            Transform[] bones = new Transform[boneNames.Length];
-            for (int i = 0; i < boneNames.Length; i++)
-            {
-                var bgo = new GameObject(boneNames[i]);
-                bgo.transform.SetParent(modelObject.transform, worldPositionStays: false);
-                bones[i] = bgo.transform;
-            }
-            smr.bones = bones;
-
-            pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
-            pmxAsset.Initialize(
-                new byte[] { 0xAA },
-                "vmd-ed-ready.pmx",
-                "Assets/vmd-ed-ready.pmx",
-                importedMeshAsset: mesh,
-                importedRootAsset: hierarchyRoot,
-                hierarchyReadinessValue: MmdImportReadiness.Ready,
-                rendererReadinessValue: MmdImportReadiness.Ready,
-                boneBindingReadinessValue: MmdImportReadiness.Ready,
-                parseSummary: new MmdPmxParseSummary(
-                    "vmd-ed-model", 3, 3, boneNames.Length, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-                    boundsMin: new Vector3(-0.5f, 0f, -0.5f), boundsMax: new Vector3(0.5f, 1f, 0.5f),
-                    materialSummaries: System.Array.Empty<MmdPmxMaterialSummary>()));
-            setupAsset.Initialize(pmxAsset);
-
-            ownedObjects.Add(pmxAsset);
-            ownedObjects.Add(hierarchyRoot);
-            ownedObjects.Add(mesh);
-            foreach (var b in bones) ownedObjects.Add(b.gameObject);
-        }
     }
 }

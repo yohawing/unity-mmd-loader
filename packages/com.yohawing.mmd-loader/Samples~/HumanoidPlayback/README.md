@@ -32,8 +32,8 @@ playback controller, a Timeline binding, camera, and directional light.
 The FBX clip demonstrates ordinary Unity Humanoid retarget playback. It does not
 reproduce native MMD IK/helper behavior, facial morphs, or Live physics. Use
 native PMX/VMD playback when those behaviors are required. VMD-to-Humanoid bake
-remains an explicit authoring workflow; its setup and generated assets are
-intentionally not bundled in this playback sample.
+uses the Avatar and mapping persisted by the PMX Humanoid import. Generated
+clips are intentionally not bundled in this playback sample.
 
 The short `HumanoidSampleMotion.vmd` used by contract fixtures is only for
 conversion-contract checks. It is not bundled in this sample and is not a

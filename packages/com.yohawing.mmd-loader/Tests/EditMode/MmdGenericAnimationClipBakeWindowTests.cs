@@ -30,7 +30,7 @@ namespace Mmd.Tests
                 Assert.That(window.ClipTypeForTests, Is.EqualTo(MmdGenericAnimationClipBakeWindow.ClipType.Humanoid));
                 Assert.That(
                     window.OutputPathForTests,
-                    Is.EqualTo(MmdHumanoidClipConversionWriter.GetDefaultOutputPath(null, pmx, null)));
+                    Is.EqualTo(MmdHumanoidClipConversionWriter.GetDefaultOutputPath(pmx, null)));
             }
             finally
             {
@@ -121,7 +121,7 @@ namespace Mmd.Tests
                 window.SetClipTypeForTests(MmdGenericAnimationClipBakeWindow.ClipType.Humanoid);
                 Assert.That(
                     window.OutputPathForTests,
-                    Is.EqualTo(MmdHumanoidClipConversionWriter.GetDefaultOutputPath(null, pmx, vmd)));
+                    Is.EqualTo(MmdHumanoidClipConversionWriter.GetDefaultOutputPath(pmx, vmd)));
                 Assert.That(window.OutputPathForTests, Is.Not.EqualTo(genericPath));
 
                 window.SetClipTypeForTests(MmdGenericAnimationClipBakeWindow.ClipType.Generic);

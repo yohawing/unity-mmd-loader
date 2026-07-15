@@ -255,8 +255,7 @@ namespace Mmd.Editor
             using (new EditorGUI.DisabledScope(true))
             {
                 EditorGUILayout.IntField("PMX Bones", asset.BoneCount);
-                EditorGUILayout.TextField("Mapping Readiness", "Not evaluated");
-                EditorGUILayout.TextField("Humanoid Setup Asset", "Explicit asset workflow");
+                EditorGUILayout.TextField("Mapping Readiness", asset.HumanoidAvatarReadiness);
                 EditorGUILayout.TextField("Native Playback Impact", "None");
             }
         }

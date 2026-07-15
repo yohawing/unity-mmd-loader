@@ -26,9 +26,7 @@ namespace Mmd.Tests
         private const string TempPmxPath = TempDirectory + "/test_1bone_cube.pmx";
         private const string TempHumanoidPmxPath = TempDirectory + "/test_semi_basic_bone.pmx";
         private const string TempVmdPath = TempDirectory + "/test_1bone_cube_motion.vmd";
-        private const string TempSetupPath = TempDirectory + "/test_1bone_cube_playback_setup.asset";
         private const string TempConfigPath = TempDirectory + "/test_playback_config.asset";
-        private const string TempHumanoidSetupPath = TempDirectory + "/test_humanoid_setup.asset";
         private const string TempPrefabPath = TempDirectory + "/test_1bone_cube.prefab";
         private const string TempScenePath = TempDirectory + "/test_1bone_cube_scene.unity";
         private const string TempRemapMaterialPath = TempDirectory + "/remapped_body.mat";
@@ -394,17 +392,6 @@ namespace Mmd.Tests
         }
 
         // Hierarchy Readiness Slice C tests.
-
-
-
-
-
-        // Humanoid setup source-slice tests.
-
-
-
-
-
 
 
 

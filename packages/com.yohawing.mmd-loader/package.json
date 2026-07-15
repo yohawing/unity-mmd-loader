@@ -25,7 +25,7 @@
     },
     {
       "displayName": "Humanoid Playback",
-      "description": "Ready-to-play Humanoid PMX/VMD bake sample with a valid Avatar, Setup Asset, generated Humanoid AnimationClip, Timeline binding, and redistributable source assets.",
+      "description": "Ready-to-play Humanoid PMX/FBX retarget-playback sample with a valid imported Avatar, Timeline binding, and redistributable source assets.",
       "path": "Samples~/HumanoidPlayback"
     }
   ]

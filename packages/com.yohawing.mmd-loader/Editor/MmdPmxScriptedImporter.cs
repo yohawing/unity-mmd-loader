@@ -368,7 +368,7 @@ namespace Mmd.Editor
                 || humanoidAvatar == null
                 || !humanoidAvatar.isHuman
                 || proxyRoot == null
-                || !string.Equals(avatarReadiness, MmdHumanoidSetupAsset.ReadyReadiness, System.StringComparison.Ordinal))
+                || !string.Equals(avatarReadiness, MmdHumanoidMappingReadiness.Ready, System.StringComparison.Ordinal))
             {
                 return controller;
             }

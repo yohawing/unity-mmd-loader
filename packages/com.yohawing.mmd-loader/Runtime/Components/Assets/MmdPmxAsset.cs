@@ -282,7 +282,7 @@ namespace Mmd
         [SerializeField] private string animationType = "Generic";
         [SerializeField] private string shaderPreset = "MmdBasicUrpToon";
         [SerializeField] private Avatar? importedAvatar;
-        [SerializeField] private string humanoidAvatarReadiness = MmdHumanoidSetupAsset.NotEvaluatedReadiness;
+        [SerializeField] private string humanoidAvatarReadiness = MmdHumanoidMappingReadiness.NotEvaluated;
         [SerializeField] private string humanoidAvatarDiagnostic = string.Empty;
         [SerializeField] private MmdHumanoidBoneMappingDiagnosticSummary humanoidBoneMappingDiagnostics =
             MmdHumanoidBoneMappingDiagnosticSummary.Empty;
@@ -500,7 +500,7 @@ namespace Mmd
             shaderPreset = NormalizeSummaryValue(assetShaderPreset, "MmdBasicUrpToon");
             importedAvatar = null;
             humanoidAvatarReadiness = string.Equals(animationType, "Humanoid", StringComparison.Ordinal)
-                ? MmdHumanoidSetupAsset.NotEvaluatedReadiness
+                ? MmdHumanoidMappingReadiness.NotEvaluated
                 : "NotRequested";
             humanoidAvatarDiagnostic = string.Equals(animationType, "Humanoid", StringComparison.Ordinal)
                 ? "humanoid-avatar: not evaluated"
@@ -534,7 +534,7 @@ namespace Mmd
         {
             animationType = NormalizeSummaryValue(assetAnimationType, "Generic");
             importedAvatar = avatar;
-            humanoidAvatarReadiness = NormalizeSummaryValue(readiness, MmdHumanoidSetupAsset.NotEvaluatedReadiness);
+            humanoidAvatarReadiness = NormalizeSummaryValue(readiness, MmdHumanoidMappingReadiness.NotEvaluated);
             humanoidAvatarDiagnostic = diagnostic ?? string.Empty;
             humanoidBoneMappingDiagnostics = mappingDiagnostics ?? MmdHumanoidBoneMappingDiagnosticSummary.Empty;
         }

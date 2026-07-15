@@ -316,7 +316,7 @@ namespace Mmd.Tests
             Assert.That(pmxAsset, Is.Not.Null);
             Assert.That(pmxAsset.ModelPreset, Is.EqualTo(nameof(MmdPmxModelPreset.Character)));
             Assert.That(pmxAsset.AnimationType, Is.EqualTo(nameof(MmdPmxAnimationType.Humanoid)));
-            Assert.That(pmxAsset.HumanoidAvatarReadiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
+            Assert.That(pmxAsset.HumanoidAvatarReadiness, Is.EqualTo(MmdHumanoidMappingReadiness.Ready));
             Assert.That(pmxAsset.HumanoidAvatarDiagnostic, Is.Not.Empty);
 
             GameObject root = AssetDatabase.LoadAssetAtPath<GameObject>(TempHumanoidPmxPath);

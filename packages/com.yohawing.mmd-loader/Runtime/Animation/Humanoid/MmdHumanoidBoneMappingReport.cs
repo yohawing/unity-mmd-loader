@@ -21,7 +21,7 @@ namespace Mmd
             string[] diagnostics,
             MmdSerializableBoneMappingEntry[]? mappingEntries = null)
         {
-            Readiness = readiness ?? MmdHumanoidSetupAsset.NotEvaluatedReadiness;
+            Readiness = readiness ?? MmdHumanoidMappingReadiness.NotEvaluated;
             TotalBoneCount = Math.Max(0, totalBoneCount);
             RequiredMappedBoneCount = Math.Max(0, requiredMappedBoneCount);
             OptionalMappedBoneCount = Math.Max(0, optionalMappedBoneCount);

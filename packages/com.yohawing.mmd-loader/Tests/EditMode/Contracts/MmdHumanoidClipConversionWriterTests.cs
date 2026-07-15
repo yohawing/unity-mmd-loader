@@ -42,45 +42,43 @@ namespace Mmd.Tests
         };
 
         [Test]
-        public void CreateInMemoryClipRejectsWhenSetupDoesNotMatchPmx()
+        public void CreateInMemoryClipUsesImportedHumanoidAvatarAndBindings()
         {
-            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(FixturePmxPath);
-            MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(FixtureVmdPath);
-            Assert.That(pmxAsset, Is.Not.Null);
-            Assert.That(vmdAsset, Is.Not.Null);
+            MmdPmxAsset pmxAsset = null!;
+            MmdVmdAsset? vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(FixtureVmdPath);
+            var ownedObjects = new List<UnityEngine.Object>();
+            MmdHumanoidClipConversionWriterResult? result = null;
 
-            var otherPmx = ScriptableObject.CreateInstance<MmdPmxAsset>();
-            otherPmx.Initialize(
-                new byte[] { 0x01, 0x02, 0x03 },
-                "writer-mismatch.pmx",
-                "Assets/writer-mismatch.pmx");
-
-            var setupAsset = ScriptableObject.CreateInstance<MmdHumanoidSetupAsset>();
-            var objects = new List<UnityEngine.Object>();
             try
             {
-                setupAsset.Initialize(otherPmx);
-                objects.Add(otherPmx);
+                CreateReadyFixturePmx(out pmxAsset, ownedObjects);
+                ConfigureImportedHumanoidState(pmxAsset, ownedObjects);
+                Assert.That(vmdAsset, Is.Not.Null);
 
-                MmdHumanoidClipConversionWriterResult result =
-                    MmdHumanoidClipConversionWriter.CreateInMemoryClip(
-                        pmxAsset!,
-                        vmdAsset!,
-                        setupAsset,
-                        frameRate: 30.0f);
+                result = MmdHumanoidClipConversionWriter.CreateInMemoryClip(
+                    pmxAsset,
+                    vmdAsset!,
+                    frameRate: 30.0f,
+                    startFrame: 0,
+                    endFrame: 2);
 
-                Assert.That(result.Clip, Is.Null);
-                Assert.That(result.CanCreateClipNow, Is.False);
-                Assert.That(result.PrerequisitesReady, Is.False);
-                Assert.That(result.Diagnostics, Is.Not.Empty);
+                Assert.That(result.Clip, Is.Not.Null, string.Join("\n", result.Diagnostics));
+                Assert.That(result.PrerequisitesReady, Is.True);
+                Assert.That(result.CanCreateClipNow, Is.True);
                 Assert.That(
                     string.Join("\n", result.Diagnostics),
-                    Does.Contain("setup.PmxAsset mismatch"));
+                    Does.Contain(MmdHumanoidClipConversionPlanner.ImportedPmxHumanoidMappingSource));
+                AssertHumanoidClipHasMuscleBindings(result.Clip!);
+                AssertRootMotionBindings(result.Clip!);
             }
             finally
             {
-                UnityEngine.Object.DestroyImmediate(setupAsset);
-                foreach (UnityEngine.Object obj in objects)
+                if (result?.Clip != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(result.Clip);
+                }
+
+                foreach (UnityEngine.Object obj in ownedObjects)
                 {
                     if (obj != null)
                     {
@@ -93,257 +91,100 @@ namespace Mmd.Tests
         [Test]
         public void CreateHumanoidAnimationClipAssetWritesAnimationClipToAssetsPath()
         {
+            const string outputDirectory = "Assets/HumanoidClipWriterTests";
+            const string outputPath = outputDirectory + "/baked.anim";
             MmdPmxAsset pmxAsset = null!;
-            MmdVmdAsset? vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(FixtureVmdPath);
-            var setupAsset = ScriptableObject.CreateInstance<MmdHumanoidSetupAsset>();
+            MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(FixtureVmdPath);
             var ownedObjects = new List<UnityEngine.Object>();
             MmdHumanoidClipConversionWriterResult? result = null;
-            string tempFolder = "Assets/H6ClipConversionWriterTests_" + Guid.NewGuid().ToString("N");
-            string outputPath = tempFolder + "/humanoid-conversion-" + Guid.NewGuid().ToString("N") + ".anim";
-            int clipCountBefore = AssetDatabase.FindAssets("t:AnimationClip").Length;
 
             try
             {
-                CreateReadyFixturePmxAndSetup(out pmxAsset, setupAsset, ownedObjects);
-                Assert.That(vmdAsset, Is.Not.Null);
-                Assert.That(pmxAsset, Is.Not.Null);
+                CreateReadyFixturePmx(out pmxAsset, ownedObjects);
+                ConfigureImportedHumanoidState(pmxAsset, ownedObjects);
+                AssetDatabase.DeleteAsset(outputDirectory);
+                CreateFolderIfMissing(outputDirectory);
 
                 result = MmdHumanoidClipConversionWriter.CreateHumanoidAnimationClipAsset(
-                    pmxAsset,
-                    vmdAsset,
-                    setupAsset,
-                    frameRate: 30.0f,
-                    startFrame: 0,
-                    endFrame: 2,
-                    outputPath: outputPath);
+                    pmxAsset, vmdAsset, 30.0f, 0, 2, outputPath);
 
-                Assert.That(result.Clip, Is.Not.Null);
-                Assert.That(result.Plan.CanCreateClipNow, Is.True);
-                Assert.That(AssetDatabase.Contains(result.Clip), Is.True);
-                Assert.That(AssetDatabase.GetAssetPath(result.Clip), Does.StartWith(tempFolder));
-                Assert.That(AssetDatabase.FindAssets("t:AnimationClip").Length, Is.EqualTo(clipCountBefore + 1));
-                AssertHumanoidClipHasMuscleBindings(result.Clip!);
+                Assert.That(result.Clip, Is.Not.Null, string.Join("\n", result.Diagnostics));
+                Assert.That(AssetDatabase.GetAssetPath(result.Clip), Is.EqualTo(outputPath));
+                Assert.That(AssetDatabase.LoadAssetAtPath<AnimationClip>(outputPath), Is.SameAs(result.Clip));
+                AssertRootMotionBindings(result.Clip!);
             }
             finally
             {
-                if (result != null && result.Clip != null)
-                {
-                    string savedPath = AssetDatabase.GetAssetPath(result.Clip);
-                    if (!string.IsNullOrWhiteSpace(savedPath))
-                    {
-                        AssetDatabase.DeleteAsset(savedPath);
-                    }
-                }
-
-                if (AssetDatabase.IsValidFolder(tempFolder))
-                {
-                    AssetDatabase.DeleteAsset(tempFolder);
-                }
-
-                UnityEngine.Object.DestroyImmediate(setupAsset);
-                foreach (UnityEngine.Object obj in ownedObjects)
-                {
-                    if (obj != null)
-                    {
-                        UnityEngine.Object.DestroyImmediate(obj);
-                    }
-                }
+                AssetDatabase.DeleteAsset(outputDirectory);
+                DestroyOwnedObjects(ownedObjects);
             }
         }
 
-        [Test]
-        [TestCase("")]
-        [TestCase("External/Generated/humanoid.anim")]
-        [TestCase("/tmp/humanoid.anim")]
-        [TestCase("Assets/../humanoid.anim")]
-        [TestCase("Assets/./humanoid.anim")]
-        [TestCase("Assets//humanoid.anim")]
-        [TestCase("Temp/humanoid.anim")]
-        [TestCase("Assets/humanoid")]
+        [TestCase("../outside.anim")]
+        [TestCase("Assets/not-animation.asset")]
         public void CreateHumanoidAnimationClipAssetRejectsInvalidOutputPath(string invalidOutputPath)
         {
             MmdPmxAsset pmxAsset = null!;
-            MmdVmdAsset? vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(FixtureVmdPath);
-            var setupAsset = ScriptableObject.CreateInstance<MmdHumanoidSetupAsset>();
+            MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(FixtureVmdPath);
             var ownedObjects = new List<UnityEngine.Object>();
-            MmdHumanoidClipConversionWriterResult? result = null;
-            int clipCountBefore = AssetDatabase.FindAssets("t:AnimationClip").Length;
 
             try
             {
-                CreateReadyFixturePmxAndSetup(out pmxAsset, setupAsset, ownedObjects);
-                Assert.That(vmdAsset, Is.Not.Null);
-                Assert.That(pmxAsset, Is.Not.Null);
+                CreateReadyFixturePmx(out pmxAsset, ownedObjects);
+                ConfigureImportedHumanoidState(pmxAsset, ownedObjects);
 
-                result = MmdHumanoidClipConversionWriter.CreateHumanoidAnimationClipAsset(
-                    pmxAsset,
-                    vmdAsset,
-                    setupAsset,
-                    frameRate: 30.0f,
-                    startFrame: 0,
-                    endFrame: 2,
-                    outputPath: invalidOutputPath);
+                MmdHumanoidClipConversionWriterResult result =
+                    MmdHumanoidClipConversionWriter.CreateHumanoidAnimationClipAsset(
+                        pmxAsset, vmdAsset, 30.0f, 0, 2, invalidOutputPath);
 
                 Assert.That(result.Clip, Is.Null);
                 Assert.That(result.Diagnostics, Is.Not.Empty);
-                Assert.That(result.Diagnostics.Any(d => d.StartsWith("validation: output path")), Is.True);
-                Assert.That(AssetDatabase.FindAssets("t:AnimationClip").Length, Is.EqualTo(clipCountBefore));
             }
             finally
             {
-                UnityEngine.Object.DestroyImmediate(setupAsset);
-                foreach (UnityEngine.Object obj in ownedObjects)
-                {
-                    if (obj != null)
-                    {
-                        UnityEngine.Object.DestroyImmediate(obj);
-                    }
-                }
+                DestroyOwnedObjects(ownedObjects);
             }
         }
 
         [Test]
-        public void CreateHumanoidAnimationClipAssetDefaultOutputPathPrefersSetupAssetDirectory()
+        public void GetDefaultOutputPathUsesAssetsDirectoryAndSourceIds()
         {
             MmdPmxAsset pmxAsset = null!;
-            MmdVmdAsset? vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(FixtureVmdPath);
-            var setupAsset = ScriptableObject.CreateInstance<MmdHumanoidSetupAsset>();
             var ownedObjects = new List<UnityEngine.Object>();
-            string setupDirectory = "Assets/H6HumanoidClipSetupOutput_" + Guid.NewGuid().ToString("N");
-            string setupAssetPath = setupDirectory + "/MmdHumanoidSetup.asset";
-
             try
             {
-                CreateReadyFixturePmxAndSetup(out pmxAsset, setupAsset, ownedObjects);
-                Assert.That(vmdAsset, Is.Not.Null);
-                Assert.That(pmxAsset, Is.Not.Null);
-
-                CreateFolderIfMissing(setupDirectory);
-                setupAsset.Initialize(pmxAsset);
-                AssetDatabase.CreateAsset(setupAsset, setupAssetPath);
-                AssetDatabase.ImportAsset(setupAssetPath, ImportAssetOptions.ForceUpdate);
-
-                string defaultOutputPath = MmdHumanoidClipConversionWriter.GetDefaultOutputPath(
-                    setupAsset,
-                    pmxAsset,
-                    vmdAsset);
-
-                Assert.That(defaultOutputPath, Does.StartWith(setupDirectory + "/"));
-                Assert.That(defaultOutputPath, Does.EndWith(".anim"));
+                CreateReadyFixturePmx(out pmxAsset, ownedObjects);
+                Assert.That(
+                    MmdHumanoidClipConversionWriter.GetDefaultOutputPath(pmxAsset, null),
+                    Is.EqualTo("Assets/H6_HumanoidClip_ready-h6-writer-slice1_pmx_vmd.anim"));
             }
             finally
             {
-                if (AssetDatabase.IsValidFolder(setupDirectory))
-                {
-                    AssetDatabase.DeleteAsset(setupDirectory);
-                }
-
-                if (setupAsset != null && !AssetDatabase.Contains(setupAsset))
-                {
-                    UnityEngine.Object.DestroyImmediate(setupAsset);
-                }
-
-                foreach (UnityEngine.Object obj in ownedObjects)
-                {
-                    if (obj != null)
-                    {
-                        UnityEngine.Object.DestroyImmediate(obj);
-                    }
-                }
+                DestroyOwnedObjects(ownedObjects);
             }
         }
 
         [Test]
-        public void CreateInMemoryClipWritesHumanoidMuscleCurvesWithoutSavingAnimationClipAsset()
+        public void CreateInMemoryClipUsesClipLocalTimeWhenStartFrameIsNonZero()
         {
             MmdPmxAsset pmxAsset = null!;
-            MmdVmdAsset? vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(FixtureVmdPath);
-            var setupAsset = ScriptableObject.CreateInstance<MmdHumanoidSetupAsset>();
-            var clipGuidsBefore = AssetDatabase.FindAssets("t:AnimationClip");
+            MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(FixtureVmdPath);
             var ownedObjects = new List<UnityEngine.Object>();
             MmdHumanoidClipConversionWriterResult? result = null;
-
             try
             {
-                CreateReadyFixturePmxAndSetup(out pmxAsset, setupAsset, ownedObjects);
-                Assert.That(vmdAsset, Is.Not.Null);
-                Assert.That(pmxAsset, Is.Not.Null);
-
-                result = MmdHumanoidClipConversionWriter.CreateInMemoryClip(
-                    pmxAsset,
-                    vmdAsset,
-                    setupAsset,
-                    frameRate: 30.0f,
-                    startFrame: 0);
-
-                string[] clipGuidsAfter = AssetDatabase.FindAssets("t:AnimationClip");
-
-                Assert.That(result.Clip, Is.Not.Null);
-                Assert.That(result.Plan.CanCreateClipNow, Is.True);
-                Assert.That(result.Clip!.frameRate, Is.EqualTo(30.0f));
-                Assert.That(result.Clip.length, Is.GreaterThan(0.0f));
-                Assert.That(AssetDatabase.Contains(result.Clip), Is.False);
-                Assert.That(clipGuidsAfter.Length, Is.EqualTo(clipGuidsBefore.Length));
-                Assert.That(result.Diagnostics, Is.Not.Empty);
-
-                EditorCurveBinding[] bindings = AnimationUtility.GetCurveBindings(result.Clip);
-                Assert.That(result.Clip.humanMotion, Is.True);
-                Assert.That(bindings.Any(b => b.type == typeof(Animator) && string.IsNullOrEmpty(b.path)), Is.True);
-                Assert.That(bindings.Any(b => b.propertyName == "m_LocalRotation.x"), Is.False);
-                Assert.That(bindings.Count(b => b.type == typeof(Animator)
-                                                && string.IsNullOrEmpty(b.path)
-                                                && (b.propertyName.StartsWith("RootT.")
-                                                    || b.propertyName.StartsWith("RootQ."))),
-                    Is.EqualTo(7));
-            }
-            finally
-            {
-                if (result != null && result.Clip != null)
-                {
-                    UnityEngine.Object.DestroyImmediate(result.Clip);
-                }
-
-                UnityEngine.Object.DestroyImmediate(setupAsset);
-                foreach (UnityEngine.Object obj in ownedObjects)
-                {
-                    if (obj != null)
-                    {
-                        UnityEngine.Object.DestroyImmediate(obj);
-                    }
-                }
-            }
-        }
-
-        [Test]
-        public void CreateInMemoryClipWithoutSetupUsesImportedHumanoidAvatarAndBindings()
-        {
-            MmdPmxAsset pmxAsset = null!;
-            MmdVmdAsset? vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(FixtureVmdPath);
-            var setupAsset = ScriptableObject.CreateInstance<MmdHumanoidSetupAsset>();
-            var ownedObjects = new List<UnityEngine.Object>();
-            MmdHumanoidClipConversionWriterResult? result = null;
-
-            try
-            {
-                CreateReadyFixturePmxAndSetup(out pmxAsset, setupAsset, ownedObjects);
+                CreateReadyFixturePmx(out pmxAsset, ownedObjects);
                 ConfigureImportedHumanoidState(pmxAsset, ownedObjects);
-                Assert.That(vmdAsset, Is.Not.Null);
-
                 result = MmdHumanoidClipConversionWriter.CreateInMemoryClip(
-                    pmxAsset,
-                    vmdAsset!,
-                    setupAsset: null,
-                    frameRate: 30.0f,
-                    startFrame: 0,
-                    endFrame: 2);
+                    pmxAsset, vmdAsset, 30.0f, startFrame: 1, endFrame: 2);
 
                 Assert.That(result.Clip, Is.Not.Null, string.Join("\n", result.Diagnostics));
-                Assert.That(result.PrerequisitesReady, Is.True);
-                Assert.That(result.CanCreateClipNow, Is.True);
-                Assert.That(
-                    string.Join("\n", result.Diagnostics),
-                    Does.Contain(MmdHumanoidClipConversionPlanner.ImportedPmxHumanoidMappingSource));
-                AssertHumanoidClipHasMuscleBindings(result.Clip!);
+                AnimationCurve rootCurve = AnimationUtility.GetEditorCurve(
+                    result.Clip!,
+                    EditorCurveBinding.FloatCurve(string.Empty, typeof(Animator), "RootT.x"));
+                Assert.That(rootCurve.keys, Has.Length.EqualTo(2));
+                Assert.That(rootCurve.keys[0].time, Is.Zero.Within(0.0001f));
+                Assert.That(rootCurve.keys[1].time, Is.EqualTo(1.0f / 30.0f).Within(0.0001f));
             }
             finally
             {
@@ -351,15 +192,7 @@ namespace Mmd.Tests
                 {
                     UnityEngine.Object.DestroyImmediate(result.Clip);
                 }
-
-                UnityEngine.Object.DestroyImmediate(setupAsset);
-                foreach (UnityEngine.Object obj in ownedObjects)
-                {
-                    if (obj != null)
-                    {
-                        UnityEngine.Object.DestroyImmediate(obj);
-                    }
-                }
+                DestroyOwnedObjects(ownedObjects);
             }
         }
 
@@ -450,113 +283,8 @@ namespace Mmd.Tests
             Assert.That(positionKeys[0][1].time, Is.EqualTo(1.0f / 30.0f).Within(0.0001f));
         }
 
-        [Test]
-        public void CreateHumanoidClipConversionWriterCanCreateFromInspectorEligibility()
-        {
-            MmdPmxAsset pmxAsset = null!;
-            MmdVmdAsset? vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(FixtureVmdPath);
-            var setupAsset = ScriptableObject.CreateInstance<MmdHumanoidSetupAsset>();
-            var ownedObjects = new List<UnityEngine.Object>();
-            MmdHumanoidClipConversionWriterResult? result = null;
-
-            try
-            {
-                CreateReadyFixturePmxAndSetup(out pmxAsset, setupAsset, ownedObjects);
-                Assert.That(vmdAsset, Is.Not.Null);
-                Assert.That(pmxAsset, Is.Not.Null);
-
-                string outputPath = "Assets/H6HumanoidClipEligibility/humanoid-eligibility.anim";
-                result = MmdHumanoidClipConversionWriter.CreateHumanoidAnimationClipAsset(
-                    pmxAsset,
-                    vmdAsset!,
-                    setupAsset,
-                    frameRate: 30.0f,
-                    startFrame: 0,
-                    endFrame: 0,
-                    outputPath: outputPath);
-
-                Assert.That(result.Plan.CanCreateClipNow, Is.True);
-                Assert.That(result.Clip, Is.Not.Null);
-            }
-            finally
-            {
-                if (result != null && result.Clip != null)
-                {
-                    AssetDatabase.DeleteAsset(AssetDatabase.GetAssetPath(result.Clip));
-                }
-
-                if (AssetDatabase.IsValidFolder("Assets/H6HumanoidClipEligibility"))
-                {
-                    AssetDatabase.DeleteAsset("Assets/H6HumanoidClipEligibility");
-                }
-
-                UnityEngine.Object.DestroyImmediate(setupAsset);
-                foreach (UnityEngine.Object obj in ownedObjects)
-                {
-                    if (obj != null)
-                    {
-                        UnityEngine.Object.DestroyImmediate(obj);
-                    }
-                }
-            }
-        }
-
-        [Test]
-        public void CreateInMemoryClipUsesClipLocalTimeWhenStartFrameIsNonZero()
-        {
-            MmdPmxAsset pmxAsset = null!;
-            MmdVmdAsset? vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(FixtureVmdPath);
-            var setupAsset = ScriptableObject.CreateInstance<MmdHumanoidSetupAsset>();
-            var ownedObjects = new List<UnityEngine.Object>();
-            MmdHumanoidClipConversionWriterResult? result = null;
-
-            try
-            {
-                CreateReadyFixturePmxAndSetup(out pmxAsset, setupAsset, ownedObjects);
-                Assert.That(vmdAsset, Is.Not.Null);
-                Assert.That(pmxAsset, Is.Not.Null);
-
-                result = MmdHumanoidClipConversionWriter.CreateInMemoryClip(
-                    pmxAsset,
-                    vmdAsset,
-                    setupAsset,
-                    frameRate: 30.0f,
-                    startFrame: 1,
-                    endFrame: 2);
-
-                Assert.That(result.Clip, Is.Not.Null);
-
-                EditorCurveBinding binding = AnimationUtility.GetCurveBindings(result.Clip!)
-                    .FirstOrDefault(b => b.type == typeof(Animator) && string.IsNullOrEmpty(b.path));
-                Assert.That(binding.propertyName, Is.Not.Empty);
-
-                AnimationCurve curve = AnimationUtility.GetEditorCurve(result.Clip!, binding);
-                Assert.That(curve, Is.Not.Null);
-                Assert.That(curve.keys, Has.Length.EqualTo(2));
-                Assert.That(curve.keys[0].time, Is.EqualTo(0.0f).Within(0.0001f));
-                Assert.That(curve.keys[1].time, Is.EqualTo(1.0f / 30.0f).Within(0.0001f));
-            }
-            finally
-            {
-                if (result != null && result.Clip != null)
-                {
-                    UnityEngine.Object.DestroyImmediate(result.Clip);
-                }
-
-                UnityEngine.Object.DestroyImmediate(setupAsset);
-                foreach (UnityEngine.Object obj in ownedObjects)
-                {
-                    if (obj != null)
-                    {
-                        UnityEngine.Object.DestroyImmediate(obj);
-                    }
-                }
-            }
-        }
-
-        private static void CreateReadyFixturePmxAndSetup(
+        private static void CreateReadyFixturePmx(
             out MmdPmxAsset pmxAsset,
-            MmdHumanoidSetupAsset setupAsset,
             List<UnityEngine.Object> ownedObjects)
         {
             var hierarchyRoot = new GameObject("H6WriterReadyPmxRoot");
@@ -616,8 +344,6 @@ namespace Mmd.Tests
                     boundsMax: new Vector3(0.5f, 1f, 0.5f),
                     materialSummaries: Array.Empty<MmdPmxMaterialSummary>()));
 
-            setupAsset.Initialize(pmxAsset);
-
             ownedObjects.Add(pmxAsset);
             ownedObjects.Add(hierarchyRoot);
             ownedObjects.Add(mesh);
@@ -629,7 +355,7 @@ namespace Mmd.Tests
         {
             MmdHumanoidProxyRigResult proxyRig = MmdHumanoidProxyRigFactory.CreateProxyRig(pmxAsset);
             Assert.That(proxyRig.ProxyRoot, Is.Not.Null, string.Join("\n", proxyRig.Diagnostics));
-            Assert.That(proxyRig.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
+            Assert.That(proxyRig.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.Ready));
 
             MmdHumanoidAvatarBuildResult avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(proxyRig);
             Assert.That(avatarResult.Avatar, Is.Not.Null, string.Join("\n", avatarResult.Diagnostics));
@@ -661,7 +387,7 @@ namespace Mmd.Tests
             pmxAsset.ApplyHumanoidAvatarImportSummary(
                 "Humanoid",
                 avatarResult.Avatar,
-                MmdHumanoidSetupAsset.ReadyReadiness,
+                MmdHumanoidMappingReadiness.Ready,
                 "test: imported Humanoid ready");
 
             ownedObjects.Add(proxyRig.ProxyRoot);
@@ -674,6 +400,36 @@ namespace Mmd.Tests
             Assert.That(clip.humanMotion, Is.True);
             Assert.That(bindings.Any(b => b.type == typeof(Animator) && string.IsNullOrEmpty(b.path)), Is.True);
             Assert.That(bindings.Any(b => b.propertyName == "m_LocalRotation.x"), Is.False);
+        }
+
+        private static void AssertRootMotionBindings(AnimationClip clip)
+        {
+            EditorCurveBinding[] bindings = AnimationUtility.GetCurveBindings(clip);
+            string[] properties =
+            {
+                "RootT.x", "RootT.y", "RootT.z",
+                "RootQ.x", "RootQ.y", "RootQ.z", "RootQ.w",
+            };
+            foreach (string property in properties)
+            {
+                Assert.That(
+                    bindings.Any(binding => binding.type == typeof(Animator)
+                                            && string.IsNullOrEmpty(binding.path)
+                                            && binding.propertyName == property),
+                    Is.True,
+                    property);
+            }
+        }
+
+        private static void DestroyOwnedObjects(IEnumerable<UnityEngine.Object> ownedObjects)
+        {
+            foreach (UnityEngine.Object obj in ownedObjects)
+            {
+                if (obj != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(obj);
+                }
+            }
         }
 
         private static void AddLinearBoneKeys(

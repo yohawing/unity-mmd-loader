@@ -141,7 +141,7 @@ namespace Mmd
             if (boneNames.Count == 0)
             {
                 return new MmdHumanoidBoneMappingReport(
-                    MmdHumanoidSetupAsset.NoBonesReadiness,
+                    MmdHumanoidMappingReadiness.NoBones,
                     0,
                     0,
                     0,
@@ -363,20 +363,20 @@ namespace Mmd
         {
             if (boneCount == 0)
             {
-                return MmdHumanoidSetupAsset.NoBonesReadiness;
+                return MmdHumanoidMappingReadiness.NoBones;
             }
 
             if (missingRequired > 0)
             {
-                return MmdHumanoidSetupAsset.MissingRequiredReadiness;
+                return MmdHumanoidMappingReadiness.MissingRequired;
             }
 
             if (requiredAmbiguous > 0)
             {
-                return MmdHumanoidSetupAsset.AmbiguousReadiness;
+                return MmdHumanoidMappingReadiness.Ambiguous;
             }
 
-            return MmdHumanoidSetupAsset.ReadyReadiness;
+            return MmdHumanoidMappingReadiness.Ready;
         }
 
         private static string[] BuildDiagnostics(

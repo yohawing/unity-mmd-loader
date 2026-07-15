@@ -16,7 +16,7 @@ namespace Mmd.Editor
             MmdHumanoidBoneMappingReport report = MmdHumanoidBoneMappingEvaluator.Evaluate(model);
             return string.Equals(
                 report.Readiness,
-                MmdHumanoidSetupAsset.ReadyReadiness,
+                MmdHumanoidMappingReadiness.Ready,
                 System.StringComparison.Ordinal)
                 ? MmdPmxModelPreset.Character
                 : MmdPmxModelPreset.Stage;

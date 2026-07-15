@@ -9,7 +9,7 @@ Import PMX models and VMD motions as ordinary Unity assets, place them in a scen
 3. Import a `.vmd`, create an `MmdVmdTimelineTrack`, bind the placed playback object, and add the VMD clip.
 4. Scrub in Edit Mode for physics-off animation preview.
 5. Play Timeline forward in Play Mode for Live physics.
-6. For a Unity Humanoid clip, configure the PMX Rig as Humanoid and explicitly bake from a Humanoid Setup Asset.
+6. For a Unity Humanoid clip, configure the PMX Rig as Humanoid and bake from the imported PMX Avatar and mapping.
 
 For the complete workflow, see the repository [HOW_TO_USE guide](https://github.com/yohawing/unity-mmd-loader/blob/main/docs/HOW_TO_USE.md).
 
@@ -22,12 +22,12 @@ For the complete workflow, see the repository [HOW_TO_USE guide](https://github.
 | Motion | Native `mmd-anim` VMD evaluation, Timeline scrub/playback, camera and directional-light motion |
 | Physics | Live physics in Play Mode forward playback; Edit Mode scrub and random access are physics-off |
 | Rendering | URP MMD Toon and URP Lit presets, outline, transparent material order, optional SelfShadow |
-| Humanoid | Rig mapping and Avatar import, explicit Setup Asset and AnimationClip bake |
+| Humanoid | Rig mapping and Avatar import, plus AnimationClip bake from the imported PMX settings |
 
 ## Samples
 
 - `Basic Playback`: ready-to-play, redistributable PMX/VMD assets for the normal import → Scene → Timeline path.
-- `Humanoid Playback`: ready-to-play Humanoid PMX/FBX example with a valid Avatar and Timeline binding, plus source assets for repeating the explicit setup and clip workflow.
+- `Humanoid Playback`: ready-to-play Humanoid PMX/FBX example with a valid Avatar and Timeline binding, plus source assets for repeating the clip workflow.
 
 ## Known limitations
 

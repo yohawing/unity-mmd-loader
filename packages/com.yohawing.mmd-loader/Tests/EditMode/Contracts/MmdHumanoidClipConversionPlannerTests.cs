@@ -2,11 +2,12 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
 using Mmd.Editor;
+using Mmd.Parser;
+using Mmd.UnityIntegration;
 
 namespace Mmd.Tests
 {
@@ -20,231 +21,193 @@ namespace Mmd.Tests
 
         private static readonly string[] RequiredBoneNames =
         {
-            "下半身",
-            "上半身",
-            "首",
-            "頭",
-            "左足",
-            "左ひざ",
-            "左足首",
-            "右足",
-            "右ひざ",
-            "右足首",
-            "左腕",
-            "左ひじ",
-            "左手首",
-            "右腕",
-            "右ひじ",
-            "右手首",
+            "下半身", "上半身", "首", "頭",
+            "左足", "左ひざ", "左足首", "右足", "右ひざ", "右足首",
+            "左腕", "左ひじ", "左手首", "右腕", "右ひじ", "右手首",
         };
 
         [Test]
         public void AnalyzePrerequisitesReturnsFailureForNullInputs()
         {
             MmdHumanoidClipConversionPlan result =
-                MmdHumanoidClipConversionPlanner.AnalyzePrerequisites(
-                    pmxAsset: null,
-                    vmdAsset: null,
-                    setupAsset: null);
+                MmdHumanoidClipConversionPlanner.AnalyzePrerequisites(null, null);
 
             Assert.That(result.PrerequisitesReady, Is.False);
             Assert.That(result.CanCreateClipNow, Is.False);
             Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidClipConversionPlanner.NotReadyReadiness));
-            Assert.That(result.Diagnostics, Is.Not.Empty);
             Assert.That(string.Join("\n", result.Diagnostics), Does.Contain("pmx asset is null"));
             Assert.That(string.Join("\n", result.Diagnostics), Does.Contain("vmd asset is null"));
         }
 
         [Test]
-        public void AnalyzePrerequisitesWithoutSetupRejectsGenericPmxWithActionableDiagnostic()
+        public void AnalyzePrerequisitesRejectsGenericImportedPmx()
         {
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(FixturePmxPath);
             MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(FixtureVmdPath);
+
             Assert.That(pmxAsset, Is.Not.Null);
             Assert.That(vmdAsset, Is.Not.Null);
-
             MmdHumanoidClipConversionPlan result =
-                MmdHumanoidClipConversionPlanner.AnalyzePrerequisites(pmxAsset, vmdAsset, setupAsset: null);
+                MmdHumanoidClipConversionPlanner.AnalyzePrerequisites(pmxAsset, vmdAsset);
 
             Assert.That(result.PrerequisitesReady, Is.False);
             Assert.That(result.CanCreateClipNow, Is.False);
-            Assert.That(
-                string.Join("\n", result.Diagnostics),
-                Does.Contain("AnimationType").And.Contain("Reimport the PMX"));
+            Assert.That(string.Join("\n", result.Diagnostics), Does.Contain("expected Humanoid"));
         }
 
         [Test]
-        public void AnalyzePrerequisitesFailsWhenSetupPmxAssetMismatchesInputPmx()
-        {
-            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(FixturePmxPath);
-            MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(FixtureVmdPath);
-            Assert.That(pmxAsset, Is.Not.Null);
-            Assert.That(vmdAsset, Is.Not.Null);
-
-            var otherPmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
-            otherPmxAsset.Initialize(new byte[] { 0x01, 0x02, 0x03 }, "synthetic-mismatch.pmx", "synthetic mismatch path");
-            var setupAsset = ScriptableObject.CreateInstance<MmdHumanoidSetupAsset>();
-
-            var objects = new List<UnityEngine.Object> { otherPmxAsset, setupAsset };
-            try
-            {
-                setupAsset.Initialize(otherPmxAsset);
-                MmdHumanoidClipConversionPlan result =
-                    MmdHumanoidClipConversionPlanner.AnalyzePrerequisites(
-                        pmxAsset,
-                        vmdAsset,
-                        setupAsset);
-
-                Assert.That(result.PrerequisitesReady, Is.False);
-                Assert.That(result.CanCreateClipNow, Is.False);
-                Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidClipConversionPlanner.NotReadyReadiness));
-                Assert.That(string.Join("\n", result.Diagnostics), Does.Contain("setup.PmxAsset mismatch"));
-            }
-            finally
-            {
-                foreach (UnityEngine.Object obj in objects)
-                {
-                    if (obj != null)
-                    {
-                        UnityEngine.Object.DestroyImmediate(obj);
-                    }
-                }
-            }
-        }
-
-        [Test]
-        public void AnalyzePrerequisitesFailsWhenSetupMappingIsNotReady()
-        {
-            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(FixturePmxPath);
-            MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(FixtureVmdPath);
-            Assert.That(pmxAsset, Is.Not.Null);
-            Assert.That(vmdAsset, Is.Not.Null);
-
-            var setupAsset = ScriptableObject.CreateInstance<MmdHumanoidSetupAsset>();
-            try
-            {
-                setupAsset.Initialize(pmxAsset);
-
-                MmdHumanoidClipConversionPlan result = MmdHumanoidClipConversionPlanner.AnalyzePrerequisites(
-                    pmxAsset,
-                    vmdAsset,
-                    setupAsset);
-
-                Assert.That(result.PrerequisitesReady, Is.False);
-                Assert.That(result.CanCreateClipNow, Is.False);
-                Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidClipConversionPlanner.NotReadyReadiness));
-                Assert.That(string.Join("\n", result.Diagnostics), Does.Contain("mapping not ready"));
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(setupAsset);
-            }
-        }
-
-        [Test]
-        public void AnalyzePrerequisitesReturnsReadyForReadySetupWithFixtureVmd()
+        public void AnalyzePrerequisitesReturnsReadyForImportedHumanoidState()
         {
             MmdPmxAsset pmxAsset = null!;
             MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(FixtureVmdPath);
-            var setupAsset = ScriptableObject.CreateInstance<MmdHumanoidSetupAsset>();
-            string[]? clipGuidsBefore = null;
-            string[]? clipGuidsAfter = null;
             var ownedObjects = new List<UnityEngine.Object>();
-
             try
             {
-                CreateReadyFixturePmxAndSetup(out pmxAsset, setupAsset, ownedObjects);
-                Assert.That(vmdAsset, Is.Not.Null);
-                Assert.That(pmxAsset, Is.Not.Null);
+                CreateReadyImportedHumanoidPmx(out pmxAsset, ownedObjects);
+                MmdHumanoidClipConversionPlan result =
+                    MmdHumanoidClipConversionPlanner.AnalyzePrerequisites(pmxAsset, vmdAsset);
 
-                clipGuidsBefore = AssetDatabase.FindAssets("t:AnimationClip");
-
-                MmdHumanoidClipConversionPlan result = MmdHumanoidClipConversionPlanner.AnalyzePrerequisites(
-                    pmxAsset,
-                    vmdAsset,
-                    setupAsset);
-
-                clipGuidsAfter = AssetDatabase.FindAssets("t:AnimationClip");
-
-                Assert.That(result.PrerequisitesReady, Is.True);
+                Assert.That(result.PrerequisitesReady, Is.True, string.Join("\n", result.Diagnostics));
                 Assert.That(result.CanCreateClipNow, Is.True);
                 Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidClipConversionPlanner.ReadyReadiness));
-                Assert.That(result.SetupPmxAssetMatch, Is.True);
-                Assert.That(result.SetupMappingReadiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
-                Assert.That(result.SetupMappingInputSource, Is.EqualTo(MmdHumanoidSetupAsset.ImportedHierarchyInputSource));
                 Assert.That(result.PmxSourceId, Is.EqualTo(pmxAsset.SourceId));
-                Assert.That(result.VmdSourceId, Is.EqualTo(vmdAsset!.SourceId));
-                Assert.That(result.SetupSourceId, Is.EqualTo(pmxAsset.SourceId));
+                Assert.That(result.VmdSourceId, Is.EqualTo(vmdAsset.SourceId));
                 Assert.That(result.PmxBoneCount, Is.EqualTo(RequiredBoneNames.Length));
                 Assert.That(result.VmdBoneKeyframeCount, Is.GreaterThan(0));
-                Assert.That(string.Join("\n", result.Diagnostics), Does.Contain("writer-status"));
-                Assert.That(
-                    clipGuidsBefore.Length,
-                    Is.EqualTo(clipGuidsAfter.Length),
-                    "AnalyzePrerequisites must not create or write AnimationClip assets in this slice.");
+                Assert.That(string.Join("\n", result.Diagnostics),
+                    Does.Contain(MmdHumanoidClipConversionPlanner.ImportedPmxHumanoidMappingSource));
             }
             finally
             {
-                if (setupAsset != null)
-                {
-                    UnityEngine.Object.DestroyImmediate(setupAsset);
-                }
-
-                foreach (UnityEngine.Object obj in ownedObjects)
-                {
-                    if (obj != null)
-                    {
-                        UnityEngine.Object.DestroyImmediate(obj);
-                    }
-                }
+                DestroyOwnedObjects(ownedObjects);
             }
         }
 
-        private static void CreateReadyFixturePmxAndSetup(
+        [Test]
+        public void AnalyzePrerequisitesUsesPassedVmdImportCacheWithoutParsingBytes()
+        {
+            MmdPmxAsset pmxAsset = null!;
+            var vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+            var ownedObjects = new List<UnityEngine.Object> { vmdAsset };
+            try
+            {
+                CreateReadyImportedHumanoidPmx(out pmxAsset, ownedObjects);
+                vmdAsset.Initialize(
+                    new byte[] { 0x00, 0xDE, 0xAD },
+                    "injected-cache.vmd",
+                    "injected-cache.vmd",
+                    new MmdVmdParseSummary("cache", 240, 120, 15, 4, 8),
+                    Array.Empty<string>());
+
+                MmdHumanoidClipConversionPlan result =
+                    MmdHumanoidClipConversionPlanner.AnalyzePrerequisites(pmxAsset, vmdAsset);
+
+                Assert.That(result.PrerequisitesReady, Is.True, string.Join("\n", result.Diagnostics));
+                Assert.That(result.VmdMaxFrame, Is.EqualTo(240));
+                Assert.That(result.VmdBoneKeyframeCount, Is.EqualTo(120));
+                Assert.That(result.VmdMorphKeyframeCount, Is.EqualTo(15));
+                Assert.That(result.VmdModelKeyframeCount, Is.EqualTo(4));
+            }
+            finally
+            {
+                DestroyOwnedObjects(ownedObjects);
+            }
+        }
+
+        [Test]
+        public void AnalyzePrerequisitesRejectsFailedOrStructurallyInvalidVmdCache()
+        {
+            MmdPmxAsset pmxAsset = null!;
+            var failed = ScriptableObject.CreateInstance<MmdVmdAsset>();
+            var structural = ScriptableObject.CreateInstance<MmdVmdAsset>();
+            var ownedObjects = new List<UnityEngine.Object> { failed, structural };
+            try
+            {
+                CreateReadyImportedHumanoidPmx(out pmxAsset, ownedObjects);
+                failed.Initialize(
+                    new byte[] { 0x01 }, "failed.vmd", "failed.vmd",
+                    new MmdVmdParseSummary("failed", 10, 1, 0, 0, 0),
+                    new[] { "Failed to parse VMD during import" });
+                structural.Initialize(
+                    new byte[] { 0x02 }, "structural.vmd", "structural.vmd",
+                    new MmdVmdParseSummary("structural", 30, 5, 1, 0, 1),
+                    new[] { "structural: invalid interpolation" });
+
+                MmdHumanoidClipConversionPlan failedResult =
+                    MmdHumanoidClipConversionPlanner.AnalyzePrerequisites(pmxAsset, failed);
+                MmdHumanoidClipConversionPlan structuralResult =
+                    MmdHumanoidClipConversionPlanner.AnalyzePrerequisites(pmxAsset, structural);
+
+                Assert.That(failedResult.PrerequisitesReady, Is.False);
+                Assert.That(structuralResult.PrerequisitesReady, Is.False);
+                Assert.That(string.Join("\n", failedResult.Diagnostics), Does.Contain("vmd validation failed"));
+                Assert.That(string.Join("\n", structuralResult.Diagnostics),
+                    Does.Contain("cached structural diagnostics present"));
+            }
+            finally
+            {
+                DestroyOwnedObjects(ownedObjects);
+            }
+        }
+
+        [Test]
+        public void AnalyzePrerequisitesRejectsMissingVmdImportCache()
+        {
+            MmdPmxAsset pmxAsset = null!;
+            var vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+            var ownedObjects = new List<UnityEngine.Object> { vmdAsset };
+            try
+            {
+                CreateReadyImportedHumanoidPmx(out pmxAsset, ownedObjects);
+                Assert.That(vmdAsset.ImportSummaryStatus, Is.EqualTo(MmdVmdImportSummaryStatus.NotParsed));
+
+                MmdHumanoidClipConversionPlan result =
+                    MmdHumanoidClipConversionPlanner.AnalyzePrerequisites(pmxAsset, vmdAsset);
+
+                Assert.That(result.PrerequisitesReady, Is.False);
+                Assert.That(result.CanCreateClipNow, Is.False);
+                Assert.That(string.Join("\n", result.Diagnostics), Does.Contain("NotParsed"));
+            }
+            finally
+            {
+                DestroyOwnedObjects(ownedObjects);
+            }
+        }
+
+        private static void CreateReadyImportedHumanoidPmx(
             out MmdPmxAsset pmxAsset,
-            MmdHumanoidSetupAsset setupAsset,
             List<UnityEngine.Object> ownedObjects)
         {
-            var hierarchyRoot = new GameObject("H6ReadyPmxRoot");
-            var modelObject = new GameObject("ReadyModel");
-            modelObject.transform.SetParent(hierarchyRoot.transform, worldPositionStays: false);
-
-            SkinnedMeshRenderer smr = modelObject.AddComponent<SkinnedMeshRenderer>();
-            Mesh mesh = new Mesh
+            var hierarchyRoot = new GameObject("PlannerReadyPmxRoot");
+            var modelObject = new GameObject("Model");
+            modelObject.transform.SetParent(hierarchyRoot.transform, false);
+            SkinnedMeshRenderer renderer = modelObject.AddComponent<SkinnedMeshRenderer>();
+            var mesh = new Mesh
             {
-                name = "H6ReadyPmxMesh",
+                vertices = new[] { new Vector3(-0.5f, 0, 0), new Vector3(0.5f, 0, 0), new Vector3(0, 1, 0) },
+                triangles = new[] { 0, 1, 2 },
+                bindposes = new Matrix4x4[RequiredBoneNames.Length],
             };
-            mesh.vertices = new Vector3[]
+            renderer.sharedMesh = mesh;
+            var bones = new Transform[RequiredBoneNames.Length];
+            for (int i = 0; i < bones.Length; i++)
             {
-                new Vector3(-0.5f, 0f, -0.5f),
-                new Vector3(0.5f, 0f, -0.5f),
-                new Vector3(0f, 1f, 0.5f),
-            };
-            mesh.triangles = new int[] { 0, 1, 2 };
-            mesh.bindposes = new Matrix4x4[RequiredBoneNames.Length];
-            smr.sharedMesh = mesh;
-
-            Transform[] bones = new Transform[RequiredBoneNames.Length];
-            for (int i = 0; i < RequiredBoneNames.Length; i++)
-            {
-                GameObject boneObject = new GameObject(RequiredBoneNames[i]);
-                boneObject.transform.SetParent(modelObject.transform, worldPositionStays: false);
-                bones[i] = boneObject.transform;
+                var bone = new GameObject(RequiredBoneNames[i]);
+                bone.transform.SetParent(modelObject.transform, false);
+                bones[i] = bone.transform;
             }
-            smr.bones = bones;
+            renderer.bones = bones;
 
             pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
             pmxAsset.Initialize(
-                new byte[] { 0x10, 0x20, 0x30 },
-                "ready-h6-slice0.pmx",
-                Path.Combine("Assets", "ready-h6-slice0.pmx"),
+                new byte[] { 0x10, 0x20 }, "planner-ready.pmx", "Assets/planner-ready.pmx",
                 importedMeshAsset: mesh,
                 importedRootAsset: hierarchyRoot,
                 hierarchyReadinessValue: MmdImportReadiness.Ready,
                 rendererReadinessValue: MmdImportReadiness.Ready,
                 boneBindingReadinessValue: MmdImportReadiness.Ready,
                 parseSummary: new MmdPmxParseSummary(
-                    "ready-h6-model",
+                    "planner-ready",
                     vertexCount: 3,
                     indexCount: 3,
                     boneCount: RequiredBoneNames.Length,
@@ -258,149 +221,42 @@ namespace Mmd.Tests
                     ikCount: 0,
                     rigidbodyCount: 0,
                     jointCount: 0,
-                    boundsMin: new Vector3(-0.5f, 0f, -0.5f),
-                    boundsMax: new Vector3(0.5f, 1f, 0.5f),
+                    boundsMin: new Vector3(-0.5f, 0, 0),
+                    boundsMax: new Vector3(0.5f, 1, 0),
                     materialSummaries: Array.Empty<MmdPmxMaterialSummary>()));
-            setupAsset.Initialize(pmxAsset);
+
+            MmdHumanoidProxyRigResult proxyRig = MmdHumanoidProxyRigFactory.CreateProxyRig(pmxAsset);
+            Assert.That(proxyRig.ProxyRoot, Is.Not.Null, string.Join("\n", proxyRig.Diagnostics));
+            MmdHumanoidAvatarBuildResult avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(proxyRig);
+            Assert.That(avatarResult.Avatar, Is.Not.Null, string.Join("\n", avatarResult.Diagnostics));
+            var bindings = new List<MmdHumanoidRetargetBinding>();
+            foreach (MmdHumanoidBoneMappingMatch match in proxyRig.Matches)
+            {
+                proxyRig.BoneMap.TryGetValue(match.HumanBone, out Transform proxyTransform);
+                bindings.Add(new MmdHumanoidRetargetBinding(
+                    match.HumanBone, match.MmdBoneIndex, proxyTransform, bones[match.MmdBoneIndex]));
+            }
+            proxyRig.ProxyRoot!.transform.SetParent(hierarchyRoot.transform, false);
+            MmdUnityPlaybackController controller = hierarchyRoot.AddComponent<MmdUnityPlaybackController>();
+            controller.ConfigureHumanoidRetarget(
+                proxyRig.ProxyRoot.transform, bindings, Array.Empty<MmdHumanoidAppendTransformBinding>());
+            pmxAsset.ApplyHumanoidAvatarImportSummary(
+                "Humanoid", avatarResult.Avatar, MmdHumanoidMappingReadiness.Ready, "test ready");
 
             ownedObjects.Add(pmxAsset);
             ownedObjects.Add(hierarchyRoot);
             ownedObjects.Add(mesh);
+            ownedObjects.Add(proxyRig.ProxyRoot);
+            ownedObjects.Add(avatarResult.Avatar!);
         }
 
-        // --- Cache-driven VMD analysis (no LoadMotion during AnalyzePrerequisites) -------------
-
-        [Test]
-        public void AnalyzePrerequisites_WithInvalidBytesButInjectedGoodCache_CanBecomeReadyWithSyntheticPmxSetup()
+        private static void DestroyOwnedObjects(IEnumerable<UnityEngine.Object> objects)
         {
-            MmdPmxAsset pmxAsset = null!;
-            MmdVmdAsset vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
-            var setupAsset = ScriptableObject.CreateInstance<MmdHumanoidSetupAsset>();
-            var ownedObjects = new List<UnityEngine.Object> { vmdAsset, setupAsset };
-
-            try
+            foreach (UnityEngine.Object obj in objects)
             {
-                CreateReadyFixturePmxAndSetup(out pmxAsset, setupAsset, ownedObjects);
-                Assert.That(pmxAsset, Is.Not.Null);
-
-                // Invalid (non-VMD) bytes + explicitly injected valid cached summary + empty structural diags.
-                // If planner called LoadMotion it would throw; success without exception proves cache-only path.
-                byte[] garbageBytes = new byte[] { 0x00, 0xDE, 0xAD, 0xBE, 0xEF, 0x42 };
-                var goodSummary = new MmdVmdParseSummary("injected-cache-model", 240, 120, 15, 4, 8);
-                var emptyDiags = Array.Empty<string>();
-                vmdAsset.Initialize(garbageBytes, "injected-cache.vmd", "injected-cache.vmd", goodSummary, emptyDiags);
-
-                Assert.That(vmdAsset.ImportSummaryStatus, Is.EqualTo(MmdVmdImportSummaryStatus.Passed));
-                Assert.That(vmdAsset.StructuralDiagnostics.Count, Is.EqualTo(0));
-
-                MmdHumanoidClipConversionPlan result = MmdHumanoidClipConversionPlanner.AnalyzePrerequisites(
-                    pmxAsset,
-                    vmdAsset,
-                    setupAsset);
-
-                Assert.That(result.PrerequisitesReady, Is.True, "Injected good VMD cache + synthetic ready PMX/setup must be ready.");
-                Assert.That(result.CanCreateClipNow, Is.True);
-                Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidClipConversionPlanner.ReadyReadiness));
-                Assert.That(result.VmdMaxFrame, Is.EqualTo(240));
-                Assert.That(result.VmdBoneKeyframeCount, Is.EqualTo(120));
-                Assert.That(result.VmdMorphKeyframeCount, Is.EqualTo(15));
-                Assert.That(result.VmdModelKeyframeCount, Is.EqualTo(4));
-                Assert.That(string.Join("\n", result.Diagnostics), Does.Contain("conversion-prerequisites: ready"));
-            }
-            finally
-            {
-                foreach (UnityEngine.Object obj in ownedObjects)
+                if (obj != null)
                 {
-                    if (obj != null)
-                    {
-                        UnityEngine.Object.DestroyImmediate(obj);
-                    }
-                }
-            }
-        }
-
-        [Test]
-        public void AnalyzePrerequisites_ReturnsNotReady_ForFailedStatusOrNonEmptyCachedStructuralDiagnostics()
-        {
-            // Use minimal ready PMX/setup (reuse helper) but pair with VMD that has Failed status or diags.
-            MmdPmxAsset pmxAsset = null!;
-            var setupAsset = ScriptableObject.CreateInstance<MmdHumanoidSetupAsset>();
-            var ownedObjects = new List<UnityEngine.Object> { setupAsset };
-
-            try
-            {
-                CreateReadyFixturePmxAndSetup(out pmxAsset, setupAsset, ownedObjects);
-
-                // Case 1: Failed status (via diags that trigger Failed in Apply)
-                MmdVmdAsset vmdFailed = ScriptableObject.CreateInstance<MmdVmdAsset>();
-                ownedObjects.Add(vmdFailed);
-                byte[] bytes1 = new byte[] { 0x01 };
-                var failSummary = new MmdVmdParseSummary("fail-model", 10, 1, 0, 0, 0);
-                var failDiags = new[] { "Failed to parse VMD during import" };
-                vmdFailed.Initialize(bytes1, "fail.vmd", "fail.vmd", failSummary, failDiags);
-                Assert.That(vmdFailed.ImportSummaryStatus, Is.EqualTo(MmdVmdImportSummaryStatus.Failed));
-
-                MmdHumanoidClipConversionPlan r1 = MmdHumanoidClipConversionPlanner.AnalyzePrerequisites(pmxAsset, vmdFailed, setupAsset);
-                Assert.That(r1.PrerequisitesReady, Is.False);
-                Assert.That(r1.CanCreateClipNow, Is.False);
-                Assert.That(r1.Readiness, Is.EqualTo(MmdHumanoidClipConversionPlanner.NotReadyReadiness));
-                Assert.That(string.Join("\n", r1.Diagnostics), Does.Contain("vmd validation failed").Or.Contain("Failed"));
-
-                // Case 2: Passed but non-empty structural diagnostics (simulated; planner must treat as not ready)
-                MmdVmdAsset vmdWithDiags = ScriptableObject.CreateInstance<MmdVmdAsset>();
-                ownedObjects.Add(vmdWithDiags);
-                byte[] bytes2 = new byte[] { 0x02 };
-                var okSummary = new MmdVmdParseSummary("diag-model", 30, 5, 1, 0, 1);
-                var structuralDiags = new[] { "structural: duplicate bone keyframe or invalid interp" };
-                vmdWithDiags.Initialize(bytes2, "diag.vmd", "diag.vmd", okSummary, structuralDiags);
-                // Note: Apply may set Failed if diags[0] contains "Failed to", here it won't; status may be Passed but we still check diags.
-                MmdHumanoidClipConversionPlan r2 = MmdHumanoidClipConversionPlanner.AnalyzePrerequisites(pmxAsset, vmdWithDiags, setupAsset);
-                Assert.That(r2.PrerequisitesReady, Is.False);
-                Assert.That(string.Join("\n", r2.Diagnostics), Does.Contain("cached structural diagnostics present"));
-            }
-            finally
-            {
-                foreach (UnityEngine.Object obj in ownedObjects)
-                {
-                    if (obj != null)
-                    {
-                        UnityEngine.Object.DestroyImmediate(obj);
-                    }
-                }
-            }
-        }
-
-        [Test]
-        public void AnalyzePrerequisites_ReturnsNotReady_ForNotParsedCache()
-        {
-            MmdPmxAsset pmxAsset = null!;
-            MmdVmdAsset vmdNotParsed = ScriptableObject.CreateInstance<MmdVmdAsset>();
-            var setupAsset = ScriptableObject.CreateInstance<MmdHumanoidSetupAsset>();
-            var ownedObjects = new List<UnityEngine.Object> { vmdNotParsed, setupAsset };
-
-            try
-            {
-                CreateReadyFixturePmxAndSetup(out pmxAsset, setupAsset, ownedObjects);
-
-                // Freshly created asset has NotParsed default, no Initialize call -> cache missing.
-                Assert.That(vmdNotParsed.ImportSummaryStatus, Is.EqualTo(MmdVmdImportSummaryStatus.NotParsed));
-
-                MmdHumanoidClipConversionPlan result = MmdHumanoidClipConversionPlanner.AnalyzePrerequisites(
-                    pmxAsset, vmdNotParsed, setupAsset);
-
-                Assert.That(result.PrerequisitesReady, Is.False);
-                Assert.That(result.CanCreateClipNow, Is.False);
-                Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidClipConversionPlanner.NotReadyReadiness));
-                Assert.That(string.Join("\n", result.Diagnostics), Does.Contain("NotParsed").Or.Contain("cache missing").Or.Contain("Reimport"));
-            }
-            finally
-            {
-                foreach (UnityEngine.Object obj in ownedObjects)
-                {
-                    if (obj != null)
-                    {
-                        UnityEngine.Object.DestroyImmediate(obj);
-                    }
+                    UnityEngine.Object.DestroyImmediate(obj);
                 }
             }
         }

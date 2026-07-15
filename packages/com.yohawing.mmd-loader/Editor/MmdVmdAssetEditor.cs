@@ -22,7 +22,6 @@ namespace Mmd.Editor
         // Non-persistent preview references for Humanoid Clip Readiness (per Inspector lifetime).
         // Selection/inspector display must not trigger VMD parse; planner now uses import cache only.
         private MmdPmxAsset? previewPmxAsset;
-        private MmdHumanoidSetupAsset? previewSetupAsset;
 
         public override void OnInspectorGUI()
         {
@@ -75,8 +74,7 @@ namespace Mmd.Editor
                     EditorGUILayout.Space();
                     MmdAssetInspectorUtility.DrawVmdHumanoidClipReadinessSection(
                         asset,
-                        ref previewPmxAsset,
-                        ref previewSetupAsset);
+                        ref previewPmxAsset);
                 }
             }
             else

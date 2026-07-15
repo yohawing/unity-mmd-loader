@@ -2,6 +2,12 @@
 
 All notable changes to `com.yohawing.mmd-loader` are documented here.
 
+## [Unreleased]
+
+### Changed
+
+- Humanoid AnimationClip bake now uses only the Avatar and retarget mapping persisted by PMX Humanoid import; the duplicate setup-asset workflow has been removed.
+
 ## [0.1.3] - 2026-07-11
 
 ### Added
@@ -76,7 +82,7 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 - Default PMX import scale of 0.1 for human-friendly meter-scale models, with import-scale-aware Live physics and VMD camera framing.
 - Humanoid rig setup at import (Animator plus a persistent proxy control rig) with retargeted playback that drives the real MMD bones and append (付与) transforms and steps Live physics.
 - Unified MmdHumanoidAnimationTrack: a single Timeline track poses the Humanoid avatar and drives the native MMD model via retarget side-effect, replacing the former two-track setup.
-- Explicit Humanoid AnimationClip bake path when PMX, VMD, and Humanoid setup prerequisites are ready.
+- Explicit Humanoid AnimationClip bake path when PMX, VMD, and imported Humanoid prerequisites are ready.
 - Windows x86_64 packaged native runtime binaries (mmd-anim v0.1.5).
 
 ### Known Limitations

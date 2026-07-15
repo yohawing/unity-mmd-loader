@@ -18,7 +18,6 @@ namespace Mmd.Editor
         private UnityEngine.Object? pmxDisplayObject;
         private MmdPmxAsset? pmxAsset;
         private MmdVmdAsset? vmdAsset;
-        private MmdHumanoidSetupAsset? setupAsset;
         private ClipType clipType;
         private int startFrame;
         private int endFrame;
@@ -42,7 +41,6 @@ namespace Mmd.Editor
             window.pmxAsset = pmxAsset;
             window.pmxDisplayObject = GetPmxDisplayObject(pmxAsset, pmxAsset);
             window.vmdAsset = null;
-            window.setupAsset = null;
             window.clipType = preferHumanoid ? ClipType.Humanoid : ClipType.Generic;
             window.startFrame = 0;
             window.endFrame = 0;
@@ -61,7 +59,6 @@ namespace Mmd.Editor
             window.pmxAsset = null;
             window.pmxDisplayObject = null;
             window.vmdAsset = vmdAsset;
-            window.setupAsset = null;
             window.clipType = ClipType.Generic;
             window.startFrame = 0;
             window.endFrame = 0;
@@ -75,7 +72,6 @@ namespace Mmd.Editor
         internal MmdPmxAsset? PmxAssetForTests => pmxAsset;
         internal UnityEngine.Object? PmxDisplayObjectForTests => pmxDisplayObject;
         internal MmdVmdAsset? VmdAssetForTests => vmdAsset;
-        internal MmdHumanoidSetupAsset? SetupAssetForTests => setupAsset;
         internal ClipType ClipTypeForTests => clipType;
         internal int EndFrameForTests => endFrame;
         internal int MaxFrameForTests => vmdAsset?.MaxFrame ?? 0;
@@ -94,14 +90,6 @@ namespace Mmd.Editor
         internal void SetVmdAssetForTests(MmdVmdAsset? asset)
         {
             SetVmdAsset(asset);
-        }
-
-        internal void SetSetupAssetForTests(MmdHumanoidSetupAsset? asset)
-        {
-            setupAsset = asset;
-            diagnostics.Clear();
-            RefreshDefaultOutputPath();
-            Repaint();
         }
 
         internal void SetClipTypeForTests(ClipType type)
@@ -146,24 +134,6 @@ namespace Mmd.Editor
             if (EditorGUI.EndChangeCheck())
             {
                 SetVmdAsset(nextVmd);
-            }
-
-            if (clipType == ClipType.Humanoid)
-            {
-                EditorGUI.BeginChangeCheck();
-                MmdHumanoidSetupAsset? nextSetup = (MmdHumanoidSetupAsset?)EditorGUILayout.ObjectField(
-                    new GUIContent(
-                        "Humanoid Setup (Optional)",
-                        "Optional manual mapping override. Humanoid-ready PMX imports use their imported Avatar and mapping by default."),
-                    setupAsset,
-                    typeof(MmdHumanoidSetupAsset),
-                    allowSceneObjects: false);
-                if (EditorGUI.EndChangeCheck())
-                {
-                    setupAsset = nextSetup;
-                    diagnostics.Clear();
-                    RefreshDefaultOutputPath();
-                }
             }
 
             startFrame = EditorGUILayout.IntField("Start Frame", startFrame);
@@ -288,8 +258,7 @@ namespace Mmd.Editor
             {
                 return MmdHumanoidClipConversionPlanner.AnalyzePrerequisites(
                     pmxAsset,
-                    vmdAsset,
-                    setupAsset);
+                    vmdAsset);
             }
             catch (Exception ex)
             {
@@ -335,7 +304,6 @@ namespace Mmd.Editor
                 MmdHumanoidClipConversionWriter.CreateHumanoidAnimationClipAsset(
                     pmxAsset,
                     vmdAsset,
-                    setupAsset,
                     frameRate,
                     startFrame,
                     endFrame,
@@ -369,7 +337,7 @@ namespace Mmd.Editor
         {
             outputPath = clipType == ClipType.Generic
                 ? MmdGenericAnimationClipWriter.GetDefaultOutputPath(pmxAsset, vmdAsset)
-                : MmdHumanoidClipConversionWriter.GetDefaultOutputPath(setupAsset, pmxAsset, vmdAsset);
+                : MmdHumanoidClipConversionWriter.GetDefaultOutputPath(pmxAsset, vmdAsset);
         }
     }
 }

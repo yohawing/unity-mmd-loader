@@ -17,8 +17,7 @@ namespace Mmd.Editor
     {
         public static void DrawVmdHumanoidClipReadinessSection(
             MmdVmdAsset vmdAsset,
-            ref MmdPmxAsset? previewPmx,
-            ref MmdHumanoidSetupAsset? previewSetup)
+            ref MmdPmxAsset? previewPmx)
         {
             if (vmdAsset == null)
             {
@@ -33,13 +32,7 @@ namespace Mmd.Editor
                 typeof(MmdPmxAsset),
                 allowSceneObjects: false);
 
-            previewSetup = (MmdHumanoidSetupAsset?)EditorGUILayout.ObjectField(
-                "Humanoid Setup Asset",
-                previewSetup,
-                typeof(MmdHumanoidSetupAsset),
-                allowSceneObjects: false);
-
-            MmdHumanoidClipConversionPlan plan = ComputeHumanoidClipReadinessForVmd(vmdAsset, previewPmx, previewSetup);
+            MmdHumanoidClipConversionPlan plan = ComputeHumanoidClipReadinessForVmd(vmdAsset, previewPmx);
 
             using (new EditorGUI.DisabledScope(true))
             {
@@ -59,17 +52,16 @@ namespace Mmd.Editor
 
         internal static MmdHumanoidClipConversionPlan ComputeHumanoidClipReadinessForVmd(
             MmdVmdAsset vmdAsset,
-            MmdPmxAsset? pmxAsset,
-            MmdHumanoidSetupAsset? setupAsset)
+            MmdPmxAsset? pmxAsset)
         {
             // Delegates to planner. Planner AnalyzePrerequisites uses VMD import cache only (no LoadMotion).
             // This helper is testable without IMGUI and without triggering full VMD parse.
             if (vmdAsset == null)
             {
                 // Planner handles null vmd; return its not-ready plan for consistency.
-                return MmdHumanoidClipConversionPlanner.AnalyzePrerequisites(pmxAsset, null, setupAsset);
+                return MmdHumanoidClipConversionPlanner.AnalyzePrerequisites(pmxAsset, null);
             }
-            return MmdHumanoidClipConversionPlanner.AnalyzePrerequisites(pmxAsset, vmdAsset, setupAsset);
+            return MmdHumanoidClipConversionPlanner.AnalyzePrerequisites(pmxAsset, vmdAsset);
         }
 
         internal static string FormatCompactVmdHumanoidIssues(MmdHumanoidClipConversionPlan plan)
@@ -88,7 +80,7 @@ namespace Mmd.Editor
             {
                 return "Humanoid Clip prerequisites not ready.";
             }
-            // Keep compact: surface first 1-2 actionable items (PMX missing, setup mismatch, VMD cache fail, hierarchy not ready, etc.).
+            // Keep compact: surface first 1-2 actionable items (PMX missing, VMD cache fail, hierarchy not ready, etc.).
             int take = System.Math.Min(2, diags.Count);
             return string.Join(" | ", diags.Take(take));
         }

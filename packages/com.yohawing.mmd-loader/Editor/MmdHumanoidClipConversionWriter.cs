@@ -17,14 +17,13 @@ namespace Mmd.Editor
         public static MmdHumanoidClipConversionWriterResult CreateHumanoidAnimationClipAsset(
             MmdPmxAsset pmxAsset,
             MmdVmdAsset vmdAsset,
-            MmdHumanoidSetupAsset? setupAsset,
             float frameRate,
             int startFrame = 0,
             int? endFrame = null,
             string? outputPath = null)
         {
             MmdHumanoidClipConversionWriterResult inMemoryResult =
-                CreateInMemoryClip(pmxAsset, vmdAsset, setupAsset, frameRate, startFrame, endFrame);
+                CreateInMemoryClip(pmxAsset, vmdAsset, frameRate, startFrame, endFrame);
             List<string> diagnostics = new(inMemoryResult.Diagnostics);
 
             if (inMemoryResult.Clip == null || !inMemoryResult.PrerequisitesReady || !inMemoryResult.CanCreateClipNow)
@@ -32,7 +31,7 @@ namespace Mmd.Editor
                 return new MmdHumanoidClipConversionWriterResult(null, inMemoryResult.Plan, diagnostics);
             }
 
-            string fallbackPath = GetDefaultOutputPath(setupAsset, pmxAsset, vmdAsset);
+            string fallbackPath = GetDefaultOutputPath(pmxAsset, vmdAsset);
             string requestedPath = outputPath == null ? fallbackPath : outputPath;
             if (!TryNormalizeAndValidateOutputPath(requestedPath, diagnostics, out string normalizedOutputPath))
             {
@@ -76,25 +75,10 @@ namespace Mmd.Editor
         }
 
         public static string GetDefaultOutputPath(
-            MmdHumanoidSetupAsset? setupAsset,
             MmdPmxAsset? pmxAsset,
             MmdVmdAsset? vmdAsset)
         {
             string directory = "Assets";
-            if (setupAsset != null && AssetDatabase.Contains(setupAsset))
-            {
-                string? setupAssetPath = AssetDatabase.GetAssetPath(setupAsset);
-                if (!string.IsNullOrWhiteSpace(setupAssetPath)
-                    && setupAssetPath.StartsWith("Assets/", StringComparison.Ordinal))
-                {
-                    string? setupDirectory = Path.GetDirectoryName(setupAssetPath)?.Replace('\\', '/');
-                    if (setupDirectory is { Length: > 0 } && !string.IsNullOrWhiteSpace(setupDirectory))
-                    {
-                        directory = setupDirectory;
-                    }
-                }
-            }
-
             return directory + "/"
                    + "H6_HumanoidClip_"
                    + NormalizeIdentifier(pmxAsset?.SourceId ?? "pmx")
@@ -151,7 +135,6 @@ namespace Mmd.Editor
         public static MmdHumanoidClipConversionWriterResult CreateInMemoryClip(
             MmdPmxAsset pmxAsset,
             MmdVmdAsset vmdAsset,
-            MmdHumanoidSetupAsset? setupAsset,
             float frameRate,
             int startFrame = 0,
             int? endFrame = null)
@@ -159,7 +142,7 @@ namespace Mmd.Editor
             List<string> diagnostics = new();
 
             MmdHumanoidClipConversionPlan plan =
-                MmdHumanoidClipConversionPlanner.AnalyzePrerequisites(pmxAsset, vmdAsset, setupAsset);
+                MmdHumanoidClipConversionPlanner.AnalyzePrerequisites(pmxAsset, vmdAsset);
             diagnostics.AddRange(plan.Diagnostics);
 
             if (!plan.PrerequisitesReady || !plan.CanCreateClipNow)
@@ -218,94 +201,54 @@ namespace Mmd.Editor
             var mappedBones = new List<(HumanBodyBones HumanBone, Transform ProxyTransform, string SourceBoneName)>();
             GameObject? proxyRoot = null;
             Avatar? proxyAvatar = null;
-            bool ownsProxyAvatar = false;
             try
             {
                 var usedHumanBones = new HashSet<HumanBodyBones>();
                 var boneKeyframesByName = BuildBoneKeyframesByName(motion.boneKeyframes);
 
-                if (setupAsset != null)
+                var importedStateDiagnostics = new List<string>();
+                if (!MmdHumanoidClipConversionPlanner.TryResolveImportedHumanoidState(
+                        pmxAsset,
+                        importedStateDiagnostics,
+                        out Mmd.UnityIntegration.MmdUnityPlaybackController? controller,
+                        out Transform[] nativeBones)
+                    || controller == null
+                    || controller.HumanoidProxyRoot == null)
                 {
-                    MmdHumanoidProxyRigResult proxyRigResult = MmdHumanoidProxyRigFactory.CreateProxyRig(pmxAsset);
-                    diagnostics.AddRange(proxyRigResult.Diagnostics);
-                    proxyRoot = proxyRigResult.ProxyRoot;
-                    if (proxyRoot == null)
+                    diagnostics.AddRange(importedStateDiagnostics);
+                    diagnostics.Add("validation: imported PMX Humanoid mapping became unavailable before writing.");
+                    return new MmdHumanoidClipConversionWriterResult(null, plan, diagnostics);
+                }
+
+                Transform importedProxyRoot = controller.HumanoidProxyRoot;
+                proxyRoot = UnityEngine.Object.Instantiate(importedProxyRoot.gameObject);
+                proxyRoot.name = importedProxyRoot.gameObject.name + "_ClipBake";
+                foreach (MmdHumanoidRetargetBinding binding in controller.HumanoidRetargetEntries)
+                {
+                    if (binding == null || !usedHumanBones.Add(binding.HumanBone))
                     {
-                        diagnostics.Add("validation: failed to create temporary proxy rig.");
+                        continue;
+                    }
+
+                    string proxyPath = AnimationUtility.CalculateTransformPath(
+                        binding.ProxyTransform,
+                        importedProxyRoot);
+                    Transform? clonedProxyTransform = string.IsNullOrEmpty(proxyPath)
+                        ? proxyRoot.transform
+                        : proxyRoot.transform.Find(proxyPath);
+                    if (clonedProxyTransform == null)
+                    {
+                        diagnostics.Add(
+                            "validation: imported proxy mapping path could not be resolved for "
+                            + binding.HumanBone + ".");
                         return new MmdHumanoidClipConversionWriterResult(null, plan, diagnostics);
                     }
 
-                    foreach (MmdSerializableBoneMappingEntry mappingEntry in setupAsset.MappingEntries)
-                    {
-                        if (mappingEntry == null || usedHumanBones.Contains(mappingEntry.HumanBone))
-                        {
-                            continue;
-                        }
-
-                        if (string.IsNullOrWhiteSpace(mappingEntry.MmdBoneName))
-                        {
-                            continue;
-                        }
-
-                        if (proxyRigResult.BoneMap.TryGetValue(mappingEntry.HumanBone, out Transform? proxyTransform))
-                        {
-                            usedHumanBones.Add(mappingEntry.HumanBone);
-                            mappedBones.Add((mappingEntry.HumanBone, proxyTransform, mappingEntry.MmdBoneName));
-                        }
-                    }
-
-                    MmdHumanoidAvatarBuildResult avatarResult =
-                        MmdHumanoidProxyRigFactory.BuildAvatar(proxyRigResult);
-                    diagnostics.AddRange(avatarResult.Diagnostics);
-                    proxyAvatar = avatarResult.Avatar;
-                    ownsProxyAvatar = proxyAvatar != null;
+                    string sourceBoneName = nativeBones[binding.MmdBoneIndex].name;
+                    mappedBones.Add((binding.HumanBone, clonedProxyTransform, sourceBoneName));
                 }
-                else
-                {
-                    var importedStateDiagnostics = new List<string>();
-                    if (!MmdHumanoidClipConversionPlanner.TryResolveImportedHumanoidState(
-                            pmxAsset,
-                            importedStateDiagnostics,
-                            out Mmd.UnityIntegration.MmdUnityPlaybackController? controller,
-                            out Transform[] nativeBones)
-                        || controller == null
-                        || controller.HumanoidProxyRoot == null)
-                    {
-                        diagnostics.AddRange(importedStateDiagnostics);
-                        diagnostics.Add("validation: imported PMX Humanoid mapping became unavailable before writing.");
-                        return new MmdHumanoidClipConversionWriterResult(null, plan, diagnostics);
-                    }
 
-                    Transform importedProxyRoot = controller.HumanoidProxyRoot;
-                    proxyRoot = UnityEngine.Object.Instantiate(importedProxyRoot.gameObject);
-                    proxyRoot.name = importedProxyRoot.gameObject.name + "_ClipBake";
-                    foreach (MmdHumanoidRetargetBinding binding in controller.HumanoidRetargetEntries)
-                    {
-                        if (binding == null || !usedHumanBones.Add(binding.HumanBone))
-                        {
-                            continue;
-                        }
-
-                        string proxyPath = AnimationUtility.CalculateTransformPath(
-                            binding.ProxyTransform,
-                            importedProxyRoot);
-                        Transform? clonedProxyTransform = string.IsNullOrEmpty(proxyPath)
-                            ? proxyRoot.transform
-                            : proxyRoot.transform.Find(proxyPath);
-                        if (clonedProxyTransform == null)
-                        {
-                            diagnostics.Add(
-                                "validation: imported proxy mapping path could not be resolved for "
-                                + binding.HumanBone + ".");
-                            return new MmdHumanoidClipConversionWriterResult(null, plan, diagnostics);
-                        }
-
-                        string sourceBoneName = nativeBones[binding.MmdBoneIndex].name;
-                        mappedBones.Add((binding.HumanBone, clonedProxyTransform, sourceBoneName));
-                    }
-
-                    proxyAvatar = pmxAsset.ImportedAvatar;
-                }
+                proxyAvatar = pmxAsset.ImportedAvatar;
 
                 if (mappedBones.Count == 0)
                 {
@@ -364,11 +307,6 @@ namespace Mmd.Editor
             }
             finally
             {
-                if (ownsProxyAvatar && proxyAvatar != null)
-                {
-                    UnityEngine.Object.DestroyImmediate(proxyAvatar);
-                }
-
                 if (proxyRoot != null)
                 {
                     UnityEngine.Object.DestroyImmediate(proxyRoot);

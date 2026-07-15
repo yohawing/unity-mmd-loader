@@ -27,7 +27,7 @@ namespace Mmd
             ProxyRoot = proxyRoot;
             BoneMap = boneMap ?? new Dictionary<HumanBodyBones, Transform>();
             Matches = matches ?? Array.Empty<MmdHumanoidBoneMappingMatch>();
-            Readiness = readiness ?? MmdHumanoidSetupAsset.NotEvaluatedReadiness;
+            Readiness = readiness ?? MmdHumanoidMappingReadiness.NotEvaluated;
             Diagnostics = diagnostics ?? Array.Empty<string>();
         }
 
@@ -205,7 +205,7 @@ namespace Mmd
             string readiness = report.Readiness;
 
             // Stop early if there are no bones at all.
-            if (readiness == MmdHumanoidSetupAsset.NoBonesReadiness)
+            if (readiness == MmdHumanoidMappingReadiness.NoBones)
             {
                 return new MmdHumanoidProxyRigResult(
                     null,
@@ -350,7 +350,7 @@ namespace Mmd
                     null,
                     null,
                     Array.Empty<MmdHumanoidBoneMappingMatch>(),
-                    MmdHumanoidSetupAsset.HierarchyNotReadyReadiness,
+                    MmdHumanoidMappingReadiness.HierarchyNotReady,
                     new[] { "hierarchy-not-ready: ImportedRoot is null. Reimport the .pmx asset." });
             }
 
@@ -365,7 +365,7 @@ namespace Mmd
                         null,
                         null,
                         Array.Empty<MmdHumanoidBoneMappingMatch>(),
-                        MmdHumanoidSetupAsset.HierarchyNotReadyReadiness,
+                        MmdHumanoidMappingReadiness.HierarchyNotReady,
                         new[] { "hierarchy-not-ready: No SkinnedMeshRenderer found under ImportedRoot." });
                 }
 
@@ -375,7 +375,7 @@ namespace Mmd
                         null,
                         null,
                         Array.Empty<MmdHumanoidBoneMappingMatch>(),
-                        MmdHumanoidSetupAsset.HierarchyNotReadyReadiness,
+                        MmdHumanoidMappingReadiness.HierarchyNotReady,
                         new[] { "hierarchy-not-ready: SkinnedMeshRenderer.bones is null under ImportedRoot." });
                 }
 
@@ -385,7 +385,7 @@ namespace Mmd
                         null,
                         null,
                         Array.Empty<MmdHumanoidBoneMappingMatch>(),
-                        MmdHumanoidSetupAsset.HierarchyNotReadyReadiness,
+                        MmdHumanoidMappingReadiness.HierarchyNotReady,
                         new[]
                         {
                             "hierarchy-not-ready: SkinnedMeshRenderer.bones length does not match PMX BoneCount."
@@ -400,7 +400,7 @@ namespace Mmd
                             null,
                             null,
                             Array.Empty<MmdHumanoidBoneMappingMatch>(),
-                            MmdHumanoidSetupAsset.HierarchyNotReadyReadiness,
+                            MmdHumanoidMappingReadiness.HierarchyNotReady,
                             new[] { "hierarchy-not-ready: SkinnedMeshRenderer.bones contains null entry." });
                     }
                 }
@@ -416,7 +416,7 @@ namespace Mmd
                 null,
                 null,
                 Array.Empty<MmdHumanoidBoneMappingMatch>(),
-                MmdHumanoidSetupAsset.NoBonesReadiness,
+                MmdHumanoidMappingReadiness.NoBones,
                 new[] { "no-bones: PMX model has no bones." });
         }
 
@@ -494,13 +494,13 @@ namespace Mmd
                 }
             }
 
-            if (readiness == MmdHumanoidSetupAsset.NoBonesReadiness)
+            if (readiness == MmdHumanoidMappingReadiness.NoBones)
             {
                 return new MmdHumanoidProxyRigResult(
                     null,
                     null,
                     matches.AsReadOnly(),
-                    MmdHumanoidSetupAsset.NoBonesReadiness,
+                    MmdHumanoidMappingReadiness.NoBones,
                     diagnostics.ToArray());
             }
 
@@ -816,7 +816,7 @@ namespace Mmd
             GameObject root = proxyRig.ProxyRoot;
             var diagnostics = new List<string>();
 
-            if (!string.Equals(proxyRig.Readiness, MmdHumanoidSetupAsset.ReadyReadiness, StringComparison.Ordinal))
+            if (!string.Equals(proxyRig.Readiness, MmdHumanoidMappingReadiness.Ready, StringComparison.Ordinal))
             {
                 diagnostics.Add("avatar-build: skipped because proxy rig readiness is " + proxyRig.Readiness);
                 diagnostics.AddRange(proxyRig.Diagnostics);
@@ -1210,7 +1210,7 @@ namespace Mmd
         {
             if (sourceBoneCount == 0)
             {
-                return MmdHumanoidSetupAsset.NoBonesReadiness;
+                return MmdHumanoidMappingReadiness.NoBones;
             }
 
             int requiredMapped = 0;
@@ -1225,8 +1225,8 @@ namespace Mmd
             }
 
             return requiredMapped >= MmdHumanoidBoneMappingEvaluator.RequiredHumanBoneCount
-                ? MmdHumanoidSetupAsset.ReadyReadiness
-                : MmdHumanoidSetupAsset.MissingRequiredReadiness;
+                ? MmdHumanoidMappingReadiness.Ready
+                : MmdHumanoidMappingReadiness.MissingRequired;
         }
     }
 }

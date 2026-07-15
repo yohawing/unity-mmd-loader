@@ -51,7 +51,7 @@ namespace Mmd.Tests
 
             MmdHumanoidBoneMappingReport report = MmdHumanoidBoneMappingEvaluator.Evaluate(model);
 
-            Assert.That(report.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
+            Assert.That(report.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.Ready));
             Assert.That(report.RequiredMappedBoneCount, Is.EqualTo(16));
             Assert.That(report.OptionalMappedBoneCount, Is.EqualTo(3));
             Assert.That(report.MissingRequiredBoneCount, Is.EqualTo(0));
@@ -93,7 +93,7 @@ namespace Mmd.Tests
 
             MmdHumanoidBoneMappingReport report = MmdHumanoidBoneMappingEvaluator.Evaluate(model);
 
-            Assert.That(report.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
+            Assert.That(report.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.Ready));
             Assert.That(report.OptionalMappedBoneCount, Is.EqualTo(7));
 
             Assert.That(MmdHumanoidBoneMappingEvaluator.TryMapBoneName("左肩", out HumanBodyBones shoulderLeft, out bool shoulderLeftRequired),
@@ -183,7 +183,7 @@ namespace Mmd.Tests
             MmdModelDefinition missingModel = CreateHumanoidMappingModel("下半身", "上半身", "頭");
             MmdHumanoidBoneMappingReport missingReport = MmdHumanoidBoneMappingEvaluator.Evaluate(missingModel);
 
-            Assert.That(missingReport.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.MissingRequiredReadiness));
+            Assert.That(missingReport.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.MissingRequired));
             Assert.That(missingReport.RequiredMappedBoneCount, Is.EqualTo(3));
             Assert.That(missingReport.MissingRequiredBoneCount, Is.EqualTo(13));
             Assert.That(string.Join("\n", missingReport.Diagnostics), Does.Contain("missing-required"));
@@ -208,37 +208,9 @@ namespace Mmd.Tests
                 "右手首");
             MmdHumanoidBoneMappingReport ambiguousReport = MmdHumanoidBoneMappingEvaluator.Evaluate(ambiguousModel);
 
-            Assert.That(ambiguousReport.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.AmbiguousReadiness));
+            Assert.That(ambiguousReport.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.Ambiguous));
             Assert.That(ambiguousReport.AmbiguousMappingCount, Is.EqualTo(1));
             Assert.That(string.Join("\n", ambiguousReport.Diagnostics), Does.Contain("ambiguous: Hips"));
-        }
-        [Test]
-        public void HumanoidSetupAssetBuilderRejectsTraversalPathBeforeCreatingDirectories()
-        {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
-            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
-            string outsideDirectoryName = "__MmdHumanoidTraversalShouldNotExist_" + System.Guid.NewGuid().ToString("N");
-            string traversalAssetPath = "Assets/../" + outsideDirectoryName + "/humanoid.asset";
-
-            Assert.Throws<System.ArgumentException>(
-                () => MmdHumanoidSetupAssetBuilder.CreateHumanoidSetupAsset(pmxAsset, traversalAssetPath));
-            Assert.That(Directory.Exists(Path.Combine(ProjectRoot, outsideDirectoryName)), Is.False);
-        }
-        [Test]
-        public void HumanoidSetupAssetUsesCustomMetadataInspector()
-        {
-            MmdHumanoidSetupAsset setup = ScriptableObject.CreateInstance<MmdHumanoidSetupAsset>();
-            try
-            {
-                UnityEditor.Editor editor = UnityEditor.Editor.CreateEditor(setup);
-
-                Assert.That(editor, Is.TypeOf<MmdHumanoidSetupAssetEditor>());
-                editor.OnInspectorGUI();
-            }
-            finally
-            {
-                Object.DestroyImmediate(setup);
-            }
         }
         [Test]
         public void HumanoidBoneMappingEvaluatorReportCarriesMappingEntriesForRequiredOptionalAndFinger()
@@ -290,31 +262,6 @@ namespace Mmd.Tests
             Assert.That(optionalCount, Is.EqualTo(2), "should have 2 optional entries");
             Assert.That(fingerCount, Is.EqualTo(4), "should have 4 finger entries");
             Assert.That(entries.Length, Is.EqualTo(10), "total 10 mapping entries");
-        }
-        [Test]
-        public void HumanoidSetupAssetStoresMappingEntriesAfterInitialize()
-        {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
-            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
-
-            MmdHumanoidSetupAsset setup = MmdHumanoidSetupAssetBuilder.CreateHumanoidSetupAsset(
-                pmxAsset,
-                TempHumanoidSetupPath,
-                MmdHumanoidSetupPreset.MmdStandard);
-
-            Assert.That(setup.MappingEntries, Is.Not.Null);
-            // test_1bone_cube.pmx has 1 bone -> at most 1 matching entry
-            Assert.That(setup.MappingEntries.Count, Is.GreaterThanOrEqualTo(0));
-            Assert.That(setup.MappingEntries.Count, Is.LessThanOrEqualTo(1));
-
-            // Verify public read-only exposure via foreach and indexer
-            var entries = setup.MappingEntries;
-            foreach (MmdSerializableBoneMappingEntry entry in entries)
-            {
-                Assert.That(entry.HumanBone, Is.Not.EqualTo(HumanBodyBones.LastBone));
-                Assert.That(entry.MmdBoneName, Is.Not.Empty);
-                Assert.That(entry.Category, Is.Not.Empty);
-            }
         }
         [Test]
         public void PmxPrefabExporterCreatesPrefabWithPersistentMeshMaterialAndProvenance()
@@ -532,40 +479,6 @@ namespace Mmd.Tests
             finally
             {
                 Object.DestroyImmediate(root);
-            }
-        }
-        [Test]
-        public void ImportedPmxHumanoidSetupUsesImportedHierarchyMappingSource()
-        {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
-
-            MmdPmxAsset? loadedPmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
-            Assert.That(loadedPmxAsset, Is.Not.Null);
-            MmdPmxAsset pmxAsset = loadedPmxAsset!;
-            Assert.That(pmxAsset.ImportedRoot, Is.Not.Null);
-
-            GameObject importedRoot = pmxAsset.ImportedRoot!;
-            SkinnedMeshRenderer? nullableSmr = importedRoot.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true);
-            Assert.That(nullableSmr, Is.Not.Null);
-            SkinnedMeshRenderer smr = nullableSmr!;
-
-            var setup = ScriptableObject.CreateInstance<MmdHumanoidSetupAsset>();
-            try
-            {
-                Assert.That(() => setup.Initialize(pmxAsset), Throws.Nothing);
-                Assert.That(setup.MappingInputSource, Is.EqualTo(MmdHumanoidSetupAsset.ImportedHierarchyInputSource));
-
-                foreach (MmdSerializableBoneMappingEntry entry in setup.MappingEntries)
-                {
-                    Assert.That(entry.MmdBoneIndex, Is.GreaterThanOrEqualTo(0));
-                    Assert.That(entry.MmdBoneIndex, Is.LessThan(smr.bones.Length));
-                    Assert.That(smr.bones[entry.MmdBoneIndex], Is.Not.Null);
-                    Assert.That(smr.bones[entry.MmdBoneIndex].name, Is.EqualTo(entry.MmdBoneName));
-                }
-            }
-            finally
-            {
-                Object.DestroyImmediate(setup);
             }
         }
     }

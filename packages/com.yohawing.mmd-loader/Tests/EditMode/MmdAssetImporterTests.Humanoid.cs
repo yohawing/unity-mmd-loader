@@ -487,42 +487,5 @@ namespace Mmd.Tests
                 Object.DestroyImmediate(parent);
             }
         }
-        [Test]
-        public void HumanoidSetupAssetBuilderCreatesSettingsOnlyAsset()
-        {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
-            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
-
-            Assert.That(
-                MmdHumanoidSetupAssetBuilder.GetDefaultSetupAssetPath(pmxAsset),
-                Is.EqualTo(TempDirectory + "/MmdHumanoidSetup.asset"));
-
-            MmdHumanoidSetupAsset setup = MmdHumanoidSetupAssetBuilder.CreateHumanoidSetupAsset(
-                pmxAsset,
-                TempHumanoidSetupPath,
-                MmdHumanoidSetupPreset.MmdStandard);
-
-            Assert.That(setup, Is.Not.Null);
-            Assert.That(AssetDatabase.GetAssetPath(setup), Is.EqualTo(TempHumanoidSetupPath));
-            Assert.That(setup.PmxAsset, Is.SameAs(pmxAsset));
-            Assert.That(setup.SetupPreset, Is.EqualTo(MmdHumanoidSetupPreset.MmdStandard));
-            Assert.That(setup.PmxBoneCount, Is.EqualTo(pmxAsset.BoneCount));
-            Assert.That(setup.MappingReadiness, Is.EqualTo(MmdHumanoidSetupAsset.MissingRequiredReadiness));
-            Assert.That(setup.RequiredMappedBoneCount, Is.EqualTo(0));
-            Assert.That(setup.OptionalMappedBoneCount, Is.EqualTo(0));
-            Assert.That(setup.MissingRequiredBoneCount, Is.GreaterThan(0));
-            Assert.That(setup.AmbiguousMappingCount, Is.EqualTo(0));
-            Assert.That(setup.MappingDiagnostics, Is.Not.Empty);
-            Assert.That(setup.NativePlaybackImpact, Is.EqualTo(MmdHumanoidSetupAsset.NoNativePlaybackImpact));
-            foreach (System.Reflection.FieldInfo field in typeof(MmdHumanoidSetupAsset).GetFields(
-                         System.Reflection.BindingFlags.Instance |
-                         System.Reflection.BindingFlags.Public |
-                         System.Reflection.BindingFlags.NonPublic))
-            {
-                Assert.That(field.FieldType, Is.Not.EqualTo(typeof(Avatar)), field.Name);
-                Assert.That(field.FieldType, Is.Not.EqualTo(typeof(GameObject)), field.Name);
-                Assert.That(field.FieldType, Is.Not.EqualTo(typeof(HumanBodyBones)), field.Name);
-            }
-        }
     }
 }

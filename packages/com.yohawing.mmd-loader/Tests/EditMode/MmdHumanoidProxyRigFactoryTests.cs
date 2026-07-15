@@ -71,7 +71,7 @@ namespace Mmd.Tests
             Assert.That(result.BoneMap.Count, Is.EqualTo(19));
 
             // Assert: readiness is Ready
-            Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
+            Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.Ready));
 
             // Assert: each transform has HideInHierarchy and is named after HumanBodyBones
             foreach (Transform t in result.BoneMap.Values)
@@ -133,7 +133,7 @@ namespace Mmd.Tests
 
             // 16 required + 7 optional = 23 mappings.
             Assert.That(result.BoneMap.Count, Is.EqualTo(23));
-            Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
+            Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.Ready));
 
             // Cleanup
             Object.DestroyImmediate(result.ProxyRoot);
@@ -208,7 +208,7 @@ namespace Mmd.Tests
             MmdHumanoidProxyRigResult result = MmdHumanoidProxyRigFactory.CreateProxyRig(model);
 
             // Assert: readiness is MissingRequired
-            Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.MissingRequiredReadiness));
+            Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.MissingRequired));
             Assert.That(result.ProxyRoot, Is.Not.Null,
                 "proxy root should still be created with whatever bones are available");
             Assert.That(result.BoneMap.Count, Is.EqualTo(3),
@@ -252,7 +252,7 @@ namespace Mmd.Tests
                 "右手首");
 
             MmdHumanoidProxyRigResult automatic = MmdHumanoidProxyRigFactory.CreateProxyRig(model);
-            Assert.That(automatic.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.MissingRequiredReadiness));
+            Assert.That(automatic.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.MissingRequired));
 
             MmdHumanoidProxyRigResult result = MmdHumanoidProxyRigFactory.CreateProxyRig(
                 model,
@@ -261,7 +261,7 @@ namespace Mmd.Tests
                     new MmdHumanoidBoneMappingOverride("custom-head", HumanBodyBones.Head),
                 });
 
-            Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
+            Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.Ready));
             Assert.That(result.BoneMap.ContainsKey(HumanBodyBones.Head), Is.True);
             MmdHumanoidBoneMappingMatch headMatch = result.Matches.Single(match => match.HumanBone == HumanBodyBones.Head);
             Assert.That(headMatch.MmdBoneName, Is.EqualTo("custom-head"));
@@ -316,7 +316,7 @@ namespace Mmd.Tests
                 MmdHumanoidBoneMappingDiagnosticSummary summary =
                     MmdHumanoidBoneMappingDiagnosticsBuilder.Build(result, overrides);
 
-                Assert.That(summary.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.MissingRequiredReadiness));
+                Assert.That(summary.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.MissingRequired));
                 Assert.That(
                     summary.MappedEntries.Any(entry =>
                         entry.HumanBone == HumanBodyBones.Head
@@ -494,7 +494,7 @@ namespace Mmd.Tests
             // Act: create proxy rig first, then build avatar.
             MmdHumanoidProxyRigResult proxyResult = MmdHumanoidProxyRigFactory.CreateProxyRig(model);
             Assert.That(proxyResult.ProxyRoot, Is.Not.Null);
-            Assert.That(proxyResult.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
+            Assert.That(proxyResult.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.Ready));
 
             MmdHumanoidAvatarBuildResult avatarResult =
                 MmdHumanoidProxyRigFactory.BuildAvatar(proxyResult);
@@ -548,7 +548,7 @@ namespace Mmd.Tests
 
             MmdHumanoidProxyRigResult proxyResult = MmdHumanoidProxyRigFactory.CreateProxyRig(model);
             Assert.That(proxyResult.ProxyRoot, Is.Not.Null);
-            Assert.That(proxyResult.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
+            Assert.That(proxyResult.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.Ready));
 
             Transform hips = proxyResult.BoneMap[HumanBodyBones.Hips];
             Transform spine = proxyResult.BoneMap[HumanBodyBones.Spine];
@@ -591,7 +591,7 @@ namespace Mmd.Tests
 
             MmdHumanoidProxyRigResult proxyResult = MmdHumanoidProxyRigFactory.CreateProxyRig(model);
             Assert.That(proxyResult.ProxyRoot, Is.Not.Null);
-            Assert.That(proxyResult.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
+            Assert.That(proxyResult.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.Ready));
 
             Transform hips = proxyResult.BoneMap[HumanBodyBones.Hips];
             Transform spine = proxyResult.BoneMap[HumanBodyBones.Spine];
@@ -671,7 +671,7 @@ namespace Mmd.Tests
 
             MmdHumanoidProxyRigResult proxyResult = MmdHumanoidProxyRigFactory.CreateProxyRig(model);
             Assert.That(proxyResult.ProxyRoot, Is.Not.Null);
-            Assert.That(proxyResult.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.MissingRequiredReadiness));
+            Assert.That(proxyResult.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.MissingRequired));
 
             // Act
             MmdHumanoidAvatarBuildResult avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(proxyResult);
@@ -702,7 +702,7 @@ namespace Mmd.Tests
             MmdHumanoidProxyRigResult proxyResult = MmdHumanoidProxyRigFactory.CreateProxyRig(model);
 
             Assert.That(proxyResult.ProxyRoot, Is.Null);
-            Assert.That(proxyResult.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.NoBonesReadiness));
+            Assert.That(proxyResult.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.NoBones));
 
             // Act & Assert
             System.InvalidOperationException? ex = Assert.Throws<System.InvalidOperationException>(
@@ -810,7 +810,7 @@ namespace Mmd.Tests
 
             MmdHumanoidBoneMappingReport report = MmdHumanoidBoneMappingEvaluator.Evaluate(model);
 
-            Assert.That(report.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
+            Assert.That(report.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.Ready));
             Assert.That(report.RequiredMappedBoneCount, Is.EqualTo(MmdHumanoidBoneMappingEvaluator.RequiredHumanBoneCount));
             Assert.That(report.OptionalMappedBoneCount, Is.EqualTo(7));
             Assert.That(report.AmbiguousMappingCount, Is.EqualTo(0));
@@ -858,7 +858,7 @@ namespace Mmd.Tests
                     root.transform,
                     "ImportedProxyRig");
 
-                Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
+                Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.Ready));
                 Assert.That(result.BoneMap.Count, Is.EqualTo(17));
                 Assert.That(result.BoneMap.ContainsKey(HumanBodyBones.Hips), Is.True);
                 Assert.That(result.BoneMap.ContainsKey(HumanBodyBones.Chest), Is.True);
@@ -903,7 +903,7 @@ namespace Mmd.Tests
                 "胸");
 
             MmdHumanoidBoneMappingReport report = MmdHumanoidBoneMappingEvaluator.Evaluate(model);
-            Assert.That(report.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
+            Assert.That(report.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.Ready));
             Assert.That(report.AmbiguousMappingCount, Is.EqualTo(1));
             Assert.That(string.Join("\n", report.Diagnostics),
                 Does.Contain("ambiguous: Chest <- 上半身2#16, 胸#17"));
@@ -911,7 +911,7 @@ namespace Mmd.Tests
             MmdHumanoidProxyRigResult result = MmdHumanoidProxyRigFactory.CreateProxyRig(model);
             try
             {
-                Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
+                Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.Ready));
                 MmdHumanoidBoneMappingMatch chest = result.Matches.Single(match => match.HumanBone == HumanBodyBones.Chest);
                 Assert.That(chest.MmdBoneName, Is.EqualTo("上半身2"));
                 Assert.That(chest.MmdBoneIndex, Is.EqualTo(16));
@@ -933,14 +933,14 @@ namespace Mmd.Tests
 
             MmdHumanoidBoneMappingReport report = MmdHumanoidBoneMappingEvaluator.Evaluate(model);
 
-            Assert.That(report.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.AmbiguousReadiness));
+            Assert.That(report.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.Ambiguous));
             Assert.That(report.AmbiguousMappingCount, Is.EqualTo(1));
             Assert.That(string.Join("\n", report.Diagnostics), Does.Contain("ambiguous: LeftLowerLeg"));
 
             MmdHumanoidProxyRigResult proxyResult = MmdHumanoidProxyRigFactory.CreateProxyRig(model);
             try
             {
-                Assert.That(proxyResult.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.AmbiguousReadiness));
+                Assert.That(proxyResult.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.Ambiguous));
 
                 MmdHumanoidAvatarBuildResult avatarResult =
                     MmdHumanoidProxyRigFactory.BuildAvatar(proxyResult);
@@ -966,7 +966,7 @@ namespace Mmd.Tests
 
             MmdHumanoidBoneMappingReport report = MmdHumanoidBoneMappingEvaluator.Evaluate(model);
 
-            Assert.That(report.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
+            Assert.That(report.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.Ready));
             Assert.That(report.RequiredMappedBoneCount, Is.EqualTo(16));
             Assert.That(report.MissingRequiredBoneCount, Is.EqualTo(0));
             Assert.That(report.AmbiguousMappingCount, Is.EqualTo(8));
@@ -978,7 +978,7 @@ namespace Mmd.Tests
             MmdHumanoidAvatarBuildResult? avatarResult = null;
             try
             {
-                Assert.That(proxyResult.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
+                Assert.That(proxyResult.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.Ready));
                 MmdHumanoidBoneMappingMatch leftIndexDistal =
                     proxyResult.Matches.Single(match => match.HumanBone == HumanBodyBones.LeftIndexDistal);
                 Assert.That(leftIndexDistal.MmdBoneName, Is.EqualTo("左人指３"));
@@ -1014,7 +1014,7 @@ namespace Mmd.Tests
             MmdHumanoidAvatarBuildResult? avatarResult = null;
             try
             {
-                Assert.That(proxyResult.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
+                Assert.That(proxyResult.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.Ready));
                 Assert.That(proxyResult.BoneMap.Keys.Count(IsFingerHumanBone), Is.EqualTo(30));
 
                 avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(proxyResult);
@@ -1054,7 +1054,7 @@ namespace Mmd.Tests
 
             try
             {
-                Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
+                Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.Ready));
                 Assert.That(string.Join(",", CanonicalizeMatches(result.Matches)), Is.EqualTo(string.Join(",", new[]
                 {
                     "Hips:4:下半身",
@@ -1099,7 +1099,7 @@ namespace Mmd.Tests
 
             // Assert
             Assert.That(result.ProxyRoot, Is.Null, "root must be null when there are no bones");
-            Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.NoBonesReadiness));
+            Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.NoBones));
             Assert.That(result.BoneMap, Is.Empty);
             Assert.That(result.Matches, Is.Empty);
         }
@@ -1355,7 +1355,7 @@ namespace Mmd.Tests
 
             MmdHumanoidBoneMappingReport report = MmdHumanoidBoneMappingEvaluator.Evaluate(model);
 
-            Assert.That(report.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.MissingRequiredReadiness));
+            Assert.That(report.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.MissingRequired));
             Assert.That(report.AmbiguousMappingCount, Is.EqualTo(1));
             Assert.That(string.Join("\n", report.Diagnostics), Does.Contain("ambiguous: LeftIndexDistal"));
         }
@@ -1396,7 +1396,7 @@ namespace Mmd.Tests
                 MmdHumanoidProxyRigResult result = MmdHumanoidProxyRigFactory.CreateProxyRig(asset);
 
                 // Assert
-                Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.HierarchyNotReadyReadiness));
+                Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.HierarchyNotReady));
                 Assert.That(result.ProxyRoot, Is.Null);
                 Assert.That(string.Join("\n", result.Diagnostics), Does.StartWith("hierarchy-not-ready"));
             }
@@ -1446,7 +1446,7 @@ namespace Mmd.Tests
                     MmdHumanoidProxyRigFactory.CreateProxyRigFromBoneTransforms(bones, root.transform, "ImportedProxyRig");
 
                 // Assert
-                Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
+                Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.Ready));
                 Assert.That(result.ProxyRoot, Is.Not.Null);
                 Assert.That(result.BoneMap.Count, Is.EqualTo(16));
                 Assert.That(result.BoneMap.ContainsKey(HumanBodyBones.Hips), Is.True);
@@ -1511,7 +1511,7 @@ namespace Mmd.Tests
                     root.transform,
                     "ImportedProxyRig");
 
-                Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
+                Assert.That(result.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.Ready));
                 Assert.That(result.ProxyRoot, Is.Not.Null);
                 Assert.That(result.BoneMap[HumanBodyBones.Spine].parent, Is.EqualTo(result.BoneMap[HumanBodyBones.Hips]));
                 Assert.That(result.BoneMap[HumanBodyBones.Neck].parent, Is.EqualTo(result.BoneMap[HumanBodyBones.Chest]));
