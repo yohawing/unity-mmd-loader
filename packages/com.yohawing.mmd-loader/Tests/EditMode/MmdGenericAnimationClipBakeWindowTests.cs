@@ -58,7 +58,11 @@ namespace Mmd.Tests
                 Assert.That(window.VmdAssetForTests, Is.SameAs(vmd));
                 Assert.That(window.ClipTypeForTests, Is.EqualTo(MmdGenericAnimationClipBakeWindow.ClipType.Generic));
                 Assert.That(window.MaxFrameForTests, Is.EqualTo(27));
+                Assert.That(window.StartFrameForTests, Is.Zero);
                 Assert.That(window.EndFrameForTests, Is.EqualTo(27));
+                Assert.That(window.FrameRateForTests, Is.EqualTo(30.0f));
+                Assert.That(window.ReduceKeysForTests, Is.True);
+                Assert.That(window.HighPrecisionForTests, Is.False);
                 Assert.That(
                     window.OutputPathForTests,
                     Is.EqualTo(MmdGenericAnimationClipWriter.GetDefaultOutputPath(null, vmd)));
@@ -122,7 +126,7 @@ namespace Mmd.Tests
                 Assert.That(
                     window.OutputPathForTests,
                     Is.EqualTo(MmdHumanoidClipConversionWriter.GetDefaultOutputPath(pmx, vmd)));
-                Assert.That(window.OutputPathForTests, Is.Not.EqualTo(genericPath));
+                Assert.That(window.OutputPathForTests, Is.EqualTo(genericPath));
 
                 window.SetClipTypeForTests(MmdGenericAnimationClipBakeWindow.ClipType.Generic);
                 Assert.That(window.OutputPathForTests, Is.EqualTo(genericPath));

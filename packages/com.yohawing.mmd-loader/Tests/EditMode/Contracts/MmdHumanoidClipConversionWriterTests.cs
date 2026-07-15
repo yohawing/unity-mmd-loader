@@ -156,7 +156,7 @@ namespace Mmd.Tests
                 CreateReadyFixturePmx(out pmxAsset, ownedObjects);
                 Assert.That(
                     MmdHumanoidClipConversionWriter.GetDefaultOutputPath(pmxAsset, null),
-                    Is.EqualTo("Assets/H6_HumanoidClip_ready-h6-writer-slice1_pmx_vmd.anim"));
+                    Is.EqualTo("Assets/ready-h6-writer-slice1_VMD.anim"));
             }
             finally
             {

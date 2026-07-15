@@ -11,6 +11,20 @@ using Mmd.UnityIntegration;
 
 namespace Mmd.Editor
 {
+    public readonly struct MmdGenericAnimationClipBakeOptions
+    {
+        public MmdGenericAnimationClipBakeOptions(bool reduceKeys, bool highPrecision)
+        {
+            ReduceKeys = reduceKeys;
+            HighPrecision = highPrecision;
+        }
+
+        public bool ReduceKeys { get; }
+        public bool HighPrecision { get; }
+
+        public static MmdGenericAnimationClipBakeOptions Default => new(true, false);
+    }
+
     public static class MmdGenericAnimationClipWriter
     {
         public static MmdGenericAnimationClipWriterResult CreateInMemoryClip(
@@ -19,6 +33,23 @@ namespace Mmd.Editor
             float frameRate,
             int startFrame = 0,
             int? endFrame = null)
+        {
+            return CreateInMemoryClip(
+                pmxAsset,
+                vmdAsset,
+                frameRate,
+                startFrame,
+                endFrame,
+                MmdGenericAnimationClipBakeOptions.Default);
+        }
+
+        public static MmdGenericAnimationClipWriterResult CreateInMemoryClip(
+            MmdPmxAsset pmxAsset,
+            MmdVmdAsset vmdAsset,
+            float frameRate,
+            int startFrame,
+            int? endFrame,
+            MmdGenericAnimationClipBakeOptions options)
         {
             var diagnostics = new List<string>();
             if (pmxAsset == null)
@@ -86,12 +117,17 @@ namespace Mmd.Editor
                     frameRate,
                     startFrame,
                     effectiveEndFrame,
+                    options,
                     out int compactedCurveCount,
                     out bool usedNativeSparse,
                     out string nativeSparseReason);
                 if (usedNativeSparse)
                 {
                     diagnostics.Add("writer: built AnimationClip exclusively from mmd-runtime sparse curve descriptors and keys.");
+                }
+                else if (!options.ReduceKeys)
+                {
+                    diagnostics.Add("writer: key reduction disabled; baked dense curves for every sampled frame.");
                 }
                 else if (!string.IsNullOrEmpty(nativeSparseReason))
                 {
@@ -127,8 +163,27 @@ namespace Mmd.Editor
             int? endFrame = null,
             string? outputPath = null)
         {
+            return CreateAnimationClipAsset(
+                pmxAsset,
+                vmdAsset,
+                frameRate,
+                startFrame,
+                endFrame,
+                outputPath,
+                MmdGenericAnimationClipBakeOptions.Default);
+        }
+
+        public static MmdGenericAnimationClipWriterResult CreateAnimationClipAsset(
+            MmdPmxAsset pmxAsset,
+            MmdVmdAsset vmdAsset,
+            float frameRate,
+            int startFrame,
+            int? endFrame,
+            string? outputPath,
+            MmdGenericAnimationClipBakeOptions options)
+        {
             MmdGenericAnimationClipWriterResult result = CreateInMemoryClip(
-                pmxAsset, vmdAsset, frameRate, startFrame, endFrame);
+                pmxAsset, vmdAsset, frameRate, startFrame, endFrame, options);
             if (result.Clip == null)
             {
                 return result;
@@ -179,8 +234,8 @@ namespace Mmd.Editor
 
         public static string GetDefaultOutputPath(MmdPmxAsset? pmxAsset, MmdVmdAsset? vmdAsset)
         {
-            return "Assets/MmdGenericClip_" + NormalizeIdentifier(pmxAsset?.SourceId ?? "pmx") + "_"
-                   + NormalizeIdentifier(vmdAsset?.SourceId ?? "vmd") + ".anim";
+            return "Assets/" + GetSourceStem(pmxAsset?.SourceId, "PMX") + "_"
+                   + GetSourceStem(vmdAsset?.SourceId, "VMD") + ".anim";
         }
 
         private static AnimationClip BakeDenseClip(
@@ -190,6 +245,7 @@ namespace Mmd.Editor
             float frameRate,
             int startFrame,
             int endFrame,
+            MmdGenericAnimationClipBakeOptions options,
             out int compactedCurveCount,
             out bool usedNativeSparse,
             out string nativeSparseReason)
@@ -210,7 +266,7 @@ namespace Mmd.Editor
             nativeSparseReason = string.Empty;
             string[] bonePaths = CalculateUniqueBonePaths(instance.BoneTransforms, instance.Root.transform);
             IReadOnlyList<MmdUnityVertexMorphBlendShapeBinding> morphs = instance.VertexMorphBlendShapes;
-            if (TryBakeSparseNativeCurves(
+            if (options.ReduceKeys && TryBakeSparseNativeCurves(
                     binding,
                     instance,
                     pmxAsset,
@@ -221,6 +277,7 @@ namespace Mmd.Editor
                     bonePaths,
                     morphs,
                     clip,
+                    options.HighPrecision,
                     out int sparseCurveCount,
                     out nativeSparseReason))
             {
@@ -301,12 +358,14 @@ namespace Mmd.Editor
                 for (int axis = 0; axis < 3; axis++)
                 {
                     curveBindings.Add(EditorCurveBinding.FloatCurve(path, typeof(Transform), positionProperties[axis]));
-                    curves.Add(CreateCompactedCurve(positionKeys[bone, axis], ref compactedCurveCount));
+                    curves.Add(CreateBakedCurve(
+                        positionKeys[bone, axis], options.ReduceKeys, ref compactedCurveCount));
                 }
                 for (int axis = 0; axis < 4; axis++)
                 {
                     curveBindings.Add(EditorCurveBinding.FloatCurve(path, typeof(Transform), rotationProperties[axis]));
-                    curves.Add(CreateCompactedCurve(rotationKeys[bone, axis], ref compactedCurveCount));
+                    curves.Add(CreateBakedCurve(
+                        rotationKeys[bone, axis], options.ReduceKeys, ref compactedCurveCount));
                 }
             }
 
@@ -319,7 +378,8 @@ namespace Mmd.Editor
                         rendererPath,
                         typeof(SkinnedMeshRenderer),
                         "blendShape." + morphs[morph].BlendShapeName));
-                    curves.Add(CreateCompactedCurve(morphKeys[morph], ref compactedCurveCount));
+                    curves.Add(CreateBakedCurve(
+                        morphKeys[morph], options.ReduceKeys, ref compactedCurveCount));
                 }
             }
 
@@ -345,6 +405,7 @@ namespace Mmd.Editor
             string[] bonePaths,
             IReadOnlyList<MmdUnityVertexMorphBlendShapeBinding> morphs,
             AnimationClip clip,
+            bool highPrecision,
             out int sparseCurveCount,
             out string reason)
         {
@@ -372,7 +433,9 @@ namespace Mmd.Editor
                         startFrame,
                         frameCount,
                         0,
-                        MmdRuntimeFfiMethods.ReductionTolerances.ForUnityAnimationClip(instance.ImportScale));
+                        MmdRuntimeFfiMethods.ReductionTolerances.ForUnityAnimationClip(
+                            instance.ImportScale,
+                            highPrecision));
                 }
 
                 using (reducedPose)
@@ -765,9 +828,12 @@ namespace Mmd.Editor
             }
         }
 
-        private static AnimationCurve CreateCompactedCurve(Keyframe[] denseKeys, ref int compactedCurveCount)
+        private static AnimationCurve CreateBakedCurve(
+            Keyframe[] denseKeys,
+            bool reduceKeys,
+            ref int compactedCurveCount)
         {
-            if (denseKeys.Length <= 1)
+            if (!reduceKeys || denseKeys.Length <= 1)
             {
                 return new AnimationCurve(denseKeys);
             }
@@ -827,6 +893,14 @@ namespace Mmd.Editor
             return string.IsNullOrWhiteSpace(value)
                 ? "asset"
                 : value.Replace('/', '_').Replace('\\', '_').Replace(':', '_').Replace('.', '_');
+        }
+
+        private static string GetSourceStem(string? sourceId, string fallback)
+        {
+            string fileName = string.IsNullOrWhiteSpace(sourceId)
+                ? fallback
+                : Path.GetFileNameWithoutExtension(sourceId!.Replace('\\', '/')) ?? fallback;
+            return NormalizeIdentifier(fileName);
         }
     }
 

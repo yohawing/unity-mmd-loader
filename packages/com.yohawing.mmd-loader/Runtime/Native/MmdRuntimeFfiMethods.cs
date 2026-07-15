@@ -43,6 +43,7 @@ namespace Mmd.Native
         internal struct ReductionTolerances
         {
             internal const float UnityPositionTolerance = 0.01f;
+            internal const float HighPrecisionUnityPositionTolerance = 0.001f;
             internal const float RotationToleranceRadians = 0.005f;
             internal const float MorphWeightTolerance = 0.0001f;
 
@@ -61,14 +62,19 @@ namespace Mmd.Native
                 morphWeight = 1.0e-4f
             };
 
-            internal static ReductionTolerances ForUnityAnimationClip(float importScale)
+            internal static ReductionTolerances ForUnityAnimationClip(
+                float importScale,
+                bool highPrecision = false)
             {
                 if (!float.IsFinite(importScale) || importScale <= 0.0f)
                 {
                     throw new ArgumentOutOfRangeException(nameof(importScale));
                 }
 
-                float sourcePositionTolerance = UnityPositionTolerance / importScale;
+                float unityPositionTolerance = highPrecision
+                    ? HighPrecisionUnityPositionTolerance
+                    : UnityPositionTolerance;
+                float sourcePositionTolerance = unityPositionTolerance / importScale;
                 return new ReductionTolerances
                 {
                     localPosition = sourcePositionTolerance,

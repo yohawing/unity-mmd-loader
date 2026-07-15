@@ -78,12 +78,10 @@ namespace Mmd.Editor
             MmdPmxAsset? pmxAsset,
             MmdVmdAsset? vmdAsset)
         {
-            string directory = "Assets";
-            return directory + "/"
-                   + "H6_HumanoidClip_"
-                   + NormalizeIdentifier(pmxAsset?.SourceId ?? "pmx")
+            return "Assets/"
+                   + GetSourceStem(pmxAsset?.SourceId, "PMX")
                    + "_"
-                   + NormalizeIdentifier(vmdAsset?.SourceId ?? "vmd")
+                   + GetSourceStem(vmdAsset?.SourceId, "VMD")
                    + ".anim";
         }
 
@@ -683,6 +681,14 @@ namespace Mmd.Editor
                 .Replace('\\', '_')
                 .Replace(':', '_')
                 .Replace('.', '_');
+        }
+
+        private static string GetSourceStem(string? sourceId, string fallback)
+        {
+            string fileName = string.IsNullOrWhiteSpace(sourceId)
+                ? fallback
+                : Path.GetFileNameWithoutExtension(sourceId!.Replace('\\', '/')) ?? fallback;
+            return NormalizeIdentifier(fileName);
         }
 
         private static string ProjectRoot => Path.GetFullPath(Path.Combine(Application.dataPath, ".."));

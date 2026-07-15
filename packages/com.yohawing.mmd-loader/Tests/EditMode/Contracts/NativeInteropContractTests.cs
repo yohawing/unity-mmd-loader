@@ -306,6 +306,17 @@ namespace Mmd.Tests
                 MmdRuntimeFfiMethods.ReductionTolerances.ForUnityAnimationClip(1.0f);
             Assert.That(unitScale.localPosition, Is.EqualTo(0.01f));
             Assert.That(unitScale.worldPosition, Is.EqualTo(0.01f));
+
+            MmdRuntimeFfiMethods.ReductionTolerances highPrecision =
+                MmdRuntimeFfiMethods.ReductionTolerances.ForUnityAnimationClip(
+                    0.1f,
+                    highPrecision: true);
+            Assert.That(
+                highPrecision.localPosition * 0.1f,
+                Is.EqualTo(0.001f).Within(1.0e-7f));
+            Assert.That(
+                highPrecision.worldPosition * 0.1f,
+                Is.EqualTo(0.001f).Within(1.0e-7f));
         }
 
         [Test]

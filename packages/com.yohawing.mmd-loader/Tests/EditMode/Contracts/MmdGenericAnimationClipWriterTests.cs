@@ -199,8 +199,49 @@ namespace Mmd.Tests
             MmdVmdAsset vmd = ScriptableObject.CreateInstance<MmdVmdAsset>();
             pmx.name = "model";
             vmd.name = "motion";
-            Assert.That(MmdGenericAnimationClipWriter.GetDefaultOutputPath(pmx, vmd), Is.EqualTo("Assets/MmdGenericClip_asset_asset.anim"));
+            Assert.That(MmdGenericAnimationClipWriter.GetDefaultOutputPath(pmx, vmd), Is.EqualTo("Assets/PMX_VMD.anim"));
             DestroyAssets(pmx, vmd);
+        }
+
+        [Test]
+        public void DefaultPathUsesOnlySourceFileStems()
+        {
+            MmdPmxAsset pmx = ScriptableObject.CreateInstance<MmdPmxAsset>();
+            MmdVmdAsset vmd = ScriptableObject.CreateInstance<MmdVmdAsset>();
+            pmx.Initialize(new byte[] { 1 }, "Model.pmx", "Assets/Models/Model.pmx", 1.0f);
+            vmd.Initialize(new byte[] { 1 }, "Motion.vmd", "Assets/Motions/Motion.vmd");
+            Assert.That(
+                MmdGenericAnimationClipWriter.GetDefaultOutputPath(pmx, vmd),
+                Is.EqualTo("Assets/Model_Motion.anim"));
+            DestroyAssets(pmx, vmd);
+        }
+
+        [Test]
+        public void DisablingKeyReductionRetainsEverySampledFrame()
+        {
+            CreateAssets(CubePmx, CubeVmd, out MmdPmxAsset pmx, out MmdVmdAsset vmd);
+            try
+            {
+                MmdGenericAnimationClipWriterResult result = MmdGenericAnimationClipWriter.CreateInMemoryClip(
+                    pmx,
+                    vmd,
+                    30.0f,
+                    0,
+                    9,
+                    new MmdGenericAnimationClipBakeOptions(reduceKeys: false, highPrecision: false));
+                Assert.That(result.Clip, Is.Not.Null, string.Join("\n", result.Diagnostics));
+                Assert.That(result.Diagnostics, Has.Some.Contains("key reduction disabled"));
+                AnimationCurve curve = AnimationUtility.GetEditorCurve(
+                    result.Clip!,
+                    AnimationUtility.GetCurveBindings(result.Clip!)
+                        .First(binding => binding.propertyName == "m_LocalPosition.x"))!;
+                Assert.That(curve.keys, Has.Length.EqualTo(10));
+                UnityEngine.Object.DestroyImmediate(result.Clip);
+            }
+            finally
+            {
+                DestroyAssets(pmx, vmd);
+            }
         }
 
         [Test]

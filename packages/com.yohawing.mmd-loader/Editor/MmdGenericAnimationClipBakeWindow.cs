@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using UnityEditor;
 using UnityEngine;
 
@@ -23,6 +24,8 @@ namespace Mmd.Editor
         private int endFrame;
         private float frameRate = 30.0f;
         private string outputPath = string.Empty;
+        private bool reduceKeys = true;
+        private bool highPrecision;
         private string? humanoidPlannerError;
         private readonly List<string> diagnostics = new();
 
@@ -37,7 +40,7 @@ namespace Mmd.Editor
         {
             MmdGenericAnimationClipBakeWindow window = GetWindow<MmdGenericAnimationClipBakeWindow>();
             window.titleContent = new GUIContent("AnimationClip Bake");
-            window.minSize = new Vector2(440.0f, 260.0f);
+            window.minSize = new Vector2(440.0f, 300.0f);
             window.pmxAsset = pmxAsset;
             window.pmxDisplayObject = GetPmxDisplayObject(pmxAsset, pmxAsset);
             window.vmdAsset = null;
@@ -45,6 +48,8 @@ namespace Mmd.Editor
             window.startFrame = 0;
             window.endFrame = 0;
             window.frameRate = 30.0f;
+            window.reduceKeys = true;
+            window.highPrecision = false;
             window.diagnostics.Clear();
             window.RefreshVmdMetadataAndOutputPath();
             window.Show();
@@ -55,7 +60,7 @@ namespace Mmd.Editor
         {
             MmdGenericAnimationClipBakeWindow window = GetWindow<MmdGenericAnimationClipBakeWindow>();
             window.titleContent = new GUIContent("AnimationClip Bake");
-            window.minSize = new Vector2(440.0f, 260.0f);
+            window.minSize = new Vector2(440.0f, 300.0f);
             window.pmxAsset = null;
             window.pmxDisplayObject = null;
             window.vmdAsset = vmdAsset;
@@ -63,6 +68,8 @@ namespace Mmd.Editor
             window.startFrame = 0;
             window.endFrame = 0;
             window.frameRate = 30.0f;
+            window.reduceKeys = true;
+            window.highPrecision = false;
             window.diagnostics.Clear();
             window.RefreshVmdMetadataAndOutputPath();
             window.Show();
@@ -73,9 +80,13 @@ namespace Mmd.Editor
         internal UnityEngine.Object? PmxDisplayObjectForTests => pmxDisplayObject;
         internal MmdVmdAsset? VmdAssetForTests => vmdAsset;
         internal ClipType ClipTypeForTests => clipType;
+        internal int StartFrameForTests => startFrame;
         internal int EndFrameForTests => endFrame;
+        internal float FrameRateForTests => frameRate;
         internal int MaxFrameForTests => vmdAsset?.MaxFrame ?? 0;
         internal string OutputPathForTests => outputPath;
+        internal bool ReduceKeysForTests => reduceKeys;
+        internal bool HighPrecisionForTests => highPrecision;
 
         internal void SetPmxAssetForTests(MmdPmxAsset? asset)
         {
@@ -136,10 +147,29 @@ namespace Mmd.Editor
                 SetVmdAsset(nextVmd);
             }
 
-            startFrame = EditorGUILayout.IntField("Start Frame", startFrame);
-            endFrame = EditorGUILayout.IntField("End Frame", endFrame);
-            frameRate = EditorGUILayout.FloatField("Frame Rate", frameRate);
-            outputPath = EditorGUILayout.TextField("Output Path", outputPath);
+            DrawFrameRangeField();
+            frameRate = EditorGUILayout.IntPopup(
+                "Frame Rate",
+                Mathf.RoundToInt(frameRate),
+                new[] { "30 fps", "60 fps" },
+                new[] { 30, 60 });
+
+            if (clipType == ClipType.Generic)
+            {
+                reduceKeys = EditorGUILayout.Toggle(
+                    new GUIContent("Reduce Keys", "Use mmd-anim sparse curve reduction. Disable to retain every sampled frame."),
+                    reduceKeys);
+                using (new EditorGUI.DisabledScope(!reduceKeys))
+                {
+                    highPrecision = EditorGUILayout.Toggle(
+                        new GUIContent(
+                            "High Precision",
+                            "Use a tighter 1 mm Unity-space position tolerance. This increases bake time and output size."),
+                        highPrecision);
+                }
+            }
+
+            DrawOutputPathField();
 
             bool canCreate = pmxAsset != null && vmdAsset != null;
             MmdHumanoidClipConversionPlan? plan = null;
@@ -147,6 +177,7 @@ namespace Mmd.Editor
             {
                 plan = AnalyzeHumanoidPrerequisites();
                 DrawHumanoidReadiness(plan);
+                DrawHumanoidDenseCurveWarning();
                 canCreate = canCreate && plan != null && plan.CanCreateClipNow;
             }
 
@@ -251,6 +282,22 @@ namespace Mmd.Editor
             }
         }
 
+        private void DrawHumanoidDenseCurveWarning()
+        {
+            int frameCount = Math.Max(0, endFrame - startFrame + 1);
+            long estimatedKeyCount = (long)frameCount * (HumanTrait.MuscleCount + 7);
+            if (estimatedKeyCount < 500_000)
+            {
+                return;
+            }
+
+            EditorGUILayout.HelpBox(
+                "Humanoid key reduction is not available yet. This range writes about "
+                + estimatedKeyCount.ToString("N0")
+                + " dense keys and may create a very large .anim asset. Narrow Frame Range or use Generic.",
+                MessageType.Warning);
+        }
+
         private MmdHumanoidClipConversionPlan? AnalyzeHumanoidPrerequisites()
         {
             humanoidPlannerError = null;
@@ -284,7 +331,8 @@ namespace Mmd.Editor
                     frameRate,
                     startFrame,
                     endFrame,
-                    outputPath);
+                    outputPath,
+                    new MmdGenericAnimationClipBakeOptions(reduceKeys, highPrecision));
                 if (result.Clip != null)
                 {
                     SelectCreatedClip(result.Clip);
@@ -325,6 +373,70 @@ namespace Mmd.Editor
         {
             Selection.activeObject = clip;
             EditorGUIUtility.PingObject(clip);
+        }
+
+        private void DrawOutputPathField()
+        {
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.PrefixLabel(new GUIContent("Output", "Project-relative .anim asset path."));
+                outputPath = EditorGUILayout.TextField(outputPath);
+                if (GUILayout.Button("...", GUILayout.Width(30.0f)))
+                {
+                    string defaultName = Path.GetFileNameWithoutExtension(outputPath);
+                    if (string.IsNullOrWhiteSpace(defaultName))
+                    {
+                        defaultName = "PMX_VMD";
+                    }
+
+                    string directory = Path.GetDirectoryName(outputPath)?.Replace('\\', '/') ?? "Assets";
+                    string selected = EditorUtility.SaveFilePanelInProject(
+                        "Bake to AnimationClip",
+                        defaultName,
+                        "anim",
+                        "Choose where to save the baked AnimationClip.",
+                        directory);
+                    if (!string.IsNullOrEmpty(selected))
+                    {
+                        outputPath = selected;
+                    }
+                }
+            }
+        }
+
+        private void DrawFrameRangeField()
+        {
+            int maxFrame = Math.Max(0, vmdAsset?.MaxFrame ?? 0);
+            float minValue = Mathf.Clamp(startFrame, 0, maxFrame);
+            float maxValue = Mathf.Clamp(endFrame, minValue, maxFrame);
+
+            using (new EditorGUI.DisabledScope(vmdAsset == null))
+            {
+                if (maxFrame > 0)
+                {
+                    EditorGUILayout.MinMaxSlider(
+                        new GUIContent("Frame Range", "Limit the bake to a frame range within the VMD motion."),
+                        ref minValue,
+                        ref maxValue,
+                        0.0f,
+                        maxFrame);
+                }
+                else
+                {
+                    EditorGUILayout.LabelField("Frame Range", "0");
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    int indent = EditorGUI.indentLevel;
+                    EditorGUI.indentLevel = indent + 1;
+                    int nextStart = EditorGUILayout.IntField("Start", Mathf.RoundToInt(minValue));
+                    int nextEnd = EditorGUILayout.IntField("End", Mathf.RoundToInt(maxValue));
+                    EditorGUI.indentLevel = indent;
+                    startFrame = Mathf.Clamp(nextStart, 0, maxFrame);
+                    endFrame = Mathf.Clamp(nextEnd, startFrame, maxFrame);
+                }
+            }
         }
 
         private void RefreshVmdMetadataAndOutputPath()
