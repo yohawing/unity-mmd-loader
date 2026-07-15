@@ -244,6 +244,51 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void SparseEulerCurvesUseNativeXyzRotationOrderForMultiAxisPose()
+        {
+            var root = new GameObject("root");
+            var bone = new GameObject("bone");
+            bone.transform.SetParent(root.transform, false);
+            var clip = new AnimationClip();
+            try
+            {
+                EditorCurveBinding[] bindings =
+                {
+                    EditorCurveBinding.FloatCurve("bone", typeof(Transform), "localEulerAnglesRaw.x"),
+                    EditorCurveBinding.FloatCurve("bone", typeof(Transform), "localEulerAnglesRaw.y"),
+                    EditorCurveBinding.FloatCurve("bone", typeof(Transform), "localEulerAnglesRaw.z")
+                };
+                AnimationCurve[] curves =
+                {
+                    new AnimationCurve(new Keyframe(0.0f, 30.0f)),
+                    new AnimationCurve(new Keyframe(0.0f, 40.0f)),
+                    new AnimationCurve(new Keyframe(0.0f, 50.0f))
+                };
+                AnimationUtility.SetEditorCurves(clip, bindings, curves);
+
+                MmdGenericAnimationClipWriter.SetSparseEulerRotationOrderToXyz(clip);
+
+                var serializedClip = new SerializedObject(clip);
+                SerializedProperty eulerCurves = serializedClip.FindProperty("m_EulerCurves");
+                Assert.That(
+                    eulerCurves.GetArrayElementAtIndex(0)
+                        .FindPropertyRelative("curve.m_RotationOrder").intValue,
+                    Is.EqualTo(0));
+                clip.SampleAnimation(root, 0.0f);
+                Quaternion expected =
+                    Quaternion.AngleAxis(50.0f, Vector3.forward) *
+                    Quaternion.AngleAxis(40.0f, Vector3.up) *
+                    Quaternion.AngleAxis(30.0f, Vector3.right);
+                Assert.That(Quaternion.Angle(bone.transform.localRotation, expected), Is.LessThan(0.001f));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(clip);
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
         public void SparseFallbackAllowlistDoesNotHideContractOrOverflowFailures()
         {
             Assert.That(MmdGenericAnimationClipWriter.IsSparseNativeFallbackException(
@@ -254,6 +299,8 @@ namespace Mmd.Tests
                 new BadImageFormatException()), Is.True);
             Assert.That(MmdGenericAnimationClipWriter.IsSparseNativeFallbackException(
                 new MmdRuntimeUnsupportedException("unsupported")), Is.True);
+            Assert.That(MmdGenericAnimationClipWriter.IsSparseNativeFallbackException(
+                new MmdRuntimeReductionInputTooLargeException("safety limit")), Is.False);
             Assert.That(MmdGenericAnimationClipWriter.IsSparseNativeFallbackException(
                 new InvalidOperationException("descriptor mismatch")), Is.False);
             Assert.That(MmdGenericAnimationClipWriter.IsSparseNativeFallbackException(
@@ -339,7 +386,7 @@ namespace Mmd.Tests
                         Is.EqualTo(expectedDuration).Within(1.0e-6f));
                 }
 
-                foreach (int frame in new[] { StartFrame, 5, EndFrame })
+                for (int frame = StartFrame; frame <= EndFrame; frame++)
                 {
                     binding.ApplyFrame(frame, FrameRate);
                     Vector3 expectedPosition = bone.localPosition;
@@ -350,11 +397,14 @@ namespace Mmd.Tests
                     Quaternion sparseRotation = bone.localRotation;
 
                     Assert.That(Vector3.Distance(sparsePosition, expectedPosition),
-                        Is.LessThanOrEqualTo(2.0e-5f),
-                        "translation parity includes PMX importScale=0.1 and flipZ conversion");
+                        Is.LessThanOrEqualTo(
+                            MmdRuntimeFfiMethods.ReductionTolerances.UnityPositionTolerance + 1.0e-5f),
+                        "translation interpolation must remain within the Unity-space reduction contract");
                     Assert.That(Quaternion.Angle(sparseRotation, expectedRotation),
-                        Is.LessThanOrEqualTo(0.02f),
-                        "Euler-driven sparse rotation must match fast-runtime Unity handedness");
+                        Is.LessThanOrEqualTo(
+                            MmdRuntimeFfiMethods.ReductionTolerances.RotationToleranceRadians
+                            * Mathf.Rad2Deg + 0.001f),
+                        "rotation interpolation must remain within the reduction contract");
                 }
             }
             finally

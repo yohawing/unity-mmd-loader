@@ -274,6 +274,41 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void ReducedPoseDenseInputHasExplicitMemorySafetyLimit()
+        {
+            const int WorldFloatsPerFrame = 16;
+            int allowedFrames = checked((int)(
+                MmdRuntimeFfiPlaybackSession.MaxReductionInputBytes /
+                (WorldFloatsPerFrame * sizeof(float))));
+
+            Assert.DoesNotThrow(() => MmdRuntimeFfiPlaybackSession.ThrowIfReductionInputTooLarge(
+                WorldFloatsPerFrame, 0, allowedFrames));
+            MmdRuntimeReductionInputTooLargeException exception =
+                Assert.Throws<MmdRuntimeReductionInputTooLargeException>(() =>
+                MmdRuntimeFfiPlaybackSession.ThrowIfReductionInputTooLarge(
+                    WorldFloatsPerFrame, 0, allowedFrames + 1))!;
+            Assert.That(exception.Message, Does.Contain("safety limit"));
+        }
+
+        [Test]
+        public void UnityAnimationClipReductionKeepsPositionErrorWithinOneCentimeter()
+        {
+            MmdRuntimeFfiMethods.ReductionTolerances tolerances =
+                MmdRuntimeFfiMethods.ReductionTolerances.ForUnityAnimationClip(0.1f);
+
+            Assert.That(tolerances.localPosition * 0.1f, Is.EqualTo(0.01f).Within(1.0e-7f));
+            Assert.That(tolerances.localRotationRadians, Is.EqualTo(0.005f));
+            Assert.That(tolerances.worldPosition * 0.1f, Is.EqualTo(0.01f).Within(1.0e-7f));
+            Assert.That(tolerances.worldRotationRadians, Is.EqualTo(0.005f));
+            Assert.That(tolerances.morphWeight, Is.EqualTo(0.0001f));
+
+            MmdRuntimeFfiMethods.ReductionTolerances unitScale =
+                MmdRuntimeFfiMethods.ReductionTolerances.ForUnityAnimationClip(1.0f);
+            Assert.That(unitScale.localPosition, Is.EqualTo(0.01f));
+            Assert.That(unitScale.worldPosition, Is.EqualTo(0.01f));
+        }
+
+        [Test]
         public void RuntimeFfiClipFrameBatchMatchesSequentialEvaluation()
         {
 #if !UNITY_EDITOR_WIN

@@ -42,6 +42,10 @@ namespace Mmd.Native
         [StructLayout(LayoutKind.Sequential)]
         internal struct ReductionTolerances
         {
+            internal const float UnityPositionTolerance = 0.01f;
+            internal const float RotationToleranceRadians = 0.005f;
+            internal const float MorphWeightTolerance = 0.0001f;
+
             internal float localPosition;
             internal float localRotationRadians;
             internal float worldPosition;
@@ -56,6 +60,24 @@ namespace Mmd.Native
                 worldRotationRadians = 1.0e-4f,
                 morphWeight = 1.0e-4f
             };
+
+            internal static ReductionTolerances ForUnityAnimationClip(float importScale)
+            {
+                if (!float.IsFinite(importScale) || importScale <= 0.0f)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(importScale));
+                }
+
+                float sourcePositionTolerance = UnityPositionTolerance / importScale;
+                return new ReductionTolerances
+                {
+                    localPosition = sourcePositionTolerance,
+                    localRotationRadians = RotationToleranceRadians,
+                    worldPosition = sourcePositionTolerance,
+                    worldRotationRadians = RotationToleranceRadians,
+                    morphWeight = MorphWeightTolerance
+                };
+            }
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -280,6 +302,8 @@ namespace Mmd.Native
     }
     internal sealed class MmdRuntimeFfiPlaybackSession : IDisposable
     {
+        internal const long MaxReductionInputBytes = 256L * 1024L * 1024L;
+
         private readonly IntPtr model;
         private readonly IntPtr clip;
         private readonly IntPtr instance;
@@ -471,6 +495,7 @@ namespace Mmd.Native
                 throw new ArgumentOutOfRangeException(nameof(frameCount));
             }
 
+            ThrowIfReductionInputTooLarge(WorldMatrixFloatCount, MorphWeightCount, frameCount);
             var worldMatrices = new float[checked(WorldMatrixFloatCount * frameCount)];
             var morphWeights = new float[checked(MorphWeightCount * frameCount)];
             EvaluateBatch(batchStartFrame, 1.0f, frameCount, workerCount, worldMatrices, morphWeights);
@@ -502,6 +527,27 @@ namespace Mmd.Native
             }
 
             return new MmdRuntimeReducedPose(reducedPose);
+        }
+
+        internal static void ThrowIfReductionInputTooLarge(
+            int worldMatrixFloatCount,
+            int morphWeightCount,
+            int frameCount)
+        {
+            if (worldMatrixFloatCount < 0 || morphWeightCount < 0 || frameCount <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(frameCount));
+            }
+
+            long inputBytes = checked(
+                ((long)worldMatrixFloatCount + morphWeightCount) * frameCount * sizeof(float));
+            if (inputBytes > MaxReductionInputBytes)
+            {
+                throw new MmdRuntimeReductionInputTooLargeException(
+                    "sparse reduction requires " + inputBytes
+                    + " bytes of dense native input, exceeding the "
+                    + MaxReductionInputBytes + " byte safety limit");
+            }
         }
 
         public void Dispose()
@@ -646,6 +692,13 @@ namespace Mmd.Native
     internal sealed class MmdRuntimeUnsupportedException : Exception
     {
         internal MmdRuntimeUnsupportedException(string message) : base(message)
+        {
+        }
+    }
+
+    internal sealed class MmdRuntimeReductionInputTooLargeException : Exception
+    {
+        internal MmdRuntimeReductionInputTooLargeException(string message) : base(message)
         {
         }
     }

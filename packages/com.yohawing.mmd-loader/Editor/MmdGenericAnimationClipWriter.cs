@@ -372,7 +372,7 @@ namespace Mmd.Editor
                         startFrame,
                         frameCount,
                         0,
-                        MmdRuntimeFfiMethods.ReductionTolerances.Default);
+                        MmdRuntimeFfiMethods.ReductionTolerances.ForUnityAnimationClip(instance.ImportScale));
                 }
 
                 using (reducedPose)
@@ -461,6 +461,7 @@ namespace Mmd.Editor
                     }
 
                     AnimationUtility.SetEditorCurves(clip, bindings.ToArray(), curves.ToArray());
+                    SetSparseEulerRotationOrderToXyz(clip);
                     sparseCurveCount = curves.Count;
                     return true;
                 }
@@ -494,6 +495,58 @@ namespace Mmd.Editor
                 key.value * valueScale,
                 key.inTangent * valueScale,
                 key.outTangent * valueScale);
+        }
+
+        internal static void SetSparseEulerRotationOrderToXyz(AnimationClip clip)
+        {
+            if (clip == null)
+            {
+                throw new ArgumentNullException(nameof(clip));
+            }
+
+            const int XyzRotationOrder = 0;
+            var serializedClip = new SerializedObject(clip);
+            SetCurveArrayRotationOrder(serializedClip.FindProperty("m_EulerCurves"), XyzRotationOrder);
+            SetCurveArrayRotationOrder(serializedClip.FindProperty("m_EulerEditorCurves"), XyzRotationOrder);
+
+            SerializedProperty? editorCurves = serializedClip.FindProperty("m_EditorCurves");
+            if (editorCurves != null && editorCurves.isArray)
+            {
+                for (int index = 0; index < editorCurves.arraySize; index++)
+                {
+                    SerializedProperty curve = editorCurves.GetArrayElementAtIndex(index);
+                    SerializedProperty? attribute = curve.FindPropertyRelative("attribute");
+                    if (attribute != null &&
+                        attribute.stringValue.StartsWith("localEulerAnglesRaw.", StringComparison.Ordinal))
+                    {
+                        SetSerializedCurveRotationOrder(curve, XyzRotationOrder);
+                    }
+                }
+            }
+
+            serializedClip.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static void SetCurveArrayRotationOrder(SerializedProperty? curves, int rotationOrder)
+        {
+            if (curves == null || !curves.isArray)
+            {
+                return;
+            }
+
+            for (int index = 0; index < curves.arraySize; index++)
+            {
+                SetSerializedCurveRotationOrder(curves.GetArrayElementAtIndex(index), rotationOrder);
+            }
+        }
+
+        private static void SetSerializedCurveRotationOrder(SerializedProperty curve, int rotationOrder)
+        {
+            SerializedProperty? property = curve.FindPropertyRelative("curve.m_RotationOrder");
+            if (property != null)
+            {
+                property.intValue = rotationOrder;
+            }
         }
 
         private static bool CanUseNativeBatch(
