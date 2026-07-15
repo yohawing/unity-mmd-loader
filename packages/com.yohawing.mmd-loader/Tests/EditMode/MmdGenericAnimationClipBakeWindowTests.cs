@@ -2,7 +2,6 @@
 
 using System.IO;
 using NUnit.Framework;
-using UnityEditor;
 using UnityEngine;
 using Mmd.Editor;
 
@@ -10,11 +9,6 @@ namespace Mmd.Tests
 {
     public sealed class MmdAnimationClipBakeWindowTests
     {
-        private const string ImportedPmxDirectory = "Assets/__MmdAnimationClipBakeWindowTests";
-        private const string ImportedPmxPath = ImportedPmxDirectory + "/test_1bone_cube.pmx";
-        private const string PmxFixturePath =
-            "Packages/com.yohawing.mmd-loader/Tests/Fixtures/Assets/test_1bone_cube.pmx";
-
         [Test]
         public void OpenFromPmxPrefillsPmxAndCanDefaultToHumanoid()
         {
@@ -71,36 +65,6 @@ namespace Mmd.Tests
             {
                 if (window != null) window.Close();
                 Object.DestroyImmediate(vmd);
-            }
-        }
-
-        [Test]
-        public void OpenFromPmxDisplaysVisibleImportedMainGameObject()
-        {
-            MmdGenericAnimationClipBakeWindow? window = null;
-            try
-            {
-                Directory.CreateDirectory(ImportedPmxDirectory);
-                File.Copy(PmxFixturePath, ImportedPmxPath, overwrite: true);
-                AssetDatabase.ImportAsset(ImportedPmxPath, ImportAssetOptions.ForceUpdate);
-
-                GameObject? mainGameObject = AssetDatabase.LoadAssetAtPath<GameObject>(ImportedPmxPath);
-                MmdPmxAsset? pmx = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(ImportedPmxPath);
-                Assert.That(mainGameObject, Is.Not.Null, "precondition: imported PMX has a visible main GameObject");
-                Assert.That(pmx, Is.Not.Null, "precondition: imported PMX has metadata sub-asset");
-
-                window = MmdGenericAnimationClipBakeWindow.OpenFromPmx(pmx);
-
-                Assert.That(window.PmxAssetForTests, Is.SameAs(pmx));
-                Assert.That(window.PmxDisplayObjectForTests, Is.SameAs(mainGameObject));
-
-                window.SetPmxDisplayObjectForTests(mainGameObject);
-                Assert.That(window.PmxAssetForTests, Is.SameAs(pmx));
-            }
-            finally
-            {
-                if (window != null) window.Close();
-                AssetDatabase.DeleteAsset(ImportedPmxDirectory);
             }
         }
 

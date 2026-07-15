@@ -16,7 +16,6 @@ namespace Mmd.Editor
             Humanoid,
         }
 
-        private UnityEngine.Object? pmxDisplayObject;
         private MmdPmxAsset? pmxAsset;
         private MmdVmdAsset? vmdAsset;
         private ClipType clipType;
@@ -42,7 +41,6 @@ namespace Mmd.Editor
             window.titleContent = new GUIContent("AnimationClip Bake");
             window.minSize = new Vector2(440.0f, 300.0f);
             window.pmxAsset = pmxAsset;
-            window.pmxDisplayObject = GetPmxDisplayObject(pmxAsset, pmxAsset);
             window.vmdAsset = null;
             window.clipType = preferHumanoid ? ClipType.Humanoid : ClipType.Generic;
             window.startFrame = 0;
@@ -62,7 +60,6 @@ namespace Mmd.Editor
             window.titleContent = new GUIContent("AnimationClip Bake");
             window.minSize = new Vector2(440.0f, 300.0f);
             window.pmxAsset = null;
-            window.pmxDisplayObject = null;
             window.vmdAsset = vmdAsset;
             window.clipType = ClipType.Generic;
             window.startFrame = 0;
@@ -77,7 +74,6 @@ namespace Mmd.Editor
         }
 
         internal MmdPmxAsset? PmxAssetForTests => pmxAsset;
-        internal UnityEngine.Object? PmxDisplayObjectForTests => pmxDisplayObject;
         internal MmdVmdAsset? VmdAssetForTests => vmdAsset;
         internal ClipType ClipTypeForTests => clipType;
         internal int StartFrameForTests => startFrame;
@@ -91,11 +87,6 @@ namespace Mmd.Editor
         internal void SetPmxAssetForTests(MmdPmxAsset? asset)
         {
             SetPmxAsset(asset);
-        }
-
-        internal void SetPmxDisplayObjectForTests(UnityEngine.Object? asset)
-        {
-            SetPmxDisplayObject(asset);
         }
 
         internal void SetVmdAssetForTests(MmdVmdAsset? asset)
@@ -121,19 +112,14 @@ namespace Mmd.Editor
             }
 
             EditorGUI.BeginChangeCheck();
-            UnityEngine.Object? nextPmxDisplayObject = EditorGUILayout.ObjectField(
-                new GUIContent("PMX Model", "Select the visible main GameObject from an imported .pmx asset."),
-                pmxDisplayObject,
-                typeof(UnityEngine.Object),
+            MmdPmxAsset? nextPmx = (MmdPmxAsset?)EditorGUILayout.ObjectField(
+                new GUIContent("PMX Model", "Select an imported MmdPmxAsset."),
+                pmxAsset,
+                typeof(MmdPmxAsset),
                 allowSceneObjects: false);
             if (EditorGUI.EndChangeCheck())
             {
-                SetPmxDisplayObject(nextPmxDisplayObject);
-            }
-
-            if (pmxDisplayObject != null && pmxAsset == null)
-            {
-                EditorGUILayout.HelpBox("Select an imported .pmx model asset.", MessageType.Warning);
+                SetPmxAsset(nextPmx);
             }
 
             EditorGUI.BeginChangeCheck();
@@ -211,44 +197,9 @@ namespace Mmd.Editor
         private void SetPmxAsset(MmdPmxAsset? asset)
         {
             pmxAsset = asset;
-            pmxDisplayObject = GetPmxDisplayObject(asset, asset);
             diagnostics.Clear();
             RefreshDefaultOutputPath();
             Repaint();
-        }
-
-        private void SetPmxDisplayObject(UnityEngine.Object? asset)
-        {
-            MmdPmxAsset? resolvedAsset = asset as MmdPmxAsset
-                ?? MmdEditorPmxLoader.TryResolveMmdPmxAssetFromMainGameObject(asset);
-            pmxAsset = resolvedAsset;
-            pmxDisplayObject = GetPmxDisplayObject(resolvedAsset, asset);
-            diagnostics.Clear();
-            RefreshDefaultOutputPath();
-            Repaint();
-        }
-
-        private static UnityEngine.Object? GetPmxDisplayObject(
-            MmdPmxAsset? asset,
-            UnityEngine.Object? fallback)
-        {
-            if (asset == null)
-            {
-                return fallback;
-            }
-
-            string path = AssetDatabase.GetAssetPath(asset);
-            if (!string.IsNullOrEmpty(path)
-                && path.EndsWith(".pmx", StringComparison.OrdinalIgnoreCase))
-            {
-                UnityEngine.Object? mainAsset = AssetDatabase.LoadMainAssetAtPath(path);
-                if (mainAsset is GameObject)
-                {
-                    return mainAsset;
-                }
-            }
-
-            return fallback ?? asset;
         }
 
         private void SetVmdAsset(MmdVmdAsset? asset)

@@ -33,6 +33,7 @@ namespace Mmd.Tests
 
             Assert.That(pmxAsset, Is.Not.Null);
             Assert.That(vmdAsset, Is.Not.Null);
+            Assert.That(pmxAsset.name, Is.EqualTo(Path.GetFileNameWithoutExtension(TempPmxPath)));
             Assert.That(pmxAsset.SourceId, Is.EqualTo(TempPmxPath));
             Assert.That(vmdAsset.SourceId, Is.EqualTo(TempVmdPath));
             Assert.That(File.Exists(pmxAsset.SourcePath), Is.True);

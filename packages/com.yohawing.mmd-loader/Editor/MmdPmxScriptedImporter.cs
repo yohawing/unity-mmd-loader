@@ -164,6 +164,7 @@ namespace Mmd.Editor
                 materialRemaps,
                 animationType.ToString(),
                 materialOverrideAsset);
+            asset.name = Path.GetFileNameWithoutExtension(ctx.assetPath);
             transaction.Track(asset);
             MmdPmxImportFaultInjection.ThrowIfRequested(ctx.assetPath, MmdPmxImportStage.ImportedAssetCreated);
             asset.ApplyProjectTextureBindingSummary(
