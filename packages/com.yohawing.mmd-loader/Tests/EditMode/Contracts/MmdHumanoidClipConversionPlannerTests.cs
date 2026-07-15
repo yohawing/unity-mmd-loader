@@ -53,7 +53,24 @@ namespace Mmd.Tests
             Assert.That(result.Diagnostics, Is.Not.Empty);
             Assert.That(string.Join("\n", result.Diagnostics), Does.Contain("pmx asset is null"));
             Assert.That(string.Join("\n", result.Diagnostics), Does.Contain("vmd asset is null"));
-            Assert.That(string.Join("\n", result.Diagnostics), Does.Contain("humanoid setup asset is null"));
+        }
+
+        [Test]
+        public void AnalyzePrerequisitesWithoutSetupRejectsGenericPmxWithActionableDiagnostic()
+        {
+            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(FixturePmxPath);
+            MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(FixtureVmdPath);
+            Assert.That(pmxAsset, Is.Not.Null);
+            Assert.That(vmdAsset, Is.Not.Null);
+
+            MmdHumanoidClipConversionPlan result =
+                MmdHumanoidClipConversionPlanner.AnalyzePrerequisites(pmxAsset, vmdAsset, setupAsset: null);
+
+            Assert.That(result.PrerequisitesReady, Is.False);
+            Assert.That(result.CanCreateClipNow, Is.False);
+            Assert.That(
+                string.Join("\n", result.Diagnostics),
+                Does.Contain("AnimationType").And.Contain("Reimport the PMX"));
         }
 
         [Test]

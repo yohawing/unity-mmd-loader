@@ -152,7 +152,9 @@ namespace Mmd.Editor
             {
                 EditorGUI.BeginChangeCheck();
                 MmdHumanoidSetupAsset? nextSetup = (MmdHumanoidSetupAsset?)EditorGUILayout.ObjectField(
-                    "Humanoid Setup",
+                    new GUIContent(
+                        "Humanoid Setup (Optional)",
+                        "Optional manual mapping override. Humanoid-ready PMX imports use their imported Avatar and mapping by default."),
                     setupAsset,
                     typeof(MmdHumanoidSetupAsset),
                     allowSceneObjects: false);
@@ -161,14 +163,6 @@ namespace Mmd.Editor
                     setupAsset = nextSetup;
                     diagnostics.Clear();
                     RefreshDefaultOutputPath();
-                }
-
-                if (setupAsset == null && pmxAsset != null)
-                {
-                    if (GUILayout.Button("Create Humanoid Setup Asset"))
-                    {
-                        CreateHumanoidSetupAsset();
-                    }
                 }
             }
 
@@ -304,28 +298,6 @@ namespace Mmd.Editor
             }
         }
 
-        private void CreateHumanoidSetupAsset()
-        {
-            if (pmxAsset == null)
-            {
-                return;
-            }
-
-            diagnostics.Clear();
-            try
-            {
-                setupAsset = MmdHumanoidSetupAssetBuilder.CreateHumanoidSetupAsset(
-                    pmxAsset,
-                    MmdHumanoidSetupAssetBuilder.GetDefaultSetupAssetPath(pmxAsset));
-                RefreshDefaultOutputPath();
-                EditorGUIUtility.PingObject(setupAsset);
-            }
-            catch (Exception ex)
-            {
-                diagnostics.Add("Humanoid Setup Asset could not be created: " + ex.Message);
-            }
-        }
-
         private void CreateClip()
         {
             diagnostics.Clear();
@@ -356,12 +328,6 @@ namespace Mmd.Editor
                     diagnostics.Add("Generic AnimationClip could not be created.");
                 }
 
-                return;
-            }
-
-            if (setupAsset == null)
-            {
-                diagnostics.Add("Humanoid Setup Asset is required for a Humanoid clip.");
                 return;
             }
 

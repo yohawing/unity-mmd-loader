@@ -308,6 +308,55 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void CreateInMemoryClipWithoutSetupUsesImportedHumanoidAvatarAndBindings()
+        {
+            MmdPmxAsset pmxAsset = null!;
+            MmdVmdAsset? vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(FixtureVmdPath);
+            var setupAsset = ScriptableObject.CreateInstance<MmdHumanoidSetupAsset>();
+            var ownedObjects = new List<UnityEngine.Object>();
+            MmdHumanoidClipConversionWriterResult? result = null;
+
+            try
+            {
+                CreateReadyFixturePmxAndSetup(out pmxAsset, setupAsset, ownedObjects);
+                ConfigureImportedHumanoidState(pmxAsset, ownedObjects);
+                Assert.That(vmdAsset, Is.Not.Null);
+
+                result = MmdHumanoidClipConversionWriter.CreateInMemoryClip(
+                    pmxAsset,
+                    vmdAsset!,
+                    setupAsset: null,
+                    frameRate: 30.0f,
+                    startFrame: 0,
+                    endFrame: 2);
+
+                Assert.That(result.Clip, Is.Not.Null, string.Join("\n", result.Diagnostics));
+                Assert.That(result.PrerequisitesReady, Is.True);
+                Assert.That(result.CanCreateClipNow, Is.True);
+                Assert.That(
+                    string.Join("\n", result.Diagnostics),
+                    Does.Contain(MmdHumanoidClipConversionPlanner.ImportedPmxHumanoidMappingSource));
+                AssertHumanoidClipHasMuscleBindings(result.Clip!);
+            }
+            finally
+            {
+                if (result?.Clip != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(result.Clip);
+                }
+
+                UnityEngine.Object.DestroyImmediate(setupAsset);
+                foreach (UnityEngine.Object obj in ownedObjects)
+                {
+                    if (obj != null)
+                    {
+                        UnityEngine.Object.DestroyImmediate(obj);
+                    }
+                }
+            }
+        }
+
+        [Test]
         public void CreateHumanoidClipConversionWriterCanCreateFromInspectorEligibility()
         {
             MmdPmxAsset pmxAsset = null!;
@@ -478,6 +527,51 @@ namespace Mmd.Tests
             ownedObjects.Add(pmxAsset);
             ownedObjects.Add(hierarchyRoot);
             ownedObjects.Add(mesh);
+        }
+
+        private static void ConfigureImportedHumanoidState(
+            MmdPmxAsset pmxAsset,
+            List<UnityEngine.Object> ownedObjects)
+        {
+            MmdHumanoidProxyRigResult proxyRig = MmdHumanoidProxyRigFactory.CreateProxyRig(pmxAsset);
+            Assert.That(proxyRig.ProxyRoot, Is.Not.Null, string.Join("\n", proxyRig.Diagnostics));
+            Assert.That(proxyRig.Readiness, Is.EqualTo(MmdHumanoidSetupAsset.ReadyReadiness));
+
+            MmdHumanoidAvatarBuildResult avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(proxyRig);
+            Assert.That(avatarResult.Avatar, Is.Not.Null, string.Join("\n", avatarResult.Diagnostics));
+            Assert.That(avatarResult.Avatar!.isValid, Is.True);
+            Assert.That(avatarResult.Avatar.isHuman, Is.True);
+
+            GameObject importedRoot = pmxAsset.ImportedRoot!;
+            Transform[] nativeBones = importedRoot
+                .GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true)!
+                .bones;
+            var bindings = new List<MmdHumanoidRetargetBinding>();
+            foreach (MmdHumanoidBoneMappingMatch match in proxyRig.Matches)
+            {
+                proxyRig.BoneMap.TryGetValue(match.HumanBone, out Transform proxyTransform);
+                bindings.Add(new MmdHumanoidRetargetBinding(
+                    match.HumanBone,
+                    match.MmdBoneIndex,
+                    proxyTransform,
+                    nativeBones[match.MmdBoneIndex]));
+            }
+
+            proxyRig.ProxyRoot!.transform.SetParent(importedRoot.transform, worldPositionStays: false);
+            Mmd.UnityIntegration.MmdUnityPlaybackController controller =
+                importedRoot.AddComponent<Mmd.UnityIntegration.MmdUnityPlaybackController>();
+            controller.ConfigureHumanoidRetarget(
+                proxyRig.ProxyRoot.transform,
+                bindings,
+                Array.Empty<MmdHumanoidAppendTransformBinding>());
+            pmxAsset.ApplyHumanoidAvatarImportSummary(
+                "Humanoid",
+                avatarResult.Avatar,
+                MmdHumanoidSetupAsset.ReadyReadiness,
+                "test: imported Humanoid ready");
+
+            ownedObjects.Add(proxyRig.ProxyRoot);
+            ownedObjects.Add(avatarResult.Avatar);
         }
 
         private static void AssertHumanoidClipHasMuscleBindings(AnimationClip clip)

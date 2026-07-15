@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using Mmd.Parser;
+using Mmd.UnityIntegration;
 
 namespace Mmd.Editor
 {
@@ -12,6 +13,8 @@ namespace Mmd.Editor
     {
         public const string ReadyReadiness = "prerequisites-ready";
         public const string NotReadyReadiness = "prerequisites-not-ready";
+        public const string ImportedPmxHumanoidMappingSource = "Imported PMX Humanoid settings";
+        public const string OptionalSetupAssetMappingSource = "Optional Humanoid Setup Asset";
 
         public static MmdHumanoidClipConversionPlan AnalyzePrerequisites(
             MmdPmxAsset? pmxAsset,
@@ -31,12 +34,7 @@ namespace Mmd.Editor
                 diagnostics.Add("vmd asset is null");
             }
 
-            if (setupAsset == null)
-            {
-                diagnostics.Add("humanoid setup asset is null");
-            }
-
-            if (!IsAllInputsPresent(pmxAsset, vmdAsset, setupAsset))
+            if (!IsAllInputsPresent(pmxAsset, vmdAsset))
             {
                 return CreateResult(
                     false,
@@ -49,9 +47,16 @@ namespace Mmd.Editor
                     motion: null);
             }
 
-            ValidateSetupAssociation(pmxAsset!, setupAsset!, diagnostics);
             ValidatePmxImportReadiness(pmxAsset!, diagnostics);
-            ValidateSetupReadiness(setupAsset!, diagnostics);
+            if (setupAsset != null)
+            {
+                ValidateSetupAssociation(pmxAsset!, setupAsset, diagnostics);
+                ValidateSetupReadiness(setupAsset, diagnostics);
+            }
+            else
+            {
+                TryResolveImportedHumanoidState(pmxAsset!, diagnostics, out _, out _);
+            }
 
             // VMD validation uses ONLY import-time cache (ImportSummaryStatus, StructuralDiagnostics, Max*/KeyframeCount).
             // Never call LoadMotion() here: analysis / inspector preview / readiness must not parse VMD.
@@ -76,6 +81,12 @@ namespace Mmd.Editor
             if (ready)
             {
                 diagnostics.Add("conversion-prerequisites: ready");
+                diagnostics.Add(
+                    "mapping-source: "
+                    + (setupAsset != null
+                        ? OptionalSetupAssetMappingSource
+                        : ImportedPmxHumanoidMappingSource)
+                    + ".");
                 diagnostics.Add("writer-status: CanCreateClipNow is true (in-memory writer in H6 slice 1).");
             }
 
@@ -147,10 +158,141 @@ namespace Mmd.Editor
 
         private static bool IsAllInputsPresent(
             MmdPmxAsset? pmxAsset,
-            MmdVmdAsset? vmdAsset,
-            MmdHumanoidSetupAsset? setupAsset)
+            MmdVmdAsset? vmdAsset)
         {
-            return pmxAsset != null && vmdAsset != null && setupAsset != null;
+            return pmxAsset != null && vmdAsset != null;
+        }
+
+        internal static bool TryResolveImportedHumanoidState(
+            MmdPmxAsset pmxAsset,
+            List<string> diagnostics,
+            out MmdUnityPlaybackController? controller,
+            out Transform[] nativeBones)
+        {
+            controller = null;
+            nativeBones = Array.Empty<Transform>();
+
+            if (!string.Equals(pmxAsset.AnimationType, "Humanoid", StringComparison.Ordinal))
+            {
+                diagnostics.Add(
+                    "pmx humanoid validation failed: AnimationType is "
+                    + pmxAsset.AnimationType
+                    + ", expected Humanoid. Reimport the PMX with Animation Type set to Humanoid.");
+                return false;
+            }
+
+            Avatar? avatar = pmxAsset.ImportedAvatar;
+            if (avatar == null || !avatar.isValid || !avatar.isHuman)
+            {
+                diagnostics.Add("pmx humanoid validation failed: ImportedAvatar is not a valid Humanoid Avatar.");
+            }
+
+            if (!string.Equals(
+                    pmxAsset.HumanoidAvatarReadiness,
+                    MmdHumanoidSetupAsset.ReadyReadiness,
+                    StringComparison.Ordinal))
+            {
+                diagnostics.Add(
+                    "pmx humanoid validation failed: HumanoidAvatarReadiness is "
+                    + pmxAsset.HumanoidAvatarReadiness
+                    + ", expected " + MmdHumanoidSetupAsset.ReadyReadiness + ".");
+            }
+
+            GameObject? importedRoot = pmxAsset.ImportedRoot;
+            if (importedRoot == null)
+            {
+                diagnostics.Add("pmx humanoid validation failed: ImportedRoot is null.");
+                return false;
+            }
+
+            controller = importedRoot.GetComponent<MmdUnityPlaybackController>();
+            if (controller == null)
+            {
+                diagnostics.Add("pmx humanoid validation failed: imported root has no MmdUnityPlaybackController.");
+                return false;
+            }
+
+            Transform? proxyRoot = controller.HumanoidProxyRoot;
+            if (proxyRoot == null)
+            {
+                diagnostics.Add("pmx humanoid validation failed: imported controller has no HumanoidProxyRoot.");
+                return false;
+            }
+
+            SkinnedMeshRenderer? smr = importedRoot.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true);
+            nativeBones = smr != null && smr.bones != null ? smr.bones : Array.Empty<Transform>();
+            if (nativeBones.Length == 0)
+            {
+                diagnostics.Add("pmx humanoid validation failed: imported SkinnedMeshRenderer has no bones.");
+                return false;
+            }
+
+            IReadOnlyList<MmdHumanoidRetargetBinding> entries = controller.HumanoidRetargetEntries;
+            if (entries == null || entries.Count == 0)
+            {
+                diagnostics.Add("pmx humanoid validation failed: imported controller has no HumanoidRetargetEntries.");
+                return false;
+            }
+
+            bool valid = true;
+            var usedHumanBones = new HashSet<HumanBodyBones>();
+            for (int i = 0; i < entries.Count; i++)
+            {
+                MmdHumanoidRetargetBinding? entry = entries[i];
+                if (entry == null)
+                {
+                    diagnostics.Add("pmx humanoid validation failed: HumanoidRetargetEntries contains a null entry.");
+                    valid = false;
+                    continue;
+                }
+
+                if (entry.HumanBone < 0
+                    || entry.HumanBone >= HumanBodyBones.LastBone
+                    || !usedHumanBones.Add(entry.HumanBone))
+                {
+                    diagnostics.Add("pmx humanoid validation failed: HumanoidRetargetEntries contains an invalid or duplicate HumanBodyBones mapping.");
+                    valid = false;
+                }
+
+                int boneIndex = entry.MmdBoneIndex;
+                if (boneIndex < 0 || boneIndex >= nativeBones.Length || nativeBones[boneIndex] == null)
+                {
+                    diagnostics.Add("pmx humanoid validation failed: retarget binding has an unusable MMD bone index.");
+                    valid = false;
+                    continue;
+                }
+
+                if (!ReferenceEquals(entry.NativeTransform, nativeBones[boneIndex]))
+                {
+                    diagnostics.Add("pmx humanoid validation failed: retarget binding native transform does not match its persisted MMD bone index.");
+                    valid = false;
+                }
+
+                if (entry.ProxyTransform == null || !IsDescendantOrSelf(entry.ProxyTransform, proxyRoot))
+                {
+                    diagnostics.Add("pmx humanoid validation failed: retarget binding has an unusable proxy transform.");
+                    valid = false;
+                }
+            }
+
+            return valid && avatar != null && avatar.isValid && avatar.isHuman
+                         && string.Equals(
+                             pmxAsset.HumanoidAvatarReadiness,
+                             MmdHumanoidSetupAsset.ReadyReadiness,
+                             StringComparison.Ordinal);
+        }
+
+        private static bool IsDescendantOrSelf(Transform transform, Transform root)
+        {
+            for (Transform? current = transform; current != null; current = current.parent)
+            {
+                if (ReferenceEquals(current, root))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static void ValidateSetupAssociation(

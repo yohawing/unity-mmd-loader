@@ -15,7 +15,7 @@ namespace Mmd.Editor
         public static MmdHumanoidClipConversionWriterResult CreateHumanoidAnimationClipAsset(
             MmdPmxAsset pmxAsset,
             MmdVmdAsset vmdAsset,
-            MmdHumanoidSetupAsset setupAsset,
+            MmdHumanoidSetupAsset? setupAsset,
             float frameRate,
             int startFrame = 0,
             int? endFrame = null,
@@ -149,7 +149,7 @@ namespace Mmd.Editor
         public static MmdHumanoidClipConversionWriterResult CreateInMemoryClip(
             MmdPmxAsset pmxAsset,
             MmdVmdAsset vmdAsset,
-            MmdHumanoidSetupAsset setupAsset,
+            MmdHumanoidSetupAsset? setupAsset,
             float frameRate,
             int startFrame = 0,
             int? endFrame = null)
@@ -213,37 +213,96 @@ namespace Mmd.Editor
                 return new MmdHumanoidClipConversionWriterResult(null, plan, diagnostics);
             }
 
-            MmdHumanoidProxyRigResult proxyRigResult = MmdHumanoidProxyRigFactory.CreateProxyRig(pmxAsset);
-            if (proxyRigResult.ProxyRoot == null)
-            {
-                diagnostics.AddRange(proxyRigResult.Diagnostics);
-                diagnostics.Add("validation: failed to create temporary proxy rig.");
-                return new MmdHumanoidClipConversionWriterResult(null, plan, diagnostics);
-            }
-
             var mappedBones = new List<(Transform ProxyTransform, string SourceBoneName)>();
+            GameObject? proxyRoot = null;
             Avatar? proxyAvatar = null;
+            bool ownsProxyAvatar = false;
             try
             {
                 var usedHumanBones = new HashSet<HumanBodyBones>();
                 var boneKeyframesByName = BuildBoneKeyframesByName(motion.boneKeyframes);
-                foreach (MmdSerializableBoneMappingEntry mappingEntry in setupAsset.MappingEntries)
+
+                if (setupAsset != null)
                 {
-                    if (mappingEntry == null || usedHumanBones.Contains(mappingEntry.HumanBone))
+                    MmdHumanoidProxyRigResult proxyRigResult = MmdHumanoidProxyRigFactory.CreateProxyRig(pmxAsset);
+                    diagnostics.AddRange(proxyRigResult.Diagnostics);
+                    proxyRoot = proxyRigResult.ProxyRoot;
+                    if (proxyRoot == null)
                     {
-                        continue;
+                        diagnostics.Add("validation: failed to create temporary proxy rig.");
+                        return new MmdHumanoidClipConversionWriterResult(null, plan, diagnostics);
                     }
 
-                    if (string.IsNullOrWhiteSpace(mappingEntry.MmdBoneName))
+                    foreach (MmdSerializableBoneMappingEntry mappingEntry in setupAsset.MappingEntries)
                     {
-                        continue;
+                        if (mappingEntry == null || usedHumanBones.Contains(mappingEntry.HumanBone))
+                        {
+                            continue;
+                        }
+
+                        if (string.IsNullOrWhiteSpace(mappingEntry.MmdBoneName))
+                        {
+                            continue;
+                        }
+
+                        if (proxyRigResult.BoneMap.TryGetValue(mappingEntry.HumanBone, out Transform? proxyTransform))
+                        {
+                            usedHumanBones.Add(mappingEntry.HumanBone);
+                            mappedBones.Add((proxyTransform, mappingEntry.MmdBoneName));
+                        }
                     }
 
-                    if (proxyRigResult.BoneMap.TryGetValue(mappingEntry.HumanBone, out Transform? proxyTransform))
+                    MmdHumanoidAvatarBuildResult avatarResult =
+                        MmdHumanoidProxyRigFactory.BuildAvatar(proxyRigResult);
+                    diagnostics.AddRange(avatarResult.Diagnostics);
+                    proxyAvatar = avatarResult.Avatar;
+                    ownsProxyAvatar = proxyAvatar != null;
+                }
+                else
+                {
+                    var importedStateDiagnostics = new List<string>();
+                    if (!MmdHumanoidClipConversionPlanner.TryResolveImportedHumanoidState(
+                            pmxAsset,
+                            importedStateDiagnostics,
+                            out Mmd.UnityIntegration.MmdUnityPlaybackController? controller,
+                            out Transform[] nativeBones)
+                        || controller == null
+                        || controller.HumanoidProxyRoot == null)
                     {
-                        usedHumanBones.Add(mappingEntry.HumanBone);
-                        mappedBones.Add((proxyTransform, mappingEntry.MmdBoneName));
+                        diagnostics.AddRange(importedStateDiagnostics);
+                        diagnostics.Add("validation: imported PMX Humanoid mapping became unavailable before writing.");
+                        return new MmdHumanoidClipConversionWriterResult(null, plan, diagnostics);
                     }
+
+                    Transform importedProxyRoot = controller.HumanoidProxyRoot;
+                    proxyRoot = UnityEngine.Object.Instantiate(importedProxyRoot.gameObject);
+                    proxyRoot.name = importedProxyRoot.gameObject.name + "_ClipBake";
+                    foreach (MmdHumanoidRetargetBinding binding in controller.HumanoidRetargetEntries)
+                    {
+                        if (binding == null || !usedHumanBones.Add(binding.HumanBone))
+                        {
+                            continue;
+                        }
+
+                        string proxyPath = AnimationUtility.CalculateTransformPath(
+                            binding.ProxyTransform,
+                            importedProxyRoot);
+                        Transform? clonedProxyTransform = string.IsNullOrEmpty(proxyPath)
+                            ? proxyRoot.transform
+                            : proxyRoot.transform.Find(proxyPath);
+                        if (clonedProxyTransform == null)
+                        {
+                            diagnostics.Add(
+                                "validation: imported proxy mapping path could not be resolved for "
+                                + binding.HumanBone + ".");
+                            return new MmdHumanoidClipConversionWriterResult(null, plan, diagnostics);
+                        }
+
+                        string sourceBoneName = nativeBones[binding.MmdBoneIndex].name;
+                        mappedBones.Add((clonedProxyTransform, sourceBoneName));
+                    }
+
+                    proxyAvatar = pmxAsset.ImportedAvatar;
                 }
 
                 if (mappedBones.Count == 0)
@@ -264,10 +323,6 @@ namespace Mmd.Editor
                 int frameCount = effectiveEndFrame - startFrame + 1;
                 float sampleFrameToTimeFactor = 1.0f / frameRate;
 
-                MmdHumanoidAvatarBuildResult avatarResult =
-                    MmdHumanoidProxyRigFactory.BuildAvatar(proxyRigResult);
-                diagnostics.AddRange(avatarResult.Diagnostics);
-                proxyAvatar = avatarResult.Avatar;
                 if (proxyAvatar == null || !proxyAvatar.isValid || !proxyAvatar.isHuman)
                 {
                     UnityEngine.Object.DestroyImmediate(clip);
@@ -277,7 +332,7 @@ namespace Mmd.Editor
 
                 AddMuscleCurvesToClip(
                     clip,
-                    proxyRigResult.ProxyRoot,
+                    proxyRoot,
                     proxyAvatar,
                     mappedBones,
                     boneKeyframesByName,
@@ -296,14 +351,14 @@ namespace Mmd.Editor
             }
             finally
             {
-                if (proxyAvatar != null)
+                if (ownsProxyAvatar && proxyAvatar != null)
                 {
                     UnityEngine.Object.DestroyImmediate(proxyAvatar);
                 }
 
-                if (proxyRigResult.ProxyRoot != null)
+                if (proxyRoot != null)
                 {
-                    UnityEngine.Object.DestroyImmediate(proxyRigResult.ProxyRoot);
+                    UnityEngine.Object.DestroyImmediate(proxyRoot);
                 }
             }
         }
