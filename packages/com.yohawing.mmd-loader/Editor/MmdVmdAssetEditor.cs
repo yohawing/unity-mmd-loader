@@ -39,6 +39,15 @@ namespace Mmd.Editor
                 MmdAssetInspectorUtility.DrawVmdMotionSummary(asset);
 
                 EditorGUILayout.Space();
+                using (new EditorGUI.DisabledScope(asset.ByteLength <= 0))
+                {
+                    if (GUILayout.Button("Bake to AnimationClip..."))
+                    {
+                        MmdGenericAnimationClipBakeWindow.OpenFromVmd(asset);
+                    }
+                }
+
+                EditorGUILayout.Space();
                 using (new EditorGUI.DisabledScope(false))
                 {
                     if (GUILayout.Button("Run VMD Diagnostics"))

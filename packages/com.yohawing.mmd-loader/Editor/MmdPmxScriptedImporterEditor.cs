@@ -197,7 +197,18 @@ namespace Mmd.Editor
                 EditorGUILayout.HelpBox("Apply import settings to refresh rig data.", MessageType.Warning);
             }
 
-            DrawPendingImportSettingsWarning(HasModified());
+            bool hasModifiedImportSettings = HasModified();
+            using (new EditorGUI.DisabledScope(asset == null || hasModifiedImportSettings))
+            {
+                if (GUILayout.Button("Bake to AnimationClip..."))
+                {
+                    MmdGenericAnimationClipBakeWindow.OpenFromPmx(
+                        asset,
+                        preferHumanoid: currentType == MmdPmxAnimationType.Humanoid);
+                }
+            }
+
+            DrawPendingImportSettingsWarning(hasModifiedImportSettings);
         }
 
         private static string BuildAvatarReadinessTooltip(MmdPmxAsset asset)

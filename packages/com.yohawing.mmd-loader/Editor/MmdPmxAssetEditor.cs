@@ -45,20 +45,6 @@ namespace Mmd.Editor
                     MmdPmxPrefabExporter.CreatePrefabWithFeedback(asset);
                 }
 
-                if (GUILayout.Button("Create Humanoid Setup Asset"))
-                {
-                    MmdHumanoidSetupAsset setup = MmdHumanoidSetupAssetBuilder.CreateHumanoidSetupAsset(
-                        asset,
-                        MmdHumanoidSetupAssetBuilder.GetDefaultSetupAssetPath(asset));
-                    Selection.activeObject = setup;
-                    EditorGUIUtility.PingObject(setup);
-                }
-
-                if (GUILayout.Button("Create Generic AnimationClip..."))
-                {
-                    MmdGenericAnimationClipBakeWindow.Open(asset);
-                }
-
             }
 
             DrawMissingTextureActions(asset);
