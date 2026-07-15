@@ -215,15 +215,33 @@ namespace Mmd.Editor
             List<string> diagnostics)
         {
             var bindings = new HashSet<string>(AnimationUtility.GetCurveBindings(clip).Select(Key), StringComparer.Ordinal);
-            string[] transformProperties =
+            string[] positionProperties =
             {
-                "m_LocalPosition.x", "m_LocalPosition.y", "m_LocalPosition.z",
+                "m_LocalPosition.x", "m_LocalPosition.y", "m_LocalPosition.z"
+            };
+            string[] quaternionProperties =
+            {
                 "m_LocalRotation.x", "m_LocalRotation.y", "m_LocalRotation.z", "m_LocalRotation.w"
             };
+            string[] eulerProperties =
+            {
+                "localEulerAnglesRaw.x", "localEulerAnglesRaw.y", "localEulerAnglesRaw.z"
+            };
             foreach (string path in bonePaths)
-                foreach (string property in transformProperties)
+            {
+                foreach (string property in positionProperties)
                     if (!bindings.Contains(Key(EditorCurveBinding.FloatCurve(path, typeof(Transform), property))))
                         diagnostics.Add("binding: missing Transform curve " + path + "|" + property + ".");
+
+                bool hasQuaternion = HasAllTransformCurves(bindings, path, quaternionProperties);
+                bool hasEuler = HasAllTransformCurves(bindings, path, eulerProperties);
+                if (!hasQuaternion && !hasEuler)
+                {
+                    diagnostics.Add(
+                        "binding: missing Transform rotation curves " + path
+                        + " (requires m_LocalRotation.* or localEulerAnglesRaw.*).");
+                }
+            }
 
             if (instance.SkinnedMeshRenderer == null && instance.VertexMorphBlendShapes.Count > 0)
             {
@@ -238,6 +256,15 @@ namespace Mmd.Editor
                     if (!bindings.Contains(Key(EditorCurveBinding.FloatCurve(path, typeof(SkinnedMeshRenderer), "blendShape." + morph.BlendShapeName))))
                         diagnostics.Add("binding: missing BlendShape curve " + path + "|" + morph.BlendShapeName + ".");
             }
+        }
+
+        private static bool HasAllTransformCurves(
+            HashSet<string> bindings,
+            string path,
+            IEnumerable<string> properties)
+        {
+            return properties.All(property =>
+                bindings.Contains(Key(EditorCurveBinding.FloatCurve(path, typeof(Transform), property))));
         }
 
         private static string Key(EditorCurveBinding binding) => binding.path + "|" + binding.type.FullName + "|" + binding.propertyName;
