@@ -283,13 +283,20 @@ namespace Mmd.Editor
                     effectiveEndFrame,
                     frameCount,
                     sampleFrameToTimeFactor,
-                    diagnostics);
+                    diagnostics,
+                    out Vector3[] bodyPositions,
+                    out Quaternion[] bodyRotations);
+
+                float humanScale = ResolveHumanScale(proxyAvatar);
 
                 AddRootMotionCurvesToClip(
                     clip,
                     pmxAsset,
                     motion,
                     mappedBones,
+                    humanScale,
+                    bodyPositions,
+                    bodyRotations,
                     startFrame,
                     effectiveEndFrame,
                     frameCount,
@@ -367,7 +374,9 @@ namespace Mmd.Editor
             int endFrame,
             int frameCount,
             float sampleFrameToTimeFactor,
-            List<string> diagnostics)
+            List<string> diagnostics,
+            out Vector3[] bodyPositions,
+            out Quaternion[] bodyRotations)
         {
             int muscleCount = HumanTrait.MuscleCount;
             var muscleKeys = new Keyframe[muscleCount][];
@@ -375,6 +384,8 @@ namespace Mmd.Editor
             {
                 muscleKeys[muscleIndex] = new Keyframe[frameCount];
             }
+            bodyPositions = new Vector3[frameCount];
+            bodyRotations = new Quaternion[frameCount];
 
             var baseRotations = new Quaternion[mappedBones.Count];
             for (int boneIndex = 0; boneIndex < mappedBones.Count; boneIndex++)
@@ -408,6 +419,8 @@ namespace Mmd.Editor
                     }
 
                     poseHandler.GetHumanPose(ref pose);
+                    bodyPositions[sampleIndex] = pose.bodyPosition;
+                    bodyRotations[sampleIndex] = pose.bodyRotation;
                     for (int muscleIndex = 0; muscleIndex < muscleCount; muscleIndex++)
                     {
                         muscleKeys[muscleIndex][sampleIndex] =
@@ -428,11 +441,30 @@ namespace Mmd.Editor
             diagnostics.Add("writer: wrote " + muscleCount + " Humanoid muscle curves.");
         }
 
+        private static float ResolveHumanScale(Avatar proxyAvatar)
+        {
+            var scaleHost = new GameObject("MmdHumanoidScaleProbe");
+            try
+            {
+                Animator animator = scaleHost.AddComponent<Animator>();
+                animator.avatar = proxyAvatar;
+                float humanScale = animator.humanScale;
+                return float.IsFinite(humanScale) && humanScale > 0.0f ? humanScale : 1.0f;
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(scaleHost);
+            }
+        }
+
         private static void AddRootMotionCurvesToClip(
             AnimationClip clip,
             MmdPmxAsset pmxAsset,
             MmdMotionDefinition motion,
             IReadOnlyList<(HumanBodyBones HumanBone, Transform ProxyTransform, string SourceBoneName)> mappedBones,
+            float humanScale,
+            Vector3[] bodyPositions,
+            Quaternion[] bodyRotations,
             int startFrame,
             int endFrame,
             int frameCount,
@@ -454,7 +486,7 @@ namespace Mmd.Editor
             };
 
             bool evaluated = false;
-            string failureDiagnostic = "root-motion: mapped Hips source is unavailable; wrote identity RootT/RootQ curves.";
+            string failureDiagnostic = "root-motion: mapped Hips source is unavailable; wrote baseline RootT/RootQ curves.";
             string? hipsSourceName = null;
             for (int i = 0; i < mappedBones.Count; i++)
             {
@@ -478,6 +510,9 @@ namespace Mmd.Editor
                             motion,
                             hipsBone.index,
                             pmxAsset.ImportScale,
+                            humanScale,
+                            bodyPositions,
+                            bodyRotations,
                             startFrame,
                             endFrame,
                             sampleFrameToTimeFactor,
@@ -488,22 +523,24 @@ namespace Mmd.Editor
                     else
                     {
                         failureDiagnostic = "root-motion: mapped Hips bone '" + hipsSourceName
-                                            + "' is absent from the PMX model; wrote identity RootT/RootQ curves.";
+                                            + "' is absent from the PMX model; wrote baseline RootT/RootQ curves.";
                     }
                 }
                 catch (Exception ex)
                 {
                     failureDiagnostic = "root-motion: PMX pose evaluation failed (" + ex.Message
-                                        + "); wrote identity RootT/RootQ curves.";
+                                        + "); wrote baseline RootT/RootQ curves.";
                 }
             }
 
             if (!evaluated)
             {
-                FillIdentityRootMotionKeys(
+                FillBodyPoseRootMotionKeys(
                     startFrame,
                     endFrame,
                     sampleFrameToTimeFactor,
+                    bodyPositions,
+                    bodyRotations,
                     positionKeys,
                     rotationKeys);
                 diagnostics.Add(failureDiagnostic);
@@ -537,6 +574,9 @@ namespace Mmd.Editor
             MmdMotionDefinition motion,
             int hipsBoneIndex,
             float importScale,
+            float humanScale,
+            Vector3[] bodyPositions,
+            Quaternion[] bodyRotations,
             int startFrame,
             int endFrame,
             float sampleFrameToTimeFactor,
@@ -550,6 +590,12 @@ namespace Mmd.Editor
                 diagnostic = "root-motion: mapped Hips index is absent from the PMX model.";
                 return false;
             }
+            int frameCount = endFrame - startFrame + 1;
+            if (bodyPositions.Length != frameCount || bodyRotations.Length != frameCount)
+            {
+                diagnostic = "root-motion: sampled Humanoid body pose count does not match the requested frame range.";
+                return false;
+            }
 
             Dictionary<int, float[]> bindWorldMatrices = MmdPoseEvaluator.EvaluateWorldMatrices(model, null);
             if (!bindWorldMatrices.TryGetValue(hipsBone.index, out float[]? bindHipsMatrix))
@@ -559,10 +605,20 @@ namespace Mmd.Editor
             }
 
             Vector3 bindHipsPosition = ExtractPosition(bindHipsMatrix);
-            Quaternion bindHipsRotation =
-                MmdCoordinateSpace.MmdToUnityRotation(ExtractRotation(bindHipsMatrix));
+            MmdBoneDefinition? hipsParent = FindBoneByIndex(model, hipsBone.parentIndex);
+            Quaternion bindAncestorRotation = Quaternion.identity;
+            if (hipsParent != null)
+            {
+                if (!bindWorldMatrices.TryGetValue(hipsParent.index, out float[]? bindParentMatrix))
+                {
+                    diagnostic = "root-motion: bind-pose Hips ancestor world matrix is unavailable.";
+                    return false;
+                }
+                bindAncestorRotation = MmdCoordinateSpace.MmdToUnityRotation(ExtractRotation(bindParentMatrix));
+            }
 
             float scale = float.IsFinite(importScale) && importScale > 0.0f ? importScale : 1.0f;
+            float normalizedHumanScale = float.IsFinite(humanScale) && humanScale > 0.0f ? humanScale : 1.0f;
             Quaternion previousRotation = Quaternion.identity;
             int sampleIndex = 0;
             for (int frame = startFrame; frame <= endFrame; frame++)
@@ -577,10 +633,22 @@ namespace Mmd.Editor
                 }
 
                 Vector3 mmdPositionDelta = ExtractPosition(hipsMatrix) - bindHipsPosition;
-                Vector3 rootPosition = MmdCoordinateSpace.MmdToUnityPosition(mmdPositionDelta) * scale;
-                Quaternion currentHipsRotation =
-                    MmdCoordinateSpace.MmdToUnityRotation(ExtractRotation(hipsMatrix));
-                Quaternion rootRotation = currentHipsRotation * Quaternion.Inverse(bindHipsRotation);
+                Vector3 rootPosition = bodyPositions[sampleIndex]
+                                       + MmdCoordinateSpace.MmdToUnityPosition(mmdPositionDelta)
+                                       * (scale / normalizedHumanScale);
+                Quaternion ancestorRotationDelta = Quaternion.identity;
+                if (hipsParent != null)
+                {
+                    if (!worldMatrices.TryGetValue(hipsParent.index, out float[]? parentMatrix))
+                    {
+                        diagnostic = "root-motion: sampled Hips ancestor world matrix is unavailable at frame " + frame + ".";
+                        return false;
+                    }
+                    Quaternion currentAncestorRotation =
+                        MmdCoordinateSpace.MmdToUnityRotation(ExtractRotation(parentMatrix));
+                    ancestorRotationDelta = currentAncestorRotation * Quaternion.Inverse(bindAncestorRotation);
+                }
+                Quaternion rootRotation = ancestorRotationDelta * bodyRotations[sampleIndex];
                 rootRotation.Normalize();
 
                 if (sampleIndex > 0 && Quaternion.Dot(previousRotation, rootRotation) < 0.0f)
@@ -607,10 +675,12 @@ namespace Mmd.Editor
             return true;
         }
 
-        private static void FillIdentityRootMotionKeys(
+        private static void FillBodyPoseRootMotionKeys(
             int startFrame,
             int endFrame,
             float sampleFrameToTimeFactor,
+            Vector3[] bodyPositions,
+            Quaternion[] bodyRotations,
             Keyframe[][] positionKeys,
             Keyframe[][] rotationKeys)
         {
@@ -618,12 +688,15 @@ namespace Mmd.Editor
             for (int frame = startFrame; frame <= endFrame; frame++)
             {
                 float time = (frame - startFrame) * sampleFrameToTimeFactor;
-                for (int i = 0; i < 3; i++)
-                {
-                    positionKeys[i][sampleIndex] = new Keyframe(time, 0.0f);
-                    rotationKeys[i][sampleIndex] = new Keyframe(time, 0.0f);
-                }
-                rotationKeys[3][sampleIndex] = new Keyframe(time, 1.0f);
+                Quaternion bodyRotation = bodyRotations[sampleIndex];
+                bodyRotation.Normalize();
+                positionKeys[0][sampleIndex] = new Keyframe(time, bodyPositions[sampleIndex].x);
+                positionKeys[1][sampleIndex] = new Keyframe(time, bodyPositions[sampleIndex].y);
+                positionKeys[2][sampleIndex] = new Keyframe(time, bodyPositions[sampleIndex].z);
+                rotationKeys[0][sampleIndex] = new Keyframe(time, bodyRotation.x);
+                rotationKeys[1][sampleIndex] = new Keyframe(time, bodyRotation.y);
+                rotationKeys[2][sampleIndex] = new Keyframe(time, bodyRotation.z);
+                rotationKeys[3][sampleIndex] = new Keyframe(time, bodyRotation.w);
                 sampleIndex++;
             }
         }

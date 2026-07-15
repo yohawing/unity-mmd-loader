@@ -89,6 +89,64 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void CreateInMemoryClipPreservesHumanoidBodyHeightAndRotationInRootCurves()
+        {
+            MmdPmxAsset pmxAsset = null!;
+            MmdVmdAsset? vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(FixtureVmdPath);
+            var ownedObjects = new List<UnityEngine.Object>();
+            MmdHumanoidClipConversionWriterResult? result = null;
+
+            try
+            {
+                CreateReadyFixturePmx(out pmxAsset, ownedObjects);
+                ConfigureImportedHumanoidState(pmxAsset, ownedObjects);
+                Assert.That(vmdAsset, Is.Not.Null);
+
+                Mmd.UnityIntegration.MmdUnityPlaybackController controller = pmxAsset.ImportedRoot!
+                    .GetComponent<Mmd.UnityIntegration.MmdUnityPlaybackController>();
+                Assert.That(controller.HumanoidProxyRoot, Is.Not.Null);
+                MmdHumanoidRetargetBinding hipsBinding = controller.HumanoidRetargetEntries
+                    .Single(binding => binding.HumanBone == HumanBodyBones.Hips);
+                hipsBinding.ProxyTransform!.localRotation *= Quaternion.AngleAxis(20.0f, Vector3.forward);
+
+                var baselinePose = new HumanPose { muscles = new float[HumanTrait.MuscleCount] };
+                using (var poseHandler = new HumanPoseHandler(
+                           pmxAsset.ImportedAvatar!,
+                           controller.HumanoidProxyRoot))
+                {
+                    poseHandler.GetHumanPose(ref baselinePose);
+                }
+
+                result = MmdHumanoidClipConversionWriter.CreateInMemoryClip(
+                    pmxAsset,
+                    vmdAsset!,
+                    frameRate: 30.0f,
+                    startFrame: 0,
+                    endFrame: 2);
+
+                Assert.That(result.Clip, Is.Not.Null, string.Join("\n", result.Diagnostics));
+                Vector3 actualPosition = ReadRootPosition(result.Clip!, 0.0f);
+                Quaternion actualRotation = ReadRootRotation(result.Clip!, 0.0f);
+                Assert.That(baselinePose.bodyPosition.y, Is.GreaterThan(0.0f), "precondition: Humanoid body height");
+                Assert.That(actualPosition.x, Is.EqualTo(baselinePose.bodyPosition.x).Within(0.0001f));
+                Assert.That(actualPosition.y, Is.EqualTo(baselinePose.bodyPosition.y).Within(0.0001f));
+                Assert.That(actualPosition.z, Is.EqualTo(baselinePose.bodyPosition.z).Within(0.0001f));
+                Assert.That(
+                    Mathf.Abs(Quaternion.Dot(actualRotation, baselinePose.bodyRotation)),
+                    Is.EqualTo(1.0f).Within(0.0001f));
+            }
+            finally
+            {
+                if (result?.Clip != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(result.Clip);
+                }
+
+                DestroyOwnedObjects(ownedObjects);
+            }
+        }
+
+        [Test]
         public void CreateHumanoidAnimationClipAssetWritesAnimationClipToAssetsPath()
         {
             const string outputDirectory = "Assets/HumanoidClipWriterTests";
@@ -197,7 +255,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void RootMotionKeysComposeHipsAncestorsConvertCoordinatesScaleAndIncludeHipsRotation()
+        public void RootMotionKeysComposeAncestorDeltaWithPerFrameHumanoidBodyPose()
         {
             var model = new MmdModelDefinition();
             model.bones.Add(new MmdBoneDefinition
@@ -249,12 +307,25 @@ namespace Mmd.Tests
                 new Keyframe[2],
                 new Keyframe[2],
             };
+            var bodyPositions = new[]
+            {
+                new Vector3(0.25f, 1.5f, -0.5f),
+                new Vector3(0.25f, 1.5f, -0.5f),
+            };
+            var bodyRotations = new[]
+            {
+                Quaternion.AngleAxis(30.0f, Vector3.forward),
+                Quaternion.AngleAxis(75.0f, Vector3.right),
+            };
 
             bool success = MmdHumanoidClipConversionWriter.TryBuildRootMotionKeys(
                 model,
                 motion,
                 hipsBoneIndex: 2,
                 importScale: 0.5f,
+                humanScale: 2.0f,
+                bodyPositions,
+                bodyRotations,
                 startFrame: 0,
                 endFrame: 1,
                 sampleFrameToTimeFactor: 1.0f / 30.0f,
@@ -264,9 +335,10 @@ namespace Mmd.Tests
 
             Assert.That(success, Is.True, diagnostic);
             // The center rotation turns the Hips local translation before the root translation is added.
-            // MMD end position delta: (14, 15, 2), then coordinate flip and scale => (-7, 7.5, -1).
-            Assert.That(positionKeys[0][1].value, Is.EqualTo(-7.0f).Within(0.0001f));
-            Assert.That(positionKeys[1][1].value, Is.EqualTo(7.5f).Within(0.0001f));
+            // MMD end position delta: (14, 15, 2), then coordinate flip, import scale,
+            // and HumanPose normalization => (-3.5, 3.75, -0.5), added to the baseline pose.
+            Assert.That(positionKeys[0][1].value, Is.EqualTo(-3.25f).Within(0.0001f));
+            Assert.That(positionKeys[1][1].value, Is.EqualTo(5.25f).Within(0.0001f));
             Assert.That(positionKeys[2][1].value, Is.EqualTo(-1.0f).Within(0.0001f));
 
             var actualRootRotation = new Quaternion(
@@ -275,10 +347,18 @@ namespace Mmd.Tests
                 rotationKeys[2][1].value,
                 rotationKeys[3][1].value);
             Quaternion expectedRootRotation =
-                MmdCoordinateSpace.MmdToUnityRotation(parentRotation * hipsRotation);
+                MmdCoordinateSpace.MmdToUnityRotation(parentRotation) * bodyRotations[1];
             Assert.That(Mathf.Abs(Quaternion.Dot(actualRootRotation, expectedRootRotation)),
                 Is.EqualTo(1.0f).Within(0.0001f),
-                "RootQ must contain the composed ancestor and Hips rotation because muscle curves do not store bodyRotation.");
+                "RootQ must add only non-Humanoid ancestor rotation to the per-frame body orientation.");
+            Assert.That(positionKeys[1][0].value, Is.EqualTo(bodyPositions[0].y).Within(0.0001f));
+            var initialRootRotation = new Quaternion(
+                rotationKeys[0][0].value,
+                rotationKeys[1][0].value,
+                rotationKeys[2][0].value,
+                rotationKeys[3][0].value);
+            Assert.That(Mathf.Abs(Quaternion.Dot(initialRootRotation, bodyRotations[0])),
+                Is.EqualTo(1.0f).Within(0.0001f));
             Assert.That(positionKeys[0][0].time, Is.Zero.Within(0.0001f));
             Assert.That(positionKeys[0][1].time, Is.EqualTo(1.0f / 30.0f).Within(0.0001f));
         }
@@ -311,6 +391,7 @@ namespace Mmd.Tests
             {
                 GameObject boneObject = new GameObject(RequiredBoneNames[i]);
                 boneObject.transform.SetParent(modelObject.transform, worldPositionStays: false);
+                boneObject.transform.localPosition = GetHumanoidFixtureBonePosition(RequiredBoneNames[i]);
                 bones[i] = boneObject.transform;
             }
             smr.bones = bones;
@@ -347,6 +428,30 @@ namespace Mmd.Tests
             ownedObjects.Add(pmxAsset);
             ownedObjects.Add(hierarchyRoot);
             ownedObjects.Add(mesh);
+        }
+
+        private static Vector3 GetHumanoidFixtureBonePosition(string boneName)
+        {
+            return boneName switch
+            {
+                "下半身" => new Vector3(0.0f, 1.0f, 0.0f),
+                "上半身" => new Vector3(0.0f, 1.25f, 0.0f),
+                "首" => new Vector3(0.0f, 1.65f, 0.0f),
+                "頭" => new Vector3(0.0f, 1.85f, 0.0f),
+                "左足" => new Vector3(-0.18f, 0.9f, 0.0f),
+                "左ひざ" => new Vector3(-0.18f, 0.5f, 0.0f),
+                "左足首" => new Vector3(-0.18f, 0.1f, 0.0f),
+                "右足" => new Vector3(0.18f, 0.9f, 0.0f),
+                "右ひざ" => new Vector3(0.18f, 0.5f, 0.0f),
+                "右足首" => new Vector3(0.18f, 0.1f, 0.0f),
+                "左腕" => new Vector3(-0.35f, 1.5f, 0.0f),
+                "左ひじ" => new Vector3(-0.65f, 1.5f, 0.0f),
+                "左手首" => new Vector3(-0.9f, 1.5f, 0.0f),
+                "右腕" => new Vector3(0.35f, 1.5f, 0.0f),
+                "右ひじ" => new Vector3(0.65f, 1.5f, 0.0f),
+                "右手首" => new Vector3(0.9f, 1.5f, 0.0f),
+                _ => Vector3.zero,
+            };
         }
 
         private static void ConfigureImportedHumanoidState(
@@ -419,6 +524,34 @@ namespace Mmd.Tests
                     Is.True,
                     property);
             }
+        }
+
+        private static Vector3 ReadRootPosition(AnimationClip clip, float time)
+        {
+            return new Vector3(
+                ReadRootCurve(clip, "RootT.x").Evaluate(time),
+                ReadRootCurve(clip, "RootT.y").Evaluate(time),
+                ReadRootCurve(clip, "RootT.z").Evaluate(time));
+        }
+
+        private static Quaternion ReadRootRotation(AnimationClip clip, float time)
+        {
+            var rotation = new Quaternion(
+                ReadRootCurve(clip, "RootQ.x").Evaluate(time),
+                ReadRootCurve(clip, "RootQ.y").Evaluate(time),
+                ReadRootCurve(clip, "RootQ.z").Evaluate(time),
+                ReadRootCurve(clip, "RootQ.w").Evaluate(time));
+            rotation.Normalize();
+            return rotation;
+        }
+
+        private static AnimationCurve ReadRootCurve(AnimationClip clip, string propertyName)
+        {
+            AnimationCurve curve = AnimationUtility.GetEditorCurve(
+                clip,
+                EditorCurveBinding.FloatCurve(string.Empty, typeof(Animator), propertyName));
+            Assert.That(curve, Is.Not.Null, propertyName);
+            return curve;
         }
 
         private static void DestroyOwnedObjects(IEnumerable<UnityEngine.Object> ownedObjects)
