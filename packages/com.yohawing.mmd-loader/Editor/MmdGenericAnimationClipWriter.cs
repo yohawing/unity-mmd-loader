@@ -68,8 +68,26 @@ namespace Mmd.Editor
                 }
 
                 binding.SetPhysicsMode(MmdPhysicsMode.Off);
-                AnimationClip clip = BakeDenseClip(binding, pmxAsset, vmdAsset, frameRate, startFrame, effectiveEndFrame);
-                diagnostics.Add("writer: baked dense Generic transform and vertex morph curves with physics off.");
+                if (binding.TryEnableFastRuntime(pmxAsset.GetBytesCopy(), vmdAsset.GetBytesCopy(), out string fastRuntimeReason))
+                {
+                    diagnostics.Add("writer: enabled persistent native evaluation for Generic bake.");
+                }
+                else
+                {
+                    diagnostics.Add("writer: persistent native evaluation unavailable; using managed fallback: "
+                                    + fastRuntimeReason);
+                }
+
+                AnimationClip clip = BakeDenseClip(
+                    binding,
+                    pmxAsset,
+                    vmdAsset,
+                    frameRate,
+                    startFrame,
+                    effectiveEndFrame,
+                    out int compactedCurveCount);
+                diagnostics.Add("writer: baked Generic transform and vertex morph curves with physics off; compacted "
+                                + compactedCurveCount + " constant curves to endpoint keys.");
                 return new MmdGenericAnimationClipWriterResult(clip, diagnostics, binding.PhysicsMode);
             }
             catch (Exception ex)
@@ -132,7 +150,7 @@ namespace Mmd.Editor
             }
             catch (Exception ex)
             {
-                if (!AssetDatabase.Contains(result.Clip))
+                if (!AssetDatabase.Contains(result.Clip) && !EditorUtility.IsPersistent(result.Clip))
                 {
                     UnityEngine.Object.DestroyImmediate(result.Clip);
                 }
@@ -157,7 +175,8 @@ namespace Mmd.Editor
             MmdVmdAsset vmdAsset,
             float frameRate,
             int startFrame,
-            int endFrame)
+            int endFrame,
+            out int compactedCurveCount)
         {
             MmdUnityModelInstance instance = binding.Instance;
             int frameCount = endFrame - startFrame + 1;
@@ -170,6 +189,7 @@ namespace Mmd.Editor
 
             try
             {
+            compactedCurveCount = 0;
             string[] bonePaths = CalculateUniqueBonePaths(instance.BoneTransforms, instance.Root.transform);
             var positionKeys = new Keyframe[instance.BoneTransforms.Length, 3][];
             var rotationKeys = new Keyframe[instance.BoneTransforms.Length, 4][];
@@ -212,22 +232,37 @@ namespace Mmd.Editor
 
             string[] positionProperties = { "m_LocalPosition.x", "m_LocalPosition.y", "m_LocalPosition.z" };
             string[] rotationProperties = { "m_LocalRotation.x", "m_LocalRotation.y", "m_LocalRotation.z", "m_LocalRotation.w" };
+            var curveBindings = new List<EditorCurveBinding>(instance.BoneTransforms.Length * 7 + morphs.Count);
+            var curves = new List<AnimationCurve>(curveBindings.Capacity);
             for (int bone = 0; bone < instance.BoneTransforms.Length; bone++)
             {
                 string path = bonePaths[bone];
                 for (int axis = 0; axis < 3; axis++)
-                    AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve(path, typeof(Transform), positionProperties[axis]), new AnimationCurve(positionKeys[bone, axis]));
+                {
+                    curveBindings.Add(EditorCurveBinding.FloatCurve(path, typeof(Transform), positionProperties[axis]));
+                    curves.Add(CreateCompactedCurve(positionKeys[bone, axis], ref compactedCurveCount));
+                }
                 for (int axis = 0; axis < 4; axis++)
-                    AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve(path, typeof(Transform), rotationProperties[axis]), new AnimationCurve(rotationKeys[bone, axis]));
+                {
+                    curveBindings.Add(EditorCurveBinding.FloatCurve(path, typeof(Transform), rotationProperties[axis]));
+                    curves.Add(CreateCompactedCurve(rotationKeys[bone, axis], ref compactedCurveCount));
+                }
             }
 
             if (instance.SkinnedMeshRenderer != null)
             {
                 string rendererPath = AnimationUtility.CalculateTransformPath(instance.SkinnedMeshRenderer.transform, instance.Root.transform);
                 for (int morph = 0; morph < morphs.Count; morph++)
-                    AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve(rendererPath, typeof(SkinnedMeshRenderer), "blendShape." + morphs[morph].BlendShapeName), new AnimationCurve(morphKeys[morph]));
+                {
+                    curveBindings.Add(EditorCurveBinding.FloatCurve(
+                        rendererPath,
+                        typeof(SkinnedMeshRenderer),
+                        "blendShape." + morphs[morph].BlendShapeName));
+                    curves.Add(CreateCompactedCurve(morphKeys[morph], ref compactedCurveCount));
+                }
             }
 
+            AnimationUtility.SetEditorCurves(clip, curveBindings.ToArray(), curves.ToArray());
             clip.EnsureQuaternionContinuity();
             return clip;
             }
@@ -236,6 +271,28 @@ namespace Mmd.Editor
                 UnityEngine.Object.DestroyImmediate(clip);
                 throw;
             }
+        }
+
+        private static AnimationCurve CreateCompactedCurve(Keyframe[] denseKeys, ref int compactedCurveCount)
+        {
+            if (denseKeys.Length <= 1)
+            {
+                return new AnimationCurve(denseKeys);
+            }
+
+            float firstValue = denseKeys[0].value;
+            for (int index = 1; index < denseKeys.Length; index++)
+            {
+                if (!denseKeys[index].value.Equals(firstValue))
+                {
+                    return new AnimationCurve(denseKeys);
+                }
+            }
+
+            compactedCurveCount++;
+            return new AnimationCurve(
+                denseKeys[0],
+                denseKeys[denseKeys.Length - 1]);
         }
 
         internal static string[] CalculateUniqueBonePaths(IReadOnlyList<Transform> boneTransforms, Transform root)

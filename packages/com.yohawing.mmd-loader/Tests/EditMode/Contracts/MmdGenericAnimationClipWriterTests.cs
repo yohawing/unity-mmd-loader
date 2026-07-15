@@ -19,7 +19,7 @@ namespace Mmd.Tests
         private const string MorphVmd = "Packages/com.yohawing.mmd-loader/Tests/Fixtures/Assets/test_vertex_morph_motion.vmd";
 
         [Test]
-        public void DenseBakeWritesTransformCurvesAtEveryIntegerFrameWithPhysicsOff()
+        public void BakeKeepsDenseChangingCurvesAndCompactsOnlyConstantCurvesWithPhysicsOff()
         {
             CreateAssets(CubePmx, CubeVmd, out MmdPmxAsset pmx, out MmdVmdAsset vmd);
             try
@@ -31,11 +31,19 @@ namespace Mmd.Tests
                 Assert.That(result.PhysicsMode, Is.EqualTo(MmdPhysicsMode.Off));
                 EditorCurveBinding[] bindings = AnimationUtility.GetCurveBindings(result.Clip!);
                 Assert.That(bindings.Count(binding => binding.type == typeof(Transform)), Is.EqualTo(7));
-                foreach (EditorCurveBinding binding in bindings.Where(binding => binding.type == typeof(Transform)))
+                int[] keyCounts = bindings
+                    .Where(binding => binding.type == typeof(Transform))
+                    .Select(binding => AnimationUtility.GetEditorCurve(result.Clip!, binding)!.keys.Length)
+                    .ToArray();
+                Assert.That(keyCounts, Does.Contain(10), "at least one changing transform curve stays dense");
+                Assert.That(keyCounts, Does.Contain(2), "constant transform curves keep only duration endpoints");
+                foreach (int keyCount in keyCounts)
                 {
-                    Assert.That(binding.propertyName, Does.Match("^m_Local(Position|Rotation)\\.[xyzw]$"));
-                    Assert.That(AnimationUtility.GetEditorCurve(result.Clip!, binding)!.keys, Has.Length.EqualTo(10));
+                    Assert.That(keyCount, Is.EqualTo(2).Or.EqualTo(10));
                 }
+
+                Assert.That(result.Diagnostics, Has.Some.Contains("persistent native evaluation"));
+                Assert.That(result.Diagnostics, Has.Some.Contains("compacted"));
             }
             finally
             {
