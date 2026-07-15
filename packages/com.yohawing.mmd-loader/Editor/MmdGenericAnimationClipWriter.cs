@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
+using Mmd.Native;
 using Mmd.Physics;
 using Mmd.UnityIntegration;
 
@@ -86,13 +87,22 @@ namespace Mmd.Editor
                     startFrame,
                     effectiveEndFrame,
                     out int compactedCurveCount,
-                    out bool usedNativeBatch);
-                if (usedNativeBatch)
+                    out bool usedNativeSparse,
+                    out string nativeSparseReason);
+                if (usedNativeSparse)
                 {
-                    diagnostics.Add("writer: sampled animation through chunked mmd-runtime batch buffers.");
+                    diagnostics.Add("writer: built AnimationClip exclusively from mmd-runtime sparse curve descriptors and keys.");
                 }
-                diagnostics.Add("writer: baked Generic transform and vertex morph curves with physics off; compacted "
-                                + compactedCurveCount + " constant curves to endpoint keys.");
+                else if (!string.IsNullOrEmpty(nativeSparseReason))
+                {
+                    diagnostics.Add("writer: native sparse reduction unavailable; using dense managed fallback: "
+                                    + nativeSparseReason);
+                }
+                if (!usedNativeSparse)
+                {
+                    diagnostics.Add("writer: baked Generic transform and vertex morph curves with physics off; compacted "
+                                    + compactedCurveCount + " constant curves to endpoint keys.");
+                }
                 return new MmdGenericAnimationClipWriterResult(clip, diagnostics, binding.PhysicsMode);
             }
             catch (Exception ex)
@@ -181,7 +191,8 @@ namespace Mmd.Editor
             int startFrame,
             int endFrame,
             out int compactedCurveCount,
-            out bool usedNativeBatch)
+            out bool usedNativeSparse,
+            out string nativeSparseReason)
         {
             MmdUnityModelInstance instance = binding.Instance;
             int frameCount = endFrame - startFrame + 1;
@@ -195,8 +206,29 @@ namespace Mmd.Editor
             try
             {
             compactedCurveCount = 0;
-            usedNativeBatch = false;
+            usedNativeSparse = false;
+            nativeSparseReason = string.Empty;
             string[] bonePaths = CalculateUniqueBonePaths(instance.BoneTransforms, instance.Root.transform);
+            IReadOnlyList<MmdUnityVertexMorphBlendShapeBinding> morphs = instance.VertexMorphBlendShapes;
+            if (TryBakeSparseNativeCurves(
+                    binding,
+                    instance,
+                    pmxAsset,
+                    vmdAsset,
+                    frameRate,
+                    startFrame,
+                    frameCount,
+                    bonePaths,
+                    morphs,
+                    clip,
+                    out int sparseCurveCount,
+                    out nativeSparseReason))
+            {
+                compactedCurveCount = sparseCurveCount;
+                usedNativeSparse = true;
+                return clip;
+            }
+
             var positionKeys = new Keyframe[instance.BoneTransforms.Length, 3][];
             var rotationKeys = new Keyframe[instance.BoneTransforms.Length, 4][];
             for (int bone = 0; bone < instance.BoneTransforms.Length; bone++)
@@ -205,7 +237,6 @@ namespace Mmd.Editor
                 for (int axis = 0; axis < 4; axis++) rotationKeys[bone, axis] = new Keyframe[frameCount];
             }
 
-            IReadOnlyList<MmdUnityVertexMorphBlendShapeBinding> morphs = instance.VertexMorphBlendShapes;
             var morphKeys = new Keyframe[morphs.Count][];
             for (int morph = 0; morph < morphs.Count; morph++) morphKeys[morph] = new Keyframe[frameCount];
 
@@ -231,7 +262,6 @@ namespace Mmd.Editor
                         positionKeys,
                         rotationKeys,
                         morphKeys);
-                    usedNativeBatch = true;
                 }
                 catch (EntryPointNotFoundException)
                 {
@@ -302,6 +332,168 @@ namespace Mmd.Editor
                 UnityEngine.Object.DestroyImmediate(clip);
                 throw;
             }
+        }
+
+        private static bool TryBakeSparseNativeCurves(
+            MmdUnityPlaybackBinding binding,
+            MmdUnityModelInstance instance,
+            MmdPmxAsset pmxAsset,
+            MmdVmdAsset vmdAsset,
+            float frameRate,
+            int startFrame,
+            int frameCount,
+            string[] bonePaths,
+            IReadOnlyList<MmdUnityVertexMorphBlendShapeBinding> morphs,
+            AnimationClip clip,
+            out int sparseCurveCount,
+            out string reason)
+        {
+            sparseCurveCount = 0;
+            reason = string.Empty;
+            if (!CanUseNativeBatch(binding, instance, out _, out _, out _))
+            {
+                reason = "native batch input is unavailable or the Unity hierarchy is unsupported.";
+                return false;
+            }
+
+            try
+            {
+                MmdRuntimeReducedPose reducedPose;
+                using (MmdRuntimeFfiPlaybackSession session = MmdRuntimeFfiPlaybackSession.Create(
+                           pmxAsset.GetBytesCopy(), vmdAsset.GetBytesCopy()))
+                {
+                    if (session.BoneCount != bonePaths.Length)
+                    {
+                        throw new InvalidOperationException(
+                            "native reduced pose bone count does not match the Unity bone mapping.");
+                    }
+
+                    reducedPose = session.ReduceBatch(
+                        startFrame,
+                        frameCount,
+                        0,
+                        MmdRuntimeFfiMethods.ReductionTolerances.Default);
+                }
+
+                using (reducedPose)
+                {
+                    const bool FlipZ = true;
+                    int descriptorCount = reducedPose.GetUnityCurveCount(frameRate, FlipZ);
+                    var bindings = new List<EditorCurveBinding>(descriptorCount);
+                    var curves = new List<AnimationCurve>(descriptorCount);
+                    var morphBindings = new Dictionary<int, MmdUnityVertexMorphBlendShapeBinding>();
+                    foreach (MmdUnityVertexMorphBlendShapeBinding morph in morphs)
+                    {
+                        if (!morphBindings.TryAdd(morph.MorphIndex, morph))
+                        {
+                            throw new InvalidOperationException(
+                                "duplicate Unity blendShape mapping for native morph index " + morph.MorphIndex + ".");
+                        }
+                    }
+
+                    string rendererPath = instance.SkinnedMeshRenderer == null
+                        ? string.Empty
+                        : AnimationUtility.CalculateTransformPath(
+                            instance.SkinnedMeshRenderer.transform, instance.Root.transform);
+                    string[] axes = { "x", "y", "z" };
+                    for (int curveIndex = 0; curveIndex < descriptorCount; curveIndex++)
+                    {
+                        MmdRuntimeFfiMethods.UnityCurveDescriptor descriptor =
+                            reducedPose.GetUnityCurveDescriptor(frameRate, FlipZ, curveIndex);
+                        int targetIndex = checked((int)descriptor.targetIndex);
+                        EditorCurveBinding curveBinding;
+                        if (descriptor.semantic == MmdRuntimeFfiMethods.UnityCurveBoneLocalTranslation ||
+                            descriptor.semantic == MmdRuntimeFfiMethods.UnityCurveBoneLocalEuler)
+                        {
+                            if (targetIndex < 0 || targetIndex >= bonePaths.Length || descriptor.axis >= 3)
+                            {
+                                throw new InvalidOperationException("native reduced pose returned an invalid bone curve descriptor.");
+                            }
+
+                            string property = descriptor.semantic == MmdRuntimeFfiMethods.UnityCurveBoneLocalTranslation
+                                ? "m_LocalPosition." + axes[descriptor.axis]
+                                : "localEulerAnglesRaw." + axes[descriptor.axis];
+                            curveBinding = EditorCurveBinding.FloatCurve(
+                                bonePaths[targetIndex], typeof(Transform), property);
+                        }
+                        else if (descriptor.semantic == MmdRuntimeFfiMethods.UnityCurveMorphWeight)
+                        {
+                            if (descriptor.axis != MmdRuntimeFfiMethods.UnityCurveAxisNone ||
+                                instance.SkinnedMeshRenderer == null ||
+                                !morphBindings.TryGetValue(targetIndex, out MmdUnityVertexMorphBlendShapeBinding morph))
+                            {
+                                continue;
+                            }
+
+                            curveBinding = EditorCurveBinding.FloatCurve(
+                                rendererPath,
+                                typeof(SkinnedMeshRenderer),
+                                "blendShape." + morph.BlendShapeName);
+                        }
+                        else
+                        {
+                            throw new InvalidOperationException("native reduced pose returned an unknown curve semantic.");
+                        }
+
+                        MmdRuntimeFfiMethods.UnityCurveKey[] nativeKeys =
+                            reducedPose.GetUnityCurveKeys(frameRate, FlipZ, curveIndex);
+                        int declaredKeyCount = MmdFfiMarshal.CheckedIntPtrToInt(
+                            descriptor.keyCount, "reduced pose descriptor key count");
+                        if (nativeKeys.Length != declaredKeyCount)
+                        {
+                            throw new InvalidOperationException("native reduced pose descriptor/key count mismatch.");
+                        }
+
+                        var unityKeys = new Keyframe[nativeKeys.Length];
+                        // Rust owns handedness, Euler filtering/degree conversion, and per-second
+                        // tangent conversion. Only the Unity host's PMX unit scale remains here;
+                        // scaling value and dv/dt together preserves the native Hermite curve.
+                        float valueScale = descriptor.semantic == MmdRuntimeFfiMethods.UnityCurveBoneLocalTranslation
+                            ? instance.ImportScale
+                            : 1.0f;
+                        for (int keyIndex = 0; keyIndex < nativeKeys.Length; keyIndex++)
+                        {
+                            unityKeys[keyIndex] = CreateUnityKeyframe(nativeKeys[keyIndex], valueScale);
+                        }
+
+                        bindings.Add(curveBinding);
+                        curves.Add(new AnimationCurve(unityKeys));
+                    }
+
+                    AnimationUtility.SetEditorCurves(clip, bindings.ToArray(), curves.ToArray());
+                    sparseCurveCount = curves.Count;
+                    return true;
+                }
+            }
+            catch (Exception ex) when (IsSparseNativeFallbackException(ex))
+            {
+                reason = ex.GetType().Name + ": " + ex.Message;
+                return false;
+            }
+        }
+
+        internal static bool IsSparseNativeFallbackException(Exception exception)
+        {
+            return exception is DllNotFoundException or
+                EntryPointNotFoundException or
+                BadImageFormatException or
+                MmdRuntimeUnsupportedException;
+        }
+
+        internal static Keyframe CreateUnityKeyframe(
+            MmdRuntimeFfiMethods.UnityCurveKey key,
+            float valueScale)
+        {
+            if (!float.IsFinite(valueScale) || valueScale <= 0.0f)
+            {
+                throw new ArgumentOutOfRangeException(nameof(valueScale));
+            }
+
+            return new Keyframe(
+                key.timeSeconds,
+                key.value * valueScale,
+                key.inTangent * valueScale,
+                key.outTangent * valueScale);
         }
 
         private static bool CanUseNativeBatch(

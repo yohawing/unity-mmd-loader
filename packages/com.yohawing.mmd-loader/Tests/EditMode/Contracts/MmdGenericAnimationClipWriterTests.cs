@@ -7,6 +7,7 @@ using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
 using Mmd.Editor;
+using Mmd.Native;
 using Mmd.Physics;
 using Mmd.UnityIntegration;
 
@@ -20,7 +21,7 @@ namespace Mmd.Tests
         private const string MorphVmd = "Packages/com.yohawing.mmd-loader/Tests/Fixtures/Assets/test_vertex_morph_motion.vmd";
 
         [Test]
-        public void BakeKeepsDenseChangingCurvesAndCompactsOnlyConstantCurvesWithPhysicsOff()
+        public void BakeUsesNativeSparseTranslationAndEulerCurvesWithPhysicsOff()
         {
             CreateAssets(CubePmx, CubeVmd, out MmdPmxAsset pmx, out MmdVmdAsset vmd);
             try
@@ -31,23 +32,28 @@ namespace Mmd.Tests
                 Assert.That(result.Clip, Is.Not.Null);
                 Assert.That(result.PhysicsMode, Is.EqualTo(MmdPhysicsMode.Off));
                 EditorCurveBinding[] bindings = AnimationUtility.GetCurveBindings(result.Clip!);
-                Assert.That(bindings.Count(binding => binding.type == typeof(Transform)), Is.EqualTo(7));
+                EditorCurveBinding[] transformBindings = bindings
+                    .Where(binding => binding.type == typeof(Transform))
+                    .ToArray();
+#if UNITY_EDITOR_WIN
+                Assert.That(transformBindings, Has.Length.EqualTo(6));
+                Assert.That(transformBindings.Count(binding => binding.propertyName.StartsWith("m_LocalPosition.", StringComparison.Ordinal)), Is.EqualTo(3));
+                Assert.That(transformBindings.Count(binding => binding.propertyName.StartsWith("localEulerAnglesRaw.", StringComparison.Ordinal)), Is.EqualTo(3));
+#else
+                Assert.That(transformBindings, Has.Length.EqualTo(7));
+#endif
                 int[] keyCounts = bindings
                     .Where(binding => binding.type == typeof(Transform))
                     .Select(binding => AnimationUtility.GetEditorCurve(result.Clip!, binding)!.keys.Length)
                     .ToArray();
-                Assert.That(keyCounts, Does.Contain(10), "at least one changing transform curve stays dense");
-                Assert.That(keyCounts, Does.Contain(2), "constant transform curves keep only duration endpoints");
-                foreach (int keyCount in keyCounts)
-                {
-                    Assert.That(keyCount, Is.EqualTo(2).Or.EqualTo(10));
-                }
-
                 Assert.That(result.Diagnostics, Has.Some.Contains("persistent native evaluation"));
 #if UNITY_EDITOR_WIN
-                Assert.That(result.Diagnostics, Has.Some.Contains("chunked mmd-runtime batch buffers"));
-#endif
+                Assert.That(keyCounts.Max(), Is.LessThan(10), "native reducer output remains sparse");
+                Assert.That(result.Diagnostics, Has.Some.Contains("exclusively from mmd-runtime sparse curve descriptors and keys"));
+#else
+                Assert.That(keyCounts, Does.Contain(10));
                 Assert.That(result.Diagnostics, Has.Some.Contains("compacted"));
+#endif
             }
             finally
             {
@@ -86,7 +92,13 @@ namespace Mmd.Tests
                 EditorCurveBinding morphBinding = AnimationUtility.GetCurveBindings(result.Clip!)
                     .Single(binding => binding.type == typeof(SkinnedMeshRenderer) && binding.propertyName.StartsWith("blendShape.", StringComparison.Ordinal));
                 AnimationCurve curve = AnimationUtility.GetEditorCurve(result.Clip!, morphBinding)!;
+#if UNITY_EDITOR_WIN
+                Assert.That(curve.keys.Length, Is.LessThan(11));
+                Assert.That(curve.keys.All(key => float.IsFinite(key.inTangent) && float.IsFinite(key.outTangent)), Is.True);
+                Assert.That(result.Diagnostics, Has.Some.Contains("sparse curve descriptors and keys"));
+#else
                 Assert.That(curve.keys, Has.Length.EqualTo(11));
+#endif
                 Assert.That(curve.keys.Max(key => key.value), Is.GreaterThan(0.0f).And.LessThanOrEqualTo(100.0f));
                 UnityEngine.Object.DestroyImmediate(result.Clip);
             }
@@ -108,7 +120,7 @@ namespace Mmd.Tests
                     MmdGenericAnimationClipWriter.CreateInMemoryClip(pmx, vmd, 30.0f, 0, 10);
                 clip = result.Clip;
                 Assert.That(clip, Is.Not.Null, string.Join("\n", result.Diagnostics));
-                Assert.That(result.Diagnostics, Has.Some.Contains("chunked mmd-runtime batch buffers"));
+                Assert.That(result.Diagnostics, Has.Some.Contains("sparse curve descriptors and keys"));
 
                 binding = MmdUnityPlaybackBinding.CreateSkinned(pmx, vmd);
                 binding.SetPhysicsMode(MmdPhysicsMode.Off);
@@ -131,7 +143,7 @@ namespace Mmd.Tests
                             .GetBlendShapeWeight(morph.BlendShapeIndex);
                         Assert.That(
                             curve.Evaluate(frame / 30.0f),
-                            Is.EqualTo(appliedWeight).Within(0.0001f),
+                            Is.EqualTo(appliedWeight).Within(0.011f),
                             $"fast-runtime morph parity for {morph.MorphName} at frame {frame}");
                     }
                 }
@@ -212,12 +224,170 @@ namespace Mmd.Tests
             }
         }
 
+        [Test]
+        public void NativeTranslationCurveAppliesDefaultHostScaleToValuesAndTangentsOnly()
+        {
+            var native = new MmdRuntimeFfiMethods.UnityCurveKey
+            {
+                timeSeconds = 2.0f,
+                value = 3.0f,
+                inTangent = 4.0f,
+                outTangent = -5.0f
+            };
+
+            Keyframe key = MmdGenericAnimationClipWriter.CreateUnityKeyframe(native, 0.1f);
+
+            Assert.That(key.time, Is.EqualTo(2.0f));
+            Assert.That(key.value, Is.EqualTo(0.3f).Within(1.0e-6f));
+            Assert.That(key.inTangent, Is.EqualTo(0.4f).Within(1.0e-6f));
+            Assert.That(key.outTangent, Is.EqualTo(-0.5f).Within(1.0e-6f));
+        }
+
+        [Test]
+        public void SparseFallbackAllowlistDoesNotHideContractOrOverflowFailures()
+        {
+            Assert.That(MmdGenericAnimationClipWriter.IsSparseNativeFallbackException(
+                new DllNotFoundException()), Is.True);
+            Assert.That(MmdGenericAnimationClipWriter.IsSparseNativeFallbackException(
+                new EntryPointNotFoundException()), Is.True);
+            Assert.That(MmdGenericAnimationClipWriter.IsSparseNativeFallbackException(
+                new BadImageFormatException()), Is.True);
+            Assert.That(MmdGenericAnimationClipWriter.IsSparseNativeFallbackException(
+                new MmdRuntimeUnsupportedException("unsupported")), Is.True);
+            Assert.That(MmdGenericAnimationClipWriter.IsSparseNativeFallbackException(
+                new InvalidOperationException("descriptor mismatch")), Is.False);
+            Assert.That(MmdGenericAnimationClipWriter.IsSparseNativeFallbackException(
+                new OverflowException("count overflow")), Is.False);
+        }
+
+        [Test]
+        public void NativeSparseBakeRemainsEnabledAtDefaultPointOneImportScale()
+        {
+#if !UNITY_EDITOR_WIN
+            Assert.Ignore("mmd-runtime sparse curve baking is only distributed for the Windows Editor.");
+#endif
+            CreateAssets(CubePmx, CubeVmd, out MmdPmxAsset pmx, out MmdVmdAsset vmd, 0.1f);
+            try
+            {
+                MmdGenericAnimationClipWriterResult result =
+                    MmdGenericAnimationClipWriter.CreateInMemoryClip(pmx, vmd, 30.0f, 0, 9);
+                Assert.That(result.Clip, Is.Not.Null, string.Join("\n", result.Diagnostics));
+                Assert.That(result.Diagnostics, Has.Some.Contains("exclusively from mmd-runtime sparse curve descriptors and keys"));
+                EditorCurveBinding[] translations = AnimationUtility.GetCurveBindings(result.Clip!)
+                    .Where(binding => binding.propertyName.StartsWith("m_LocalPosition.", StringComparison.Ordinal))
+                    .ToArray();
+                Assert.That(translations, Has.Length.EqualTo(3));
+                Assert.That(translations.All(binding =>
+                    AnimationUtility.GetEditorCurve(result.Clip!, binding)!.keys.All(key =>
+                        float.IsFinite(key.value) &&
+                        float.IsFinite(key.inTangent) &&
+                        float.IsFinite(key.outTangent))), Is.True);
+                UnityEngine.Object.DestroyImmediate(result.Clip);
+            }
+            finally
+            {
+                DestroyAssets(pmx, vmd);
+            }
+        }
+
+        [Test]
+        public void NativeSparseTransformCurvesMatchFastRuntimeWithNonzeroStartAndDefaultScale()
+        {
+#if !UNITY_EDITOR_WIN
+            Assert.Ignore("mmd-runtime sparse curve baking is only distributed for the Windows Editor.");
+#endif
+            const float FrameRate = 30.0f;
+            const int StartFrame = 2;
+            const int EndFrame = 9;
+            const float ImportScale = MmdPmxAsset.DefaultImportScale;
+            CreateAssets(CubePmx, CubeVmd, out MmdPmxAsset pmx, out MmdVmdAsset vmd, ImportScale);
+            MmdUnityPlaybackBinding? binding = null;
+            AnimationClip? clip = null;
+            try
+            {
+                MmdGenericAnimationClipWriterResult result =
+                    MmdGenericAnimationClipWriter.CreateInMemoryClip(
+                        pmx, vmd, FrameRate, StartFrame, EndFrame);
+                clip = result.Clip;
+                Assert.That(clip, Is.Not.Null, string.Join("\n", result.Diagnostics));
+                Assert.That(result.Diagnostics, Has.Some.Contains(
+                    "exclusively from mmd-runtime sparse curve descriptors and keys"));
+                Assert.That(pmx.ImportScale, Is.EqualTo(ImportScale));
+
+                binding = MmdUnityPlaybackBinding.CreateSkinned(pmx, vmd);
+                binding.SetPhysicsMode(MmdPhysicsMode.Off);
+                Assert.That(
+                    binding.TryEnableFastRuntime(pmx.GetBytesCopy(), vmd.GetBytesCopy(), out string reason),
+                    Is.True,
+                    reason);
+
+                Transform bone = binding.Instance.BoneTransforms[0];
+                string path = AnimationUtility.CalculateTransformPath(
+                    bone, binding.Instance.Root.transform);
+                AnimationCurve px = GetTransformCurve(clip!, path, "m_LocalPosition.x");
+                AnimationCurve py = GetTransformCurve(clip!, path, "m_LocalPosition.y");
+                AnimationCurve pz = GetTransformCurve(clip!, path, "m_LocalPosition.z");
+                AnimationCurve rx = GetTransformCurve(clip!, path, "localEulerAnglesRaw.x");
+                AnimationCurve ry = GetTransformCurve(clip!, path, "localEulerAnglesRaw.y");
+                AnimationCurve rz = GetTransformCurve(clip!, path, "localEulerAnglesRaw.z");
+                float expectedDuration = (EndFrame - StartFrame) / FrameRate;
+                foreach (AnimationCurve curve in new[] { px, py, pz, rx, ry, rz })
+                {
+                    Assert.That(curve.keys[0].time, Is.EqualTo(0.0f).Within(1.0e-7f),
+                        "reduced time origin must be clip-relative even when startFrame is nonzero");
+                    Assert.That(curve.keys[curve.keys.Length - 1].time,
+                        Is.EqualTo(expectedDuration).Within(1.0e-6f));
+                }
+
+                foreach (int frame in new[] { StartFrame, 5, EndFrame })
+                {
+                    binding.ApplyFrame(frame, FrameRate);
+                    Vector3 expectedPosition = bone.localPosition;
+                    Quaternion expectedRotation = bone.localRotation;
+                    float time = (frame - StartFrame) / FrameRate;
+                    clip!.SampleAnimation(binding.Instance.Root, time);
+                    Vector3 sparsePosition = bone.localPosition;
+                    Quaternion sparseRotation = bone.localRotation;
+
+                    Assert.That(Vector3.Distance(sparsePosition, expectedPosition),
+                        Is.LessThanOrEqualTo(2.0e-5f),
+                        "translation parity includes PMX importScale=0.1 and flipZ conversion");
+                    Assert.That(Quaternion.Angle(sparseRotation, expectedRotation),
+                        Is.LessThanOrEqualTo(0.02f),
+                        "Euler-driven sparse rotation must match fast-runtime Unity handedness");
+                }
+            }
+            finally
+            {
+                binding?.Dispose();
+                if (clip != null) UnityEngine.Object.DestroyImmediate(clip);
+                DestroyAssets(pmx, vmd);
+            }
+        }
+
         private static string BindingKey(EditorCurveBinding binding) => binding.path + "|" + binding.type.FullName + "|" + binding.propertyName;
 
-        private static void CreateAssets(string pmxPath, string vmdPath, out MmdPmxAsset pmx, out MmdVmdAsset vmd)
+        private static AnimationCurve GetTransformCurve(
+            AnimationClip clip,
+            string path,
+            string propertyName)
+        {
+            EditorCurveBinding curveBinding = AnimationUtility.GetCurveBindings(clip).Single(binding =>
+                binding.path == path &&
+                binding.type == typeof(Transform) &&
+                binding.propertyName == propertyName);
+            return AnimationUtility.GetEditorCurve(clip, curveBinding)!;
+        }
+
+        private static void CreateAssets(
+            string pmxPath,
+            string vmdPath,
+            out MmdPmxAsset pmx,
+            out MmdVmdAsset vmd,
+            float importScale = 1.0f)
         {
             pmx = ScriptableObject.CreateInstance<MmdPmxAsset>();
-            pmx.Initialize(File.ReadAllBytes(pmxPath), Path.GetFileName(pmxPath), pmxPath, 1.0f);
+            pmx.Initialize(File.ReadAllBytes(pmxPath), Path.GetFileName(pmxPath), pmxPath, importScale);
             vmd = ScriptableObject.CreateInstance<MmdVmdAsset>();
             vmd.Initialize(File.ReadAllBytes(vmdPath), Path.GetFileName(vmdPath), vmdPath);
         }

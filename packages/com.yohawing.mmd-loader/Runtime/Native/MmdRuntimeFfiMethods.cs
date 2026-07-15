@@ -12,6 +12,15 @@ namespace Mmd.Native
         internal const uint FeatureSplitPhysicsEvaluation = 1u << 0;
         internal const uint FeaturePhysicsBulletNative = 1u << 1;
         internal const uint PhysicsModeLive = 2;
+        internal const int StatusOk = 0;
+        internal const int StatusUnsupported = 2;
+        internal const int StatusBufferTooSmall = 3;
+        internal const uint ReductionTargetDccCubic = 2;
+
+        internal const uint UnityCurveBoneLocalTranslation = 0;
+        internal const uint UnityCurveBoneLocalEuler = 1;
+        internal const uint UnityCurveMorphWeight = 2;
+        internal const uint UnityCurveAxisNone = 3;
 
         [StructLayout(LayoutKind.Sequential)]
         internal struct PhysicsStepStats
@@ -28,6 +37,43 @@ namespace Mmd.Native
             internal PhysicsStepStats tick;
             internal IntPtr kinematicRigidbodiesFed;
             internal IntPtr bonesWrittenBack;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct ReductionTolerances
+        {
+            internal float localPosition;
+            internal float localRotationRadians;
+            internal float worldPosition;
+            internal float worldRotationRadians;
+            internal float morphWeight;
+
+            internal static ReductionTolerances Default => new ReductionTolerances
+            {
+                localPosition = 1.0e-4f,
+                localRotationRadians = 1.0e-4f,
+                worldPosition = 1.0e-4f,
+                worldRotationRadians = 1.0e-4f,
+                morphWeight = 1.0e-4f
+            };
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct UnityCurveDescriptor
+        {
+            internal uint semantic;
+            internal uint targetIndex;
+            internal uint axis;
+            internal IntPtr keyCount;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct UnityCurveKey
+        {
+            internal float timeSeconds;
+            internal float value;
+            internal float inTangent;
+            internal float outTangent;
         }
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_abi_version", CallingConvention = CallingConvention.Cdecl)]
@@ -169,6 +215,49 @@ namespace Mmd.Native
             IntPtr outWorldMatricesF32Len,
             [Out] float[] outMorphWeightsF32,
             IntPtr outMorphWeightsF32Len);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_reduced_pose_create_from_dense", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ReducedPoseCreateFromDense(
+            IntPtr model,
+            ulong modelIdentity,
+            float[] worldMatricesF32,
+            IntPtr worldMatricesF32Len,
+            float[] morphWeightsF32,
+            IntPtr morphWeightsF32Len,
+            IntPtr frameCount,
+            float startFrame,
+            float frameStep,
+            uint target,
+            ReductionTolerances tolerances,
+            out IntPtr reducedPose);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_reduced_pose_free", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void ReducedPoseFree(IntPtr reducedPose);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_reduced_pose_unity_curve_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ReducedPoseUnityCurveCount(
+            IntPtr reducedPose,
+            float framesPerSecond,
+            [MarshalAs(UnmanagedType.I1)] bool flipZ,
+            out IntPtr curveCount);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_reduced_pose_unity_curve_descriptor", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ReducedPoseUnityCurveDescriptor(
+            IntPtr reducedPose,
+            float framesPerSecond,
+            [MarshalAs(UnmanagedType.I1)] bool flipZ,
+            IntPtr curveIndex,
+            out UnityCurveDescriptor descriptor);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_reduced_pose_unity_curve_keys", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ReducedPoseUnityCurveKeys(
+            IntPtr reducedPose,
+            float framesPerSecond,
+            [MarshalAs(UnmanagedType.I1)] bool flipZ,
+            IntPtr curveIndex,
+            [Out] UnityCurveKey[]? keys,
+            IntPtr keyCapacity,
+            out IntPtr requiredCount);
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_ik_enabled_len", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr InstanceIkEnabledLen(IntPtr instance);
@@ -366,6 +455,55 @@ namespace Mmd.Native
             }
         }
 
+        internal MmdRuntimeReducedPose ReduceBatch(
+            float batchStartFrame,
+            int frameCount,
+            uint workerCount,
+            MmdRuntimeFfiMethods.ReductionTolerances tolerances)
+        {
+            if (disposed)
+            {
+                throw new ObjectDisposedException(nameof(MmdRuntimeFfiPlaybackSession));
+            }
+
+            if (!float.IsFinite(batchStartFrame) || frameCount <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(frameCount));
+            }
+
+            var worldMatrices = new float[checked(WorldMatrixFloatCount * frameCount)];
+            var morphWeights = new float[checked(MorphWeightCount * frameCount)];
+            EvaluateBatch(batchStartFrame, 1.0f, frameCount, workerCount, worldMatrices, morphWeights);
+
+            IntPtr reducedPose = IntPtr.Zero;
+            int status = MmdRuntimeFfiMethods.ReducedPoseCreateFromDense(
+                model,
+                0,
+                worldMatrices,
+                new IntPtr(worldMatrices.Length),
+                morphWeights,
+                new IntPtr(morphWeights.Length),
+                new IntPtr(frameCount),
+                0.0f,
+                1.0f,
+                MmdRuntimeFfiMethods.ReductionTargetDccCubic,
+                tolerances,
+                out reducedPose);
+            if (status != MmdRuntimeFfiMethods.StatusOk || reducedPose == IntPtr.Zero)
+            {
+                if (reducedPose != IntPtr.Zero)
+                {
+                    MmdRuntimeFfiMethods.ReducedPoseFree(reducedPose);
+                }
+
+                throw new InvalidOperationException(
+                    "mmd-runtime reduced pose creation failed with status " + status + ": "
+                    + MmdRuntimeFfiMarshal.LastErrorMessage());
+            }
+
+            return new MmdRuntimeReducedPose(reducedPose);
+        }
+
         public void Dispose()
         {
             if (disposed)
@@ -377,6 +515,147 @@ namespace Mmd.Native
             MmdRuntimeFfiMethods.ClipFree(clip);
             MmdRuntimeFfiMethods.ModelFree(model);
             disposed = true;
+        }
+    }
+
+    internal sealed class MmdRuntimeReducedPose : IDisposable
+    {
+        private IntPtr handle;
+
+        internal MmdRuntimeReducedPose(IntPtr handle)
+        {
+            this.handle = handle != IntPtr.Zero
+                ? handle
+                : throw new ArgumentException("Reduced pose handle is required.", nameof(handle));
+        }
+
+        internal int GetUnityCurveCount(float framesPerSecond, bool flipZ)
+        {
+            ThrowIfDisposed();
+            int status = MmdRuntimeFfiMethods.ReducedPoseUnityCurveCount(
+                handle, framesPerSecond, flipZ, out IntPtr count);
+            ThrowForStatus(status, "curve count");
+            return MmdFfiMarshal.CheckedIntPtrToInt(count, "reduced pose curve count");
+        }
+
+        internal MmdRuntimeFfiMethods.UnityCurveDescriptor GetUnityCurveDescriptor(
+            float framesPerSecond,
+            bool flipZ,
+            int curveIndex)
+        {
+            ThrowIfDisposed();
+            int status = MmdRuntimeFfiMethods.ReducedPoseUnityCurveDescriptor(
+                handle,
+                framesPerSecond,
+                flipZ,
+                new IntPtr(curveIndex),
+                out MmdRuntimeFfiMethods.UnityCurveDescriptor descriptor);
+            ThrowForStatus(status, "curve descriptor");
+            return descriptor;
+        }
+
+        internal MmdRuntimeFfiMethods.UnityCurveKey[] GetUnityCurveKeys(
+            float framesPerSecond,
+            bool flipZ,
+            int curveIndex)
+        {
+            ThrowIfDisposed();
+            int status = MmdRuntimeFfiMethods.ReducedPoseUnityCurveKeys(
+                handle,
+                framesPerSecond,
+                flipZ,
+                new IntPtr(curveIndex),
+                null,
+                IntPtr.Zero,
+                out IntPtr requiredCount);
+            if (status != MmdRuntimeFfiMethods.StatusBufferTooSmall)
+            {
+                ThrowForStatus(status, "curve key count");
+            }
+
+            MmdRuntimeFfiMethods.UnityCurveKey[] keys = AllocateUnityCurveKeyBuffer(requiredCount);
+            if (keys.Length == 0)
+            {
+                return keys;
+            }
+
+            status = MmdRuntimeFfiMethods.ReducedPoseUnityCurveKeys(
+                handle,
+                framesPerSecond,
+                flipZ,
+                new IntPtr(curveIndex),
+                keys,
+                new IntPtr(keys.Length),
+                out IntPtr copiedCount);
+            ThrowForStatus(status, "curve keys");
+            if (copiedCount != requiredCount)
+            {
+                throw new InvalidOperationException("mmd-runtime reduced pose curve key count changed during enumeration.");
+            }
+
+            return keys;
+        }
+
+        internal static MmdRuntimeFfiMethods.UnityCurveKey[] AllocateUnityCurveKeyBuffer(
+            IntPtr requiredCount)
+        {
+            int keyCount = MmdFfiMarshal.CheckedIntPtrToInt(
+                requiredCount, "reduced pose curve key count");
+            return keyCount == 0
+                ? Array.Empty<MmdRuntimeFfiMethods.UnityCurveKey>()
+                : new MmdRuntimeFfiMethods.UnityCurveKey[keyCount];
+        }
+
+        public void Dispose()
+        {
+            if (handle == IntPtr.Zero)
+            {
+                return;
+            }
+
+            MmdRuntimeFfiMethods.ReducedPoseFree(handle);
+            handle = IntPtr.Zero;
+        }
+
+        private void ThrowIfDisposed()
+        {
+            if (handle == IntPtr.Zero)
+            {
+                throw new ObjectDisposedException(nameof(MmdRuntimeReducedPose));
+            }
+        }
+
+        private static void ThrowForStatus(int status, string operation)
+        {
+            if (status == MmdRuntimeFfiMethods.StatusOk)
+            {
+                return;
+            }
+
+            string message = "mmd-runtime reduced pose " + operation + " failed with status " + status + ": "
+                             + MmdRuntimeFfiMarshal.LastErrorMessage();
+            if (status == MmdRuntimeFfiMethods.StatusUnsupported)
+            {
+                throw new MmdRuntimeUnsupportedException(message);
+            }
+
+            throw new InvalidOperationException(message);
+        }
+    }
+
+    internal sealed class MmdRuntimeUnsupportedException : Exception
+    {
+        internal MmdRuntimeUnsupportedException(string message) : base(message)
+        {
+        }
+    }
+
+    internal static class MmdRuntimeFfiMarshal
+    {
+        internal static string LastErrorMessage()
+        {
+            IntPtr message = MmdRuntimeFfiMethods.LastErrorMessage();
+            return message == IntPtr.Zero ? "no native diagnostic" : Marshal.PtrToStringAnsi(message) ?? "no native diagnostic";
         }
     }
 
