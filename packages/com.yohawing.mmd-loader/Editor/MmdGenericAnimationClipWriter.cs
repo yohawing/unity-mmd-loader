@@ -85,7 +85,12 @@ namespace Mmd.Editor
                     frameRate,
                     startFrame,
                     effectiveEndFrame,
-                    out int compactedCurveCount);
+                    out int compactedCurveCount,
+                    out bool usedNativeBatch);
+                if (usedNativeBatch)
+                {
+                    diagnostics.Add("writer: sampled animation through chunked mmd-runtime batch buffers.");
+                }
                 diagnostics.Add("writer: baked Generic transform and vertex morph curves with physics off; compacted "
                                 + compactedCurveCount + " constant curves to endpoint keys.");
                 return new MmdGenericAnimationClipWriterResult(clip, diagnostics, binding.PhysicsMode);
@@ -144,7 +149,6 @@ namespace Mmd.Editor
                 string uniquePath = AssetDatabase.GenerateUniqueAssetPath(normalizedPath);
                 AssetDatabase.CreateAsset(result.Clip, uniquePath);
                 AssetDatabase.SaveAssets();
-                AssetDatabase.ImportAsset(uniquePath, ImportAssetOptions.ForceUpdate);
                 AnimationClip? saved = AssetDatabase.LoadAssetAtPath<AnimationClip>(uniquePath);
                 return new MmdGenericAnimationClipWriterResult(saved, result.Diagnostics, result.PhysicsMode, uniquePath);
             }
@@ -176,7 +180,8 @@ namespace Mmd.Editor
             float frameRate,
             int startFrame,
             int endFrame,
-            out int compactedCurveCount)
+            out int compactedCurveCount,
+            out bool usedNativeBatch)
         {
             MmdUnityModelInstance instance = binding.Instance;
             int frameCount = endFrame - startFrame + 1;
@@ -190,6 +195,7 @@ namespace Mmd.Editor
             try
             {
             compactedCurveCount = 0;
+            usedNativeBatch = false;
             string[] bonePaths = CalculateUniqueBonePaths(instance.BoneTransforms, instance.Root.transform);
             var positionKeys = new Keyframe[instance.BoneTransforms.Length, 3][];
             var rotationKeys = new Keyframe[instance.BoneTransforms.Length, 4][];
@@ -203,31 +209,56 @@ namespace Mmd.Editor
             var morphKeys = new Keyframe[morphs.Count][];
             for (int morph = 0; morph < morphs.Count; morph++) morphKeys[morph] = new Keyframe[frameCount];
 
-            for (int frame = startFrame, sample = 0; frame <= endFrame; frame++, sample++)
+            if (CanUseNativeBatch(
+                    binding,
+                    instance,
+                    out int[] parentBoneIndices,
+                    out Vector3[] staticParentPositions,
+                    out Quaternion[] staticParentRotations))
             {
-                binding.ApplyFrame(frame, frameRate);
-                float time = (frame - startFrame) / frameRate;
-                for (int bone = 0; bone < instance.BoneTransforms.Length; bone++)
+                try
                 {
-                    Vector3 p = instance.BoneTransforms[bone].localPosition;
-                    Quaternion q = instance.BoneTransforms[bone].localRotation;
-                    positionKeys[bone, 0][sample] = new Keyframe(time, p.x);
-                    positionKeys[bone, 1][sample] = new Keyframe(time, p.y);
-                    positionKeys[bone, 2][sample] = new Keyframe(time, p.z);
-                    rotationKeys[bone, 0][sample] = new Keyframe(time, q.x);
-                    rotationKeys[bone, 1][sample] = new Keyframe(time, q.y);
-                    rotationKeys[bone, 2][sample] = new Keyframe(time, q.z);
-                    rotationKeys[bone, 3][sample] = new Keyframe(time, q.w);
+                    FillDenseKeysFromNativeBatch(
+                        binding,
+                        instance,
+                        parentBoneIndices,
+                        staticParentPositions,
+                        staticParentRotations,
+                        morphs,
+                        frameRate,
+                        startFrame,
+                        frameCount,
+                        positionKeys,
+                        rotationKeys,
+                        morphKeys);
+                    usedNativeBatch = true;
                 }
-
-                if (instance.SkinnedMeshRenderer != null)
+                catch (EntryPointNotFoundException)
                 {
-                    for (int morph = 0; morph < morphs.Count; morph++)
-                    {
-                        float weight = instance.SkinnedMeshRenderer.GetBlendShapeWeight(morphs[morph].BlendShapeIndex);
-                        morphKeys[morph][sample] = new Keyframe(time, weight);
-                    }
+                    FillDenseKeysThroughUnityTransforms(
+                        binding,
+                        instance,
+                        morphs,
+                        frameRate,
+                        startFrame,
+                        endFrame,
+                        positionKeys,
+                        rotationKeys,
+                        morphKeys);
                 }
+            }
+            else
+            {
+                FillDenseKeysThroughUnityTransforms(
+                    binding,
+                    instance,
+                    morphs,
+                    frameRate,
+                    startFrame,
+                    endFrame,
+                    positionKeys,
+                    rotationKeys,
+                    morphKeys);
             }
 
             string[] positionProperties = { "m_LocalPosition.x", "m_LocalPosition.y", "m_LocalPosition.z" };
@@ -270,6 +301,222 @@ namespace Mmd.Editor
             {
                 UnityEngine.Object.DestroyImmediate(clip);
                 throw;
+            }
+        }
+
+        private static bool CanUseNativeBatch(
+            MmdUnityPlaybackBinding binding,
+            MmdUnityModelInstance instance,
+            out int[] parentBoneIndices,
+            out Vector3[] staticParentPositions,
+            out Quaternion[] staticParentRotations)
+        {
+            parentBoneIndices = Array.Empty<int>();
+            staticParentPositions = Array.Empty<Vector3>();
+            staticParentRotations = Array.Empty<Quaternion>();
+            if (!binding.HasFastRuntimeBatch ||
+                binding.FastRuntimeWorldMatrixFloatCount != instance.BoneTransforms.Length * 16 ||
+                binding.FastRuntimeMorphWeightCount <= 0 && instance.VertexMorphBlendShapes.Count > 0 ||
+                instance.RenderingDescriptor.flipMorphs.Count > 0)
+            {
+                return false;
+            }
+
+            var boneIndices = new Dictionary<Transform, int>(instance.BoneTransforms.Length);
+            for (int bone = 0; bone < instance.BoneTransforms.Length; bone++)
+            {
+                boneIndices[instance.BoneTransforms[bone]] = bone;
+            }
+
+            parentBoneIndices = new int[instance.BoneTransforms.Length];
+            staticParentPositions = new Vector3[instance.BoneTransforms.Length];
+            staticParentRotations = new Quaternion[instance.BoneTransforms.Length];
+            Transform root = instance.Root.transform;
+            for (int bone = 0; bone < instance.BoneTransforms.Length; bone++)
+            {
+                Transform? parent = instance.BoneTransforms[bone].parent;
+                if (parent != null && boneIndices.TryGetValue(parent, out int parentBone))
+                {
+                    parentBoneIndices[bone] = parentBone;
+                }
+                else if (parent != null && (parent == root || parent.IsChildOf(root)))
+                {
+                    parentBoneIndices[bone] = -1;
+                    staticParentPositions[bone] = root.InverseTransformPoint(parent.position);
+                    staticParentRotations[bone] = Quaternion.Inverse(root.rotation) * parent.rotation;
+                }
+                else
+                {
+                    parentBoneIndices = Array.Empty<int>();
+                    staticParentPositions = Array.Empty<Vector3>();
+                    staticParentRotations = Array.Empty<Quaternion>();
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static void FillDenseKeysFromNativeBatch(
+            MmdUnityPlaybackBinding binding,
+            MmdUnityModelInstance instance,
+            int[] parentBoneIndices,
+            Vector3[] staticParentPositions,
+            Quaternion[] staticParentRotations,
+            IReadOnlyList<MmdUnityVertexMorphBlendShapeBinding> morphs,
+            float frameRate,
+            int startFrame,
+            int frameCount,
+            Keyframe[,][] positionKeys,
+            Keyframe[,][] rotationKeys,
+            Keyframe[][] morphKeys)
+        {
+            const int ChunkFrameCount = 256;
+            int worldFloatsPerFrame = binding.FastRuntimeWorldMatrixFloatCount;
+            int morphFloatsPerFrame = binding.FastRuntimeMorphWeightCount;
+            var worldMatrices = new float[checked(worldFloatsPerFrame * Math.Min(frameCount, ChunkFrameCount))];
+            var morphWeights = new float[checked(morphFloatsPerFrame * Math.Min(frameCount, ChunkFrameCount))];
+            float importScale = float.IsFinite(instance.ImportScale) && instance.ImportScale > 0.0f
+                ? instance.ImportScale
+                : 1.0f;
+
+            for (int chunkStart = 0; chunkStart < frameCount; chunkStart += ChunkFrameCount)
+            {
+                int chunkCount = Math.Min(ChunkFrameCount, frameCount - chunkStart);
+                binding.EvaluateFastRuntimeBatch(
+                    startFrame + chunkStart,
+                    1.0f,
+                    chunkCount,
+                    workerCount: 0,
+                    worldMatrices,
+                    morphWeights);
+
+                for (int chunkSample = 0; chunkSample < chunkCount; chunkSample++)
+                {
+                    int sample = chunkStart + chunkSample;
+                    float time = sample / frameRate;
+                    ReadOnlySpan<float> frameWorld = worldMatrices.AsSpan(
+                        chunkSample * worldFloatsPerFrame,
+                        worldFloatsPerFrame);
+                    for (int bone = 0; bone < instance.BoneTransforms.Length; bone++)
+                    {
+                        ReadWorldPose(frameWorld, bone, out Vector3 worldPosition, out Quaternion worldRotation);
+                        int parentBone = parentBoneIndices[bone];
+                        Vector3 localPosition;
+                        Quaternion localRotation;
+                        if (parentBone >= 0)
+                        {
+                            ReadWorldPose(frameWorld, parentBone, out Vector3 parentPosition, out Quaternion parentRotation);
+                            Quaternion inverseParent = Quaternion.Inverse(parentRotation);
+                            localPosition = inverseParent * (worldPosition - parentPosition) * importScale;
+                            localRotation = inverseParent * worldRotation;
+                        }
+                        else
+                        {
+                            Quaternion inverseParent = Quaternion.Inverse(staticParentRotations[bone]);
+                            localPosition = inverseParent * (
+                                worldPosition * importScale - staticParentPositions[bone]);
+                            localRotation = inverseParent * worldRotation;
+                        }
+
+                        if (sample > 0)
+                        {
+                            Quaternion previous = new Quaternion(
+                                rotationKeys[bone, 0][sample - 1].value,
+                                rotationKeys[bone, 1][sample - 1].value,
+                                rotationKeys[bone, 2][sample - 1].value,
+                                rotationKeys[bone, 3][sample - 1].value);
+                            if (Quaternion.Dot(previous, localRotation) < 0.0f)
+                            {
+                                localRotation = new Quaternion(
+                                    -localRotation.x,
+                                    -localRotation.y,
+                                    -localRotation.z,
+                                    -localRotation.w);
+                            }
+                        }
+
+                        positionKeys[bone, 0][sample] = new Keyframe(time, localPosition.x);
+                        positionKeys[bone, 1][sample] = new Keyframe(time, localPosition.y);
+                        positionKeys[bone, 2][sample] = new Keyframe(time, localPosition.z);
+                        rotationKeys[bone, 0][sample] = new Keyframe(time, localRotation.x);
+                        rotationKeys[bone, 1][sample] = new Keyframe(time, localRotation.y);
+                        rotationKeys[bone, 2][sample] = new Keyframe(time, localRotation.z);
+                        rotationKeys[bone, 3][sample] = new Keyframe(time, localRotation.w);
+                    }
+
+                    int morphOffset = chunkSample * morphFloatsPerFrame;
+                    for (int morph = 0; morph < morphs.Count; morph++)
+                    {
+                        morphKeys[morph][sample] = new Keyframe(
+                            time,
+                            morphWeights[morphOffset + morphs[morph].MorphIndex] * 100.0f);
+                    }
+                }
+            }
+        }
+
+        private static void ReadWorldPose(
+            ReadOnlySpan<float> frameWorld,
+            int bone,
+            out Vector3 position,
+            out Quaternion rotation)
+        {
+            int offset = bone * 16;
+            position = MmdCoordinateSpace.MmdToUnityPosition(new Vector3(
+                frameWorld[offset + 12],
+                frameWorld[offset + 13],
+                frameWorld[offset + 14]));
+            Vector3 forward = new Vector3(
+                frameWorld[offset + 8],
+                frameWorld[offset + 9],
+                frameWorld[offset + 10]);
+            Vector3 up = new Vector3(
+                frameWorld[offset + 4],
+                frameWorld[offset + 5],
+                frameWorld[offset + 6]);
+            Quaternion mmdRotation = forward.sqrMagnitude > 0.0f && up.sqrMagnitude > 0.0f
+                ? Quaternion.LookRotation(forward.normalized, up.normalized)
+                : Quaternion.identity;
+            rotation = MmdCoordinateSpace.MmdToUnityRotation(mmdRotation);
+        }
+
+        private static void FillDenseKeysThroughUnityTransforms(
+            MmdUnityPlaybackBinding binding,
+            MmdUnityModelInstance instance,
+            IReadOnlyList<MmdUnityVertexMorphBlendShapeBinding> morphs,
+            float frameRate,
+            int startFrame,
+            int endFrame,
+            Keyframe[,][] positionKeys,
+            Keyframe[,][] rotationKeys,
+            Keyframe[][] morphKeys)
+        {
+            for (int frame = startFrame, sample = 0; frame <= endFrame; frame++, sample++)
+            {
+                binding.ApplyFrame(frame, frameRate);
+                float time = (frame - startFrame) / frameRate;
+                for (int bone = 0; bone < instance.BoneTransforms.Length; bone++)
+                {
+                    Vector3 p = instance.BoneTransforms[bone].localPosition;
+                    Quaternion q = instance.BoneTransforms[bone].localRotation;
+                    positionKeys[bone, 0][sample] = new Keyframe(time, p.x);
+                    positionKeys[bone, 1][sample] = new Keyframe(time, p.y);
+                    positionKeys[bone, 2][sample] = new Keyframe(time, p.z);
+                    rotationKeys[bone, 0][sample] = new Keyframe(time, q.x);
+                    rotationKeys[bone, 1][sample] = new Keyframe(time, q.y);
+                    rotationKeys[bone, 2][sample] = new Keyframe(time, q.z);
+                    rotationKeys[bone, 3][sample] = new Keyframe(time, q.w);
+                }
+
+                if (instance.SkinnedMeshRenderer != null)
+                {
+                    for (int morph = 0; morph < morphs.Count; morph++)
+                    {
+                        float weight = instance.SkinnedMeshRenderer.GetBlendShapeWeight(morphs[morph].BlendShapeIndex);
+                        morphKeys[morph][sample] = new Keyframe(time, weight);
+                    }
+                }
             }
         }
 

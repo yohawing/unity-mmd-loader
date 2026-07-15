@@ -8,6 +8,7 @@ using UnityEditor;
 using UnityEngine;
 using Mmd.Editor;
 using Mmd.Physics;
+using Mmd.UnityIntegration;
 
 namespace Mmd.Tests
 {
@@ -43,6 +44,9 @@ namespace Mmd.Tests
                 }
 
                 Assert.That(result.Diagnostics, Has.Some.Contains("persistent native evaluation"));
+#if UNITY_EDITOR_WIN
+                Assert.That(result.Diagnostics, Has.Some.Contains("chunked mmd-runtime batch buffers"));
+#endif
                 Assert.That(result.Diagnostics, Has.Some.Contains("compacted"));
             }
             finally
@@ -87,6 +91,57 @@ namespace Mmd.Tests
                 UnityEngine.Object.DestroyImmediate(result.Clip);
             }
             finally { DestroyAssets(pmx, vmd); }
+        }
+
+        [Test]
+        public void BatchMorphCurveMatchesFastRuntimeApplication()
+        {
+#if !UNITY_EDITOR_WIN
+            Assert.Ignore("mmd-runtime batch playback is only distributed for the Windows Editor.");
+#endif
+            CreateAssets(MorphPmx, MorphVmd, out MmdPmxAsset pmx, out MmdVmdAsset vmd);
+            MmdUnityPlaybackBinding? binding = null;
+            AnimationClip? clip = null;
+            try
+            {
+                MmdGenericAnimationClipWriterResult result =
+                    MmdGenericAnimationClipWriter.CreateInMemoryClip(pmx, vmd, 30.0f, 0, 10);
+                clip = result.Clip;
+                Assert.That(clip, Is.Not.Null, string.Join("\n", result.Diagnostics));
+                Assert.That(result.Diagnostics, Has.Some.Contains("chunked mmd-runtime batch buffers"));
+
+                binding = MmdUnityPlaybackBinding.CreateSkinned(pmx, vmd);
+                binding.SetPhysicsMode(MmdPhysicsMode.Off);
+                Assert.That(
+                    binding.TryEnableFastRuntime(pmx.GetBytesCopy(), vmd.GetBytesCopy(), out string reason),
+                    Is.True,
+                    reason);
+
+                foreach (MmdUnityVertexMorphBlendShapeBinding morph in binding.Instance.VertexMorphBlendShapes)
+                {
+                    EditorCurveBinding curveBinding = AnimationUtility.GetCurveBindings(clip!)
+                        .Single(candidate =>
+                            candidate.type == typeof(SkinnedMeshRenderer) &&
+                            candidate.propertyName == "blendShape." + morph.BlendShapeName);
+                    AnimationCurve curve = AnimationUtility.GetEditorCurve(clip!, curveBinding)!;
+                    foreach (int frame in new[] { 0, 5, 10 })
+                    {
+                        binding.ApplyFrame(frame, 30.0f);
+                        float appliedWeight = binding.Instance.SkinnedMeshRenderer!
+                            .GetBlendShapeWeight(morph.BlendShapeIndex);
+                        Assert.That(
+                            curve.Evaluate(frame / 30.0f),
+                            Is.EqualTo(appliedWeight).Within(0.0001f),
+                            $"fast-runtime morph parity for {morph.MorphName} at frame {frame}");
+                    }
+                }
+            }
+            finally
+            {
+                binding?.Dispose();
+                if (clip != null) UnityEngine.Object.DestroyImmediate(clip);
+                DestroyAssets(pmx, vmd);
+            }
         }
 
         [TestCase(0.0f, 0, 0)]

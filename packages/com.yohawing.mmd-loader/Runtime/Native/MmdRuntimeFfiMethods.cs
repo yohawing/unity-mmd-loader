@@ -151,6 +151,25 @@ namespace Mmd.Native
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_copy_morph_weights", CallingConvention = CallingConvention.Cdecl)]
         internal static extern byte InstanceCopyMorphWeights(IntPtr instance, [Out] float[] outF32, IntPtr outF32Len);
 
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_clip_frame_batch_world_matrix_f32_len", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr InstanceClipFrameBatchWorldMatrixF32Len(IntPtr instance, IntPtr frameCount);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_clip_frame_batch_morph_weight_f32_len", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr InstanceClipFrameBatchMorphWeightF32Len(IntPtr instance, IntPtr frameCount);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_evaluate_clip_frame_batch", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern byte InstanceEvaluateClipFrameBatch(
+            IntPtr instance,
+            IntPtr clip,
+            float startFrame,
+            float frameStep,
+            IntPtr frameCount,
+            uint workerCount,
+            [Out] float[] outWorldMatricesF32,
+            IntPtr outWorldMatricesF32Len,
+            [Out] float[] outMorphWeightsF32,
+            IntPtr outMorphWeightsF32Len);
+
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_ik_enabled_len", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr InstanceIkEnabledLen(IntPtr instance);
 
@@ -278,6 +297,73 @@ namespace Mmd.Native
             }
 
             MmdRuntimeFfiSmoke.EvaluateWithoutIkAndCopy(instance, clip, frame, worldMatrices, morphWeights, ikEnabled);
+        }
+
+        public void EvaluateBatch(
+            float startFrame,
+            float frameStep,
+            int frameCount,
+            uint workerCount,
+            float[] worldMatrices,
+            float[] morphWeights)
+        {
+            if (disposed)
+            {
+                throw new ObjectDisposedException(nameof(MmdRuntimeFfiPlaybackSession));
+            }
+
+            if (!float.IsFinite(startFrame) || !float.IsFinite(frameStep))
+            {
+                throw new ArgumentOutOfRangeException(nameof(startFrame), "Batch frame inputs must be finite.");
+            }
+
+            if (frameCount < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(frameCount));
+            }
+
+            if (worldMatrices == null)
+            {
+                throw new ArgumentNullException(nameof(worldMatrices));
+            }
+
+            if (morphWeights == null)
+            {
+                throw new ArgumentNullException(nameof(morphWeights));
+            }
+
+            int requiredWorldCount = MmdFfiMarshal.CheckedIntPtrToInt(
+                MmdRuntimeFfiMethods.InstanceClipFrameBatchWorldMatrixF32Len(instance, new IntPtr(frameCount)),
+                "batch world matrix float count");
+            int requiredMorphCount = MmdFfiMarshal.CheckedIntPtrToInt(
+                MmdRuntimeFfiMethods.InstanceClipFrameBatchMorphWeightF32Len(instance, new IntPtr(frameCount)),
+                "batch morph weight float count");
+            if (worldMatrices.Length < requiredWorldCount)
+            {
+                throw new ArgumentException(
+                    $"Batch world matrix buffer requires {requiredWorldCount} floats.", nameof(worldMatrices));
+            }
+
+            if (morphWeights.Length < requiredMorphCount)
+            {
+                throw new ArgumentException(
+                    $"Batch morph weight buffer requires {requiredMorphCount} floats.", nameof(morphWeights));
+            }
+
+            if (MmdRuntimeFfiMethods.InstanceEvaluateClipFrameBatch(
+                    instance,
+                    clip,
+                    startFrame,
+                    frameStep,
+                    new IntPtr(frameCount),
+                    workerCount,
+                    worldMatrices,
+                    new IntPtr(worldMatrices.Length),
+                    morphWeights,
+                    new IntPtr(morphWeights.Length)) == 0)
+            {
+                throw new InvalidOperationException("mmd-runtime batch clip frame evaluation returned false.");
+            }
         }
 
         public void Dispose()

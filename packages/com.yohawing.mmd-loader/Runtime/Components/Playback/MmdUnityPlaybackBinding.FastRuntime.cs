@@ -121,6 +121,34 @@ namespace Mmd.UnityIntegration
             DisposeFastRuntime();
         }
 
+        internal bool HasFastRuntimeBatch => fastSession != null;
+
+        internal int FastRuntimeWorldMatrixFloatCount => fastSession?.WorldMatrixFloatCount ?? 0;
+
+        internal int FastRuntimeMorphWeightCount => fastSession?.MorphWeightCount ?? 0;
+
+        internal void EvaluateFastRuntimeBatch(
+            float startFrame,
+            float frameStep,
+            int frameCount,
+            uint workerCount,
+            float[] worldMatrices,
+            float[] morphWeights)
+        {
+            if (fastSession == null)
+            {
+                throw new InvalidOperationException("mmd-runtime fast playback session is not enabled.");
+            }
+
+            fastSession.EvaluateBatch(
+                startFrame,
+                frameStep,
+                frameCount,
+                workerCount,
+                worldMatrices,
+                morphWeights);
+        }
+
         private void DisposeFastRuntime()
         {
             fastSession?.Dispose();

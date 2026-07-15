@@ -141,6 +141,70 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void RuntimeFfiPinsClipFrameBatchEntrypoints()
+        {
+            AssertRuntimeFfiSignature(
+                "InstanceClipFrameBatchWorldMatrixF32Len",
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr));
+            AssertRuntimeFfiSignature(
+                "InstanceClipFrameBatchMorphWeightF32Len",
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr));
+            AssertRuntimeFfiSignature(
+                "InstanceEvaluateClipFrameBatch",
+                typeof(byte),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(float),
+                typeof(float),
+                typeof(IntPtr),
+                typeof(uint),
+                typeof(float[]),
+                typeof(IntPtr),
+                typeof(float[]),
+                typeof(IntPtr));
+        }
+
+        [Test]
+        public void RuntimeFfiClipFrameBatchMatchesSequentialEvaluation()
+        {
+#if !UNITY_EDITOR_WIN
+            Assert.Ignore("mmd-runtime batch playback is only distributed for the Windows Editor.");
+#endif
+            byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube.pmx");
+            byte[] vmdBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube_motion.vmd");
+            using var session = MmdRuntimeFfiPlaybackSession.Create(pmxBytes, vmdBytes);
+            const int frameCount = 3;
+            var batchWorld = new float[session.WorldMatrixFloatCount * frameCount];
+            var batchMorphs = new float[session.MorphWeightCount * frameCount];
+
+            session.EvaluateBatch(0.0f, 1.0f, frameCount, 0, batchWorld, batchMorphs);
+
+            var sequentialWorld = new float[session.WorldMatrixFloatCount];
+            var sequentialMorphs = new float[session.MorphWeightCount];
+            var sequentialIk = new byte[session.IkEnabledCount];
+            for (int frame = 0; frame < frameCount; frame++)
+            {
+                session.EvaluateAndCopy(frame, sequentialWorld, sequentialMorphs, sequentialIk);
+                CollectionAssert.AreEqual(
+                    sequentialWorld,
+                    batchWorld.Skip(frame * session.WorldMatrixFloatCount)
+                        .Take(session.WorldMatrixFloatCount)
+                        .ToArray(),
+                    $"world matrices at frame {frame}");
+                CollectionAssert.AreEqual(
+                    sequentialMorphs,
+                    batchMorphs.Skip(frame * session.MorphWeightCount)
+                        .Take(session.MorphWeightCount)
+                        .ToArray(),
+                    $"morph weights at frame {frame}");
+            }
+        }
+
+        [Test]
         public void RuntimeFfiSamplesVmdCameraIntoCallerOwnedBuffer()
         {
             string fixturePath = Path.Combine(
