@@ -7,6 +7,8 @@ using System.Linq;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Animations;
+using UnityEngine.Playables;
 using Mmd.Editor;
 using Mmd.Parser;
 using Mmd.UnityIntegration;
@@ -173,6 +175,136 @@ namespace Mmd.Tests
             }
             finally
             {
+                AssetDatabase.DeleteAsset(outputDirectory);
+                DestroyOwnedObjects(ownedObjects);
+            }
+        }
+
+        [Test]
+        public void ReimportedHumanoidClipDrivesFreshAvatarWithBodyHeightAndHipsRotation()
+        {
+            string outputDirectory = "Assets/HumanoidClipApplicationTests_" + Guid.NewGuid().ToString("N");
+            string outputPath = outputDirectory + "/baked-humanoid.anim";
+            MmdPmxAsset pmxAsset = null!;
+            MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(FixtureVmdPath);
+            var ownedObjects = new List<UnityEngine.Object>();
+            MmdHumanoidClipConversionWriterResult? result = null;
+            AnimationClip? inMemoryClip = null;
+            GameObject? referenceRoot = null;
+            GameObject? playbackRoot = null;
+            PlayableGraph referenceGraph = default;
+            PlayableGraph playbackGraph = default;
+
+            try
+            {
+                CreateReadyFixturePmx(out pmxAsset, ownedObjects);
+                ConfigureImportedHumanoidState(pmxAsset, ownedObjects);
+                CreateFolderIfMissing(outputDirectory);
+
+                Mmd.UnityIntegration.MmdUnityPlaybackController controller = pmxAsset.ImportedRoot!
+                    .GetComponent<Mmd.UnityIntegration.MmdUnityPlaybackController>();
+                Assert.That(controller.HumanoidProxyRoot, Is.Not.Null);
+                Transform sourceProxyRoot = controller.HumanoidProxyRoot!;
+                MmdHumanoidRetargetBinding sourceHipsBinding = controller.HumanoidRetargetEntries
+                    .Single(binding => binding.HumanBone == HumanBodyBones.Hips);
+                Assert.That(sourceHipsBinding.ProxyTransform, Is.Not.Null);
+
+                string hipsPath = AnimationUtility.CalculateTransformPath(
+                    sourceHipsBinding.ProxyTransform,
+                    sourceProxyRoot);
+                referenceRoot = CreateFreshHumanoidPlaybackRoot(sourceProxyRoot, "InMemoryHumanoidPlaybackRoot");
+                playbackRoot = CreateFreshHumanoidPlaybackRoot(sourceProxyRoot, "ReimportedHumanoidPlaybackRoot");
+                Transform? referenceHips = referenceRoot.transform.Find(hipsPath);
+                Transform? playbackHips = playbackRoot.transform.Find(hipsPath);
+                Assert.That(referenceHips, Is.Not.Null, "reference clone must preserve the Avatar Hips path");
+                Assert.That(playbackHips, Is.Not.Null, "fresh clone must preserve the Avatar Hips path");
+                Quaternion bindHipsRotation = playbackHips!.rotation;
+
+                sourceHipsBinding.ProxyTransform!.localRotation *=
+                    Quaternion.AngleAxis(20.0f, Vector3.forward);
+                result = MmdHumanoidClipConversionWriter.CreateHumanoidAnimationClipAsset(
+                    pmxAsset,
+                    vmdAsset,
+                    frameRate: 30.0f,
+                    startFrame: 0,
+                    endFrame: 2,
+                    outputPath);
+
+                Assert.That(result.Clip, Is.Not.Null, string.Join("\n", result.Diagnostics));
+                inMemoryClip = UnityEngine.Object.Instantiate(result.Clip);
+                AssetDatabase.ImportAsset(outputPath, ImportAssetOptions.ForceUpdate);
+                AnimationClip? reimported = AssetDatabase.LoadAssetAtPath<AnimationClip>(outputPath);
+                Assert.That(reimported, Is.Not.Null);
+                Assert.That(reimported!.humanMotion, Is.True);
+
+                Avatar avatar = pmxAsset.ImportedAvatar!;
+                Assert.That(avatar, Is.Not.Null);
+                Assert.That(avatar.isValid && avatar.isHuman, Is.True);
+                Animator referenceAnimator = ConfigureHumanoidPlaybackAnimator(referenceRoot, avatar);
+                Animator playbackAnimator = ConfigureHumanoidPlaybackAnimator(playbackRoot, avatar);
+                HumanPose baselinePose = ReadHumanPose(avatar, playbackRoot.transform);
+                float baselineHipsHeight = playbackHips.position.y - playbackRoot.transform.position.y;
+                Assert.That(baselinePose.bodyPosition.y, Is.GreaterThan(0.0f));
+                Assert.That(baselineHipsHeight, Is.GreaterThan(0.0f));
+
+                referenceGraph = CreateHumanoidPlaybackGraph(
+                    "InMemoryHumanoidBake",
+                    referenceAnimator,
+                    inMemoryClip!,
+                    out AnimationClipPlayable referencePlayable);
+                playbackGraph = CreateHumanoidPlaybackGraph(
+                    "ReimportedHumanoidBake",
+                    playbackAnimator,
+                    reimported,
+                    out AnimationClipPlayable playbackPlayable);
+
+                Vector3 expectedBodyPosition = ReadRootPosition(reimported, 0.0f);
+                Quaternion expectedBodyRotation = ReadRootRotation(reimported, 0.0f);
+                Assert.That(expectedBodyPosition.y, Is.GreaterThan(0.0f),
+                    "persisted RootT must retain the baked Humanoid body height");
+                Assert.That(Quaternion.Angle(Quaternion.identity, expectedBodyRotation), Is.GreaterThan(1.0f),
+                    "persisted RootQ must retain the baked Humanoid body rotation");
+
+                foreach (double time in new[] { 0.0, 2.0 / 30.0 })
+                {
+                    referencePlayable.SetTime(time);
+                    playbackPlayable.SetTime(time);
+                    referenceGraph.Evaluate(0.0f);
+                    playbackGraph.Evaluate(0.0f);
+
+                    HumanPose referencePose = ReadHumanPose(avatar, referenceRoot.transform);
+                    HumanPose appliedPose = ReadHumanPose(avatar, playbackRoot.transform);
+                    Assert.That(Vector3.Distance(appliedPose.bodyPosition, referencePose.bodyPosition),
+                        Is.LessThan(0.0001f), "body position round-trip parity at " + time);
+                    Assert.That(Mathf.Abs(Quaternion.Dot(appliedPose.bodyRotation, referencePose.bodyRotation)),
+                        Is.EqualTo(1.0f).Within(0.0001f), "body rotation round-trip parity at " + time);
+                    Assert.That(Vector3.Distance(playbackRoot.transform.position, referenceRoot.transform.position),
+                        Is.LessThan(0.0001f), "root position round-trip parity at " + time);
+                    Assert.That(Quaternion.Angle(playbackRoot.transform.rotation, referenceRoot.transform.rotation),
+                        Is.LessThan(0.01f), "root rotation round-trip parity at " + time);
+                    Assert.That(Vector3.Distance(playbackHips.position, referenceHips!.position),
+                        Is.LessThan(0.0001f), "Hips position round-trip parity at " + time);
+                    Assert.That(Quaternion.Angle(playbackHips.rotation, referenceHips.rotation),
+                        Is.LessThan(0.01f), "Hips rotation round-trip parity at " + time);
+
+                    Assert.That(float.IsFinite(appliedPose.bodyPosition.y), Is.True);
+                    Assert.That(appliedPose.bodyPosition.y, Is.GreaterThan(baselinePose.bodyPosition.y * 0.5f),
+                        "reimported Humanoid clip must not collapse body/Hips height to Y=0");
+                    float appliedHipsHeight = playbackHips.position.y - playbackRoot.transform.position.y;
+                    Assert.That(appliedHipsHeight, Is.GreaterThan(baselineHipsHeight * 0.5f),
+                        "fresh Avatar Hips must retain their bind-relative height after clip evaluation");
+                    Assert.That(Quaternion.Angle(bindHipsRotation, playbackHips.rotation),
+                        Is.GreaterThan(1.0f),
+                        "reimported RootQ/muscle curves must visibly rotate the fresh Avatar Hips");
+                }
+            }
+            finally
+            {
+                if (referenceGraph.IsValid()) referenceGraph.Destroy();
+                if (playbackGraph.IsValid()) playbackGraph.Destroy();
+                if (inMemoryClip != null) UnityEngine.Object.DestroyImmediate(inMemoryClip);
+                if (referenceRoot != null) UnityEngine.Object.DestroyImmediate(referenceRoot);
+                if (playbackRoot != null) UnityEngine.Object.DestroyImmediate(playbackRoot);
                 AssetDatabase.DeleteAsset(outputDirectory);
                 DestroyOwnedObjects(ownedObjects);
             }
@@ -524,6 +656,50 @@ namespace Mmd.Tests
                     Is.True,
                     property);
             }
+        }
+
+        private static GameObject CreateFreshHumanoidPlaybackRoot(Transform sourceRoot, string name)
+        {
+            GameObject clone = UnityEngine.Object.Instantiate(sourceRoot.gameObject);
+            clone.name = name;
+            clone.transform.SetParent(null, worldPositionStays: false);
+            clone.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+            clone.SetActive(true);
+            return clone;
+        }
+
+        private static Animator ConfigureHumanoidPlaybackAnimator(GameObject root, Avatar avatar)
+        {
+            Animator animator = root.AddComponent<Animator>();
+            animator.avatar = avatar;
+            animator.applyRootMotion = true;
+            animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            return animator;
+        }
+
+        private static PlayableGraph CreateHumanoidPlaybackGraph(
+            string name,
+            Animator animator,
+            AnimationClip clip,
+            out AnimationClipPlayable playable)
+        {
+            PlayableGraph graph = PlayableGraph.Create(name);
+            graph.SetTimeUpdateMode(DirectorUpdateMode.Manual);
+            playable = AnimationClipPlayable.Create(graph, clip);
+            AnimationPlayableOutput output = AnimationPlayableOutput.Create(graph, name, animator);
+            output.SetSourcePlayable(playable);
+            graph.Play();
+            return graph;
+        }
+
+        private static HumanPose ReadHumanPose(Avatar avatar, Transform root)
+        {
+            var pose = new HumanPose { muscles = new float[HumanTrait.MuscleCount] };
+            using (var poseHandler = new HumanPoseHandler(avatar, root))
+            {
+                poseHandler.GetHumanPose(ref pose);
+            }
+            return pose;
         }
 
         private static Vector3 ReadRootPosition(AnimationClip clip, float time)
