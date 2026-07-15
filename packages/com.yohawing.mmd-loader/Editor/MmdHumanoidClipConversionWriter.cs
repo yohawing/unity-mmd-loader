@@ -7,6 +7,8 @@ using UnityEditor;
 using UnityEngine;
 using Mmd.Parser;
 using Mmd.Motion;
+using Mmd.Pose;
+using Mmd.UnityIntegration;
 
 namespace Mmd.Editor
 {
@@ -213,7 +215,7 @@ namespace Mmd.Editor
                 return new MmdHumanoidClipConversionWriterResult(null, plan, diagnostics);
             }
 
-            var mappedBones = new List<(Transform ProxyTransform, string SourceBoneName)>();
+            var mappedBones = new List<(HumanBodyBones HumanBone, Transform ProxyTransform, string SourceBoneName)>();
             GameObject? proxyRoot = null;
             Avatar? proxyAvatar = null;
             bool ownsProxyAvatar = false;
@@ -248,7 +250,7 @@ namespace Mmd.Editor
                         if (proxyRigResult.BoneMap.TryGetValue(mappingEntry.HumanBone, out Transform? proxyTransform))
                         {
                             usedHumanBones.Add(mappingEntry.HumanBone);
-                            mappedBones.Add((proxyTransform, mappingEntry.MmdBoneName));
+                            mappedBones.Add((mappingEntry.HumanBone, proxyTransform, mappingEntry.MmdBoneName));
                         }
                     }
 
@@ -299,7 +301,7 @@ namespace Mmd.Editor
                         }
 
                         string sourceBoneName = nativeBones[binding.MmdBoneIndex].name;
-                        mappedBones.Add((clonedProxyTransform, sourceBoneName));
+                        mappedBones.Add((binding.HumanBone, clonedProxyTransform, sourceBoneName));
                     }
 
                     proxyAvatar = pmxAsset.ImportedAvatar;
@@ -336,6 +338,17 @@ namespace Mmd.Editor
                     proxyAvatar,
                     mappedBones,
                     boneKeyframesByName,
+                    startFrame,
+                    effectiveEndFrame,
+                    frameCount,
+                    sampleFrameToTimeFactor,
+                    diagnostics);
+
+                AddRootMotionCurvesToClip(
+                    clip,
+                    pmxAsset,
+                    motion,
+                    mappedBones,
                     startFrame,
                     effectiveEndFrame,
                     frameCount,
@@ -412,7 +425,7 @@ namespace Mmd.Editor
             AnimationClip clip,
             GameObject proxyRoot,
             Avatar proxyAvatar,
-            IReadOnlyList<(Transform ProxyTransform, string SourceBoneName)> mappedBones,
+            IReadOnlyList<(HumanBodyBones HumanBone, Transform ProxyTransform, string SourceBoneName)> mappedBones,
             Dictionary<string, List<MmdBoneKeyframeDefinition>> boneKeyframesByName,
             int startFrame,
             int endFrame,
@@ -442,7 +455,7 @@ namespace Mmd.Editor
                     float time = (frame - startFrame) * sampleFrameToTimeFactor;
                     for (int boneIndex = 0; boneIndex < mappedBones.Count; boneIndex++)
                     {
-                        (Transform proxyTransform, string sourceBoneName) = mappedBones[boneIndex];
+                        (_, Transform proxyTransform, string sourceBoneName) = mappedBones[boneIndex];
                         IReadOnlyList<MmdBoneKeyframeDefinition> keyframes = SelectBoneKeyframes(
                             boneKeyframesByName,
                             sourceBoneName);
@@ -477,6 +490,248 @@ namespace Mmd.Editor
             }
 
             diagnostics.Add("writer: wrote " + muscleCount + " Humanoid muscle curves.");
+        }
+
+        private static void AddRootMotionCurvesToClip(
+            AnimationClip clip,
+            MmdPmxAsset pmxAsset,
+            MmdMotionDefinition motion,
+            IReadOnlyList<(HumanBodyBones HumanBone, Transform ProxyTransform, string SourceBoneName)> mappedBones,
+            int startFrame,
+            int endFrame,
+            int frameCount,
+            float sampleFrameToTimeFactor,
+            List<string> diagnostics)
+        {
+            var positionKeys = new[]
+            {
+                new Keyframe[frameCount],
+                new Keyframe[frameCount],
+                new Keyframe[frameCount],
+            };
+            var rotationKeys = new[]
+            {
+                new Keyframe[frameCount],
+                new Keyframe[frameCount],
+                new Keyframe[frameCount],
+                new Keyframe[frameCount],
+            };
+
+            bool evaluated = false;
+            string failureDiagnostic = "root-motion: mapped Hips source is unavailable; wrote identity RootT/RootQ curves.";
+            string? hipsSourceName = null;
+            for (int i = 0; i < mappedBones.Count; i++)
+            {
+                if (mappedBones[i].HumanBone == HumanBodyBones.Hips)
+                {
+                    hipsSourceName = mappedBones[i].SourceBoneName;
+                    break;
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(hipsSourceName))
+            {
+                try
+                {
+                    MmdModelDefinition model = pmxAsset.LoadModel();
+                    MmdBoneDefinition? hipsBone = FindBoneByName(model, hipsSourceName!);
+                    if (hipsBone != null)
+                    {
+                        evaluated = TryBuildRootMotionKeys(
+                            model,
+                            motion,
+                            hipsBone.index,
+                            pmxAsset.ImportScale,
+                            startFrame,
+                            endFrame,
+                            sampleFrameToTimeFactor,
+                            positionKeys,
+                            rotationKeys,
+                            out failureDiagnostic);
+                    }
+                    else
+                    {
+                        failureDiagnostic = "root-motion: mapped Hips bone '" + hipsSourceName
+                                            + "' is absent from the PMX model; wrote identity RootT/RootQ curves.";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    failureDiagnostic = "root-motion: PMX pose evaluation failed (" + ex.Message
+                                        + "); wrote identity RootT/RootQ curves.";
+                }
+            }
+
+            if (!evaluated)
+            {
+                FillIdentityRootMotionKeys(
+                    startFrame,
+                    endFrame,
+                    sampleFrameToTimeFactor,
+                    positionKeys,
+                    rotationKeys);
+                diagnostics.Add(failureDiagnostic);
+            }
+            else
+            {
+                diagnostics.Add("root-motion: wrote evaluated dense RootT/RootQ curves from mapped Hips hierarchy.");
+            }
+
+            string[] positionProperties = { "RootT.x", "RootT.y", "RootT.z" };
+            string[] rotationProperties = { "RootQ.x", "RootQ.y", "RootQ.z", "RootQ.w" };
+            for (int i = 0; i < positionProperties.Length; i++)
+            {
+                AnimationUtility.SetEditorCurve(
+                    clip,
+                    EditorCurveBinding.FloatCurve(string.Empty, typeof(Animator), positionProperties[i]),
+                    new AnimationCurve(positionKeys[i]));
+            }
+
+            for (int i = 0; i < rotationProperties.Length; i++)
+            {
+                AnimationUtility.SetEditorCurve(
+                    clip,
+                    EditorCurveBinding.FloatCurve(string.Empty, typeof(Animator), rotationProperties[i]),
+                    new AnimationCurve(rotationKeys[i]));
+            }
+        }
+
+        internal static bool TryBuildRootMotionKeys(
+            MmdModelDefinition model,
+            MmdMotionDefinition motion,
+            int hipsBoneIndex,
+            float importScale,
+            int startFrame,
+            int endFrame,
+            float sampleFrameToTimeFactor,
+            Keyframe[][] positionKeys,
+            Keyframe[][] rotationKeys,
+            out string diagnostic)
+        {
+            MmdBoneDefinition? hipsBone = FindBoneByIndex(model, hipsBoneIndex);
+            if (hipsBone == null)
+            {
+                diagnostic = "root-motion: mapped Hips index is absent from the PMX model.";
+                return false;
+            }
+
+            Dictionary<int, float[]> bindWorldMatrices = MmdPoseEvaluator.EvaluateWorldMatrices(model, null);
+            if (!bindWorldMatrices.TryGetValue(hipsBone.index, out float[]? bindHipsMatrix))
+            {
+                diagnostic = "root-motion: bind-pose Hips world matrix is unavailable.";
+                return false;
+            }
+
+            Vector3 bindHipsPosition = ExtractPosition(bindHipsMatrix);
+            Quaternion bindHipsRotation =
+                MmdCoordinateSpace.MmdToUnityRotation(ExtractRotation(bindHipsMatrix));
+
+            float scale = float.IsFinite(importScale) && importScale > 0.0f ? importScale : 1.0f;
+            Quaternion previousRotation = Quaternion.identity;
+            int sampleIndex = 0;
+            for (int frame = startFrame; frame <= endFrame; frame++)
+            {
+                float time = (frame - startFrame) * sampleFrameToTimeFactor;
+                MmdSampledMotion sampledMotion = VmdMotionSampler.Sample(motion, frame);
+                Dictionary<int, float[]> worldMatrices = MmdPoseEvaluator.EvaluateWorldMatrices(model, sampledMotion);
+                if (!worldMatrices.TryGetValue(hipsBone.index, out float[]? hipsMatrix))
+                {
+                    diagnostic = "root-motion: sampled Hips world matrix is unavailable at frame " + frame + ".";
+                    return false;
+                }
+
+                Vector3 mmdPositionDelta = ExtractPosition(hipsMatrix) - bindHipsPosition;
+                Vector3 rootPosition = MmdCoordinateSpace.MmdToUnityPosition(mmdPositionDelta) * scale;
+                Quaternion currentHipsRotation =
+                    MmdCoordinateSpace.MmdToUnityRotation(ExtractRotation(hipsMatrix));
+                Quaternion rootRotation = currentHipsRotation * Quaternion.Inverse(bindHipsRotation);
+                rootRotation.Normalize();
+
+                if (sampleIndex > 0 && Quaternion.Dot(previousRotation, rootRotation) < 0.0f)
+                {
+                    rootRotation = new Quaternion(
+                        -rootRotation.x,
+                        -rootRotation.y,
+                        -rootRotation.z,
+                        -rootRotation.w);
+                }
+                previousRotation = rootRotation;
+
+                positionKeys[0][sampleIndex] = new Keyframe(time, rootPosition.x);
+                positionKeys[1][sampleIndex] = new Keyframe(time, rootPosition.y);
+                positionKeys[2][sampleIndex] = new Keyframe(time, rootPosition.z);
+                rotationKeys[0][sampleIndex] = new Keyframe(time, rootRotation.x);
+                rotationKeys[1][sampleIndex] = new Keyframe(time, rootRotation.y);
+                rotationKeys[2][sampleIndex] = new Keyframe(time, rootRotation.z);
+                rotationKeys[3][sampleIndex] = new Keyframe(time, rootRotation.w);
+                sampleIndex++;
+            }
+
+            diagnostic = string.Empty;
+            return true;
+        }
+
+        private static void FillIdentityRootMotionKeys(
+            int startFrame,
+            int endFrame,
+            float sampleFrameToTimeFactor,
+            Keyframe[][] positionKeys,
+            Keyframe[][] rotationKeys)
+        {
+            int sampleIndex = 0;
+            for (int frame = startFrame; frame <= endFrame; frame++)
+            {
+                float time = (frame - startFrame) * sampleFrameToTimeFactor;
+                for (int i = 0; i < 3; i++)
+                {
+                    positionKeys[i][sampleIndex] = new Keyframe(time, 0.0f);
+                    rotationKeys[i][sampleIndex] = new Keyframe(time, 0.0f);
+                }
+                rotationKeys[3][sampleIndex] = new Keyframe(time, 1.0f);
+                sampleIndex++;
+            }
+        }
+
+        private static MmdBoneDefinition? FindBoneByName(MmdModelDefinition model, string boneName)
+        {
+            for (int i = 0; i < model.bones.Count; i++)
+            {
+                MmdBoneDefinition bone = model.bones[i];
+                if (bone != null && string.Equals(bone.name, boneName, StringComparison.Ordinal))
+                {
+                    return bone;
+                }
+            }
+
+            return null;
+        }
+
+        private static MmdBoneDefinition? FindBoneByIndex(MmdModelDefinition model, int boneIndex)
+        {
+            for (int i = 0; i < model.bones.Count; i++)
+            {
+                MmdBoneDefinition bone = model.bones[i];
+                if (bone != null && bone.index == boneIndex)
+                {
+                    return bone;
+                }
+            }
+
+            return null;
+        }
+
+        private static Vector3 ExtractPosition(float[] matrix)
+        {
+            return new Vector3(matrix[3], matrix[7], matrix[11]);
+        }
+
+        private static Quaternion ExtractRotation(float[] matrix)
+        {
+            Vector3 forward = new(matrix[2], matrix[6], matrix[10]);
+            Vector3 up = new(matrix[1], matrix[5], matrix[9]);
+            return forward.sqrMagnitude > 0.0f && up.sqrMagnitude > 0.0f
+                ? Quaternion.LookRotation(forward.normalized, up.normalized)
+                : Quaternion.identity;
         }
 
         private static string NormalizeIdentifier(string value)

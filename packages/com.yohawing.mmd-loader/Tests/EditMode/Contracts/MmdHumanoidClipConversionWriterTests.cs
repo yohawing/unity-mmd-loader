@@ -8,6 +8,8 @@ using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
 using Mmd.Editor;
+using Mmd.Parser;
+using Mmd.UnityIntegration;
 
 namespace Mmd.Tests
 {
@@ -288,6 +290,11 @@ namespace Mmd.Tests
                 Assert.That(result.Clip.humanMotion, Is.True);
                 Assert.That(bindings.Any(b => b.type == typeof(Animator) && string.IsNullOrEmpty(b.path)), Is.True);
                 Assert.That(bindings.Any(b => b.propertyName == "m_LocalRotation.x"), Is.False);
+                Assert.That(bindings.Count(b => b.type == typeof(Animator)
+                                                && string.IsNullOrEmpty(b.path)
+                                                && (b.propertyName.StartsWith("RootT.")
+                                                    || b.propertyName.StartsWith("RootQ."))),
+                    Is.EqualTo(7));
             }
             finally
             {
@@ -354,6 +361,93 @@ namespace Mmd.Tests
                     }
                 }
             }
+        }
+
+        [Test]
+        public void RootMotionKeysComposeHipsAncestorsConvertCoordinatesScaleAndIncludeHipsRotation()
+        {
+            var model = new MmdModelDefinition();
+            model.bones.Add(new MmdBoneDefinition
+            {
+                index = 0,
+                name = "全ての親",
+                parentIndex = -1,
+                origin = new[] { 0.0f, 0.0f, 0.0f },
+            });
+            model.bones.Add(new MmdBoneDefinition
+            {
+                index = 1,
+                name = "センター",
+                parentIndex = 0,
+                origin = new[] { 0.0f, 1.0f, 0.0f },
+            });
+            model.bones.Add(new MmdBoneDefinition
+            {
+                index = 2,
+                name = "下半身",
+                parentIndex = 1,
+                origin = new[] { 0.0f, 2.0f, 0.0f },
+            });
+
+            Quaternion parentRotation = Quaternion.AngleAxis(90.0f, Vector3.up);
+            Quaternion hipsRotation = Quaternion.AngleAxis(75.0f, Vector3.right);
+            var motion = new MmdMotionDefinition { maxFrame = 1 };
+            AddLinearBoneKeys(
+                motion,
+                "全ての親",
+                new Vector3(1.0f, 2.0f, 3.0f),
+                Quaternion.identity);
+            AddLinearBoneKeys(
+                motion,
+                "センター",
+                new Vector3(4.0f, 5.0f, 6.0f),
+                parentRotation);
+            AddLinearBoneKeys(
+                motion,
+                "下半身",
+                new Vector3(7.0f, 8.0f, 9.0f),
+                hipsRotation);
+
+            var positionKeys = new[] { new Keyframe[2], new Keyframe[2], new Keyframe[2] };
+            var rotationKeys = new[]
+            {
+                new Keyframe[2],
+                new Keyframe[2],
+                new Keyframe[2],
+                new Keyframe[2],
+            };
+
+            bool success = MmdHumanoidClipConversionWriter.TryBuildRootMotionKeys(
+                model,
+                motion,
+                hipsBoneIndex: 2,
+                importScale: 0.5f,
+                startFrame: 0,
+                endFrame: 1,
+                sampleFrameToTimeFactor: 1.0f / 30.0f,
+                positionKeys,
+                rotationKeys,
+                out string diagnostic);
+
+            Assert.That(success, Is.True, diagnostic);
+            // The center rotation turns the Hips local translation before the root translation is added.
+            // MMD end position delta: (14, 15, 2), then coordinate flip and scale => (-7, 7.5, -1).
+            Assert.That(positionKeys[0][1].value, Is.EqualTo(-7.0f).Within(0.0001f));
+            Assert.That(positionKeys[1][1].value, Is.EqualTo(7.5f).Within(0.0001f));
+            Assert.That(positionKeys[2][1].value, Is.EqualTo(-1.0f).Within(0.0001f));
+
+            var actualRootRotation = new Quaternion(
+                rotationKeys[0][1].value,
+                rotationKeys[1][1].value,
+                rotationKeys[2][1].value,
+                rotationKeys[3][1].value);
+            Quaternion expectedRootRotation =
+                MmdCoordinateSpace.MmdToUnityRotation(parentRotation * hipsRotation);
+            Assert.That(Mathf.Abs(Quaternion.Dot(actualRootRotation, expectedRootRotation)),
+                Is.EqualTo(1.0f).Within(0.0001f),
+                "RootQ must contain the composed ancestor and Hips rotation because muscle curves do not store bodyRotation.");
+            Assert.That(positionKeys[0][0].time, Is.Zero.Within(0.0001f));
+            Assert.That(positionKeys[0][1].time, Is.EqualTo(1.0f / 30.0f).Within(0.0001f));
         }
 
         [Test]
@@ -580,6 +674,31 @@ namespace Mmd.Tests
             Assert.That(clip.humanMotion, Is.True);
             Assert.That(bindings.Any(b => b.type == typeof(Animator) && string.IsNullOrEmpty(b.path)), Is.True);
             Assert.That(bindings.Any(b => b.propertyName == "m_LocalRotation.x"), Is.False);
+        }
+
+        private static void AddLinearBoneKeys(
+            MmdMotionDefinition motion,
+            string boneName,
+            Vector3 endTranslation,
+            Quaternion endRotation)
+        {
+            MmdBoneInterpolationDefinition interpolation = MmdTestFixtures.LinearBoneInterpolation();
+            motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
+            {
+                boneName = boneName,
+                frame = 0,
+                translation = new[] { 0.0f, 0.0f, 0.0f },
+                rotation = new[] { 0.0f, 0.0f, 0.0f, 1.0f },
+                interpolation = interpolation,
+            });
+            motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
+            {
+                boneName = boneName,
+                frame = 1,
+                translation = new[] { endTranslation.x, endTranslation.y, endTranslation.z },
+                rotation = new[] { endRotation.x, endRotation.y, endRotation.z, endRotation.w },
+                interpolation = interpolation,
+            });
         }
 
         private static void CreateFolderIfMissing(string folderPath)
