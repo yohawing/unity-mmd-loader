@@ -64,7 +64,8 @@ namespace Mmd.UnityIntegration
             string animationTypeLabel,
             System.Collections.Generic.IReadOnlyList<MmdHumanoidBoneMappingOverride>? mappingOverrides = null,
             MmdModelDefinition? model = null,
-            MmdHumanoidRetargetQualitySettings? retargetQualitySettings = null)
+            MmdHumanoidRetargetQualitySettings? retargetQualitySettings = null,
+            GameObject? avatarRoot = null)
         {
             if (!shouldBuildHumanoid)
             {
@@ -92,9 +93,15 @@ namespace Mmd.UnityIntegration
             bool keepAvatar = false;
             try
             {
+                if (avatarRoot != null)
+                {
+                    proxyRig.ProxyRoot.transform.SetParent(avatarRoot.transform, worldPositionStays: false);
+                }
+
                 MmdHumanoidAvatarBuildResult avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(
                     proxyRig,
-                    retargetQualitySettings);
+                    retargetQualitySettings,
+                    avatarRoot);
                 createdAvatar = avatarResult.Avatar;
                 diagnostic = CombineDiagnostics(diagnostic, avatarResult.Diagnostics);
 

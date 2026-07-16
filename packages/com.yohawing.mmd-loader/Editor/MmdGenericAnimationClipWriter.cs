@@ -612,20 +612,22 @@ namespace Mmd.Editor
             }
         }
 
-        private static bool CanUseNativeBatch(
+        internal static bool CanUseNativeBatch(
             MmdUnityPlaybackBinding binding,
             MmdUnityModelInstance instance,
             out int[] parentBoneIndices,
             out Vector3[] staticParentPositions,
-            out Quaternion[] staticParentRotations)
+            out Quaternion[] staticParentRotations,
+            bool requireMorphCompatibility = true)
         {
             parentBoneIndices = Array.Empty<int>();
             staticParentPositions = Array.Empty<Vector3>();
             staticParentRotations = Array.Empty<Quaternion>();
             if (!binding.HasFastRuntimeBatch ||
                 binding.FastRuntimeWorldMatrixFloatCount != instance.BoneTransforms.Length * 16 ||
-                binding.FastRuntimeMorphWeightCount <= 0 && instance.VertexMorphBlendShapes.Count > 0 ||
-                instance.RenderingDescriptor.flipMorphs.Count > 0)
+                requireMorphCompatibility &&
+                (binding.FastRuntimeMorphWeightCount <= 0 && instance.VertexMorphBlendShapes.Count > 0 ||
+                 instance.RenderingDescriptor.flipMorphs.Count > 0))
             {
                 return false;
             }
@@ -764,7 +766,7 @@ namespace Mmd.Editor
             }
         }
 
-        private static void ReadWorldPose(
+        internal static void ReadWorldPose(
             ReadOnlySpan<float> frameWorld,
             int bone,
             out Vector3 position,

@@ -804,7 +804,8 @@ namespace Mmd
         /// </exception>
         public static MmdHumanoidAvatarBuildResult BuildAvatar(
             MmdHumanoidProxyRigResult proxyRig,
-            MmdHumanoidRetargetQualitySettings? retargetQualitySettings = null)
+            MmdHumanoidRetargetQualitySettings? retargetQualitySettings = null,
+            GameObject? avatarRoot = null)
         {
             if (proxyRig == null)
                 throw new ArgumentNullException(nameof(proxyRig));
@@ -813,7 +814,13 @@ namespace Mmd
                 throw new InvalidOperationException(
                     "Cannot build Avatar: proxy rig root is null (check readiness).");
 
-            GameObject root = proxyRig.ProxyRoot;
+            GameObject proxyRoot = proxyRig.ProxyRoot;
+            GameObject root = avatarRoot ?? proxyRoot;
+            if (root != proxyRoot && !proxyRoot.transform.IsChildOf(root.transform))
+            {
+                throw new InvalidOperationException(
+                    "Cannot build Avatar: proxy rig root must be a descendant of the Avatar root.");
+            }
             var diagnostics = new List<string>();
 
             if (!string.Equals(proxyRig.Readiness, MmdHumanoidMappingReadiness.Ready, StringComparison.Ordinal))
@@ -876,7 +883,21 @@ namespace Mmd
                 });
             }
 
-            AddSkeletonBonesPreOrder(root.transform, humanBoneByTransform, skeletonList);
+            if (root == proxyRoot)
+            {
+                AddSkeletonBonesPreOrder(root.transform, humanBoneByTransform, skeletonList);
+            }
+            else
+            {
+                skeletonList.Add(new SkeletonBone
+                {
+                    name = proxyRoot.name,
+                    position = proxyRoot.transform.localPosition,
+                    rotation = proxyRoot.transform.localRotation,
+                    scale = proxyRoot.transform.localScale
+                });
+                AddSkeletonBonesPreOrder(proxyRoot.transform, humanBoneByTransform, skeletonList);
+            }
 
             humanDescription.human = humanBoneList.ToArray();
             humanDescription.skeleton = skeletonList.ToArray();

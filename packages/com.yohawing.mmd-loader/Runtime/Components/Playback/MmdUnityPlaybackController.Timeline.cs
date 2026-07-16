@@ -43,7 +43,14 @@ namespace Mmd.UnityIntegration
                 return LastHumanoidRetargetResult;
             }
 
-            LastHumanoidRetargetResult = MmdHumanoidRetargeter.RetargetPose(humanoidRetargetEntries);
+            // RootT is already consumed by the custom Timeline root-motion driver. Copying the
+            // proxy Hips position into the native center during the same evaluation would apply
+            // that translation twice. Keep the legacy position-copy path when no driver is active.
+            bool copyLocalPositions =
+                !(GetComponent<MmdHumanoidRootMotionDriver>()?.IsTimelineEvaluationActive ?? false);
+            LastHumanoidRetargetResult = MmdHumanoidRetargeter.RetargetPose(
+                humanoidRetargetEntries,
+                copyLocalPositions);
             MmdHumanoidAppendTransformApplier.Apply(humanoidAppendEntries);
             StepHumanoidRetargetLivePhysicsIfNeeded(LastHumanoidRetargetResult);
             return LastHumanoidRetargetResult;

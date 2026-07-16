@@ -180,7 +180,8 @@ namespace Mmd.Editor
                     animationTypeLabel: animationType.ToString(),
                     mappingOverrides: humanoidBoneMappingOverrides,
                     model: model,
-                    retargetQualitySettings: HumanoidRetargetQualitySettings);
+                    retargetQualitySettings: HumanoidRetargetQualitySettings,
+                    avatarRoot: generatedAssets.Root);
             Avatar? importedAvatar = avatarImport.Avatar;
             GameObject? importedHumanoidProxyRoot = avatarImport.ProxyRoot;
             transaction.Track(importedAvatar);
@@ -344,6 +345,11 @@ namespace Mmd.Editor
                 ? humanoidAvatar
                 : genericAvatar;
             animator.applyRootMotion = true;
+            if (importedAnimationType == MmdPmxAnimationType.Humanoid &&
+                root.GetComponent<MmdHumanoidRootMotionDriver>() == null)
+            {
+                root.AddComponent<MmdHumanoidRootMotionDriver>();
+            }
             return animator;
         }
 

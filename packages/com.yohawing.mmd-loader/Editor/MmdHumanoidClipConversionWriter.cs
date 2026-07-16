@@ -7,6 +7,7 @@ using UnityEditor;
 using UnityEngine;
 using Mmd.Parser;
 using Mmd.Motion;
+using Mmd.Physics;
 using Mmd.Pose;
 using Mmd.UnityIntegration;
 
@@ -196,9 +197,10 @@ namespace Mmd.Editor
                 return new MmdHumanoidClipConversionWriterResult(null, plan, diagnostics);
             }
 
-            var mappedBones = new List<(HumanBodyBones HumanBone, Transform ProxyTransform, string SourceBoneName)>();
+            var mappedBones = new List<(HumanBodyBones HumanBone, Transform ProxyTransform, string SourceBoneName, MmdHumanoidRetargetBinding Binding)>();
             GameObject? proxyRoot = null;
             Avatar? proxyAvatar = null;
+            MmdUnityPlaybackBinding? evaluatedBinding = null;
             try
             {
                 var usedHumanBones = new HashSet<HumanBodyBones>();
@@ -218,9 +220,14 @@ namespace Mmd.Editor
                     return new MmdHumanoidClipConversionWriterResult(null, plan, diagnostics);
                 }
 
+                Transform importedAvatarRoot = controller.transform;
                 Transform importedProxyRoot = controller.HumanoidProxyRoot;
-                proxyRoot = UnityEngine.Object.Instantiate(importedProxyRoot.gameObject);
-                proxyRoot.name = importedProxyRoot.gameObject.name + "_ClipBake";
+                proxyRoot = new GameObject(importedAvatarRoot.gameObject.name + "_ClipBake");
+                GameObject clonedProxyRoot = UnityEngine.Object.Instantiate(
+                    importedProxyRoot.gameObject,
+                    proxyRoot.transform,
+                    worldPositionStays: false);
+                clonedProxyRoot.name = importedProxyRoot.gameObject.name;
                 foreach (MmdHumanoidRetargetBinding binding in controller.HumanoidRetargetEntries)
                 {
                     if (binding == null || !usedHumanBones.Add(binding.HumanBone))
@@ -230,7 +237,7 @@ namespace Mmd.Editor
 
                     string proxyPath = AnimationUtility.CalculateTransformPath(
                         binding.ProxyTransform,
-                        importedProxyRoot);
+                        importedAvatarRoot);
                     Transform? clonedProxyTransform = string.IsNullOrEmpty(proxyPath)
                         ? proxyRoot.transform
                         : proxyRoot.transform.Find(proxyPath);
@@ -243,7 +250,7 @@ namespace Mmd.Editor
                     }
 
                     string sourceBoneName = nativeBones[binding.MmdBoneIndex].name;
-                    mappedBones.Add((binding.HumanBone, clonedProxyTransform, sourceBoneName));
+                    mappedBones.Add((binding.HumanBone, clonedProxyTransform, sourceBoneName, binding));
                 }
 
                 proxyAvatar = pmxAsset.ImportedAvatar;
@@ -273,11 +280,35 @@ namespace Mmd.Editor
                     return new MmdHumanoidClipConversionWriterResult(null, plan, diagnostics);
                 }
 
+                try
+                {
+                    evaluatedBinding = MmdUnityPlaybackBinding.CreateSkinned(pmxAsset, vmdAsset);
+                    evaluatedBinding.SetPhysicsMode(MmdPhysicsMode.Off);
+                    if (evaluatedBinding.TryEnableFastRuntime(
+                            pmxAsset.GetBytesCopy(),
+                            vmdAsset.GetBytesCopy(),
+                            out string fastRuntimeReason))
+                    {
+                        diagnostics.Add("writer: enabled native batch evaluation for Humanoid IK sampling.");
+                    }
+                    else
+                    {
+                        diagnostics.Add("writer: native batch evaluation unavailable; using managed IK sampling: "
+                                        + fastRuntimeReason);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    diagnostics.Add("writer: evaluated MMD pose unavailable; using direct VMD bone fallback: " + ex.Message);
+                    evaluatedBinding = null;
+                }
+
                 AddMuscleCurvesToClip(
                     clip,
                     proxyRoot,
                     proxyAvatar,
                     mappedBones,
+                    evaluatedBinding,
                     boneKeyframesByName,
                     startFrame,
                     effectiveEndFrame,
@@ -312,6 +343,10 @@ namespace Mmd.Editor
             }
             finally
             {
+                if (evaluatedBinding != null)
+                {
+                    evaluatedBinding.Dispose();
+                }
                 if (proxyRoot != null)
                 {
                     UnityEngine.Object.DestroyImmediate(proxyRoot);
@@ -340,7 +375,6 @@ namespace Mmd.Editor
                     list = new List<MmdBoneKeyframeDefinition>();
                     grouped.Add(keyframe.boneName, list);
                 }
-
                 list.Add(keyframe);
             }
 
@@ -348,7 +382,6 @@ namespace Mmd.Editor
             {
                 list.Sort((left, right) => left.frame.CompareTo(right.frame));
             }
-
             return grouped;
         }
 
@@ -356,19 +389,17 @@ namespace Mmd.Editor
             Dictionary<string, List<MmdBoneKeyframeDefinition>> grouped,
             string sourceBoneName)
         {
-            if (!grouped.TryGetValue(sourceBoneName, out List<MmdBoneKeyframeDefinition>? keyframes))
-            {
-                return Array.Empty<MmdBoneKeyframeDefinition>();
-            }
-
-            return keyframes;
+            return grouped.TryGetValue(sourceBoneName, out List<MmdBoneKeyframeDefinition>? keyframes)
+                ? keyframes
+                : Array.Empty<MmdBoneKeyframeDefinition>();
         }
 
         private static void AddMuscleCurvesToClip(
             AnimationClip clip,
             GameObject proxyRoot,
             Avatar proxyAvatar,
-            IReadOnlyList<(HumanBodyBones HumanBone, Transform ProxyTransform, string SourceBoneName)> mappedBones,
+            IReadOnlyList<(HumanBodyBones HumanBone, Transform ProxyTransform, string SourceBoneName, MmdHumanoidRetargetBinding Binding)> mappedBones,
+            MmdUnityPlaybackBinding? evaluatedBinding,
             Dictionary<string, List<MmdBoneKeyframeDefinition>> boneKeyframesByName,
             int startFrame,
             int endFrame,
@@ -386,7 +417,6 @@ namespace Mmd.Editor
             }
             bodyPositions = new Vector3[frameCount];
             bodyRotations = new Quaternion[frameCount];
-
             var baseRotations = new Quaternion[mappedBones.Count];
             for (int boneIndex = 0; boneIndex < mappedBones.Count; boneIndex++)
             {
@@ -396,38 +426,68 @@ namespace Mmd.Editor
             using (var poseHandler = new HumanPoseHandler(proxyAvatar, proxyRoot.transform))
             {
                 var pose = new HumanPose { muscles = new float[muscleCount] };
-                int sampleIndex = 0;
-                for (int frame = startFrame; frame <= endFrame; frame++)
+                bool usedNativeBatch = evaluatedBinding != null &&
+                    TryFillMuscleKeysFromNativeBatch(
+                        evaluatedBinding,
+                        mappedBones,
+                        poseHandler,
+                        ref pose,
+                        startFrame,
+                        frameCount,
+                        sampleFrameToTimeFactor,
+                        muscleKeys,
+                        bodyPositions,
+                        bodyRotations);
+                if (usedNativeBatch)
                 {
-                    float time = (frame - startFrame) * sampleFrameToTimeFactor;
-                    for (int boneIndex = 0; boneIndex < mappedBones.Count; boneIndex++)
+                    diagnostics.Add("writer: sampled evaluated MMD IK pose through native batch output.");
+                }
+                else
+                {
+                    int sampleIndex = 0;
+                    for (int frame = startFrame; frame <= endFrame; frame++)
                     {
-                        (_, Transform proxyTransform, string sourceBoneName) = mappedBones[boneIndex];
-                        IReadOnlyList<MmdBoneKeyframeDefinition> keyframes = SelectBoneKeyframes(
-                            boneKeyframesByName,
-                            sourceBoneName);
-                        float[] rotated = VmdBoneSampler.SampleSortedPose(
-                            keyframes,
-                            sourceBoneName,
-                            frame).Rotation;
-                        var rotationDelta = new Quaternion(
-                            -rotated[0],
-                            rotated[1],
-                            -rotated[2],
-                            rotated[3]);
-                        proxyTransform.localRotation = baseRotations[boneIndex] * rotationDelta;
-                    }
+                        float time = (frame - startFrame) * sampleFrameToTimeFactor;
+                        evaluatedBinding?.ApplyFrame(frame, 1.0f / sampleFrameToTimeFactor);
+                        for (int boneIndex = 0; boneIndex < mappedBones.Count; boneIndex++)
+                        {
+                            (_, Transform proxyTransform, string sourceBoneName, MmdHumanoidRetargetBinding binding) = mappedBones[boneIndex];
+                            if (evaluatedBinding != null)
+                            {
+                                Transform evaluatedNative = evaluatedBinding.Instance.BoneTransforms[binding.MmdBoneIndex];
+                                ApplyEvaluatedLocalPoseToProxy(
+                                    proxyTransform,
+                                    binding,
+                                    evaluatedNative.localRotation);
+                            }
+                            else
+                            {
+                                IReadOnlyList<MmdBoneKeyframeDefinition> keyframes = SelectBoneKeyframes(
+                                    boneKeyframesByName,
+                                    sourceBoneName);
+                                float[] rotated = VmdBoneSampler.SampleSortedPose(
+                                    keyframes,
+                                    sourceBoneName,
+                                    frame).Rotation;
+                                var rotationDelta = new Quaternion(
+                                    -rotated[0],
+                                    rotated[1],
+                                    -rotated[2],
+                                    rotated[3]);
+                                proxyTransform.localRotation = baseRotations[boneIndex] * rotationDelta;
+                            }
+                        }
 
-                    poseHandler.GetHumanPose(ref pose);
-                    bodyPositions[sampleIndex] = pose.bodyPosition;
-                    bodyRotations[sampleIndex] = pose.bodyRotation;
-                    for (int muscleIndex = 0; muscleIndex < muscleCount; muscleIndex++)
-                    {
-                        muscleKeys[muscleIndex][sampleIndex] =
-                            new Keyframe(time, pose.muscles[muscleIndex]);
+                        poseHandler.GetHumanPose(ref pose);
+                        bodyPositions[sampleIndex] = pose.bodyPosition;
+                        bodyRotations[sampleIndex] = pose.bodyRotation;
+                        for (int muscleIndex = 0; muscleIndex < muscleCount; muscleIndex++)
+                        {
+                            muscleKeys[muscleIndex][sampleIndex] =
+                                new Keyframe(time, pose.muscles[muscleIndex]);
+                        }
+                        sampleIndex++;
                     }
-
-                    sampleIndex++;
                 }
             }
 
@@ -439,6 +499,138 @@ namespace Mmd.Editor
             }
 
             diagnostics.Add("writer: wrote " + muscleCount + " Humanoid muscle curves.");
+        }
+
+        private static bool TryFillMuscleKeysFromNativeBatch(
+            MmdUnityPlaybackBinding binding,
+            IReadOnlyList<(HumanBodyBones HumanBone, Transform ProxyTransform, string SourceBoneName, MmdHumanoidRetargetBinding Binding)> mappedBones,
+            HumanPoseHandler poseHandler,
+            ref HumanPose pose,
+            int startFrame,
+            int frameCount,
+            float sampleFrameToTimeFactor,
+            Keyframe[][] muscleKeys,
+            Vector3[] bodyPositions,
+            Quaternion[] bodyRotations)
+        {
+            MmdUnityModelInstance instance = binding.Instance;
+            if (!MmdGenericAnimationClipWriter.CanUseNativeBatch(
+                    binding,
+                    instance,
+                    out int[] parentBoneIndices,
+                    out Vector3[] staticParentPositions,
+                    out Quaternion[] staticParentRotations,
+                    requireMorphCompatibility: false))
+            {
+                return false;
+            }
+
+            const int ChunkFrameCount = 256;
+            int worldFloatsPerFrame = binding.FastRuntimeWorldMatrixFloatCount;
+            int morphFloatsPerFrame = binding.FastRuntimeMorphWeightCount;
+            int bufferFrameCount = Math.Min(frameCount, ChunkFrameCount);
+            var worldMatrices = new float[checked(worldFloatsPerFrame * bufferFrameCount)];
+            var morphWeights = new float[checked(morphFloatsPerFrame * bufferFrameCount)];
+            float importScale = float.IsFinite(instance.ImportScale) && instance.ImportScale > 0.0f
+                ? instance.ImportScale
+                : 1.0f;
+
+            for (int chunkStart = 0; chunkStart < frameCount; chunkStart += ChunkFrameCount)
+            {
+                int chunkCount = Math.Min(ChunkFrameCount, frameCount - chunkStart);
+                binding.EvaluateFastRuntimeBatch(
+                    startFrame + chunkStart,
+                    1.0f,
+                    chunkCount,
+                    workerCount: 0,
+                    worldMatrices,
+                    morphWeights);
+
+                for (int chunkSample = 0; chunkSample < chunkCount; chunkSample++)
+                {
+                    int sampleIndex = chunkStart + chunkSample;
+                    float time = sampleIndex * sampleFrameToTimeFactor;
+                    ReadOnlySpan<float> frameWorld = worldMatrices.AsSpan(
+                        chunkSample * worldFloatsPerFrame,
+                        worldFloatsPerFrame);
+                    for (int boneIndex = 0; boneIndex < mappedBones.Count; boneIndex++)
+                    {
+                        (_, Transform proxyTransform, _, MmdHumanoidRetargetBinding retargetBinding) = mappedBones[boneIndex];
+                        ReadNativeLocalPose(
+                            frameWorld,
+                            retargetBinding.MmdBoneIndex,
+                            parentBoneIndices,
+                            staticParentPositions,
+                            staticParentRotations,
+                            importScale,
+                            out _,
+                            out Quaternion localRotation);
+
+                        ApplyEvaluatedLocalPoseToProxy(
+                            proxyTransform,
+                            retargetBinding,
+                            localRotation);
+                    }
+
+                    poseHandler.GetHumanPose(ref pose);
+                    bodyPositions[sampleIndex] = pose.bodyPosition;
+                    bodyRotations[sampleIndex] = pose.bodyRotation;
+                    for (int muscleIndex = 0; muscleIndex < muscleKeys.Length; muscleIndex++)
+                    {
+                        muscleKeys[muscleIndex][sampleIndex] = new Keyframe(
+                            time,
+                            pose.muscles[muscleIndex]);
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        private static void ReadNativeLocalPose(
+            ReadOnlySpan<float> frameWorld,
+            int boneIndex,
+            int[] parentBoneIndices,
+            Vector3[] staticParentPositions,
+            Quaternion[] staticParentRotations,
+            float importScale,
+            out Vector3 localPosition,
+            out Quaternion localRotation)
+        {
+            MmdGenericAnimationClipWriter.ReadWorldPose(
+                frameWorld,
+                boneIndex,
+                out Vector3 worldPosition,
+                out Quaternion worldRotation);
+            int parentBone = parentBoneIndices[boneIndex];
+            if (parentBone >= 0)
+            {
+                MmdGenericAnimationClipWriter.ReadWorldPose(
+                    frameWorld,
+                    parentBone,
+                    out Vector3 parentPosition,
+                    out Quaternion parentRotation);
+                Quaternion inverseParent = Quaternion.Inverse(parentRotation);
+                localPosition = inverseParent * (worldPosition - parentPosition) * importScale;
+                localRotation = inverseParent * worldRotation;
+                return;
+            }
+
+            Quaternion inverseStaticParent = Quaternion.Inverse(staticParentRotations[boneIndex]);
+            localPosition = inverseStaticParent * (
+                worldPosition * importScale - staticParentPositions[boneIndex]);
+            localRotation = inverseStaticParent * worldRotation;
+        }
+
+        private static void ApplyEvaluatedLocalPoseToProxy(
+            Transform proxyTransform,
+            MmdHumanoidRetargetBinding binding,
+            Quaternion evaluatedLocalRotation)
+        {
+            proxyTransform.localRotation =
+                binding.ProxyBindLocalRotation *
+                Quaternion.Inverse(binding.NativeBindLocalRotation) *
+                evaluatedLocalRotation;
         }
 
         private static float ResolveHumanScale(Avatar proxyAvatar)
@@ -461,7 +653,7 @@ namespace Mmd.Editor
             AnimationClip clip,
             MmdPmxAsset pmxAsset,
             MmdMotionDefinition motion,
-            IReadOnlyList<(HumanBodyBones HumanBone, Transform ProxyTransform, string SourceBoneName)> mappedBones,
+            IReadOnlyList<(HumanBodyBones HumanBone, Transform ProxyTransform, string SourceBoneName, MmdHumanoidRetargetBinding Binding)> mappedBones,
             float humanScale,
             Vector3[] bodyPositions,
             Quaternion[] bodyRotations,
@@ -567,6 +759,22 @@ namespace Mmd.Editor
                     EditorCurveBinding.FloatCurve(string.Empty, typeof(Animator), rotationProperties[i]),
                     new AnimationCurve(rotationKeys[i]));
             }
+
+            var verticalOffsetKeys = new Keyframe[frameCount];
+            float bindBodyPositionY = bodyPositions[0].y;
+            for (int i = 0; i < frameCount; i++)
+            {
+                verticalOffsetKeys[i] = new Keyframe(
+                    positionKeys[1][i].time,
+                    positionKeys[1][i].value - bindBodyPositionY);
+            }
+            AnimationUtility.SetEditorCurve(
+                clip,
+                EditorCurveBinding.FloatCurve(
+                    string.Empty,
+                    typeof(MmdHumanoidRootMotionDriver),
+                    "clipRootVerticalOffset"),
+                new AnimationCurve(verticalOffsetKeys));
         }
 
         internal static bool TryBuildRootMotionKeys(

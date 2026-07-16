@@ -40,9 +40,13 @@ namespace Mmd.Timeline
             }
 
             AnimationClipPlayable clipPlayable = AnimationClipPlayable.Create(graph, clip);
+            // The evaluated MMD IK result is already baked into the Humanoid muscles.
+            // AnimationClipPlayable defaults this to true and would solve the legs again
+            // against fallback goals, collapsing or substantially changing the source pose.
+            clipPlayable.SetApplyFootIK(false);
             ScriptPlayable<MmdHumanoidAnimationRootMotionGuardBehaviour> guardPlayable =
                 ScriptPlayable<MmdHumanoidAnimationRootMotionGuardBehaviour>.Create(graph, 1);
-            guardPlayable.GetBehaviour().Initialize(animator, animator.applyRootMotion, director);
+            guardPlayable.GetBehaviour().Initialize(animator, director);
             graph.Connect(clipPlayable, 0, guardPlayable, 0);
             guardPlayable.SetInputWeight(0, 1.0f);
             guardPlayable.SetPropagateSetTime(true);
@@ -197,25 +201,43 @@ namespace Mmd.Timeline
 
         public void Initialize(
             Animator animator,
-            bool applyRootMotionDuringEvaluation,
             PlayableDirector? director)
         {
             guardedAnimator = animator;
             guardedDirector = director;
+            Activate();
+        }
+
+        public override void OnBehaviourPlay(Playable playable, FrameData info)
+        {
+            Activate();
+        }
+
+        private void Activate()
+        {
+            if (initialized || guardedAnimator == null)
+            {
+                return;
+            }
+
             initialized = true;
             if (guardedDirector != null)
             {
                 guardedDirector.stopped += OnDirectorStopped;
             }
 
-            if (!GuardStates.TryGetValue(animator, out GuardState state))
+            if (!GuardStates.TryGetValue(guardedAnimator, out GuardState state))
             {
-                state = new GuardState(animator);
-                GuardStates.Add(animator, state);
+                state = new GuardState(guardedAnimator);
+                GuardStates.Add(guardedAnimator, state);
             }
 
             state.ReferenceCount++;
-            animator.applyRootMotion = applyRootMotionDuringEvaluation;
+            guardedAnimator.applyRootMotion = false;
+            if (state.ReferenceCount == 1)
+            {
+                guardedAnimator.GetComponent<MmdHumanoidRootMotionDriver>()?.BeginTimelineEvaluation(guardedDirector);
+            }
         }
 
         public override void OnGraphStop(Playable playable)
@@ -226,6 +248,8 @@ namespace Mmd.Timeline
         public override void OnPlayableDestroy(Playable playable)
         {
             Restore();
+            guardedAnimator = null;
+            guardedDirector = null;
         }
 
         private void OnDirectorStopped(PlayableDirector stoppedDirector)
@@ -241,7 +265,6 @@ namespace Mmd.Timeline
             if (guardedDirector != null)
             {
                 guardedDirector.stopped -= OnDirectorStopped;
-                guardedDirector = null;
             }
 
             if (!initialized)
@@ -264,10 +287,9 @@ namespace Mmd.Timeline
             GuardStates.Remove(guardedAnimator);
             if (state.Animator != null)
             {
+                state.Animator.GetComponent<MmdHumanoidRootMotionDriver>()?.EndTimelineEvaluation();
                 state.Animator.applyRootMotion = state.OriginalApplyRootMotion;
             }
-
-            guardedAnimator = null;
         }
     }
 }

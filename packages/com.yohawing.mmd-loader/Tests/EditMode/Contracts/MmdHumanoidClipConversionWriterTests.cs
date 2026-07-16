@@ -114,7 +114,7 @@ namespace Mmd.Tests
                 var baselinePose = new HumanPose { muscles = new float[HumanTrait.MuscleCount] };
                 using (var poseHandler = new HumanPoseHandler(
                            pmxAsset.ImportedAvatar!,
-                           controller.HumanoidProxyRoot))
+                           pmxAsset.ImportedRoot!.transform))
                 {
                     poseHandler.GetHumanPose(ref baselinePose);
                 }
@@ -204,16 +204,16 @@ namespace Mmd.Tests
                 Mmd.UnityIntegration.MmdUnityPlaybackController controller = pmxAsset.ImportedRoot!
                     .GetComponent<Mmd.UnityIntegration.MmdUnityPlaybackController>();
                 Assert.That(controller.HumanoidProxyRoot, Is.Not.Null);
-                Transform sourceProxyRoot = controller.HumanoidProxyRoot!;
+                Transform sourceAvatarRoot = pmxAsset.ImportedRoot.transform;
                 MmdHumanoidRetargetBinding sourceHipsBinding = controller.HumanoidRetargetEntries
                     .Single(binding => binding.HumanBone == HumanBodyBones.Hips);
                 Assert.That(sourceHipsBinding.ProxyTransform, Is.Not.Null);
 
                 string hipsPath = AnimationUtility.CalculateTransformPath(
                     sourceHipsBinding.ProxyTransform,
-                    sourceProxyRoot);
-                referenceRoot = CreateFreshHumanoidPlaybackRoot(sourceProxyRoot, "InMemoryHumanoidPlaybackRoot");
-                playbackRoot = CreateFreshHumanoidPlaybackRoot(sourceProxyRoot, "ReimportedHumanoidPlaybackRoot");
+                    sourceAvatarRoot);
+                referenceRoot = CreateFreshHumanoidPlaybackRoot(sourceAvatarRoot, "InMemoryHumanoidPlaybackRoot");
+                playbackRoot = CreateFreshHumanoidPlaybackRoot(sourceAvatarRoot, "ReimportedHumanoidPlaybackRoot");
                 Transform? referenceHips = referenceRoot.transform.Find(hipsPath);
                 Transform? playbackHips = playbackRoot.transform.Find(hipsPath);
                 Assert.That(referenceHips, Is.Not.Null, "reference clone must preserve the Avatar Hips path");
@@ -259,11 +259,8 @@ namespace Mmd.Tests
                     out AnimationClipPlayable playbackPlayable);
 
                 Vector3 expectedBodyPosition = ReadRootPosition(reimported, 0.0f);
-                Quaternion expectedBodyRotation = ReadRootRotation(reimported, 0.0f);
                 Assert.That(expectedBodyPosition.y, Is.GreaterThan(0.0f),
                     "persisted RootT must retain the baked Humanoid body height");
-                Assert.That(Quaternion.Angle(Quaternion.identity, expectedBodyRotation), Is.GreaterThan(1.0f),
-                    "persisted RootQ must retain the baked Humanoid body rotation");
 
                 foreach (double time in new[] { 0.0, 2.0 / 30.0 })
                 {
@@ -375,6 +372,15 @@ namespace Mmd.Tests
                 Assert.That(rootCurve.keys, Has.Length.EqualTo(2));
                 Assert.That(rootCurve.keys[0].time, Is.Zero.Within(0.0001f));
                 Assert.That(rootCurve.keys[1].time, Is.EqualTo(1.0f / 30.0f).Within(0.0001f));
+                AnimationCurve verticalOffsetCurve = AnimationUtility.GetEditorCurve(
+                    result.Clip!,
+                    EditorCurveBinding.FloatCurve(
+                        string.Empty,
+                        typeof(MmdHumanoidRootMotionDriver),
+                        "clipRootVerticalOffset"));
+                Assert.That(verticalOffsetCurve.keys, Has.Length.EqualTo(2));
+                Assert.That(verticalOffsetCurve.keys[0].time, Is.Zero.Within(0.0001f));
+                Assert.That(verticalOffsetCurve.keys[1].time, Is.EqualTo(1.0f / 30.0f).Within(0.0001f));
             }
             finally
             {
@@ -594,12 +600,15 @@ namespace Mmd.Tests
             Assert.That(proxyRig.ProxyRoot, Is.Not.Null, string.Join("\n", proxyRig.Diagnostics));
             Assert.That(proxyRig.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.Ready));
 
-            MmdHumanoidAvatarBuildResult avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(proxyRig);
+            GameObject importedRoot = pmxAsset.ImportedRoot!;
+            proxyRig.ProxyRoot!.transform.SetParent(importedRoot.transform, worldPositionStays: false);
+            MmdHumanoidAvatarBuildResult avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(
+                proxyRig,
+                avatarRoot: importedRoot);
             Assert.That(avatarResult.Avatar, Is.Not.Null, string.Join("\n", avatarResult.Diagnostics));
             Assert.That(avatarResult.Avatar!.isValid, Is.True);
             Assert.That(avatarResult.Avatar.isHuman, Is.True);
 
-            GameObject importedRoot = pmxAsset.ImportedRoot!;
             Transform[] nativeBones = importedRoot
                 .GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true)!
                 .bones;
@@ -614,7 +623,6 @@ namespace Mmd.Tests
                     nativeBones[match.MmdBoneIndex]));
             }
 
-            proxyRig.ProxyRoot!.transform.SetParent(importedRoot.transform, worldPositionStays: false);
             Mmd.UnityIntegration.MmdUnityPlaybackController controller =
                 importedRoot.AddComponent<Mmd.UnityIntegration.MmdUnityPlaybackController>();
             controller.ConfigureHumanoidRetarget(
@@ -656,6 +664,12 @@ namespace Mmd.Tests
                     Is.True,
                     property);
             }
+            Assert.That(
+                bindings.Any(binding => binding.type == typeof(MmdHumanoidRootMotionDriver)
+                                        && string.IsNullOrEmpty(binding.path)
+                                        && binding.propertyName == "clipRootVerticalOffset"),
+                Is.True,
+                "clipRootVerticalOffset");
         }
 
         private static GameObject CreateFreshHumanoidPlaybackRoot(Transform sourceRoot, string name)
