@@ -440,8 +440,11 @@ namespace Mmd.Editor
 
                 using (reducedPose)
                 {
-                    const bool FlipZ = true;
-                    int descriptorCount = reducedPose.GetUnityCurveCount(frameRate, FlipZ);
+                    // Request native MMD-space curves. This package maps MMD to Unity with a
+                    // 180-degree Y rotation (X/Z sign change), which is not the native FBX
+                    // exporter's Z-reflection option. Apply the package convention below once.
+                    const bool NativeFlipZ = false;
+                    int descriptorCount = reducedPose.GetUnityCurveCount(frameRate, NativeFlipZ);
                     var bindings = new List<EditorCurveBinding>(descriptorCount);
                     var curves = new List<AnimationCurve>(descriptorCount);
                     var morphBindings = new Dictionary<int, MmdUnityVertexMorphBlendShapeBinding>();
@@ -462,7 +465,7 @@ namespace Mmd.Editor
                     for (int curveIndex = 0; curveIndex < descriptorCount; curveIndex++)
                     {
                         MmdRuntimeFfiMethods.UnityCurveDescriptor descriptor =
-                            reducedPose.GetUnityCurveDescriptor(frameRate, FlipZ, curveIndex);
+                            reducedPose.GetUnityCurveDescriptor(frameRate, NativeFlipZ, curveIndex);
                         int targetIndex = checked((int)descriptor.targetIndex);
                         EditorCurveBinding curveBinding;
                         if (descriptor.semantic == MmdRuntimeFfiMethods.UnityCurveBoneLocalTranslation ||
@@ -499,7 +502,7 @@ namespace Mmd.Editor
                         }
 
                         MmdRuntimeFfiMethods.UnityCurveKey[] nativeKeys =
-                            reducedPose.GetUnityCurveKeys(frameRate, FlipZ, curveIndex);
+                            reducedPose.GetUnityCurveKeys(frameRate, NativeFlipZ, curveIndex);
                         int declaredKeyCount = MmdFfiMarshal.CheckedIntPtrToInt(
                             descriptor.keyCount, "reduced pose descriptor key count");
                         if (nativeKeys.Length != declaredKeyCount)
@@ -508,12 +511,10 @@ namespace Mmd.Editor
                         }
 
                         var unityKeys = new Keyframe[nativeKeys.Length];
-                        // Rust owns handedness, Euler filtering/degree conversion, and per-second
-                        // tangent conversion. Only the Unity host's PMX unit scale remains here;
-                        // scaling value and dv/dt together preserves the native Hermite curve.
-                        float valueScale = descriptor.semantic == MmdRuntimeFfiMethods.UnityCurveBoneLocalTranslation
-                            ? instance.ImportScale
-                            : 1.0f;
+                        // Rust owns Euler filtering/degree conversion and per-second tangents.
+                        // The host applies its coordinate convention and PMX unit scale to both
+                        // value and dv/dt so the native Hermite curve remains intact.
+                        float valueScale = GetSparseCurveValueScale(descriptor, instance.ImportScale);
                         for (int keyIndex = 0; keyIndex < nativeKeys.Length; keyIndex++)
                         {
                             unityKeys[keyIndex] = CreateUnityKeyframe(nativeKeys[keyIndex], valueScale);
@@ -548,7 +549,7 @@ namespace Mmd.Editor
             MmdRuntimeFfiMethods.UnityCurveKey key,
             float valueScale)
         {
-            if (!float.IsFinite(valueScale) || valueScale <= 0.0f)
+            if (!float.IsFinite(valueScale) || valueScale == 0.0f)
             {
                 throw new ArgumentOutOfRangeException(nameof(valueScale));
             }
@@ -558,6 +559,29 @@ namespace Mmd.Editor
                 key.value * valueScale,
                 key.inTangent * valueScale,
                 key.outTangent * valueScale);
+        }
+
+        internal static float GetSparseCurveValueScale(
+            MmdRuntimeFfiMethods.UnityCurveDescriptor descriptor,
+            float importScale)
+        {
+            if (!float.IsFinite(importScale) || importScale <= 0.0f)
+            {
+                throw new ArgumentOutOfRangeException(nameof(importScale));
+            }
+
+            bool flipAxis = descriptor.axis == 0 || descriptor.axis == 2;
+            if (descriptor.semantic == MmdRuntimeFfiMethods.UnityCurveBoneLocalTranslation)
+            {
+                return flipAxis ? -importScale : importScale;
+            }
+
+            if (descriptor.semantic == MmdRuntimeFfiMethods.UnityCurveBoneLocalEuler)
+            {
+                return flipAxis ? -1.0f : 1.0f;
+            }
+
+            return 1.0f;
         }
 
         internal static void SetSparseEulerRotationOrderToXyz(AnimationClip clip)

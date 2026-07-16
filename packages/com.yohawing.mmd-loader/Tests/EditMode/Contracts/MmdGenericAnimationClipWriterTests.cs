@@ -285,6 +285,48 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void NativeSparseCurvesApplyPackageXzCoordinateFlipToValuesAndTangents()
+        {
+            var native = new MmdRuntimeFfiMethods.UnityCurveKey
+            {
+                timeSeconds = 2.0f,
+                value = 3.0f,
+                inTangent = 4.0f,
+                outTangent = -5.0f
+            };
+            var descriptor = new MmdRuntimeFfiMethods.UnityCurveDescriptor
+            {
+                semantic = MmdRuntimeFfiMethods.UnityCurveBoneLocalTranslation,
+                axis = 0
+            };
+
+            float scale = MmdGenericAnimationClipWriter.GetSparseCurveValueScale(descriptor, 0.1f);
+            Keyframe key = MmdGenericAnimationClipWriter.CreateUnityKeyframe(native, scale);
+
+            Assert.That(scale, Is.EqualTo(-0.1f));
+            Assert.That(key.value, Is.EqualTo(-0.3f).Within(1.0e-6f));
+            Assert.That(key.inTangent, Is.EqualTo(-0.4f).Within(1.0e-6f));
+            Assert.That(key.outTangent, Is.EqualTo(0.5f).Within(1.0e-6f));
+
+            descriptor.axis = 1;
+            Assert.That(
+                MmdGenericAnimationClipWriter.GetSparseCurveValueScale(descriptor, 0.1f),
+                Is.EqualTo(0.1f));
+            descriptor.axis = 2;
+            Assert.That(
+                MmdGenericAnimationClipWriter.GetSparseCurveValueScale(descriptor, 0.1f),
+                Is.EqualTo(-0.1f));
+
+            descriptor.semantic = MmdRuntimeFfiMethods.UnityCurveBoneLocalEuler;
+            descriptor.axis = 0;
+            Assert.That(MmdGenericAnimationClipWriter.GetSparseCurveValueScale(descriptor, 0.1f), Is.EqualTo(-1.0f));
+            descriptor.axis = 1;
+            Assert.That(MmdGenericAnimationClipWriter.GetSparseCurveValueScale(descriptor, 0.1f), Is.EqualTo(1.0f));
+            descriptor.axis = 2;
+            Assert.That(MmdGenericAnimationClipWriter.GetSparseCurveValueScale(descriptor, 0.1f), Is.EqualTo(-1.0f));
+        }
+
+        [Test]
         public void SparseEulerCurvesUseNativeXyzRotationOrderForMultiAxisPose()
         {
             var root = new GameObject("root");
