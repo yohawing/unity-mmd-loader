@@ -3,6 +3,7 @@
 #pragma warning disable CS0618
 
 using System;
+using System.IO;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -33,12 +34,43 @@ namespace Mmd.Tests
         [Test]
         public void LegacySerializedFieldsRemainReadable()
         {
-            var asset = ScriptableObject.CreateInstance<MmdHumanoidSetupAsset>();
+            const string AssetPath = "Assets/__MmdLegacyHumanoidSetup.asset";
+            string absolutePath = Path.Combine(Application.dataPath, "__MmdLegacyHumanoidSetup.asset");
             try
             {
-                EditorJsonUtility.FromJsonOverwrite(
-                    "{\"setupPreset\":1,\"pmxBoneCount\":42,\"mappingReadiness\":\"Ready\",\"mappingInputSource\":\"ImportedHierarchy\",\"nativePlaybackImpact\":\"None\"}",
-                    asset);
+                File.WriteAllText(absolutePath,
+                    "%YAML 1.1\n"
+                    + "%TAG !u! tag:unity3d.com,2011:\n"
+                    + "--- !u!114 &11400000\n"
+                    + "MonoBehaviour:\n"
+                    + "  m_ObjectHideFlags: 0\n"
+                    + "  m_CorrespondingSourceObject: {fileID: 0}\n"
+                    + "  m_PrefabInstance: {fileID: 0}\n"
+                    + "  m_PrefabAsset: {fileID: 0}\n"
+                    + "  m_GameObject: {fileID: 0}\n"
+                    + "  m_Enabled: 1\n"
+                    + "  m_EditorHideFlags: 0\n"
+                    + "  m_Script: {fileID: 11500000, guid: 954e97ec9101f0c49bba3077496fe31f, type: 3}\n"
+                    + "  m_Name: LegacyHumanoidSetup\n"
+                    + "  m_EditorClassIdentifier:\n"
+                    + "  pmxAsset: {fileID: 0}\n"
+                    + "  setupPreset: 1\n"
+                    + "  pmxBoneCount: 42\n"
+                    + "  mappingReadiness: Ready\n"
+                    + "  mappingInputSource: ImportedHierarchy\n"
+                    + "  requiredMappedBoneCount: 0\n"
+                    + "  optionalMappedBoneCount: 0\n"
+                    + "  missingRequiredBoneCount: 0\n"
+                    + "  ambiguousMappingCount: 0\n"
+                    + "  ignoredHelperBoneCount: 0\n"
+                    + "  mappingDiagnostics: []\n"
+                    + "  nativePlaybackImpact: None\n"
+                    + "  mappingEntries: []\n");
+                AssetDatabase.ImportAsset(AssetPath, ImportAssetOptions.ForceSynchronousImport);
+
+                MmdHumanoidSetupAsset asset =
+                    AssetDatabase.LoadAssetAtPath<MmdHumanoidSetupAsset>(AssetPath);
+                Assert.That(asset, Is.Not.Null);
 
                 Assert.That(asset.SetupPreset, Is.EqualTo(MmdHumanoidSetupPreset.MmdStandard));
                 Assert.That(asset.PmxBoneCount, Is.EqualTo(42));
@@ -48,7 +80,9 @@ namespace Mmd.Tests
             }
             finally
             {
-                UnityEngine.Object.DestroyImmediate(asset);
+                AssetDatabase.DeleteAsset(AssetPath);
+                if (File.Exists(absolutePath)) File.Delete(absolutePath);
+                if (File.Exists(absolutePath + ".meta")) File.Delete(absolutePath + ".meta");
             }
         }
 
