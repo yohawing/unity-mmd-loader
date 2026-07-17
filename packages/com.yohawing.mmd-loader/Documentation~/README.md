@@ -1,6 +1,6 @@
 # MMD Loader for Unity
 
-Import PMX models and VMD motions as ordinary Unity assets, place them in a scene, and drive them from Timeline. This documentation describes the `v0.1.3` release candidate for Unity 6000.4 URP on Windows x86_64.
+Import PMX models and VMD motions as ordinary Unity assets, place them in a scene, and drive them from Timeline. This documentation describes the `v0.2.0` release candidate for Unity 6000.4 URP on Windows x86_64.
 
 ## Quick start
 

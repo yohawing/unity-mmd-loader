@@ -1,6 +1,6 @@
 {
   "name": "com.yohawing.mmd-loader",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "displayName": "MMD Loader",
   "description": "Unity package for importing, placing, and playing PMX/VMD assets through standard Unity workflows.",
   "unity": "6000.4",

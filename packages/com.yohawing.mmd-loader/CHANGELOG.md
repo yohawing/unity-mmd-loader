@@ -4,9 +4,36 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-17
+
+### Added
+
+- Explicit Generic and Humanoid AnimationClip bake workflows for imported PMX/VMD assets, including frame-range controls, batched native sampling, sparse reduced curves, parity checks, and safe project-relative output paths.
+- Humanoid bake round-trip coverage and Timeline authoring support that synchronizes directly assigned Humanoid clips to their AnimationClip duration.
+- Bounded texture decoding and adversarial import coverage for PNG, JPEG, BMP, DDS, and TGA inputs.
+
 ### Changed
 
 - Humanoid AnimationClip bake now uses only the Avatar and retarget mapping persisted by PMX Humanoid import; the duplicate setup-asset workflow has been removed.
+- Live physics now uses the bundled `mmd-anim` Bullet runtime, with the package native runtime aligned to `mmd-anim` `v0.3.0` / remote `main` commit `c3a35e0`.
+- PMX and VMD inspectors now expose a smaller, asset-focused action surface, and no-op importer settings and duplicate scene-action buttons have been removed.
+- Imported playback reconfiguration now treats borrowed scene objects, preview visibility, SelfShadow targets, and transient runtime instances as explicit ownership boundaries.
+
+### Fixed
+
+- Generic sparse AnimationClip bake now preserves Unity coordinate conversion and accepts Euler rotation curves in parity checks.
+- Humanoid AnimationClip bake now preserves frame-wise body pose and root-motion fidelity.
+- PMX importer failures roll back generated Unity objects instead of leaving partial imported state.
+- Runtime texture references are sandboxed to approved asset roots, and oversized or malformed texture inputs are rejected before unbounded decode allocation.
+- Domain reload and playback rebind paths restore borrowed scene state and dispose owned runtime instances.
+- PMX draw-edge materials render outlines again after the material-policy refactor.
+
+### Known Limitations
+
+- macOS and Linux native binaries are not distributed in the package.
+- Timeline random access keeps physics off; Live physics is limited to Play Mode forward playback.
+- Raw VMD Timeline clips use deterministic hard-cut selection rather than weighted blending.
+- Humanoid bake does not include Live physics, facial morphs, or native MMD IK/helper behavior.
 
 ## [0.1.3] - 2026-07-11
 

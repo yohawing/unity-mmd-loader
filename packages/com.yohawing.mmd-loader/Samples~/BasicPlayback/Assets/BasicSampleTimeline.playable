@@ -130,7 +130,7 @@ MonoBehaviour:
     defaultValue: {fileID: 0}
   motionAsset: {fileID: 6479661542685298348, guid: aa8515d6b926435a988fb52ff9b8b44d, type: 3}
   modelSourceId: 
-  motionSourceId: Assets/Samples/MMD Loader/0.1.3/Basic Playback/Assets/mmt_test_model_test_motion.vmd
+  motionSourceId: Assets/Samples/MMD Loader/0.2.0/Basic Playback/Assets/mmt_test_model_test_motion.vmd
   frameRate: 30
   startOffsetSeconds: 0
   loopPolicy: 0
