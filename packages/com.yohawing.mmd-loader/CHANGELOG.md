@@ -7,6 +7,8 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 ### Removed
 
 - Removed the experimental Editable Rig post-processing layer and its public authoring types.
+- Removed unused PMX/VMD Inspector readiness helpers, the unconnected Generic AnimationClip parity verifier, and the SelfShadow RendererFeature setup warning UI.
+- Removed automatic generated-model playback fallback, its transient runtime marker, and the public `allowRuntimeFallback` overload parameters; playback now requires a matching scene `SkinnedMeshRenderer`.
 
 ## [0.2.0] - 2026-07-17
 

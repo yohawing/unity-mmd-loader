@@ -54,15 +54,6 @@ namespace Mmd.Tests
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
 
             Assert.That(pmxAsset.ImportScale, Is.EqualTo(0.1f).Within(0.0001f));
-
-            // Default PMX import scale is 0.1, and runtime playback/live physics are scale-aware.
-            MmdScaleAwarePhysicsReadiness readiness = MmdAssetInspectorUtility.GetScaleAwarePhysicsReadiness(pmxAsset);
-            Assert.That(readiness.ImportScale, Is.EqualTo(0.1f).Within(0.0001f));
-            Assert.That(readiness.HasPhysicsDescriptors, Is.False);
-            Assert.That(readiness.GravityPolicy, Is.EqualTo("scale-aware-mmd-gravity-98"));
-            Assert.That(readiness.BackendReadbackSpace, Is.EqualTo(MmdScaleAwarePhysicsReadiness.MmdSpaceReadback));
-            Assert.That(readiness.ScaleAwareHandoffReadiness, Is.EqualTo(MmdScaleAwarePhysicsReadiness.ScaleAwareHandoffReady));
-            Assert.That(readiness.RequiredSmoke, Is.EqualTo(MmdScaleAwarePhysicsReadiness.ScaleAwareSmokeCovered));
         }
         [Test]
         public void ImportedPmxAssetCarriesImportUiSettingsSummaryFromImporter()
@@ -166,15 +157,8 @@ namespace Mmd.Tests
             Assert.That(pmxAsset.VertexCount, Is.EqualTo(TestOneBoneCubeVertexCount));
             Assert.That(pmxAsset.MaterialCount, Is.EqualTo(1));
 
-            MmdScaleAwarePhysicsReadiness readiness = MmdAssetInspectorUtility.GetScaleAwarePhysicsReadiness(pmxAsset);
-            Assert.That(readiness.ImportScale, Is.EqualTo(2.5f).Within(0.0001f));
             Assert.That(pmxAsset.RigidbodyCount, Is.EqualTo(0));
             Assert.That(pmxAsset.JointCount, Is.EqualTo(0));
-            Assert.That(readiness.HasPhysicsDescriptors, Is.False);
-            Assert.That(readiness.GravityPolicy, Is.EqualTo("scale-aware-mmd-gravity-98"));
-            Assert.That(readiness.BackendReadbackSpace, Is.EqualTo(MmdScaleAwarePhysicsReadiness.MmdSpaceReadback));
-            Assert.That(readiness.ScaleAwareHandoffReadiness, Is.EqualTo(MmdScaleAwarePhysicsReadiness.ScaleAwareHandoffReady));
-            Assert.That(readiness.RequiredSmoke, Is.EqualTo(MmdScaleAwarePhysicsReadiness.ScaleAwareSmokeCovered));
 
             // Prove imported asset ImportScale flows to scene instantiation (transient bones/physics) and cached mesh.
             MmdUnityModelInstance? loadInstance = null;
@@ -291,14 +275,6 @@ namespace Mmd.Tests
 
             Assert.That(importer.ImportScale, Is.EqualTo(0.1f).Within(0.0001f));
             Assert.That(pmxAsset.ImportScale, Is.EqualTo(0.1f).Within(0.0001f));
-
-            MmdScaleAwarePhysicsReadiness readiness = MmdAssetInspectorUtility.GetScaleAwarePhysicsReadiness(pmxAsset);
-            Assert.That(readiness.ImportScale, Is.EqualTo(0.1f).Within(0.0001f));
-            Assert.That(readiness.HasPhysicsDescriptors, Is.False);
-            Assert.That(readiness.GravityPolicy, Is.EqualTo("scale-aware-mmd-gravity-98"));
-            Assert.That(readiness.BackendReadbackSpace, Is.EqualTo(MmdScaleAwarePhysicsReadiness.MmdSpaceReadback));
-            Assert.That(readiness.ScaleAwareHandoffReadiness, Is.EqualTo(MmdScaleAwarePhysicsReadiness.ScaleAwareHandoffReady));
-            Assert.That(readiness.RequiredSmoke, Is.EqualTo(MmdScaleAwarePhysicsReadiness.ScaleAwareSmokeCovered));
         }
         [Test]
         public void HumanoidAnimationTypeImportsRootAnimatorWithReadyAvatar()

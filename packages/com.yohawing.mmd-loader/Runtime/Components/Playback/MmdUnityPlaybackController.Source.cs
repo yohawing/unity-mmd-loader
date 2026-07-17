@@ -4,7 +4,6 @@ using System;
 using System.IO;
 using Mmd;
 using Mmd.Parser;
-using Mmd.Rendering;
 using UnityEngine;
 
 namespace Mmd.UnityIntegration
@@ -64,19 +63,30 @@ namespace Mmd.UnityIntegration
                 return;
             }
 
-            ConfigureFallbackAssetBinding(
-                pmxAsset,
-                vmdAsset,
-                fallbackBinding => Configure(fallbackBinding, config),
-                applyStartFrame: null);
+            throw CreateMissingSceneModelException(ResolveAssetSourceId(pmxAsset), timelineEvaluation: false);
         }
 
         public void ConfigureFromRuntimeImporterPaths(
             string pmxPath,
             string vmdPath,
+            MmdPlaybackConfig config)
+        {
+            ConfigureFromRuntimeImporterPathsCore(pmxPath, vmdPath, config, requireNativeClip: false);
+        }
+
+        internal void ConfigureFromRuntimeImporterPathsForTimeline(
+            string pmxPath,
+            string vmdPath,
+            MmdPlaybackConfig config)
+        {
+            ConfigureFromRuntimeImporterPathsCore(pmxPath, vmdPath, config, requireNativeClip: true);
+        }
+
+        private void ConfigureFromRuntimeImporterPathsCore(
+            string pmxPath,
+            string vmdPath,
             MmdPlaybackConfig config,
-            bool allowRuntimeFallback = true,
-            MmdMaterialPreset materialPreset = MmdMaterialPreset.MmdToon)
+            bool requireNativeClip)
         {
             if (string.IsNullOrWhiteSpace(pmxPath))
             {
@@ -108,53 +118,27 @@ namespace Mmd.UnityIntegration
             MmdModelValidator.ThrowIfInvalid(model);
             MmdMotionDefinition motion = parser.LoadMotion(vmdBytes);
             MmdMotionValidator.ThrowIfInvalid(motion);
-            MmdUnityPlaybackBinding? runtimeImporterBinding = null;
-            bool reboundExisting = false;
-            try
+            if (!HasExistingSceneSkinnedMeshRenderer())
             {
-                MmdUnityModelFactory.ValidateExistingSkinnedModelCompatibility(gameObject, model);
-                ReleaseCurrentBindingBeforeSceneRebind();
-                runtimeImporterBinding = MmdUnityPlaybackBinding.CreateSkinnedFromExistingSceneModel(
+                throw CreateMissingSceneModelException(resolvedPmxPath, requireNativeClip);
+            }
+
+            MmdUnityModelFactory.ValidateExistingSkinnedModelCompatibility(gameObject, model);
+            ReleaseCurrentBindingBeforeSceneRebind();
+            MmdUnityPlaybackBinding runtimeImporterBinding =
+                MmdUnityPlaybackBinding.CreateSkinnedFromExistingSceneModel(
                     gameObject,
                     model,
                     motion,
                     resolvedPmxPath,
                     resolvedVmdPath,
                     resolvedPmxPath);
-                reboundExisting = true;
-            }
-            catch (MissingComponentException)
-            {
-            }
-            catch (InvalidOperationException)
-            {
-            }
-
-            if (!reboundExisting || runtimeImporterBinding == null)
-            {
-                if (!allowRuntimeFallback)
-                {
-                    throw new InvalidOperationException(
-                        "Timeline evaluation requires an existing scene PMX model with a SkinnedMeshRenderer " +
-                        "to bind motion. The runtime importer path (" + resolvedPmxPath +
-                        ") could not find a matching SkinnedMeshRenderer in the scene.");
-                }
-
-                runtimeImporterBinding = MmdUnityPlaybackBinding.CreateSkinned(
-                    model,
-                    motion,
-                    resolvedPmxPath,
-                    resolvedVmdPath,
-                    resolvedPmxPath,
-                    materialPreset);
-                AttachRestoredRuntimeInstance(runtimeImporterBinding.Instance);
-            }
 
             Configure(runtimeImporterBinding, config);
             TryEnableFastRuntimeFromBytesForDefaultPlayback(pmxBytes, vmdBytes);
-            if (!reboundExisting)
+            if (requireNativeClip)
             {
-                HidePreviewRenderersIfFallbackVisible(runtimeImporterBinding.Instance, resolvedPmxPath);
+                ThrowIfTimelineNativeClipUnavailable();
             }
         }
 
@@ -172,8 +156,36 @@ namespace Mmd.UnityIntegration
             MmdVmdAsset vmdAsset,
             float playbackFrameRate,
             int startFrame = 0,
-            bool playOnStart = true,
-            bool allowRuntimeFallback = true)
+            bool playOnStart = true)
+        {
+            ConfigureMotionFromProviderModelSourceCore(
+                vmdAsset,
+                playbackFrameRate,
+                startFrame,
+                playOnStart,
+                requireNativeClip: false);
+        }
+
+        internal void ConfigureMotionFromProviderModelSourceForTimeline(
+            MmdVmdAsset vmdAsset,
+            float playbackFrameRate,
+            int startFrame = 0,
+            bool playOnStart = false)
+        {
+            ConfigureMotionFromProviderModelSourceCore(
+                vmdAsset,
+                playbackFrameRate,
+                startFrame,
+                playOnStart,
+                requireNativeClip: true);
+        }
+
+        private void ConfigureMotionFromProviderModelSourceCore(
+            MmdVmdAsset vmdAsset,
+            float playbackFrameRate,
+            int startFrame,
+            bool playOnStart,
+            bool requireNativeClip)
         {
             if (vmdAsset == null)
             {
@@ -186,9 +198,9 @@ namespace Mmd.UnityIntegration
             }
 
             ConfigureMotionAsset(vmdAsset);
-            MmdMotionDefinition motion = allowRuntimeFallback
-                ? vmdAsset.LoadMotion()
-                : vmdAsset.CreateNativeClipMotionHeader();
+            MmdMotionDefinition motion = requireNativeClip
+                ? vmdAsset.CreateNativeClipMotionHeader()
+                : vmdAsset.LoadMotion();
             MmdMotionValidator.ThrowIfInvalid(motion);
 
             // Model source from controller asset source or RuntimeImporterComponent raw path.
@@ -211,27 +223,15 @@ namespace Mmd.UnityIntegration
                     vmdAsset,
                     motion,
                     reboundBinding => Configure(reboundBinding, playbackFrameRate, playOnStart),
-                    requireNativeClip: !allowRuntimeFallback,
+                    requireNativeClip,
                     applyStartFrame: startFrame))
                 {
                     return;
                 }
 
-                if (!allowRuntimeFallback)
-                {
-                    throw new InvalidOperationException(
-                        "Timeline evaluation requires an existing scene PMX model with a SkinnedMeshRenderer " +
-                        "to bind motion. Provide a scene GameObject with a controller PMX source and a " +
-                        "SkinnedMeshRenderer matching the provider model source (" +
-                        ResolveAssetSourceId(providerPmxAsset) + ").");
-                }
-
-                ConfigureFallbackAssetBinding(
-                    providerPmxAsset,
-                    vmdAsset,
-                    fallbackBinding => Configure(fallbackBinding, playbackFrameRate, playOnStart),
-                    applyStartFrame: startFrame);
-                return;
+                throw CreateMissingSceneModelException(
+                    ResolveAssetSourceId(providerPmxAsset),
+                    requireNativeClip);
             }
 
             // providerPmxPath (runtime importer model path) + vmdAsset case
@@ -245,61 +245,32 @@ namespace Mmd.UnityIntegration
             MmdModelDefinition model = parser.LoadModel(File.ReadAllBytes(resolvedPmxPath));
             MmdModelValidator.ThrowIfInvalid(model);
 
-            MmdUnityPlaybackBinding? pathBinding = null;
-            bool reboundExisting = false;
-            try
+            if (!HasExistingSceneSkinnedMeshRenderer())
             {
-                MmdUnityModelFactory.ValidateExistingSkinnedModelCompatibility(gameObject, model);
-                ReleaseCurrentBindingBeforeSceneRebind();
-                pathBinding = MmdUnityPlaybackBinding.CreateSkinnedFromExistingSceneModel(
+                throw CreateMissingSceneModelException(resolvedPmxPath, requireNativeClip);
+            }
+
+            MmdUnityModelFactory.ValidateExistingSkinnedModelCompatibility(gameObject, model);
+            ReleaseCurrentBindingBeforeSceneRebind();
+            MmdUnityPlaybackBinding pathBinding =
+                MmdUnityPlaybackBinding.CreateSkinnedFromExistingSceneModel(
                     gameObject,
                     model,
                     motion,
                     resolvedPmxPath,
                     string.IsNullOrWhiteSpace(vmdAsset.SourceId) ? vmdAsset.name : vmdAsset.SourceId,
                     resolvedPmxPath);
-                reboundExisting = true;
-            }
-            catch (MissingComponentException)
-            {
-            }
-            catch (InvalidOperationException)
-            {
-            }
-
-            if (!reboundExisting || pathBinding == null)
-            {
-                if (!allowRuntimeFallback)
-                {
-                    throw new InvalidOperationException(
-                        "Timeline evaluation requires an existing scene PMX model with a SkinnedMeshRenderer " +
-                        "to bind motion. The runtime importer path (" + resolvedPmxPath +
-                        ") could not find a matching SkinnedMeshRenderer in the scene.");
-                }
-
-                pathBinding = MmdUnityPlaybackBinding.CreateSkinned(
-                    model,
-                    motion,
-                    resolvedPmxPath,
-                    string.IsNullOrWhiteSpace(vmdAsset.SourceId) ? vmdAsset.name : vmdAsset.SourceId,
-                    resolvedPmxPath);
-                AttachRestoredRuntimeInstance(pathBinding.Instance);
-            }
 
             Configure(pathBinding, playbackFrameRate, playOnStart);
             TryEnableFastRuntimeFromBytesForDefaultPlayback(
                 File.ReadAllBytes(resolvedPmxPath),
                 vmdAsset.GetBytesCopy());
-            if (!allowRuntimeFallback)
+            if (requireNativeClip)
             {
                 ThrowIfTimelineNativeClipUnavailable();
             }
 
             ApplyFrame(startFrame);
-            if (!reboundExisting)
-            {
-                HidePreviewRenderersIfFallbackVisible(pathBinding.Instance, resolvedPmxPath);
-            }
         }
 
         public bool IsConfiguredForMotionAsset(MmdVmdAsset motion)
@@ -320,8 +291,7 @@ namespace Mmd.UnityIntegration
             MmdVmdAsset vmdAsset,
             float playbackFrameRate,
             int startFrame = 0,
-            bool playOnStart = true,
-            bool allowRuntimeFallback = true)
+            bool playOnStart = true)
         {
             if (startFrame < 0)
             {
@@ -331,9 +301,7 @@ namespace Mmd.UnityIntegration
             ConfigureModelAsset(pmxAsset);
             ConfigureMotionAsset(vmdAsset);
             var parser = new NativeMmdParser();
-            MmdMotionDefinition motion = allowRuntimeFallback
-                ? vmdAsset.LoadMotion(parser)
-                : vmdAsset.CreateNativeClipMotionHeader();
+            MmdMotionDefinition motion = vmdAsset.LoadMotion(parser);
             MmdMotionValidator.ThrowIfInvalid(motion);
 
             if (TryConfigureReboundAssetBinding(
@@ -341,33 +309,31 @@ namespace Mmd.UnityIntegration
                 vmdAsset,
                 motion,
                 reboundBinding => Configure(reboundBinding, playbackFrameRate, playOnStart),
-                requireNativeClip: !allowRuntimeFallback,
+                requireNativeClip: false,
                 applyStartFrame: startFrame))
             {
                 return;
             }
 
-            if (!allowRuntimeFallback)
-            {
-                throw new InvalidOperationException(
-                    "Timeline evaluation requires an existing scene PMX model with a SkinnedMeshRenderer " +
-                    "to bind motion. Provide a scene GameObject with a controller PMX source and a " +
-                    "SkinnedMeshRenderer matching the provider model source (" +
-                    ResolveAssetSourceId(pmxAsset) + ").");
-            }
-
-            // Fallback to runtime generation (explicit, consistent with ConfigureFromPlaybackSource / ConfigureMotionFromProviderModelSource).
-            ConfigureFallbackAssetBinding(
-                pmxAsset,
-                vmdAsset,
-                assetBinding => Configure(assetBinding, playbackFrameRate, playOnStart),
-                applyStartFrame: startFrame);
+            throw CreateMissingSceneModelException(ResolveAssetSourceId(pmxAsset), timelineEvaluation: false);
         }
 
-        public bool ConfigureFromPlaybackSourceIfAvailable(bool allowRuntimeFallback = true)
+        public bool ConfigureFromPlaybackSourceIfAvailable()
+        {
+            return ConfigureFromPlaybackSourceIfAvailableCore(requireNativeClip: false);
+        }
+
+        internal bool ConfigureFromPlaybackSourceIfAvailableForTimeline()
+        {
+            return ConfigureFromPlaybackSourceIfAvailableCore(requireNativeClip: true);
+        }
+
+        private bool ConfigureFromPlaybackSourceIfAvailableCore(bool requireNativeClip)
         {
             MmdRuntimeImporterComponent? runtimeImporter = GetComponent<MmdRuntimeImporterComponent>();
-            if (runtimeImporter != null && runtimeImporter.TryConfigureController(this, allowRuntimeFallback))
+            if (runtimeImporter != null && (requireNativeClip
+                ? runtimeImporter.TryConfigureControllerForTimeline(this)
+                : runtimeImporter.TryConfigureController(this)))
             {
                 return true;
             }
@@ -378,30 +344,27 @@ namespace Mmd.UnityIntegration
             MmdVmdAsset? motionAsset = MotionAssetSource;
             if (modelAsset != null && motionAsset != null)
             {
-                ConfigureFromAssets(
-                    modelAsset,
-                    motionAsset,
-                    frameRate,
-                    initialFrame,
-                    playOnStart,
-                    allowRuntimeFallback);
+                if (requireNativeClip)
+                {
+                    ConfigureMotionFromProviderModelSourceForTimeline(
+                        motionAsset,
+                        frameRate,
+                        initialFrame,
+                        playOnStart);
+                }
+                else
+                {
+                    ConfigureFromAssets(
+                        modelAsset,
+                        motionAsset,
+                        frameRate,
+                        initialFrame,
+                        playOnStart);
+                }
                 return true;
             }
 
             return false;
-        }
-
-        private void AttachRestoredRuntimeInstance(MmdUnityModelInstance instance)
-        {
-            instance.Root.name = gameObject.name + " Runtime";
-            instance.Root.transform.SetParent(transform.parent, worldPositionStays: false);
-            instance.Root.transform.localPosition = transform.localPosition;
-            instance.Root.transform.localRotation = transform.localRotation;
-            instance.Root.transform.localScale = transform.localScale;
-            MmdTransientRuntimeInstanceMarker marker =
-                instance.Root.GetComponent<MmdTransientRuntimeInstanceMarker>() ??
-                instance.Root.AddComponent<MmdTransientRuntimeInstanceMarker>();
-            marker.Initialize(this, instance);
         }
 
         private bool TryCreateExistingSceneBinding(
@@ -410,28 +373,27 @@ namespace Mmd.UnityIntegration
             MmdMotionDefinition motion,
             out MmdUnityPlaybackBinding binding)
         {
-            try
+            if (!HasExistingSceneSkinnedMeshRenderer())
             {
-                var parser = new NativeMmdParser();
-                MmdModelDefinition model = pmxAsset.LoadModel(parser);
-                MmdUnityModelFactory.ValidateExistingSkinnedModelCompatibility(gameObject, model);
-                ReleaseCurrentBindingBeforeSceneRebind();
-                binding = MmdUnityPlaybackBinding.CreateSkinnedFromExistingSceneModel(
-                    gameObject,
-                    pmxAsset,
-                    vmdAsset,
-                    motion);
-                return true;
-            }
-            catch (MissingComponentException)
-            {
-            }
-            catch (InvalidOperationException)
-            {
+                binding = null!;
+                return false;
             }
 
-            binding = null!;
-            return false;
+            var parser = new NativeMmdParser();
+            MmdModelDefinition model = pmxAsset.LoadModel(parser);
+            MmdUnityModelFactory.ValidateExistingSkinnedModelCompatibility(gameObject, model);
+            ReleaseCurrentBindingBeforeSceneRebind();
+            binding = MmdUnityPlaybackBinding.CreateSkinnedFromExistingSceneModel(
+                gameObject,
+                pmxAsset,
+                vmdAsset,
+                motion);
+            return true;
+        }
+
+        private bool HasExistingSceneSkinnedMeshRenderer()
+        {
+            return GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true) != null;
         }
 
         private void ReleaseCurrentBindingBeforeSceneRebind()
@@ -477,24 +439,6 @@ namespace Mmd.UnityIntegration
             return true;
         }
 
-        private void ConfigureFallbackAssetBinding(
-            MmdPmxAsset pmxAsset,
-            MmdVmdAsset vmdAsset,
-            Action<MmdUnityPlaybackBinding> configure,
-            int? applyStartFrame)
-        {
-            MmdUnityPlaybackBinding fallbackBinding = MmdUnityPlaybackBinding.CreateSkinned(pmxAsset, vmdAsset);
-            AttachRestoredRuntimeInstance(fallbackBinding.Instance);
-            configure(fallbackBinding);
-            TryEnableFastRuntimeFromAssetBytesForDefaultPlayback(pmxAsset, vmdAsset);
-            if (applyStartFrame.HasValue)
-            {
-                ApplyFrame(applyStartFrame.Value);
-            }
-
-            HidePreviewRenderersIfFallbackVisible(fallbackBinding.Instance, ResolveAssetSourceId(pmxAsset));
-        }
-
         private void ThrowIfTimelineNativeClipUnavailable()
         {
             if (IsFastRuntimeEnabled)
@@ -514,59 +458,14 @@ namespace Mmd.UnityIntegration
                 "Fast runtime unavailable: " + reason);
         }
 
-        private void HidePreviewRenderersIfFallbackVisible(MmdUnityModelInstance fallbackInstance, string reason)
+        private static InvalidOperationException CreateMissingSceneModelException(
+            string sourceId,
+            bool timelineEvaluation)
         {
-            int runtimeRendererCount = CountEnabledRenderers(fallbackInstance.Root);
-            if (runtimeRendererCount <= 0)
-            {
-                Debug.LogWarning(
-                    "MMD restore kept preview renderers enabled because the fallback runtime has no enabled renderers. reason=" + reason,
-                    this);
-                return;
-            }
-
-            Transform? modelRoot = transform.Find("Model");
-            Renderer? previewRenderer = modelRoot != null
-                ? modelRoot.GetComponent<SkinnedMeshRenderer>()
-                : null;
-            if (previewRenderer == null && modelRoot != null)
-            {
-                previewRenderer = modelRoot.GetComponent<MeshRenderer>();
-            }
-            if (previewRenderer == null)
-            {
-                Debug.LogWarning(
-                    "MMD restore kept Scene renderers enabled because no canonical package Model renderer was found. reason=" + reason,
-                    this);
-                return;
-            }
-
-            MmdTransientRuntimeInstanceMarker marker =
-                fallbackInstance.Root.GetComponent<MmdTransientRuntimeInstanceMarker>() ??
-                throw new InvalidOperationException("Fallback runtime instance is missing its ownership marker.");
-            bool wasEnabled = previewRenderer.enabled;
-            marker.CaptureAndDisableBorrowedRenderer(previewRenderer);
-            Debug.Log("MMD restore used fallback runtime. preview-hidden=" + wasEnabled + " hidden-count=" + (wasEnabled ? 1 : 0) + " runtime-renderer-count=" + runtimeRendererCount + " reason=" + reason, this);
-        }
-
-        private static int CountEnabledRenderers(GameObject root)
-        {
-            if (root == null)
-            {
-                return 0;
-            }
-
-            int count = 0;
-            Renderer[] renderers = root.GetComponentsInChildren<Renderer>(includeInactive: true);
-            foreach (Renderer renderer in renderers)
-            {
-                if (renderer != null && renderer.enabled)
-                {
-                    count++;
-                }
-            }
-
-            return count;
+            string prefix = timelineEvaluation ? "Timeline evaluation" : "MMD playback";
+            return new InvalidOperationException(
+                prefix + " requires an existing scene PMX model with a SkinnedMeshRenderer to bind motion. " +
+                "No matching SkinnedMeshRenderer was found for provider model source (" + sourceId + ").");
         }
 
         private static string ResolveAssetSourceId(MmdVmdAsset asset)

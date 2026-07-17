@@ -473,8 +473,7 @@ namespace Mmd.Tests
                 result.Controller.ConfigureFromRuntimeImporterPaths(
                     fullPmxPath,
                     fullVmdPath,
-                    new MmdPlaybackConfig(30.0f, 0, playOnStart: false),
-                    allowRuntimeFallback: false);
+                    new MmdPlaybackConfig(30.0f, 0, playOnStart: false));
 
                 Assert.That(sceneRoot != null, Is.True, "Reconfiguration must not destroy the authored Scene root.");
                 Assert.That(sceneMesh != null, Is.True, "Reconfiguration must preserve the authored Scene mesh.");

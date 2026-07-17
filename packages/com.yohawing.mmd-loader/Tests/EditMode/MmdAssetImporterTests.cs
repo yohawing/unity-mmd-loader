@@ -7,14 +7,12 @@ using UnityEditor;
 using UnityEditor.AssetImporters;
 using UnityEditor.SceneManagement;
 using UnityEngine;
-using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using Mmd.Editor;
 using Mmd.Parser;
 using Mmd.Physics;
 using Mmd.Rendering;
-using Mmd.Rendering.Universal;
 using Mmd.UnityIntegration;
 using Object = UnityEngine.Object;
 
@@ -447,81 +445,5 @@ namespace Mmd.Tests
             }
         }
 
-        private static void AddSelfShadowFeature(
-            UniversalRendererData rendererData,
-            MmdSelfShadowRendererFeature feature)
-        {
-            var rendererDataSo = new SerializedObject(rendererData);
-            var features = rendererDataSo.FindProperty("m_RendererFeatures");
-            features.arraySize = 1;
-            features.GetArrayElementAtIndex(0).objectReferenceValue = feature;
-            rendererDataSo.ApplyModifiedPropertiesWithoutUndo();
-        }
-
-        private static void SetRendererDataList(
-            UniversalRenderPipelineAsset pipeline,
-            int defaultRendererIndex,
-            params UniversalRendererData[] rendererData)
-        {
-            var pipelineSo = new SerializedObject(pipeline);
-            var rendererDataList = pipelineSo.FindProperty("m_RendererDataList");
-            rendererDataList.arraySize = rendererData.Length;
-            for (int i = 0; i < rendererData.Length; i++)
-            {
-                rendererDataList.GetArrayElementAtIndex(i).objectReferenceValue = rendererData[i];
-            }
-
-            var defaultRendererIndexProperty = pipelineSo.FindProperty("m_DefaultRendererIndex");
-            defaultRendererIndexProperty.intValue = defaultRendererIndex;
-            pipelineSo.ApplyModifiedPropertiesWithoutUndo();
-        }
-
-        private sealed class SelfShadowRendererSetupFixture : IDisposable
-        {
-            private SelfShadowRendererSetupFixture(
-                UniversalRenderPipelineAsset pipeline,
-                UniversalRendererData rendererData,
-                MmdSelfShadowRendererFeature? feature)
-            {
-                Pipeline = pipeline;
-                RendererData = rendererData;
-                Feature = feature;
-            }
-
-            public UniversalRenderPipelineAsset Pipeline { get; }
-
-            private UniversalRendererData RendererData { get; }
-
-            private MmdSelfShadowRendererFeature? Feature { get; }
-
-            public static SelfShadowRendererSetupFixture Create(bool includeFeature, bool featureEnabled = true)
-            {
-                var pipeline = ScriptableObject.CreateInstance<UniversalRenderPipelineAsset>();
-                var rendererData = ScriptableObject.CreateInstance<UniversalRendererData>();
-                MmdSelfShadowRendererFeature? feature = null;
-
-                if (includeFeature)
-                {
-                    feature = ScriptableObject.CreateInstance<MmdSelfShadowRendererFeature>();
-                    feature.SetActive(featureEnabled);
-                    AddSelfShadowFeature(rendererData, feature);
-                }
-
-                SetRendererDataList(pipeline, 0, rendererData);
-
-                return new SelfShadowRendererSetupFixture(pipeline, rendererData, feature);
-            }
-
-            public void Dispose()
-            {
-                if (Feature != null)
-                {
-                    Object.DestroyImmediate(Feature);
-                }
-
-                Object.DestroyImmediate(RendererData);
-                Object.DestroyImmediate(Pipeline);
-            }
-        }
     }
 }

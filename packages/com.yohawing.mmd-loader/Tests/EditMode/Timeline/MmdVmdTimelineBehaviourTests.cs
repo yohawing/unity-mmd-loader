@@ -312,7 +312,7 @@ namespace Mmd.Tests
         {
             MmdPmxAsset? pmxAsset = null;
             MmdVmdAsset? vmdAsset = null;
-            MmdUnityPlaybackController? controller = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 const float frameRate = 30.0f;
@@ -323,8 +323,11 @@ namespace Mmd.Tests
                 pmxAsset.Initialize(File.ReadAllBytes(pmxPath), "test_1bone_cube.pmx", pmxPath, assetImportScale: 1.0f);
                 vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
                 vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
-                var holder = new GameObject("timeline-fast-runtime-apply-time");
-                controller = holder.AddComponent<MmdUnityPlaybackController>();
+                var parser = new NativeMmdParser();
+                instance = MmdUnityModelFactory.CreateSkinnedModel(
+                    parser.LoadModel(File.ReadAllBytes(pmxPath)),
+                    pmxPath);
+                MmdUnityPlaybackController controller = instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.ConfigureFromAssets(pmxAsset, vmdAsset, frameRate, startFrame: 0);
                 var behaviour = new MmdVmdTimelineBehaviour
                 {
@@ -351,11 +354,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                if (controller != null)
-                {
-                    Object.DestroyImmediate(controller.gameObject);
-                }
-
+                MmdTestInstanceScope.DestroyInstance(instance);
                 Object.DestroyImmediate(pmxAsset);
                 Object.DestroyImmediate(vmdAsset);
             }
@@ -458,7 +457,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void TimelinePlaybackSourceEvaluationRebindsProviderAssetsWithoutCreatingRuntimeFallback()
+        public void TimelinePlaybackSourceEvaluationRebindsProviderAssetsToExistingSceneModel()
         {
             MmdPmxAsset? pmxAsset = null;
             MmdVmdAsset? vmdAsset = null;

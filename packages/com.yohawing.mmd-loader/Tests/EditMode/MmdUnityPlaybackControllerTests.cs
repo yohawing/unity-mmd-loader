@@ -949,21 +949,6 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void PmxInspectorPhysicsSummaryDoesNotAdvertiseCacheFieldOrHelpBox()
-        {
-            // Contract: MmdAssetInspectorUtility.DrawPhysicsSummary no longer renders
-            // a "Physics Cache" disabled text field or a HelpBox about Cache being reserved.
-            // The removed row was "Physics Cache: Not implemented".
-            // Since DrawPhysicsSummary is GUI-only, we verify via the readiness contract
-            // that GetScaleAwarePhysicsReadiness doesn't leak cache-related strings.
-            var readiness = MmdAssetInspectorUtility.GetScaleAwarePhysicsReadiness(null);
-            Assert.That(readiness.BackendReadbackSpace, Does.Not.Contain("Cache"));
-            Assert.That(readiness.ScaleAwareHandoffReadiness, Does.Not.Contain("Cache"));
-            Assert.That(readiness.RequiredSmoke, Does.Not.Contain("Cache"));
-            Assert.That(readiness.GravityPolicy, Does.Not.Contain("Cache"));
-        }
-
-        [Test]
         public void PlaybackControllerInspectorHidesLegacySourceAndSettingsFieldsFromDefaultDraw()
         {
             string[] excluded = MmdUnityPlaybackControllerEditor.DefaultInspectorExcludedProperties;
@@ -1121,7 +1106,7 @@ namespace Mmd.Tests
         {
             MmdPmxAsset? pmxAsset = null;
             MmdVmdAsset? vmdAsset = null;
-            MmdUnityPlaybackController? controller = null;
+            MmdUnityModelInstance? previewInstance = null;
             try
             {
                 string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
@@ -1130,8 +1115,9 @@ namespace Mmd.Tests
                 pmxAsset.Initialize(File.ReadAllBytes(pmxPath), "test_1bone_cube.pmx", pmxPath, assetImportScale: 1.0f);
                 vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
                 vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
-                var holder = new GameObject("mmd-configure-assets-default-fast-runtime");
-                controller = holder.AddComponent<MmdUnityPlaybackController>();
+                var parser = new NativeMmdParser();
+                previewInstance = MmdUnityModelFactory.CreateSkinnedModel(parser.LoadModel(File.ReadAllBytes(pmxPath)), pmxPath);
+                MmdUnityPlaybackController controller = previewInstance.Root.AddComponent<MmdUnityPlaybackController>();
 
                 controller.ConfigureFromAssets(pmxAsset, vmdAsset, 30.0f, startFrame: 0);
 
@@ -1152,7 +1138,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstanceFromController(controller);
+                MmdTestInstanceScope.DestroyInstance(previewInstance);
                 Object.DestroyImmediate(pmxAsset);
                 Object.DestroyImmediate(vmdAsset);
             }
@@ -1194,7 +1180,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void ConfigureFromAssetsWithoutSceneModelThrowsWhenRuntimeFallbackIsDisabled()
+        public void ConfigureFromAssetsWithoutSceneModelThrows()
         {
             MmdPmxAsset? pmxAsset = null;
             MmdVmdAsset? vmdAsset = null;
@@ -1216,15 +1202,13 @@ namespace Mmd.Tests
                         vmdAsset,
                         30.0f,
                         startFrame: 0,
-                        playOnStart: false,
-                        allowRuntimeFallback: false))!;
+                        playOnStart: false))!;
 
                 Assert.That(
                     exception.Message,
                     Is.EqualTo(
-                        "Timeline evaluation requires an existing scene PMX model with a SkinnedMeshRenderer " +
-                        "to bind motion. Provide a scene GameObject with a controller PMX source and a " +
-                        "SkinnedMeshRenderer matching the provider model source (test_1bone_cube.pmx)."));
+                        "MMD playback requires an existing scene PMX model with a SkinnedMeshRenderer to bind motion. " +
+                        "No matching SkinnedMeshRenderer was found for provider model source (test_1bone_cube.pmx)."));
                 Assert.That(controller.IsConfigured, Is.False);
             }
             finally
@@ -1311,6 +1295,7 @@ namespace Mmd.Tests
             {
                 string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
                 string incompatiblePath = ResolvePackageFixture("test_append_bone.pmx");
+                string incompatibleMotionPath = ResolvePackageFixture("test_append_bone.vmd");
                 string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
                 byte[] pmxBytes = File.ReadAllBytes(pmxPath);
                 var parser = new NativeMmdParser();
@@ -1328,15 +1313,24 @@ namespace Mmd.Tests
                 Mesh activePlaybackMesh = renderer.sharedMesh;
                 int revision = controller.ConfigurationRevision;
 
-                Assert.Throws<InvalidOperationException>(() =>
+                InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
                     controller.ConfigureFromAssets(
                         incompatibleAsset,
                         vmdAsset,
                         30.0f,
                         startFrame: 0,
-                        playOnStart: false,
-                        allowRuntimeFallback: false));
+                        playOnStart: false))!;
 
+                Assert.That(exception.Message, Does.Contain("bones do not match the PMX bone descriptor"));
+                Assert.That(exception.Message, Does.Not.Contain("No matching SkinnedMeshRenderer"));
+
+                InvalidOperationException rawPathException = Assert.Throws<InvalidOperationException>(() =>
+                    controller.ConfigureFromRuntimeImporterPaths(
+                        incompatiblePath,
+                        incompatibleMotionPath,
+                        new MmdPlaybackConfig(30.0f, 0, playOnStart: false)))!;
+                Assert.That(rawPathException.Message, Does.Contain("bones do not match the PMX bone descriptor"));
+                Assert.That(rawPathException.Message, Does.Not.Contain("No matching SkinnedMeshRenderer"));
                 Assert.That(controller.IsConfigured, Is.True);
                 Assert.That(controller.ConfigurationRevision, Is.EqualTo(revision));
                 Assert.That(controller.CurrentFrame, Is.EqualTo(9));
@@ -1557,14 +1551,15 @@ namespace Mmd.Tests
         [Test]
         public void RuntimeImporterComponentConfiguresControllerFromRawPaths()
         {
-            MmdUnityPlaybackController? controller = null;
+            MmdUnityModelInstance? previewInstance = null;
             try
             {
                 string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
                 string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
-                var holder = new GameObject("mmd-runtime-importer-source");
-                controller = holder.AddComponent<MmdUnityPlaybackController>();
-                MmdRuntimeImporterComponent importer = holder.AddComponent<MmdRuntimeImporterComponent>();
+                var parser = new NativeMmdParser();
+                previewInstance = MmdUnityModelFactory.CreateSkinnedModel(parser.LoadModel(File.ReadAllBytes(pmxPath)), pmxPath);
+                MmdUnityPlaybackController controller = previewInstance.Root.AddComponent<MmdUnityPlaybackController>();
+                MmdRuntimeImporterComponent importer = previewInstance.Root.AddComponent<MmdRuntimeImporterComponent>();
                 importer.ConfigurePaths(
                     pmxPath,
                     vmdPath,
@@ -1591,80 +1586,23 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstanceFromController(controller);
-            }
-        }
-
-        [Test]
-        public void RuntimeFallbackHidesOnlyCanonicalModelRendererAndRestoresItOnReconfigureAndDestroy()
-        {
-            string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
-            string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
-            var holder = new GameObject("mmd-runtime-fallback-visibility");
-            var model = new GameObject("Model");
-            model.transform.SetParent(holder.transform, false);
-            MeshRenderer previewRenderer = model.AddComponent<MeshRenderer>();
-            var accessory = new GameObject("Accessory");
-            accessory.transform.SetParent(holder.transform, false);
-            MeshRenderer accessoryRenderer = accessory.AddComponent<MeshRenderer>();
-            var disabledAccessory = new GameObject("Disabled Accessory");
-            disabledAccessory.transform.SetParent(holder.transform, false);
-            MeshRenderer disabledAccessoryRenderer = disabledAccessory.AddComponent<MeshRenderer>();
-            disabledAccessoryRenderer.enabled = false;
-
-            MmdUnityPlaybackController? controller = null;
-            try
-            {
-                controller = holder.AddComponent<MmdUnityPlaybackController>();
-                controller.SetPhysicsMode(MmdPhysicsMode.Off);
-                MmdRuntimeImporterComponent importer = holder.AddComponent<MmdRuntimeImporterComponent>();
-                importer.ConfigurePaths(pmxPath, vmdPath, shouldPlayOnStart: false);
-
-                Assert.That(importer.TryConfigureController(controller), Is.True);
-                Assert.That(previewRenderer.enabled, Is.False);
-                Assert.That(accessoryRenderer.enabled, Is.True);
-                Assert.That(disabledAccessoryRenderer.enabled, Is.False);
-
-                controller.ConfigureFromRuntimeImporterPaths(
-                    pmxPath,
-                    vmdPath,
-                    new MmdPlaybackConfig(30.0f, 0, playOnStart: false));
-                Assert.That(previewRenderer.enabled, Is.False);
-                Assert.That(accessoryRenderer.enabled, Is.True);
-                Assert.That(disabledAccessoryRenderer.enabled, Is.False);
-
-                controller.ReleasePlaybackResources();
-                Assert.That(previewRenderer.enabled, Is.True);
-                Assert.That(accessoryRenderer.enabled, Is.True);
-                Assert.That(disabledAccessoryRenderer.enabled, Is.False);
-
-                Object.DestroyImmediate(importer);
-                Object.DestroyImmediate(controller);
-                controller = null;
-            }
-            finally
-            {
-                if (controller != null)
-                {
-                    Object.DestroyImmediate(controller);
-                }
-
-                Object.DestroyImmediate(holder);
+                MmdTestInstanceScope.DestroyInstance(previewInstance);
             }
         }
 
         [Test]
         public void RuntimeImporterComponentUsesPlaybackConfigAssetWhenPresent()
         {
-            MmdUnityPlaybackController? controller = null;
+            MmdUnityModelInstance? previewInstance = null;
             MmdPlaybackConfigAsset? configAsset = null;
             try
             {
                 string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
                 string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
-                var holder = new GameObject("mmd-runtime-importer-config-asset");
-                controller = holder.AddComponent<MmdUnityPlaybackController>();
-                MmdRuntimeImporterComponent importer = holder.AddComponent<MmdRuntimeImporterComponent>();
+                var parser = new NativeMmdParser();
+                previewInstance = MmdUnityModelFactory.CreateSkinnedModel(parser.LoadModel(File.ReadAllBytes(pmxPath)), pmxPath);
+                MmdUnityPlaybackController controller = previewInstance.Root.AddComponent<MmdUnityPlaybackController>();
+                MmdRuntimeImporterComponent importer = previewInstance.Root.AddComponent<MmdRuntimeImporterComponent>();
                 importer.ConfigurePaths(
                     pmxPath,
                     vmdPath,
@@ -1692,7 +1630,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstanceFromController(controller);
+                MmdTestInstanceScope.DestroyInstance(previewInstance);
                 if (configAsset != null)
                 {
                     UnityEngine.Object.DestroyImmediate(configAsset);
@@ -1735,7 +1673,7 @@ namespace Mmd.Tests
         {
             MmdPmxAsset? pmxAsset = null;
             MmdVmdAsset? vmdAsset = null;
-            MmdUnityPlaybackController? controller = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 const float frameRate = 30.0f;
@@ -1746,8 +1684,11 @@ namespace Mmd.Tests
                 pmxAsset.Initialize(File.ReadAllBytes(pmxPath), "test_1bone_cube.pmx", pmxPath, assetImportScale: 1.0f);
                 vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
                 vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
-                var holder = new GameObject("mmd-apply-time-fast-runtime");
-                controller = holder.AddComponent<MmdUnityPlaybackController>();
+                var parser = new NativeMmdParser();
+                instance = MmdUnityModelFactory.CreateSkinnedModel(
+                    parser.LoadModel(File.ReadAllBytes(pmxPath)),
+                    pmxPath);
+                MmdUnityPlaybackController controller = instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.ConfigureFromAssets(pmxAsset, vmdAsset, frameRate, startFrame: 0);
                 // ApplyTime random access requires explicit Off (Live does not support); arbitrary EditMode evaluation for fast snapshot test
                 controller.SetPhysicsMode(MmdPhysicsMode.Off);
@@ -1773,7 +1714,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstanceFromController(controller);
+                MmdTestInstanceScope.DestroyInstance(instance);
                 Object.DestroyImmediate(pmxAsset);
                 Object.DestroyImmediate(vmdAsset);
             }
