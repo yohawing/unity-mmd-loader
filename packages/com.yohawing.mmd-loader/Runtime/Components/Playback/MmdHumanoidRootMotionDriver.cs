@@ -73,5 +73,21 @@ namespace Mmd.UnityIntegration
             lastSourceRootRotation = sourceRootRotation;
             hasAppliedRootPose = true;
         }
+
+        private void LateUpdate()
+        {
+            if (!timelineEvaluationActive || !hasAppliedRootPose)
+            {
+                return;
+            }
+
+            Animator animator = cachedAnimator != null
+                ? cachedAnimator
+                : cachedAnimator = GetComponent<Animator>();
+            Vector3 rootPosition = transform.position;
+            rootPosition.y = baselinePosition.y + clipRootVerticalOffset * animator.humanScale;
+            transform.position = rootPosition;
+            lastRootPosition.y = rootPosition.y;
+        }
     }
 }

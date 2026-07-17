@@ -1409,9 +1409,11 @@ namespace Mmd.Tests
                 MmdHumanoidRetargeterResult manualRetargetResult = controller.ApplyHumanoidRetargetNow();
                 Assert.That(manualRetargetResult.CopiedTranslationCount, Is.EqualTo(1),
                     "manual retarget must preserve explicit position-copy behavior");
+                Vector3 expectedRetargetPosition = nativeCenterBindPosition + retargetPositionDelta;
                 Assert.That(
-                    nativeCenterObject.transform.localPosition,
-                    Is.EqualTo(nativeCenterBindPosition + retargetPositionDelta));
+                    Vector3.Distance(nativeCenterObject.transform.localPosition, expectedRetargetPosition),
+                    Is.LessThanOrEqualTo(1.0e-5f),
+                    "manual retarget must copy the requested position within float precision");
                 nativeCenterObject.transform.localPosition = nativeCenterBindPosition;
                 Transform leftFoot = animator.GetBoneTransform(HumanBodyBones.LeftFoot);
                 Transform rightFoot = animator.GetBoneTransform(HumanBodyBones.RightFoot);
@@ -1447,8 +1449,10 @@ namespace Mmd.Tests
                 Assert.That(inactiveTimelineRetargetResult.CopiedTranslationCount, Is.EqualTo(1),
                     "Timeline retarget without an active root driver must preserve position copying");
                 Assert.That(
-                    nativeCenterObject.transform.localPosition,
-                    Is.EqualTo(nativeCenterBindPosition + retargetPositionDelta));
+                    Vector3.Distance(
+                        nativeCenterObject.transform.localPosition,
+                        nativeCenterBindPosition + retargetPositionDelta),
+                    Is.LessThanOrEqualTo(1.0e-5f));
 
                 director.time = 0.0;
                 director.Play();
