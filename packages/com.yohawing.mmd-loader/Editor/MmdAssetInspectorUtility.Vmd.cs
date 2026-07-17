@@ -15,33 +15,6 @@ namespace Mmd.Editor
 {
     internal static partial class MmdAssetInspectorUtility
     {
-        public static void DrawVmdMotionSummary(MmdVmdAsset asset)
-        {
-            EditorGUILayout.LabelField("VMD Motion Summary", EditorStyles.boldLabel);
-            using (new EditorGUI.DisabledScope(true))
-            {
-                try
-                {
-                    MmdVmdMotionSummary summary = GetVmdMotionSummary(asset);
-                    EditorGUILayout.TextField("Target Model Name", summary.TargetModelName);
-                    EditorGUILayout.IntField("Max Frame", summary.MaxFrame);
-                    EditorGUILayout.IntField("Bone Keyframes", summary.BoneKeyframeCount);
-                    EditorGUILayout.IntField("Morph Keyframes", summary.MorphKeyframeCount);
-                    EditorGUILayout.IntField("Model Keyframes", summary.ModelKeyframeCount);
-                    EditorGUILayout.IntField("Constraint States", summary.ConstraintStateCount);
-                    EditorGUILayout.IntField("Camera Keyframes", summary.CameraKeyframeCount);
-                    EditorGUILayout.IntField("Light Keyframes", summary.LightKeyframeCount);
-                    EditorGUILayout.IntField("Self-Shadow Keyframes", summary.SelfShadowKeyframeCount);
-                }
-                catch (System.Exception ex)
-                {
-                    EditorGUILayout.HelpBox(
-                        "Failed to get VMD motion summary: " + ex.Message,
-                        MessageType.Error);
-                }
-            }
-        }
-
         internal static MmdVmdMotionSummary GetVmdMotionSummary(MmdVmdAsset asset)
         {
             if (asset == null)
@@ -68,67 +41,12 @@ namespace Mmd.Editor
                 asset.SelfShadowKeyframeCount);
         }
 
-        public static void DrawVmdStructuralDiagnostics(IReadOnlyList<string>? diagnostics)
-        {
-            EditorGUILayout.LabelField("Structural Validation", EditorStyles.boldLabel);
-            if (diagnostics == null)
-            {
-                EditorGUILayout.HelpBox(
-                    "Run VMD Diagnostics to check structural motion validity.",
-                    MessageType.Info);
-                return;
-            }
-
-            if (diagnostics.Count == 0)
-            {
-                EditorGUILayout.HelpBox(
-                    "No structural issues found. VMD motion is valid.",
-                    MessageType.Info);
-                return;
-            }
-
-            using (new EditorGUI.DisabledScope(true))
-            {
-                for (int i = 0; i < diagnostics.Count; i++)
-                {
-                    EditorGUILayout.TextField("Issue " + (i + 1).ToString(System.Globalization.CultureInfo.InvariantCulture), diagnostics[i]);
-                }
-            }
-
-            EditorGUILayout.HelpBox(
-                diagnostics.Count == 1
-                    ? "1 structural issue found."
-                    : diagnostics.Count.ToString(System.Globalization.CultureInfo.InvariantCulture) + " structural issues found.",
-                MessageType.Warning);
-        }
-
         internal static IReadOnlyList<string> GetVmdStructuralDiagnostics(MmdVmdAsset asset)
         {
-            // Explicit revalidation path (calls LoadMotion + Validate). Intended for "Run VMD Diagnostics"
-            // and focused tests that deliberately exercise full parse. Selection / summary display
-            // paths must not invoke this.
+            // Explicit revalidation path for focused tests and diagnostic tooling that deliberately
+            // exercise full parse. Asset selection paths must not invoke this.
             MmdMotionDefinition motion = asset.LoadMotion();
             return MmdMotionValidator.ValidateStructuralMotion(motion);
-        }
-
-        public static void DrawVmdTimelineReadiness(MmdVmdAsset asset)
-        {
-            if (asset == null)
-            {
-                return;
-            }
-
-            MmdVmdTimelineReadiness readiness = GetVmdTimelineReadiness(asset);
-            EditorGUILayout.LabelField("Timeline Readiness", EditorStyles.boldLabel);
-            using (new EditorGUI.DisabledScope(true))
-            {
-                EditorGUILayout.IntField("Max Frame (Duration)", readiness.MaxFrame);
-                EditorGUILayout.TextField("Scene Motion", readiness.SceneMotionStatus);
-                EditorGUILayout.TextField("Self-Shadow Motion", readiness.SelfShadowSceneMotionStatus);
-                EditorGUILayout.TextField("Clip Creation", readiness.ClipCreationRequirement);
-            }
-            // Compact diagnostic rows only. No long normal-state HelpBox per UI contract.
-            // Raw camera/light/self-shadow counts are already shown in VMD Motion Summary above.
         }
 
         internal static MmdVmdTimelineReadiness GetVmdTimelineReadiness(MmdVmdAsset? asset)
@@ -177,8 +95,6 @@ namespace Mmd.Editor
                 selfShadowStatus,
                 "PMX model source and Timeline are required for VMD Clip creation.");
         }
-
-        // --- Humanoid Clip Readiness preview (VMD Inspector, cache-only, non-persistent) ---
 
     }
 }
