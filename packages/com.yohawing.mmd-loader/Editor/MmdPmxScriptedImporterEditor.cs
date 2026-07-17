@@ -104,7 +104,7 @@ namespace Mmd.Editor
             if (asset != null)
             {
                 DrawReadOnlySelectableText("Model", string.IsNullOrWhiteSpace(asset.ModelName) ? asset.name : asset.ModelName);
-                DrawAssetActions(asset);
+                DrawMissingTextureAction(asset);
             }
             else
             {
@@ -118,23 +118,17 @@ namespace Mmd.Editor
             }
         }
 
-        private void DrawAssetActions(MmdPmxAsset asset)
+        private void DrawMissingTextureAction(MmdPmxAsset asset)
         {
+            if (asset.MissingProjectTextureReferenceCount <= 0)
+            {
+                return;
+            }
+
             EditorGUILayout.Space();
             using (new EditorGUI.DisabledScope(asset.ByteLength <= 0 || HasModified()))
             {
-                if (GUILayout.Button("Load PMX Into Scene"))
-                {
-                    MmdEditorPmxLoader.LoadPmxIntoScene(asset);
-                }
-
-                if (GUILayout.Button("Create Prefab from PMX"))
-                {
-                    MmdPmxPrefabExporter.CreatePrefabWithFeedback(asset);
-                }
-
-                if (asset.MissingProjectTextureReferenceCount > 0
-                    && GUILayout.Button("Resolve First Missing Texture..."))
+                if (GUILayout.Button("Resolve First Missing Texture..."))
                 {
                     ResolveFirstMissingTexture(asset);
                 }
