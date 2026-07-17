@@ -369,7 +369,7 @@ namespace Mmd.Tests
                     Assert.That(renderer.sharedMaterials[0], Is.Not.SameAs(authoredMaterial));
                 }
 
-                controller.PrepareForAssemblyReload();
+                controller.ReleasePlaybackResources();
                 Assert.That(renderer.sharedMesh, Is.SameAs(authoredMesh));
                 Assert.That(renderer.sharedMaterials[0], Is.SameAs(authoredMaterial));
                 Object.DestroyImmediate(controller);
@@ -1631,7 +1631,7 @@ namespace Mmd.Tests
                 Assert.That(firstPlaybackMesh == null, Is.True, "reconfigure must destroy the first playback Mesh clone");
                 Assert.That(secondPlaybackMesh, Is.Not.SameAs(authoredMesh));
 
-                controller.PrepareForAssemblyReload();
+                controller.ReleasePlaybackResources();
                 Assert.That(secondPlaybackMesh == null, Is.True, "release must destroy the second playback Mesh clone");
                 Assert.That(renderer.sharedMesh, Is.SameAs(authoredMesh));
                 Assert.That(renderer.sharedMaterials[0], Is.SameAs(authoredMaterial));
@@ -1982,7 +1982,7 @@ namespace Mmd.Tests
                 Assert.That(accessoryRenderer.enabled, Is.True);
                 Assert.That(disabledAccessoryRenderer.enabled, Is.False);
 
-                controller.PrepareForAssemblyReload();
+                controller.ReleasePlaybackResources();
                 Assert.That(previewRenderer.enabled, Is.True);
                 Assert.That(accessoryRenderer.enabled, Is.True);
                 Assert.That(disabledAccessoryRenderer.enabled, Is.False);

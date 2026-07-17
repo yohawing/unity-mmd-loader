@@ -26,7 +26,7 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 - Humanoid AnimationClip bake now preserves frame-wise body pose and root-motion fidelity.
 - PMX importer failures roll back generated Unity objects instead of leaving partial imported state.
 - Runtime texture references are sandboxed to approved asset roots, and oversized or malformed texture inputs are rejected before unbounded decode allocation.
-- Domain reload and playback rebind paths restore borrowed scene state and dispose owned runtime instances.
+- Playback rebind paths restore borrowed scene state and dispose owned runtime instances.
 - PMX draw-edge materials render outlines again after the material-policy refactor.
 
 ### Known Limitations

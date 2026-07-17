@@ -878,7 +878,7 @@ namespace Mmd.Tests
                 Mesh vmdPlaybackMesh = renderer.sharedMesh;
                 Assert.That(vmdPlaybackMesh, Is.Not.SameAs(authoredMesh));
 
-                controller.PrepareForAssemblyReload();
+                controller.ReleasePlaybackResources();
                 yield return null;
                 Assert.That(vmdPlaybackMesh == null, Is.True);
                 Assert.That(renderer.sharedMesh, Is.SameAs(authoredMesh));

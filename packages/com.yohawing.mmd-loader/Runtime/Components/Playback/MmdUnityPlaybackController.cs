@@ -427,15 +427,10 @@ namespace Mmd.UnityIntegration
 
         private void OnDestroy()
         {
-            DisposeHumanoidPhysicsBinding();
-            binding?.Dispose();
-            binding = null;
-            LastSnapshot = null;
-            LastEditableRigDiagnostics = null;
-            IsPlaying = false;
+            ReleasePlaybackResources();
         }
 
-        internal void PrepareForAssemblyReload()
+        internal void ReleasePlaybackResources()
         {
             DisposeHumanoidPhysicsBinding();
             binding?.Dispose();
