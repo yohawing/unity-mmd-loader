@@ -197,10 +197,23 @@ namespace Mmd.Editor
                 return new MmdHumanoidClipConversionWriterResult(null, plan, diagnostics);
             }
 
+            long requestedFrameCount = (long)effectiveEndFrame - startFrame + 1;
+            if (!MmdAnimationClipBakeBudget.TryValidateHumanoid(
+                    requestedFrameCount,
+                    HumanTrait.MuscleCount,
+                    out _,
+                    out string budgetDiagnostic))
+            {
+                diagnostics.Add(budgetDiagnostic);
+                return new MmdHumanoidClipConversionWriterResult(null, plan, diagnostics);
+            }
+            int frameCount = checked((int)requestedFrameCount);
+
             var mappedBones = new List<(HumanBodyBones HumanBone, Transform ProxyTransform, string SourceBoneName, MmdHumanoidRetargetBinding Binding)>();
             GameObject? proxyRoot = null;
             Avatar? proxyAvatar = null;
             MmdUnityPlaybackBinding? evaluatedBinding = null;
+            AnimationClip? ownedClip = null;
             try
             {
                 var usedHumanBones = new HashSet<HumanBodyBones>();
@@ -262,6 +275,7 @@ namespace Mmd.Editor
                 }
 
                 var clip = new AnimationClip();
+                ownedClip = clip;
                 clip.name = "H6_HumanoidProxyClip_"
                             + NormalizeIdentifier(pmxAsset.SourceId) + "_"
                             + NormalizeIdentifier(vmdAsset.SourceId) + "_"
@@ -270,12 +284,10 @@ namespace Mmd.Editor
                             + "_" + frameRate + "fps";
                 clip.frameRate = frameRate;
 
-                int frameCount = effectiveEndFrame - startFrame + 1;
                 float sampleFrameToTimeFactor = 1.0f / frameRate;
 
                 if (proxyAvatar == null || !proxyAvatar.isValid || !proxyAvatar.isHuman)
                 {
-                    UnityEngine.Object.DestroyImmediate(clip);
                     diagnostics.Add("validation: temporary proxy Avatar is not a valid Humanoid Avatar.");
                     return new MmdHumanoidClipConversionWriterResult(null, plan, diagnostics);
                 }
@@ -334,7 +346,9 @@ namespace Mmd.Editor
                     sampleFrameToTimeFactor,
                     diagnostics);
 
-                return new MmdHumanoidClipConversionWriterResult(clip, plan, diagnostics);
+                var result = new MmdHumanoidClipConversionWriterResult(clip, plan, diagnostics);
+                ownedClip = null;
+                return result;
             }
             catch (Exception ex)
             {
@@ -343,6 +357,10 @@ namespace Mmd.Editor
             }
             finally
             {
+                if (ownedClip != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(ownedClip);
+                }
                 if (evaluatedBinding != null)
                 {
                     evaluatedBinding.Dispose();

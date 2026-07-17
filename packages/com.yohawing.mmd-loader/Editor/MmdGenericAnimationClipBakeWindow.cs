@@ -237,8 +237,18 @@ namespace Mmd.Editor
 
         private void DrawHumanoidDenseCurveWarning()
         {
-            int frameCount = Math.Max(0, endFrame - startFrame + 1);
-            long estimatedKeyCount = (long)frameCount * (HumanTrait.MuscleCount + 7);
+            long frameCount = Math.Max(0L, (long)endFrame - startFrame + 1);
+            if (frameCount > 0 && !MmdAnimationClipBakeBudget.TryValidateHumanoid(
+                    frameCount,
+                    HumanTrait.MuscleCount,
+                    out _,
+                    out string budgetDiagnostic))
+            {
+                EditorGUILayout.HelpBox(budgetDiagnostic, MessageType.Error);
+                return;
+            }
+
+            long estimatedKeyCount = frameCount * (HumanTrait.MuscleCount + 7);
             if (estimatedKeyCount < 500_000)
             {
                 return;

@@ -286,6 +286,19 @@ namespace Mmd.Editor
                 return clip;
             }
 
+            // Native sparse reduction owns a separate byte budget and may return a
+            // small clip for ranges that would be unsafe to materialize as managed
+            // Keyframe arrays. Apply this budget only at the dense fallback boundary.
+            if (!MmdAnimationClipBakeBudget.TryValidateGeneric(
+                    frameCount,
+                    instance.BoneTransforms.Length,
+                    morphs.Count,
+                    out _,
+                    out string budgetDiagnostic))
+            {
+                throw new InvalidOperationException(budgetDiagnostic);
+            }
+
             var positionKeys = new Keyframe[instance.BoneTransforms.Length, 3][];
             var rotationKeys = new Keyframe[instance.BoneTransforms.Length, 4][];
             for (int bone = 0; bone < instance.BoneTransforms.Length; bone++)

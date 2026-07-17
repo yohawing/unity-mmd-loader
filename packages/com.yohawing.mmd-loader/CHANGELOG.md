@@ -21,6 +21,7 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 
 ### Fixed
 
+- Generic and Humanoid AnimationClip writers reject oversized dense bake ranges before allocating unbounded managed key buffers, and failed Humanoid writes now release unreturned clips.
 - Generic sparse AnimationClip bake now preserves Unity coordinate conversion and accepts Euler rotation curves in parity checks.
 - Humanoid AnimationClip bake now preserves frame-wise body pose and root-motion fidelity.
 - PMX importer failures roll back generated Unity objects instead of leaving partial imported state.

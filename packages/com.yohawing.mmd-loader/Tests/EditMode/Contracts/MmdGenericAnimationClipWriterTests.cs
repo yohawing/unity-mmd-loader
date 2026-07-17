@@ -21,6 +21,57 @@ namespace Mmd.Tests
         private const string MorphVmd = "Packages/com.yohawing.mmd-loader/Tests/Fixtures/Assets/test_vertex_morph_motion.vmd";
 
         [Test]
+        public void DenseBakeBudgetAcceptsExactBoundaryAndRejectsNextKeyEquivalent()
+        {
+            Assert.That(MmdAnimationClipBakeBudget.TryValidate(
+                MmdAnimationClipBakeBudget.MaxDenseKeyEquivalentCount,
+                1,
+                out long acceptedCount,
+                out string acceptedDiagnostic), Is.True);
+            Assert.That(acceptedCount, Is.EqualTo(MmdAnimationClipBakeBudget.MaxDenseKeyEquivalentCount));
+            Assert.That(acceptedDiagnostic, Is.Empty);
+
+            Assert.That(MmdAnimationClipBakeBudget.TryValidate(
+                MmdAnimationClipBakeBudget.MaxDenseKeyEquivalentCount + 1,
+                1,
+                out long rejectedCount,
+                out string rejectedDiagnostic), Is.False);
+            Assert.That(rejectedCount, Is.EqualTo(MmdAnimationClipBakeBudget.MaxDenseKeyEquivalentCount + 1));
+            Assert.That(rejectedDiagnostic, Does.Contain("Narrow Frame Range"));
+        }
+
+        [Test]
+        public void DenseBakeBudgetRejectsOverflowWithoutAllocating()
+        {
+            Assert.That(MmdAnimationClipBakeBudget.TryValidate(
+                int.MaxValue,
+                long.MaxValue,
+                out long rejectedCount,
+                out string diagnostic), Is.False);
+            Assert.That(rejectedCount, Is.EqualTo(long.MaxValue));
+            Assert.That(diagnostic, Does.Contain("Narrow Frame Range"));
+        }
+
+        [Test]
+        public void DenseBakeBudgetAccountsForWriterChannelsAndHumanoidWorkingPose()
+        {
+            Assert.That(MmdAnimationClipBakeBudget.TryValidateGeneric(
+                frameCount: 10,
+                boneCount: 2,
+                morphCount: 3,
+                out long genericCount,
+                out _), Is.True);
+            Assert.That(genericCount, Is.EqualTo(170));
+
+            Assert.That(MmdAnimationClipBakeBudget.TryValidateHumanoid(
+                frameCount: 10,
+                muscleCount: HumanTrait.MuscleCount,
+                out long humanoidCount,
+                out _), Is.True);
+            Assert.That(humanoidCount, Is.EqualTo((HumanTrait.MuscleCount + 9L) * 10));
+        }
+
+        [Test]
         public void BakeUsesNativeSparseTranslationAndEulerCurvesWithPhysicsOff()
         {
             CreateAssets(CubePmx, CubeVmd, out MmdPmxAsset pmx, out MmdVmdAsset vmd);
