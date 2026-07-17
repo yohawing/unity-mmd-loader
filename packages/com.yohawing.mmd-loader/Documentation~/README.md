@@ -1,51 +1,36 @@
-# MMD Loader for Unity
+# unity-mmd-loader
 
-Import PMX models and VMD motions as ordinary Unity assets, place them in a scene, and drive them from Timeline. This documentation describes the `v0.2.0` release candidate for Unity 6000.4 URP on Windows x86_64.
+![unity-mmd-loader](https://raw.githubusercontent.com/yohawing/unity-mmd-loader/main/docs/assets/main-image.png)
 
-## Quick start
+> Credits — Model: [Sour](https://bowlroll.net/file/146103) / Motion: [mobiusP](https://www.nicovideo.jp/watch/sm42576784) / Camera motion: [koko](https://bowlroll.net/file/305434) / Background: [Tojiru](https://seiga.nicovideo.jp/seiga/im11796453)
 
-1. Import the `Basic Playback` sample from Package Manager.
-2. Import a `.pmx` with its referenced textures and drag the imported PMX asset into the Scene or Hierarchy.
-3. Import a `.vmd`, create an `MmdVmdTimelineTrack`, bind the placed playback object, and add the VMD clip.
-4. Scrub in Edit Mode for physics-off animation preview.
-5. Play Timeline forward in Play Mode for Live physics.
-6. For a Unity Humanoid clip, configure the PMX Rig as Humanoid and bake from the imported PMX Avatar and mapping.
+unity-mmd-loader is a plugin for importing PMX / VMD into Unity.
+It provides a native-feel PMX importer, a Timeline-integrated VMD importer, and custom URP-based MMD shaders.
 
-For the complete workflow, see the repository [HOW_TO_USE guide](https://github.com/yohawing/unity-mmd-loader/blob/main/docs/HOW_TO_USE.md).
+[日本語](https://github.com/yohawing/unity-mmd-loader/blob/main/docs/README.ja.md) / [Detailed guide](https://github.com/yohawing/unity-mmd-loader/blob/main/docs/HOW_TO_USE.md)
+
+## Features
+
+- **Treat MMD files as ordinary Unity assets** — PMX / VMD go through Unity's import pipeline instead of a dedicated viewer. Just drop a `.pmx` into the project and it becomes a prefab, with materials and textures set up automatically.
+- **Edit VMD on the Timeline** — VMD motion is handled as Timeline clips. In addition to Humanoid motion, camera and light VMD are also supported.
+- **MMD-style toon rendering** — A URP-based MMD shader brings edges, alpha, and textures closer to the MMD look.
 
 ## Requirements and support
 
 | Item | Current support |
 | --- | --- |
-| Unity | Unity 6000.4, Windows x86_64, Universal Render Pipeline 17 |
-| Models | PMX import and scene placement; PMD is not supported |
-| Motion | Native `mmd-anim` VMD evaluation, Timeline scrub/playback, camera and directional-light motion |
-| Physics | Live physics in Play Mode forward playback; Edit Mode scrub and random access are physics-off |
-| Rendering | URP MMD Toon and URP Lit presets, outline, transparent material order, optional SelfShadow |
-| Humanoid | Rig mapping and Avatar import, plus AnimationClip bake from the imported PMX settings |
-
-## Samples
-
-- `Basic Playback`: ready-to-play, redistributable PMX/VMD assets for the normal import → Scene → Timeline path.
-- `Humanoid Playback`: ready-to-play Humanoid PMX/FBX example with a valid Avatar and Timeline binding, plus source assets for repeating the clip workflow.
-
-## Known limitations
-
-- Overlapping VMD clips select one winner; weighted pose blending is not supported.
-- PMD import and packaged macOS/Linux native binaries are not supported.
-- Live physics is not evaluated during Edit Mode scrub or baked into Humanoid clips.
-- Directional light is the release light path; unsupported projection/light cases report not-ready diagnostics.
-- SelfShadow requires explicit URP RendererFeature setup. Exact MMD/ray-mmd visual parity is not guaranteed.
-- Runtime raw-path loading is a developer diagnostic path and is not distributed as a package sample; imported assets are the normal authoring path.
+| Target environment | Unity 6000.4 / Windows x86_64 / URP |
+| Models | PMX import and scene placement (PMD is not supported) |
+| VMD | Import and Timeline clips. Motion playback is runtime evaluation by [mmd-anim](https://github.com/yohawing/mmd-anim). Camera motion supported |
+| Morphs | Vertex (BlendShape), UV, material, bone, and group morphs |
+| Physics | Real-time physics during normal Play Mode playback |
+| Rendering | URP-based toon, outline, transparent material draw order, and self-shadow |
+| Humanoid | Animator and proxy rig set up automatically on import. Existing motion assets can be retargeted. |
 
 ## Install
 
-Use Unity Package Manager **Add package from git URL**:
+In Unity Package Manager, choose **Add package from git URL**:
 
 ```text
 https://github.com/yohawing/unity-mmd-loader.git?path=packages/com.yohawing.mmd-loader
 ```
-
-## License boundary
-
-The package does not redistribute third-party PMX, VMD, texture, motion, audio, or capture assets. Verify their licenses and keep local verification assets and generated artifacts outside package commits.

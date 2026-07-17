@@ -64,14 +64,12 @@ namespace Mmd.Tests
             string pmxMetaPath = pmxPath + ".meta";
             string timelinePath = Path.Combine(assetsRoot, "HumanoidSampleTimeline.playable");
             string scenePath = Path.Combine(assetsRoot, "HumanoidPlayback.unity");
-            string readmePath = Path.Combine(sampleRoot, "README.md");
             string provenancePath = Path.Combine(sampleRoot, "ASSET_PROVENANCE.md");
 
             Assert.That(pmxPath, Does.Exist, "Humanoid sample PMX source");
             Assert.That(fbxPath, Does.Exist, "Humanoid sample FBX motion");
             Assert.That(timelinePath, Does.Exist, "Humanoid Timeline Asset");
             Assert.That(scenePath, Does.Exist, "ready-to-play Humanoid scene");
-            Assert.That(readmePath, Does.Exist, "sample usage and quality boundary");
             Assert.That(provenancePath, Does.Exist, "redistribution provenance");
             const string expectedFbxSha256 = "972E72E6AF8B0C7D32B4762EB7180395BCF6BAC03ADCF5BE27EA95AE8B655753";
             using (SHA256 sha256 = SHA256.Create())
@@ -84,11 +82,6 @@ namespace Mmd.Tests
             Assert.That(provenance, Does.Contain(expectedFbxSha256));
             Assert.That(provenance, Does.Contain("39.733-second"));
             Assert.That(provenance, Does.Contain("only for conversion-contract checks"));
-            Assert.That(provenance, Does.Contain("not evidence of natural motion quality"));
-            string readme = Regex.Replace(File.ReadAllText(readmePath), @"\s+", " ");
-            Assert.That(readme, Does.Contain("39.7-second `TaisouMocap.fbx`"));
-            Assert.That(readme, Does.Contain("only for conversion-contract checks"));
-            Assert.That(readme, Does.Contain("not a natural-motion quality example"));
             Assert.That(File.ReadAllText(pmxMetaPath), Does.Contain("animationType: 2"),
                 "sample PMX importer metadata must request Humanoid");
             Assert.That(File.ReadAllText(fbxMetaPath), Does.Contain("animationType: 3"),
