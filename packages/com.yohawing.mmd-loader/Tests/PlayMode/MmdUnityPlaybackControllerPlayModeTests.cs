@@ -79,65 +79,6 @@ namespace Mmd.Tests
         }
 
         [UnityTest]
-        public IEnumerator EditableRigLayerAppliesDuringForwardPlayModeTick()
-        {
-            MmdUnityPlaybackBinding? binding = null;
-            try
-            {
-                binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    MmdPlayModeTestFixtures.CreateMinimalTriangleModel(SyntheticPlayModeModelName),
-                    MmdPlayModeTestFixtures.CreateRootTranslationMotion(SyntheticPlayModeModelName),
-                    "playmode-editable-rig-synthetic.pmx",
-                    "playmode-editable-rig-synthetic.vmd");
-                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
-                controller.SetPhysicsMode(MmdPhysicsMode.Off);
-                controller.Configure(binding, 30.0f, playOnStart: true);
-                var layer = binding.Instance.Root.AddComponent<MmdEditableRigLayer>();
-                layer.AddBoneCorrection(
-                    binding.Instance.BoneTransforms[0].name,
-                    0,
-                    new Vector3(0.0f, 0.5f, 0.0f),
-                    Quaternion.identity,
-                    Vector3.zero);
-
-                layer.EditableRigEnabled = false;
-                yield return null;
-                controller.Tick(10.0f / 30.0f);
-
-                Assert.That(controller.CurrentFrame, Is.EqualTo(10));
-                Assert.That(binding.Instance.BoneTransforms[0].localPosition, Is.EqualTo(new Vector3(-2.0f, 0.0f, 0.0f)));
-                Assert.That(controller.LastEditableRigDiagnostics, Is.Not.Null);
-                Assert.That(controller.LastEditableRigDiagnostics!.transformState, Is.EqualTo("native-only"));
-
-                controller.Pause();
-                controller.ApplyFrame(0);
-                layer.EditableRigEnabled = true;
-                layer.LayerWeight = 1.0f;
-                controller.Play();
-                controller.Tick(10.0f / 30.0f);
-
-                Assert.That(controller.CurrentFrame, Is.EqualTo(10));
-                Assert.That(binding.Instance.BoneTransforms[0].localPosition, Is.EqualTo(new Vector3(-2.0f, 0.5f, 0.0f)));
-                Assert.That(controller.LastEditableRigDiagnostics, Is.Not.Null);
-                Assert.That(controller.LastEditableRigDiagnostics!.executionStage, Is.EqualTo("post-native-apply-frame"));
-                Assert.That(controller.LastEditableRigDiagnostics.correctedBoneCount, Is.EqualTo(1));
-
-                controller.ApplyFrame(0);
-                layer.LayerWeight = 0.0f;
-                controller.Play();
-                controller.Tick(10.0f / 30.0f);
-
-                Assert.That(binding.Instance.BoneTransforms[0].localPosition, Is.EqualTo(new Vector3(-2.0f, 0.0f, 0.0f)));
-                Assert.That(controller.LastEditableRigDiagnostics, Is.Not.Null);
-                Assert.That(controller.LastEditableRigDiagnostics!.noOpReason, Is.EqualTo("zero-weight"));
-            }
-            finally
-            {
-                MmdPlayModeTestInstanceScope.DestroyInstance(binding?.Instance);
-            }
-        }
-
-        [UnityTest]
         public IEnumerator StopReturnsToBindFrameInPlayMode()
         {
             MmdUnityPlaybackBinding? binding = null;

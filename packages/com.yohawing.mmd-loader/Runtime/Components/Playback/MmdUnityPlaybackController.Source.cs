@@ -445,7 +445,6 @@ namespace Mmd.UnityIntegration
             binding.Dispose();
             binding = null;
             LastSnapshot = null;
-            LastEditableRigDiagnostics = null;
             IsPlaying = false;
             ResetLivePhysicsDriveSource();
         }
@@ -509,7 +508,6 @@ namespace Mmd.UnityIntegration
             binding?.Dispose();
             binding = null;
             LastSnapshot = null;
-            LastEditableRigDiagnostics = null;
             IsPlaying = false;
             throw new InvalidOperationException(
                 "Timeline evaluation requires mmd-anim native clip playback for VMD asset evaluation. " +

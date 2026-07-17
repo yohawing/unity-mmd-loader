@@ -4,6 +4,10 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 
 ## [Unreleased]
 
+### Removed
+
+- Removed the experimental Editable Rig post-processing layer and its public authoring types.
+
 ## [0.2.0] - 2026-07-17
 
 ### Added
