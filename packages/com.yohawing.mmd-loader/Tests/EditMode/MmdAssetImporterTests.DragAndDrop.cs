@@ -30,19 +30,23 @@ namespace Mmd.Tests
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(TempVmdPath);
             AssetImporter pmxImporter = AssetImporter.GetAtPath(TempPmxPath);
+            AssetImporter vmdImporter = AssetImporter.GetAtPath(TempVmdPath);
             UnityEditor.Editor? pmxEditor = null;
             UnityEditor.Editor? vmdEditor = null;
             UnityEditor.Editor? pmxImporterEditor = null;
+            UnityEditor.Editor? vmdImporterEditor = null;
 
             try
             {
                 pmxEditor = UnityEditor.Editor.CreateEditor(pmxAsset);
                 vmdEditor = UnityEditor.Editor.CreateEditor(vmdAsset);
                 pmxImporterEditor = UnityEditor.Editor.CreateEditor(pmxImporter);
+                vmdImporterEditor = UnityEditor.Editor.CreateEditor(vmdImporter);
 
                 Assert.That(pmxEditor, Is.TypeOf<MmdPmxAssetEditor>());
                 Assert.That(vmdEditor, Is.TypeOf<MmdVmdAssetEditor>());
                 Assert.That(pmxImporterEditor, Is.TypeOf<MmdPmxScriptedImporterEditor>());
+                Assert.That(vmdImporterEditor, Is.TypeOf<MmdVmdScriptedImporterEditor>());
             }
             finally
             {
@@ -59,6 +63,11 @@ namespace Mmd.Tests
                 if (pmxImporterEditor != null)
                 {
                     Object.DestroyImmediate(pmxImporterEditor);
+                }
+
+                if (vmdImporterEditor != null)
+                {
+                    Object.DestroyImmediate(vmdImporterEditor);
                 }
             }
         }

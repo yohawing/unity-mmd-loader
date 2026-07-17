@@ -104,6 +104,7 @@ namespace Mmd.Editor
             if (asset != null)
             {
                 DrawReadOnlySelectableText("Model", string.IsNullOrWhiteSpace(asset.ModelName) ? asset.name : asset.ModelName);
+                DrawAssetActions(asset);
             }
             else
             {
@@ -114,6 +115,55 @@ namespace Mmd.Editor
             if (asset != null)
             {
                 DrawPendingImportSettingsWarning(hasModifiedImportSettings);
+            }
+        }
+
+        private void DrawAssetActions(MmdPmxAsset asset)
+        {
+            EditorGUILayout.Space();
+            using (new EditorGUI.DisabledScope(asset.ByteLength <= 0 || HasModified()))
+            {
+                if (GUILayout.Button("Load PMX Into Scene"))
+                {
+                    MmdEditorPmxLoader.LoadPmxIntoScene(asset);
+                }
+
+                if (GUILayout.Button("Create Prefab from PMX"))
+                {
+                    MmdPmxPrefabExporter.CreatePrefabWithFeedback(asset);
+                }
+
+                if (asset.MissingProjectTextureReferenceCount > 0
+                    && GUILayout.Button("Resolve First Missing Texture..."))
+                {
+                    ResolveFirstMissingTexture(asset);
+                }
+            }
+        }
+
+        private static void ResolveFirstMissingTexture(MmdPmxAsset asset)
+        {
+            string searchRoot = EditorUtility.OpenFolderPanel(
+                "Search Missing PMX Texture",
+                Application.dataPath,
+                string.Empty);
+            if (string.IsNullOrWhiteSpace(searchRoot))
+            {
+                return;
+            }
+
+            MmdPmxMissingTextureResolveResult result =
+                MmdPmxMissingTextureResolver.ResolveFirstMissingTextureReference(asset, searchRoot);
+            if (result.Success)
+            {
+                EditorUtility.DisplayDialog(
+                    "Missing Texture Resolved",
+                    $"Copied {result.Reference} to {result.TargetAssetPath}. PMX reimport was requested.",
+                    "OK");
+            }
+            else
+            {
+                EditorUtility.DisplayDialog("Missing Texture Not Resolved", result.Message, "OK");
             }
         }
 
@@ -198,16 +248,6 @@ namespace Mmd.Editor
             }
 
             bool hasModifiedImportSettings = HasModified();
-            using (new EditorGUI.DisabledScope(asset == null || hasModifiedImportSettings))
-            {
-                if (GUILayout.Button("Bake to AnimationClip..."))
-                {
-                    MmdGenericAnimationClipBakeWindow.OpenFromPmx(
-                        asset,
-                        preferHumanoid: currentType == MmdPmxAnimationType.Humanoid);
-                }
-            }
-
             DrawPendingImportSettingsWarning(hasModifiedImportSettings);
         }
 
