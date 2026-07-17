@@ -10,15 +10,16 @@ namespace Mmd.Tests
     public sealed class MmdAnimationClipBakeWindowTests
     {
         [Test]
-        public void OpenFromPmxPrefillsPmxAndCanDefaultToHumanoid()
+        public void LegacyOpenFromPmxRemainsAsCompatibilityShim()
         {
             MmdPmxAsset pmx = ScriptableObject.CreateInstance<MmdPmxAsset>();
             pmx.Initialize(new byte[] { 1 }, "prefill.pmx", "Assets/prefill.pmx", 1.0f);
             MmdGenericAnimationClipBakeWindow? window = null;
             try
             {
+#pragma warning disable CS0618
                 window = MmdGenericAnimationClipBakeWindow.OpenFromPmx(pmx, preferHumanoid: true);
-
+#pragma warning restore CS0618
                 Assert.That(window.PmxAssetForTests, Is.SameAs(pmx));
                 Assert.That(window.VmdAssetForTests, Is.Null);
                 Assert.That(window.ClipTypeForTests, Is.EqualTo(MmdGenericAnimationClipBakeWindow.ClipType.Humanoid));

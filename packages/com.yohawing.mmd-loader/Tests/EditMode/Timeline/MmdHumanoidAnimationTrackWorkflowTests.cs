@@ -138,6 +138,89 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void DirectlyAddedHumanoidClipUsesAssignedAnimationClipLength()
+        {
+            TimelineAsset? timeline = null;
+            AnimationClip? animationClip = null;
+            try
+            {
+                timeline = ScriptableObject.CreateInstance<TimelineAsset>();
+                MmdHumanoidAnimationTrack track =
+                    timeline.CreateTrack<MmdHumanoidAnimationTrack>(null, "MMD Humanoid");
+                TimelineClip timelineClip = track.CreateClip<MmdHumanoidAnimationClip>();
+                double defaultDuration = timelineClip.duration;
+
+                animationClip = new AnimationClip { frameRate = 30.0f };
+                animationClip.SetCurve(
+                    string.Empty,
+                    typeof(Animator),
+                    ResolveSpineMuscleName(),
+                    AnimationCurve.Linear(0.0f, 0.0f, 2.5f, 0.5f));
+                ((MmdHumanoidAnimationClip)timelineClip.asset).clip = animationClip;
+
+                bool applied = MmdHumanoidAnimationClipEditor.ApplyDurationFromAnimationClip(timelineClip);
+
+                Assert.That(applied, Is.True);
+                Assert.That(timelineClip.duration, Is.EqualTo((double)animationClip.length).Within(0.001));
+                Assert.That(timelineClip.duration, Is.Not.EqualTo(defaultDuration).Within(0.001));
+            }
+            finally
+            {
+                if (timeline != null)
+                {
+                    Object.DestroyImmediate(timeline);
+                }
+
+                if (animationClip != null)
+                {
+                    Object.DestroyImmediate(animationClip);
+                }
+            }
+        }
+
+        [Test]
+        public void DirectlyAddedHumanoidClipKeepsFallbackDurationUntilAnimationClipIsAssigned()
+        {
+            TimelineAsset? timeline = null;
+            AnimationClip? animationClip = null;
+            try
+            {
+                timeline = ScriptableObject.CreateInstance<TimelineAsset>();
+                MmdHumanoidAnimationTrack track =
+                    timeline.CreateTrack<MmdHumanoidAnimationTrack>(null, "MMD Humanoid");
+                TimelineClip timelineClip = track.CreateClip<MmdHumanoidAnimationClip>();
+                double fallbackDuration = timelineClip.duration;
+
+                Assert.That(
+                    MmdHumanoidAnimationClipEditor.ApplyDurationFromAnimationClip(timelineClip),
+                    Is.False);
+                Assert.That(timelineClip.duration, Is.EqualTo(fallbackDuration));
+
+                animationClip = new AnimationClip();
+                ((MmdHumanoidAnimationClip)timelineClip.asset).clip = animationClip;
+
+                Assert.That(animationClip.length, Is.GreaterThan(0.0f),
+                    "Unity assigns a positive runtime length even to a newly created empty AnimationClip");
+                Assert.That(
+                    MmdHumanoidAnimationClipEditor.ApplyDurationFromAnimationClip(timelineClip),
+                    Is.True);
+                Assert.That(timelineClip.duration, Is.EqualTo((double)animationClip.length).Within(0.001));
+            }
+            finally
+            {
+                if (timeline != null)
+                {
+                    Object.DestroyImmediate(timeline);
+                }
+
+                if (animationClip != null)
+                {
+                    Object.DestroyImmediate(animationClip);
+                }
+            }
+        }
+
+        [Test]
         public void HumanoidAnimationClipAutoResolvesProxyAnimatorFromTrackBinding()
         {
             GameObject? root = null;

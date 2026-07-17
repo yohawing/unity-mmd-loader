@@ -28,11 +28,13 @@ namespace Mmd.Editor
         private string? humanoidPlannerError;
         private readonly List<string> diagnostics = new();
 
+        [Obsolete("Use OpenFromVmd so AnimationClip baking starts from the motion asset.")]
         public static MmdGenericAnimationClipBakeWindow Open(MmdPmxAsset? pmxAsset)
         {
             return OpenFromPmx(pmxAsset, preferHumanoid: false);
         }
 
+        [Obsolete("Use OpenFromVmd so AnimationClip baking starts from the motion asset.")]
         public static MmdGenericAnimationClipBakeWindow OpenFromPmx(
             MmdPmxAsset? pmxAsset,
             bool preferHumanoid = false)
