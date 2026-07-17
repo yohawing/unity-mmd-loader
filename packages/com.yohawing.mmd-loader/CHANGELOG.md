@@ -14,7 +14,7 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 
 ### Changed
 
-- Humanoid AnimationClip bake now uses only the Avatar and retarget mapping persisted by PMX Humanoid import; the duplicate setup-asset workflow has been removed.
+- Humanoid AnimationClip bake now uses only the Avatar and retarget mapping persisted by PMX Humanoid import; the duplicate setup-asset workflow and creation UI have been removed. The obsolete `MmdHumanoidSetupAsset` type, preset enum, serialized field layout, original MonoScript GUID, and builder signatures remain as read-only/source-compatible bridges for existing assets and integrations. The builder no longer creates assets and instead directs callers to reimport with `Animation Type = Humanoid`.
 - Live physics now uses the bundled `mmd-anim` Bullet runtime, with the package native runtime aligned to `mmd-anim` `v0.3.0` / remote `main` commit `c3a35e0`.
 - PMX and VMD inspectors now expose a smaller, asset-focused action surface, and no-op importer settings and duplicate scene-action buttons have been removed.
 - Imported playback reconfiguration now treats borrowed scene objects, preview visibility, SelfShadow targets, and transient runtime instances as explicit ownership boundaries.
