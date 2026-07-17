@@ -25,6 +25,7 @@ namespace Mmd.UnityIntegration
         HumanoidRetarget = 2
     }
 
+    [DisallowMultipleComponent]
     public sealed partial class MmdUnityPlaybackController : MonoBehaviour
     {
         private MmdUnityPlaybackBinding? binding;
@@ -82,8 +83,6 @@ namespace Mmd.UnityIntegration
         public GameObject? ConfiguredInstanceRoot => binding?.Instance.Root;
 
         public MmdPlaybackSnapshot? LastSnapshot { get; private set; }
-
-        public MmdEditableRigLayerDiagnostics? LastEditableRigDiagnostics { get; private set; }
 
         public MmdLivePhysicsFrameDiagnostics? LastLivePhysicsDiagnostics =>
             binding?.LastLivePhysicsDiagnostics ?? humanoidPhysicsBinding?.LastLivePhysicsDiagnostics;
@@ -144,7 +143,6 @@ namespace Mmd.UnityIntegration
             playbackFrame = 0.0f;
             CurrentFrame = 0;
             LastSnapshot = null;
-            LastEditableRigDiagnostics = null;
             IsPlaying = false;
             this.playOnStart = playOnStart;
             binding.SetPhysicsMode(physicsMode);
@@ -240,7 +238,6 @@ namespace Mmd.UnityIntegration
                 return ApplyPlaybackPose(() =>
                 {
                     LastSnapshot = binding.ApplyFrame(CurrentFrame, frameRate);
-                    ApplyEditableRigLayer("post-seek-frame");
                     return LastSnapshot;
                 });
             }
@@ -275,7 +272,6 @@ namespace Mmd.UnityIntegration
             return ApplyPlaybackPose(() =>
             {
                 LastSnapshot = binding.ApplyTime(time, playbackFrameRate);
-                ApplyEditableRigLayer("post-native-apply-time");
                 return LastSnapshot;
             });
         }
@@ -305,7 +301,6 @@ namespace Mmd.UnityIntegration
             playbackFrame = 0.0f;
             CurrentFrame = 0;
             LastSnapshot = null;
-            LastEditableRigDiagnostics = null;
         }
 
         public void Tick(float deltaTime)
@@ -426,11 +421,15 @@ namespace Mmd.UnityIntegration
 
         private void OnDestroy()
         {
+            ReleasePlaybackResources();
+        }
+
+        internal void ReleasePlaybackResources()
+        {
             DisposeHumanoidPhysicsBinding();
             binding?.Dispose();
             binding = null;
             LastSnapshot = null;
-            LastEditableRigDiagnostics = null;
             IsPlaying = false;
         }
 
@@ -509,7 +508,6 @@ namespace Mmd.UnityIntegration
                     PrepareLivePhysicsDriveSource(LivePhysicsDriveSource.VmdForward);
                     LastSnapshot = binding.ApplyFrame(0, frameRate);
                     lastVmdLivePhysicsFrameCount = Time.frameCount;
-                    ApplyEditableRigLayer("post-physics-live-frame");
                     return LastSnapshot;
                 });
             }
@@ -528,7 +526,6 @@ namespace Mmd.UnityIntegration
                 PrepareLivePhysicsDriveSource(LivePhysicsDriveSource.VmdForward);
                 LastSnapshot = binding.ApplyLivePhysicsForwardFrame(CurrentFrame, frameRate);
                 lastVmdLivePhysicsFrameCount = Time.frameCount;
-                ApplyEditableRigLayer("post-physics-live-frame");
                 return LastSnapshot;
             }
 
@@ -543,7 +540,6 @@ namespace Mmd.UnityIntegration
                 lastVmdLivePhysicsFrameCount = Time.frameCount;
             }
 
-            ApplyEditableRigLayer(binding.PhysicsMode == MmdPhysicsMode.Live ? "post-physics-live-frame" : "post-native-apply-frame");
             return LastSnapshot;
         }
 

@@ -18,11 +18,17 @@ namespace Mmd.Tests
 {
     public sealed class MmdUnityPlaybackControllerTests
     {
+        [Test]
+        public void PlaybackControllerDisallowsMultipleComponentsOnOneGameObject()
+        {
+            Assert.That(
+                Attribute.IsDefined(typeof(MmdUnityPlaybackController), typeof(DisallowMultipleComponent)),
+                Is.True);
+        }
+
         private const string SyntheticControllerModelName = "minimal-controller-triangle";
         private const string PlaybackPmxId = "test_1bone_cube.pmx";
         private const string PlaybackVmdId = "test_1bone_cube_motion.vmd";
-        private const string ManualIkPmxId = "GeneratedPmx/bdef2-two-bone-strip.pmx";
-        private const int EditableRigPlaybackFrame = 9;
         private const int LivePhysicsPlaybackFrame = 10;
 
         [Test]
@@ -158,7 +164,19 @@ namespace Mmd.Tests
                 var parser = new NativeMmdParser();
                 MmdModelDefinition model = parser.LoadModel(pmxBytes);
                 previewInstance = MmdUnityModelFactory.CreateSkinnedModel(model, pmxPath);
+                previewInstance.RenderingDescriptor.urpMaterialBindings[0].shaderName = "Custom Borrowed Shader";
                 originalMaterial = previewInstance.Materials[0];
+                SkinnedMeshRenderer renderer = previewInstance.SkinnedMeshRenderer!;
+                Mesh originalMesh = renderer.sharedMesh!;
+                Transform borrowedBone = previewInstance.BoneTransforms[0];
+                borrowedBone.localPosition += new Vector3(1.0f, 2.0f, 3.0f);
+                borrowedBone.localRotation = Quaternion.Euler(0.0f, 45.0f, 0.0f);
+                borrowedBone.localScale = new Vector3(1.2f, 0.8f, 1.1f);
+                Vector3 originalBonePosition = borrowedBone.localPosition;
+                Quaternion originalBoneRotation = borrowedBone.localRotation;
+                Vector3 originalBoneScale = borrowedBone.localScale;
+                Transform? originalRootBone = renderer.rootBone;
+                Bounds originalLocalBounds = renderer.localBounds;
 
                 overrideAsset = ScriptableObject.CreateInstance<MmdMaterialOverrideAsset>();
                 overrideAsset.entries = new[]
@@ -182,17 +200,41 @@ namespace Mmd.Tests
                 vmdAsset.Initialize(vmdBytes, "test_1bone_cube_motion.vmd", vmdPath);
 
                 binding = MmdUnityPlaybackBinding.CreateSkinned(previewInstance, pmxAsset, vmdAsset);
+                binding.SetPhysicsMode(MmdPhysicsMode.Off);
 
                 Assert.That(binding.Instance, Is.SameAs(previewInstance));
-                Assert.That(binding.Instance.RenderingDescriptor.materials[0].alpha, Is.EqualTo(0.45f).Within(0.00001f));
-                Assert.That(binding.Instance.RenderingDescriptor.urpMaterialBindings[0].alpha, Is.EqualTo(0.45f).Within(0.00001f));
-                Assert.That(binding.Instance.RenderingDescriptor.urpMaterialBindings[0].isTransparent, Is.True);
-                Assert.That(binding.Instance.Materials[0], Is.Not.SameAs(originalMaterial));
-                Assert.That(ReadMaterialFloat(binding.Instance.Materials[0], MmdMaterialPropertyNames.Alpha), Is.EqualTo(0.45f).Within(0.00001f));
+                Assert.That(binding.PlaybackInstance, Is.Not.SameAs(previewInstance));
+                Assert.That(binding.Instance.Root, Is.SameAs(previewInstance.Root));
+                Assert.That(binding.PlaybackInstance.Mesh, Is.Not.SameAs(originalMesh));
+                Assert.That(renderer.sharedMesh, Is.SameAs(binding.PlaybackInstance.Mesh));
+                Assert.That(binding.PlaybackInstance.BindLocalPositions, Is.EqualTo(previewInstance.BindLocalPositions));
+                Assert.That(binding.PlaybackInstance.BindLocalRotations, Is.EqualTo(previewInstance.BindLocalRotations));
+                Assert.That(binding.PlaybackInstance.RenderingDescriptor.materials[0].alpha, Is.EqualTo(0.45f).Within(0.00001f));
+                Assert.That(binding.PlaybackInstance.RenderingDescriptor.urpMaterialBindings[0].alpha, Is.EqualTo(0.45f).Within(0.00001f));
+                Assert.That(binding.PlaybackInstance.RenderingDescriptor.urpMaterialBindings[0].isTransparent, Is.True);
+                Assert.That(binding.PlaybackInstance.RenderingDescriptor.urpMaterialBindings[0].shaderName, Is.EqualTo("Custom Borrowed Shader"));
+                Assert.That(previewInstance.RenderingDescriptor.urpMaterialBindings[0].shaderName, Is.EqualTo("Custom Borrowed Shader"));
+                Assert.That(previewInstance.RenderingDescriptor.urpMaterialBindings[0].alpha, Is.EqualTo(1.0f).Within(0.00001f));
+                Assert.That(binding.PlaybackInstance.Materials[0], Is.Not.SameAs(originalMaterial));
+                Assert.That(ReadMaterialFloat(binding.PlaybackInstance.Materials[0], MmdMaterialPropertyNames.Alpha), Is.EqualTo(0.45f).Within(0.00001f));
                 Assert.That(ReadMaterialFloat(originalMaterial!, MmdMaterialPropertyNames.Alpha), Is.EqualTo(1.0f).Within(0.00001f));
-                Assert.That(binding.Instance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
-                Assert.That(binding.Instance.MaterialBindingDiagnostics[0].isTransparent, Is.True);
-                Assert.That(binding.Instance.MaterialBindingDiagnostics[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
+                Assert.That(binding.PlaybackInstance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
+                Assert.That(binding.PlaybackInstance.MaterialBindingDiagnostics[0].isTransparent, Is.True);
+                Assert.That(binding.PlaybackInstance.MaterialBindingDiagnostics[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
+                binding.ApplyFrame(9, 30.0f);
+                Assert.That(Quaternion.Angle(borrowedBone.localRotation, originalBoneRotation), Is.GreaterThan(0.1f));
+
+                binding.Dispose();
+                Assert.That(binding.Instance, Is.SameAs(previewInstance));
+                Assert.That(binding.PlaybackInstance, Is.SameAs(previewInstance));
+                Assert.That(renderer.sharedMesh, Is.SameAs(originalMesh));
+                Assert.That(renderer.sharedMaterials[0], Is.SameAs(originalMaterial));
+                Assert.That(renderer.rootBone, Is.SameAs(originalRootBone));
+                Assert.That(renderer.localBounds, Is.EqualTo(originalLocalBounds));
+                Assert.That(borrowedBone.localPosition, Is.EqualTo(originalBonePosition));
+                Assert.That(borrowedBone.localRotation, Is.EqualTo(originalBoneRotation));
+                Assert.That(borrowedBone.localScale, Is.EqualTo(originalBoneScale));
+                binding = null;
             }
             finally
             {
@@ -201,10 +243,6 @@ namespace Mmd.Tests
                 Object.DestroyImmediate(pmxAsset);
                 Object.DestroyImmediate(vmdAsset);
                 Object.DestroyImmediate(overrideAsset);
-                if (originalMaterial != null)
-                {
-                    Object.DestroyImmediate(originalMaterial);
-                }
             }
         }
 
@@ -259,10 +297,18 @@ namespace Mmd.Tests
                 vmdAsset.Initialize(vmdBytes, "test_1bone_cube_motion.vmd", vmdPath);
 
                 binding = MmdUnityPlaybackBinding.CreateSkinned(previewInstance, pmxAsset, vmdAsset);
+                binding.SetPhysicsMode(MmdPhysicsMode.Off);
 
-                Assert.That(binding.Instance.Materials[0], Is.SameAs(remapMaterial));
-                Assert.That(binding.Instance.SkinnedMeshRenderer!.sharedMaterials[0], Is.SameAs(remapMaterial));
+                Assert.That(binding.Instance, Is.SameAs(previewInstance));
+                Assert.That(binding.PlaybackInstance.Materials[0], Is.Not.SameAs(remapMaterial));
+                Assert.That(binding.PlaybackInstance.SkinnedMeshRenderer!.sharedMaterials[0], Is.SameAs(binding.PlaybackInstance.Materials[0]));
+                Assert.That(ReadMaterialFloat(binding.PlaybackInstance.Materials[0], MmdMaterialPropertyNames.Alpha), Is.EqualTo(0.8f).Within(0.00001f));
                 Assert.That(ReadMaterialFloat(remapMaterial, MmdMaterialPropertyNames.Alpha), Is.EqualTo(0.8f).Within(0.00001f));
+
+                binding.Dispose();
+                Assert.That(binding.Instance, Is.SameAs(previewInstance));
+                Assert.That(previewInstance.SkinnedMeshRenderer!.sharedMaterials[0], Is.SameAs(remapMaterial));
+                binding = null;
             }
             finally
             {
@@ -275,6 +321,103 @@ namespace Mmd.Tests
                 {
                     Object.DestroyImmediate(originalMaterial);
                 }
+            }
+        }
+
+        [Test]
+        public void ReconfigureBorrowedInstanceReleasesPreviousPlaybackClonesAndRestoresAuthoredResources()
+        {
+            MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
+            MmdUnityModelInstance? previewInstance = null;
+            MmdUnityPlaybackController? controller = null;
+
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                byte[] pmxBytes = File.ReadAllBytes(pmxPath);
+                byte[] vmdBytes = File.ReadAllBytes(vmdPath);
+                var parser = new NativeMmdParser();
+                previewInstance = MmdUnityModelFactory.CreateSkinnedModel(parser.LoadModel(pmxBytes), pmxPath);
+                SkinnedMeshRenderer renderer = previewInstance.SkinnedMeshRenderer!;
+                Mesh authoredMesh = renderer.sharedMesh!;
+                Material authoredMaterial = renderer.sharedMaterials[0];
+                controller = previewInstance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+
+                pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                pmxAsset.Initialize(pmxBytes, "test_1bone_cube.pmx", pmxPath);
+                vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                vmdAsset.Initialize(vmdBytes, "test_1bone_cube_motion.vmd", vmdPath);
+
+                Mesh? previousPlaybackMesh = null;
+                for (int i = 0; i < 20; i++)
+                {
+                    MmdUnityPlaybackBinding next = MmdUnityPlaybackBinding.CreateSkinned(previewInstance, pmxAsset, vmdAsset);
+                    controller.Configure(next, 30.0f, playOnStart: false);
+
+                    if (i > 0)
+                    {
+                        Assert.That(previousPlaybackMesh == null, Is.True, $"reconfigure {i} must destroy the previous playback Mesh clone");
+                    }
+
+                    previousPlaybackMesh = renderer.sharedMesh;
+                    Assert.That(previousPlaybackMesh, Is.Not.SameAs(authoredMesh));
+                    Assert.That(renderer.sharedMaterials[0], Is.Not.SameAs(authoredMaterial));
+                }
+
+                controller.ReleasePlaybackResources();
+                Assert.That(renderer.sharedMesh, Is.SameAs(authoredMesh));
+                Assert.That(renderer.sharedMaterials[0], Is.SameAs(authoredMaterial));
+                Object.DestroyImmediate(controller);
+                controller = null;
+            }
+            finally
+            {
+                if (controller != null)
+                {
+                    Object.DestroyImmediate(controller);
+                }
+
+                MmdTestInstanceScope.DestroyInstance(previewInstance);
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+            }
+        }
+
+        [Test]
+        public void BorrowedMutationLeaseRestoresPhysicsBodyReadbackState()
+        {
+            MmdUnityModelInstance? previewInstance = null;
+            MmdBorrowedSceneMutationLease? lease = null;
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_hair_physics.pmx");
+                var parser = new NativeMmdParser();
+                MmdModelDefinition model = parser.LoadModel(File.ReadAllBytes(pmxPath));
+                previewInstance = MmdUnityModelFactory.CreateSkinnedModel(model, pmxPath);
+                Assert.That(previewInstance.PhysicsBodies, Is.Not.Empty);
+                MmdUnityPhysicsBody body = previewInstance.PhysicsBodies[0];
+                Assert.That(body.HasNativeTransform, Is.False);
+
+                lease = new MmdBorrowedSceneMutationLease(previewInstance);
+                lease.Activate();
+                body.RecordNativeTransform(
+                    new[] { 1.0f, 2.0f, 3.0f },
+                    new[] { 0.0f, 0.0f, 0.0f, 1.0f });
+                Assert.That(body.HasNativeTransform, Is.True);
+
+                lease.Dispose();
+                lease = null;
+                Assert.That(body.HasNativeTransform, Is.False);
+                Assert.That(body.NativePosition, Is.EqualTo(Vector3.zero));
+                Assert.That(body.NativeRotation, Is.EqualTo(Quaternion.identity));
+            }
+            finally
+            {
+                lease?.Dispose();
+                MmdTestInstanceScope.DestroyInstance(previewInstance);
             }
         }
 
@@ -441,353 +584,6 @@ namespace Mmd.Tests
             finally
             {
                 MmdTestInstanceScope.DestroyInstance(binding?.Instance);
-            }
-        }
-
-        [Test]
-        public void DisabledEditableRigLayerRunsAfterNativeApplyWithoutChangingBoneTransform()
-        {
-            MmdUnityPlaybackBinding? binding = null;
-            try
-            {
-                binding = CreatePlaybackBinding();
-                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
-                controller.Configure(binding, 30.0f);
-                // arbitrary EditMode evaluation (non-zero ApplyFrame for rig diagnostics), not normal Live forward playback
-                controller.SetPhysicsMode(MmdPhysicsMode.Off);
-                var layer = binding.Instance.Root.AddComponent<MmdEditableRigLayer>();
-
-                Quaternion expectedNativeLocalRotation = ExpectedPlaybackLocalRotation(binding);
-
-                MmdPlaybackSnapshot snapshot = controller.ApplyFrame(EditableRigPlaybackFrame);
-
-                Assert.That(snapshot.frame.frame, Is.EqualTo(EditableRigPlaybackFrame));
-                Assert.That(binding.Instance.BoneTransforms[0].localPosition, Is.EqualTo(binding.Instance.BindLocalPositions[0]));
-                Assert.That(Quaternion.Angle(binding.Instance.BoneTransforms[0].localRotation, expectedNativeLocalRotation), Is.LessThan(0.001f));
-                Assert.That(controller.LastEditableRigDiagnostics, Is.Not.Null);
-                Assert.That(controller.LastEditableRigDiagnostics!.layerFound, Is.True);
-                Assert.That(controller.LastEditableRigDiagnostics.editableRigEnabled, Is.False);
-                Assert.That(controller.LastEditableRigDiagnostics.executionStage, Is.EqualTo("post-native-apply-frame"));
-                Assert.That(controller.LastEditableRigDiagnostics.transformState, Is.EqualTo("native-only"));
-                Assert.That(controller.LastEditableRigDiagnostics.noOpReason, Is.EqualTo("layer-disabled"));
-                Assert.That(controller.LastEditableRigDiagnostics.maxLayerDelta, Is.EqualTo(0.0f));
-                Assert.That(layer.EditableRigEnabled, Is.False);
-            }
-            finally
-            {
-                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
-            }
-        }
-
-        [Test]
-        public void ApplyTimeReportsEditableRigPostProcessBoundary()
-        {
-            MmdUnityPlaybackBinding? binding = null;
-            try
-            {
-                binding = CreatePlaybackBinding();
-                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
-                controller.Configure(binding, 30.0f);
-                // arbitrary EditMode evaluation (ApplyTime), not normal Live forward playback
-                controller.SetPhysicsMode(MmdPhysicsMode.Off);
-                binding.Instance.Root.AddComponent<MmdEditableRigLayer>();
-
-                Quaternion expectedNativeLocalRotation = ExpectedPlaybackLocalRotation(binding);
-
-                controller.ApplyTime(EditableRigPlaybackFrame / 30.0f);
-
-                Assert.That(controller.LastEditableRigDiagnostics, Is.Not.Null);
-                Assert.That(controller.LastEditableRigDiagnostics!.executionStage, Is.EqualTo("post-native-apply-time"));
-                Assert.That(controller.LastEditableRigDiagnostics.transformState, Is.EqualTo("native-only"));
-                Assert.That(binding.Instance.BoneTransforms[0].localPosition.x, Is.EqualTo(binding.Instance.BindLocalPositions[0].x).Within(0.00001f));
-                Assert.That(Quaternion.Angle(binding.Instance.BoneTransforms[0].localRotation, expectedNativeLocalRotation), Is.LessThan(0.001f));
-            }
-            finally
-            {
-                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
-            }
-        }
-
-        [Test]
-        public void EnabledEditableRigBoneCorrectionAppliesTargetBoneDeltaWithoutAccumulation()
-        {
-            MmdUnityPlaybackBinding? binding = null;
-            try
-            {
-                binding = CreatePlaybackBinding();
-                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
-                controller.Configure(binding, 30.0f);
-                // arbitrary EditMode evaluation (non-zero ApplyFrame for rig delta), not normal Live forward playback
-                controller.SetPhysicsMode(MmdPhysicsMode.Off);
-                var layer = binding.Instance.Root.AddComponent<MmdEditableRigLayer>();
-                layer.EditableRigEnabled = true;
-                layer.LayerWeight = 0.5f;
-                layer.AddBoneCorrection(
-                    binding.Instance.BoneTransforms[0].name,
-                    boneIndex: -1,
-                    localPositionDelta: new Vector3(0.0f, 2.0f, 0.0f),
-                    localRotationDelta: Quaternion.AngleAxis(90.0f, Vector3.forward),
-                    localScaleDelta: new Vector3(0.0f, 0.0f, 0.4f),
-                    weight: 0.5f);
-
-                Quaternion expectedNativeLocalRotation = ExpectedPlaybackLocalRotation(binding);
-                Quaternion expectedCorrectedLocalRotation =
-                    expectedNativeLocalRotation * Quaternion.AngleAxis(22.5f, Vector3.forward);
-
-                controller.ApplyFrame(EditableRigPlaybackFrame);
-                Vector3 firstPosition = binding.Instance.BoneTransforms[0].localPosition;
-                Quaternion firstRotation = binding.Instance.BoneTransforms[0].localRotation;
-                Vector3 firstScale = binding.Instance.BoneTransforms[0].localScale;
-                controller.ApplyFrame(EditableRigPlaybackFrame);
-
-                Assert.That(Vector3.Distance(firstPosition, binding.Instance.BindLocalPositions[0] + new Vector3(0.0f, 0.5f, 0.0f)), Is.LessThan(0.0001f));
-                Assert.That(Quaternion.Angle(expectedCorrectedLocalRotation, firstRotation), Is.LessThan(0.001f));
-                Assert.That(Vector3.Distance(firstScale, new Vector3(1.0f, 1.0f, 1.1f)), Is.LessThan(0.0001f));
-                Assert.That(Vector3.Distance(binding.Instance.BoneTransforms[0].localPosition, firstPosition), Is.LessThan(0.0001f));
-                Assert.That(Quaternion.Angle(binding.Instance.BoneTransforms[0].localRotation, firstRotation), Is.LessThan(0.0001f));
-                Assert.That(Vector3.Distance(binding.Instance.BoneTransforms[0].localScale, firstScale), Is.LessThan(0.0001f));
-                Assert.That(controller.LastEditableRigDiagnostics, Is.Not.Null);
-                Assert.That(controller.LastEditableRigDiagnostics!.editableRigEnabled, Is.True);
-                Assert.That(controller.LastEditableRigDiagnostics.transformState, Is.EqualTo("post-editable-rig"));
-                Assert.That(controller.LastEditableRigDiagnostics.noOpReason, Is.Empty);
-                Assert.That(controller.LastEditableRigDiagnostics.correctedBoneCount, Is.EqualTo(1));
-                Assert.That(controller.LastEditableRigDiagnostics.maxLayerDelta, Is.GreaterThan(0.0f));
-            }
-            finally
-            {
-                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
-            }
-        }
-
-        [Test]
-        public void EditableRigRejectsUnknownDuplicateAndInvalidCorrections()
-        {
-            MmdUnityPlaybackBinding? binding = null;
-            try
-            {
-                binding = CreatePlaybackBinding();
-                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
-                controller.Configure(binding, 30.0f);
-                // arbitrary EditMode evaluation (non-zero ApplyFrame for rig error cases), not normal Live forward playback
-                controller.SetPhysicsMode(MmdPhysicsMode.Off);
-                var layer = binding.Instance.Root.AddComponent<MmdEditableRigLayer>();
-                layer.EditableRigEnabled = true;
-
-                layer.AddBoneCorrection("missing", -1, Vector3.zero, Quaternion.identity, Vector3.zero);
-                Assert.That(
-                    () => controller.ApplyFrame(EditableRigPlaybackFrame),
-                    Throws.InvalidOperationException.With.Message.Contains("editable-rig-unknown-bone"));
-
-                layer.ClearBoneCorrections();
-                string boneName = binding.Instance.BoneTransforms[0].name;
-                layer.AddBoneCorrection(boneName, -1, Vector3.zero, Quaternion.identity, Vector3.zero);
-                layer.AddBoneCorrection(boneName, -1, Vector3.zero, Quaternion.identity, Vector3.zero);
-                Assert.That(
-                    () => controller.ApplyFrame(EditableRigPlaybackFrame),
-                    Throws.InvalidOperationException.With.Message.Contains("editable-rig-duplicate-bone-correction"));
-
-                layer.ClearBoneCorrections();
-                layer.AddBoneCorrection(boneName, -1, Vector3.zero, Quaternion.identity, Vector3.zero, weight: 1.5f);
-                Assert.That(
-                    () => controller.ApplyFrame(EditableRigPlaybackFrame),
-                    Throws.InvalidOperationException.With.Message.Contains("weight must be finite and in [0, 1]"));
-            }
-            finally
-            {
-                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
-            }
-        }
-
-        [Test]
-        public void EnabledManualIkTargetMovesEffectorTowardExplicitUnityTarget()
-        {
-            MmdUnityPlaybackBinding? binding = null;
-            GameObject? target = null;
-            try
-            {
-                binding = CreateManualIkBinding();
-                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
-                controller.Configure(binding, 30.0f);
-                target = new GameObject("manual-ik-target");
-                target.transform.position = new Vector3(0.7f, 0.7f, 0.0f);
-                (int chainIndex, int effectorIndex) = GetManualIkSlots(binding);
-                float beforeDistance = Vector3.Distance(binding.Instance.BoneTransforms[effectorIndex].position, target.transform.position);
-                var layer = binding.Instance.Root.AddComponent<MmdEditableRigLayer>();
-                layer.EditableRigEnabled = true;
-                layer.AddManualIkTarget(
-                    target.transform,
-                    binding.Instance.BoneTransforms[effectorIndex].name,
-                    effectorBoneIndex: effectorIndex,
-                    chainBoneNames: new[] { binding.Instance.BoneTransforms[chainIndex].name },
-                    chainBoneIndices: new[] { chainIndex },
-                    weight: 1.0f,
-                    iterationLimit: 8);
-
-                controller.ApplyFrame(0);
-
-                float afterDistance = Vector3.Distance(binding.Instance.BoneTransforms[effectorIndex].position, target.transform.position);
-                Assert.That(afterDistance, Is.LessThan(beforeDistance));
-                Assert.That(controller.LastEditableRigDiagnostics, Is.Not.Null);
-                Assert.That(controller.LastEditableRigDiagnostics!.solvedManualIkTargetCount, Is.EqualTo(1));
-                Assert.That(controller.LastEditableRigDiagnostics.skippedManualIkTargetCount, Is.EqualTo(0));
-                Assert.That(controller.LastEditableRigDiagnostics.worstManualIkDistance, Is.EqualTo(afterDistance).Within(0.0001f));
-            }
-            finally
-            {
-                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
-                Object.DestroyImmediate(target);
-            }
-        }
-
-        [Test]
-        public void ManualIkTargetDisabledStateIsObservableNoOp()
-        {
-            MmdUnityPlaybackBinding? binding = null;
-            GameObject? target = null;
-            try
-            {
-                binding = CreateManualIkBinding();
-                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
-                controller.Configure(binding, 30.0f);
-                target = new GameObject("manual-ik-disabled-target");
-                target.transform.position = new Vector3(0.7f, 0.7f, 0.0f);
-                (_, int effectorIndex) = GetManualIkSlots(binding);
-                Vector3 beforePosition = binding.Instance.BoneTransforms[effectorIndex].position;
-                var layer = binding.Instance.Root.AddComponent<MmdEditableRigLayer>();
-                layer.EditableRigEnabled = true;
-                layer.AddManualIkTarget(
-                    target.transform,
-                    string.Empty,
-                    effectorBoneIndex: -1,
-                    chainBoneNames: System.Array.Empty<string>(),
-                    chainBoneIndices: System.Array.Empty<int>(),
-                    weight: 1.0f,
-                    iterationLimit: 8,
-                    enabled: false);
-
-                controller.ApplyFrame(0);
-
-                Assert.That(binding.Instance.BoneTransforms[effectorIndex].position, Is.EqualTo(beforePosition));
-                Assert.That(controller.LastEditableRigDiagnostics, Is.Not.Null);
-                Assert.That(controller.LastEditableRigDiagnostics!.solvedManualIkTargetCount, Is.EqualTo(0));
-                Assert.That(controller.LastEditableRigDiagnostics.skippedManualIkTargetCount, Is.EqualTo(1));
-                Assert.That(controller.LastEditableRigDiagnostics.manualIkSkippedReasons, Does.Contain("disabled"));
-            }
-            finally
-            {
-                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
-                Object.DestroyImmediate(target);
-            }
-        }
-
-        [Test]
-        public void ManualIkZeroWeightTargetSkipsBeforeSolveValidation()
-        {
-            MmdUnityPlaybackBinding? binding = null;
-            GameObject? target = null;
-            try
-            {
-                binding = CreateManualIkBinding();
-                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
-                controller.Configure(binding, 30.0f);
-                target = new GameObject("manual-ik-zero-weight-target");
-                target.transform.position = new Vector3(0.7f, 0.7f, 0.0f);
-                (_, int effectorIndex) = GetManualIkSlots(binding);
-                Vector3 beforePosition = binding.Instance.BoneTransforms[effectorIndex].position;
-                var layer = binding.Instance.Root.AddComponent<MmdEditableRigLayer>();
-                layer.EditableRigEnabled = true;
-                layer.AddManualIkTarget(
-                    target.transform,
-                    string.Empty,
-                    effectorBoneIndex: -1,
-                    chainBoneNames: System.Array.Empty<string>(),
-                    chainBoneIndices: System.Array.Empty<int>(),
-                    weight: 0.0f,
-                    iterationLimit: 8);
-
-                controller.ApplyFrame(0);
-
-                Assert.That(binding.Instance.BoneTransforms[effectorIndex].position, Is.EqualTo(beforePosition));
-                Assert.That(controller.LastEditableRigDiagnostics, Is.Not.Null);
-                Assert.That(controller.LastEditableRigDiagnostics!.solvedManualIkTargetCount, Is.EqualTo(0));
-                Assert.That(controller.LastEditableRigDiagnostics.skippedManualIkTargetCount, Is.EqualTo(1));
-                Assert.That(controller.LastEditableRigDiagnostics.manualIkSkippedReasons, Does.Contain("zero-weight"));
-            }
-            finally
-            {
-                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
-                Object.DestroyImmediate(target);
-            }
-        }
-
-        [Test]
-        public void ManualIkRejectsInvalidChainAndDuplicateEffectorTargets()
-        {
-            MmdUnityPlaybackBinding? binding = null;
-            GameObject? target = null;
-            try
-            {
-                binding = CreateManualIkBinding();
-                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
-                controller.Configure(binding, 30.0f);
-                target = new GameObject("manual-ik-invalid-target");
-                target.transform.position = new Vector3(0.7f, 0.7f, 0.0f);
-                (int chainIndex, int effectorIndex) = GetManualIkSlots(binding);
-                var layer = binding.Instance.Root.AddComponent<MmdEditableRigLayer>();
-                layer.EditableRigEnabled = true;
-                layer.AddManualIkTarget(
-                    target.transform,
-                    binding.Instance.BoneTransforms[effectorIndex].name,
-                    effectorBoneIndex: effectorIndex,
-                    chainBoneNames: System.Array.Empty<string>(),
-                    chainBoneIndices: System.Array.Empty<int>(),
-                    weight: 1.0f,
-                    iterationLimit: 8);
-
-                Assert.That(
-                    () => controller.ApplyFrame(0),
-                    Throws.InvalidOperationException.With.Message.Contains("editable-rig-invalid-manual-ik-chain"));
-
-                layer.ClearManualIkTargets();
-                layer.AddManualIkTarget(
-                    target.transform,
-                    binding.Instance.BoneTransforms[effectorIndex].name,
-                    effectorBoneIndex: effectorIndex,
-                    chainBoneNames: new[] { binding.Instance.BoneTransforms[chainIndex].name, binding.Instance.BoneTransforms[effectorIndex].name },
-                    chainBoneIndices: new[] { chainIndex },
-                    weight: 1.0f,
-                    iterationLimit: 8);
-
-                Assert.That(
-                    () => controller.ApplyFrame(0),
-                    Throws.InvalidOperationException.With.Message.Contains("editable-rig-invalid-manual-ik-chain"));
-
-                layer.ClearManualIkTargets();
-                layer.AddManualIkTarget(
-                    target.transform,
-                    binding.Instance.BoneTransforms[effectorIndex].name,
-                    effectorBoneIndex: effectorIndex,
-                    chainBoneNames: new[] { binding.Instance.BoneTransforms[chainIndex].name },
-                    chainBoneIndices: new[] { chainIndex },
-                    weight: 1.0f,
-                    iterationLimit: 8);
-                layer.AddManualIkTarget(
-                    target.transform,
-                    binding.Instance.BoneTransforms[effectorIndex].name,
-                    effectorBoneIndex: effectorIndex,
-                    chainBoneNames: new[] { binding.Instance.BoneTransforms[chainIndex].name },
-                    chainBoneIndices: new[] { chainIndex },
-                    weight: 1.0f,
-                    iterationLimit: 8);
-
-                Assert.That(
-                    () => controller.ApplyFrame(0),
-                    Throws.InvalidOperationException.With.Message.Contains("editable-rig-duplicate-manual-ik-target"));
-            }
-            finally
-            {
-                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
-                Object.DestroyImmediate(target);
             }
         }
 
@@ -1153,21 +949,6 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void PmxInspectorPhysicsSummaryDoesNotAdvertiseCacheFieldOrHelpBox()
-        {
-            // Contract: MmdAssetInspectorUtility.DrawPhysicsSummary no longer renders
-            // a "Physics Cache" disabled text field or a HelpBox about Cache being reserved.
-            // The removed row was "Physics Cache: Not implemented".
-            // Since DrawPhysicsSummary is GUI-only, we verify via the readiness contract
-            // that GetScaleAwarePhysicsReadiness doesn't leak cache-related strings.
-            var readiness = MmdAssetInspectorUtility.GetScaleAwarePhysicsReadiness(null);
-            Assert.That(readiness.BackendReadbackSpace, Does.Not.Contain("Cache"));
-            Assert.That(readiness.ScaleAwareHandoffReadiness, Does.Not.Contain("Cache"));
-            Assert.That(readiness.RequiredSmoke, Does.Not.Contain("Cache"));
-            Assert.That(readiness.GravityPolicy, Does.Not.Contain("Cache"));
-        }
-
-        [Test]
         public void PlaybackControllerInspectorHidesLegacySourceAndSettingsFieldsFromDefaultDraw()
         {
             string[] excluded = MmdUnityPlaybackControllerEditor.DefaultInspectorExcludedProperties;
@@ -1325,7 +1106,7 @@ namespace Mmd.Tests
         {
             MmdPmxAsset? pmxAsset = null;
             MmdVmdAsset? vmdAsset = null;
-            MmdUnityPlaybackController? controller = null;
+            MmdUnityModelInstance? previewInstance = null;
             try
             {
                 string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
@@ -1334,8 +1115,9 @@ namespace Mmd.Tests
                 pmxAsset.Initialize(File.ReadAllBytes(pmxPath), "test_1bone_cube.pmx", pmxPath, assetImportScale: 1.0f);
                 vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
                 vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
-                var holder = new GameObject("mmd-configure-assets-default-fast-runtime");
-                controller = holder.AddComponent<MmdUnityPlaybackController>();
+                var parser = new NativeMmdParser();
+                previewInstance = MmdUnityModelFactory.CreateSkinnedModel(parser.LoadModel(File.ReadAllBytes(pmxPath)), pmxPath);
+                MmdUnityPlaybackController controller = previewInstance.Root.AddComponent<MmdUnityPlaybackController>();
 
                 controller.ConfigureFromAssets(pmxAsset, vmdAsset, 30.0f, startFrame: 0);
 
@@ -1356,7 +1138,251 @@ namespace Mmd.Tests
             }
             finally
             {
+                MmdTestInstanceScope.DestroyInstance(previewInstance);
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+            }
+        }
+
+        [Test]
+        public void ConfigureFromPlaybackSourceUsesPlaybackConfigInitialFrame()
+        {
+            MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
+            MmdUnityModelInstance? previewInstance = null;
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                byte[] pmxBytes = File.ReadAllBytes(pmxPath);
+                var parser = new NativeMmdParser();
+                previewInstance = MmdUnityModelFactory.CreateSkinnedModel(parser.LoadModel(pmxBytes), pmxPath);
+                pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                pmxAsset.Initialize(pmxBytes, "test_1bone_cube.pmx", pmxPath, assetImportScale: 1.0f);
+                vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
+                MmdUnityPlaybackController controller = previewInstance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+                var config = new MmdPlaybackConfig(frameRate: 30.0f, initialFrame: 9, playOnStart: false);
+
+                controller.ConfigureFromPlaybackSource(pmxAsset, vmdAsset, config);
+
+                Assert.That(controller.CurrentFrame, Is.EqualTo(config.InitialFrame));
+                Assert.That(controller.LastSnapshot, Is.Not.Null);
+                Assert.That(controller.LastSnapshot!.frame.frame, Is.EqualTo(config.InitialFrame));
+            }
+            finally
+            {
+                MmdTestInstanceScope.DestroyInstance(previewInstance);
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+            }
+        }
+
+        [Test]
+        public void ConfigureFromAssetsWithoutSceneModelThrows()
+        {
+            MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
+            MmdUnityPlaybackController? controller = null;
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                pmxAsset.Initialize(File.ReadAllBytes(pmxPath), "test_1bone_cube.pmx", pmxPath, assetImportScale: 1.0f);
+                vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
+                var holder = new GameObject("mmd-configure-assets-no-scene-model");
+                controller = holder.AddComponent<MmdUnityPlaybackController>();
+
+                InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+                    controller.ConfigureFromAssets(
+                        pmxAsset,
+                        vmdAsset,
+                        30.0f,
+                        startFrame: 0,
+                        playOnStart: false))!;
+
+                Assert.That(
+                    exception.Message,
+                    Is.EqualTo(
+                        "MMD playback requires an existing scene PMX model with a SkinnedMeshRenderer to bind motion. " +
+                        "No matching SkinnedMeshRenderer was found for provider model source (test_1bone_cube.pmx)."));
+                Assert.That(controller.IsConfigured, Is.False);
+            }
+            finally
+            {
                 DestroyInstanceFromController(controller);
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+            }
+        }
+
+        [Test]
+        public void ConfigureFromAssetsAppliesStartFrameToExistingSceneModel()
+        {
+            MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
+            MmdUnityModelInstance? previewInstance = null;
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                byte[] pmxBytes = File.ReadAllBytes(pmxPath);
+                var parser = new NativeMmdParser();
+                previewInstance = MmdUnityModelFactory.CreateSkinnedModel(parser.LoadModel(pmxBytes), pmxPath);
+                pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                pmxAsset.Initialize(pmxBytes, "test_1bone_cube.pmx", pmxPath, assetImportScale: 1.0f);
+                vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
+                MmdUnityPlaybackController controller = previewInstance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+                SkinnedMeshRenderer renderer = previewInstance.SkinnedMeshRenderer!;
+                Mesh authoredMesh = renderer.sharedMesh!;
+                Material authoredMaterial = renderer.sharedMaterials[0];
+                Transform? authoredRootBone = renderer.rootBone;
+                Bounds authoredBounds = renderer.localBounds;
+                Transform bone = previewInstance.BoneTransforms[0];
+                bone.localPosition += new Vector3(1.0f, 2.0f, 3.0f);
+                bone.localRotation = Quaternion.Euler(0.0f, 35.0f, 0.0f);
+                bone.localScale = new Vector3(1.2f, 0.8f, 1.1f);
+                Vector3 authoredPosition = bone.localPosition;
+                Quaternion authoredRotation = bone.localRotation;
+                Vector3 authoredScale = bone.localScale;
+                Quaternion expectedRotation = previewInstance.BindLocalRotations[0]
+                    * ToUnityRotation(new[] { -0.3826833665f, 0.0f, 0.0f, 0.9238795638f });
+
+                controller.ConfigureFromAssets(pmxAsset, vmdAsset, 30.0f, startFrame: 9, playOnStart: false);
+                Mesh firstPlaybackMesh = renderer.sharedMesh;
+
+                Assert.That(controller.CurrentFrame, Is.EqualTo(9));
+                Assert.That(
+                    Quaternion.Angle(previewInstance.BoneTransforms[0].localRotation, expectedRotation),
+                    Is.LessThan(0.001f));
+
+                controller.ConfigureFromAssets(pmxAsset, vmdAsset, 30.0f, startFrame: 0, playOnStart: false);
+                Mesh secondPlaybackMesh = renderer.sharedMesh;
+                Assert.That(firstPlaybackMesh == null, Is.True, "reconfigure must destroy the first playback Mesh clone");
+                Assert.That(secondPlaybackMesh, Is.Not.SameAs(authoredMesh));
+
+                controller.ReleasePlaybackResources();
+                Assert.That(secondPlaybackMesh == null, Is.True, "release must destroy the second playback Mesh clone");
+                Assert.That(renderer.sharedMesh, Is.SameAs(authoredMesh));
+                Assert.That(renderer.sharedMaterials[0], Is.SameAs(authoredMaterial));
+                Assert.That(renderer.rootBone, Is.SameAs(authoredRootBone));
+                Assert.That(renderer.localBounds, Is.EqualTo(authoredBounds));
+                Assert.That(bone.localPosition, Is.EqualTo(authoredPosition));
+                Assert.That(bone.localRotation, Is.EqualTo(authoredRotation));
+                Assert.That(bone.localScale, Is.EqualTo(authoredScale));
+            }
+            finally
+            {
+                MmdTestInstanceScope.DestroyInstance(previewInstance);
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+            }
+        }
+
+        [Test]
+        public void ConfigureFromAssetsCompatibilityFailurePreservesCurrentPlaybackBinding()
+        {
+            MmdPmxAsset? pmxAsset = null;
+            MmdPmxAsset? incompatibleAsset = null;
+            MmdVmdAsset? vmdAsset = null;
+            MmdUnityModelInstance? previewInstance = null;
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string incompatiblePath = ResolvePackageFixture("test_append_bone.pmx");
+                string incompatibleMotionPath = ResolvePackageFixture("test_append_bone.vmd");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                byte[] pmxBytes = File.ReadAllBytes(pmxPath);
+                var parser = new NativeMmdParser();
+                previewInstance = MmdUnityModelFactory.CreateSkinnedModel(parser.LoadModel(pmxBytes), pmxPath);
+                pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                pmxAsset.Initialize(pmxBytes, "test_1bone_cube.pmx", pmxPath);
+                incompatibleAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                incompatibleAsset.Initialize(File.ReadAllBytes(incompatiblePath), "test_append_bone.pmx", incompatiblePath);
+                vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
+                MmdUnityPlaybackController controller = previewInstance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+                controller.ConfigureFromAssets(pmxAsset, vmdAsset, 30.0f, startFrame: 9, playOnStart: false);
+                SkinnedMeshRenderer renderer = previewInstance.SkinnedMeshRenderer!;
+                Mesh activePlaybackMesh = renderer.sharedMesh;
+                int revision = controller.ConfigurationRevision;
+
+                InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+                    controller.ConfigureFromAssets(
+                        incompatibleAsset,
+                        vmdAsset,
+                        30.0f,
+                        startFrame: 0,
+                        playOnStart: false))!;
+
+                Assert.That(exception.Message, Does.Contain("bones do not match the PMX bone descriptor"));
+                Assert.That(exception.Message, Does.Not.Contain("No matching SkinnedMeshRenderer"));
+
+                InvalidOperationException rawPathException = Assert.Throws<InvalidOperationException>(() =>
+                    controller.ConfigureFromRuntimeImporterPaths(
+                        incompatiblePath,
+                        incompatibleMotionPath,
+                        new MmdPlaybackConfig(30.0f, 0, playOnStart: false)))!;
+                Assert.That(rawPathException.Message, Does.Contain("bones do not match the PMX bone descriptor"));
+                Assert.That(rawPathException.Message, Does.Not.Contain("No matching SkinnedMeshRenderer"));
+                Assert.That(controller.IsConfigured, Is.True);
+                Assert.That(controller.ConfigurationRevision, Is.EqualTo(revision));
+                Assert.That(controller.CurrentFrame, Is.EqualTo(9));
+                Assert.That(renderer.sharedMesh, Is.SameAs(activePlaybackMesh));
+                Assert.That(activePlaybackMesh == null, Is.False);
+            }
+            finally
+            {
+                MmdTestInstanceScope.DestroyInstance(previewInstance);
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(incompatibleAsset);
+                Object.DestroyImmediate(vmdAsset);
+            }
+        }
+
+        [Test]
+        public void ConfigureMotionFromProviderAssetAppliesStartFrameToExistingSceneModel()
+        {
+            MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
+            MmdUnityModelInstance? previewInstance = null;
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                byte[] pmxBytes = File.ReadAllBytes(pmxPath);
+                var parser = new NativeMmdParser();
+                previewInstance = MmdUnityModelFactory.CreateSkinnedModel(parser.LoadModel(pmxBytes), pmxPath);
+                pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                pmxAsset.Initialize(pmxBytes, "test_1bone_cube.pmx", pmxPath, assetImportScale: 1.0f);
+                vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
+                MmdUnityPlaybackController controller = previewInstance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+                controller.ConfigureModelAsset(pmxAsset);
+                Quaternion expectedRotation = previewInstance.BindLocalRotations[0]
+                    * ToUnityRotation(new[] { -0.3826833665f, 0.0f, 0.0f, 0.9238795638f });
+
+                controller.ConfigureMotionFromProviderModelSource(
+                    vmdAsset,
+                    30.0f,
+                    startFrame: 9,
+                    playOnStart: false);
+
+                Assert.That(controller.CurrentFrame, Is.EqualTo(9));
+                Assert.That(
+                    Quaternion.Angle(previewInstance.BoneTransforms[0].localRotation, expectedRotation),
+                    Is.LessThan(0.001f));
+            }
+            finally
+            {
+                MmdTestInstanceScope.DestroyInstance(previewInstance);
                 Object.DestroyImmediate(pmxAsset);
                 Object.DestroyImmediate(vmdAsset);
             }
@@ -1525,14 +1551,15 @@ namespace Mmd.Tests
         [Test]
         public void RuntimeImporterComponentConfiguresControllerFromRawPaths()
         {
-            MmdUnityPlaybackController? controller = null;
+            MmdUnityModelInstance? previewInstance = null;
             try
             {
                 string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
                 string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
-                var holder = new GameObject("mmd-runtime-importer-source");
-                controller = holder.AddComponent<MmdUnityPlaybackController>();
-                MmdRuntimeImporterComponent importer = holder.AddComponent<MmdRuntimeImporterComponent>();
+                var parser = new NativeMmdParser();
+                previewInstance = MmdUnityModelFactory.CreateSkinnedModel(parser.LoadModel(File.ReadAllBytes(pmxPath)), pmxPath);
+                MmdUnityPlaybackController controller = previewInstance.Root.AddComponent<MmdUnityPlaybackController>();
+                MmdRuntimeImporterComponent importer = previewInstance.Root.AddComponent<MmdRuntimeImporterComponent>();
                 importer.ConfigurePaths(
                     pmxPath,
                     vmdPath,
@@ -1559,22 +1586,23 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstanceFromController(controller);
+                MmdTestInstanceScope.DestroyInstance(previewInstance);
             }
         }
 
         [Test]
         public void RuntimeImporterComponentUsesPlaybackConfigAssetWhenPresent()
         {
-            MmdUnityPlaybackController? controller = null;
+            MmdUnityModelInstance? previewInstance = null;
             MmdPlaybackConfigAsset? configAsset = null;
             try
             {
                 string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
                 string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
-                var holder = new GameObject("mmd-runtime-importer-config-asset");
-                controller = holder.AddComponent<MmdUnityPlaybackController>();
-                MmdRuntimeImporterComponent importer = holder.AddComponent<MmdRuntimeImporterComponent>();
+                var parser = new NativeMmdParser();
+                previewInstance = MmdUnityModelFactory.CreateSkinnedModel(parser.LoadModel(File.ReadAllBytes(pmxPath)), pmxPath);
+                MmdUnityPlaybackController controller = previewInstance.Root.AddComponent<MmdUnityPlaybackController>();
+                MmdRuntimeImporterComponent importer = previewInstance.Root.AddComponent<MmdRuntimeImporterComponent>();
                 importer.ConfigurePaths(
                     pmxPath,
                     vmdPath,
@@ -1602,7 +1630,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstanceFromController(controller);
+                MmdTestInstanceScope.DestroyInstance(previewInstance);
                 if (configAsset != null)
                 {
                     UnityEngine.Object.DestroyImmediate(configAsset);
@@ -1645,7 +1673,7 @@ namespace Mmd.Tests
         {
             MmdPmxAsset? pmxAsset = null;
             MmdVmdAsset? vmdAsset = null;
-            MmdUnityPlaybackController? controller = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 const float frameRate = 30.0f;
@@ -1656,8 +1684,11 @@ namespace Mmd.Tests
                 pmxAsset.Initialize(File.ReadAllBytes(pmxPath), "test_1bone_cube.pmx", pmxPath, assetImportScale: 1.0f);
                 vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
                 vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
-                var holder = new GameObject("mmd-apply-time-fast-runtime");
-                controller = holder.AddComponent<MmdUnityPlaybackController>();
+                var parser = new NativeMmdParser();
+                instance = MmdUnityModelFactory.CreateSkinnedModel(
+                    parser.LoadModel(File.ReadAllBytes(pmxPath)),
+                    pmxPath);
+                MmdUnityPlaybackController controller = instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.ConfigureFromAssets(pmxAsset, vmdAsset, frameRate, startFrame: 0);
                 // ApplyTime random access requires explicit Off (Live does not support); arbitrary EditMode evaluation for fast snapshot test
                 controller.SetPhysicsMode(MmdPhysicsMode.Off);
@@ -1683,7 +1714,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstanceFromController(controller);
+                MmdTestInstanceScope.DestroyInstance(instance);
                 Object.DestroyImmediate(pmxAsset);
                 Object.DestroyImmediate(vmdAsset);
             }
@@ -1768,71 +1799,6 @@ namespace Mmd.Tests
             });
         }
 
-        private static MmdModelDefinition CreateManualIkTwoBoneModel()
-        {
-            var model = new MmdModelDefinition
-            {
-                name = "manual-ik-two-bone"
-            };
-            model.bones.Add(new MmdBoneDefinition
-            {
-                index = 0,
-                name = "root",
-                parentIndex = -1,
-                transformOrder = 0,
-                origin = new[] { 0.0f, 0.0f, 0.0f },
-                isMovable = true,
-                isRotatable = true
-            });
-            model.bones.Add(new MmdBoneDefinition
-            {
-                index = 1,
-                name = "effector",
-                parentIndex = 0,
-                transformOrder = 1,
-                origin = new[] { 0.0f, 1.0f, 0.0f },
-                isMovable = true,
-                isRotatable = true
-            });
-            model.vertices.Add(MmdTestFixtures.CreateSyntheticVertex(0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f));
-            model.vertices.Add(MmdTestFixtures.CreateSyntheticVertex(1, 0.2f, 1.0f, 0.0f, 1.0f, 0.0f));
-            model.vertices.Add(MmdTestFixtures.CreateSyntheticVertex(2, -0.2f, 1.0f, 0.0f, 0.0f, 1.0f));
-            model.indices.AddRange(new[] { 0, 1, 2 });
-            model.materials.Add(new MmdMaterialDefinition
-            {
-                index = 0,
-                name = "manual-ik-material",
-                vertexCount = 3
-            });
-            return model;
-        }
-
-        private static MmdMotionDefinition CreateStaticManualIkMotion()
-        {
-            var motion = new MmdMotionDefinition
-            {
-                targetModelName = "manual-ik-two-bone",
-                maxFrame = 0
-            };
-            motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
-            {
-                boneName = "root",
-                frame = 0,
-                translation = new[] { 0.0f, 0.0f, 0.0f },
-                rotation = new[] { 0.0f, 0.0f, 0.0f, 1.0f },
-                interpolation = MmdTestFixtures.LinearBoneInterpolation()
-            });
-            motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
-            {
-                boneName = "effector",
-                frame = 0,
-                translation = new[] { 0.0f, 0.0f, 0.0f },
-                rotation = new[] { 0.0f, 0.0f, 0.0f, 1.0f },
-                interpolation = MmdTestFixtures.LinearBoneInterpolation()
-            });
-            return motion;
-        }
-
         private static float ReadMaterialFloat(Material material, string propertyName)
         {
             Assert.That(material.HasProperty(propertyName), Is.True, $"Material should expose {propertyName}");
@@ -1914,34 +1880,6 @@ namespace Mmd.Tests
             Assert.That(model.bones, Is.Not.Null.And.Not.Empty);
             Assert.That(model.bones[0].name, Is.Not.Null.And.Not.Empty);
             return model.bones[0].name;
-        }
-
-        private static Quaternion ExpectedPlaybackLocalRotation(MmdUnityPlaybackBinding binding)
-        {
-            float[] expectedMmdLocalRotation = { -0.3826833665f, 0.0f, 0.0f, 0.9238795638f };
-            return binding.Instance.BindLocalRotations[0] * ToUnityRotation(expectedMmdLocalRotation);
-        }
-
-        private static (MmdModelDefinition Model, MmdMotionDefinition Motion) LoadManualIkFixturePair()
-        {
-            var parser = new NativeMmdParser();
-            MmdModelDefinition model = parser.LoadModel(MmdTestFixtures.ReadFixtureAssetBytes(ManualIkPmxId));
-            MmdMotionDefinition motion = parser.LoadMotion(MmdTestFixtures.ReadFixtureAssetBytes(PlaybackVmdId));
-            return (model, motion);
-        }
-
-        private static MmdUnityPlaybackBinding CreateManualIkBinding()
-        {
-            (MmdModelDefinition model, MmdMotionDefinition motion) = LoadManualIkFixturePair();
-            return MmdUnityPlaybackBinding.CreateSkinned(model, motion, ManualIkPmxId, PlaybackVmdId);
-        }
-
-        private static (int ChainIndex, int EffectorIndex) GetManualIkSlots(MmdUnityPlaybackBinding binding)
-        {
-            Assert.That(binding.Instance.BoneTransforms, Has.Length.GreaterThanOrEqualTo(2));
-            int effectorIndex = binding.Instance.BoneTransforms.Length - 1;
-            int chainIndex = Math.Max(0, effectorIndex - 1);
-            return (chainIndex, effectorIndex);
         }
 
         private static (MmdModelDefinition Model, MmdMotionDefinition Motion) LoadAppendFixturePair()

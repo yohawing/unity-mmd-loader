@@ -6,6 +6,17 @@ using UnityEngine;
 
 namespace Mmd.Editor
 {
+    internal enum MmdOutputPathError
+    {
+        None,
+        Empty,
+        Rooted,
+        NotUnderAssets,
+        WrongExtension,
+        EmptyOrDotSegment,
+        EscapesAssets
+    }
+
     internal static class MmdAssetPathUtility
     {
         public static string ResolveAssetSourcePath(string assetPath)
@@ -47,6 +58,64 @@ namespace Mmd.Editor
                 relativeReference,
                 requireExistingFile: false,
                 out resolvedAssetPath);
+        }
+
+        internal static bool TryValidateProjectRelativeOutputPath(
+            string outputPath,
+            string requiredExtension,
+            out string normalizedOutputPath,
+            out MmdOutputPathError error)
+        {
+            normalizedOutputPath = string.Empty;
+            if (string.IsNullOrWhiteSpace(outputPath))
+            {
+                error = MmdOutputPathError.Empty;
+                return false;
+            }
+
+            if (Path.IsPathRooted(outputPath))
+            {
+                error = MmdOutputPathError.Rooted;
+                return false;
+            }
+
+            string normalized = outputPath.Replace('\\', '/');
+            if (!normalized.StartsWith("Assets/", System.StringComparison.Ordinal))
+            {
+                error = MmdOutputPathError.NotUnderAssets;
+                return false;
+            }
+
+            if (!normalized.EndsWith(requiredExtension, System.StringComparison.OrdinalIgnoreCase))
+            {
+                error = MmdOutputPathError.WrongExtension;
+                return false;
+            }
+
+            foreach (string segment in normalized.Split('/'))
+            {
+                if (string.IsNullOrWhiteSpace(segment) || segment == "." || segment == "..")
+                {
+                    error = MmdOutputPathError.EmptyOrDotSegment;
+                    return false;
+                }
+            }
+
+            string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            string assetsRoot = Path.GetFullPath(Application.dataPath);
+            string assetsRootWithSeparator = assetsRoot.TrimEnd(
+                Path.DirectorySeparatorChar,
+                Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            string fullOutputPath = Path.GetFullPath(Path.Combine(projectRoot, normalized));
+            if (!fullOutputPath.StartsWith(assetsRootWithSeparator, System.StringComparison.OrdinalIgnoreCase))
+            {
+                error = MmdOutputPathError.EscapesAssets;
+                return false;
+            }
+
+            normalizedOutputPath = normalized;
+            error = MmdOutputPathError.None;
+            return true;
         }
 
         private static bool TryResolveProjectRelativeAssetPath(

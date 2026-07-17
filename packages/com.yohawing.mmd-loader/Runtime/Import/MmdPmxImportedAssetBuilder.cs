@@ -19,6 +19,36 @@ namespace Mmd.UnityIntegration
     /// </remarks>
     public static class MmdPmxImportedAssetBuilder
     {
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static MmdPmxAsset CreateAndInitializeImportedAsset(
+            byte[] bytes,
+            string assetPath,
+            string resolvedSourcePath,
+            float importScale,
+            string modelPreset,
+            string meshGenerationMode,
+            string materialTexturePolicy,
+            string shaderPreset,
+            MmdPmxParseSummary parseSummary,
+            MmdUnityModelInstance generatedAssets,
+            Material[] materialRemaps,
+            string animationType,
+            MmdMaterialOverrideAsset? materialOverrideAsset = null)
+        {
+            return CreateAndInitializeImportedAsset(
+                bytes,
+                assetPath,
+                resolvedSourcePath,
+                importScale,
+                modelPreset,
+                shaderPreset,
+                parseSummary,
+                generatedAssets,
+                materialRemaps,
+                animationType,
+                materialOverrideAsset);
+        }
+
         /// <summary>
         /// Creates a fresh MmdPmxAsset (ScriptableObject), computes readiness from
         /// the generated hierarchy/root and bone count, then initializes it with
@@ -30,8 +60,6 @@ namespace Mmd.UnityIntegration
             string resolvedSourcePath,
             float importScale,
             string modelPreset,
-            string meshGenerationMode,
-            string materialTexturePolicy,
             string shaderPreset,
             MmdPmxParseSummary parseSummary,
             MmdUnityModelInstance generatedAssets,
@@ -61,30 +89,36 @@ namespace Mmd.UnityIntegration
                 out string boneBindingDiagnostic);
 
             MmdPmxAsset asset = MmdPmxAsset.CreateInstance<MmdPmxAsset>();
-            asset.Initialize(
-                bytes,
-                assetPath,
-                resolvedSourcePath,
-                importScale,
-                modelPreset,
-                meshGenerationMode,
-                materialTexturePolicy,
-                shaderPreset,
-                parseSummary,
-                generatedAssets.Mesh,
-                generatedAssets.Materials,
-                materialRemaps,
-                generatedAssets.Root,
-                hierarchyReadiness,
-                rendererReadiness,
-                boneBindingReadiness,
-                hierarchyDiagnostic,
-                rendererDiagnostic,
-                boneBindingDiagnostic,
-                animationType,
-                materialOverrideAsset);
+            try
+            {
+                asset.InitializeImportedAsset(
+                    bytes,
+                    assetPath,
+                    resolvedSourcePath,
+                    importScale,
+                    modelPreset,
+                    shaderPreset,
+                    parseSummary,
+                    generatedAssets.Mesh,
+                    generatedAssets.Materials,
+                    materialRemaps,
+                    generatedAssets.Root,
+                    hierarchyReadiness,
+                    rendererReadiness,
+                    boneBindingReadiness,
+                    hierarchyDiagnostic,
+                    rendererDiagnostic,
+                    boneBindingDiagnostic,
+                    animationType,
+                    materialOverrideAsset);
 
-            return asset;
+                return asset;
+            }
+            catch
+            {
+                Object.DestroyImmediate(asset);
+                throw;
+            }
         }
     }
 }

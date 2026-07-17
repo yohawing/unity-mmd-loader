@@ -30,44 +30,66 @@ namespace Mmd.UnityIntegration
         {
             Shader shader = ResolveShader(ResolveRequestedShaderName(descriptor), out shaderDiagnostics);
             var materials = new Material[descriptor.materials.Count];
-            for (int i = 0; i < descriptor.materials.Count; i++)
+            try
             {
-                MmdMaterialDescriptor source = descriptor.materials[i];
-                var material = new Material(shader)
+                for (int i = 0; i < descriptor.materials.Count; i++)
                 {
-                    hideFlags = RuntimeGeneratedAssetHideFlags,
-                    name = string.IsNullOrWhiteSpace(source.name)
-                        ? $"MMD Material {source.materialIndex}"
-                        : source.name
-                };
-                ApplyMaterialColors(material, source);
-                MmdMaterialTransparencyMode transparencyMode = ResolveMaterialTransparencyMode(descriptor, source, textureResolution);
-                ApplyMaterialRenderingPolicy(material, source.alpha, transparencyMode, source.cullingPolicy, i);
-                materials[i] = material;
+                    MmdMaterialDescriptor source = descriptor.materials[i];
+                    var material = new Material(shader)
+                    {
+                        hideFlags = RuntimeGeneratedAssetHideFlags,
+                        name = string.IsNullOrWhiteSpace(source.name)
+                            ? $"MMD Material {source.materialIndex}"
+                            : source.name
+                    };
+                    materials[i] = material;
+                    ApplyMaterialColors(material, source);
+                    MmdMaterialTransparencyMode transparencyMode = ResolveMaterialTransparencyMode(descriptor, source, textureResolution);
+                    ApplyMaterialRenderingPolicy(material, source.alpha, transparencyMode, source.cullingPolicy, i);
+                }
+
+                BindDiffuseTextures(descriptor, materials, textureResolution);
+                BindDiagnosticTextures(
+                    descriptor,
+                    textureResolution.SphereTextures,
+                    materials,
+                    textureResolution.Diagnostics,
+                    "_SphereMap",
+                    "sphere");
+                BindDiagnosticTextures(
+                    descriptor,
+                    textureResolution.ToonTextures,
+                    materials,
+                    textureResolution.Diagnostics,
+                    "_ToonMap",
+                    "toon");
+
+                if (IsUrpLitShader(shader))
+                {
+                    ApplyUrpLitDefaults(materials);
+                }
+
+                return materials;
             }
-
-            BindDiffuseTextures(descriptor, materials, textureResolution);
-            BindDiagnosticTextures(
-                descriptor,
-                textureResolution.SphereTextures,
-                materials,
-                textureResolution.Diagnostics,
-                "_SphereMap",
-                "sphere");
-            BindDiagnosticTextures(
-                descriptor,
-                textureResolution.ToonTextures,
-                materials,
-                textureResolution.Diagnostics,
-                "_ToonMap",
-                "toon");
-
-            if (IsUrpLitShader(shader))
+            catch
             {
-                ApplyUrpLitDefaults(materials);
-            }
+                foreach (Material material in materials)
+                {
+                    if (material != null)
+                    {
+                        if (Application.isPlaying)
+                        {
+                            UnityEngine.Object.Destroy(material);
+                        }
+                        else
+                        {
+                            UnityEngine.Object.DestroyImmediate(material);
+                        }
+                    }
+                }
 
-            return materials;
+                throw;
+            }
         }
     }
 }

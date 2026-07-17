@@ -64,7 +64,8 @@ namespace Mmd.UnityIntegration
             string animationTypeLabel,
             System.Collections.Generic.IReadOnlyList<MmdHumanoidBoneMappingOverride>? mappingOverrides = null,
             MmdModelDefinition? model = null,
-            MmdHumanoidRetargetQualitySettings? retargetQualitySettings = null)
+            MmdHumanoidRetargetQualitySettings? retargetQualitySettings = null,
+            GameObject? avatarRoot = null)
         {
             if (!shouldBuildHumanoid)
             {
@@ -88,16 +89,25 @@ namespace Mmd.UnityIntegration
             }
 
             bool keepProxyRoot = false;
+            Avatar? createdAvatar = null;
+            bool keepAvatar = false;
             try
             {
+                if (avatarRoot != null)
+                {
+                    proxyRig.ProxyRoot.transform.SetParent(avatarRoot.transform, worldPositionStays: false);
+                }
+
                 MmdHumanoidAvatarBuildResult avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(
                     proxyRig,
-                    retargetQualitySettings);
+                    retargetQualitySettings,
+                    avatarRoot);
+                createdAvatar = avatarResult.Avatar;
                 diagnostic = CombineDiagnostics(diagnostic, avatarResult.Diagnostics);
 
                 if (!avatarResult.IsValidHumanAvatar || avatarResult.Avatar == null)
                 {
-                    readiness = string.Equals(proxyRig.Readiness, MmdHumanoidSetupAsset.ReadyReadiness, System.StringComparison.Ordinal)
+                    readiness = string.Equals(proxyRig.Readiness, MmdHumanoidMappingReadiness.Ready, System.StringComparison.Ordinal)
                         ? "AvatarInvalid"
                         : proxyRig.Readiness;
                     return new MmdPmxHumanoidAvatarImportResult(null, readiness, diagnostic, mappingDiagnostics);
@@ -113,8 +123,9 @@ namespace Mmd.UnityIntegration
                     BuildRuntimeRetargetBindings(asset, proxyRig);
                 IReadOnlyList<MmdHumanoidAppendTransformBinding> appendBindings =
                     BuildRuntimeAppendTransformBindings(model ?? asset.LoadModel(), asset.ImportedRoot);
-                readiness = MmdHumanoidSetupAsset.ReadyReadiness;
+                readiness = MmdHumanoidMappingReadiness.Ready;
                 keepProxyRoot = true;
+                keepAvatar = true;
                 return new MmdPmxHumanoidAvatarImportResult(
                     avatar,
                     readiness,
@@ -129,6 +140,10 @@ namespace Mmd.UnityIntegration
                 if (!keepProxyRoot)
                 {
                     Object.DestroyImmediate(proxyRig.ProxyRoot);
+                }
+                if (!keepAvatar && createdAvatar != null)
+                {
+                    Object.DestroyImmediate(createdAvatar);
                 }
             }
         }

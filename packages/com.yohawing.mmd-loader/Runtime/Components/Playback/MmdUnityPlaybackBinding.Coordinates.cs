@@ -11,19 +11,19 @@ namespace Mmd.UnityIntegration
     {
         private void RefreshEvaluatedFrameFromUnityTransforms(MmdEvaluatedFrame frame)
         {
-            Transform root = Instance.Root.transform;
-            float importScale = NormalizeImportScale(Instance.ImportScale);
+            Transform root = playbackInstance.Root.transform;
+            float importScale = NormalizeImportScale(playbackInstance.ImportScale);
             foreach (MmdEvaluatedBonePose bonePose in frame.bones)
             {
                 int index = bonePose.index;
-                if (index < 0 || index >= Instance.BoneTransforms.Length)
+                if (index < 0 || index >= playbackInstance.BoneTransforms.Length)
                 {
                     continue;
                 }
 
-                Transform bone = Instance.BoneTransforms[index];
-                Vector3 localDelta = bone.localPosition - Instance.BindLocalPositions[index];
-                Quaternion localRotation = Quaternion.Inverse(Instance.BindLocalRotations[index]) * bone.localRotation;
+                Transform bone = playbackInstance.BoneTransforms[index];
+                Vector3 localDelta = bone.localPosition - playbackInstance.BindLocalPositions[index];
+                Quaternion localRotation = Quaternion.Inverse(playbackInstance.BindLocalRotations[index]) * bone.localRotation;
                 bonePose.localPosition = ToArray(ToMmdModelPosition(localDelta, importScale));
                 bonePose.localRotation = ToArray(ToMmdModelRotation(localRotation));
                 bonePose.localScale = ToArray(bone.localScale);

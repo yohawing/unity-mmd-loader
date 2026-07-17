@@ -9,6 +9,7 @@ namespace Mmd.UnityIntegration
     public sealed class MmdLivePhysicsFrameDiagnostics
     {
         public int frame;
+        public string backendName = string.Empty;
         public float deltaTime;
         public double totalMs;
         public double ensureBackendMs;

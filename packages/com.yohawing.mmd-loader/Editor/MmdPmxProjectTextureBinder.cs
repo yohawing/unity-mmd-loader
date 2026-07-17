@@ -24,16 +24,18 @@ namespace Mmd.Editor
             // so a model with many shared-toon materials adds at most one texture per ramp.
             var sharedToonSubAssets = new Dictionary<int, Texture2D>();
             var summary = new MmdPmxProjectTextureBindingSummaryBuilder();
-
-            int count = System.Math.Min(model.materials.Count, materials.Length);
-            for (int i = 0; i < count; i++)
+            var ownedSubAssets = new List<MmdPmxOwnedTextureSubAsset>();
+            try
             {
-                MmdMaterialDefinition matDef = model.materials[i];
-                Material mat = materials[i];
-                if (mat == null)
+                int count = System.Math.Min(model.materials.Count, materials.Length);
+                for (int i = 0; i < count; i++)
                 {
-                    continue;
-                }
+                    MmdMaterialDefinition matDef = model.materials[i];
+                    Material mat = materials[i];
+                    if (mat == null)
+                    {
+                        continue;
+                    }
 
                 summary.Record(i, "diffuse", matDef.texture, BindOneTextureReference(matDef.texture, pmxAssetPath, mat, ctx, "_BaseMap", "_MainTex"));
                 MmdUnityMaterialBuilder.ApplyDiffuseBoundSideEffects(mat);
@@ -51,7 +53,10 @@ namespace Mmd.Editor
                     // path-based bind above never resolves it. Persist the built-in GoldenOracle
                     // ramp as a sub-asset so the imported material shades through the toon ramp
                     // instead of falling back to flat lighting.
-                    Texture2D? sharedToon = GetOrCreateSharedToonSubAsset(matDef.sharedToonIndex, ctx, sharedToonSubAssets);
+                    Texture2D? sharedToon = GetOrCreateSharedToonSubAsset(
+                        matDef.sharedToonIndex,
+                        sharedToonSubAssets,
+                        ownedSubAssets);
                     if (sharedToon != null && mat.HasProperty("_ToonMap"))
                     {
                         mat.SetTexture("_ToonMap", sharedToon);
@@ -84,35 +89,53 @@ namespace Mmd.Editor
                         diffuseAssetPath = resolvedAssetPath;
                         try
                         {
-                            byte[] texBytes = System.IO.File.ReadAllBytes(resolvedAssetPath);
+                            byte[] texBytes = MmdTextureDecodeBudget.Default.ReadFileBytes(resolvedAssetPath);
                             decodedAlphaTexture = MmdRuntimeTextureResolver.DecodeTextureBytes(
                                 texBytes,
                                 System.IO.Path.GetExtension(resolvedAssetPath),
                                 System.IO.Path.GetFileNameWithoutExtension(resolvedAssetPath));
                         }
-                        catch (System.IO.IOException)
+                        catch (System.Exception ex) when (ex is System.IO.IOException || ex is System.ArgumentException)
                         {
                             decodedAlphaTexture = null;
                         }
                     }
 
-                    MmdUnityMaterialBuilder.ReapplyImportedMaterialTransparency(
-                        mat, descriptor, source, i, matDef.texture, diffuseAssetPath, decodedAlphaTexture);
-
-                    if (decodedAlphaTexture != null)
+                    try
                     {
-                        UnityEngine.Object.DestroyImmediate(decodedAlphaTexture);
+                        MmdUnityMaterialBuilder.ReapplyImportedMaterialTransparency(
+                            mat, descriptor, source, i, matDef.texture, diffuseAssetPath, decodedAlphaTexture);
+                    }
+                    finally
+                    {
+                        if (decodedAlphaTexture != null)
+                        {
+                            UnityEngine.Object.DestroyImmediate(decodedAlphaTexture);
+                        }
                     }
                 }
-            }
+                }
 
-            return summary.Build();
+                return summary.Build(ownedSubAssets);
+            }
+            catch
+            {
+                foreach (MmdPmxOwnedTextureSubAsset ownedSubAsset in ownedSubAssets)
+                {
+                    if (ownedSubAsset.Texture != null)
+                    {
+                        Object.DestroyImmediate(ownedSubAsset.Texture);
+                    }
+                }
+
+                throw;
+            }
         }
 
         private static Texture2D? GetOrCreateSharedToonSubAsset(
             int sharedToonIndex,
-            AssetImportContext ctx,
-            Dictionary<int, Texture2D> cache)
+            Dictionary<int, Texture2D> cache,
+            List<MmdPmxOwnedTextureSubAsset> ownedSubAssets)
         {
             if (cache.TryGetValue(sharedToonIndex, out Texture2D existing))
             {
@@ -129,8 +152,10 @@ namespace Mmd.Editor
             texture.filterMode = FilterMode.Bilinear;
             texture.wrapMode = TextureWrapMode.Clamp;
             texture.name = $"MMD Shared Toon {sharedToonIndex + 1:00}";
-            ctx.AddObjectToAsset($"SharedToon_{sharedToonIndex:00}", texture);
             cache[sharedToonIndex] = texture;
+            ownedSubAssets.Add(new MmdPmxOwnedTextureSubAsset(
+                $"SharedToon_{sharedToonIndex:00}",
+                texture));
             return texture;
         }
 
@@ -199,22 +224,35 @@ namespace Mmd.Editor
                 }
             }
 
-            public MmdPmxProjectTextureBindingSummary Build()
+            public MmdPmxProjectTextureBindingSummary Build(IReadOnlyList<MmdPmxOwnedTextureSubAsset> ownedSubAssets)
             {
-                return new MmdPmxProjectTextureBindingSummary(resolvedCount, missingCount, missingSample);
+                return new MmdPmxProjectTextureBindingSummary(
+                    resolvedCount,
+                    missingCount,
+                    missingSample,
+                    ownedSubAssets);
             }
         }
     }
 
     internal readonly struct MmdPmxProjectTextureBindingSummary
     {
-        public static readonly MmdPmxProjectTextureBindingSummary Empty = new MmdPmxProjectTextureBindingSummary(0, 0, string.Empty);
+        public static readonly MmdPmxProjectTextureBindingSummary Empty = new MmdPmxProjectTextureBindingSummary(
+            0,
+            0,
+            string.Empty,
+            System.Array.Empty<MmdPmxOwnedTextureSubAsset>());
 
-        public MmdPmxProjectTextureBindingSummary(int resolvedReferenceCount, int missingReferenceCount, string? missingReferenceSample)
+        public MmdPmxProjectTextureBindingSummary(
+            int resolvedReferenceCount,
+            int missingReferenceCount,
+            string? missingReferenceSample,
+            IReadOnlyList<MmdPmxOwnedTextureSubAsset>? ownedSubAssets = null)
         {
             ResolvedReferenceCount = System.Math.Max(0, resolvedReferenceCount);
             MissingReferenceCount = System.Math.Max(0, missingReferenceCount);
             MissingReferenceSample = missingReferenceSample ?? string.Empty;
+            OwnedSubAssets = ownedSubAssets ?? System.Array.Empty<MmdPmxOwnedTextureSubAsset>();
         }
 
         public int ResolvedReferenceCount { get; }
@@ -222,5 +260,20 @@ namespace Mmd.Editor
         public int MissingReferenceCount { get; }
 
         public string MissingReferenceSample { get; }
+
+        public IReadOnlyList<MmdPmxOwnedTextureSubAsset> OwnedSubAssets { get; }
+    }
+
+    internal readonly struct MmdPmxOwnedTextureSubAsset
+    {
+        public MmdPmxOwnedTextureSubAsset(string identifier, Texture2D texture)
+        {
+            Identifier = identifier;
+            Texture = texture;
+        }
+
+        public string Identifier { get; }
+
+        public Texture2D Texture { get; }
     }
 }

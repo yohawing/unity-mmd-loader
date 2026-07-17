@@ -312,7 +312,7 @@ namespace Mmd.Tests
         {
             MmdPmxAsset? pmxAsset = null;
             MmdVmdAsset? vmdAsset = null;
-            MmdUnityPlaybackController? controller = null;
+            MmdUnityModelInstance? instance = null;
             try
             {
                 const float frameRate = 30.0f;
@@ -323,8 +323,11 @@ namespace Mmd.Tests
                 pmxAsset.Initialize(File.ReadAllBytes(pmxPath), "test_1bone_cube.pmx", pmxPath, assetImportScale: 1.0f);
                 vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
                 vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
-                var holder = new GameObject("timeline-fast-runtime-apply-time");
-                controller = holder.AddComponent<MmdUnityPlaybackController>();
+                var parser = new NativeMmdParser();
+                instance = MmdUnityModelFactory.CreateSkinnedModel(
+                    parser.LoadModel(File.ReadAllBytes(pmxPath)),
+                    pmxPath);
+                MmdUnityPlaybackController controller = instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.ConfigureFromAssets(pmxAsset, vmdAsset, frameRate, startFrame: 0);
                 var behaviour = new MmdVmdTimelineBehaviour
                 {
@@ -351,11 +354,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                if (controller != null)
-                {
-                    Object.DestroyImmediate(controller.gameObject);
-                }
-
+                MmdTestInstanceScope.DestroyInstance(instance);
                 Object.DestroyImmediate(pmxAsset);
                 Object.DestroyImmediate(vmdAsset);
             }
@@ -458,7 +457,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void TimelinePlaybackSourceEvaluationRebindsProviderAssetsWithoutCreatingRuntimeFallback()
+        public void TimelinePlaybackSourceEvaluationRebindsProviderAssetsToExistingSceneModel()
         {
             MmdPmxAsset? pmxAsset = null;
             MmdVmdAsset? vmdAsset = null;
@@ -581,95 +580,6 @@ namespace Mmd.Tests
             finally
             {
                 MmdVmdTimelineBehaviour.ProcessFrameEvaluated -= OnProcessFrame;
-                if (directorObject != null)
-                {
-                    Object.DestroyImmediate(directorObject);
-                }
-
-                if (timelineAsset != null)
-                {
-                    Object.DestroyImmediate(timelineAsset);
-                }
-
-                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
-            }
-        }
-
-        [Test]
-        public void PlayableDirectorTimelineEvaluateAppliesEditableRigBoundary()
-        {
-            MmdUnityPlaybackBinding? binding = null;
-            GameObject? directorObject = null;
-            TimelineAsset? timelineAsset = null;
-            try
-            {
-                binding = CreatePlaybackBinding();
-                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
-                controller.Configure(binding, 30.0f);
-                var layer = binding.Instance.Root.AddComponent<MmdEditableRigLayer>();
-                layer.AddBoneCorrection(
-                    binding.Instance.BoneTransforms[0].name,
-                    0,
-                    new Vector3(0.0f, 0.5f, 0.0f),
-                    Quaternion.identity,
-                    Vector3.zero);
-
-                timelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
-                MmdVmdTimelineTrack track = timelineAsset.CreateTrack<MmdVmdTimelineTrack>(null, "MMD VMD");
-                TimelineClip clip = track.CreateClip<MmdVmdTimelineClip>();
-                clip.start = 0.0;
-                clip.duration = 1.0;
-                var mmdClip = (MmdVmdTimelineClip)clip.asset;
-                mmdClip.FrameRate = 30.0f;
-                mmdClip.MotionSourceId = PlaybackVmdId;
-
-                directorObject = new GameObject("timeline-editable-rig-director");
-                PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
-                director.playableAsset = timelineAsset;
-                director.SetGenericBinding(track, controller);
-
-                layer.EditableRigEnabled = false;
-                director.time = 9.25 / 30.0;
-                director.Evaluate();
-                Assert.That(binding.Instance.BoneTransforms[0].localPosition, Is.EqualTo(Vector3.zero));
-                Assert.That(Quaternion.Angle(binding.Instance.BoneTransforms[0].localRotation, ExpectedFrameNineUnityRotation(binding)), Is.LessThan(0.001f));
-                Assert.That(controller.LastEditableRigDiagnostics, Is.Not.Null);
-                Assert.That(controller.LastEditableRigDiagnostics!.transformState, Is.EqualTo("native-only"));
-
-                layer.EditableRigEnabled = true;
-                layer.LayerWeight = 1.0f;
-                director.Evaluate();
-                Vector3 enabledPosition = binding.Instance.BoneTransforms[0].localPosition;
-                Assert.That(enabledPosition, Is.EqualTo(new Vector3(0.0f, 0.5f, 0.0f)));
-                Assert.That(controller.LastEditableRigDiagnostics, Is.Not.Null);
-                Assert.That(controller.LastEditableRigDiagnostics!.executionStage, Is.EqualTo("post-native-apply-time"));
-                Assert.That(controller.LastEditableRigDiagnostics.transformState, Is.EqualTo("post-editable-rig"));
-                Assert.That(controller.LastEditableRigDiagnostics.correctedBoneCount, Is.EqualTo(1));
-
-                director.Evaluate();
-                Assert.That(binding.Instance.BoneTransforms[0].localPosition, Is.EqualTo(enabledPosition));
-
-                layer.LayerWeight = 0.0f;
-                director.Evaluate();
-                Assert.That(binding.Instance.BoneTransforms[0].localPosition, Is.EqualTo(Vector3.zero));
-                Assert.That(controller.LastEditableRigDiagnostics, Is.Not.Null);
-                Assert.That(controller.LastEditableRigDiagnostics!.transformState, Is.EqualTo("native-only"));
-                Assert.That(controller.LastEditableRigDiagnostics.noOpReason, Is.EqualTo("zero-weight"));
-
-                layer.LayerWeight = 1.0f;
-                director.Evaluate();
-                Assert.That(binding.Instance.BoneTransforms[0].localPosition, Is.EqualTo(enabledPosition));
-                track.muted = true;
-                director.RebuildGraph();
-                director.Evaluate();
-                Assert.That(binding.Instance.BoneTransforms[0].localPosition, Is.EqualTo(enabledPosition));
-                Assert.That(controller.LastEditableRigDiagnostics, Is.Not.Null);
-                Assert.That(controller.LastEditableRigDiagnostics!.transformState, Is.EqualTo("post-editable-rig"));
-
-                Assert.That(controller.PhysicsMode, Is.EqualTo(MmdPhysicsMode.Live));
-            }
-            finally
-            {
                 if (directorObject != null)
                 {
                     Object.DestroyImmediate(directorObject);

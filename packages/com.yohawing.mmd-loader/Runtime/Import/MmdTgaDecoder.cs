@@ -9,6 +9,11 @@ namespace Mmd.UnityIntegration
     {
         public static Texture2D Decode(byte[] bytes, string textureName)
         {
+            return Decode(bytes, textureName, MmdTextureDecodeBudget.Default);
+        }
+
+        internal static Texture2D Decode(byte[] bytes, string textureName, MmdTextureDecodeBudget budget)
+        {
             if (bytes == null)
             {
                 throw new ArgumentNullException(nameof(bytes));
@@ -18,6 +23,8 @@ namespace Mmd.UnityIntegration
             {
                 throw new ArgumentException("TGA data is too short.", nameof(bytes));
             }
+
+            budget.ValidateInputLength(bytes.LongLength);
 
             int idLength = bytes[0];
             int colorMapType = bytes[1];
@@ -47,13 +54,15 @@ namespace Mmd.UnityIntegration
                 throw new NotSupportedException($"TGA bit depth {bitsPerPixel} is not supported.");
             }
 
+            int pixelCount = budget.ValidateImageAndGetPixelCount(width, height);
+
             int dataOffset = 18 + idLength;
             if (dataOffset > bytes.Length)
             {
                 throw new ArgumentException("TGA image data offset exceeds the file length.", nameof(bytes));
             }
 
-            var pixels = new Color32[checked(width * height)];
+            var pixels = new Color32[pixelCount];
             bool topOrigin = (descriptor & 0x20) != 0;
             bool rightOrigin = (descriptor & 0x10) != 0;
             int bytesPerPixel = bitsPerPixel / 8;
@@ -87,7 +96,7 @@ namespace Mmd.UnityIntegration
             Color32[] pixels)
         {
             int cursor = offset;
-            int pixelCount = width * height;
+            int pixelCount = checked(width * height);
             for (int sourceIndex = 0; sourceIndex < pixelCount; sourceIndex++)
             {
                 if (cursor + bytesPerPixel > bytes.Length)
@@ -112,7 +121,7 @@ namespace Mmd.UnityIntegration
         {
             int cursor = offset;
             int sourceIndex = 0;
-            int pixelCount = width * height;
+            int pixelCount = checked(width * height);
             while (sourceIndex < pixelCount)
             {
                 if (cursor >= bytes.Length)

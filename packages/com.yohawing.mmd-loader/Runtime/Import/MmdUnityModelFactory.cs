@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.Rendering;
 using Mmd.Parser;
@@ -200,7 +201,8 @@ namespace Mmd.UnityIntegration
             string? sourcePath,
             float importScale,
             bool includeSelfShadowTarget = true,
-            MmdMaterialOverrideAsset? materialOverride = null)
+            MmdMaterialOverrideAsset? materialOverride = null,
+            bool preserveExistingSelfShadowTarget = false)
         {
             if (root == null)
             {
@@ -223,9 +225,7 @@ namespace Mmd.UnityIntegration
             MmdMaterialOverrideApplier.ApplyToRenderingDescriptor(materialOverride, descriptor);
 
             Transform modelRoot = FindExistingSkinnedModelRoot(root.transform);
-            SkinnedMeshRenderer renderer = modelRoot.GetComponent<SkinnedMeshRenderer>()
-                ?? root.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true)
-                ?? throw new InvalidOperationException("Existing PMX scene object must contain a SkinnedMeshRenderer.");
+            SkinnedMeshRenderer renderer = ResolveExistingSkinnedMeshRenderer(root, modelRoot);
             Mesh? sharedMesh = renderer.sharedMesh;
             Material[] materials = renderer.sharedMaterials;
             if (materials.Length < descriptor.materials.Count)
@@ -233,16 +233,17 @@ namespace Mmd.UnityIntegration
                 throw new InvalidOperationException("Existing PMX scene SkinnedMeshRenderer material slots do not match the PMX material descriptor.");
             }
 
-            materials = CloneMaterialsForOverride(materials, materialOverride);
-            renderer.sharedMaterials = materials;
-            MmdMaterialOverrideApplier.Apply(materialOverride, materials);
-
             Transform[] boneTransforms = renderer.bones;
             IReadOnlyList<MmdBoneDefinition> orderedBones = CreateOrderedBones(model.bones);
-            if (boneTransforms == null || boneTransforms.Length != orderedBones.Count)
+            ValidateExistingBoneTransforms(orderedBones, boneTransforms);
+            var rollback = new MmdExistingSceneRebindLease(root);
+            try
             {
-                throw new InvalidOperationException("Existing PMX scene SkinnedMeshRenderer bones do not match the PMX bone descriptor.");
-            }
+
+            materials = CloneMaterialsForOverride(materials, materialOverride);
+            rollback.AdoptGeneratedMaterials(materials);
+            MmdMaterialOverrideApplier.Apply(materialOverride, materials);
+            renderer.sharedMaterials = materials;
 
             ResetExistingBoneTransformsToBindPose(orderedBones, boneTransforms, scale);
             renderer.rootBone = boneTransforms.Length > 0 ? boneTransforms[0] : modelRoot;
@@ -260,6 +261,7 @@ namespace Mmd.UnityIntegration
             else
             {
                 mesh = BuildMesh(descriptor, scale);
+                rollback.AdoptGeneratedMesh(mesh);
                 ApplySkinning(mesh, descriptor, orderedBones, boneTransforms, modelRoot);
                 BakeVertexMorphBlendShapes(mesh, descriptor, scale);
                 mesh.name = sharedMesh == null || string.IsNullOrWhiteSpace(sharedMesh.name)
@@ -268,10 +270,10 @@ namespace Mmd.UnityIntegration
                 renderer.sharedMesh = mesh;
             }
             MmdShaderBindingDiagnostics shaderDiagnostics = MmdUnityMaterialBuilder.BuildExistingShaderDiagnostics(renderer);
-            ApplySelfShadowTargetPolicy(root, modelRoot, includeSelfShadowTarget);
+            ApplySelfShadowTargetPolicy(root, modelRoot, includeSelfShadowTarget, preserveExistingSelfShadowTarget);
 
             MmdUnityPhysicsBody[] physicsBodies = root.GetComponentsInChildren<MmdUnityPhysicsBody>(includeInactive: true);
-            return new MmdUnityModelInstance(
+            var instance = new MmdUnityModelInstance(
                 root,
                 mesh,
                 materials,
@@ -285,6 +287,77 @@ namespace Mmd.UnityIntegration
                 new MmdTextureBindingDiagnostics(),
                 shaderDiagnostics,
                 scale);
+            rollback.Commit();
+            return instance;
+            }
+            catch
+            {
+                rollback.RollbackFactoryFailure();
+                throw;
+            }
+        }
+
+        internal static SkinnedMeshRenderer ResolveExistingSkinnedMeshRenderer(GameObject root)
+        {
+            if (root == null)
+            {
+                throw new ArgumentNullException(nameof(root));
+            }
+
+            return ResolveExistingSkinnedMeshRenderer(root, FindExistingSkinnedModelRoot(root.transform));
+        }
+
+        internal static void ValidateExistingSkinnedModelCompatibility(GameObject root, MmdModelDefinition model)
+        {
+            if (root == null)
+            {
+                throw new ArgumentNullException(nameof(root));
+            }
+
+            if (model == null)
+            {
+                throw new ArgumentNullException(nameof(model));
+            }
+
+            if (model.bones == null || model.bones.Count == 0)
+            {
+                throw new ArgumentException("Existing skinned MMD model rebinding requires at least one bone.", nameof(model));
+            }
+
+            MmdRenderingDescriptor descriptor = BuildRuntimeRenderingDescriptor(model);
+            ValidateDescriptor(descriptor);
+            SkinnedMeshRenderer renderer = ResolveExistingSkinnedMeshRenderer(root);
+            if (renderer.sharedMaterials.Length < descriptor.materials.Count)
+            {
+                throw new InvalidOperationException("Existing PMX scene SkinnedMeshRenderer material slots do not match the PMX material descriptor.");
+            }
+
+            ValidateExistingBoneTransforms(CreateOrderedBones(model.bones), renderer.bones);
+        }
+
+        private static SkinnedMeshRenderer ResolveExistingSkinnedMeshRenderer(GameObject root, Transform modelRoot)
+        {
+            return modelRoot.GetComponent<SkinnedMeshRenderer>()
+                ?? root.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true)
+                ?? throw new InvalidOperationException("Existing PMX scene object must contain a SkinnedMeshRenderer.");
+        }
+
+        private static void ValidateExistingBoneTransforms(
+            IReadOnlyList<MmdBoneDefinition> orderedBones,
+            Transform[]? boneTransforms)
+        {
+            if (boneTransforms == null || boneTransforms.Length != orderedBones.Count)
+            {
+                throw new InvalidOperationException("Existing PMX scene SkinnedMeshRenderer bones do not match the PMX bone descriptor.");
+            }
+
+            for (int i = 0; i < boneTransforms.Length; i++)
+            {
+                if (boneTransforms[i] == null)
+                {
+                    throw new InvalidOperationException($"Existing PMX scene bone at index {i} is missing.");
+                }
+            }
         }
 
         private static Material[] CloneMaterialsForOverride(Material[] materials, MmdMaterialOverrideAsset? materialOverride)
@@ -295,21 +368,40 @@ namespace Mmd.UnityIntegration
             }
 
             var clones = new Material[materials.Length];
-            for (int i = 0; i < materials.Length; i++)
+            try
             {
-                Material source = materials[i];
-                if (source == null)
+                for (int i = 0; i < materials.Length; i++)
                 {
-                    continue;
+                    Material source = materials[i];
+                    if (source == null)
+                    {
+                        continue;
+                    }
+
+                    clones[i] = new Material(source)
+                    {
+                        name = source.name
+                    };
                 }
 
-                clones[i] = new Material(source)
-                {
-                    name = source.name
-                };
+                return clones;
             }
+            catch
+            {
+                foreach (Material clone in clones.Where(material => material != null))
+                {
+                    if (Application.isPlaying)
+                    {
+                        UnityEngine.Object.Destroy(clone);
+                    }
+                    else
+                    {
+                        UnityEngine.Object.DestroyImmediate(clone);
+                    }
+                }
 
-            return clones;
+                throw;
+            }
         }
 
         private static MmdRenderingDescriptor BuildRuntimeRenderingDescriptor(
@@ -338,36 +430,47 @@ namespace Mmd.UnityIntegration
             MmdMaterialOverrideApplier.ApplyToRenderingDescriptor(materialOverride, descriptor);
 
             var root = new GameObject(ResolveModelName(modelName));
-            Transform modelRoot = CreateModelRoot(root.transform);
-            var mesh = BuildMesh(descriptor, importScale);
-            MmdRuntimeTextureResolution textureResolution = MmdRuntimeTextureResolver.ResolveDiffuseTextures(descriptor, sourceContext);
-            Material[] materials = MmdUnityMaterialBuilder.BuildMaterials(descriptor, textureResolution, out MmdShaderBindingDiagnostics shaderDiagnostics);
-            MmdMaterialOverrideApplier.Apply(materialOverride, materials);
-            Transform[] boneTransforms = BuildBoneTransforms(modelRoot, bones, importScale);
-            MmdUnityPhysicsBody[] physicsBodies = BuildPhysicsBodies(modelRoot, bones, boneTransforms, physics, importScale);
+            Mesh? mesh = null;
+            Material[] materials = Array.Empty<Material>();
+            MmdRuntimeTextureResolution? textureResolution = null;
+            try
+            {
+                Transform modelRoot = CreateModelRoot(root.transform);
+                mesh = BuildMesh(descriptor, importScale);
+                textureResolution = MmdRuntimeTextureResolver.ResolveDiffuseTextures(descriptor, sourceContext);
+                materials = MmdUnityMaterialBuilder.BuildMaterials(descriptor, textureResolution, out MmdShaderBindingDiagnostics shaderDiagnostics);
+                MmdMaterialOverrideApplier.Apply(materialOverride, materials);
+                Transform[] boneTransforms = BuildBoneTransforms(modelRoot, bones, importScale);
+                MmdUnityPhysicsBody[] physicsBodies = BuildPhysicsBodies(modelRoot, bones, boneTransforms, physics, importScale);
 
-            var meshFilter = modelRoot.gameObject.AddComponent<MeshFilter>();
-            meshFilter.sharedMesh = mesh;
+                var meshFilter = modelRoot.gameObject.AddComponent<MeshFilter>();
+                meshFilter.sharedMesh = mesh;
 
-            var meshRenderer = modelRoot.gameObject.AddComponent<MeshRenderer>();
-            meshRenderer.sharedMaterials = materials;
-            ApplyRendererShadowPolicy(meshRenderer);
-            ApplySelfShadowTargetPolicy(root, modelRoot, includeSelfShadowTarget);
+                var meshRenderer = modelRoot.gameObject.AddComponent<MeshRenderer>();
+                meshRenderer.sharedMaterials = materials;
+                ApplyRendererShadowPolicy(meshRenderer);
+                ApplySelfShadowTargetPolicy(root, modelRoot, includeSelfShadowTarget);
 
-            return new MmdUnityModelInstance(
-                root,
-                mesh,
-                materials,
-                descriptor,
-                boneTransforms,
-                physicsBodies,
-                meshRenderer,
-                skinnedMeshRenderer: null,
-                sourceContext,
-                GetOwnedTextures(textureResolution),
-                textureResolution.Diagnostics,
-                shaderDiagnostics,
-                importScale);
+                return new MmdUnityModelInstance(
+                    root,
+                    mesh,
+                    materials,
+                    descriptor,
+                    boneTransforms,
+                    physicsBodies,
+                    meshRenderer,
+                    skinnedMeshRenderer: null,
+                    sourceContext,
+                    GetOwnedTextures(textureResolution),
+                    textureResolution.Diagnostics,
+                    shaderDiagnostics,
+                    importScale);
+            }
+            catch
+            {
+                DestroyGeneratedModelArtifacts(root, mesh, materials, textureResolution);
+                throw;
+            }
         }
 
         private static MmdUnityModelInstance CreateSkinnedModel(
@@ -384,38 +487,94 @@ namespace Mmd.UnityIntegration
             MmdMaterialOverrideApplier.ApplyToRenderingDescriptor(materialOverride, descriptor);
 
             var root = new GameObject(ResolveModelName(modelName));
-            Transform modelRoot = CreateModelRoot(root.transform);
-            Transform[] boneTransforms = BuildBoneTransforms(modelRoot, bones, importScale);
-            MmdUnityPhysicsBody[] physicsBodies = BuildPhysicsBodies(modelRoot, bones, boneTransforms, physics, importScale);
-            var mesh = BuildMesh(descriptor, importScale);
-            ApplySkinning(mesh, descriptor, bones, boneTransforms, modelRoot);
-            BakeVertexMorphBlendShapes(mesh, descriptor, importScale);
-            MmdRuntimeTextureResolution textureResolution = MmdRuntimeTextureResolver.ResolveDiffuseTextures(descriptor, sourceContext);
-            Material[] materials = MmdUnityMaterialBuilder.BuildMaterials(descriptor, textureResolution, out MmdShaderBindingDiagnostics shaderDiagnostics);
-            MmdMaterialOverrideApplier.Apply(materialOverride, materials);
+            Mesh? mesh = null;
+            Material[] materials = Array.Empty<Material>();
+            MmdRuntimeTextureResolution? textureResolution = null;
+            try
+            {
+                Transform modelRoot = CreateModelRoot(root.transform);
+                Transform[] boneTransforms = BuildBoneTransforms(modelRoot, bones, importScale);
+                MmdUnityPhysicsBody[] physicsBodies = BuildPhysicsBodies(modelRoot, bones, boneTransforms, physics, importScale);
+                mesh = BuildMesh(descriptor, importScale);
+                ApplySkinning(mesh, descriptor, bones, boneTransforms, modelRoot);
+                BakeVertexMorphBlendShapes(mesh, descriptor, importScale);
+                textureResolution = MmdRuntimeTextureResolver.ResolveDiffuseTextures(descriptor, sourceContext);
+                materials = MmdUnityMaterialBuilder.BuildMaterials(descriptor, textureResolution, out MmdShaderBindingDiagnostics shaderDiagnostics);
+                MmdMaterialOverrideApplier.Apply(materialOverride, materials);
 
-            var renderer = modelRoot.gameObject.AddComponent<SkinnedMeshRenderer>();
-            renderer.sharedMesh = mesh;
-            renderer.sharedMaterials = materials;
-            renderer.bones = boneTransforms;
-            renderer.rootBone = boneTransforms.Length > 0 ? boneTransforms[0] : modelRoot;
-            ApplyRendererShadowPolicy(renderer);
-            ApplySelfShadowTargetPolicy(root, modelRoot, includeSelfShadowTarget);
+                var renderer = modelRoot.gameObject.AddComponent<SkinnedMeshRenderer>();
+                renderer.sharedMesh = mesh;
+                renderer.sharedMaterials = materials;
+                renderer.bones = boneTransforms;
+                renderer.rootBone = boneTransforms.Length > 0 ? boneTransforms[0] : modelRoot;
+                ApplyRendererShadowPolicy(renderer);
+                ApplySelfShadowTargetPolicy(root, modelRoot, includeSelfShadowTarget);
 
-            return new MmdUnityModelInstance(
-                root,
-                mesh,
-                materials,
-                descriptor,
-                boneTransforms,
-                physicsBodies,
-                meshRenderer: null,
-                skinnedMeshRenderer: renderer,
-                sourceContext,
-                GetOwnedTextures(textureResolution),
-                textureResolution.Diagnostics,
-                shaderDiagnostics,
-                importScale);
+                return new MmdUnityModelInstance(
+                    root,
+                    mesh,
+                    materials,
+                    descriptor,
+                    boneTransforms,
+                    physicsBodies,
+                    meshRenderer: null,
+                    skinnedMeshRenderer: renderer,
+                    sourceContext,
+                    GetOwnedTextures(textureResolution),
+                    textureResolution.Diagnostics,
+                    shaderDiagnostics,
+                    importScale);
+            }
+            catch
+            {
+                DestroyGeneratedModelArtifacts(root, mesh, materials, textureResolution);
+                throw;
+            }
+        }
+
+        private static void DestroyGeneratedModelArtifacts(
+            GameObject root,
+            Mesh? mesh,
+            Material[] materials,
+            MmdRuntimeTextureResolution? textureResolution)
+        {
+            DestroyGeneratedObject(root);
+            DestroyGeneratedObject(mesh);
+            foreach (Material material in materials)
+            {
+                DestroyGeneratedObject(material);
+            }
+
+            if (textureResolution == null)
+            {
+                return;
+            }
+
+            var destroyedTextureIds = new HashSet<int>();
+            foreach (Texture2D texture in GetOwnedTextures(textureResolution))
+            {
+                if (texture != null && destroyedTextureIds.Add(texture.GetInstanceID()))
+                {
+                    DestroyGeneratedObject(texture);
+                }
+            }
+        }
+
+        private static void DestroyGeneratedObject(UnityEngine.Object? value)
+        {
+            if (value == null)
+            {
+                return;
+            }
+
+            if (Application.isPlaying)
+            {
+                UnityEngine.Object.Destroy(value);
+            }
+            else
+            {
+                UnityEngine.Object.DestroyImmediate(value);
+            }
         }
 
         private static Transform CreateModelRoot(Transform root)
@@ -434,7 +593,11 @@ namespace Mmd.UnityIntegration
             renderer.receiveShadows = true;
         }
 
-        private static void ApplySelfShadowTargetPolicy(GameObject root, Transform modelRoot, bool includeSelfShadowTarget)
+        private static void ApplySelfShadowTargetPolicy(
+            GameObject root,
+            Transform modelRoot,
+            bool includeSelfShadowTarget,
+            bool preserveExistingTarget = false)
         {
             if (includeSelfShadowTarget)
             {
@@ -449,6 +612,11 @@ namespace Mmd.UnityIntegration
             }
 
             existingTarget.enabled = false;
+            if (preserveExistingTarget)
+            {
+                return;
+            }
+
             if (Application.isPlaying)
             {
                 UnityEngine.Object.Destroy(existingTarget);

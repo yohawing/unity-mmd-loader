@@ -4,6 +4,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using NUnit.Framework;
 using Mmd.Native;
 using Mmd.Parser;
@@ -138,6 +139,261 @@ namespace Mmd.Tests
             AssertRuntimeFfiSignature("VmdSelfShadowTrackSample", typeof(byte), typeof(IntPtr), typeof(float), typeof(float[]), typeof(IntPtr));
             AssertRuntimeFfiSignature("VmdSelfShadowTrackFree", typeof(void), typeof(IntPtr));
             AssertRuntimeFfiSignature("VmdCameraTrackFree", typeof(void), typeof(IntPtr));
+        }
+
+        [Test]
+        public void RuntimeFfiPinsClipFrameBatchEntrypoints()
+        {
+            AssertRuntimeFfiSignature(
+                "InstanceClipFrameBatchWorldMatrixF32Len",
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr));
+            AssertRuntimeFfiSignature(
+                "InstanceClipFrameBatchMorphWeightF32Len",
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr));
+            AssertRuntimeFfiSignature(
+                "InstanceEvaluateClipFrameBatch",
+                typeof(byte),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(float),
+                typeof(float),
+                typeof(IntPtr),
+                typeof(uint),
+                typeof(float[]),
+                typeof(IntPtr),
+                typeof(float[]),
+                typeof(IntPtr));
+        }
+
+        [Test]
+        public void RuntimeFfiPinsSparseReducedCurveEntrypointsWithoutDenseSampleBinding()
+        {
+            AssertRuntimeFfiSignature(
+                "ReducedPoseCreateFromDense",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(ulong),
+                typeof(float[]),
+                typeof(IntPtr),
+                typeof(float[]),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(float),
+                typeof(float),
+                typeof(uint),
+                typeof(MmdRuntimeFfiMethods.ReductionTolerances),
+                typeof(IntPtr).MakeByRefType());
+            AssertRuntimeFfiSignature("ReducedPoseFree", typeof(void), typeof(IntPtr));
+            AssertRuntimeFfiSignature(
+                "ReducedPoseUnityCurveCount",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(float),
+                typeof(bool),
+                typeof(IntPtr).MakeByRefType());
+            AssertRuntimeFfiSignature(
+                "ReducedPoseUnityCurveDescriptor",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(float),
+                typeof(bool),
+                typeof(IntPtr),
+                typeof(MmdRuntimeFfiMethods.UnityCurveDescriptor).MakeByRefType());
+            AssertRuntimeFfiSignature(
+                "ReducedPoseUnityCurveKeys",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(float),
+                typeof(bool),
+                typeof(IntPtr),
+                typeof(MmdRuntimeFfiMethods.UnityCurveKey[]),
+                typeof(IntPtr),
+                typeof(IntPtr).MakeByRefType());
+            Assert.That(
+                typeof(MmdRuntimeFfiMethods).GetMethod(
+                    "ReducedPoseSample", BindingFlags.NonPublic | BindingFlags.Static),
+                Is.Null,
+                "the transitional dense reduced-pose sampler must not have a managed binding");
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.ReductionTolerances>(), Is.EqualTo(20));
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.UnityCurveKey>(), Is.EqualTo(16));
+            Assert.That(
+                Marshal.SizeOf<MmdRuntimeFfiMethods.UnityCurveDescriptor>(),
+                Is.EqualTo(IntPtr.Size == 8 ? 24 : 16));
+            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.ReductionTolerances>("localPosition").ToInt32(), Is.EqualTo(0));
+            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.ReductionTolerances>("localRotationRadians").ToInt32(), Is.EqualTo(4));
+            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.ReductionTolerances>("worldPosition").ToInt32(), Is.EqualTo(8));
+            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.ReductionTolerances>("worldRotationRadians").ToInt32(), Is.EqualTo(12));
+            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.ReductionTolerances>("morphWeight").ToInt32(), Is.EqualTo(16));
+            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.UnityCurveDescriptor>("semantic").ToInt32(), Is.EqualTo(0));
+            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.UnityCurveDescriptor>("targetIndex").ToInt32(), Is.EqualTo(4));
+            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.UnityCurveDescriptor>("axis").ToInt32(), Is.EqualTo(8));
+            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.UnityCurveDescriptor>("keyCount").ToInt32(), Is.EqualTo(IntPtr.Size == 8 ? 16 : 12));
+            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.UnityCurveKey>("timeSeconds").ToInt32(), Is.EqualTo(0));
+            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.UnityCurveKey>("value").ToInt32(), Is.EqualTo(4));
+            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.UnityCurveKey>("inTangent").ToInt32(), Is.EqualTo(8));
+            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.UnityCurveKey>("outTangent").ToInt32(), Is.EqualTo(12));
+
+            foreach (string methodName in new[]
+                     {
+                         "ReducedPoseCreateFromDense",
+                         "ReducedPoseFree",
+                         "ReducedPoseUnityCurveCount",
+                         "ReducedPoseUnityCurveDescriptor",
+                         "ReducedPoseUnityCurveKeys"
+                     })
+            {
+                DllImportAttribute import = GetRuntimeFfiMethod(methodName).GetCustomAttribute<DllImportAttribute>()!;
+                Assert.That(import, Is.Not.Null, methodName);
+                Assert.That(import.CallingConvention, Is.EqualTo(CallingConvention.Cdecl), methodName);
+            }
+
+            foreach (string methodName in new[]
+                     {
+                         "ReducedPoseUnityCurveCount",
+                         "ReducedPoseUnityCurveDescriptor",
+                         "ReducedPoseUnityCurveKeys"
+                     })
+            {
+                ParameterInfo flipZ = GetRuntimeFfiMethod(methodName).GetParameters()[2];
+                MarshalAsAttribute marshalAs = flipZ.GetCustomAttribute<MarshalAsAttribute>()!;
+                Assert.That(marshalAs, Is.Not.Null, methodName + " flipZ");
+                Assert.That(marshalAs.Value, Is.EqualTo(UnmanagedType.I1), methodName + " flipZ");
+            }
+        }
+
+        [Test]
+        public void ReducedPoseZeroKeyBufferUsesSharedEmptyArray()
+        {
+            MmdRuntimeFfiMethods.UnityCurveKey[] keys =
+                MmdRuntimeReducedPose.AllocateUnityCurveKeyBuffer(IntPtr.Zero);
+            Assert.That(keys, Is.SameAs(Array.Empty<MmdRuntimeFfiMethods.UnityCurveKey>()));
+        }
+
+        [Test]
+        public void ReducedPoseDenseInputHasExplicitMemorySafetyLimit()
+        {
+            const int WorldFloatsPerFrame = 16;
+            int allowedFrames = checked((int)(
+                MmdRuntimeFfiPlaybackSession.MaxReductionInputBytes /
+                (WorldFloatsPerFrame * sizeof(float))));
+
+            Assert.DoesNotThrow(() => MmdRuntimeFfiPlaybackSession.ThrowIfReductionInputTooLarge(
+                WorldFloatsPerFrame, 0, allowedFrames));
+            MmdRuntimeReductionInputTooLargeException exception =
+                Assert.Throws<MmdRuntimeReductionInputTooLargeException>(() =>
+                MmdRuntimeFfiPlaybackSession.ThrowIfReductionInputTooLarge(
+                    WorldFloatsPerFrame, 0, allowedFrames + 1))!;
+            Assert.That(exception.Message, Does.Contain("safety limit"));
+        }
+
+        [Test]
+        public void UnityAnimationClipReductionKeepsPositionErrorWithinOneCentimeter()
+        {
+            MmdRuntimeFfiMethods.ReductionTolerances tolerances =
+                MmdRuntimeFfiMethods.ReductionTolerances.ForUnityAnimationClip(0.1f);
+
+            Assert.That(tolerances.localPosition * 0.1f, Is.EqualTo(0.01f).Within(1.0e-7f));
+            Assert.That(tolerances.localRotationRadians, Is.EqualTo(0.005f));
+            Assert.That(tolerances.worldPosition * 0.1f, Is.EqualTo(0.01f).Within(1.0e-7f));
+            Assert.That(tolerances.worldRotationRadians, Is.EqualTo(0.005f));
+            Assert.That(tolerances.morphWeight, Is.EqualTo(0.0001f));
+
+            MmdRuntimeFfiMethods.ReductionTolerances unitScale =
+                MmdRuntimeFfiMethods.ReductionTolerances.ForUnityAnimationClip(1.0f);
+            Assert.That(unitScale.localPosition, Is.EqualTo(0.01f));
+            Assert.That(unitScale.worldPosition, Is.EqualTo(0.01f));
+
+            MmdRuntimeFfiMethods.ReductionTolerances highPrecision =
+                MmdRuntimeFfiMethods.ReductionTolerances.ForUnityAnimationClip(
+                    0.1f,
+                    highPrecision: true);
+            Assert.That(
+                highPrecision.localPosition * 0.1f,
+                Is.EqualTo(0.001f).Within(1.0e-7f));
+            Assert.That(
+                highPrecision.worldPosition * 0.1f,
+                Is.EqualTo(0.001f).Within(1.0e-7f));
+        }
+
+        [Test]
+        public void RuntimeFfiClipFrameBatchMatchesSequentialEvaluation()
+        {
+#if !UNITY_EDITOR_WIN
+            Assert.Ignore("mmd-runtime batch playback is only distributed for the Windows Editor.");
+#endif
+            byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube.pmx");
+            byte[] vmdBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube_motion.vmd");
+            using var session = MmdRuntimeFfiPlaybackSession.Create(pmxBytes, vmdBytes);
+            const int frameCount = 3;
+            var batchWorld = new float[session.WorldMatrixFloatCount * frameCount];
+            var batchMorphs = new float[session.MorphWeightCount * frameCount];
+
+            session.EvaluateBatch(0.0f, 1.0f, frameCount, 0, batchWorld, batchMorphs);
+
+            var sequentialWorld = new float[session.WorldMatrixFloatCount];
+            var sequentialMorphs = new float[session.MorphWeightCount];
+            var sequentialIk = new byte[session.IkEnabledCount];
+            for (int frame = 0; frame < frameCount; frame++)
+            {
+                session.EvaluateAndCopy(frame, sequentialWorld, sequentialMorphs, sequentialIk);
+                CollectionAssert.AreEqual(
+                    sequentialWorld,
+                    batchWorld.Skip(frame * session.WorldMatrixFloatCount)
+                        .Take(session.WorldMatrixFloatCount)
+                        .ToArray(),
+                    $"world matrices at frame {frame}");
+                CollectionAssert.AreEqual(
+                    sequentialMorphs,
+                    batchMorphs.Skip(frame * session.MorphWeightCount)
+                        .Take(session.MorphWeightCount)
+                        .ToArray(),
+                    $"morph weights at frame {frame}");
+            }
+        }
+
+        [Test]
+        public void ReducedPoseEnumeratesSparseKeysAfterSourceSessionIsDisposed()
+        {
+#if !UNITY_EDITOR_WIN
+            Assert.Ignore("mmd-runtime reduced curves are only distributed for the Windows Editor.");
+#endif
+            byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube.pmx");
+            byte[] vmdBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube_motion.vmd");
+            MmdRuntimeReducedPose reducedPose;
+            using (var session = MmdRuntimeFfiPlaybackSession.Create(pmxBytes, vmdBytes))
+            {
+                reducedPose = session.ReduceBatch(
+                    0.0f, 10, 0, MmdRuntimeFfiMethods.ReductionTolerances.Default);
+            }
+
+            try
+            {
+                int curveCount = reducedPose.GetUnityCurveCount(30.0f, true);
+                Assert.That(curveCount, Is.EqualTo(6), "one bone exposes translation XYZ and Euler XYZ");
+                for (int curveIndex = 0; curveIndex < curveCount; curveIndex++)
+                {
+                    MmdRuntimeFfiMethods.UnityCurveDescriptor descriptor =
+                        reducedPose.GetUnityCurveDescriptor(30.0f, true, curveIndex);
+                    MmdRuntimeFfiMethods.UnityCurveKey[] keys =
+                        reducedPose.GetUnityCurveKeys(30.0f, true, curveIndex);
+                    Assert.That(keys.Length, Is.EqualTo(descriptor.keyCount.ToInt64()));
+                    Assert.That(keys, Is.Not.Empty);
+                    Assert.That(keys.All(key =>
+                        float.IsFinite(key.timeSeconds) &&
+                        float.IsFinite(key.value) &&
+                        float.IsFinite(key.inTangent) &&
+                        float.IsFinite(key.outTangent)), Is.True);
+                }
+            }
+            finally
+            {
+                reducedPose.Dispose();
+                reducedPose.Dispose();
+            }
         }
 
         [Test]
@@ -284,10 +540,18 @@ namespace Mmd.Tests
 
         private static void AssertRuntimeFfiSignature(string methodName, Type returnType, params Type[] parameterTypes)
         {
-            MethodInfo method = typeof(MmdRuntimeFfiMethods).GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Static);
+            MethodInfo method = GetRuntimeFfiMethod(methodName);
             Assert.That(method, Is.Not.Null, methodName);
             Assert.That(method.ReturnType, Is.EqualTo(returnType), methodName);
             CollectionAssert.AreEqual(parameterTypes, method.GetParameters().Select(parameter => parameter.ParameterType).ToArray(), methodName);
+        }
+
+        private static MethodInfo GetRuntimeFfiMethod(string methodName)
+        {
+            MethodInfo? method = typeof(MmdRuntimeFfiMethods).GetMethod(
+                methodName, BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.That(method, Is.Not.Null, methodName);
+            return method!;
         }
 
         private static void AssertCameraSample(float[] values)

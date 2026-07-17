@@ -2,6 +2,46 @@
 
 All notable changes to `com.yohawing.mmd-loader` are documented here.
 
+## [Unreleased]
+
+### Removed
+
+- Removed the experimental Editable Rig post-processing layer and its public authoring types.
+- Removed unused PMX/VMD Inspector readiness helpers, the unconnected Generic AnimationClip parity verifier, and the SelfShadow RendererFeature setup warning UI.
+- Removed automatic generated-model playback fallback, its transient runtime marker, and the public `allowRuntimeFallback` overload parameters; playback now requires a matching scene `SkinnedMeshRenderer`.
+
+## [0.2.0] - 2026-07-17
+
+### Added
+
+- Explicit Generic and Humanoid AnimationClip bake workflows for imported PMX/VMD assets, including frame-range controls, batched native sampling, sparse reduced curves, parity checks, and safe project-relative output paths.
+- Humanoid bake round-trip coverage and Timeline authoring support that synchronizes directly assigned Humanoid clips to their AnimationClip duration.
+- Bounded texture decoding and adversarial import coverage for PNG, JPEG, BMP, DDS, and TGA inputs.
+
+### Changed
+
+- Humanoid AnimationClip bake now uses only the Avatar and retarget mapping persisted by PMX Humanoid import; the duplicate setup-asset workflow and creation UI have been removed. The obsolete `MmdHumanoidSetupAsset` type, preset enum, serialized field layout, original MonoScript GUID, and builder signatures remain as read-only/source-compatible bridges for existing assets and integrations. The builder no longer creates assets and instead directs callers to reimport with `Animation Type = Humanoid`.
+- Live physics now uses the bundled `mmd-anim` Bullet runtime, with the package native runtime aligned to `mmd-anim` `v0.3.0` / remote `main` commit `c3a35e0`.
+- PMX and VMD inspectors now expose a smaller, asset-focused action surface, and no-op importer settings and duplicate scene-action buttons have been removed.
+- Imported playback reconfiguration now treats borrowed scene objects, preview visibility, SelfShadow targets, and transient runtime instances as explicit ownership boundaries.
+
+### Fixed
+
+- Generic and Humanoid AnimationClip writers reject oversized dense bake ranges before allocating unbounded managed key buffers, and failed Humanoid writes now release unreturned clips.
+- Generic sparse AnimationClip bake now preserves Unity coordinate conversion and accepts Euler rotation curves in parity checks.
+- Humanoid AnimationClip bake now preserves frame-wise body pose and root-motion fidelity.
+- PMX importer failures roll back generated Unity objects instead of leaving partial imported state.
+- Runtime texture references are sandboxed to approved asset roots, and oversized or malformed texture inputs are rejected before unbounded decode allocation.
+- Playback rebind paths restore borrowed scene state and dispose owned runtime instances.
+- PMX draw-edge materials render outlines again after the material-policy refactor.
+
+### Known Limitations
+
+- macOS and Linux native binaries are not distributed in the package.
+- Timeline random access keeps physics off; Live physics is limited to Play Mode forward playback.
+- Raw VMD Timeline clips use deterministic hard-cut selection rather than weighted blending.
+- Humanoid bake does not include Live physics, facial morphs, or native MMD IK/helper behavior.
+
 ## [0.1.3] - 2026-07-11
 
 ### Added
@@ -76,7 +116,7 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 - Default PMX import scale of 0.1 for human-friendly meter-scale models, with import-scale-aware Live physics and VMD camera framing.
 - Humanoid rig setup at import (Animator plus a persistent proxy control rig) with retargeted playback that drives the real MMD bones and append (付与) transforms and steps Live physics.
 - Unified MmdHumanoidAnimationTrack: a single Timeline track poses the Humanoid avatar and drives the native MMD model via retarget side-effect, replacing the former two-track setup.
-- Explicit Humanoid AnimationClip bake path when PMX, VMD, and Humanoid setup prerequisites are ready.
+- Explicit Humanoid AnimationClip bake path when PMX, VMD, and imported Humanoid prerequisites are ready.
 - Windows x86_64 packaged native runtime binaries (mmd-anim v0.1.5).
 
 ### Known Limitations

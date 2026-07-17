@@ -279,12 +279,10 @@ namespace Mmd
         [SerializeField] private string sourcePath = string.Empty;
         [SerializeField] private float importScale = DefaultImportScale;
         [SerializeField] private string modelPreset = "Custom";
-        [SerializeField] private string meshGenerationMode = "SingleMesh";
-        [SerializeField] private string materialTexturePolicy = "ResolveReferencesOnly";
         [SerializeField] private string animationType = "Generic";
         [SerializeField] private string shaderPreset = "MmdBasicUrpToon";
         [SerializeField] private Avatar? importedAvatar;
-        [SerializeField] private string humanoidAvatarReadiness = MmdHumanoidSetupAsset.NotEvaluatedReadiness;
+        [SerializeField] private string humanoidAvatarReadiness = MmdHumanoidMappingReadiness.NotEvaluated;
         [SerializeField] private string humanoidAvatarDiagnostic = string.Empty;
         [SerializeField] private MmdHumanoidBoneMappingDiagnosticSummary humanoidBoneMappingDiagnostics =
             MmdHumanoidBoneMappingDiagnosticSummary.Empty;
@@ -333,9 +331,11 @@ namespace Mmd
 
         public string ModelPreset => modelPreset;
 
-        public string MeshGenerationMode => meshGenerationMode;
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public string MeshGenerationMode => "SingleMesh";
 
-        public string MaterialTexturePolicy => materialTexturePolicy;
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public string MaterialTexturePolicy => "ResolveReferencesOnly";
 
         public string AnimationType => animationType;
 
@@ -419,6 +419,7 @@ namespace Mmd
 
         public GameObject? ImportedRoot => importedRoot;
 
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
         public void Initialize(
             byte[] bytes,
             string assetSourceId,
@@ -427,6 +428,49 @@ namespace Mmd
             string assetModelPreset = "Custom",
             string assetMeshGenerationMode = "SingleMesh",
             string assetMaterialTexturePolicy = "ResolveReferencesOnly",
+            string assetShaderPreset = "MmdBasicUrpToon",
+            MmdPmxParseSummary? parseSummary = null,
+            Mesh? importedMeshAsset = null,
+            Material[]? importedMaterialAssets = null,
+            Material[]? materialRemapAssets = null,
+            GameObject? importedRootAsset = null,
+            MmdImportReadiness hierarchyReadinessValue = MmdImportReadiness.NotEvaluated,
+            MmdImportReadiness rendererReadinessValue = MmdImportReadiness.NotEvaluated,
+            MmdImportReadiness boneBindingReadinessValue = MmdImportReadiness.NotEvaluated,
+            string? hierarchyReadinessDiagnosticValue = null,
+            string? rendererReadinessDiagnosticValue = null,
+            string? boneBindingReadinessDiagnosticValue = null,
+            string assetAnimationType = "Generic",
+            MmdMaterialOverrideAsset? importedMaterialOverrideAsset = null)
+        {
+            InitializeImportedAsset(
+                bytes,
+                assetSourceId,
+                assetSourcePath,
+                assetImportScale,
+                assetModelPreset,
+                assetShaderPreset,
+                parseSummary,
+                importedMeshAsset,
+                importedMaterialAssets,
+                materialRemapAssets,
+                importedRootAsset,
+                hierarchyReadinessValue,
+                rendererReadinessValue,
+                boneBindingReadinessValue,
+                hierarchyReadinessDiagnosticValue,
+                rendererReadinessDiagnosticValue,
+                boneBindingReadinessDiagnosticValue,
+                assetAnimationType,
+                importedMaterialOverrideAsset);
+        }
+
+        internal void InitializeImportedAsset(
+            byte[] bytes,
+            string assetSourceId,
+            string assetSourcePath,
+            float assetImportScale = DefaultImportScale,
+            string assetModelPreset = "Custom",
             string assetShaderPreset = "MmdBasicUrpToon",
             MmdPmxParseSummary? parseSummary = null,
             Mesh? importedMeshAsset = null,
@@ -452,13 +496,11 @@ namespace Mmd
             sourcePath = assetSourcePath ?? string.Empty;
             importScale = NormalizeImportScale(assetImportScale);
             modelPreset = NormalizeSummaryValue(assetModelPreset, "Custom");
-            meshGenerationMode = NormalizeSummaryValue(assetMeshGenerationMode, "SingleMesh");
-            materialTexturePolicy = NormalizeSummaryValue(assetMaterialTexturePolicy, "ResolveReferencesOnly");
             animationType = NormalizeSummaryValue(assetAnimationType, "Generic");
             shaderPreset = NormalizeSummaryValue(assetShaderPreset, "MmdBasicUrpToon");
             importedAvatar = null;
             humanoidAvatarReadiness = string.Equals(animationType, "Humanoid", StringComparison.Ordinal)
-                ? MmdHumanoidSetupAsset.NotEvaluatedReadiness
+                ? MmdHumanoidMappingReadiness.NotEvaluated
                 : "NotRequested";
             humanoidAvatarDiagnostic = string.Equals(animationType, "Humanoid", StringComparison.Ordinal)
                 ? "humanoid-avatar: not evaluated"
@@ -492,7 +534,7 @@ namespace Mmd
         {
             animationType = NormalizeSummaryValue(assetAnimationType, "Generic");
             importedAvatar = avatar;
-            humanoidAvatarReadiness = NormalizeSummaryValue(readiness, MmdHumanoidSetupAsset.NotEvaluatedReadiness);
+            humanoidAvatarReadiness = NormalizeSummaryValue(readiness, MmdHumanoidMappingReadiness.NotEvaluated);
             humanoidAvatarDiagnostic = diagnostic ?? string.Empty;
             humanoidBoneMappingDiagnostics = mappingDiagnostics ?? MmdHumanoidBoneMappingDiagnosticSummary.Empty;
         }

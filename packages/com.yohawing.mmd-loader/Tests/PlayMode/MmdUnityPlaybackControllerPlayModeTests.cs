@@ -5,6 +5,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using NUnit.Framework;
 using UnityEngine;
@@ -70,65 +71,6 @@ namespace Mmd.Tests
                 Assert.That(binding.Instance.BoneTransforms[0].localPosition, Is.EqualTo(new Vector3(-2.0f, 0.0f, 0.0f)));
                 s_playOnStartForwardPlayback = true;
                 s_smokeReport = CreateSmokeReport(controller, binding.Instance.BoneTransforms[0].localPosition);
-            }
-            finally
-            {
-                MmdPlayModeTestInstanceScope.DestroyInstance(binding?.Instance);
-            }
-        }
-
-        [UnityTest]
-        public IEnumerator EditableRigLayerAppliesDuringForwardPlayModeTick()
-        {
-            MmdUnityPlaybackBinding? binding = null;
-            try
-            {
-                binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    MmdPlayModeTestFixtures.CreateMinimalTriangleModel(SyntheticPlayModeModelName),
-                    MmdPlayModeTestFixtures.CreateRootTranslationMotion(SyntheticPlayModeModelName),
-                    "playmode-editable-rig-synthetic.pmx",
-                    "playmode-editable-rig-synthetic.vmd");
-                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
-                controller.SetPhysicsMode(MmdPhysicsMode.Off);
-                controller.Configure(binding, 30.0f, playOnStart: true);
-                var layer = binding.Instance.Root.AddComponent<MmdEditableRigLayer>();
-                layer.AddBoneCorrection(
-                    binding.Instance.BoneTransforms[0].name,
-                    0,
-                    new Vector3(0.0f, 0.5f, 0.0f),
-                    Quaternion.identity,
-                    Vector3.zero);
-
-                layer.EditableRigEnabled = false;
-                yield return null;
-                controller.Tick(10.0f / 30.0f);
-
-                Assert.That(controller.CurrentFrame, Is.EqualTo(10));
-                Assert.That(binding.Instance.BoneTransforms[0].localPosition, Is.EqualTo(new Vector3(-2.0f, 0.0f, 0.0f)));
-                Assert.That(controller.LastEditableRigDiagnostics, Is.Not.Null);
-                Assert.That(controller.LastEditableRigDiagnostics!.transformState, Is.EqualTo("native-only"));
-
-                controller.Pause();
-                controller.ApplyFrame(0);
-                layer.EditableRigEnabled = true;
-                layer.LayerWeight = 1.0f;
-                controller.Play();
-                controller.Tick(10.0f / 30.0f);
-
-                Assert.That(controller.CurrentFrame, Is.EqualTo(10));
-                Assert.That(binding.Instance.BoneTransforms[0].localPosition, Is.EqualTo(new Vector3(-2.0f, 0.5f, 0.0f)));
-                Assert.That(controller.LastEditableRigDiagnostics, Is.Not.Null);
-                Assert.That(controller.LastEditableRigDiagnostics!.executionStage, Is.EqualTo("post-native-apply-frame"));
-                Assert.That(controller.LastEditableRigDiagnostics.correctedBoneCount, Is.EqualTo(1));
-
-                controller.ApplyFrame(0);
-                layer.LayerWeight = 0.0f;
-                controller.Play();
-                controller.Tick(10.0f / 30.0f);
-
-                Assert.That(binding.Instance.BoneTransforms[0].localPosition, Is.EqualTo(new Vector3(-2.0f, 0.0f, 0.0f)));
-                Assert.That(controller.LastEditableRigDiagnostics, Is.Not.Null);
-                Assert.That(controller.LastEditableRigDiagnostics!.noOpReason, Is.EqualTo("zero-weight"));
             }
             finally
             {
@@ -251,14 +193,16 @@ namespace Mmd.Tests
                 "scene SMR bone count must match pmxAsset.BoneCount");
             Assert.That(sceneSMR.rootBone, Is.Not.Null,
                 "scene SMR must have a valid rootBone");
-            Assert.That(sharedMesh, Is.SameAs(modelAsset.ImportedMesh),
-                "scene SMR sharedMesh must be the importer-owned Mesh sub-asset");
+            Assert.That(sharedMesh, Is.Not.SameAs(modelAsset.ImportedMesh),
+                "active playback must isolate mesh mutation from the importer-owned Mesh sub-asset");
+            Assert.That(sharedMesh.name, Does.StartWith(modelAsset.ImportedMesh.name));
             if (modelAsset.ImportedMaterials is { Length: > 0 } mats)
             {
                 Material[] smrMats = sceneSMR.sharedMaterials;
                 Assert.That(smrMats, Is.Not.Null.And.Not.Empty);
-                Assert.That(smrMats[0], Is.SameAs(mats[0]),
-                    "first scene SMR material must be the importer-owned Material sub-asset");
+                Assert.That(smrMats[0], Is.Not.SameAs(mats[0]),
+                    "active playback must isolate material mutation from the importer-owned Material sub-asset");
+                Assert.That(smrMats[0].name, Does.StartWith(mats[0].name));
             }
 
             controller.Pause();
@@ -551,6 +495,8 @@ namespace Mmd.Tests
                 Assert.That(controller.CurrentFrame, Is.EqualTo(0));
                 Assert.That(binding.LastLivePhysicsDiagnostics, Is.Not.Null);
                 Assert.That(binding.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(0));
+                Assert.That(binding.LastLivePhysicsDiagnostics.backendName, Is.EqualTo("mmd-anim-bullet-native"),
+                    "The migration fixture must exercise the mmd-anim Bullet host backend, not the legacy fallback.");
                 Assert.That(binding.LastLivePhysicsDiagnostics.stepPhysicsMs, Is.GreaterThanOrEqualTo(0.0));
                 Assert.That(binding.LastLivePhysicsDiagnostics.pinnedBodies.pinnedBodyCount, Is.GreaterThan(0));
                 Assert.That(binding.LastLivePhysicsDiagnostics.pinnedBodies.dynamicOrientationPinnedBodyCount, Is.GreaterThan(0),
@@ -731,6 +677,7 @@ namespace Mmd.Tests
 
             MmdUnityModelInstance? instance = null;
             MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
             MmdHumanoidProxyRigResult? proxyRig = null;
             Avatar? avatar = null;
             PlayableGraph graph = default;
@@ -750,6 +697,12 @@ namespace Mmd.Tests
                     pmxPath,
                     MmdPmxAsset.DefaultImportScale,
                     parseSummary: MmdPmxParseSummary.FromModel(model));
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
+                SkinnedMeshRenderer renderer = instance.SkinnedMeshRenderer!;
+                Mesh authoredMesh = renderer.sharedMesh;
+                Material authoredMaterial = renderer.sharedMaterials[0];
 
                 MmdUnityPlaybackController controller = instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.ConfigureModelAsset(pmxAsset);
@@ -850,6 +803,27 @@ namespace Mmd.Tests
 
                 Assert.That(anyHairBoneChanged, Is.True,
                     "Expected humanoid-retargeted body motion to drive live physics feedback into at least one non-static hair bone");
+
+                Mesh humanoidPlaybackMesh = renderer.sharedMesh;
+                FieldInfo? physicsModeField = typeof(MmdUnityPlaybackController).GetField(
+                    "physicsMode",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(physicsModeField, Is.Not.Null);
+                physicsModeField!.SetValue(controller, MmdPhysicsMode.Off);
+                controller.ConfigureFromAssets(pmxAsset, vmdAsset, 30.0f, startFrame: 0, playOnStart: false);
+                yield return null;
+                Assert.That(controller.HasHumanoidPhysicsBinding, Is.False);
+                Assert.That(controller.IsConfigured, Is.True);
+                Assert.That(humanoidPlaybackMesh == null, Is.True,
+                    "VMD rebind must release the previous Humanoid physics Mesh clone before capturing Scene state");
+                Mesh vmdPlaybackMesh = renderer.sharedMesh;
+                Assert.That(vmdPlaybackMesh, Is.Not.SameAs(authoredMesh));
+
+                controller.ReleasePlaybackResources();
+                yield return null;
+                Assert.That(vmdPlaybackMesh == null, Is.True);
+                Assert.That(renderer.sharedMesh, Is.SameAs(authoredMesh));
+                Assert.That(renderer.sharedMaterials[0], Is.SameAs(authoredMaterial));
             }
             finally
             {
@@ -871,6 +845,11 @@ namespace Mmd.Tests
                 if (pmxAsset != null)
                 {
                     UnityEngine.Object.Destroy(pmxAsset);
+                }
+
+                if (vmdAsset != null)
+                {
+                    UnityEngine.Object.Destroy(vmdAsset);
                 }
 
                 MmdPlayModeTestInstanceScope.DestroyInstance(instance);
@@ -1239,11 +1218,11 @@ namespace Mmd.Tests
             return string.Empty;
         }
 
-        // Regression: the single MmdHumanoidAnimationTrack preserves the proxy Animator's serialized
-        // root-motion setting. Humanoid PMX import enables it by default, while an explicit user opt-out
-        // must not be overridden by Timeline graph construction.
+        // Regression: the custom Humanoid Timeline output must not let Unity accumulate the
+        // body-height offset into the PMX root. Horizontal RootT and RootQ are applied as an
+        // absolute root pose, while the imported Animator setting is restored after playback.
         [UnityTest]
-        public IEnumerator HumanoidAnimationTrackPreservesRootMotionOnProxyAnimator()
+        public IEnumerator HumanoidAnimationTrackAppliesStableRootPoseWithoutHeightCollapse()
         {
             GameObject? root = null;
             Avatar? avatar = null;
@@ -1256,23 +1235,31 @@ namespace Mmd.Tests
                 root = new GameObject("humanoid-rootmotion-root");
                 var nativeBoneObject = new GameObject("NativeSpine");
                 nativeBoneObject.transform.SetParent(root.transform, worldPositionStays: false);
+                var nativeCenterObject = new GameObject("NativeCenter");
+                nativeCenterObject.transform.SetParent(root.transform, worldPositionStays: false);
 
                 proxyRig = MmdHumanoidProxyRigFactory.CreateProxyRig(CreateHumanoidMappingModelWithOriginsForLivePhysics());
                 Assert.That(proxyRig.ProxyRoot, Is.Not.Null);
                 proxyRig.ProxyRoot!.transform.SetParent(root.transform, worldPositionStays: false);
                 proxyRig.ProxyRoot.SetActive(true);
-                MmdHumanoidAvatarBuildResult avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(proxyRig);
+                MmdHumanoidAvatarBuildResult avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(
+                    proxyRig,
+                    avatarRoot: root);
                 Assert.That(avatarResult.IsValidHumanAvatar, Is.True, string.Join("\n", avatarResult.Diagnostics));
                 avatar = avatarResult.Avatar;
 
                 Animator animator = root.AddComponent<Animator>();
                 animator.avatar = avatar;
                 animator.applyRootMotion = true;
+                root.AddComponent<MmdHumanoidRootMotionDriver>();
 
                 MmdUnityPlaybackController controller = root.AddComponent<MmdUnityPlaybackController>();
                 controller.SetPhysicsMode(MmdPhysicsMode.Off);
 
                 Transform proxySpine = proxyRig.BoneMap[HumanBodyBones.Spine];
+                Transform proxyHips = proxyRig.BoneMap[HumanBodyBones.Hips];
+                Vector3 proxyHipsBindPosition = proxyHips.localPosition;
+                Vector3 nativeCenterBindPosition = nativeCenterObject.transform.localPosition;
                 controller.ConfigureHumanoidRetarget(
                     proxyRig.ProxyRoot.transform,
                     new[]
@@ -1283,7 +1270,19 @@ namespace Mmd.Tests
                             proxySpine,
                             nativeBoneObject.transform,
                             proxySpine.localRotation,
-                            nativeBoneObject.transform.localRotation)
+                            nativeBoneObject.transform.localRotation),
+                        new MmdHumanoidRetargetBinding(
+                            HumanBodyBones.Hips,
+                            1,
+                            proxyHips,
+                            nativeCenterObject.transform,
+                            proxyHips.localRotation,
+                            nativeCenterObject.transform.localRotation,
+                            copyLocalPosition: true,
+                            translationTargetTransform: nativeCenterObject.transform,
+                            translationTargetMmdBoneIndex: 1,
+                            proxyBindLocalPosition: proxyHipsBindPosition,
+                            translationTargetBindLocalPosition: nativeCenterBindPosition)
                     },
                     Array.Empty<MmdHumanoidAppendTransformBinding>());
 
@@ -1293,6 +1292,24 @@ namespace Mmd.Tests
                     typeof(Animator),
                     ResolveSpineMuscleName(),
                     AnimationCurve.Linear(0.0f, 0.0f, 1.0f, 0.5f));
+                float bodyHeight = proxyRig.BoneMap[HumanBodyBones.Hips].position.y - root.transform.position.y;
+                muscleClip.SetCurve(string.Empty, typeof(Animator), "RootT.x", AnimationCurve.Linear(0.0f, 0.0f, 1.0f, 0.5f));
+                muscleClip.SetCurve(
+                    string.Empty,
+                    typeof(Animator),
+                    "RootT.y",
+                    AnimationCurve.Linear(0.0f, bodyHeight, 1.0f, bodyHeight + 0.25f));
+                muscleClip.SetCurve(
+                    string.Empty,
+                    typeof(MmdHumanoidRootMotionDriver),
+                    "clipRootVerticalOffset",
+                    AnimationCurve.Linear(0.0f, 0.0f, 1.0f, 0.25f / animator.humanScale));
+                muscleClip.SetCurve(string.Empty, typeof(Animator), "RootT.z", AnimationCurve.Constant(0.0f, 1.0f, 0.0f));
+                Quaternion rootRotation = Quaternion.Euler(0.0f, 90.0f, 0.0f);
+                muscleClip.SetCurve(string.Empty, typeof(Animator), "RootQ.x", AnimationCurve.Linear(0.0f, 0.0f, 1.0f, rootRotation.x));
+                muscleClip.SetCurve(string.Empty, typeof(Animator), "RootQ.y", AnimationCurve.Linear(0.0f, 0.0f, 1.0f, rootRotation.y));
+                muscleClip.SetCurve(string.Empty, typeof(Animator), "RootQ.z", AnimationCurve.Linear(0.0f, 0.0f, 1.0f, rootRotation.z));
+                muscleClip.SetCurve(string.Empty, typeof(Animator), "RootQ.w", AnimationCurve.Linear(0.0f, 1.0f, 1.0f, rootRotation.w));
 
                 timelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
                 MmdHumanoidAnimationTrack humanoidTrack =
@@ -1306,17 +1323,85 @@ namespace Mmd.Tests
                 directorObject = new GameObject("humanoid-rootmotion-director");
                 PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
                 director.playOnAwake = false;
+                director.timeUpdateMode = DirectorUpdateMode.Manual;
                 director.playableAsset = timelineAsset;
                 director.SetGenericBinding(humanoidTrack, controller);
 
                 Assert.That(animator.applyRootMotion, Is.True, "precondition: imported Humanoid root motion starts enabled");
 
                 director.time = 0.0;
+                director.Play();
                 director.Evaluate();
                 yield return null;
 
+                Assert.That(animator.applyRootMotion, Is.False,
+                    "the custom Timeline output must suppress Unity's accumulating automatic root motion");
+                Assert.That(root.transform.position.y, Is.EqualTo(0.0f).Within(0.001f),
+                    "RootT body height must not lower the imported PMX root");
+                Vector3 retargetPositionDelta = new Vector3(0.25f, 0.1f, -0.15f);
+                proxyHips.localPosition = proxyHipsBindPosition + retargetPositionDelta;
+                MmdHumanoidRetargeterResult timelineRetargetResult =
+                    controller.ApplyHumanoidRetargetFromTimeline();
+                Assert.That(timelineRetargetResult.CopiedTranslationCount, Is.EqualTo(0),
+                    "Timeline retarget must not copy proxy Hips translation while RootT is active");
+                Assert.That(nativeCenterObject.transform.localPosition, Is.EqualTo(nativeCenterBindPosition),
+                    "RootT and native-center translation must not be applied together");
+
+                MmdHumanoidRetargeterResult manualRetargetResult = controller.ApplyHumanoidRetargetNow();
+                Assert.That(manualRetargetResult.CopiedTranslationCount, Is.EqualTo(1),
+                    "manual retarget must preserve explicit position-copy behavior");
+                Vector3 expectedRetargetPosition = nativeCenterBindPosition + retargetPositionDelta;
+                Assert.That(
+                    Vector3.Distance(nativeCenterObject.transform.localPosition, expectedRetargetPosition),
+                    Is.LessThanOrEqualTo(1.0e-5f),
+                    "manual retarget must copy the requested position within float precision");
+                nativeCenterObject.transform.localPosition = nativeCenterBindPosition;
+                Transform leftFoot = animator.GetBoneTransform(HumanBodyBones.LeftFoot);
+                Transform rightFoot = animator.GetBoneTransform(HumanBodyBones.RightFoot);
+                Assert.That(Vector3.Distance(leftFoot.position, rightFoot.position), Is.GreaterThan(0.05f),
+                    "Timeline playback must disable AnimationClipPlayable's default Foot IK when " +
+                    "the baked clip has no foot-goal curves; otherwise both feet collapse to one fallback goal");
+
+                director.time = 0.9;
+                director.Evaluate();
+                yield return null;
+                Vector3 firstPosition = root.transform.position;
+                Quaternion firstRotation = root.transform.rotation;
+                Assert.That(firstPosition.x, Is.GreaterThan(0.1f), "horizontal RootT must reach the PMX root");
+                Assert.That(firstPosition.y, Is.GreaterThan(0.1f),
+                    "vertical RootT displacement must reach the PMX root after removing bind body height");
+                Assert.That(Quaternion.Angle(Quaternion.identity, firstRotation), Is.GreaterThan(2.0f),
+                    "RootQ must reach the PMX root");
+
+                director.Evaluate();
+                yield return null;
+                Assert.That(Vector3.Distance(root.transform.position, firstPosition), Is.LessThan(0.001f),
+                    "re-evaluating one Timeline time must not accumulate root translation");
+                Assert.That(Quaternion.Angle(root.transform.rotation, firstRotation), Is.LessThan(0.1f),
+                    "re-evaluating one Timeline time must not accumulate root rotation");
+
+                director.Stop();
+                yield return null;
                 Assert.That(animator.applyRootMotion, Is.True,
-                    "the single humanoid track must preserve applyRootMotion so the clip's root motion travels the model");
+                    "Timeline teardown must restore the imported Animator setting");
+                proxyHips.localPosition = proxyHipsBindPosition + retargetPositionDelta;
+                MmdHumanoidRetargeterResult inactiveTimelineRetargetResult =
+                    controller.ApplyHumanoidRetargetFromTimeline();
+                Assert.That(inactiveTimelineRetargetResult.CopiedTranslationCount, Is.EqualTo(1),
+                    "Timeline retarget without an active root driver must preserve position copying");
+                Assert.That(
+                    Vector3.Distance(
+                        nativeCenterObject.transform.localPosition,
+                        nativeCenterBindPosition + retargetPositionDelta),
+                    Is.LessThanOrEqualTo(1.0e-5f));
+
+                director.time = 0.0;
+                director.Play();
+                director.Evaluate();
+                yield return null;
+                Assert.That(animator.applyRootMotion, Is.False,
+                    "replaying a retained Timeline graph must reactivate guarded root motion");
+                director.Stop();
             }
             finally
             {

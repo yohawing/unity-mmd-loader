@@ -407,7 +407,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void MissingLivePmxInstanceThrowsWithoutRuntimeFallback()
+        public void MissingLivePmxInstanceThrows()
         {
             CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
@@ -419,8 +419,7 @@ namespace Mmd.Tests
             try
             {
                 root = new GameObject("mmd-reloaded-root");
-                // No SkinnedMeshRenderer on root — Timeline EvaluateAtLocalTime must not create a
-                // fallback runtime root. It throws InvalidOperationException instead.
+                // No SkinnedMeshRenderer on root: Timeline evaluation requires an existing Scene model.
                 MmdUnityPlaybackController controller = root.AddComponent<MmdUnityPlaybackController>();
                 controller.ConfigureModelAsset(pmxAsset);
                 Assert.That(controller.HasModelSource, Is.True);
@@ -439,7 +438,6 @@ namespace Mmd.Tests
                 Assert.That(ex.Message, Does.Contain("Timeline").Or.Contain("timeline"));
                 Assert.That(ex.Message, Does.Contain("SkinnedMeshRenderer".ToLower()).Or.Contain("SkinnedMeshRenderer"));
 
-                // No runtime fallback root was created.
                 Assert.That(controller.IsConfigured, Is.False);
                 Assert.That(CountTimelineClips(track), Is.EqualTo(1));
                 Assert.That(clip.asset, Is.TypeOf<MmdVmdTimelineClip>());

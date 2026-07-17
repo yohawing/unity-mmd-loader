@@ -1,7 +1,6 @@
 #nullable enable
 
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using UnityEngine;
@@ -14,10 +13,17 @@ namespace Mmd.UnityIntegration
 
         public static Texture2D Decode(byte[] bytes, string textureName)
         {
+            return Decode(bytes, textureName, MmdTextureDecodeBudget.Default);
+        }
+
+        internal static Texture2D Decode(byte[] bytes, string textureName, MmdTextureDecodeBudget budget)
+        {
             if (bytes == null)
             {
                 throw new ArgumentNullException(nameof(bytes));
             }
+
+            budget.ValidateInputLength(bytes.LongLength);
 
             if (bytes.Length < Signature.Length || !HasSignature(bytes))
             {
@@ -28,39 +34,76 @@ namespace Mmd.UnityIntegration
             int height = 0;
             byte bitDepth = 0;
             byte colorType = 0;
-            var idat = new List<byte>();
+            using var idat = new MemoryStream();
             int cursor = Signature.Length;
+            int chunkCount = 0;
+            bool sawHeader = false;
+            bool sawImageData = false;
+            bool sawEnd = false;
             while (cursor + 12 <= bytes.Length)
             {
+                chunkCount++;
+                if (chunkCount > budget.MaxPngChunkCount)
+                {
+                    throw new ArgumentException($"PNG chunk count exceeds the decode budget {budget.MaxPngChunkCount}.", nameof(bytes));
+                }
+
                 int length = ReadInt32BigEndian(bytes, cursor);
                 cursor += 4;
                 string chunkType = System.Text.Encoding.ASCII.GetString(bytes, cursor, 4);
                 cursor += 4;
-                if (length < 0 || cursor + length + 4 > bytes.Length)
+                if (length < 0 || length > bytes.Length - cursor - 4)
                 {
                     throw new ArgumentException("PNG chunk length exceeds the file length.", nameof(bytes));
                 }
 
                 if (chunkType == "IHDR")
                 {
+                    if (sawHeader || sawImageData || chunkCount != 1 || length != 13)
+                    {
+                        throw new ArgumentException("PNG must contain one 13-byte IHDR as its first chunk.", nameof(bytes));
+                    }
+
                     width = ReadInt32BigEndian(bytes, cursor);
                     height = ReadInt32BigEndian(bytes, cursor + 4);
                     bitDepth = bytes[cursor + 8];
                     colorType = bytes[cursor + 9];
+                    if (bytes[cursor + 10] != 0 || bytes[cursor + 11] != 0 || bytes[cursor + 12] != 0)
+                    {
+                        throw new NotSupportedException("PNG compression, filter, and interlace methods must be zero.");
+                    }
+
+                    sawHeader = true;
                 }
                 else if (chunkType == "IDAT")
                 {
-                    for (int i = 0; i < length; i++)
+                    if (!sawHeader || sawEnd)
                     {
-                        idat.Add(bytes[cursor + i]);
+                        throw new ArgumentException("PNG IDAT must follow IHDR and precede IEND.", nameof(bytes));
                     }
+
+                    long combinedLength = checked(idat.Length + length);
+                    budget.ValidateInputLength(combinedLength);
+                    idat.Write(bytes, cursor, length);
+                    sawImageData = true;
                 }
                 else if (chunkType == "IEND")
                 {
+                    if (!sawHeader || !sawImageData || length != 0)
+                    {
+                        throw new ArgumentException("PNG IEND must be empty and follow image data.", nameof(bytes));
+                    }
+
+                    sawEnd = true;
                     break;
                 }
 
                 cursor += length + 4;
+            }
+
+            if (!sawHeader || !sawImageData || !sawEnd)
+            {
+                throw new ArgumentException("PNG is missing required IHDR, IDAT, or IEND chunks.", nameof(bytes));
             }
 
             if (width <= 0 || height <= 0)
@@ -73,14 +116,10 @@ namespace Mmd.UnityIntegration
                 throw new NotSupportedException($"PNG color type {colorType} with bit depth {bitDepth} is not supported.");
             }
 
-            byte[] inflated = InflateZlib(idat.ToArray());
             int bytesPerPixel = GetBytesPerPixel(colorType);
-            int stride = width * bytesPerPixel;
-            int expected = checked((stride + 1) * height);
-            if (inflated.Length < expected)
-            {
-                throw new ArgumentException("PNG image data ended before all rows were decoded.", nameof(bytes));
-            }
+            int expected = budget.ValidateImageAndGetPngInflatedLength(width, height, bytesPerPixel);
+            int stride = checked(width * bytesPerPixel);
+            byte[] inflated = InflateZlib(idat.ToArray(), expected);
 
             var pixels = new Color32[checked(width * height)];
             var previous = new byte[stride];
@@ -146,7 +185,7 @@ namespace Mmd.UnityIntegration
             return true;
         }
 
-        private static byte[] InflateZlib(byte[] bytes)
+        private static byte[] InflateZlib(byte[] bytes, int expectedLength)
         {
             if (bytes.Length < 6)
             {
@@ -155,9 +194,25 @@ namespace Mmd.UnityIntegration
 
             using var input = new MemoryStream(bytes, 2, bytes.Length - 6);
             using var deflate = new DeflateStream(input, CompressionMode.Decompress);
-            using var output = new MemoryStream();
-            deflate.CopyTo(output);
-            return output.ToArray();
+            var output = new byte[expectedLength];
+            int offset = 0;
+            while (offset < output.Length)
+            {
+                int read = deflate.Read(output, offset, output.Length - offset);
+                if (read == 0)
+                {
+                    throw new ArgumentException("PNG image data ended before all rows were decoded.", nameof(bytes));
+                }
+
+                offset += read;
+            }
+
+            if (deflate.ReadByte() != -1)
+            {
+                throw new ArgumentException("PNG image data exceeds the expected row budget.", nameof(bytes));
+            }
+
+            return output;
         }
 
         private static void Unfilter(byte[] current, byte[] previous, byte filter, int bytesPerPixel)

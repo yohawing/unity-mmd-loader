@@ -11,6 +11,11 @@ namespace Mmd.UnityIntegration
 
         public static Texture2D Decode(byte[] bytes, string textureName)
         {
+            return Decode(bytes, textureName, MmdTextureDecodeBudget.Default);
+        }
+
+        internal static Texture2D Decode(byte[] bytes, string textureName, MmdTextureDecodeBudget budget)
+        {
             if (bytes == null)
             {
                 throw new ArgumentNullException(nameof(bytes));
@@ -24,6 +29,8 @@ namespace Mmd.UnityIntegration
             {
                 throw new ArgumentException("DDS data must start with a DDS magic header.", nameof(bytes));
             }
+
+            budget.ValidateInputLength(bytes.LongLength);
 
             int headerByteSize = ReadInt32(bytes, 4);
             int pixelFormatByteSize = ReadInt32(bytes, 76);
@@ -39,12 +46,14 @@ namespace Mmd.UnityIntegration
                 throw new ArgumentException("DDS width and height must be positive.", nameof(bytes));
             }
 
+            int pixelCount = budget.ValidateImageAndGetPixelCount(width, height);
+
             string fourCc = FourCc(bytes, 84);
             Color32[] pixels = fourCc switch
             {
-                "DXT1" => DecodeDxt(bytes, HeaderSize, width, height, DxtFormat.Dxt1),
-                "DXT3" => DecodeDxt(bytes, HeaderSize, width, height, DxtFormat.Dxt3),
-                "DXT5" => DecodeDxt(bytes, HeaderSize, width, height, DxtFormat.Dxt5),
+                "DXT1" => DecodeDxt(bytes, HeaderSize, width, height, pixelCount, DxtFormat.Dxt1),
+                "DXT3" => DecodeDxt(bytes, HeaderSize, width, height, pixelCount, DxtFormat.Dxt3),
+                "DXT5" => DecodeDxt(bytes, HeaderSize, width, height, pixelCount, DxtFormat.Dxt5),
                 _ => throw new NotSupportedException($"DDS FourCC '{fourCc}' is not supported.")
             };
 
@@ -57,18 +66,18 @@ namespace Mmd.UnityIntegration
             return texture;
         }
 
-        private static Color32[] DecodeDxt(byte[] bytes, int offset, int width, int height, DxtFormat format)
+        private static Color32[] DecodeDxt(byte[] bytes, int offset, int width, int height, int pixelCount, DxtFormat format)
         {
             int blockBytes = format == DxtFormat.Dxt1 ? 8 : 16;
-            int blockCountX = Math.Max(1, (width + 3) / 4);
-            int blockCountY = Math.Max(1, (height + 3) / 4);
-            int requiredBytes = offset + blockCountX * blockCountY * blockBytes;
-            if (requiredBytes > bytes.Length)
+            int blockCountX = checked((int)Math.Max(1L, ((long)width + 3L) / 4L));
+            int blockCountY = checked((int)Math.Max(1L, ((long)height + 3L) / 4L));
+            long requiredBytes = checked((long)offset + (long)blockCountX * blockCountY * blockBytes);
+            if (requiredBytes > bytes.LongLength)
             {
                 throw new ArgumentException("DDS pixel data is truncated.", nameof(bytes));
             }
 
-            var pixels = new Color32[checked(width * height)];
+            var pixels = new Color32[pixelCount];
             int cursor = offset;
             for (int blockY = 0; blockY < blockCountY; blockY++)
             {

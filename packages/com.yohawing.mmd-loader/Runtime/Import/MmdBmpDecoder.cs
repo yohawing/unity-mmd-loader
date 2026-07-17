@@ -9,6 +9,11 @@ namespace Mmd.UnityIntegration
     {
         public static Texture2D Decode(byte[] bytes, string textureName)
         {
+            return Decode(bytes, textureName, MmdTextureDecodeBudget.Default);
+        }
+
+        internal static Texture2D Decode(byte[] bytes, string textureName, MmdTextureDecodeBudget budget)
+        {
             if (bytes == null)
             {
                 throw new ArgumentNullException(nameof(bytes));
@@ -18,6 +23,8 @@ namespace Mmd.UnityIntegration
             {
                 throw new ArgumentException("BMP data must start with a BITMAPFILEHEADER.", nameof(bytes));
             }
+
+            budget.ValidateInputLength(bytes.LongLength);
 
             int pixelOffset = ReadInt32(bytes, 10);
             int dibHeaderSize = ReadInt32(bytes, 14);
@@ -37,7 +44,7 @@ namespace Mmd.UnityIntegration
                 throw new ArgumentException("BMP planes must be 1.", nameof(bytes));
             }
 
-            if (width <= 0 || signedHeight == 0)
+            if (width <= 0 || signedHeight == 0 || signedHeight == int.MinValue)
             {
                 throw new ArgumentException("BMP width and height must be non-zero.", nameof(bytes));
             }
@@ -55,9 +62,10 @@ namespace Mmd.UnityIntegration
             int height = Math.Abs(signedHeight);
             bool topDown = signedHeight < 0;
             int bytesPerPixel = bitsPerPixel / 8;
-            int rowStride = ((width * bytesPerPixel + 3) / 4) * 4;
-            int requiredBytes = pixelOffset + rowStride * height;
-            if (pixelOffset < 0 || requiredBytes > bytes.Length)
+            int pixelCount = budget.ValidateImageAndGetPixelCount(width, height);
+            long rowStrideLong = checked((((long)width * bytesPerPixel) + 3L) / 4L * 4L);
+            long requiredBytes = checked((long)pixelOffset + rowStrideLong * height);
+            if (pixelOffset < 0 || requiredBytes > bytes.LongLength)
             {
                 throw new ArgumentException("BMP pixel data is truncated.", nameof(bytes));
             }
@@ -67,14 +75,16 @@ namespace Mmd.UnityIntegration
             {
                 int colorsUsed = ReadInt32(bytes, 46);
                 int paletteEntryCount = colorsUsed > 0 ? colorsUsed : 256;
-                int paletteOffset = 14 + dibHeaderSize;
-                int paletteBytes = checked(paletteEntryCount * 4);
-                if (paletteOffset < 0 || paletteOffset + paletteBytes > bytes.Length || paletteOffset + paletteBytes > pixelOffset)
+                long paletteOffsetLong = checked(14L + dibHeaderSize);
+                long paletteBytes = checked((long)paletteEntryCount * 4L);
+                long paletteEnd = checked(paletteOffsetLong + paletteBytes);
+                if (paletteEntryCount <= 0 || paletteOffsetLong < 0 || paletteEnd > bytes.LongLength || paletteEnd > pixelOffset)
                 {
                     throw new ArgumentException("BMP palette data is truncated.", nameof(bytes));
                 }
 
                 palette = new Color32[paletteEntryCount];
+                int paletteOffset = checked((int)paletteOffsetLong);
                 for (int i = 0; i < paletteEntryCount; i++)
                 {
                     int offset = paletteOffset + i * 4;
@@ -82,7 +92,8 @@ namespace Mmd.UnityIntegration
                 }
             }
 
-            var pixels = new Color32[checked(width * height)];
+            int rowStride = checked((int)rowStrideLong);
+            var pixels = new Color32[pixelCount];
             for (int sourceY = 0; sourceY < height; sourceY++)
             {
                 int targetY = topDown ? height - 1 - sourceY : sourceY;

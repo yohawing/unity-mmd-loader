@@ -142,15 +142,14 @@ namespace Mmd.Timeline
 
             if (MotionAsset != null && !target.IsConfiguredForMotionAsset(MotionAsset))
             {
-                target.ConfigureMotionFromProviderModelSource(
+                target.ConfigureMotionFromProviderModelSourceForTimeline(
                     MotionAsset,
                     FrameRate,
                     startFrame: 0,
-                    playOnStart: false,
-                    allowRuntimeFallback: false);
+                    playOnStart: false);
             }
             else if (!target.IsConfigured &&
-                !target.ConfigureFromPlaybackSourceIfAvailable(allowRuntimeFallback: false))
+                !target.ConfigureFromPlaybackSourceIfAvailableForTimeline())
             {
                 throw new InvalidOperationException("Timeline target playback controller is not configured and has no provider-owned PMX/VMD source.");
             }

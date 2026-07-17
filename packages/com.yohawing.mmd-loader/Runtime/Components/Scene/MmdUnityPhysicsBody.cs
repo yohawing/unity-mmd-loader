@@ -92,6 +92,13 @@ namespace Mmd.UnityIntegration
             this.hasNativeTransform = true;
         }
 
+        internal void RestoreNativeTransform(bool hasTransform, Vector3 position, Quaternion rotation)
+        {
+            hasNativeTransform = hasTransform;
+            nativePosition = position;
+            nativeRotation = rotation;
+        }
+
         private static Vector3 ToVector3(float[] values)
         {
             if (values == null || values.Length < 3)

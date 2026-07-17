@@ -1,20 +1,22 @@
 #nullable enable
 
+#pragma warning disable CS0618
+
 using System;
 using System.IO;
 using UnityEditor;
-using UnityEngine;
 
 namespace Mmd.Editor
 {
+    [Obsolete("MmdHumanoidSetupAssetBuilder is retained only for source compatibility. Reimport the PMX with Animation Type = Humanoid instead.")]
     public static class MmdHumanoidSetupAssetBuilder
     {
         public static string GetDefaultSetupAssetPath(MmdPmxAsset pmxAsset)
         {
             string pmxPath = AssetDatabase.GetAssetPath(pmxAsset);
             string directory = "Assets";
-            if (!string.IsNullOrWhiteSpace(pmxPath) &&
-                pmxPath.StartsWith("Assets/", StringComparison.Ordinal))
+            if (!string.IsNullOrWhiteSpace(pmxPath)
+                && pmxPath.StartsWith("Assets/", StringComparison.Ordinal))
             {
                 directory = Path.GetDirectoryName(pmxPath)?.Replace('\\', '/') ?? "Assets";
             }
@@ -22,72 +24,15 @@ namespace Mmd.Editor
             return directory + "/MmdHumanoidSetup.asset";
         }
 
+        [Obsolete("Legacy setup assets can no longer be created. Reimport the PMX with Animation Type = Humanoid instead.")]
         public static MmdHumanoidSetupAsset CreateHumanoidSetupAsset(
             MmdPmxAsset pmxAsset,
             string assetPath,
             MmdHumanoidSetupPreset preset = MmdHumanoidSetupPreset.MmdSemiStandard)
         {
-            if (pmxAsset == null)
-            {
-                throw new ArgumentNullException(nameof(pmxAsset));
-            }
-
-            if (string.IsNullOrWhiteSpace(assetPath))
-            {
-                throw new ArgumentException("Humanoid setup asset path is required.", nameof(assetPath));
-            }
-
-            string normalizedAssetPath = NormalizeSetupAssetPath(assetPath);
-            string? directory = Path.GetDirectoryName(normalizedAssetPath)?.Replace('\\', '/');
-            if (!string.IsNullOrEmpty(directory) && !AssetDatabase.IsValidFolder(directory))
-            {
-                Directory.CreateDirectory(Path.Combine(ProjectRoot, directory));
-                AssetDatabase.Refresh();
-            }
-
-            string uniqueAssetPath = AssetDatabase.GenerateUniqueAssetPath(normalizedAssetPath);
-            MmdHumanoidSetupAsset setup = ScriptableObject.CreateInstance<MmdHumanoidSetupAsset>();
-            setup.Initialize(pmxAsset, preset);
-            AssetDatabase.CreateAsset(setup, uniqueAssetPath);
-            AssetDatabase.SaveAssets();
-            AssetDatabase.ImportAsset(uniqueAssetPath, ImportAssetOptions.ForceUpdate);
-            MmdHumanoidSetupAsset loaded = AssetDatabase.LoadAssetAtPath<MmdHumanoidSetupAsset>(uniqueAssetPath);
-            if (loaded == null)
-            {
-                throw new InvalidOperationException("Created humanoid setup asset was not found: " + uniqueAssetPath);
-            }
-
-            return loaded;
+            throw new NotSupportedException(
+                "Legacy MmdHumanoidSetupAsset creation was removed. "
+                + "Reimport the PMX with Animation Type = Humanoid to persist its Avatar and retarget mapping.");
         }
-
-        private static string NormalizeSetupAssetPath(string assetPath)
-        {
-            if (Path.IsPathRooted(assetPath))
-            {
-                throw new ArgumentException("Humanoid setup asset path must be a project-relative Assets/*.asset path.", nameof(assetPath));
-            }
-
-            string normalizedAssetPath = assetPath.Replace('\\', '/');
-            if (!normalizedAssetPath.StartsWith("Assets/", StringComparison.Ordinal) ||
-                !normalizedAssetPath.EndsWith(".asset", StringComparison.OrdinalIgnoreCase))
-            {
-                throw new ArgumentException("Humanoid setup asset path must be an Assets/*.asset path.", nameof(assetPath));
-            }
-
-            string[] segments = normalizedAssetPath.Split('/');
-            foreach (string segment in segments)
-            {
-                if (string.IsNullOrWhiteSpace(segment) ||
-                    string.Equals(segment, ".", StringComparison.Ordinal) ||
-                    string.Equals(segment, "..", StringComparison.Ordinal))
-                {
-                    throw new ArgumentException("Humanoid setup asset path must not contain empty or traversal segments.", nameof(assetPath));
-                }
-            }
-
-            return normalizedAssetPath;
-        }
-
-        private static string ProjectRoot => Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
     }
 }

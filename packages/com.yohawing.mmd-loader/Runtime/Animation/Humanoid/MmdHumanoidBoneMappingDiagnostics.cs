@@ -9,7 +9,7 @@ namespace Mmd
     [Serializable]
     public sealed class MmdHumanoidBoneMappingDiagnosticSummary
     {
-        [SerializeField] private string readiness = MmdHumanoidSetupAsset.NotEvaluatedReadiness;
+        [SerializeField] private string readiness = MmdHumanoidMappingReadiness.NotEvaluated;
         [SerializeField] private MmdHumanoidBoneMappingDiagnosticEntry[] mappedEntries =
             Array.Empty<MmdHumanoidBoneMappingDiagnosticEntry>();
         [SerializeField] private MmdHumanoidMissingRequiredBone[] missingRequiredBones =
@@ -25,7 +25,7 @@ namespace Mmd
             string[]? conflictDiagnostics)
         {
             this.readiness = string.IsNullOrWhiteSpace(readiness)
-                ? MmdHumanoidSetupAsset.NotEvaluatedReadiness
+                ? MmdHumanoidMappingReadiness.NotEvaluated
                 : readiness;
             this.mappedEntries = mappedEntries != null
                 ? (MmdHumanoidBoneMappingDiagnosticEntry[])mappedEntries.Clone()
@@ -48,7 +48,7 @@ namespace Mmd
 
         public static MmdHumanoidBoneMappingDiagnosticSummary Empty { get; } =
             new MmdHumanoidBoneMappingDiagnosticSummary(
-                MmdHumanoidSetupAsset.NotEvaluatedReadiness,
+                MmdHumanoidMappingReadiness.NotEvaluated,
                 Array.Empty<MmdHumanoidBoneMappingDiagnosticEntry>(),
                 Array.Empty<MmdHumanoidMissingRequiredBone>(),
                 Array.Empty<string>());

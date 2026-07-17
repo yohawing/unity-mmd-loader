@@ -97,9 +97,19 @@ namespace Mmd.UnityIntegration
             LastConfigurationStatus = "configured-model-path-assigned";
         }
 
-        public bool TryConfigureController(
-            MmdUnityPlaybackController? controller = null,
-            bool allowRuntimeFallback = true)
+        public bool TryConfigureController(MmdUnityPlaybackController? controller = null)
+        {
+            return TryConfigureControllerCore(controller, requireNativeClip: false);
+        }
+
+        internal bool TryConfigureControllerForTimeline(MmdUnityPlaybackController? controller = null)
+        {
+            return TryConfigureControllerCore(controller, requireNativeClip: true);
+        }
+
+        private bool TryConfigureControllerCore(
+            MmdUnityPlaybackController? controller,
+            bool requireNativeClip)
         {
             controller ??= GetComponent<MmdUnityPlaybackController>();
             if (controller == null)
@@ -133,11 +143,14 @@ namespace Mmd.UnityIntegration
             }
 
             MmdPlaybackConfig config = ToConfig();
-            controller.ConfigureFromRuntimeImporterPaths(
-                modelPath,
-                motionPath,
-                config,
-                allowRuntimeFallback);
+            if (requireNativeClip)
+            {
+                controller.ConfigureFromRuntimeImporterPathsForTimeline(modelPath, motionPath, config);
+            }
+            else
+            {
+                controller.ConfigureFromRuntimeImporterPaths(modelPath, motionPath, config);
+            }
 
             LastConfiguredSourceId = modelPath + " -> " + motionPath;
             LastConfiguredControllerRevision = controller.ConfigurationRevision;

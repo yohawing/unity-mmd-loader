@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using Mmd.Parser;
+using Mmd.UnityIntegration;
 
 namespace Mmd.Editor
 {
@@ -12,11 +13,11 @@ namespace Mmd.Editor
     {
         public const string ReadyReadiness = "prerequisites-ready";
         public const string NotReadyReadiness = "prerequisites-not-ready";
+        public const string ImportedPmxHumanoidMappingSource = "Imported PMX Humanoid settings";
 
         public static MmdHumanoidClipConversionPlan AnalyzePrerequisites(
             MmdPmxAsset? pmxAsset,
-            MmdVmdAsset? vmdAsset,
-            MmdHumanoidSetupAsset? setupAsset)
+            MmdVmdAsset? vmdAsset)
         {
             var diagnostics = new List<string>();
             MmdMotionDefinition? motion = null;
@@ -31,12 +32,7 @@ namespace Mmd.Editor
                 diagnostics.Add("vmd asset is null");
             }
 
-            if (setupAsset == null)
-            {
-                diagnostics.Add("humanoid setup asset is null");
-            }
-
-            if (!IsAllInputsPresent(pmxAsset, vmdAsset, setupAsset))
+            if (!IsAllInputsPresent(pmxAsset, vmdAsset))
             {
                 return CreateResult(
                     false,
@@ -45,13 +41,11 @@ namespace Mmd.Editor
                     diagnostics: diagnostics,
                     pmxAsset: pmxAsset,
                     vmdAsset: vmdAsset,
-                    setupAsset: setupAsset,
                     motion: null);
             }
 
-            ValidateSetupAssociation(pmxAsset!, setupAsset!, diagnostics);
             ValidatePmxImportReadiness(pmxAsset!, diagnostics);
-            ValidateSetupReadiness(setupAsset!, diagnostics);
+            TryResolveImportedHumanoidState(pmxAsset!, diagnostics, out _, out _);
 
             // VMD validation uses ONLY import-time cache (ImportSummaryStatus, StructuralDiagnostics, Max*/KeyframeCount).
             // Never call LoadMotion() here: analysis / inspector preview / readiness must not parse VMD.
@@ -76,6 +70,7 @@ namespace Mmd.Editor
             if (ready)
             {
                 diagnostics.Add("conversion-prerequisites: ready");
+                diagnostics.Add("mapping-source: " + ImportedPmxHumanoidMappingSource + ".");
                 diagnostics.Add("writer-status: CanCreateClipNow is true (in-memory writer in H6 slice 1).");
             }
 
@@ -86,7 +81,6 @@ namespace Mmd.Editor
                 diagnostics,
                 pmxAsset,
                 vmdAsset,
-                setupAsset,
                 motion,
                 cachedVmdMaxFrame: cachedVmdMaxFrame,
                 cachedVmdBoneKeyframeCount: cachedVmdBoneKeyframeCount,
@@ -147,43 +141,141 @@ namespace Mmd.Editor
 
         private static bool IsAllInputsPresent(
             MmdPmxAsset? pmxAsset,
-            MmdVmdAsset? vmdAsset,
-            MmdHumanoidSetupAsset? setupAsset)
+            MmdVmdAsset? vmdAsset)
         {
-            return pmxAsset != null && vmdAsset != null && setupAsset != null;
+            return pmxAsset != null && vmdAsset != null;
         }
 
-        private static void ValidateSetupAssociation(
+        internal static bool TryResolveImportedHumanoidState(
             MmdPmxAsset pmxAsset,
-            MmdHumanoidSetupAsset setupAsset,
-            List<string> diagnostics)
+            List<string> diagnostics,
+            out MmdUnityPlaybackController? controller,
+            out Transform[] nativeBones)
         {
-            if (!ReferenceEquals(setupAsset.PmxAsset, pmxAsset))
-            {
-                diagnostics.Add("setup validation failed: setup.PmxAsset mismatch.");
-            }
-        }
+            controller = null;
+            nativeBones = Array.Empty<Transform>();
 
-        private static void ValidateSetupReadiness(
-            MmdHumanoidSetupAsset setupAsset,
-            List<string> diagnostics)
-        {
-            if (setupAsset.MappingReadiness != MmdHumanoidSetupAsset.ReadyReadiness)
+            if (!string.Equals(pmxAsset.AnimationType, "Humanoid", StringComparison.Ordinal))
             {
-                diagnostics.Add("setup validation failed: mapping not ready.");
+                diagnostics.Add(
+                    "pmx humanoid validation failed: AnimationType is "
+                    + pmxAsset.AnimationType
+                    + ", expected Humanoid. Reimport the PMX with Animation Type set to Humanoid.");
+                return false;
+            }
+
+            Avatar? avatar = pmxAsset.ImportedAvatar;
+            if (avatar == null || !avatar.isValid || !avatar.isHuman)
+            {
+                diagnostics.Add("pmx humanoid validation failed: ImportedAvatar is not a valid Humanoid Avatar.");
             }
 
             if (!string.Equals(
-                    setupAsset.MappingInputSource,
-                    MmdHumanoidSetupAsset.ImportedHierarchyInputSource,
+                    pmxAsset.HumanoidAvatarReadiness,
+                    MmdHumanoidMappingReadiness.Ready,
                     StringComparison.Ordinal))
             {
                 diagnostics.Add(
-                    "setup validation failed: mapping source is "
-                    + setupAsset.MappingInputSource
-                    + ", expected "
-                    + MmdHumanoidSetupAsset.ImportedHierarchyInputSource + ".");
+                    "pmx humanoid validation failed: HumanoidAvatarReadiness is "
+                    + pmxAsset.HumanoidAvatarReadiness
+                    + ", expected " + MmdHumanoidMappingReadiness.Ready + ".");
             }
+
+            GameObject? importedRoot = pmxAsset.ImportedRoot;
+            if (importedRoot == null)
+            {
+                diagnostics.Add("pmx humanoid validation failed: ImportedRoot is null.");
+                return false;
+            }
+
+            controller = importedRoot.GetComponent<MmdUnityPlaybackController>();
+            if (controller == null)
+            {
+                diagnostics.Add("pmx humanoid validation failed: imported root has no MmdUnityPlaybackController.");
+                return false;
+            }
+
+            Transform? proxyRoot = controller.HumanoidProxyRoot;
+            if (proxyRoot == null)
+            {
+                diagnostics.Add("pmx humanoid validation failed: imported controller has no HumanoidProxyRoot.");
+                return false;
+            }
+
+            SkinnedMeshRenderer? smr = importedRoot.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true);
+            nativeBones = smr != null && smr.bones != null ? smr.bones : Array.Empty<Transform>();
+            if (nativeBones.Length == 0)
+            {
+                diagnostics.Add("pmx humanoid validation failed: imported SkinnedMeshRenderer has no bones.");
+                return false;
+            }
+
+            IReadOnlyList<MmdHumanoidRetargetBinding> entries = controller.HumanoidRetargetEntries;
+            if (entries == null || entries.Count == 0)
+            {
+                diagnostics.Add("pmx humanoid validation failed: imported controller has no HumanoidRetargetEntries.");
+                return false;
+            }
+
+            bool valid = true;
+            var usedHumanBones = new HashSet<HumanBodyBones>();
+            for (int i = 0; i < entries.Count; i++)
+            {
+                MmdHumanoidRetargetBinding? entry = entries[i];
+                if (entry == null)
+                {
+                    diagnostics.Add("pmx humanoid validation failed: HumanoidRetargetEntries contains a null entry.");
+                    valid = false;
+                    continue;
+                }
+
+                if (entry.HumanBone < 0
+                    || entry.HumanBone >= HumanBodyBones.LastBone
+                    || !usedHumanBones.Add(entry.HumanBone))
+                {
+                    diagnostics.Add("pmx humanoid validation failed: HumanoidRetargetEntries contains an invalid or duplicate HumanBodyBones mapping.");
+                    valid = false;
+                }
+
+                int boneIndex = entry.MmdBoneIndex;
+                if (boneIndex < 0 || boneIndex >= nativeBones.Length || nativeBones[boneIndex] == null)
+                {
+                    diagnostics.Add("pmx humanoid validation failed: retarget binding has an unusable MMD bone index.");
+                    valid = false;
+                    continue;
+                }
+
+                if (!ReferenceEquals(entry.NativeTransform, nativeBones[boneIndex]))
+                {
+                    diagnostics.Add("pmx humanoid validation failed: retarget binding native transform does not match its persisted MMD bone index.");
+                    valid = false;
+                }
+
+                if (entry.ProxyTransform == null || !IsDescendantOrSelf(entry.ProxyTransform, proxyRoot))
+                {
+                    diagnostics.Add("pmx humanoid validation failed: retarget binding has an unusable proxy transform.");
+                    valid = false;
+                }
+            }
+
+            return valid && avatar != null && avatar.isValid && avatar.isHuman
+                         && string.Equals(
+                             pmxAsset.HumanoidAvatarReadiness,
+                             MmdHumanoidMappingReadiness.Ready,
+                             StringComparison.Ordinal);
+        }
+
+        private static bool IsDescendantOrSelf(Transform transform, Transform root)
+        {
+            for (Transform? current = transform; current != null; current = current.parent)
+            {
+                if (ReferenceEquals(current, root))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static void ValidatePmxImportReadiness(MmdPmxAsset pmxAsset, List<string> diagnostics)
@@ -248,7 +340,6 @@ namespace Mmd.Editor
             List<string> diagnostics,
             MmdPmxAsset? pmxAsset,
             MmdVmdAsset? vmdAsset,
-            MmdHumanoidSetupAsset? setupAsset,
             MmdMotionDefinition? motion,
             int cachedVmdMaxFrame = 0,
             int cachedVmdBoneKeyframeCount = 0,
@@ -273,18 +364,10 @@ namespace Mmd.Editor
                 diagnostics,
                 pmxSourceId: pmxAsset?.SourceId ?? string.Empty,
                 vmdSourceId: vmdAsset?.SourceId ?? string.Empty,
-                setupSourceId: setupAsset?.PmxAsset?.SourceId ?? string.Empty,
-                setupPmxAssetMatch: setupAsset != null && setupAsset.PmxAsset == pmxAsset,
                 pmxBoneCount: pmxAsset?.BoneCount ?? 0,
                 pmxHierarchyReadiness: pmxAsset != null ? pmxAsset.HierarchyReadiness.ToString() : string.Empty,
                 pmxRendererReadiness: pmxAsset != null ? pmxAsset.RendererReadiness.ToString() : string.Empty,
                 pmxBoneBindingReadiness: pmxAsset != null ? pmxAsset.BoneBindingReadiness.ToString() : string.Empty,
-                setupMappingReadiness: setupAsset?.MappingReadiness ?? string.Empty,
-                setupMappingInputSource: setupAsset?.MappingInputSource ?? string.Empty,
-                setupRequiredMappedBoneCount: setupAsset?.RequiredMappedBoneCount ?? 0,
-                setupOptionalMappedBoneCount: setupAsset?.OptionalMappedBoneCount ?? 0,
-                setupMissingRequiredBoneCount: setupAsset?.MissingRequiredBoneCount ?? 0,
-                setupAmbiguousMappingCount: setupAsset?.AmbiguousMappingCount ?? 0,
                 vmdMaxFrame: vmdMaxFrame,
                 vmdBoneKeyframeCount: vmdBoneKeyframeCount,
                 vmdMorphKeyframeCount: vmdMorphKeyframeCount,
@@ -301,18 +384,10 @@ namespace Mmd.Editor
             IReadOnlyList<string> diagnostics,
             string pmxSourceId,
             string vmdSourceId,
-            string setupSourceId,
-            bool setupPmxAssetMatch,
             int pmxBoneCount,
             string pmxHierarchyReadiness,
             string pmxRendererReadiness,
             string pmxBoneBindingReadiness,
-            string setupMappingReadiness,
-            string setupMappingInputSource,
-            int setupRequiredMappedBoneCount,
-            int setupOptionalMappedBoneCount,
-            int setupMissingRequiredBoneCount,
-            int setupAmbiguousMappingCount,
             int vmdMaxFrame,
             int vmdBoneKeyframeCount,
             int vmdMorphKeyframeCount,
@@ -324,18 +399,10 @@ namespace Mmd.Editor
             Diagnostics = diagnostics != null ? new List<string>(diagnostics).AsReadOnly() : Array.Empty<string>();
             PmxSourceId = pmxSourceId ?? string.Empty;
             VmdSourceId = vmdSourceId ?? string.Empty;
-            SetupSourceId = setupSourceId ?? string.Empty;
-            SetupPmxAssetMatch = setupPmxAssetMatch;
             PmxBoneCount = pmxBoneCount;
             PmxHierarchyReadiness = pmxHierarchyReadiness ?? string.Empty;
             PmxRendererReadiness = pmxRendererReadiness ?? string.Empty;
             PmxBoneBindingReadiness = pmxBoneBindingReadiness ?? string.Empty;
-            SetupMappingReadiness = setupMappingReadiness ?? string.Empty;
-            SetupMappingInputSource = setupMappingInputSource ?? string.Empty;
-            SetupRequiredMappedBoneCount = setupRequiredMappedBoneCount;
-            SetupOptionalMappedBoneCount = setupOptionalMappedBoneCount;
-            SetupMissingRequiredBoneCount = setupMissingRequiredBoneCount;
-            SetupAmbiguousMappingCount = setupAmbiguousMappingCount;
             VmdMaxFrame = vmdMaxFrame;
             VmdBoneKeyframeCount = vmdBoneKeyframeCount;
             VmdMorphKeyframeCount = vmdMorphKeyframeCount;
@@ -354,10 +421,6 @@ namespace Mmd.Editor
 
         public string VmdSourceId { get; }
 
-        public string SetupSourceId { get; }
-
-        public bool SetupPmxAssetMatch { get; }
-
         public int PmxBoneCount { get; }
 
         public string PmxHierarchyReadiness { get; }
@@ -365,18 +428,6 @@ namespace Mmd.Editor
         public string PmxRendererReadiness { get; }
 
         public string PmxBoneBindingReadiness { get; }
-
-        public string SetupMappingReadiness { get; }
-
-        public string SetupMappingInputSource { get; }
-
-        public int SetupRequiredMappedBoneCount { get; }
-
-        public int SetupOptionalMappedBoneCount { get; }
-
-        public int SetupMissingRequiredBoneCount { get; }
-
-        public int SetupAmbiguousMappingCount { get; }
 
         public int VmdMaxFrame { get; }
 

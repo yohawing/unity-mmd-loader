@@ -276,7 +276,8 @@ namespace Mmd
         }
 
         public static MmdHumanoidRetargeterResult RetargetPose(
-            IReadOnlyList<MmdHumanoidRetargetBinding> entries)
+            IReadOnlyList<MmdHumanoidRetargetBinding> entries,
+            bool copyLocalPositions = true)
         {
             if (entries == null)
                 throw new ArgumentNullException(nameof(entries));
@@ -366,7 +367,7 @@ namespace Mmd
 
                 }
 
-                if (!entry.CopyLocalPosition)
+                if (!copyLocalPositions || !entry.CopyLocalPosition)
                 {
                     continue;
                 }
