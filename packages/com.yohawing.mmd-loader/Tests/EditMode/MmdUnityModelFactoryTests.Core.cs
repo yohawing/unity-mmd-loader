@@ -68,6 +68,8 @@ namespace Mmd.Tests
             Assert.That(instance.Materials[0].FindPass("Outline"), Is.GreaterThanOrEqualTo(0));
             Assert.That(instance.Materials[0].FindPass("MmdSelfShadowCaster"), Is.GreaterThanOrEqualTo(0));
             Assert.That(instance.Materials[0].FindPass("ShadowCaster"), Is.GreaterThanOrEqualTo(0));
+            Assert.That(instance.Materials[0].FindPass("DepthOnly"), Is.GreaterThanOrEqualTo(0));
+            Assert.That(instance.Materials[0].FindPass("DepthNormals"), Is.GreaterThanOrEqualTo(0));
         }
         [Test]
         public void MmdToonLitShaderUsesUrpMainLightShadowsWithoutChangingLegacyShader()
@@ -109,6 +111,32 @@ namespace Mmd.Tests
             Shader toonLitShader = Shader.Find(MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName);
             Assert.That(toonLitShader, Is.Not.Null);
             Assert.That(toonLitShader!.name, Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName));
+        }
+        [Test]
+        public void MmdToonLitShaderProvidesUrpDepthAndSsaoContractsWithoutChangingLegacyShader()
+        {
+            string shaderDirectory = Path.Combine(MmdTestFixtures.PackageRoot, "Runtime", "Shaders");
+            string legacySource = File.ReadAllText(Path.Combine(shaderDirectory, "MmdBasicUrpToon.shader"));
+            string toonLitSource = File.ReadAllText(Path.Combine(shaderDirectory, "MmdToonLit.shader"));
+
+            Assert.That(legacySource, Does.Not.Contain("Name \"DepthOnly\""));
+            Assert.That(legacySource, Does.Not.Contain("Name \"DepthNormals\""));
+            Assert.That(legacySource, Does.Not.Contain("_SCREEN_SPACE_OCCLUSION"));
+
+            Assert.That(toonLitSource, Does.Contain("Name \"DepthOnly\""));
+            Assert.That(toonLitSource, Does.Contain("\"LightMode\" = \"DepthOnly\""));
+            Assert.That(toonLitSource, Does.Contain("Name \"DepthNormals\""));
+            Assert.That(toonLitSource, Does.Contain("\"LightMode\" = \"DepthNormals\""));
+            Assert.That(toonLitSource, Does.Contain("Cull [_Cull]"));
+            Assert.That(toonLitSource, Does.Contain("clip(alpha - _AlphaClipThreshold);"));
+            Assert.That(toonLitSource, Does.Contain("_MmdNormalMapBound"));
+            Assert.That(toonLitSource, Does.Contain("UnpackNormal("));
+            Assert.That(toonLitSource, Does.Contain("#pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION"));
+            Assert.That(toonLitSource, Does.Contain("#pragma shader_feature_local_fragment _SURFACE_TYPE_TRANSPARENT"));
+            Assert.That(toonLitSource, Does.Contain("ShaderLibrary/AmbientOcclusion.hlsl"));
+            Assert.That(toonLitSource, Does.Contain("CreateAmbientOcclusionFactor("));
+            Assert.That(toonLitSource, Does.Contain("aoFactor.indirectAmbientOcclusion"));
+            Assert.That(toonLitSource, Does.Contain("ambientShSrgb *= aoFactor.indirectAmbientOcclusion;"));
         }
         [Test]
         public void CreateStaticModelKeepsShadowCasterAndAddsHiddenSelfShadowTarget()

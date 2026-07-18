@@ -419,6 +419,212 @@ namespace Mmd.Tests
             LogAssert.NoUnexpectedReceived();
         }
 
+        [Test]
+        [Explicit("Run the S1b URP SSAO visual delta explicitly; FLIP artifacts still require human review.")]
+        [Category("VisualShadingTier")]
+        public void ToonRampToonLit_TracksSsaoWhileLegacyStaysInvariant()
+        {
+            bool optedOut = string.Equals(
+                Environment.GetEnvironmentVariable("YMU_VISUAL_TIER_OPT_OUT"), "1",
+                StringComparison.Ordinal);
+            var visualCase = new MmdGeneratedPmxVisualCase(
+                "mmd-toon-ramp-lit-box",
+                "mmd-toon-ramp-lit-box.pmx",
+                new Vector3(-0.06f, 0.6f, 3.3f),
+                new Vector3(-0.06f, 0.6f, 0.0f),
+                27.0f,
+                0.03f);
+
+            var availability = MmdFlipHelper.ProbeAvailability();
+            if (!availability.available)
+            {
+                RequireOrOptOut(optedOut, "FLIP not available: " + availability.unsupportedReason);
+            }
+
+            string fixtureDirectory = ResolveGeneratedPmxFixtureDirectory();
+            string pmxPath = Path.Combine(fixtureDirectory, visualCase.modelFileName);
+            if (!File.Exists(pmxPath))
+            {
+                RequireOrOptOut(optedOut, "Generated PMX fixture missing: " + pmxPath);
+            }
+
+            string artifactsDir = ResolveArtifactsDir();
+            Directory.CreateDirectory(artifactsDir);
+            string legacyOffPath = Path.Combine(artifactsDir, visualCase.name + ".legacy-ssao-off.png");
+            string legacyOnPath = Path.Combine(artifactsDir, visualCase.name + ".legacy-ssao-on.png");
+            string toonLitOffPath = Path.Combine(artifactsDir, visualCase.name + ".toon-lit-ssao-off.png");
+            string toonLitOnPath = Path.Combine(artifactsDir, visualCase.name + ".toon-lit-ssao-on.png");
+
+            // The first renderer-feature toggle may allocate SSAO intermediates or warm shader
+            // variants. Keep that infrastructure work out of the measured Legacy invariant.
+            MmdGeneratedPmxVisualCaseReport warmupOff = RenderSsaoCase(
+                visualCase,
+                fixtureDirectory,
+                Path.Combine(artifactsDir, visualCase.name + ".ssao-warmup-off.png"),
+                MmdMaterialPreset.MmdToon,
+                ssaoEnabled: false);
+            MmdGeneratedPmxVisualCaseReport warmupOn = RenderSsaoCase(
+                visualCase,
+                fixtureDirectory,
+                Path.Combine(artifactsDir, visualCase.name + ".ssao-warmup-on.png"),
+                MmdMaterialPreset.MmdToon,
+                ssaoEnabled: true);
+            AssertCaptureEvidence(warmupOff, MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName, "SSAO warm-up off");
+            AssertCaptureEvidence(warmupOn, MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName, "SSAO warm-up on");
+
+            MmdGeneratedPmxVisualCaseReport legacyOff = RenderSsaoCase(
+                visualCase, fixtureDirectory, legacyOffPath, MmdMaterialPreset.MmdToon, ssaoEnabled: false);
+            MmdGeneratedPmxVisualCaseReport legacyOn = RenderSsaoCase(
+                visualCase, fixtureDirectory, legacyOnPath, MmdMaterialPreset.MmdToon, ssaoEnabled: true);
+            MmdGeneratedPmxVisualCaseReport toonLitOff = RenderSsaoCase(
+                visualCase, fixtureDirectory, toonLitOffPath, MmdMaterialPreset.MmdToonLit, ssaoEnabled: false);
+            MmdGeneratedPmxVisualCaseReport toonLitOn = RenderSsaoCase(
+                visualCase, fixtureDirectory, toonLitOnPath, MmdMaterialPreset.MmdToonLit, ssaoEnabled: true);
+
+            AssertCaptureEvidence(legacyOff, MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName, "SSAO Legacy off");
+            AssertCaptureEvidence(legacyOn, MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName, "SSAO Legacy on");
+            AssertCaptureEvidence(toonLitOff, MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName, "SSAO Toon Lit off");
+            AssertCaptureEvidence(toonLitOn, MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName, "SSAO Toon Lit on");
+            Assert.That(legacyOff.ssaoAvailable, Is.True, "SSAO off capture must find the configured URP feature.");
+            Assert.That(legacyOn.ssaoAvailable, Is.True, "SSAO on capture must find the configured URP feature.");
+            Assert.That(toonLitOff.ssaoConfigured, Is.True, "SSAO off capture must configure the renderer feature.");
+            Assert.That(toonLitOn.ssaoConfigured, Is.True, "SSAO on capture must configure the renderer feature.");
+
+            float legacyDelta = MmdFlipHelper.ComputeMeanError(legacyOffPath, legacyOnPath, artifactsDir);
+            string? legacyHeatmap = FindLatestFlipHeatmap(artifactsDir);
+            float toonLitDelta = MmdFlipHelper.ComputeMeanError(toonLitOffPath, toonLitOnPath, artifactsDir);
+            string? toonLitHeatmap = FindLatestFlipHeatmap(artifactsDir);
+            const float minimumVisibleDelta = 0.01f;
+            Assert.That(legacyDelta, Is.LessThanOrEqualTo(0.0001f),
+                "Legacy MMD Toon must remain invariant when only the URP SSAO feature changes.");
+            Assert.That(toonLitDelta, Is.GreaterThan(legacyDelta + minimumVisibleDelta),
+                "MMD Toon Lit must visibly consume URP SSAO indirectAmbientOcclusion.");
+            WriteSsaoDeltaManifest(
+                artifactsDir,
+                visualCase,
+                legacyOffPath,
+                legacyOnPath,
+                toonLitOffPath,
+                toonLitOnPath,
+                legacyDelta,
+                toonLitDelta,
+                legacyHeatmap,
+                toonLitHeatmap,
+                minimumVisibleDelta,
+                toonLitOn);
+            TestContext.WriteLine(
+                $"[toon-lit-ssao] legacy={legacyDelta:F6} toon-lit={toonLitDelta:F6} humanSignoff=pending");
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        private static MmdGeneratedPmxVisualCaseReport RenderSsaoCase(
+            MmdGeneratedPmxVisualCase visualCase,
+            string fixtureDirectory,
+            string capturePath,
+            MmdMaterialPreset materialPreset,
+            bool ssaoEnabled)
+        {
+            return MmdEditorRenderingDiagnostics.RenderGeneratedPmxVisualCase(
+                visualCase,
+                fixtureDirectory,
+                capturePath,
+                backgroundEnabled: true,
+                postProcessingEnabled: false,
+                materialPreset: materialPreset,
+                directionalLightColorOverride: Color.black,
+                directionalLightIntensityOverride: 0.0f,
+                ambientLightColorOverride: Color.black,
+                ambientLightIntensityOverride: 0.0f,
+                ambientShEnabledOverride: true,
+                fogEnabledOverride: false,
+                ssaoEnabledOverride: ssaoEnabled);
+        }
+
+        private static void WriteSsaoDeltaManifest(
+            string artifactsDir,
+            MmdGeneratedPmxVisualCase visualCase,
+            string legacyOffPath,
+            string legacyOnPath,
+            string toonLitOffPath,
+            string toonLitOnPath,
+            float legacyDelta,
+            float toonLitDelta,
+            string? legacyHeatmap,
+            string? toonLitHeatmap,
+            float minimumVisibleDelta,
+            MmdGeneratedPmxVisualCaseReport report)
+        {
+            PackageInfo? urp = PackageInfo.GetAllRegisteredPackages()
+                .FirstOrDefault(package => package.name == "com.unity.render-pipelines.universal");
+            var manifest = new VisualReviewManifest
+            {
+                artifactKind = "s1b-ssao-delta",
+                runId = new DirectoryInfo(artifactsDir).Name,
+                unityVersion = Application.unityVersion,
+                urpVersion = urp?.version ?? "unknown",
+                gpu = SystemInfo.graphicsDeviceName,
+                humanSignoff = "pending: FLIP pass is not human approval",
+                cases = new List<VisualReviewCase>
+                {
+                    new VisualReviewCase
+                    {
+                        id = visualCase.name + "-ssao",
+                        feature = "ssao",
+                        reference = Path.GetFileName(toonLitOffPath),
+                        candidate = Path.GetFileName(toonLitOnPath),
+                        heatmap = toonLitHeatmap == null ? string.Empty : Path.GetFileName(toonLitHeatmap),
+                        flipMean = toonLitDelta,
+                        expectedDeltaFloor = minimumVisibleDelta,
+                        passed = report.status == "passed" &&
+                            report.captureUsedStandardRequest &&
+                            report.selectedMaterialPassValid &&
+                            report.ssaoAvailable &&
+                            report.ssaoConfigured &&
+                            legacyDelta <= 0.0001f &&
+                            toonLitDelta > legacyDelta + minimumVisibleDelta,
+                        shaderProfile = report.shaderName,
+                        selectedMaterialPassName = report.selectedMaterialPassName,
+                        selectedMaterialLightMode = report.selectedMaterialLightMode,
+                        selectedMaterialPassIndex = report.selectedMaterialPassIndex,
+                        selectedMaterialPassEnabled = report.selectedMaterialPassEnabled,
+                        selectedMaterialPassValid = report.selectedMaterialPassValid,
+                        captureRequestType = report.captureRequestType,
+                        captureRenderPath = report.captureRenderPath,
+                        captureUsedStandardRequest = report.captureUsedStandardRequest,
+                        renderPipelineName = report.renderPipelineName,
+                        mainLightColor = report.mainLightColor,
+                        ssaoEnabled = report.ssaoEnabled,
+                        ssaoAvailable = report.ssaoAvailable,
+                        ssaoConfigured = report.ssaoConfigured,
+                        ssaoMode = report.ssaoMode,
+                        cameraPosition = report.cameraPosition,
+                        cameraTarget = report.cameraTarget,
+                        cameraFieldOfView = report.cameraFieldOfView,
+                        ambientLightColor = report.ambientLightColor,
+                        ambientLightIntensity = report.ambientLightIntensity,
+                        directionalLightColor = report.directionalLightColor,
+                        directionalLightIntensity = report.directionalLightIntensity,
+                        directionalLightPosition = report.directionalLightPosition,
+                        directionalLightTarget = report.directionalLightTarget,
+                        directionalLightMode = report.directionalLightMode,
+                        volume = "disabled",
+                        intendedChange = "Only MMD Toon Lit consumes URP SSAO indirectAmbientOcclusion; Legacy stays invariant.",
+                        legacyReference = Path.GetFileName(legacyOffPath),
+                        legacyCandidate = Path.GetFileName(legacyOnPath),
+                        legacyFlipMean = legacyDelta,
+                        legacyFeatureHeatmap = legacyHeatmap == null ? string.Empty : Path.GetFileName(legacyHeatmap),
+                        featureReference = Path.GetFileName(toonLitOffPath),
+                        featureCandidate = Path.GetFileName(toonLitOnPath),
+                        featureFlipMean = toonLitDelta,
+                        featureHeatmap = toonLitHeatmap == null ? string.Empty : Path.GetFileName(toonLitHeatmap)
+                    }
+                }
+            };
+            File.WriteAllText(
+                Path.Combine(artifactsDir, "manifest.json"),
+                JsonUtility.ToJson(manifest, prettyPrint: true));
+        }
+
         private static MmdGeneratedPmxVisualCaseReport RenderAmbientFogCase(
             MmdGeneratedPmxVisualCase visualCase,
             string fixtureDirectory,
@@ -897,6 +1103,10 @@ namespace Mmd.Tests
             public float fogDensity;
             public float fogStartDistance;
             public float fogEndDistance;
+            public bool ssaoEnabled;
+            public bool ssaoAvailable;
+            public bool ssaoConfigured;
+            public string ssaoMode = string.Empty;
             public float[] cameraPosition = Array.Empty<float>();
             public float[] cameraTarget = Array.Empty<float>();
             public float cameraFieldOfView;

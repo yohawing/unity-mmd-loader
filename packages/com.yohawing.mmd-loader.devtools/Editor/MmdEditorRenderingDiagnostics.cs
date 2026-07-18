@@ -1,8 +1,10 @@
 #nullable enable
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -47,7 +49,8 @@ namespace Mmd.Editor
             float? ambientLightIntensityOverride = null,
             bool realtimeShadowOccluderEnabled = false,
             bool? ambientShEnabledOverride = null,
-            bool? fogEnabledOverride = null)
+            bool? fogEnabledOverride = null,
+            bool? ssaoEnabledOverride = null)
         {
             const int width = 1024;
             const int height = 1024;
@@ -60,6 +63,8 @@ namespace Mmd.Editor
             var cameraObject = new GameObject("phase17-generated-pmx-camera");
             var lightObject = new GameObject("phase17-generated-pmx-light");
             GameObject? shadowOccluder = null;
+            GameObject? ssaoOccluder = null;
+            Material? ssaoOccluderMaterial = null;
             RenderTexture? renderTexture = null;
             Texture2D? pixels = null;
             MmdUnityModelInstance? instance = null;
@@ -70,6 +75,11 @@ namespace Mmd.Editor
             bool selectedMaterialPassEnabled = false;
             bool selectedMaterialPassValid = false;
             bool usedStandardRequest = false;
+            bool ssaoAvailable = false;
+            bool ssaoConfigured = !ssaoEnabledOverride.HasValue;
+            bool ssaoEnabled = ssaoEnabledOverride == true;
+            List<UnityEngine.Object>? configuredSsaoFeatures = null;
+            List<bool>? previousSsaoFeatureStates = null;
             Color previousAmbientLight = RenderSettings.ambientLight;
             AmbientMode previousAmbientMode = RenderSettings.ambientMode;
             SphericalHarmonicsL2 previousAmbientProbe = RenderSettings.ambientProbe;
@@ -103,6 +113,33 @@ namespace Mmd.Editor
                     RenderSettings.fogStartDistance = GeneratedPmxFogStartDistance;
                     RenderSettings.fogEndDistance = GeneratedPmxFogEndDistance;
                     RenderSettings.fogDensity = 0.0f;
+                }
+
+                if (ssaoEnabledOverride.HasValue)
+                {
+                    List<UnityEngine.Object> ssaoFeatures = FindSsaoFeatures();
+                    ssaoAvailable = ssaoFeatures.Count > 0;
+                    if (ssaoAvailable)
+                    {
+                        configuredSsaoFeatures = new List<UnityEngine.Object>(ssaoFeatures.Count);
+                        previousSsaoFeatureStates = new List<bool>(ssaoFeatures.Count);
+                        bool allFeaturesConfigured = true;
+                        foreach (UnityEngine.Object feature in ssaoFeatures)
+                        {
+                            if (TryGetSsaoFeatureActive(feature, out bool previousActive) &&
+                                SetSsaoFeatureActive(feature, ssaoEnabled))
+                            {
+                                configuredSsaoFeatures.Add(feature);
+                                previousSsaoFeatureStates.Add(previousActive);
+                            }
+                            else
+                            {
+                                allFeaturesConfigured = false;
+                            }
+                        }
+
+                        ssaoConfigured = allFeaturesConfigured;
+                    }
                 }
 
                 Camera camera = cameraObject.AddComponent<Camera>();
@@ -146,6 +183,24 @@ namespace Mmd.Editor
                     Renderer occluderRenderer = shadowOccluder.GetComponent<Renderer>();
                     occluderRenderer.shadowCastingMode = ShadowCastingMode.ShadowsOnly;
                     occluderRenderer.receiveShadows = false;
+                }
+
+                if (ssaoEnabledOverride.HasValue)
+                {
+                    Shader? ssaoShader = Shader.Find("Universal Render Pipeline/Lit");
+                    if (ssaoShader != null)
+                    {
+                        ssaoOccluder = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                        ssaoOccluder.name = "phase17-generated-pmx-ssao-occluder";
+                        ssaoOccluder.transform.position = visualCase.cameraTarget + new Vector3(0.32f, 0.0f, 0.02f);
+                        ssaoOccluder.transform.localScale = new Vector3(0.28f, 0.42f, 0.28f);
+                        ssaoOccluderMaterial = new Material(ssaoShader)
+                        {
+                            name = "phase17-generated-pmx-ssao-occluder-material",
+                            color = new Color(0.18f, 0.18f, 0.18f, 1.0f)
+                        };
+                        ssaoOccluder.GetComponent<Renderer>().sharedMaterial = ssaoOccluderMaterial;
+                    }
                 }
 
                 var parser = new NativeMmdParser();
@@ -238,7 +293,8 @@ namespace Mmd.Editor
 
                 bool passed = nonBlank > 0 && alpha > 0 &&
                     selectedMaterialPassValid &&
-                    usedStandardRequest;
+                    usedStandardRequest &&
+                    (!ssaoEnabledOverride.HasValue || (ssaoAvailable && ssaoConfigured));
                 return new MmdGeneratedPmxVisualCaseReport
                 {
                     caseName = "phase17-generated-pmx-" + visualCase.name,
@@ -299,6 +355,12 @@ namespace Mmd.Editor
                     fogDensity = fogConfigured ? RenderSettings.fogDensity : 0.0f,
                     fogStartDistance = fogConfigured ? RenderSettings.fogStartDistance : 0.0f,
                     fogEndDistance = fogConfigured ? RenderSettings.fogEndDistance : 0.0f,
+                    ssaoEnabled = ssaoEnabled,
+                    ssaoAvailable = ssaoAvailable,
+                    ssaoConfigured = ssaoConfigured,
+                    ssaoMode = ssaoEnabledOverride.HasValue
+                        ? (ssaoAvailable ? "renderer-feature" : "unavailable")
+                        : "unchanged",
                     selectedMaterialPassName = selectedMaterialPassName,
                     selectedMaterialLightMode = selectedMaterialLightMode,
                     selectedMaterialPassIndex = selectedMaterialPassIndex,
@@ -335,6 +397,16 @@ namespace Mmd.Editor
                 RenderSettings.fogDensity = previousFogDensity;
                 RenderSettings.fogStartDistance = previousFogStartDistance;
                 RenderSettings.fogEndDistance = previousFogEndDistance;
+                if (configuredSsaoFeatures != null && previousSsaoFeatureStates != null)
+                {
+                    for (int i = 0; i < configuredSsaoFeatures.Count && i < previousSsaoFeatureStates.Count; i++)
+                    {
+                        if (configuredSsaoFeatures[i] != null)
+                        {
+                            SetSsaoFeatureActive(configuredSsaoFeatures[i], previousSsaoFeatureStates[i]);
+                        }
+                    }
+                }
                 RenderSettings.sun = previousSun;
                 if (proxyStats != null)
                 {
@@ -353,6 +425,14 @@ namespace Mmd.Editor
                 {
                     UnityEngine.Object.DestroyImmediate(shadowOccluder);
                 }
+                if (ssaoOccluder != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(ssaoOccluder);
+                }
+                if (ssaoOccluderMaterial != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(ssaoOccluderMaterial);
+                }
                 if (renderTexture != null)
                 {
                     renderTexture.Release();
@@ -364,6 +444,79 @@ namespace Mmd.Editor
                     UnityEngine.Object.DestroyImmediate(pixels);
                 }
             }
+        }
+
+        private static List<UnityEngine.Object> FindSsaoFeatures()
+        {
+            var features = new List<UnityEngine.Object>();
+            RenderPipelineAsset? pipelineAsset = GraphicsSettings.currentRenderPipeline;
+            if (pipelineAsset == null)
+            {
+                return features;
+            }
+
+            PropertyInfo? rendererDataProperty = pipelineAsset.GetType().GetProperty(
+                "scriptableRendererData",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            object? rendererData = rendererDataProperty?.GetValue(pipelineAsset);
+            if (rendererData == null)
+            {
+                return features;
+            }
+
+            PropertyInfo? featuresProperty = rendererData.GetType().GetProperty(
+                "rendererFeatures",
+                BindingFlags.Instance | BindingFlags.Public);
+            if (!(featuresProperty?.GetValue(rendererData) is IEnumerable rendererFeatures))
+            {
+                return features;
+            }
+
+            foreach (object? feature in rendererFeatures)
+            {
+                if (feature is UnityEngine.Object featureObject &&
+                    string.Equals(
+                        featureObject.GetType().FullName,
+                        "UnityEngine.Rendering.Universal.ScreenSpaceAmbientOcclusion",
+                        StringComparison.Ordinal))
+                {
+                    features.Add(featureObject);
+                }
+            }
+
+            return features;
+        }
+
+        private static bool TryGetSsaoFeatureActive(UnityEngine.Object feature, out bool active)
+        {
+            PropertyInfo? property = feature.GetType().GetProperty(
+                "isActive",
+                BindingFlags.Instance | BindingFlags.Public);
+            if (property?.PropertyType == typeof(bool) && property.CanRead)
+            {
+                active = (bool)property.GetValue(feature);
+                return true;
+            }
+
+            active = false;
+            return false;
+        }
+
+        private static bool SetSsaoFeatureActive(UnityEngine.Object feature, bool active)
+        {
+            MethodInfo? method = feature.GetType().GetMethod(
+                "SetActive",
+                BindingFlags.Instance | BindingFlags.Public,
+                binder: null,
+                types: new[] { typeof(bool) },
+                modifiers: null);
+            if (method == null)
+            {
+                return false;
+            }
+
+            method.Invoke(feature, new object[] { active });
+            return true;
         }
 
         private static SphericalHarmonicsL2 BuildAmbientProbe(Color color, float intensity)
@@ -936,6 +1089,10 @@ namespace Mmd.Editor
         public float fogDensity;
         public float fogStartDistance;
         public float fogEndDistance;
+        public bool ssaoEnabled;
+        public bool ssaoAvailable;
+        public bool ssaoConfigured;
+        public string ssaoMode = string.Empty;
         public string selectedMaterialPassName = string.Empty;
         public string selectedMaterialLightMode = string.Empty;
         public int selectedMaterialPassIndex = -1;

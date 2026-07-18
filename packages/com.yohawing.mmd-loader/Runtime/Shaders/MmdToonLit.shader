@@ -72,9 +72,12 @@ Shader "MMD Toon Lit"
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile _ _CLUSTER_LIGHT_LOOP
             #pragma multi_compile_fragment _ _SHADOWS_SOFT_LOW _SHADOWS_SOFT_MEDIUM _SHADOWS_SOFT_HIGH
+            #pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION
+            #pragma shader_feature_local_fragment _SURFACE_TYPE_TRANSPARENT
             #pragma multi_compile_fog
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/AmbientOcclusion.hlsl"
 
             TEXTURE2D(_BaseMap);
             SAMPLER(sampler_BaseMap);
@@ -267,6 +270,16 @@ Shader "MMD Toon Lit"
                 }
 
                 half3 ambientShSrgb = LinearToSRGB(SampleSH(normalWS));
+                #if defined(_SCREEN_SPACE_OCCLUSION)
+                    float2 normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(input.positionCS);
+                    AmbientOcclusionFactor aoFactor = CreateAmbientOcclusionFactor(
+                        normalizedScreenSpaceUV,
+                        half(1.0h));
+                    // URP's AO factor is intentionally applied to indirect light only. The MMD
+                    // direct/toon ramp and dedicated self-shadow remain unchanged when the
+                    // Renderer Feature is toggled on or off.
+                    ambientShSrgb *= aoFactor.indirectAmbientOcclusion;
+                #endif
                 half3 baseSrgb = saturate(
                     LinearToSRGB(_BaseColor.rgb) * (mainLightSrgb + ambientShSrgb)
                     + LinearToSRGB(_AmbientColor.rgb));
@@ -287,6 +300,170 @@ Shader "MMD Toon Lit"
                 color.rgb = _GammaTarget > 0.5h ? LinearToSRGB(foggedLinear) : foggedLinear;
                 color.a = lerp(_Alpha, albedoAlpha, saturate(_TextureAlphaOutputWeight));
                 return color;
+            }
+            ENDHLSL
+        }
+
+        // URP SSAO consumes the camera depth and normals textures. Keep these passes local to
+        // the opt-in Toon Lit shader so Legacy MMD Toon remains byte-for-byte unchanged.
+        Pass
+        {
+            Name "DepthOnly"
+            Tags { "LightMode" = "DepthOnly" }
+
+            ZWrite On
+            ColorMask R
+            Cull [_Cull]
+
+            HLSLPROGRAM
+            #pragma target 2.0
+            #pragma vertex MmdDepthOnlyVertex
+            #pragma fragment MmdDepthOnlyFragment
+            #pragma multi_compile_instancing
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            TEXTURE2D(_BaseMap);
+            SAMPLER(sampler_BaseMap);
+
+            CBUFFER_START(UnityPerMaterial)
+                float4 _BaseMap_ST;
+                half4 _BaseColor;
+                half4 _DiagnosticColor;
+                half _AlphaClipThreshold;
+                half _BodyVisible;
+            CBUFFER_END
+
+            struct MmdDepthOnlyAttributes
+            {
+                float4 positionOS : POSITION;
+                float2 uv : TEXCOORD0;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+            };
+
+            struct MmdDepthOnlyVaryings
+            {
+                float4 positionCS : SV_POSITION;
+                float2 uv : TEXCOORD0;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+            };
+
+            MmdDepthOnlyVaryings MmdDepthOnlyVertex(MmdDepthOnlyAttributes input)
+            {
+                MmdDepthOnlyVaryings output;
+                UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_TRANSFER_INSTANCE_ID(input, output);
+                output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
+                output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
+                return output;
+            }
+
+            half MmdDepthOnlyFragment(MmdDepthOnlyVaryings input) : SV_TARGET
+            {
+                UNITY_SETUP_INSTANCE_ID(input);
+                half alpha = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv).a *
+                    _BaseColor.a * _DiagnosticColor.a;
+                clip(_BodyVisible - 0.5h);
+                clip(alpha - _AlphaClipThreshold);
+                return input.positionCS.z;
+            }
+            ENDHLSL
+        }
+
+        // URP's DepthNormals texture is the source consumed by the official SSAO Renderer
+        // Feature. Match ForwardLit's normal-map binding and world-space tangent basis exactly.
+        Pass
+        {
+            Name "DepthNormals"
+            Tags { "LightMode" = "DepthNormals" }
+
+            ZWrite On
+            Cull [_Cull]
+
+            HLSLPROGRAM
+            #pragma target 2.0
+            #pragma vertex MmdDepthNormalsVertex
+            #pragma fragment MmdDepthNormalsFragment
+            #pragma multi_compile_fragment _ _GBUFFER_NORMALS_OCT
+            #pragma multi_compile_instancing
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            TEXTURE2D(_BaseMap);
+            SAMPLER(sampler_BaseMap);
+            TEXTURE2D(_MmdNormalMap);
+            SAMPLER(sampler_MmdNormalMap);
+
+            CBUFFER_START(UnityPerMaterial)
+                float4 _BaseMap_ST;
+                half4 _BaseColor;
+                half4 _DiagnosticColor;
+                half _AlphaClipThreshold;
+                half _BodyVisible;
+                half _MmdNormalMapBound;
+            CBUFFER_END
+
+            struct MmdDepthNormalsAttributes
+            {
+                float4 positionOS : POSITION;
+                float3 normalOS : NORMAL;
+                float4 tangentOS : TANGENT;
+                float2 uv : TEXCOORD0;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+            };
+
+            struct MmdDepthNormalsVaryings
+            {
+                float4 positionCS : SV_POSITION;
+                float3 normalWS : TEXCOORD0;
+                float2 uv : TEXCOORD1;
+                float3 tangentWS : TEXCOORD2;
+                float3 bitangentWS : TEXCOORD3;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+            };
+
+            MmdDepthNormalsVaryings MmdDepthNormalsVertex(MmdDepthNormalsAttributes input)
+            {
+                MmdDepthNormalsVaryings output;
+                UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_TRANSFER_INSTANCE_ID(input, output);
+                float3 normalWS = normalize(TransformObjectToWorldNormal(input.normalOS));
+                float3 tangentWS = normalize(TransformObjectToWorldDir(input.tangentOS.xyz));
+                output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
+                output.normalWS = normalWS;
+                output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
+                output.tangentWS = tangentWS;
+                output.bitangentWS = cross(normalWS, tangentWS) * input.tangentOS.w;
+                return output;
+            }
+
+            void MmdDepthNormalsFragment(
+                MmdDepthNormalsVaryings input,
+                out half4 outNormalWS : SV_Target0)
+            {
+                UNITY_SETUP_INSTANCE_ID(input);
+                half alpha = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv).a *
+                    _BaseColor.a * _DiagnosticColor.a;
+                clip(_BodyVisible - 0.5h);
+                clip(alpha - _AlphaClipThreshold);
+
+                half3 normalWS = normalize(input.normalWS);
+                if (_MmdNormalMapBound > 0.5h)
+                {
+                    half3 normalTS = UnpackNormal(
+                        SAMPLE_TEXTURE2D(_MmdNormalMap, sampler_MmdNormalMap, input.uv));
+                    normalWS = normalize(
+                        normalize(input.tangentWS) * normalTS.x +
+                        normalize(input.bitangentWS) * normalTS.y +
+                        normalWS * normalTS.z);
+                }
+
+                #if defined(_GBUFFER_NORMALS_OCT)
+                    float2 octNormalWS = PackNormalOctQuadEncode(normalWS);
+                    float2 remappedOctNormalWS = saturate(octNormalWS * 0.5 + 0.5);
+                    half3 packedNormalWS = PackFloat2To888(remappedOctNormalWS);
+                    outNormalWS = half4(packedNormalWS, 0.0h);
+                #else
+                    outNormalWS = half4(NormalizeNormalPerPixel(normalWS), 0.0h);
+                #endif
             }
             ENDHLSL
         }
