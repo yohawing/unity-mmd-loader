@@ -140,6 +140,10 @@ namespace Mmd.Tests
             string legacyCandidate = Path.Combine(artifactsDir, visualCase.name + ".legacy-main-light-changed.png");
             string toonLitReference = Path.Combine(artifactsDir, visualCase.name + ".toon-lit-main-light-default.png");
             string toonLitCandidate = Path.Combine(artifactsDir, visualCase.name + ".toon-lit-main-light-changed.png");
+            string legacyShadowReference = Path.Combine(artifactsDir, visualCase.name + ".legacy-realtime-shadow-off.png");
+            string legacyShadowCandidate = Path.Combine(artifactsDir, visualCase.name + ".legacy-realtime-shadow-on.png");
+            string toonLitShadowReference = Path.Combine(artifactsDir, visualCase.name + ".toon-lit-realtime-shadow-off.png");
+            string toonLitShadowCandidate = Path.Combine(artifactsDir, visualCase.name + ".toon-lit-realtime-shadow-on.png");
 
             MmdGeneratedPmxVisualCaseReport legacyReferenceReport = MmdEditorRenderingDiagnostics.RenderGeneratedPmxVisualCase(
                 visualCase, fixtureDirectory, legacyReference,
@@ -169,6 +173,38 @@ namespace Mmd.Tests
                 directionalLightIntensityOverride: changedLightIntensity,
                 ambientLightColorOverride: Color.black,
                 ambientLightIntensityOverride: 0.0f);
+            MmdGeneratedPmxVisualCaseReport legacyShadowReferenceReport = MmdEditorRenderingDiagnostics.RenderGeneratedPmxVisualCase(
+                visualCase, fixtureDirectory, legacyShadowReference,
+                backgroundEnabled: true, postProcessingEnabled: false,
+                materialPreset: MmdMaterialPreset.MmdToon,
+                ambientLightColorOverride: Color.black,
+                ambientLightIntensityOverride: 0.0f);
+            MmdGeneratedPmxVisualCaseReport legacyShadowCandidateReport = MmdEditorRenderingDiagnostics.RenderGeneratedPmxVisualCase(
+                visualCase, fixtureDirectory, legacyShadowCandidate,
+                backgroundEnabled: true, postProcessingEnabled: false,
+                materialPreset: MmdMaterialPreset.MmdToon,
+                ambientLightColorOverride: Color.black,
+                ambientLightIntensityOverride: 0.0f,
+                realtimeShadowOccluderEnabled: true);
+            MmdGeneratedPmxVisualCaseReport toonLitShadowReferenceReport = MmdEditorRenderingDiagnostics.RenderGeneratedPmxVisualCase(
+                visualCase, fixtureDirectory, toonLitShadowReference,
+                backgroundEnabled: true, postProcessingEnabled: false,
+                materialPreset: MmdMaterialPreset.MmdToonLit,
+                ambientLightColorOverride: Color.black,
+                ambientLightIntensityOverride: 0.0f);
+            MmdGeneratedPmxVisualCaseReport toonLitShadowCandidateReport =
+                MmdEditorRenderingDiagnostics.RenderGeneratedPmxVisualCase(
+                    visualCase, fixtureDirectory, toonLitShadowCandidate,
+                    backgroundEnabled: true, postProcessingEnabled: false,
+                    materialPreset: MmdMaterialPreset.MmdToonLit,
+                    ambientLightColorOverride: Color.black,
+                    ambientLightIntensityOverride: 0.0f,
+                    realtimeShadowOccluderEnabled: true);
+
+            Assert.That(legacyShadowReferenceReport.status, Is.EqualTo("passed"));
+            Assert.That(legacyShadowCandidateReport.status, Is.EqualTo("passed"));
+            Assert.That(toonLitShadowReferenceReport.status, Is.EqualTo("passed"));
+            Assert.That(toonLitShadowCandidateReport.status, Is.EqualTo("passed"));
 
             Assert.That(legacyReferenceReport.shaderName,
                 Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName));
@@ -222,6 +258,9 @@ namespace Mmd.Tests
             float legacyDelta = MmdFlipHelper.ComputeMeanError(legacyReference, legacyCandidate, artifactsDir);
             float toonLitDelta = MmdFlipHelper.ComputeMeanError(toonLitReference, toonLitCandidate, artifactsDir);
             string? toonLitLightHeatmap = FindLatestFlipHeatmap(artifactsDir);
+            float legacyShadowDelta = MmdFlipHelper.ComputeMeanError(legacyShadowReference, legacyShadowCandidate, artifactsDir);
+            float toonLitShadowDelta = MmdFlipHelper.ComputeMeanError(toonLitShadowReference, toonLitShadowCandidate, artifactsDir);
+            string? toonLitShadowHeatmap = FindLatestFlipHeatmap(artifactsDir);
             const float minimumVisibleDelta = 0.01f;
             Assert.That(legacyDelta, Is.LessThanOrEqualTo(0.0001f),
                 "Legacy MMD Toon must remain invariant when only the Unity main light changes.");
@@ -229,6 +268,10 @@ namespace Mmd.Tests
                 "MMD Toon Lit must visibly follow Unity main-light color and intensity. "
                 + $"Captured URP main-light default=({string.Join(",", toonLitReferenceReport.mainLightColor.Select(value => value.ToString("F3")))}) "
                 + $"changed=({string.Join(",", toonLitCandidateReport.mainLightColor.Select(value => value.ToString("F3")))}).");
+            Assert.That(legacyShadowDelta, Is.LessThanOrEqualTo(0.0001f),
+                "Legacy MMD Toon must remain invariant when only Unity realtime shadowing changes.");
+            Assert.That(toonLitShadowDelta, Is.GreaterThan(legacyShadowDelta + minimumVisibleDelta),
+                "MMD Toon Lit must visibly follow Unity main-light realtime shadow attenuation.");
             WriteToonLitDeltaManifest(
                 artifactsDir,
                 visualCase,
@@ -241,10 +284,18 @@ namespace Mmd.Tests
                 legacyDelta,
                 toonLitDelta,
                 toonLitLightHeatmap,
+                legacyShadowReference,
+                legacyShadowCandidate,
+                toonLitShadowReference,
+                toonLitShadowCandidate,
+                legacyShadowDelta,
+                toonLitShadowDelta,
+                toonLitShadowHeatmap,
                 minimumVisibleDelta,
-                toonLitCandidateReport);
+                toonLitShadowCandidateReport);
             TestContext.WriteLine(
-                $"[toon-lit-main-light] legacy={legacyDelta:F6} toon-lit={toonLitDelta:F6} humanSignoff=pending");
+                $"[toon-lit-main-light] legacy={legacyDelta:F6} toon-lit={toonLitDelta:F6} "
+                + $"legacy-shadow={legacyShadowDelta:F6} toon-lit-shadow={toonLitShadowDelta:F6} humanSignoff=pending");
             LogAssert.NoUnexpectedReceived();
         }
 
@@ -323,6 +374,13 @@ namespace Mmd.Tests
             float legacyDelta,
             float toonLitDelta,
             string? toonLitLightHeatmap,
+            string legacyShadowReference,
+            string legacyShadowCandidate,
+            string toonLitShadowReference,
+            string toonLitShadowCandidate,
+            float legacyShadowDelta,
+            float toonLitShadowDelta,
+            string? toonLitShadowHeatmap,
             float minimumVisibleDelta,
             MmdGeneratedPmxVisualCaseReport report)
         {
@@ -341,12 +399,15 @@ namespace Mmd.Tests
                     new VisualReviewCase
                     {
                         id = visualCase.name + "-toon-lit-main-light",
-                        reference = Path.GetFileName(legacyReference),
-                        candidate = Path.GetFileName(toonLitReference),
-                        heatmap = profileHeatmap == null ? string.Empty : Path.GetFileName(profileHeatmap),
-                        flipMean = profileDelta,
+                        reference = Path.GetFileName(toonLitShadowReference),
+                        candidate = Path.GetFileName(toonLitShadowCandidate),
+                        heatmap = toonLitShadowHeatmap == null ? string.Empty : Path.GetFileName(toonLitShadowHeatmap),
+                        flipMean = toonLitShadowDelta,
                         expectedDeltaFloor = minimumVisibleDelta,
                         passed = toonLitDelta > legacyDelta + minimumVisibleDelta &&
+                            legacyDelta <= 0.0001f &&
+                            toonLitShadowDelta > legacyShadowDelta + minimumVisibleDelta &&
+                            legacyShadowDelta <= 0.0001f &&
                             report.selectedMaterialPassValid &&
                             report.captureUsedStandardRequest,
                         shaderProfile = report.shaderName,
@@ -371,14 +432,25 @@ namespace Mmd.Tests
                         directionalLightTarget = report.directionalLightTarget,
                         directionalLightMode = report.directionalLightMode,
                         volume = "disabled",
-                        intendedChange = "Only MMD Toon Lit follows Unity main-light color/intensity; Legacy stays invariant.",
+                        intendedChange = "Only MMD Toon Lit follows Unity main-light color/intensity and realtime shadow attenuation; Legacy stays invariant.",
+                        profileReference = Path.GetFileName(legacyReference),
+                        profileCandidate = Path.GetFileName(toonLitReference),
+                        profileFlipMean = profileDelta,
+                        profileHeatmap = profileHeatmap == null ? string.Empty : Path.GetFileName(profileHeatmap),
                         legacyReference = Path.GetFileName(legacyReference),
                         legacyCandidate = Path.GetFileName(legacyCandidate),
                         legacyFlipMean = legacyDelta,
                         toonLitLightReference = Path.GetFileName(toonLitReference),
                         toonLitLightCandidate = Path.GetFileName(toonLitCandidate),
                         toonLitLightFlipMean = toonLitDelta,
-                        toonLitLightHeatmap = toonLitLightHeatmap == null ? string.Empty : Path.GetFileName(toonLitLightHeatmap)
+                        toonLitLightHeatmap = toonLitLightHeatmap == null ? string.Empty : Path.GetFileName(toonLitLightHeatmap),
+                        legacyShadowReference = Path.GetFileName(legacyShadowReference),
+                        legacyShadowCandidate = Path.GetFileName(legacyShadowCandidate),
+                        legacyShadowFlipMean = legacyShadowDelta,
+                        toonLitShadowReference = Path.GetFileName(toonLitShadowReference),
+                        toonLitShadowCandidate = Path.GetFileName(toonLitShadowCandidate),
+                        toonLitShadowFlipMean = toonLitShadowDelta,
+                        toonLitShadowHeatmap = toonLitShadowHeatmap == null ? string.Empty : Path.GetFileName(toonLitShadowHeatmap)
                     }
                 }
             };
@@ -534,6 +606,17 @@ namespace Mmd.Tests
             public string toonLitLightCandidate = string.Empty;
             public float toonLitLightFlipMean;
             public string toonLitLightHeatmap = string.Empty;
+            public string profileReference = string.Empty;
+            public string profileCandidate = string.Empty;
+            public float profileFlipMean;
+            public string profileHeatmap = string.Empty;
+            public string legacyShadowReference = string.Empty;
+            public string legacyShadowCandidate = string.Empty;
+            public float legacyShadowFlipMean;
+            public string toonLitShadowReference = string.Empty;
+            public string toonLitShadowCandidate = string.Empty;
+            public float toonLitShadowFlipMean;
+            public string toonLitShadowHeatmap = string.Empty;
         }
     }
 }

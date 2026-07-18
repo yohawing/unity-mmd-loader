@@ -39,7 +39,8 @@ namespace Mmd.Editor
             Color? directionalLightColorOverride = null,
             float? directionalLightIntensityOverride = null,
             Color? ambientLightColorOverride = null,
-            float? ambientLightIntensityOverride = null)
+            float? ambientLightIntensityOverride = null,
+            bool realtimeShadowOccluderEnabled = false)
         {
             const int width = 1024;
             const int height = 1024;
@@ -51,6 +52,7 @@ namespace Mmd.Editor
 
             var cameraObject = new GameObject("phase17-generated-pmx-camera");
             var lightObject = new GameObject("phase17-generated-pmx-light");
+            GameObject? shadowOccluder = null;
             RenderTexture? renderTexture = null;
             Texture2D? pixels = null;
             MmdUnityModelInstance? instance = null;
@@ -88,6 +90,7 @@ namespace Mmd.Editor
                 light.type = LightType.Directional;
                 light.color = directionalLightColorOverride ?? GeneratedPmxDirectionalLightColor;
                 light.intensity = directionalLightIntensityOverride ?? GeneratedPmxDirectionalLightIntensity;
+                light.shadows = realtimeShadowOccluderEnabled ? LightShadows.Hard : LightShadows.None;
                 // Orient the directional light to the MMD reference direction so the toon
                 // shading matches the GoldenOracle render's lit side.
                 Vector3 unityLightTravel = GeneratedPmxMmdLightTravelDirection.normalized;
@@ -100,6 +103,18 @@ namespace Mmd.Editor
                 // Keep the MMD direction override so Legacy remains byte-stable while this harness
                 // changes only Unity's main-light color/intensity for the S1a delta assertion.
                 Vector3 generatedPmxDirectionToLight = -lightObject.transform.forward;
+
+                if (realtimeShadowOccluderEnabled)
+                {
+                    shadowOccluder = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    shadowOccluder.name = "phase17-generated-pmx-shadow-occluder";
+                    shadowOccluder.transform.position = visualCase.cameraTarget + generatedPmxDirectionToLight * 0.55f;
+                    shadowOccluder.transform.rotation = Quaternion.LookRotation(lightObject.transform.forward, Vector3.up);
+                    shadowOccluder.transform.localScale = new Vector3(0.75f, 0.75f, 0.04f);
+                    Renderer occluderRenderer = shadowOccluder.GetComponent<Renderer>();
+                    occluderRenderer.shadowCastingMode = ShadowCastingMode.ShadowsOnly;
+                    occluderRenderer.receiveShadows = false;
+                }
 
                 var parser = new NativeMmdParser();
                 MmdModelDefinition model = parser.LoadModel(File.ReadAllBytes(pmxPath));
@@ -285,6 +300,10 @@ namespace Mmd.Editor
                 DestroyInstance(instance);
                 UnityEngine.Object.DestroyImmediate(cameraObject);
                 UnityEngine.Object.DestroyImmediate(lightObject);
+                if (shadowOccluder != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(shadowOccluder);
+                }
                 if (renderTexture != null)
                 {
                     renderTexture.Release();
