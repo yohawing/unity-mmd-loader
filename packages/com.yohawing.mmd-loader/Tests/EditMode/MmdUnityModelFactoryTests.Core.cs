@@ -79,6 +79,7 @@ namespace Mmd.Tests
             Assert.That(legacySource, Does.Not.Contain("_MAIN_LIGHT_SHADOWS"));
             Assert.That(legacySource, Does.Not.Contain("mainLight.shadowAttenuation"));
             Assert.That(toonLitSource, Does.Contain("#pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN"));
+            Assert.That(toonLitSource, Does.Contain("#pragma multi_compile _ _CLUSTER_LIGHT_LOOP"));
             Assert.That(toonLitSource, Does.Contain("#pragma multi_compile_fragment _ _SHADOWS_SOFT_LOW _SHADOWS_SOFT_MEDIUM _SHADOWS_SOFT_HIGH"));
             Assert.That(toonLitSource, Does.Contain("GetMainLight(TransformWorldToShadowCoord(input.positionWS))"));
             Assert.That(toonLitSource, Does.Contain("mainLight.shadowAttenuation"));
