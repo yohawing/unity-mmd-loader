@@ -22,6 +22,23 @@ namespace Mmd.UnityIntegration
             return MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName;
         }
 
+        private static string ResolveRequestedShaderName(
+            MmdRenderingDescriptor descriptor,
+            int materialIndex)
+        {
+            foreach (MmdUrpMaterialBindingDescriptor binding in descriptor.urpMaterialBindings)
+            {
+                if (binding.materialIndex == materialIndex)
+                {
+                    return string.IsNullOrWhiteSpace(binding.shaderName)
+                        ? MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName
+                        : binding.shaderName;
+                }
+            }
+
+            return MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName;
+        }
+
         private static Shader ResolveShader(string requestedShaderName, out MmdShaderBindingDiagnostics diagnostics)
         {
             if (string.IsNullOrWhiteSpace(requestedShaderName))

@@ -28,13 +28,18 @@ namespace Mmd.UnityIntegration
             MmdRuntimeTextureResolution textureResolution,
             out MmdShaderBindingDiagnostics shaderDiagnostics)
         {
-            Shader shader = ResolveShader(ResolveRequestedShaderName(descriptor), out shaderDiagnostics);
+            // Keep the existing model-level scalar diagnostics contract while resolving the
+            // actual shader independently for each material binding below.
+            ResolveShader(ResolveRequestedShaderName(descriptor), out shaderDiagnostics);
             var materials = new Material[descriptor.materials.Count];
             try
             {
                 for (int i = 0; i < descriptor.materials.Count; i++)
                 {
                     MmdMaterialDescriptor source = descriptor.materials[i];
+                    Shader shader = ResolveShader(
+                        ResolveRequestedShaderName(descriptor, source.materialIndex),
+                        out _);
                     var material = new Material(shader)
                     {
                         hideFlags = RuntimeGeneratedAssetHideFlags,
@@ -46,6 +51,10 @@ namespace Mmd.UnityIntegration
                     ApplyMaterialColors(material, source);
                     MmdMaterialTransparencyMode transparencyMode = ResolveMaterialTransparencyMode(descriptor, source, textureResolution);
                     ApplyMaterialRenderingPolicy(material, source.alpha, transparencyMode, source.cullingPolicy, i);
+                    if (IsUrpLitShader(shader))
+                    {
+                        ApplyUrpLitDefaults(new[] { material });
+                    }
                 }
 
                 BindDiffuseTextures(descriptor, materials, textureResolution);
@@ -63,11 +72,6 @@ namespace Mmd.UnityIntegration
                     textureResolution.Diagnostics,
                     "_ToonMap",
                     "toon");
-
-                if (IsUrpLitShader(shader))
-                {
-                    ApplyUrpLitDefaults(materials);
-                }
 
                 return materials;
             }

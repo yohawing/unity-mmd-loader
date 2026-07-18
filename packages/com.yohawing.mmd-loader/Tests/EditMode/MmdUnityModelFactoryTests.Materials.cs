@@ -214,6 +214,34 @@ namespace Mmd.Tests
             Assert.That(instance.Materials[0].shader, Is.Not.Null);
         }
         [Test]
+        public void CreateStaticModelResolvesLegacyAndUrpLitShadersPerMaterialSlot()
+        {
+            MmdModelDefinition model = CreateTwoTransparentTriangleModel();
+            MmdRenderingDescriptor descriptor = MmdRenderingDescriptorBuilder.Build(model);
+            descriptor.urpMaterialBindings[0].shaderName = MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName;
+            descriptor.urpMaterialBindings[1].shaderName = MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName;
+
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(descriptor, "mixed-shader-smoke"));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            Assert.That(instance.Materials, Has.Length.EqualTo(2));
+            Assert.That(instance.Materials[0].shader.name, Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName));
+            Assert.That(instance.Materials[1].shader.name, Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName));
+            Assert.That(instance.MaterialBindingDiagnostics[0].resolvedShaderName,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName));
+            Assert.That(instance.MaterialBindingDiagnostics[1].resolvedShaderName,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName));
+            Assert.That(instance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
+            Assert.That(instance.Materials[1].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent + 1));
+
+            // Model-level diagnostics remain the legacy scalar summary of the first requested shader.
+            Assert.That(instance.ShaderDiagnostics.requestedShaderName,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName));
+            Assert.That(instance.ShaderDiagnostics.resolvedShaderName,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName));
+            Assert.That(instance.ShaderDiagnostics.shaderFallbackUsed, Is.False);
+        }
+        [Test]
         public void CreateStaticModelPreservesRawSnapshotUvAndFlipsViewportUv()
         {
 
