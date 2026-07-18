@@ -28,6 +28,24 @@ namespace Mmd.UnityIntegration
             MmdRuntimeTextureResolution textureResolution,
             out MmdShaderBindingDiagnostics shaderDiagnostics)
         {
+            return BuildMaterials(
+                descriptor,
+                textureResolution,
+                MmdMaterialMapperSet.BuiltIn,
+                out shaderDiagnostics);
+        }
+
+        internal static Material[] BuildMaterials(
+            MmdRenderingDescriptor descriptor,
+            MmdRuntimeTextureResolution textureResolution,
+            MmdMaterialMapperSet materialMappers,
+            out MmdShaderBindingDiagnostics shaderDiagnostics)
+        {
+            if (materialMappers == null)
+            {
+                throw new ArgumentNullException(nameof(materialMappers));
+            }
+
             // Keep the existing model-level scalar diagnostics contract while resolving the
             // actual shader independently for each material binding below.
             ResolveShader(ResolveRequestedShaderName(descriptor), out shaderDiagnostics);
@@ -40,18 +58,22 @@ namespace Mmd.UnityIntegration
                     Shader shader = ResolveShader(
                         ResolveRequestedShaderName(descriptor, source.materialIndex),
                         out _);
-                    var material = new Material(shader)
+                    Material material = materialMappers.Resolve(source.materialIndex)(source, shader);
+                    if (material == null)
                     {
-                        hideFlags = RuntimeGeneratedAssetHideFlags,
-                        name = string.IsNullOrWhiteSpace(source.name)
-                            ? $"MMD Material {source.materialIndex}"
-                            : source.name
-                    };
+                        throw new InvalidOperationException(
+                            $"Material mapper returned null for MMD material index {source.materialIndex}.");
+                    }
+
+                    material.hideFlags = RuntimeGeneratedAssetHideFlags;
+                    material.name = string.IsNullOrWhiteSpace(source.name)
+                        ? $"MMD Material {source.materialIndex}"
+                        : source.name;
                     materials[i] = material;
                     ApplyMaterialColors(material, source);
                     MmdMaterialTransparencyMode transparencyMode = ResolveMaterialTransparencyMode(descriptor, source, textureResolution);
                     ApplyMaterialRenderingPolicy(material, source.alpha, transparencyMode, source.cullingPolicy, i);
-                    if (IsUrpLitShader(shader))
+                    if (IsUrpLitShader(material.shader))
                     {
                         ApplyUrpLitDefaults(new[] { material });
                     }

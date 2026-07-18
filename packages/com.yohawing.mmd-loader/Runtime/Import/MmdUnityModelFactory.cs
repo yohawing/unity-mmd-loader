@@ -45,7 +45,36 @@ namespace Mmd.UnityIntegration
             MmdMaterialPreset preset,
             MmdMaterialOverrideAsset? materialOverride)
         {
-            return CreateStaticModel(model, sourcePath, importScale, preset, includeSelfShadowTarget: true, materialOverride: materialOverride);
+            return CreateStaticModel(
+                model,
+                sourcePath,
+                importScale,
+                preset,
+                materialOverride,
+                MmdMaterialMapperSet.BuiltIn);
+        }
+
+        public static MmdUnityModelInstance CreateStaticModel(
+            MmdModelDefinition model,
+            string? sourcePath,
+            float importScale,
+            MmdMaterialPreset preset,
+            MmdMaterialOverrideAsset? materialOverride,
+            MmdMaterialMapperSet materialMappers)
+        {
+            if (materialMappers == null)
+            {
+                throw new ArgumentNullException(nameof(materialMappers));
+            }
+
+            return CreateStaticModel(
+                model,
+                sourcePath,
+                importScale,
+                preset,
+                includeSelfShadowTarget: true,
+                materialOverride,
+                materialMappers);
         }
 
         internal static MmdUnityModelInstance CreateStaticModel(
@@ -73,7 +102,8 @@ namespace Mmd.UnityIntegration
             float importScale,
             MmdMaterialPreset preset,
             bool includeSelfShadowTarget,
-            MmdMaterialOverrideAsset? materialOverride)
+            MmdMaterialOverrideAsset? materialOverride,
+            MmdMaterialMapperSet? materialMappers = null)
         {
             if (model == null)
             {
@@ -89,11 +119,25 @@ namespace Mmd.UnityIntegration
                 MmdUnityModelSourceContext.FromOptionalPath(sourcePath),
                 scale,
                 includeSelfShadowTarget,
-                materialOverride);
+                materialOverride,
+                materialMappers ?? MmdMaterialMapperSet.BuiltIn);
         }
 
         public static MmdUnityModelInstance CreateStaticModel(MmdRenderingDescriptor descriptor, string modelName)
         {
+            return CreateStaticModel(descriptor, modelName, MmdMaterialMapperSet.BuiltIn);
+        }
+
+        public static MmdUnityModelInstance CreateStaticModel(
+            MmdRenderingDescriptor descriptor,
+            string modelName,
+            MmdMaterialMapperSet materialMappers)
+        {
+            if (materialMappers == null)
+            {
+                throw new ArgumentNullException(nameof(materialMappers));
+            }
+
             return CreateStaticModel(
                 descriptor,
                 modelName,
@@ -101,7 +145,8 @@ namespace Mmd.UnityIntegration
                 physics: null,
                 sourceContext: null,
                 importScale: 1.0f,
-                includeSelfShadowTarget: true);
+                includeSelfShadowTarget: true,
+                materialMappers: materialMappers);
         }
 
         public static MmdUnityModelInstance CreateSkinnedModel(MmdModelDefinition model)
@@ -135,7 +180,36 @@ namespace Mmd.UnityIntegration
             MmdMaterialPreset preset,
             MmdMaterialOverrideAsset? materialOverride)
         {
-            return CreateSkinnedModel(model, sourcePath, importScale, preset, includeSelfShadowTarget: true, materialOverride: materialOverride);
+            return CreateSkinnedModel(
+                model,
+                sourcePath,
+                importScale,
+                preset,
+                materialOverride,
+                MmdMaterialMapperSet.BuiltIn);
+        }
+
+        public static MmdUnityModelInstance CreateSkinnedModel(
+            MmdModelDefinition model,
+            string? sourcePath,
+            float importScale,
+            MmdMaterialPreset preset,
+            MmdMaterialOverrideAsset? materialOverride,
+            MmdMaterialMapperSet materialMappers)
+        {
+            if (materialMappers == null)
+            {
+                throw new ArgumentNullException(nameof(materialMappers));
+            }
+
+            return CreateSkinnedModel(
+                model,
+                sourcePath,
+                importScale,
+                preset,
+                includeSelfShadowTarget: true,
+                materialOverride,
+                materialMappers);
         }
 
         internal static MmdUnityModelInstance CreateSkinnedModel(
@@ -163,7 +237,8 @@ namespace Mmd.UnityIntegration
             float importScale,
             MmdMaterialPreset preset,
             bool includeSelfShadowTarget,
-            MmdMaterialOverrideAsset? materialOverride)
+            MmdMaterialOverrideAsset? materialOverride,
+            MmdMaterialMapperSet? materialMappers = null)
         {
             if (model == null)
             {
@@ -184,7 +259,8 @@ namespace Mmd.UnityIntegration
                 MmdUnityModelSourceContext.FromOptionalPath(sourcePath),
                 scale,
                 includeSelfShadowTarget,
-                materialOverride);
+                materialOverride,
+                materialMappers ?? MmdMaterialMapperSet.BuiltIn);
         }
 
         public static MmdUnityModelInstance CreateExistingSkinnedModelInstance(
@@ -419,7 +495,8 @@ namespace Mmd.UnityIntegration
             MmdUnityModelSourceContext? sourceContext,
             float importScale,
             bool includeSelfShadowTarget,
-            MmdMaterialOverrideAsset? materialOverride = null)
+            MmdMaterialOverrideAsset? materialOverride = null,
+            MmdMaterialMapperSet? materialMappers = null)
         {
             if (descriptor == null)
             {
@@ -438,7 +515,11 @@ namespace Mmd.UnityIntegration
                 Transform modelRoot = CreateModelRoot(root.transform);
                 mesh = BuildMesh(descriptor, importScale);
                 textureResolution = MmdRuntimeTextureResolver.ResolveDiffuseTextures(descriptor, sourceContext);
-                materials = MmdUnityMaterialBuilder.BuildMaterials(descriptor, textureResolution, out MmdShaderBindingDiagnostics shaderDiagnostics);
+                materials = MmdUnityMaterialBuilder.BuildMaterials(
+                    descriptor,
+                    textureResolution,
+                    materialMappers ?? MmdMaterialMapperSet.BuiltIn,
+                    out MmdShaderBindingDiagnostics shaderDiagnostics);
                 MmdMaterialOverrideApplier.Apply(materialOverride, materials);
                 Transform[] boneTransforms = BuildBoneTransforms(modelRoot, bones, importScale);
                 MmdUnityPhysicsBody[] physicsBodies = BuildPhysicsBodies(modelRoot, bones, boneTransforms, physics, importScale);
@@ -481,7 +562,8 @@ namespace Mmd.UnityIntegration
             MmdUnityModelSourceContext? sourceContext,
             float importScale,
             bool includeSelfShadowTarget,
-            MmdMaterialOverrideAsset? materialOverride = null)
+            MmdMaterialOverrideAsset? materialOverride = null,
+            MmdMaterialMapperSet? materialMappers = null)
         {
             ValidateDescriptor(descriptor);
             MmdMaterialOverrideApplier.ApplyToRenderingDescriptor(materialOverride, descriptor);
@@ -499,7 +581,11 @@ namespace Mmd.UnityIntegration
                 ApplySkinning(mesh, descriptor, bones, boneTransforms, modelRoot);
                 BakeVertexMorphBlendShapes(mesh, descriptor, importScale);
                 textureResolution = MmdRuntimeTextureResolver.ResolveDiffuseTextures(descriptor, sourceContext);
-                materials = MmdUnityMaterialBuilder.BuildMaterials(descriptor, textureResolution, out MmdShaderBindingDiagnostics shaderDiagnostics);
+                materials = MmdUnityMaterialBuilder.BuildMaterials(
+                    descriptor,
+                    textureResolution,
+                    materialMappers ?? MmdMaterialMapperSet.BuiltIn,
+                    out MmdShaderBindingDiagnostics shaderDiagnostics);
                 MmdMaterialOverrideApplier.Apply(materialOverride, materials);
 
                 var renderer = modelRoot.gameObject.AddComponent<SkinnedMeshRenderer>();
