@@ -16,6 +16,50 @@ namespace Mmd.Samples.UnityToonShader.Tests
     public sealed class UnityToonShaderAdapterTests
     {
         [Test]
+        public void DemoRebuildDoesNotGeneratePersistentObjectsInEditMode()
+        {
+            var root = new GameObject("UTS demo edit-mode guard");
+            try
+            {
+                var demo = root.AddComponent<UnityToonShaderAdapterDemo>();
+                demo.RebuildDemo();
+                Assert.That(root.transform.childCount, Is.Zero);
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void SideBySideDemoSceneIsBundledAndDocumentsFallback()
+        {
+            UnityEditor.PackageManager.PackageInfo package = UnityEditor.PackageManager.PackageInfo
+                .FindForAssetPath("Packages/com.yohawing.mmd-loader");
+            Assert.That(package, Is.Not.Null, "The loader package must be installed for this sample test.");
+            string packageRoot = package.resolvedPath;
+            string sampleRoot = Path.Combine(packageRoot, "Samples~", "UnityToonShaderAdapter");
+            string demoSource = Path.Combine(sampleRoot, "Assets", "UnityToonShaderAdapterDemo.cs");
+            string demoScene = Path.Combine(sampleRoot, "Scenes", "UnityToonShaderAdapterDemo.unity");
+            string readme = Path.Combine(sampleRoot, "README.md");
+
+            Assert.That(demoSource, Does.Exist);
+            Assert.That(demoScene, Does.Exist);
+            Assert.That(readme, Does.Exist);
+            string source = File.ReadAllText(demoSource);
+            string usage = File.ReadAllText(readme);
+            Assert.That(source, Does.Contain("OnGUI"));
+            Assert.That(source, Does.Contain("Legacy MMD Toon"));
+            Assert.That(source, Does.Contain("UTS unavailable/incompatible"));
+            Assert.That(source, Does.Contain("RebuildDemo"));
+            Assert.That(source, Does.Contain("DestroyDemo();"));
+            Assert.That(source, Does.Contain("convertedMaterialsOwned"));
+            Assert.That(source, Does.Contain("ambientStateCaptured"));
+            Assert.That(usage, Does.Contain("UnityToonShaderAdapterDemo.unity"));
+            Assert.That(usage, Does.Contain("UTS_FALLBACK_MMD_TOON"));
+        }
+
+        [Test]
         public void SchemaCanaryAcceptsUts0141WhenPresent()
         {
             Shader shader = RequireInstalledUtsShader();

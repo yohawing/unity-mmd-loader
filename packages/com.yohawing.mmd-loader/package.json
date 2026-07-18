@@ -30,7 +30,7 @@
     },
     {
       "displayName": "Unity Toon Shader Adapter",
-      "description": "Optional, conservative PMX material conversion for Unity Toon Shader 0.14.1-preview. This sample is not an MMD parity renderer.",
+      "description": "Optional, conservative PMX material conversion for Unity Toon Shader 0.14.1-preview with a self-contained side-by-side generated-material demo scene and fail-closed fallback. This sample is not an MMD parity renderer.",
       "path": "Samples~/UnityToonShaderAdapter"
     }
   ]

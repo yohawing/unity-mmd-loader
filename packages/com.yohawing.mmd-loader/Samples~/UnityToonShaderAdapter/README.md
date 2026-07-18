@@ -6,6 +6,12 @@ The adapter targets the property/pass schema shipped by **Unity Toon Shader 0.14
 
 ## Usage
 
+### User-verifiable side-by-side demo
+
+Import this sample through Package Manager, open `Scenes/UnityToonShaderAdapterDemo.unity`, and press Play. The scene generates a deterministic two-slot PMX-style body/hair canary at runtime: Legacy MMD Toon is on the left and the UTS conversion is on the right. The overlay identifies the active UTS schema and prints every adapter diagnostic.
+
+UTS is optional. When `Toon/Toon` is missing or fails schema validation, the right side intentionally retains the original MMD Toon materials and the overlay reports `UTS_FALLBACK_MMD_TOON`; the scene remains playable and does not throw. No external or licensed MMD asset is required.
+
 ```csharp
 var diagnostics = new List<UnityToonShaderDiagnostic>();
 if (UnityToonShaderAdapter.TryConvertMaterials(
