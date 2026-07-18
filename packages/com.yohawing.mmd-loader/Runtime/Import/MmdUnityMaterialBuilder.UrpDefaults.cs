@@ -70,6 +70,11 @@ namespace Mmd.UnityIntegration
                 material.SetFloat(MmdMaterialPropertyNames.ToonFeather, source.toonFeather);
             }
 
+            if (material.HasProperty(MmdMaterialPropertyNames.ToonBandCount))
+            {
+                material.SetFloat(MmdMaterialPropertyNames.ToonBandCount, source.toonBandCount);
+            }
+
             if (material.HasProperty("_OutlineColor"))
             {
                 material.SetColor("_OutlineColor", edge);

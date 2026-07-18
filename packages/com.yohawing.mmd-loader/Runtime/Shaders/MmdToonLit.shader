@@ -22,6 +22,7 @@ Shader "MMD Toon Lit"
         // Optional authoring controls. -1 keeps the current MMD visibility ramp exactly intact.
         _ToonBoundary ("Toon Boundary", Range(-1, 1)) = -1
         _ToonFeather ("Toon Boundary Feather", Range(-1, 1)) = -1
+        _ToonBandCount ("Toon Band Count", Range(-1, 8)) = -1
         _OutlineColor ("Outline Color", Color) = (0, 0, 0, 1)
         _OutlineWidth ("Outline Width", Float) = 0
         _OutlineScreenSpaceWeight ("Outline Screen Space Weight", Float) = 0
@@ -133,6 +134,7 @@ Shader "MMD Toon Lit"
                 half _ReflectionProbeWeight;
                 half _ToonBoundary;
                 half _ToonFeather;
+                half _ToonBandCount;
             CBUFFER_END
 
             struct Attributes
@@ -254,6 +256,24 @@ Shader "MMD Toon Lit"
                 return smoothstep(lower, max(lower + 1e-4h, upper), visibility);
             }
 
+            half ApplyMmdToonBandCount(half visibility)
+            {
+                // Negative is the compatibility sentinel. Explicit values quantize the
+                // visibility ramp into a small, deterministic number of evenly spaced bands.
+                if (_ToonBandCount < 0.5h)
+                {
+                    return visibility;
+                }
+
+                half bandCount = max(1.0h, min(8.0h, floor(_ToonBandCount + 0.5h)));
+                if (bandCount <= 1.0h)
+                {
+                    return 0.0h;
+                }
+
+                return floor(saturate(visibility) * (bandCount - 1.0h) + 0.5h) / (bandCount - 1.0h);
+            }
+
             half4 ForwardFragment(Varyings input) : SV_Target
             {
                 UNITY_SETUP_INSTANCE_ID(input);
@@ -291,8 +311,9 @@ Shader "MMD Toon Lit"
 
                 half ndotl = saturate(dot(normalWS, lightDirection));
                 half lightVisibility = saturate(dot(normalWS, lightDirection) * 3.0h);
-                half toonRampVisibility = ApplyMmdToonBoundary(lightVisibility);
-                half toonVisibility = ApplyMmdToonBoundary(min(selfShadowVisibility, lightVisibility));
+                half toonRampVisibility = ApplyMmdToonBoundary(ApplyMmdToonBandCount(lightVisibility));
+                half toonVisibility = ApplyMmdToonBoundary(
+                    ApplyMmdToonBandCount(min(selfShadowVisibility, lightVisibility)));
                 half3 fallbackSelfShadowToon = half3(1.0h, 1.0h, 1.0h);
                 half3 mappedSelfShadowToon = SAMPLE_TEXTURE2D(_ToonMap, sampler_ToonMap, float2(0.5, 0.22)).rgb;
                 half3 selfShadowToon = lerp(fallbackSelfShadowToon, mappedSelfShadowToon, saturate(_ToonMapBound));

@@ -65,6 +65,8 @@ namespace Mmd
 
         public bool hasToonFeather;
         public float toonFeather = -1.0f;
+        public bool hasToonBandCount;
+        public float toonBandCount = -1.0f;
 
         public bool hasOutlineColor;
         public Color outlineColor = Color.black;

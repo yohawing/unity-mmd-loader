@@ -30,6 +30,7 @@ namespace Mmd.Rendering
         public const string AmbientColor = "_AmbientColor";
         public const string ToonBoundary = "_ToonBoundary";
         public const string ToonFeather = "_ToonFeather";
+        public const string ToonBandCount = "_ToonBandCount";
         public const string OutlineColor = "_OutlineColor";
         public const string OutlineWidth = "_OutlineWidth";
         public const string OutlineVisible = "_OutlineVisible";

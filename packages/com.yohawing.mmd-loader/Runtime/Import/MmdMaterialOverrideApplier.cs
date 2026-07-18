@@ -259,6 +259,11 @@ namespace Mmd.UnityIntegration
                 SetFloatIfPresent(material, MmdMaterialPropertyNames.ToonFeather, NormalizeToonOptional(entry.toonFeather));
             }
 
+            if (entry.hasToonBandCount)
+            {
+                SetFloatIfPresent(material, MmdMaterialPropertyNames.ToonBandCount, NormalizeToonBandCount(entry.toonBandCount));
+            }
+
             if (entry.hasOutlineColor)
             {
                 SetColorIfPresent(material, MmdMaterialPropertyNames.OutlineColor, entry.outlineColor);
@@ -445,6 +450,11 @@ namespace Mmd.UnityIntegration
                 material.toonFeather = NormalizeToonOptional(entry.toonFeather);
             }
 
+            if (entry.hasToonBandCount)
+            {
+                material.toonBandCount = NormalizeToonBandCount(entry.toonBandCount);
+            }
+
             if (entry.hasOutlineColor)
             {
                 material.edgeColor = new[]
@@ -492,6 +502,11 @@ namespace Mmd.UnityIntegration
             if (entry.hasToonFeather)
             {
                 binding.toonFeather = NormalizeToonOptional(entry.toonFeather);
+            }
+
+            if (entry.hasToonBandCount)
+            {
+                binding.toonBandCount = NormalizeToonBandCount(entry.toonBandCount);
             }
 
             if (entry.hasOutlineColor)
@@ -745,6 +760,11 @@ namespace Mmd.UnityIntegration
         private static float NormalizeToonOptional(float value)
         {
             return IsFinite(value) ? Mathf.Clamp(value, -1.0f, 1.0f) : -1.0f;
+        }
+
+        private static float NormalizeToonBandCount(float value)
+        {
+            return IsFinite(value) ? Mathf.Clamp(value, -1.0f, 8.0f) : -1.0f;
         }
 
         private static bool IsFinite(float value)

@@ -147,9 +147,11 @@ namespace Mmd.Tests
             Assert.That(toonLitSource, Does.Contain("#if !defined(_SURFACE_TYPE_TRANSPARENT)"));
             Assert.That(toonLitSource, Does.Contain("_ToonBoundary (\"Toon Boundary\", Range(-1, 1)) = -1"));
             Assert.That(toonLitSource, Does.Contain("_ToonFeather (\"Toon Boundary Feather\", Range(-1, 1)) = -1"));
+            Assert.That(toonLitSource, Does.Contain("_ToonBandCount (\"Toon Band Count\", Range(-1, 8)) = -1"));
             Assert.That(toonLitSource, Does.Contain("if (_ToonBoundary < -0.5h)"));
-            Assert.That(toonLitSource, Does.Contain("half toonRampVisibility = ApplyMmdToonBoundary(lightVisibility);"));
-            Assert.That(toonLitSource, Does.Contain("half toonVisibility = ApplyMmdToonBoundary(min(selfShadowVisibility, lightVisibility));"));
+            Assert.That(toonLitSource, Does.Contain("if (_ToonBandCount < 0.5h)"));
+            Assert.That(toonLitSource, Does.Contain("half toonRampVisibility = ApplyMmdToonBoundary(ApplyMmdToonBandCount(lightVisibility));"));
+            Assert.That(toonLitSource, Does.Contain("ApplyMmdToonBandCount(min(selfShadowVisibility, lightVisibility))"));
             Assert.That(toonLitSource, Does.Contain("half3 mmdToonLight = lerp(selfShadowToon, half3(1.0h, 1.0h, 1.0h), toonRampVisibility);"));
             Assert.That(toonLitSource, Does.Contain("half3 selfShadowMmdToonLight = lerp(selfShadowToon, half3(1.0h, 1.0h, 1.0h), toonVisibility);"));
         }

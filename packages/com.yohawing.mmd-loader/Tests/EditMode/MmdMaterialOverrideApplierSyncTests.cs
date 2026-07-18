@@ -65,6 +65,7 @@ namespace Mmd.EditModeTests
                 "hasRoughnessMap",
                 "hasSmoothness",
                 "hasSurfaceMode",
+                "hasToonBandCount",
                 "hasToonBoundary",
                 "hasToonFeather"
             };
@@ -112,8 +113,9 @@ namespace Mmd.EditModeTests
 
                 AssertHasProperties(toonMaterial,
                     MmdMaterialPropertyNames.BaseColor, MmdMaterialPropertyNames.Color, MmdMaterialPropertyNames.Alpha,
-                    MmdMaterialPropertyNames.AmbientColor, MmdMaterialPropertyNames.ToonBoundary,
-                    MmdMaterialPropertyNames.ToonFeather, MmdMaterialPropertyNames.OutlineColor,
+                    MmdMaterialPropertyNames.AmbientColor, MmdMaterialPropertyNames.ToonBandCount,
+                    MmdMaterialPropertyNames.ToonBoundary, MmdMaterialPropertyNames.ToonFeather,
+                    MmdMaterialPropertyNames.OutlineColor,
                     MmdMaterialPropertyNames.OutlineWidth, MmdMaterialPropertyNames.OutlineVisible,
                     MmdMaterialPropertyNames.MmdNormalMap, MmdMaterialPropertyNames.MmdNormalMapBound,
                     MmdMaterialPropertyNames.AlphaClipThreshold, MmdMaterialPropertyNames.ShadowAlphaClipThreshold,
@@ -122,6 +124,7 @@ namespace Mmd.EditModeTests
                 AssertColor(toonMaterial.GetColor(MmdMaterialPropertyNames.Color), new Color(0.44f, 0.55f, 0.66f, 0.42f));
                 Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.Alpha), Is.EqualTo(0.42f).Within(0.00001f));
                 AssertColor(toonMaterial.GetColor(MmdMaterialPropertyNames.AmbientColor), new Color(0.13f, 0.24f, 0.35f, 1.0f));
+                Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.ToonBandCount), Is.EqualTo(3.0f).Within(0.00001f));
                 Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.ToonBoundary), Is.EqualTo(0.42f).Within(0.00001f));
                 Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.ToonFeather), Is.EqualTo(0.12f).Within(0.00001f));
                 AssertColor(toonMaterial.GetColor(MmdMaterialPropertyNames.OutlineColor), new Color(0.72f, 0.61f, 0.5f, 0.39f));
@@ -192,6 +195,7 @@ namespace Mmd.EditModeTests
                 Assert.That(material.diffuseColor, Is.EqualTo(new[] { 0.11f, 0.22f, 0.33f }));
                 Assert.That(material.alpha, Is.EqualTo(0.42f).Within(0.00001f));
                 Assert.That(material.ambientColor, Is.EqualTo(new[] { 0.13f, 0.24f, 0.35f }));
+                Assert.That(material.toonBandCount, Is.EqualTo(3.0f).Within(0.00001f));
                 Assert.That(material.toonBoundary, Is.EqualTo(0.42f).Within(0.00001f));
                 Assert.That(material.toonFeather, Is.EqualTo(0.12f).Within(0.00001f));
                 Assert.That(material.edgeColor, Is.EqualTo(new[] { 0.72f, 0.61f, 0.5f, 0.39f }));
@@ -221,6 +225,7 @@ namespace Mmd.EditModeTests
                 Assert.That(binding.diffuseColor, Is.EqualTo(new[] { 0.11f, 0.22f, 0.33f }));
                 Assert.That(binding.alpha, Is.EqualTo(0.42f).Within(0.00001f));
                 Assert.That(binding.ambientColor, Is.EqualTo(new[] { 0.13f, 0.24f, 0.35f }));
+                Assert.That(binding.toonBandCount, Is.EqualTo(3.0f).Within(0.00001f));
                 Assert.That(binding.toonBoundary, Is.EqualTo(0.42f).Within(0.00001f));
                 Assert.That(binding.toonFeather, Is.EqualTo(0.12f).Within(0.00001f));
                 Assert.That(binding.edgeColor, Is.EqualTo(new[] { 0.72f, 0.61f, 0.5f, 0.39f }));
@@ -252,6 +257,8 @@ namespace Mmd.EditModeTests
                 alpha = 0.42f,
                 hasAmbientColor = true,
                 ambientColor = new Color(0.13f, 0.24f, 0.35f, 1.0f),
+                hasToonBandCount = true,
+                toonBandCount = 3.0f,
                 hasToonBoundary = true,
                 toonBoundary = 0.42f,
                 hasToonFeather = true,
