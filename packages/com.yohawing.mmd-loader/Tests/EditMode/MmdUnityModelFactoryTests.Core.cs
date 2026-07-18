@@ -171,6 +171,16 @@ namespace Mmd.Tests
             Assert.That(toonLitSource, Does.Contain("half3 fixedRimSrgb = LinearToSRGB(_RimColor.rgb) * rimMask;"));
             Assert.That(toonLitSource, Does.Contain("half3 followRimSrgb = LinearToSRGB(_RimColor.rgb) * mainLightSrgb"));
             Assert.That(toonLitSource, Does.Contain("lightFacing * selfShadowVisibility * rimMask"));
+            Assert.That(toonLitSource, Does.Contain("[HDR] _EmissionColor (\"Emission Color\", Color) = (1, 1, 1, 1)"));
+            Assert.That(toonLitSource, Does.Contain("_EmissionMap (\"Emission Map\", 2D) = \"white\" {}"));
+            Assert.That(toonLitSource, Does.Contain("_MmdEmissionIntensity (\"MMD Emission Intensity\", Range(-1, 8)) = -1"));
+            Assert.That(toonLitSource, Does.Contain("_MmdEmissionMapBound"));
+            Assert.That(toonLitSource, Does.Contain("_MmdEmissionMask (\"MMD Emission Mask\", 2D) = \"white\" {}"));
+            Assert.That(toonLitSource, Does.Contain("_MmdEmissionMaskBound"));
+            Assert.That(toonLitSource, Does.Contain("if (_MmdEmissionIntensity >= 0.0h)"));
+            Assert.That(toonLitSource, Does.Contain("SAMPLE_TEXTURE2D(_MmdEmissionMask, sampler_MmdEmissionMask, input.uv).r"));
+            Assert.That(toonLitSource, Does.Contain("emissionLinear = max(_EmissionColor.rgb, 0.0h) *"));
+            Assert.That(toonLitSource, Does.Contain("MixFog(SRGBToLinear(litSrgb) + emissionLinear"));
         }
         [Test]
         public void CreateStaticModelKeepsShadowCasterAndAddsHiddenSelfShadowTarget()

@@ -715,6 +715,29 @@ namespace Mmd.Tests
                 onRimLightFollow: 1.0f);
         }
 
+        [Test]
+        [Explicit("Run the S1c HDR emission visual delta explicitly; FLIP artifacts still require human review.")]
+        [Category("VisualShadingTier")]
+        public void ToonRampToonLit_TracksHdrEmissionWhileLegacyStaysInvariant()
+        {
+            RunToonAuthoringDeltaCase(
+                "hdr-emission",
+                offBoundary: -1.0f,
+                offFeather: -1.0f,
+                offBandCount: -1.0f,
+                onBoundary: -1.0f,
+                onFeather: -1.0f,
+                onBandCount: -1.0f,
+                artifactKind: "s1c-hdr-emission-delta",
+                caseSuffix: "hdr-emission",
+                feature: "hdr-emission",
+                intendedChange: "Only MMD Toon Lit consumes the explicit HDR emission color and intensity in linear space before fog; alpha and Legacy remain invariant.",
+                offEmissionColor: Color.white,
+                offEmissionIntensity: -1.0f,
+                onEmissionColor: new Color(3.0f, 1.2f, 0.25f, 1.0f),
+                onEmissionIntensity: 1.0f);
+        }
+
         private static void RunToonAuthoringDeltaCase(
             string artifactStem,
             float offBoundary,
@@ -740,7 +763,11 @@ namespace Mmd.Tests
             Color? onRimColor = null,
             float? onRimBoundary = null,
             float? onRimFeather = null,
-            float? onRimLightFollow = null)
+            float? onRimLightFollow = null,
+            Color? offEmissionColor = null,
+            float? offEmissionIntensity = null,
+            Color? onEmissionColor = null,
+            float? onEmissionIntensity = null)
         {
             bool optedOut = string.Equals(
                 Environment.GetEnvironmentVariable("YMU_VISUAL_TIER_OPT_OUT"), "1",
@@ -776,19 +803,23 @@ namespace Mmd.Tests
             MmdGeneratedPmxVisualCaseReport legacyOff = RenderToonBoundaryCase(
                 visualCase, fixtureDirectory, legacyOffPath, MmdMaterialPreset.MmdToon, offBoundary, offFeather, offBandCount,
                 offStylizedSpecularColor, offStylizedSpecularBoundary, offStylizedSpecularFeather,
-                offRimColor, offRimBoundary, offRimFeather, offRimLightFollow);
+                offRimColor, offRimBoundary, offRimFeather, offRimLightFollow,
+                offEmissionColor, offEmissionIntensity);
             MmdGeneratedPmxVisualCaseReport legacyOn = RenderToonBoundaryCase(
                 visualCase, fixtureDirectory, legacyOnPath, MmdMaterialPreset.MmdToon, onBoundary, onFeather, onBandCount,
                 onStylizedSpecularColor, onStylizedSpecularBoundary, onStylizedSpecularFeather,
-                onRimColor, onRimBoundary, onRimFeather, onRimLightFollow);
+                onRimColor, onRimBoundary, onRimFeather, onRimLightFollow,
+                onEmissionColor, onEmissionIntensity);
             MmdGeneratedPmxVisualCaseReport toonLitOff = RenderToonBoundaryCase(
                 visualCase, fixtureDirectory, toonLitOffPath, MmdMaterialPreset.MmdToonLit, offBoundary, offFeather, offBandCount,
                 offStylizedSpecularColor, offStylizedSpecularBoundary, offStylizedSpecularFeather,
-                offRimColor, offRimBoundary, offRimFeather, offRimLightFollow);
+                offRimColor, offRimBoundary, offRimFeather, offRimLightFollow,
+                offEmissionColor, offEmissionIntensity);
             MmdGeneratedPmxVisualCaseReport toonLitOn = RenderToonBoundaryCase(
                 visualCase, fixtureDirectory, toonLitOnPath, MmdMaterialPreset.MmdToonLit, onBoundary, onFeather, onBandCount,
                 onStylizedSpecularColor, onStylizedSpecularBoundary, onStylizedSpecularFeather,
-                onRimColor, onRimBoundary, onRimFeather, onRimLightFollow);
+                onRimColor, onRimBoundary, onRimFeather, onRimLightFollow,
+                onEmissionColor, onEmissionIntensity);
 
             AssertCaptureEvidence(legacyOff, MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName, "Toon boundary Legacy off");
             AssertCaptureEvidence(legacyOn, MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName, "Toon boundary Legacy on");
@@ -800,6 +831,8 @@ namespace Mmd.Tests
             Assert.That(toonLitOn.stylizedSpecularConfigured, Is.True, "Toon Lit on capture must expose stylized specular properties.");
             Assert.That(toonLitOff.rimConfigured, Is.True, "Toon Lit off capture must expose rim properties.");
             Assert.That(toonLitOn.rimConfigured, Is.True, "Toon Lit on capture must expose rim properties.");
+            Assert.That(toonLitOff.emissionConfigured, Is.True, "Toon Lit off capture must expose HDR emission properties.");
+            Assert.That(toonLitOn.emissionConfigured, Is.True, "Toon Lit on capture must expose HDR emission properties.");
 
             float legacyDelta = MmdFlipHelper.ComputeMeanError(legacyOffPath, legacyOnPath, artifactsDir);
             string? legacyHeatmap = FindLatestFlipHeatmap(artifactsDir);
@@ -846,7 +879,9 @@ namespace Mmd.Tests
             Color? rimColor = null,
             float? rimBoundary = null,
             float? rimFeather = null,
-            float? rimLightFollow = null)
+            float? rimLightFollow = null,
+            Color? emissionColor = null,
+            float? emissionIntensity = null)
         {
             return MmdEditorRenderingDiagnostics.RenderGeneratedPmxVisualCase(
                 visualCase,
@@ -866,7 +901,9 @@ namespace Mmd.Tests
                 rimColorOverride: rimColor,
                 rimBoundaryOverride: rimBoundary,
                 rimFeatherOverride: rimFeather,
-                rimLightFollowOverride: rimLightFollow);
+                rimLightFollowOverride: rimLightFollow,
+                emissionColorOverride: emissionColor,
+                emissionIntensityOverride: emissionIntensity);
         }
 
         private static void WriteToonAuthoringDeltaManifest(
@@ -914,6 +951,7 @@ namespace Mmd.Tests
                             report.toonBoundaryConfigured &&
                             report.stylizedSpecularConfigured &&
                             report.rimConfigured &&
+                            report.emissionConfigured &&
                             legacyDelta <= 0.0001f &&
                             toonLitDelta > legacyDelta + minimumVisibleDelta,
                         shaderProfile = report.shaderName,
@@ -942,6 +980,10 @@ namespace Mmd.Tests
                         rimLightFollow = report.rimLightFollow,
                         rimConfigured = report.rimConfigured,
                         rimMode = report.rimMode,
+                        emissionColor = report.emissionColor,
+                        emissionIntensity = report.emissionIntensity,
+                        emissionConfigured = report.emissionConfigured,
+                        emissionMode = report.emissionMode,
                         cameraPosition = report.cameraPosition,
                         cameraTarget = report.cameraTarget,
                         cameraFieldOfView = report.cameraFieldOfView,
@@ -1688,6 +1730,10 @@ namespace Mmd.Tests
             public float rimLightFollow;
             public bool rimConfigured;
             public string rimMode = string.Empty;
+            public float[] emissionColor = Array.Empty<float>();
+            public float emissionIntensity = -1.0f;
+            public bool emissionConfigured;
+            public string emissionMode = string.Empty;
             public float[] cameraPosition = Array.Empty<float>();
             public float[] cameraTarget = Array.Empty<float>();
             public float cameraFieldOfView;

@@ -26,6 +26,10 @@ namespace Mmd.Rendering
         public const string OcclusionStrength = "_OcclusionStrength";
         public const string EmissionColor = "_EmissionColor";
         public const string EmissionMap = "_EmissionMap";
+        public const string MmdEmissionIntensity = "_MmdEmissionIntensity";
+        public const string MmdEmissionMapBound = "_MmdEmissionMapBound";
+        public const string MmdEmissionMask = "_MmdEmissionMask";
+        public const string MmdEmissionMaskBound = "_MmdEmissionMaskBound";
         public const string Alpha = "_Alpha";
         public const string AmbientColor = "_AmbientColor";
         public const string ToonBoundary = "_ToonBoundary";

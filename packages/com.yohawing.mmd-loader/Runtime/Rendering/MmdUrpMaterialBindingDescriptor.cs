@@ -23,6 +23,10 @@ namespace Mmd.Rendering
         public float alpha = 1.0f;
         public float[] diffuseColor = new[] { 1.0f, 1.0f, 1.0f };
         public float[] ambientColor = new[] { 0.25f, 0.25f, 0.25f };
+        public float[] emissionColor = new[] { 1.0f, 1.0f, 1.0f };
+        public float emissionIntensity = -1.0f;
+        public bool usesEmissionMap;
+        public bool usesEmissionMask;
         public float toonBoundary = -1.0f;
         public float toonFeather = -1.0f;
         public float toonBandCount = -1.0f;
@@ -95,6 +99,10 @@ namespace Mmd.Rendering
                     alpha = material.alpha,
                     diffuseColor = CopyColor(material.diffuseColor, 3, new[] { 1.0f, 1.0f, 1.0f }),
                     ambientColor = CopyColor(material.ambientColor, 3, new[] { 0.25f, 0.25f, 0.25f }),
+                    emissionColor = CopyHdrColor(material.emissionColor, 3, new[] { 1.0f, 1.0f, 1.0f }),
+                    emissionIntensity = material.emissionIntensity,
+                    usesEmissionMap = material.usesEmissionMap,
+                    usesEmissionMask = material.usesEmissionMask,
                     toonBoundary = material.toonBoundary,
                     toonFeather = material.toonFeather,
                     toonBandCount = material.toonBandCount,
@@ -195,6 +203,18 @@ namespace Mmd.Rendering
                 }
 
                 result[i] = value;
+            }
+
+            return result;
+        }
+
+        private static float[] CopyHdrColor(float[]? values, int length, float[] fallback)
+        {
+            var result = new float[length];
+            for (int i = 0; i < length; i++)
+            {
+                float value = values != null && i < values.Length ? values[i] : fallback[i];
+                result[i] = float.IsNaN(value) || float.IsInfinity(value) ? fallback[i] : value;
             }
 
             return result;

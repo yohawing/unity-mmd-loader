@@ -48,6 +48,15 @@ namespace Mmd
         public bool hasEmissionColor;
         public Color emissionColor = Color.black;
 
+        public bool hasEmissionIntensity;
+        public float emissionIntensity = -1.0f;
+
+        public bool hasEmissionMap;
+        public Texture2D? emissionMap;
+
+        public bool hasEmissionMask;
+        public Texture2D? emissionMask;
+
         public bool hasBaseColor;
         public Color baseColor = Color.white;
 

@@ -91,6 +91,27 @@ namespace Mmd.UnityIntegration
                 material.SetFloat(MmdMaterialPropertyNames.StylizedSpecularFeather, source.stylizedSpecularFeather);
             }
 
+            if (material.HasProperty(MmdMaterialPropertyNames.EmissionColor))
+            {
+                material.SetColor(MmdMaterialPropertyNames.EmissionColor,
+                    ToHdrColor(source.emissionColor, Color.white));
+            }
+
+            if (material.HasProperty(MmdMaterialPropertyNames.MmdEmissionIntensity))
+            {
+                material.SetFloat(MmdMaterialPropertyNames.MmdEmissionIntensity, source.emissionIntensity);
+            }
+
+            if (material.HasProperty(MmdMaterialPropertyNames.MmdEmissionMapBound))
+            {
+                material.SetFloat(MmdMaterialPropertyNames.MmdEmissionMapBound, source.usesEmissionMap ? 1.0f : 0.0f);
+            }
+
+            if (material.HasProperty(MmdMaterialPropertyNames.MmdEmissionMaskBound))
+            {
+                material.SetFloat(MmdMaterialPropertyNames.MmdEmissionMaskBound, source.usesEmissionMask ? 1.0f : 0.0f);
+            }
+
             if (material.HasProperty(MmdMaterialPropertyNames.RimColor))
             {
                 material.SetColor(MmdMaterialPropertyNames.RimColor,
@@ -150,6 +171,19 @@ namespace Mmd.UnityIntegration
             float b = values.Length > 2 && IsFinite(values[2]) ? Mathf.Clamp01(values[2]) : fallback.b;
             float a = IsFinite(alpha) ? Mathf.Clamp01(alpha) : fallback.a;
             return new Color(r, g, b, a);
+        }
+
+        private static Color ToHdrColor(float[]? values, Color fallback)
+        {
+            if (values == null)
+            {
+                return fallback;
+            }
+
+            float r = values.Length > 0 && IsFinite(values[0]) ? values[0] : fallback.r;
+            float g = values.Length > 1 && IsFinite(values[1]) ? values[1] : fallback.g;
+            float b = values.Length > 2 && IsFinite(values[2]) ? values[2] : fallback.b;
+            return new Color(r, g, b, fallback.a);
         }
 
         private static void SetColorAlpha(Material material, string propertyName, float alpha)

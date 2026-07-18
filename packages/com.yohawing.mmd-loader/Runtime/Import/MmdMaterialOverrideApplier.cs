@@ -356,6 +356,28 @@ namespace Mmd.UnityIntegration
                 SetEmissionColorIfPresent(material, entry.emissionColor);
             }
 
+            if (entry.hasEmissionIntensity)
+            {
+                SetFloatIfPresent(material, MmdMaterialPropertyNames.MmdEmissionIntensity,
+                    NormalizeEmissionIntensity(entry.emissionIntensity));
+            }
+
+            if (entry.hasEmissionMap)
+            {
+                bool emissionMapBound = SetOptionalTextureIfPresent(
+                    material, MmdMaterialPropertyNames.EmissionMap, entry.emissionMap);
+                SetFloatIfPresent(material, MmdMaterialPropertyNames.MmdEmissionMapBound,
+                    emissionMapBound ? 1.0f : 0.0f);
+            }
+
+            if (entry.hasEmissionMask)
+            {
+                bool emissionMaskBound = SetOptionalTextureIfPresent(
+                    material, MmdMaterialPropertyNames.MmdEmissionMask, entry.emissionMask);
+                SetFloatIfPresent(material, MmdMaterialPropertyNames.MmdEmissionMaskBound,
+                    emissionMaskBound ? 1.0f : 0.0f);
+            }
+
             if (entry.hasNormalScale)
             {
                 SetFloatIfPresent(material, MmdMaterialPropertyNames.BumpScale, entry.normalScale);
@@ -480,6 +502,31 @@ namespace Mmd.UnityIntegration
                 material.ambientColor = new[] { Clamp01(entry.ambientColor.r), Clamp01(entry.ambientColor.g), Clamp01(entry.ambientColor.b) };
             }
 
+            if (entry.hasEmissionColor)
+            {
+                material.emissionColor = new[]
+                {
+                    NormalizeHdr(entry.emissionColor.r),
+                    NormalizeHdr(entry.emissionColor.g),
+                    NormalizeHdr(entry.emissionColor.b)
+                };
+            }
+
+            if (entry.hasEmissionIntensity)
+            {
+                material.emissionIntensity = NormalizeEmissionIntensity(entry.emissionIntensity);
+            }
+
+            if (entry.hasEmissionMap)
+            {
+                material.usesEmissionMap = entry.emissionMap != null;
+            }
+
+            if (entry.hasEmissionMask)
+            {
+                material.usesEmissionMask = entry.emissionMask != null;
+            }
+
             if (entry.hasToonBoundary)
             {
                 material.toonBoundary = NormalizeToonOptional(entry.toonBoundary);
@@ -577,6 +624,31 @@ namespace Mmd.UnityIntegration
             if (entry.hasAmbientColor)
             {
                 binding.ambientColor = new[] { Clamp01(entry.ambientColor.r), Clamp01(entry.ambientColor.g), Clamp01(entry.ambientColor.b) };
+            }
+
+            if (entry.hasEmissionColor)
+            {
+                binding.emissionColor = new[]
+                {
+                    NormalizeHdr(entry.emissionColor.r),
+                    NormalizeHdr(entry.emissionColor.g),
+                    NormalizeHdr(entry.emissionColor.b)
+                };
+            }
+
+            if (entry.hasEmissionIntensity)
+            {
+                binding.emissionIntensity = NormalizeEmissionIntensity(entry.emissionIntensity);
+            }
+
+            if (entry.hasEmissionMap)
+            {
+                binding.usesEmissionMap = entry.emissionMap != null;
+            }
+
+            if (entry.hasEmissionMask)
+            {
+                binding.usesEmissionMask = entry.emissionMask != null;
             }
 
             if (entry.hasToonBoundary)
@@ -712,13 +784,28 @@ namespace Mmd.UnityIntegration
             return true;
         }
 
+        private static bool SetOptionalTextureIfPresent(Material material, string propertyName, Texture? value)
+        {
+            if (!material.HasProperty(propertyName))
+            {
+                return false;
+            }
+
+            material.SetTexture(propertyName, value!);
+            return value != null;
+        }
+
         private static void SetEmissionColorIfPresent(Material material, Color value)
         {
             if (material.HasProperty(MmdMaterialPropertyNames.EmissionColor))
             {
                 material.SetColor(MmdMaterialPropertyNames.EmissionColor, value);
-                material.EnableKeyword("_EMISSION");
-                material.globalIlluminationFlags &= ~MaterialGlobalIlluminationFlags.EmissiveIsBlack;
+                LocalKeyword emissionKeyword = material.shader.keywordSpace.FindKeyword("_EMISSION");
+                if (emissionKeyword.isValid)
+                {
+                    material.EnableKeyword("_EMISSION");
+                    material.globalIlluminationFlags &= ~MaterialGlobalIlluminationFlags.EmissiveIsBlack;
+                }
             }
         }
 
@@ -895,6 +982,16 @@ namespace Mmd.UnityIntegration
         private static float NormalizeToonBandCount(float value)
         {
             return IsFinite(value) ? Mathf.Clamp(value, -1.0f, 8.0f) : -1.0f;
+        }
+
+        private static float NormalizeEmissionIntensity(float value)
+        {
+            return IsFinite(value) ? Mathf.Clamp(value, -1.0f, 8.0f) : -1.0f;
+        }
+
+        private static float NormalizeHdr(float value)
+        {
+            return IsFinite(value) ? value : 0.0f;
         }
 
         private static bool IsFinite(float value)

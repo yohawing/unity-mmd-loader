@@ -61,7 +61,9 @@ namespace Mmd.Editor
             Color? rimColorOverride = null,
             float? rimBoundaryOverride = null,
             float? rimFeatherOverride = null,
-            float? rimLightFollowOverride = null)
+            float? rimLightFollowOverride = null,
+            Color? emissionColorOverride = null,
+            float? emissionIntensityOverride = null)
         {
             const int width = 1024;
             const int height = 1024;
@@ -111,6 +113,9 @@ namespace Mmd.Editor
             float rimBoundary = rimBoundaryOverride ?? -1.0f;
             float rimFeather = rimFeatherOverride ?? -1.0f;
             float rimLightFollow = rimLightFollowOverride ?? 0.0f;
+            bool emissionConfigured = !emissionColorOverride.HasValue && !emissionIntensityOverride.HasValue;
+            Color emissionColor = emissionColorOverride ?? Color.white;
+            float emissionIntensity = emissionIntensityOverride ?? -1.0f;
             List<UnityEngine.Object>? configuredSsaoFeatures = null;
             List<bool>? previousSsaoFeatureStates = null;
             Color previousAmbientLight = RenderSettings.ambientLight;
@@ -440,6 +445,38 @@ namespace Mmd.Editor
                     rimConfigured = materialPreset != MmdMaterialPreset.MmdToonLit ||
                         (anyRimMaterial && allRimMaterialsConfigured);
                 }
+                if (emissionColorOverride.HasValue || emissionIntensityOverride.HasValue)
+                {
+                    bool anyEmissionMaterial = false;
+                    bool allEmissionMaterialsConfigured = true;
+                    foreach (Material material in instance.Materials)
+                    {
+                        if (material == null)
+                        {
+                            continue;
+                        }
+
+                        bool hasColor = material.HasProperty(MmdMaterialPropertyNames.EmissionColor);
+                        bool hasIntensity = material.HasProperty(MmdMaterialPropertyNames.MmdEmissionIntensity);
+                        if (hasColor && emissionColorOverride.HasValue)
+                        {
+                            material.SetColor(MmdMaterialPropertyNames.EmissionColor, emissionColor);
+                        }
+                        if (hasIntensity && emissionIntensityOverride.HasValue)
+                        {
+                            material.SetFloat(MmdMaterialPropertyNames.MmdEmissionIntensity, emissionIntensity);
+                        }
+
+                        anyEmissionMaterial |= hasColor || hasIntensity;
+                        if (materialPreset == MmdMaterialPreset.MmdToonLit && (!hasColor || !hasIntensity))
+                        {
+                            allEmissionMaterialsConfigured = false;
+                        }
+                    }
+
+                    emissionConfigured = materialPreset != MmdMaterialPreset.MmdToonLit ||
+                        (anyEmissionMaterial && allEmissionMaterialsConfigured);
+                }
                 if (perturbShaderOutput)
                 {
                     foreach (Material material in instance.Materials)
@@ -514,7 +551,8 @@ namespace Mmd.Editor
                     ((!stylizedSpecularColorOverride.HasValue && !stylizedSpecularBoundaryOverride.HasValue &&
                         !stylizedSpecularFeatherOverride.HasValue) || stylizedSpecularConfigured) &&
                     ((!rimColorOverride.HasValue && !rimBoundaryOverride.HasValue &&
-                        !rimFeatherOverride.HasValue && !rimLightFollowOverride.HasValue) || rimConfigured);
+                        !rimFeatherOverride.HasValue && !rimLightFollowOverride.HasValue) || rimConfigured) &&
+                    ((!emissionColorOverride.HasValue && !emissionIntensityOverride.HasValue) || emissionConfigured);
                 return new MmdGeneratedPmxVisualCaseReport
                 {
                     caseName = "phase17-generated-pmx-" + visualCase.name,
@@ -611,6 +649,12 @@ namespace Mmd.Editor
                     rimMode = rimColorOverride.HasValue || rimBoundaryOverride.HasValue ||
                         rimFeatherOverride.HasValue || rimLightFollowOverride.HasValue
                         ? (rimConfigured ? "material-properties" : "unavailable")
+                        : "unchanged",
+                    emissionColor = ToColorArray(emissionColor),
+                    emissionIntensity = emissionIntensity,
+                    emissionConfigured = emissionConfigured,
+                    emissionMode = emissionColorOverride.HasValue || emissionIntensityOverride.HasValue
+                        ? (emissionConfigured ? "material-properties" : "unavailable")
                         : "unchanged",
                     selectedMaterialPassName = selectedMaterialPassName,
                     selectedMaterialLightMode = selectedMaterialLightMode,
@@ -1407,6 +1451,10 @@ namespace Mmd.Editor
         public float rimLightFollow;
         public bool rimConfigured;
         public string rimMode = string.Empty;
+        public float[] emissionColor = Array.Empty<float>();
+        public float emissionIntensity = -1.0f;
+        public bool emissionConfigured;
+        public string emissionMode = string.Empty;
         public string selectedMaterialPassName = string.Empty;
         public string selectedMaterialLightMode = string.Empty;
         public int selectedMaterialPassIndex = -1;

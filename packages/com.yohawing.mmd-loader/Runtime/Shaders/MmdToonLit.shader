@@ -30,6 +30,12 @@ Shader "MMD Toon Lit"
         _RimBoundary ("Rim Boundary", Range(-1, 1)) = -1
         _RimFeather ("Rim Feather", Range(-1, 1)) = -1
         _RimLightFollow ("Rim Light Follow", Range(0, 1)) = 0
+        [HDR] _EmissionColor ("Emission Color", Color) = (1, 1, 1, 1)
+        _EmissionMap ("Emission Map", 2D) = "white" {}
+        _MmdEmissionIntensity ("MMD Emission Intensity", Range(-1, 8)) = -1
+        _MmdEmissionMapBound ("MMD Emission Map Bound", Float) = 0
+        _MmdEmissionMask ("MMD Emission Mask", 2D) = "white" {}
+        _MmdEmissionMaskBound ("MMD Emission Mask Bound", Float) = 0
         _OutlineColor ("Outline Color", Color) = (0, 0, 0, 1)
         _OutlineWidth ("Outline Width", Float) = 0
         _OutlineScreenSpaceWeight ("Outline Screen Space Weight", Float) = 0
@@ -108,6 +114,10 @@ Shader "MMD Toon Lit"
             SAMPLER(sampler_MmdSelfShadowMap);
             TEXTURE2D(_MmdNormalMap);
             SAMPLER(sampler_MmdNormalMap);
+            TEXTURE2D(_EmissionMap);
+            SAMPLER(sampler_EmissionMap);
+            TEXTURE2D(_MmdEmissionMask);
+            SAMPLER(sampler_MmdEmissionMask);
 
             float4x4 _MmdSelfShadowWorldToShadow;
             float4 _MmdSelfShadowParams;
@@ -149,6 +159,10 @@ Shader "MMD Toon Lit"
                 half _RimBoundary;
                 half _RimFeather;
                 half _RimLightFollow;
+                half4 _EmissionColor;
+                half _MmdEmissionIntensity;
+                half _MmdEmissionMapBound;
+                half _MmdEmissionMaskBound;
             CBUFFER_END
 
             struct Attributes
@@ -452,7 +466,19 @@ Shader "MMD Toon Lit"
                     half3 rimSrgb = lerp(fixedRimSrgb, followRimSrgb, saturate(_RimLightFollow));
                     litSrgb = saturate(litSrgb + rimSrgb);
                 }
-                half3 foggedLinear = MixFog(SRGBToLinear(litSrgb), input.fogFactor);
+                half3 emissionLinear = half3(0.0h, 0.0h, 0.0h);
+                if (_MmdEmissionIntensity >= 0.0h)
+                {
+                    half3 emissionMap = _MmdEmissionMapBound > 0.5h
+                        ? SAMPLE_TEXTURE2D(_EmissionMap, sampler_EmissionMap, input.uv).rgb
+                        : half3(1.0h, 1.0h, 1.0h);
+                    half emissionMask = _MmdEmissionMaskBound > 0.5h
+                        ? SAMPLE_TEXTURE2D(_MmdEmissionMask, sampler_MmdEmissionMask, input.uv).r
+                        : 1.0h;
+                    emissionLinear = max(_EmissionColor.rgb, 0.0h) *
+                        _MmdEmissionIntensity * emissionMap * emissionMask;
+                }
+                half3 foggedLinear = MixFog(SRGBToLinear(litSrgb) + emissionLinear, input.fogFactor);
                 half4 color;
                 color.rgb = _GammaTarget > 0.5h ? LinearToSRGB(foggedLinear) : foggedLinear;
                 color.a = lerp(_Alpha, albedoAlpha, saturate(_TextureAlphaOutputWeight));
