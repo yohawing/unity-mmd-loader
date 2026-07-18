@@ -6,6 +6,8 @@ using System.IO;
 using System.Linq;
 using Mmd.Rendering;
 using NUnit.Framework;
+using UnityEditor;
+using UnityEditor.Rendering;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -16,11 +18,7 @@ namespace Mmd.Samples.UnityToonShader.Tests
         [Test]
         public void SchemaCanaryAcceptsUts0141WhenPresent()
         {
-            Shader shader = Shader.Find(UnityToonShaderAdapter.ExpectedShaderName);
-            if (shader == null)
-            {
-                Assert.Ignore("Optional Unity Toon Shader is not installed.");
-            }
+            Shader shader = RequireInstalledUtsShader();
 
             var diagnostics = new List<UnityToonShaderDiagnostic>();
             Assert.That(UnityToonShaderAdapter.TryValidateSchema(shader, diagnostics), Is.True,
@@ -59,11 +57,7 @@ namespace Mmd.Samples.UnityToonShader.Tests
         [Test]
         public void ConversionMapsConservativeStatesAndReportsApproximations()
         {
-            Shader shader = Shader.Find(UnityToonShaderAdapter.ExpectedShaderName);
-            if (shader == null)
-            {
-                Assert.Ignore("Optional Unity Toon Shader is not installed.");
-            }
+            Shader shader = RequireInstalledUtsShader();
 
             Material original = CreateSourceMaterial();
             var texture = new Texture2D(1, 1);
@@ -121,11 +115,7 @@ namespace Mmd.Samples.UnityToonShader.Tests
         [Test]
         public void AlphaClipThresholdIsConvertedToUtsClippingOffset()
         {
-            Shader shader = Shader.Find(UnityToonShaderAdapter.ExpectedShaderName);
-            if (shader == null)
-            {
-                Assert.Ignore("Optional Unity Toon Shader is not installed.");
-            }
+            Shader shader = RequireInstalledUtsShader();
 
             Material original = CreateSourceMaterial();
             MmdMaterialDescriptor descriptor = CreateDescriptor();
@@ -159,11 +149,7 @@ namespace Mmd.Samples.UnityToonShader.Tests
         [Test]
         public void UnrepresentableAlphaClipThresholdIsClampedWithDiagnostic()
         {
-            Shader shader = Shader.Find(UnityToonShaderAdapter.ExpectedShaderName);
-            if (shader == null)
-            {
-                Assert.Ignore("Optional Unity Toon Shader is not installed.");
-            }
+            Shader shader = RequireInstalledUtsShader();
 
             Material original = CreateSourceMaterial();
             MmdMaterialDescriptor descriptor = CreateDescriptor();
@@ -190,11 +176,7 @@ namespace Mmd.Samples.UnityToonShader.Tests
         [Test]
         public void RepresentativeMaterialRendersVisualCanaryPng()
         {
-            Shader shader = Shader.Find(UnityToonShaderAdapter.ExpectedShaderName);
-            if (shader == null)
-            {
-                Assert.Ignore("Optional Unity Toon Shader is not installed.");
-            }
+            Shader shader = RequireInstalledUtsShader();
 
             Material original = CreateSourceMaterial();
             var baseTexture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
@@ -265,6 +247,7 @@ namespace Mmd.Samples.UnityToonShader.Tests
 
                 renderTexture.Create();
                 camera.Render();
+                AssertUtsShaderHealthy(shader);
                 RenderTexture.active = renderTexture;
                 readback.ReadPixels(new Rect(0, 0, renderTexture.width, renderTexture.height), 0, 0);
                 readback.Apply();
@@ -321,6 +304,30 @@ namespace Mmd.Samples.UnityToonShader.Tests
             Shader shader = Shader.Find("MMD Basic URP Toon");
             Assert.That(shader, Is.Not.Null, "MMD Toon shader must be available to the imported sample tests.");
             return new Material(shader);
+        }
+
+        private static Shader RequireInstalledUtsShader()
+        {
+            Shader shader = Shader.Find(UnityToonShaderAdapter.ExpectedShaderName);
+            if (shader == null)
+            {
+                Assert.Ignore("Optional Unity Toon Shader is not installed.");
+            }
+
+            AssertUtsShaderHealthy(shader);
+            return shader;
+        }
+
+        private static void AssertUtsShaderHealthy(Shader shader)
+        {
+            Assert.That(shader.isSupported, Is.True,
+                "Installed Unity Toon Shader must be supported by the active render pipeline.");
+            ShaderMessage[] messages = ShaderUtil.GetShaderMessages(shader);
+            string errors = string.Join("\n", messages
+                .Where(message => message.severity == ShaderCompilerMessageSeverity.Error)
+                .Select(message => message.message));
+            Assert.That(ShaderUtil.ShaderHasError(shader), Is.False,
+                "Installed Unity Toon Shader has compiler errors:\n" + errors);
         }
 
         private static MmdMaterialDescriptor CreateDescriptor()
