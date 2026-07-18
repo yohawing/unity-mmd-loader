@@ -636,6 +636,31 @@ namespace Mmd.Tests
                 intendedChange: "Only MMD Toon Lit consumes the explicit Toon band count; boundary and feather remain fixed, the -1 sentinel preserves the prior ramp, and Legacy stays invariant.");
         }
 
+        [Test]
+        [Explicit("Run the S1c stylized-specular visual delta explicitly; FLIP artifacts still require human review.")]
+        [Category("VisualShadingTier")]
+        public void ToonRampToonLit_TracksStylizedSpecularWhileLegacyStaysInvariant()
+        {
+            RunToonAuthoringDeltaCase(
+                "stylized-specular",
+                offBoundary: -1.0f,
+                offFeather: -1.0f,
+                offBandCount: -1.0f,
+                onBoundary: -1.0f,
+                onFeather: -1.0f,
+                onBandCount: -1.0f,
+                artifactKind: "s1c-stylized-specular-delta",
+                caseSuffix: "stylized-specular",
+                feature: "stylized-specular",
+                intendedChange: "Only MMD Toon Lit consumes the explicit Blinn stylized specular color, boundary, and feather; the boundary sentinel preserves the prior look and Legacy stays invariant.",
+                offStylizedSpecularColor: Color.white,
+                offStylizedSpecularBoundary: -1.0f,
+                offStylizedSpecularFeather: -1.0f,
+                onStylizedSpecularColor: new Color(1.0f, 0.35f, 0.1f, 1.0f),
+                onStylizedSpecularBoundary: 0.90f,
+                onStylizedSpecularFeather: 0.03f);
+        }
+
         private static void RunToonAuthoringDeltaCase(
             string artifactStem,
             float offBoundary,
@@ -647,7 +672,13 @@ namespace Mmd.Tests
             string artifactKind,
             string caseSuffix,
             string feature,
-            string intendedChange)
+            string intendedChange,
+            Color? offStylizedSpecularColor = null,
+            float? offStylizedSpecularBoundary = null,
+            float? offStylizedSpecularFeather = null,
+            Color? onStylizedSpecularColor = null,
+            float? onStylizedSpecularBoundary = null,
+            float? onStylizedSpecularFeather = null)
         {
             bool optedOut = string.Equals(
                 Environment.GetEnvironmentVariable("YMU_VISUAL_TIER_OPT_OUT"), "1",
@@ -681,13 +712,17 @@ namespace Mmd.Tests
             string toonLitOnPath = Path.Combine(artifactsDir, visualCase.name + ".toon-lit-" + artifactStem + "-on.png");
 
             MmdGeneratedPmxVisualCaseReport legacyOff = RenderToonBoundaryCase(
-                visualCase, fixtureDirectory, legacyOffPath, MmdMaterialPreset.MmdToon, offBoundary, offFeather, offBandCount);
+                visualCase, fixtureDirectory, legacyOffPath, MmdMaterialPreset.MmdToon, offBoundary, offFeather, offBandCount,
+                offStylizedSpecularColor, offStylizedSpecularBoundary, offStylizedSpecularFeather);
             MmdGeneratedPmxVisualCaseReport legacyOn = RenderToonBoundaryCase(
-                visualCase, fixtureDirectory, legacyOnPath, MmdMaterialPreset.MmdToon, onBoundary, onFeather, onBandCount);
+                visualCase, fixtureDirectory, legacyOnPath, MmdMaterialPreset.MmdToon, onBoundary, onFeather, onBandCount,
+                onStylizedSpecularColor, onStylizedSpecularBoundary, onStylizedSpecularFeather);
             MmdGeneratedPmxVisualCaseReport toonLitOff = RenderToonBoundaryCase(
-                visualCase, fixtureDirectory, toonLitOffPath, MmdMaterialPreset.MmdToonLit, offBoundary, offFeather, offBandCount);
+                visualCase, fixtureDirectory, toonLitOffPath, MmdMaterialPreset.MmdToonLit, offBoundary, offFeather, offBandCount,
+                offStylizedSpecularColor, offStylizedSpecularBoundary, offStylizedSpecularFeather);
             MmdGeneratedPmxVisualCaseReport toonLitOn = RenderToonBoundaryCase(
-                visualCase, fixtureDirectory, toonLitOnPath, MmdMaterialPreset.MmdToonLit, onBoundary, onFeather, onBandCount);
+                visualCase, fixtureDirectory, toonLitOnPath, MmdMaterialPreset.MmdToonLit, onBoundary, onFeather, onBandCount,
+                onStylizedSpecularColor, onStylizedSpecularBoundary, onStylizedSpecularFeather);
 
             AssertCaptureEvidence(legacyOff, MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName, "Toon boundary Legacy off");
             AssertCaptureEvidence(legacyOn, MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName, "Toon boundary Legacy on");
@@ -695,6 +730,8 @@ namespace Mmd.Tests
             AssertCaptureEvidence(toonLitOn, MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName, "Toon boundary Toon Lit on");
             Assert.That(toonLitOff.toonBoundaryConfigured, Is.True, "Toon Lit off capture must expose both authoring properties.");
             Assert.That(toonLitOn.toonBoundaryConfigured, Is.True, "Toon Lit on capture must expose both authoring properties.");
+            Assert.That(toonLitOff.stylizedSpecularConfigured, Is.True, "Toon Lit off capture must expose stylized specular properties.");
+            Assert.That(toonLitOn.stylizedSpecularConfigured, Is.True, "Toon Lit on capture must expose stylized specular properties.");
 
             float legacyDelta = MmdFlipHelper.ComputeMeanError(legacyOffPath, legacyOnPath, artifactsDir);
             string? legacyHeatmap = FindLatestFlipHeatmap(artifactsDir);
@@ -734,7 +771,10 @@ namespace Mmd.Tests
             MmdMaterialPreset materialPreset,
             float? toonBoundary,
             float? toonFeather,
-            float? toonBandCount)
+            float? toonBandCount,
+            Color? stylizedSpecularColor = null,
+            float? stylizedSpecularBoundary = null,
+            float? stylizedSpecularFeather = null)
         {
             return MmdEditorRenderingDiagnostics.RenderGeneratedPmxVisualCase(
                 visualCase,
@@ -747,7 +787,10 @@ namespace Mmd.Tests
                 fogEnabledOverride: false,
                 toonBoundaryOverride: toonBoundary,
                 toonFeatherOverride: toonFeather,
-                toonBandCountOverride: toonBandCount);
+                toonBandCountOverride: toonBandCount,
+                stylizedSpecularColorOverride: stylizedSpecularColor,
+                stylizedSpecularBoundaryOverride: stylizedSpecularBoundary,
+                stylizedSpecularFeatherOverride: stylizedSpecularFeather);
         }
 
         private static void WriteToonAuthoringDeltaManifest(
@@ -793,6 +836,7 @@ namespace Mmd.Tests
                             report.captureUsedStandardRequest &&
                             report.selectedMaterialPassValid &&
                             report.toonBoundaryConfigured &&
+                            report.stylizedSpecularConfigured &&
                             legacyDelta <= 0.0001f &&
                             toonLitDelta > legacyDelta + minimumVisibleDelta,
                         shaderProfile = report.shaderName,
@@ -810,6 +854,11 @@ namespace Mmd.Tests
                         toonBandCount = report.toonBandCount,
                         toonBoundaryConfigured = report.toonBoundaryConfigured,
                         toonBoundaryMode = report.toonBoundaryMode,
+                        stylizedSpecularColor = report.stylizedSpecularColor,
+                        stylizedSpecularBoundary = report.stylizedSpecularBoundary,
+                        stylizedSpecularFeather = report.stylizedSpecularFeather,
+                        stylizedSpecularConfigured = report.stylizedSpecularConfigured,
+                        stylizedSpecularMode = report.stylizedSpecularMode,
                         cameraPosition = report.cameraPosition,
                         cameraTarget = report.cameraTarget,
                         cameraFieldOfView = report.cameraFieldOfView,
@@ -1545,6 +1594,11 @@ namespace Mmd.Tests
             public float toonBandCount = -1.0f;
             public bool toonBoundaryConfigured;
             public string toonBoundaryMode = string.Empty;
+            public float[] stylizedSpecularColor = Array.Empty<float>();
+            public float stylizedSpecularBoundary = -1.0f;
+            public float stylizedSpecularFeather = -1.0f;
+            public bool stylizedSpecularConfigured;
+            public string stylizedSpecularMode = string.Empty;
             public float[] cameraPosition = Array.Empty<float>();
             public float[] cameraTarget = Array.Empty<float>();
             public float cameraFieldOfView;

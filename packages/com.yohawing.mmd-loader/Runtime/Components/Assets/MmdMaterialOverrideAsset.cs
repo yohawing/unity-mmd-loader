@@ -68,6 +68,15 @@ namespace Mmd
         public bool hasToonBandCount;
         public float toonBandCount = -1.0f;
 
+        public bool hasStylizedSpecularColor;
+        public Color stylizedSpecularColor = Color.white;
+
+        public bool hasStylizedSpecularBoundary;
+        public float stylizedSpecularBoundary = -1.0f;
+
+        public bool hasStylizedSpecularFeather;
+        public float stylizedSpecularFeather = -1.0f;
+
         public bool hasOutlineColor;
         public Color outlineColor = Color.black;
 

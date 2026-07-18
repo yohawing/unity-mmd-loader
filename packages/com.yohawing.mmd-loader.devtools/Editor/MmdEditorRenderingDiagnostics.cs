@@ -54,7 +54,10 @@ namespace Mmd.Editor
             bool? reflectionProbeEnabledOverride = null,
             float? toonBoundaryOverride = null,
             float? toonFeatherOverride = null,
-            float? toonBandCountOverride = null)
+            float? toonBandCountOverride = null,
+            Color? stylizedSpecularColorOverride = null,
+            float? stylizedSpecularBoundaryOverride = null,
+            float? stylizedSpecularFeatherOverride = null)
         {
             const int width = 1024;
             const int height = 1024;
@@ -93,6 +96,11 @@ namespace Mmd.Editor
             float toonBoundary = toonBoundaryOverride ?? -1.0f;
             float toonFeather = toonFeatherOverride ?? -1.0f;
             float toonBandCount = toonBandCountOverride ?? -1.0f;
+            bool stylizedSpecularConfigured = !stylizedSpecularColorOverride.HasValue &&
+                !stylizedSpecularBoundaryOverride.HasValue && !stylizedSpecularFeatherOverride.HasValue;
+            Color stylizedSpecularColor = stylizedSpecularColorOverride ?? Color.white;
+            float stylizedSpecularBoundary = stylizedSpecularBoundaryOverride ?? -1.0f;
+            float stylizedSpecularFeather = stylizedSpecularFeatherOverride ?? -1.0f;
             List<UnityEngine.Object>? configuredSsaoFeatures = null;
             List<bool>? previousSsaoFeatureStates = null;
             Color previousAmbientLight = RenderSettings.ambientLight;
@@ -341,6 +349,44 @@ namespace Mmd.Editor
                     toonBoundaryConfigured = materialPreset != MmdMaterialPreset.MmdToonLit ||
                         (anyToonBoundaryMaterial && allToonBoundaryMaterialsConfigured);
                 }
+                if (stylizedSpecularColorOverride.HasValue || stylizedSpecularBoundaryOverride.HasValue ||
+                    stylizedSpecularFeatherOverride.HasValue)
+                {
+                    bool anyStylizedSpecularMaterial = false;
+                    bool allStylizedSpecularMaterialsConfigured = true;
+                    foreach (Material material in instance.Materials)
+                    {
+                        if (material == null)
+                        {
+                            continue;
+                        }
+
+                        bool hasColor = material.HasProperty(MmdMaterialPropertyNames.StylizedSpecularColor);
+                        bool hasBoundary = material.HasProperty(MmdMaterialPropertyNames.StylizedSpecularBoundary);
+                        bool hasFeather = material.HasProperty(MmdMaterialPropertyNames.StylizedSpecularFeather);
+                        if (hasColor && stylizedSpecularColorOverride.HasValue)
+                        {
+                            material.SetColor(MmdMaterialPropertyNames.StylizedSpecularColor, stylizedSpecularColor);
+                        }
+                        if (hasBoundary && stylizedSpecularBoundaryOverride.HasValue)
+                        {
+                            material.SetFloat(MmdMaterialPropertyNames.StylizedSpecularBoundary, stylizedSpecularBoundary);
+                        }
+                        if (hasFeather && stylizedSpecularFeatherOverride.HasValue)
+                        {
+                            material.SetFloat(MmdMaterialPropertyNames.StylizedSpecularFeather, stylizedSpecularFeather);
+                        }
+
+                        anyStylizedSpecularMaterial |= hasColor || hasBoundary || hasFeather;
+                        if (materialPreset == MmdMaterialPreset.MmdToonLit && (!hasColor || !hasBoundary || !hasFeather))
+                        {
+                            allStylizedSpecularMaterialsConfigured = false;
+                        }
+                    }
+
+                    stylizedSpecularConfigured = materialPreset != MmdMaterialPreset.MmdToonLit ||
+                        (anyStylizedSpecularMaterial && allStylizedSpecularMaterialsConfigured);
+                }
                 if (perturbShaderOutput)
                 {
                     foreach (Material material in instance.Materials)
@@ -411,7 +457,9 @@ namespace Mmd.Editor
                     (!reflectionProbeEnabledOverride.HasValue ||
                         (reflectionProbeAvailable && reflectionProbeConfigured)) &&
                     ((!toonBoundaryOverride.HasValue && !toonFeatherOverride.HasValue &&
-                        !toonBandCountOverride.HasValue) || toonBoundaryConfigured);
+                        !toonBandCountOverride.HasValue) || toonBoundaryConfigured) &&
+                    ((!stylizedSpecularColorOverride.HasValue && !stylizedSpecularBoundaryOverride.HasValue &&
+                        !stylizedSpecularFeatherOverride.HasValue) || stylizedSpecularConfigured);
                 return new MmdGeneratedPmxVisualCaseReport
                 {
                     caseName = "phase17-generated-pmx-" + visualCase.name,
@@ -491,6 +539,14 @@ namespace Mmd.Editor
                     toonBoundaryMode = toonBoundaryOverride.HasValue || toonFeatherOverride.HasValue ||
                         toonBandCountOverride.HasValue
                         ? (toonBoundaryConfigured ? "material-properties" : "unavailable")
+                        : "unchanged",
+                    stylizedSpecularColor = ToColorArray(stylizedSpecularColor),
+                    stylizedSpecularBoundary = stylizedSpecularBoundary,
+                    stylizedSpecularFeather = stylizedSpecularFeather,
+                    stylizedSpecularConfigured = stylizedSpecularConfigured,
+                    stylizedSpecularMode = stylizedSpecularColorOverride.HasValue ||
+                        stylizedSpecularBoundaryOverride.HasValue || stylizedSpecularFeatherOverride.HasValue
+                        ? (stylizedSpecularConfigured ? "material-properties" : "unavailable")
                         : "unchanged",
                     selectedMaterialPassName = selectedMaterialPassName,
                     selectedMaterialLightMode = selectedMaterialLightMode,
@@ -1276,6 +1332,11 @@ namespace Mmd.Editor
         public float toonBandCount = -1.0f;
         public bool toonBoundaryConfigured;
         public string toonBoundaryMode = string.Empty;
+        public float[] stylizedSpecularColor = Array.Empty<float>();
+        public float stylizedSpecularBoundary = -1.0f;
+        public float stylizedSpecularFeather = -1.0f;
+        public bool stylizedSpecularConfigured;
+        public string stylizedSpecularMode = string.Empty;
         public string selectedMaterialPassName = string.Empty;
         public string selectedMaterialLightMode = string.Empty;
         public int selectedMaterialPassIndex = -1;

@@ -21,6 +21,9 @@ namespace Mmd.Rendering
         public float toonBoundary = -1.0f;
         public float toonFeather = -1.0f;
         public float toonBandCount = -1.0f;
+        public float[] stylizedSpecularColor = new[] { 1.0f, 1.0f, 1.0f };
+        public float stylizedSpecularBoundary = -1.0f;
+        public float stylizedSpecularFeather = -1.0f;
         public float[] edgeColor = new[] { 0.0f, 0.0f, 0.0f, 1.0f };
         public float edgeSize;
         public string sphereTextureMode = string.Empty;
@@ -64,6 +67,9 @@ namespace Mmd.Rendering
                     toonBoundary = -1.0f,
                     toonFeather = -1.0f,
                     toonBandCount = -1.0f,
+                    stylizedSpecularColor = new[] { 1.0f, 1.0f, 1.0f },
+                    stylizedSpecularBoundary = -1.0f,
+                    stylizedSpecularFeather = -1.0f,
                     edgeColor = CopyColor(material.edgeColor, 4, new[] { 0.0f, 0.0f, 0.0f, 1.0f }),
                     edgeSize = ClampNonNegative(material.edgeSize),
                     sphereTextureMode = NormalizeOptionalString(material.sphereTextureMode),

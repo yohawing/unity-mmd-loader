@@ -26,6 +26,9 @@ namespace Mmd.Rendering
         public float toonBoundary = -1.0f;
         public float toonFeather = -1.0f;
         public float toonBandCount = -1.0f;
+        public float[] stylizedSpecularColor = new[] { 1.0f, 1.0f, 1.0f };
+        public float stylizedSpecularBoundary = -1.0f;
+        public float stylizedSpecularFeather = -1.0f;
         public float[] edgeColor = new[] { 0.0f, 0.0f, 0.0f, 1.0f };
         public float edgeSize;
         public bool drawEdgeFlag;
@@ -91,6 +94,9 @@ namespace Mmd.Rendering
                     toonBoundary = material.toonBoundary,
                     toonFeather = material.toonFeather,
                     toonBandCount = material.toonBandCount,
+                    stylizedSpecularColor = CopyColor(material.stylizedSpecularColor, 3, new[] { 1.0f, 1.0f, 1.0f }),
+                    stylizedSpecularBoundary = material.stylizedSpecularBoundary,
+                    stylizedSpecularFeather = material.stylizedSpecularFeather,
                     edgeColor = CopyColor(material.edgeColor, 4, new[] { 0.0f, 0.0f, 0.0f, 1.0f }),
                     edgeSize = material.drawEdgeFlag ? ClampNonNegative(material.edgeSize) : 0.0f,
                     drawEdgeFlag = material.drawEdgeFlag,

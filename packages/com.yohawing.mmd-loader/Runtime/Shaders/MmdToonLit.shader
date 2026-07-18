@@ -23,6 +23,9 @@ Shader "MMD Toon Lit"
         _ToonBoundary ("Toon Boundary", Range(-1, 1)) = -1
         _ToonFeather ("Toon Boundary Feather", Range(-1, 1)) = -1
         _ToonBandCount ("Toon Band Count", Range(-1, 8)) = -1
+        _StylizedSpecularColor ("Stylized Specular Color", Color) = (1, 1, 1, 1)
+        _StylizedSpecularBoundary ("Stylized Specular Boundary", Range(-1, 1)) = -1
+        _StylizedSpecularFeather ("Stylized Specular Feather", Range(-1, 1)) = -1
         _OutlineColor ("Outline Color", Color) = (0, 0, 0, 1)
         _OutlineWidth ("Outline Width", Float) = 0
         _OutlineScreenSpaceWeight ("Outline Screen Space Weight", Float) = 0
@@ -135,6 +138,9 @@ Shader "MMD Toon Lit"
                 half _ToonBoundary;
                 half _ToonFeather;
                 half _ToonBandCount;
+                half4 _StylizedSpecularColor;
+                half _StylizedSpecularBoundary;
+                half _StylizedSpecularFeather;
             CBUFFER_END
 
             struct Attributes
@@ -274,6 +280,35 @@ Shader "MMD Toon Lit"
                 return floor(saturate(visibility) * (bandCount - 1.0h) + 0.5h) / (bandCount - 1.0h);
             }
 
+            half ComputeMmdStylizedSpecularMask(
+                half3 normalWS,
+                half3 lightDirection,
+                half3 viewDirectionWS)
+            {
+                // A negative boundary is the sole compatibility sentinel: no specular
+                // contribution is emitted unless authoring explicitly opts in.
+                if (_StylizedSpecularBoundary < -0.5h)
+                {
+                    return 0.0h;
+                }
+
+                half3 halfVector = SafeNormalize(lightDirection + viewDirectionWS);
+                half ndoth = saturate(dot(normalWS, halfVector));
+                half boundary = saturate(_StylizedSpecularBoundary);
+                half feather = _StylizedSpecularFeather < -0.5h
+                    ? 0.0h
+                    : saturate(_StylizedSpecularFeather);
+                if (feather <= 1e-4h)
+                {
+                    return step(boundary, ndoth) * step(1e-4h, dot(normalWS, lightDirection));
+                }
+
+                half lower = max(0.0h, boundary - feather);
+                half upper = min(1.0h, boundary + feather);
+                return smoothstep(lower, max(lower + 1e-4h, upper), ndoth) *
+                    step(1e-4h, dot(normalWS, lightDirection));
+            }
+
             half4 ForwardFragment(Varyings input) : SV_Target
             {
                 UNITY_SETUP_INSTANCE_ID(input);
@@ -368,6 +403,14 @@ Shader "MMD Toon Lit"
                 half3 litSrgb = saturate(albedoSrgb * LinearToSRGB(toonLight));
                 half3 flatLitSrgb = saturate(albedoSrgb * _TextureFlatLightingValue * unityMainLightSrgb);
                 litSrgb = lerp(litSrgb, flatLitSrgb, saturate(_BaseMapBound * _TextureFlatLightingWeight));
+                if (_StylizedSpecularBoundary >= -0.5h)
+                {
+                    half3 viewDirectionWS = GetWorldSpaceNormalizeViewDir(input.positionWS);
+                    half specularMask = ComputeMmdStylizedSpecularMask(normalWS, lightDirection, viewDirectionWS);
+                    half3 stylizedSpecularSrgb = LinearToSRGB(_StylizedSpecularColor.rgb) *
+                        mainLightSrgb * selfShadowVisibility * specularMask;
+                    litSrgb = saturate(litSrgb + stylizedSpecularSrgb);
+                }
                 half3 foggedLinear = MixFog(SRGBToLinear(litSrgb), input.fogFactor);
                 half4 color;
                 color.rgb = _GammaTarget > 0.5h ? LinearToSRGB(foggedLinear) : foggedLinear;

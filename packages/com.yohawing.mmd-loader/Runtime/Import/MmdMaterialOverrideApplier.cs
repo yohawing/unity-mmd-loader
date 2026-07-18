@@ -264,6 +264,23 @@ namespace Mmd.UnityIntegration
                 SetFloatIfPresent(material, MmdMaterialPropertyNames.ToonBandCount, NormalizeToonBandCount(entry.toonBandCount));
             }
 
+            if (entry.hasStylizedSpecularColor)
+            {
+                SetColorIfPresent(material, MmdMaterialPropertyNames.StylizedSpecularColor, entry.stylizedSpecularColor);
+            }
+
+            if (entry.hasStylizedSpecularBoundary)
+            {
+                SetFloatIfPresent(material, MmdMaterialPropertyNames.StylizedSpecularBoundary,
+                    NormalizeToonOptional(entry.stylizedSpecularBoundary));
+            }
+
+            if (entry.hasStylizedSpecularFeather)
+            {
+                SetFloatIfPresent(material, MmdMaterialPropertyNames.StylizedSpecularFeather,
+                    NormalizeToonOptional(entry.stylizedSpecularFeather));
+            }
+
             if (entry.hasOutlineColor)
             {
                 SetColorIfPresent(material, MmdMaterialPropertyNames.OutlineColor, entry.outlineColor);
@@ -455,6 +472,26 @@ namespace Mmd.UnityIntegration
                 material.toonBandCount = NormalizeToonBandCount(entry.toonBandCount);
             }
 
+            if (entry.hasStylizedSpecularColor)
+            {
+                material.stylizedSpecularColor = new[]
+                {
+                    Clamp01(entry.stylizedSpecularColor.r),
+                    Clamp01(entry.stylizedSpecularColor.g),
+                    Clamp01(entry.stylizedSpecularColor.b)
+                };
+            }
+
+            if (entry.hasStylizedSpecularBoundary)
+            {
+                material.stylizedSpecularBoundary = NormalizeToonOptional(entry.stylizedSpecularBoundary);
+            }
+
+            if (entry.hasStylizedSpecularFeather)
+            {
+                material.stylizedSpecularFeather = NormalizeToonOptional(entry.stylizedSpecularFeather);
+            }
+
             if (entry.hasOutlineColor)
             {
                 material.edgeColor = new[]
@@ -507,6 +544,26 @@ namespace Mmd.UnityIntegration
             if (entry.hasToonBandCount)
             {
                 binding.toonBandCount = NormalizeToonBandCount(entry.toonBandCount);
+            }
+
+            if (entry.hasStylizedSpecularColor)
+            {
+                binding.stylizedSpecularColor = new[]
+                {
+                    Clamp01(entry.stylizedSpecularColor.r),
+                    Clamp01(entry.stylizedSpecularColor.g),
+                    Clamp01(entry.stylizedSpecularColor.b)
+                };
+            }
+
+            if (entry.hasStylizedSpecularBoundary)
+            {
+                binding.stylizedSpecularBoundary = NormalizeToonOptional(entry.stylizedSpecularBoundary);
+            }
+
+            if (entry.hasStylizedSpecularFeather)
+            {
+                binding.stylizedSpecularFeather = NormalizeToonOptional(entry.stylizedSpecularFeather);
             }
 
             if (entry.hasOutlineColor)

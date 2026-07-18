@@ -75,6 +75,22 @@ namespace Mmd.UnityIntegration
                 material.SetFloat(MmdMaterialPropertyNames.ToonBandCount, source.toonBandCount);
             }
 
+            if (material.HasProperty(MmdMaterialPropertyNames.StylizedSpecularColor))
+            {
+                material.SetColor(MmdMaterialPropertyNames.StylizedSpecularColor,
+                    ToColor(source.stylizedSpecularColor, 1.0f, Color.white));
+            }
+
+            if (material.HasProperty(MmdMaterialPropertyNames.StylizedSpecularBoundary))
+            {
+                material.SetFloat(MmdMaterialPropertyNames.StylizedSpecularBoundary, source.stylizedSpecularBoundary);
+            }
+
+            if (material.HasProperty(MmdMaterialPropertyNames.StylizedSpecularFeather))
+            {
+                material.SetFloat(MmdMaterialPropertyNames.StylizedSpecularFeather, source.stylizedSpecularFeather);
+            }
+
             if (material.HasProperty("_OutlineColor"))
             {
                 material.SetColor("_OutlineColor", edge);

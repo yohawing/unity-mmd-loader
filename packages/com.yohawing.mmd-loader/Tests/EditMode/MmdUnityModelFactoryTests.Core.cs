@@ -154,6 +154,14 @@ namespace Mmd.Tests
             Assert.That(toonLitSource, Does.Contain("ApplyMmdToonBandCount(min(selfShadowVisibility, lightVisibility))"));
             Assert.That(toonLitSource, Does.Contain("half3 mmdToonLight = lerp(selfShadowToon, half3(1.0h, 1.0h, 1.0h), toonRampVisibility);"));
             Assert.That(toonLitSource, Does.Contain("half3 selfShadowMmdToonLight = lerp(selfShadowToon, half3(1.0h, 1.0h, 1.0h), toonVisibility);"));
+            Assert.That(toonLitSource, Does.Contain("_StylizedSpecularColor (\"Stylized Specular Color\", Color) = (1, 1, 1, 1)"));
+            Assert.That(toonLitSource, Does.Contain("_StylizedSpecularBoundary (\"Stylized Specular Boundary\", Range(-1, 1)) = -1"));
+            Assert.That(toonLitSource, Does.Contain("_StylizedSpecularFeather (\"Stylized Specular Feather\", Range(-1, 1)) = -1"));
+            Assert.That(toonLitSource, Does.Contain("if (_StylizedSpecularBoundary < -0.5h)"));
+            Assert.That(toonLitSource, Does.Contain("half3 halfVector = SafeNormalize(lightDirection + viewDirectionWS);"));
+            Assert.That(toonLitSource, Does.Contain("step(1e-4h, dot(normalWS, lightDirection))"));
+            Assert.That(toonLitSource, Does.Contain("LinearToSRGB(_StylizedSpecularColor.rgb) *"));
+            Assert.That(toonLitSource, Does.Contain("mainLightSrgb * selfShadowVisibility * specularMask"));
         }
         [Test]
         public void CreateStaticModelKeepsShadowCasterAndAddsHiddenSelfShadowTarget()

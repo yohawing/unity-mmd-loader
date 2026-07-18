@@ -64,6 +64,9 @@ namespace Mmd.EditModeTests
                 "hasOutlineWidth",
                 "hasRoughnessMap",
                 "hasSmoothness",
+                "hasStylizedSpecularBoundary",
+                "hasStylizedSpecularColor",
+                "hasStylizedSpecularFeather",
                 "hasSurfaceMode",
                 "hasToonBandCount",
                 "hasToonBoundary",
@@ -115,6 +118,9 @@ namespace Mmd.EditModeTests
                     MmdMaterialPropertyNames.BaseColor, MmdMaterialPropertyNames.Color, MmdMaterialPropertyNames.Alpha,
                     MmdMaterialPropertyNames.AmbientColor, MmdMaterialPropertyNames.ToonBandCount,
                     MmdMaterialPropertyNames.ToonBoundary, MmdMaterialPropertyNames.ToonFeather,
+                    MmdMaterialPropertyNames.StylizedSpecularColor,
+                    MmdMaterialPropertyNames.StylizedSpecularBoundary,
+                    MmdMaterialPropertyNames.StylizedSpecularFeather,
                     MmdMaterialPropertyNames.OutlineColor,
                     MmdMaterialPropertyNames.OutlineWidth, MmdMaterialPropertyNames.OutlineVisible,
                     MmdMaterialPropertyNames.MmdNormalMap, MmdMaterialPropertyNames.MmdNormalMapBound,
@@ -127,6 +133,9 @@ namespace Mmd.EditModeTests
                 Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.ToonBandCount), Is.EqualTo(3.0f).Within(0.00001f));
                 Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.ToonBoundary), Is.EqualTo(0.42f).Within(0.00001f));
                 Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.ToonFeather), Is.EqualTo(0.12f).Within(0.00001f));
+                AssertColor(toonMaterial.GetColor(MmdMaterialPropertyNames.StylizedSpecularColor), new Color(0.91f, 0.81f, 0.71f, 0.61f));
+                Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.StylizedSpecularBoundary), Is.EqualTo(0.90f).Within(0.00001f));
+                Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.StylizedSpecularFeather), Is.EqualTo(0.03f).Within(0.00001f));
                 AssertColor(toonMaterial.GetColor(MmdMaterialPropertyNames.OutlineColor), new Color(0.72f, 0.61f, 0.5f, 0.39f));
                 Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.OutlineWidth), Is.EqualTo(1.75f).Within(0.00001f));
                 Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.OutlineVisible), Is.EqualTo(1.0f));
@@ -198,6 +207,9 @@ namespace Mmd.EditModeTests
                 Assert.That(material.toonBandCount, Is.EqualTo(3.0f).Within(0.00001f));
                 Assert.That(material.toonBoundary, Is.EqualTo(0.42f).Within(0.00001f));
                 Assert.That(material.toonFeather, Is.EqualTo(0.12f).Within(0.00001f));
+                Assert.That(material.stylizedSpecularColor, Is.EqualTo(new[] { 0.91f, 0.81f, 0.71f }));
+                Assert.That(material.stylizedSpecularBoundary, Is.EqualTo(0.90f).Within(0.00001f));
+                Assert.That(material.stylizedSpecularFeather, Is.EqualTo(0.03f).Within(0.00001f));
                 Assert.That(material.edgeColor, Is.EqualTo(new[] { 0.72f, 0.61f, 0.5f, 0.39f }));
                 Assert.That(material.edgeSize, Is.EqualTo(1.75f).Within(0.00001f));
                 Assert.That(material.drawEdgeFlag, Is.True);
@@ -228,6 +240,9 @@ namespace Mmd.EditModeTests
                 Assert.That(binding.toonBandCount, Is.EqualTo(3.0f).Within(0.00001f));
                 Assert.That(binding.toonBoundary, Is.EqualTo(0.42f).Within(0.00001f));
                 Assert.That(binding.toonFeather, Is.EqualTo(0.12f).Within(0.00001f));
+                Assert.That(binding.stylizedSpecularColor, Is.EqualTo(new[] { 0.91f, 0.81f, 0.71f }));
+                Assert.That(binding.stylizedSpecularBoundary, Is.EqualTo(0.90f).Within(0.00001f));
+                Assert.That(binding.stylizedSpecularFeather, Is.EqualTo(0.03f).Within(0.00001f));
                 Assert.That(binding.edgeColor, Is.EqualTo(new[] { 0.72f, 0.61f, 0.5f, 0.39f }));
                 Assert.That(binding.edgeSize, Is.EqualTo(1.75f).Within(0.00001f));
                 Assert.That(binding.drawEdgeFlag, Is.True);
@@ -263,6 +278,12 @@ namespace Mmd.EditModeTests
                 toonBoundary = 0.42f,
                 hasToonFeather = true,
                 toonFeather = 0.12f,
+                hasStylizedSpecularColor = true,
+                stylizedSpecularColor = new Color(0.91f, 0.81f, 0.71f, 0.61f),
+                hasStylizedSpecularBoundary = true,
+                stylizedSpecularBoundary = 0.90f,
+                hasStylizedSpecularFeather = true,
+                stylizedSpecularFeather = 0.03f,
                 hasOutlineColor = true,
                 outlineColor = new Color(0.72f, 0.61f, 0.5f, 0.39f),
                 hasOutlineWidth = true,
