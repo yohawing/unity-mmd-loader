@@ -1,0 +1,22 @@
+{
+  "name": "com.yohawing.mmd-loader.devtools",
+  "version": "0.1.0",
+  "displayName": "MMD Loader DevTools",
+  "description": "Non-distributable development, diagnostics, benchmark and verification tools for com.yohawing.mmd-loader. Editor-only package for internal use in the consumer project and CI verification loops. Not intended for UPM publication or redistribution.",
+  "unity": "6000.4",
+  "author": {
+    "name": "MMD Loader contributors"
+  },
+  "keywords": [
+    "mmd",
+    "pmx",
+    "vmd",
+    "devtools",
+    "diagnostics",
+    "editor"
+  ],
+  "dependencies": {
+    "com.yohawing.mmd-loader": "0.2.0",
+    "com.unity.timeline": "1.8.12"
+  }
+}

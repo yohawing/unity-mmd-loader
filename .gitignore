@@ -5,6 +5,37 @@ unity-mmd/
 scripts/
 packages/com.yohawing.mmd-loader.devtools/
 
+# Tracked minimum visual shading tier. Keep the rest of DevTools local-only.
+!packages/com.yohawing.mmd-loader.devtools/
+packages/com.yohawing.mmd-loader.devtools/*
+!packages/com.yohawing.mmd-loader.devtools/package.json
+!packages/com.yohawing.mmd-loader.devtools/package.json.meta
+!packages/com.yohawing.mmd-loader.devtools/Editor.meta
+!packages/com.yohawing.mmd-loader.devtools/Editor/
+packages/com.yohawing.mmd-loader.devtools/Editor/*
+!packages/com.yohawing.mmd-loader.devtools/Editor/AssemblyInfo.cs
+!packages/com.yohawing.mmd-loader.devtools/Editor/AssemblyInfo.cs.meta
+!packages/com.yohawing.mmd-loader.devtools/Editor/Mmd.DevTools.Editor.asmdef
+!packages/com.yohawing.mmd-loader.devtools/Editor/Mmd.DevTools.Editor.asmdef.meta
+!packages/com.yohawing.mmd-loader.devtools/Editor/MmdEditorRenderingDiagnostics.cs
+!packages/com.yohawing.mmd-loader.devtools/Editor/MmdEditorRenderingDiagnostics.cs.meta
+!packages/com.yohawing.mmd-loader.devtools/Tests.meta
+!packages/com.yohawing.mmd-loader.devtools/Tests/
+packages/com.yohawing.mmd-loader.devtools/Tests/*
+!packages/com.yohawing.mmd-loader.devtools/Tests/EditMode.meta
+!packages/com.yohawing.mmd-loader.devtools/Tests/EditMode/
+packages/com.yohawing.mmd-loader.devtools/Tests/EditMode/*
+!packages/com.yohawing.mmd-loader.devtools/Tests/EditMode/Mmd.DevTools.EditModeTests.asmdef
+!packages/com.yohawing.mmd-loader.devtools/Tests/EditMode/Mmd.DevTools.EditModeTests.asmdef.meta
+!packages/com.yohawing.mmd-loader.devtools/Tests/EditMode/MmdFlipHelper.cs
+!packages/com.yohawing.mmd-loader.devtools/Tests/EditMode/MmdFlipHelper.cs.meta
+!packages/com.yohawing.mmd-loader.devtools/Tests/EditMode/MmdGeneratedPmxVisualParityTests.cs
+!packages/com.yohawing.mmd-loader.devtools/Tests/EditMode/MmdGeneratedPmxVisualParityTests.cs.meta
+!packages/com.yohawing.mmd-loader.devtools/Tests/EditMode/visual-parity-baseline.json
+!packages/com.yohawing.mmd-loader.devtools/Tests/EditMode/visual-parity-baseline.json.meta
+!packages/com.yohawing.mmd-loader.devtools/Tests/EditMode/mmd-toon-ramp-lit-box.golden.base64
+!packages/com.yohawing.mmd-loader.devtools/Tests/EditMode/mmd-toon-ramp-lit-box.golden.base64.meta
+
 # Local-only artifacts and licensed data references
 artifacts/
 data-local/*
