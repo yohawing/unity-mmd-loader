@@ -88,7 +88,7 @@ namespace Mmd.Tests
             }
 
             float mean = MmdFlipHelper.ComputeMeanError(goldenPath!, candidatePng, artifactsDir);
-            UnityEngine.Debug.Log($"[visual-shading-tier] {visualCase.name} mean={mean:F6} perturb={perturb}");
+            TestContext.WriteLine($"[visual-shading-tier] {visualCase.name} mean={mean:F6} perturb={perturb}");
             string baselineJsonPath = GetBaselineJsonPath();
             BaselineList baseline = LoadBaseline(baselineJsonPath);
             BaselineEntry? entry = baseline.FindEntry(visualCase.name);
