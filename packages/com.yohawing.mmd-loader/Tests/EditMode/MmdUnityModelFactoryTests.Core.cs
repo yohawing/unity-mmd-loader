@@ -50,6 +50,43 @@ namespace Mmd.Tests
             Assert.That(instance.MaterialBindingDiagnostics[0].cullingPolicy, Is.EqualTo("unknown"));
         }
         [Test]
+        public void CreateStaticModelWithMmdToonLitUsesSeparateShaderAndKeepsMmdPasses()
+        {
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(
+                model,
+                sourcePath: null,
+                importScale: 1.0f,
+                preset: MmdMaterialPreset.MmdToonLit));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            Assert.That(instance.Materials[0].shader.name,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName));
+            Assert.That(instance.MaterialBindingDiagnostics[0].shaderName,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName));
+            Assert.That(instance.Materials[0].FindPass("Outline"), Is.GreaterThanOrEqualTo(0));
+            Assert.That(instance.Materials[0].FindPass("MmdSelfShadowCaster"), Is.GreaterThanOrEqualTo(0));
+            Assert.That(instance.Materials[0].FindPass("ShadowCaster"), Is.GreaterThanOrEqualTo(0));
+        }
+        [Test]
+        public void MmdToonLitShaderUsesUrpMainLightShadowsWithoutChangingLegacyShader()
+        {
+            string shaderDirectory = Path.Combine(MmdTestFixtures.PackageRoot, "Runtime", "Shaders");
+            string legacySource = File.ReadAllText(Path.Combine(shaderDirectory, "MmdBasicUrpToon.shader"));
+            string toonLitSource = File.ReadAllText(Path.Combine(shaderDirectory, "MmdToonLit.shader"));
+
+            Assert.That(legacySource, Does.Not.Contain("_MAIN_LIGHT_SHADOWS"));
+            Assert.That(legacySource, Does.Not.Contain("mainLight.shadowAttenuation"));
+            Assert.That(toonLitSource, Does.Contain("#pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN"));
+            Assert.That(toonLitSource, Does.Contain("#pragma multi_compile_fragment _ _SHADOWS_SOFT_LOW _SHADOWS_SOFT_MEDIUM _SHADOWS_SOFT_HIGH"));
+            Assert.That(toonLitSource, Does.Contain("GetMainLight(TransformWorldToShadowCoord(input.positionWS))"));
+            Assert.That(toonLitSource, Does.Contain("mainLight.shadowAttenuation"));
+            Assert.That(toonLitSource, Does.Contain("dot(_MmdLightDirection.xyz, _MmdLightDirection.xyz) > 0.0h"));
+            Assert.That(toonLitSource, Does.Contain("LinearToSRGB(_MmdLightColor.rgb) * LinearToSRGB(mainLight.color)"));
+            Assert.That(toonLitSource, Does.Contain("UsePass \"MMD Basic URP Toon/MmdSelfShadowCaster\""));
+        }
+        [Test]
         public void CreateStaticModelKeepsShadowCasterAndAddsHiddenSelfShadowTarget()
         {
 

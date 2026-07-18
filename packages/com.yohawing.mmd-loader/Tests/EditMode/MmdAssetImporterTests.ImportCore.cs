@@ -198,6 +198,26 @@ namespace Mmd.Tests
                 Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName));
         }
         [Test]
+        public void PmxImporterMmdToonLitShaderPresetGeneratesOptInToonLitMaterials()
+        {
+            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            var importer = AssetImporter.GetAtPath(TempPmxPath) as MmdPmxScriptedImporter;
+            Assert.That(importer, Is.Not.Null);
+
+            var serializedImporter = new SerializedObject(importer!);
+            serializedImporter.FindProperty("shaderPreset").enumValueIndex = (int)MmdPmxShaderPreset.MmdToonLit;
+            serializedImporter.ApplyModifiedPropertiesWithoutUndo();
+            importer!.SaveAndReimport();
+
+            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+
+            Assert.That(pmxAsset.ShaderPreset, Is.EqualTo(nameof(MmdPmxShaderPreset.MmdToonLit)));
+            Assert.That(pmxAsset.ImportedMaterials, Is.Not.Null.And.Not.Empty);
+            Assert.That(pmxAsset.ImportedMaterials[0].shader, Is.Not.Null);
+            Assert.That(pmxAsset.ImportedMaterials[0].shader.name,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName));
+        }
+        [Test]
         public void PmxImporterAppliesPersistentMaterialOverrideAssetAfterTextureBinding()
         {
             CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);

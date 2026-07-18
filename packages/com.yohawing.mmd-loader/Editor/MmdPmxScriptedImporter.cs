@@ -39,7 +39,8 @@ namespace Mmd.Editor
     public enum MmdPmxShaderPreset
     {
         MmdBasicUrpToon = 0,
-        UrpLit = 1
+        UrpLit = 1,
+        MmdToonLit = 2
     }
 
     [ScriptedImporter(26, "pmx")]
@@ -291,6 +292,7 @@ namespace Mmd.Editor
             {
                 MmdPmxShaderPreset.MmdBasicUrpToon => MmdMaterialPreset.MmdToon,
                 MmdPmxShaderPreset.UrpLit => MmdMaterialPreset.UrpLit,
+                MmdPmxShaderPreset.MmdToonLit => MmdMaterialPreset.MmdToonLit,
                 _ => MmdMaterialPreset.MmdToon
             };
         }
