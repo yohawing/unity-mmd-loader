@@ -157,13 +157,55 @@ namespace Mmd.Samples.UnityToonShader.Tests
         }
 
         [Test]
-        public void AlphaClipThresholdIsConvertedToUtsClippingOffset()
+        public void DiffuseTextureTransformIsCopiedFromSelectedSourceProperty()
         {
             Shader shader = RequireInstalledUtsShader();
 
             Material original = CreateSourceMaterial();
+            var texture = new Texture2D(1, 1);
+            Vector2 scale = new(-1.0f, 1.25f);
+            Vector2 offset = new(0.125f, -0.25f);
+            original.SetTexture("_BaseMap", texture);
+            original.SetTextureScale("_BaseMap", scale);
+            original.SetTextureOffset("_BaseMap", offset);
+            var diagnostics = new List<UnityToonShaderDiagnostic>();
+            Material[] converted = Array.Empty<Material>();
+            try
+            {
+                bool success = UnityToonShaderAdapter.TryConvertMaterialsWithShader(
+                    new[] { CreateDescriptor() },
+                    new[] { original },
+                    shader,
+                    containsMaterialMorphs: false,
+                    out converted,
+                    diagnostics);
+
+                Assert.That(success, Is.True, string.Join("\n", diagnostics));
+                Assert.That(converted[0].GetTextureScale("_BaseMap"), Is.EqualTo(scale));
+                Assert.That(converted[0].GetTextureScale("_MainTex"), Is.EqualTo(scale));
+                Assert.That(converted[0].GetTextureScale("_ClippingMask"), Is.EqualTo(scale));
+                Assert.That(converted[0].GetTextureOffset("_BaseMap"), Is.EqualTo(offset));
+                Assert.That(converted[0].GetTextureOffset("_MainTex"), Is.EqualTo(offset));
+                Assert.That(converted[0].GetTextureOffset("_ClippingMask"), Is.EqualTo(offset));
+            }
+            finally
+            {
+                UnityToonShaderAdapter.DestroyMaterials(converted);
+                Object.DestroyImmediate(original);
+                Object.DestroyImmediate(texture);
+            }
+        }
+
+        [Test]
+        public void AlphaClipThresholdUsesBaseMapAlphaAndUtsTransClipping()
+        {
+            Shader shader = RequireInstalledUtsShader();
+
+            Material original = CreateSourceMaterial();
+            var texture = new Texture2D(1, 1);
             MmdMaterialDescriptor descriptor = CreateDescriptor();
             descriptor.alpha = 1.0f;
+            original.SetTexture("_BaseMap", texture);
             original.SetFloat("_AlphaClipThreshold", 0.2f);
             var diagnostics = new List<UnityToonShaderDiagnostic>();
             Material[] converted = new Material[0];
@@ -178,15 +220,19 @@ namespace Mmd.Samples.UnityToonShader.Tests
                     diagnostics);
 
                 Assert.That(success, Is.True, string.Join("\n", diagnostics));
-                Assert.That(converted[0].GetFloat("_ClippingMode"), Is.EqualTo(1.0f));
+                Assert.That(converted[0].GetFloat("_ClippingMode"), Is.EqualTo(2.0f));
                 Assert.That(converted[0].GetFloat("_Clipping_Level"), Is.EqualTo(0.3f).Within(0.0001f));
-                Assert.That(converted[0].IsKeywordEnabled("_IS_CLIPPING_MODE"), Is.True);
+                Assert.That(converted[0].IsKeywordEnabled("_IS_CLIPPING_TRANSMODE"), Is.True);
+                Assert.That(converted[0].IsKeywordEnabled("_IS_CLIPPING_MODE"), Is.False);
+                Assert.That(converted[0].GetFloat("_IsBaseMapAlphaAsClippingMask"), Is.EqualTo(1.0f));
+                Assert.That(converted[0].GetTexture("_ClippingMask"), Is.SameAs(texture));
                 Assert.That(converted[0].GetFloat("_SPRDefaultUnlitColorMask"), Is.EqualTo(15.0f));
             }
             finally
             {
                 UnityToonShaderAdapter.DestroyMaterials(converted);
                 Object.DestroyImmediate(original);
+                Object.DestroyImmediate(texture);
             }
         }
 

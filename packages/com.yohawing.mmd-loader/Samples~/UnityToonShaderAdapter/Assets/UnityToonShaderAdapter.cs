@@ -48,7 +48,7 @@ namespace Mmd.Samples.UnityToonShader
             "_MainTex", "_BaseMap", "_BaseColor", "_Color",
             "_1st_ShadeColor", "_2nd_ShadeColor",
             "_TransparentEnabled", "_ClippingMode", "_IsBaseMapAlphaAsClippingMask",
-            "_Clipping_Level", "_CullMode", "_ZWriteMode", "_ZWrite", "_AutoRenderQueue",
+            "_ClippingMask", "_Clipping_Level", "_CullMode", "_ZWriteMode", "_ZWrite", "_AutoRenderQueue",
             "_SPRDefaultUnlitColorMask", "_SRPDefaultUnlitColMode",
             "_MatCap", "_MatCap_Sampler", "_MatCapColor", "_Is_BlendAddToMatCap",
             "_OUTLINE", "_Outline_Width", "_Outline_Color"
@@ -252,11 +252,23 @@ namespace Mmd.Samples.UnityToonShader
                 target.SetColor("_1st_ShadeColor", ScaleRgb(diffuse, 0.65f));
                 target.SetColor("_2nd_ShadeColor", ScaleRgb(diffuse, 0.35f));
 
-                Texture? baseTexture = GetFirstTexture(source, "_BaseMap", "_MainTex");
+                string? baseTextureProperty = GetFirstTextureProperty(source, "_BaseMap", "_MainTex");
+                Texture? baseTexture = baseTextureProperty != null
+                    ? source.GetTexture(baseTextureProperty)
+                    : null;
                 if (baseTexture != null)
                 {
                     target.SetTexture("_BaseMap", baseTexture);
                     target.SetTexture("_MainTex", baseTexture);
+                    target.SetTexture("_ClippingMask", baseTexture);
+                    Vector2 textureScale = source.GetTextureScale(baseTextureProperty!);
+                    Vector2 textureOffset = source.GetTextureOffset(baseTextureProperty!);
+                    target.SetTextureScale("_BaseMap", textureScale);
+                    target.SetTextureScale("_MainTex", textureScale);
+                    target.SetTextureScale("_ClippingMask", textureScale);
+                    target.SetTextureOffset("_BaseMap", textureOffset);
+                    target.SetTextureOffset("_MainTex", textureOffset);
+                    target.SetTextureOffset("_ClippingMask", textureOffset);
                 }
 
                 bool alphaClip = GetFloat(source, "_AlphaClipThreshold") > 0.0f ||
@@ -264,7 +276,10 @@ namespace Mmd.Samples.UnityToonShader
                 bool transparent = alpha < 0.999f || source.renderQueue >= (int)RenderQueue.Transparent;
                 target.SetFloat("_AutoRenderQueue", 0.0f);
                 target.SetFloat("_TransparentEnabled", transparent ? 1.0f : 0.0f);
-                target.SetFloat("_ClippingMode", transparent ? 2.0f : alphaClip ? 1.0f : 0.0f);
+                // UTS mode 1 samples _ClippingMask.r directly. Mode 2 (TransClipping) can
+                // instead select the base-map alpha through _IsBaseMapAlphaAsClippingMask,
+                // which preserves PMX alpha-test cutouts without requiring a separate mask.
+                target.SetFloat("_ClippingMode", transparent || alphaClip ? 2.0f : 0.0f);
                 target.SetFloat("_IsBaseMapAlphaAsClippingMask", alphaClip || transparent ? 1.0f : 0.0f);
                 float sourceAlphaThreshold = Mathf.Clamp01(GetFloat(source, "_AlphaClipThreshold"));
                 target.SetFloat("_Clipping_Level", transparent
@@ -363,7 +378,9 @@ namespace Mmd.Samples.UnityToonShader
             }
             else if (alphaClip)
             {
-                material.EnableKeyword("_IS_CLIPPING_MODE");
+                // UTS's mode-1 branch ignores _IsBaseMapAlphaAsClippingMask and samples only
+                // _ClippingMask.r. Use TransClipping so the base texture alpha drives cutouts.
+                material.EnableKeyword("_IS_CLIPPING_TRANSMODE");
                 material.EnableKeyword("_IS_OUTLINE_CLIPPING_YES");
             }
             else
@@ -375,6 +392,12 @@ namespace Mmd.Samples.UnityToonShader
 
         private static Texture? GetFirstTexture(Material source, params string[] names)
         {
+            string? property = GetFirstTextureProperty(source, names);
+            return property != null ? source.GetTexture(property) : null;
+        }
+
+        private static string? GetFirstTextureProperty(Material source, params string[] names)
+        {
             foreach (string name in names)
             {
                 if (source.HasProperty(name))
@@ -382,7 +405,7 @@ namespace Mmd.Samples.UnityToonShader
                     Texture texture = source.GetTexture(name);
                     if (texture != null)
                     {
-                        return texture;
+                        return name;
                     }
                 }
             }
