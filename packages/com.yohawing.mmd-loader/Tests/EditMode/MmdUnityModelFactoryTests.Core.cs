@@ -162,6 +162,15 @@ namespace Mmd.Tests
             Assert.That(toonLitSource, Does.Contain("step(1e-4h, dot(normalWS, lightDirection))"));
             Assert.That(toonLitSource, Does.Contain("LinearToSRGB(_StylizedSpecularColor.rgb) *"));
             Assert.That(toonLitSource, Does.Contain("mainLightSrgb * selfShadowVisibility * specularMask"));
+            Assert.That(toonLitSource, Does.Contain("_RimColor (\"Rim Color\", Color) = (1, 1, 1, 1)"));
+            Assert.That(toonLitSource, Does.Contain("_RimBoundary (\"Rim Boundary\", Range(-1, 1)) = -1"));
+            Assert.That(toonLitSource, Does.Contain("_RimFeather (\"Rim Feather\", Range(-1, 1)) = -1"));
+            Assert.That(toonLitSource, Does.Contain("_RimLightFollow (\"Rim Light Follow\", Range(0, 1)) = 0"));
+            Assert.That(toonLitSource, Does.Contain("if (_RimBoundary < -0.5h)"));
+            Assert.That(toonLitSource, Does.Contain("half rim = 1.0h - saturate(abs(dot(normalWS, viewDirectionWS)));"));
+            Assert.That(toonLitSource, Does.Contain("half3 fixedRimSrgb = LinearToSRGB(_RimColor.rgb) * rimMask;"));
+            Assert.That(toonLitSource, Does.Contain("half3 followRimSrgb = LinearToSRGB(_RimColor.rgb) * mainLightSrgb"));
+            Assert.That(toonLitSource, Does.Contain("lightFacing * selfShadowVisibility * rimMask"));
         }
         [Test]
         public void CreateStaticModelKeepsShadowCasterAndAddsHiddenSelfShadowTarget()

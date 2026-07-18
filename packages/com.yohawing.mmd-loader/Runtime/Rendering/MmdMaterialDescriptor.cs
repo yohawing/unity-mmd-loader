@@ -24,6 +24,10 @@ namespace Mmd.Rendering
         public float[] stylizedSpecularColor = new[] { 1.0f, 1.0f, 1.0f };
         public float stylizedSpecularBoundary = -1.0f;
         public float stylizedSpecularFeather = -1.0f;
+        public float[] rimColor = new[] { 1.0f, 1.0f, 1.0f };
+        public float rimBoundary = -1.0f;
+        public float rimFeather = -1.0f;
+        public float rimLightFollow;
         public float[] edgeColor = new[] { 0.0f, 0.0f, 0.0f, 1.0f };
         public float edgeSize;
         public string sphereTextureMode = string.Empty;
@@ -70,6 +74,10 @@ namespace Mmd.Rendering
                     stylizedSpecularColor = new[] { 1.0f, 1.0f, 1.0f },
                     stylizedSpecularBoundary = -1.0f,
                     stylizedSpecularFeather = -1.0f,
+                    rimColor = new[] { 1.0f, 1.0f, 1.0f },
+                    rimBoundary = -1.0f,
+                    rimFeather = -1.0f,
+                    rimLightFollow = 0.0f,
                     edgeColor = CopyColor(material.edgeColor, 4, new[] { 0.0f, 0.0f, 0.0f, 1.0f }),
                     edgeSize = ClampNonNegative(material.edgeSize),
                     sphereTextureMode = NormalizeOptionalString(material.sphereTextureMode),

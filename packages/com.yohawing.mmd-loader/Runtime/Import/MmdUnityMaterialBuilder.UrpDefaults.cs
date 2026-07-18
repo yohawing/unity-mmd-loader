@@ -91,6 +91,27 @@ namespace Mmd.UnityIntegration
                 material.SetFloat(MmdMaterialPropertyNames.StylizedSpecularFeather, source.stylizedSpecularFeather);
             }
 
+            if (material.HasProperty(MmdMaterialPropertyNames.RimColor))
+            {
+                material.SetColor(MmdMaterialPropertyNames.RimColor,
+                    ToColor(source.rimColor, 1.0f, Color.white));
+            }
+
+            if (material.HasProperty(MmdMaterialPropertyNames.RimBoundary))
+            {
+                material.SetFloat(MmdMaterialPropertyNames.RimBoundary, source.rimBoundary);
+            }
+
+            if (material.HasProperty(MmdMaterialPropertyNames.RimFeather))
+            {
+                material.SetFloat(MmdMaterialPropertyNames.RimFeather, source.rimFeather);
+            }
+
+            if (material.HasProperty(MmdMaterialPropertyNames.RimLightFollow))
+            {
+                material.SetFloat(MmdMaterialPropertyNames.RimLightFollow, source.rimLightFollow);
+            }
+
             if (material.HasProperty("_OutlineColor"))
             {
                 material.SetColor("_OutlineColor", edge);

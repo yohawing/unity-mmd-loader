@@ -57,7 +57,11 @@ namespace Mmd.Editor
             float? toonBandCountOverride = null,
             Color? stylizedSpecularColorOverride = null,
             float? stylizedSpecularBoundaryOverride = null,
-            float? stylizedSpecularFeatherOverride = null)
+            float? stylizedSpecularFeatherOverride = null,
+            Color? rimColorOverride = null,
+            float? rimBoundaryOverride = null,
+            float? rimFeatherOverride = null,
+            float? rimLightFollowOverride = null)
         {
             const int width = 1024;
             const int height = 1024;
@@ -101,6 +105,12 @@ namespace Mmd.Editor
             Color stylizedSpecularColor = stylizedSpecularColorOverride ?? Color.white;
             float stylizedSpecularBoundary = stylizedSpecularBoundaryOverride ?? -1.0f;
             float stylizedSpecularFeather = stylizedSpecularFeatherOverride ?? -1.0f;
+            bool rimConfigured = !rimColorOverride.HasValue && !rimBoundaryOverride.HasValue &&
+                !rimFeatherOverride.HasValue && !rimLightFollowOverride.HasValue;
+            Color rimColor = rimColorOverride ?? Color.white;
+            float rimBoundary = rimBoundaryOverride ?? -1.0f;
+            float rimFeather = rimFeatherOverride ?? -1.0f;
+            float rimLightFollow = rimLightFollowOverride ?? 0.0f;
             List<UnityEngine.Object>? configuredSsaoFeatures = null;
             List<bool>? previousSsaoFeatureStates = null;
             Color previousAmbientLight = RenderSettings.ambientLight;
@@ -387,6 +397,49 @@ namespace Mmd.Editor
                     stylizedSpecularConfigured = materialPreset != MmdMaterialPreset.MmdToonLit ||
                         (anyStylizedSpecularMaterial && allStylizedSpecularMaterialsConfigured);
                 }
+                if (rimColorOverride.HasValue || rimBoundaryOverride.HasValue || rimFeatherOverride.HasValue ||
+                    rimLightFollowOverride.HasValue)
+                {
+                    bool anyRimMaterial = false;
+                    bool allRimMaterialsConfigured = true;
+                    foreach (Material material in instance.Materials)
+                    {
+                        if (material == null)
+                        {
+                            continue;
+                        }
+
+                        bool hasColor = material.HasProperty(MmdMaterialPropertyNames.RimColor);
+                        bool hasBoundary = material.HasProperty(MmdMaterialPropertyNames.RimBoundary);
+                        bool hasFeather = material.HasProperty(MmdMaterialPropertyNames.RimFeather);
+                        bool hasFollow = material.HasProperty(MmdMaterialPropertyNames.RimLightFollow);
+                        if (hasColor && rimColorOverride.HasValue)
+                        {
+                            material.SetColor(MmdMaterialPropertyNames.RimColor, rimColor);
+                        }
+                        if (hasBoundary && rimBoundaryOverride.HasValue)
+                        {
+                            material.SetFloat(MmdMaterialPropertyNames.RimBoundary, rimBoundary);
+                        }
+                        if (hasFeather && rimFeatherOverride.HasValue)
+                        {
+                            material.SetFloat(MmdMaterialPropertyNames.RimFeather, rimFeather);
+                        }
+                        if (hasFollow && rimLightFollowOverride.HasValue)
+                        {
+                            material.SetFloat(MmdMaterialPropertyNames.RimLightFollow, rimLightFollow);
+                        }
+
+                        anyRimMaterial |= hasColor || hasBoundary || hasFeather || hasFollow;
+                        if (materialPreset == MmdMaterialPreset.MmdToonLit && (!hasColor || !hasBoundary || !hasFeather || !hasFollow))
+                        {
+                            allRimMaterialsConfigured = false;
+                        }
+                    }
+
+                    rimConfigured = materialPreset != MmdMaterialPreset.MmdToonLit ||
+                        (anyRimMaterial && allRimMaterialsConfigured);
+                }
                 if (perturbShaderOutput)
                 {
                     foreach (Material material in instance.Materials)
@@ -459,7 +512,9 @@ namespace Mmd.Editor
                     ((!toonBoundaryOverride.HasValue && !toonFeatherOverride.HasValue &&
                         !toonBandCountOverride.HasValue) || toonBoundaryConfigured) &&
                     ((!stylizedSpecularColorOverride.HasValue && !stylizedSpecularBoundaryOverride.HasValue &&
-                        !stylizedSpecularFeatherOverride.HasValue) || stylizedSpecularConfigured);
+                        !stylizedSpecularFeatherOverride.HasValue) || stylizedSpecularConfigured) &&
+                    ((!rimColorOverride.HasValue && !rimBoundaryOverride.HasValue &&
+                        !rimFeatherOverride.HasValue && !rimLightFollowOverride.HasValue) || rimConfigured);
                 return new MmdGeneratedPmxVisualCaseReport
                 {
                     caseName = "phase17-generated-pmx-" + visualCase.name,
@@ -547,6 +602,15 @@ namespace Mmd.Editor
                     stylizedSpecularMode = stylizedSpecularColorOverride.HasValue ||
                         stylizedSpecularBoundaryOverride.HasValue || stylizedSpecularFeatherOverride.HasValue
                         ? (stylizedSpecularConfigured ? "material-properties" : "unavailable")
+                        : "unchanged",
+                    rimColor = ToColorArray(rimColor),
+                    rimBoundary = rimBoundary,
+                    rimFeather = rimFeather,
+                    rimLightFollow = rimLightFollow,
+                    rimConfigured = rimConfigured,
+                    rimMode = rimColorOverride.HasValue || rimBoundaryOverride.HasValue ||
+                        rimFeatherOverride.HasValue || rimLightFollowOverride.HasValue
+                        ? (rimConfigured ? "material-properties" : "unavailable")
                         : "unchanged",
                     selectedMaterialPassName = selectedMaterialPassName,
                     selectedMaterialLightMode = selectedMaterialLightMode,
@@ -1337,6 +1401,12 @@ namespace Mmd.Editor
         public float stylizedSpecularFeather = -1.0f;
         public bool stylizedSpecularConfigured;
         public string stylizedSpecularMode = string.Empty;
+        public float[] rimColor = Array.Empty<float>();
+        public float rimBoundary = -1.0f;
+        public float rimFeather = -1.0f;
+        public float rimLightFollow;
+        public bool rimConfigured;
+        public string rimMode = string.Empty;
         public string selectedMaterialPassName = string.Empty;
         public string selectedMaterialLightMode = string.Empty;
         public int selectedMaterialPassIndex = -1;

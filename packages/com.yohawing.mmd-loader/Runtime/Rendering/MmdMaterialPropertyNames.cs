@@ -34,6 +34,10 @@ namespace Mmd.Rendering
         public const string StylizedSpecularColor = "_StylizedSpecularColor";
         public const string StylizedSpecularBoundary = "_StylizedSpecularBoundary";
         public const string StylizedSpecularFeather = "_StylizedSpecularFeather";
+        public const string RimColor = "_RimColor";
+        public const string RimBoundary = "_RimBoundary";
+        public const string RimFeather = "_RimFeather";
+        public const string RimLightFollow = "_RimLightFollow";
         public const string OutlineColor = "_OutlineColor";
         public const string OutlineWidth = "_OutlineWidth";
         public const string OutlineVisible = "_OutlineVisible";

@@ -62,6 +62,10 @@ namespace Mmd.EditModeTests
                 "hasOcclusionStrength",
                 "hasOutlineColor",
                 "hasOutlineWidth",
+                "hasRimBoundary",
+                "hasRimColor",
+                "hasRimFeather",
+                "hasRimLightFollow",
                 "hasRoughnessMap",
                 "hasSmoothness",
                 "hasStylizedSpecularBoundary",
@@ -121,6 +125,10 @@ namespace Mmd.EditModeTests
                     MmdMaterialPropertyNames.StylizedSpecularColor,
                     MmdMaterialPropertyNames.StylizedSpecularBoundary,
                     MmdMaterialPropertyNames.StylizedSpecularFeather,
+                    MmdMaterialPropertyNames.RimColor,
+                    MmdMaterialPropertyNames.RimBoundary,
+                    MmdMaterialPropertyNames.RimFeather,
+                    MmdMaterialPropertyNames.RimLightFollow,
                     MmdMaterialPropertyNames.OutlineColor,
                     MmdMaterialPropertyNames.OutlineWidth, MmdMaterialPropertyNames.OutlineVisible,
                     MmdMaterialPropertyNames.MmdNormalMap, MmdMaterialPropertyNames.MmdNormalMapBound,
@@ -136,6 +144,10 @@ namespace Mmd.EditModeTests
                 AssertColor(toonMaterial.GetColor(MmdMaterialPropertyNames.StylizedSpecularColor), new Color(0.91f, 0.81f, 0.71f, 0.61f));
                 Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.StylizedSpecularBoundary), Is.EqualTo(0.90f).Within(0.00001f));
                 Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.StylizedSpecularFeather), Is.EqualTo(0.03f).Within(0.00001f));
+                AssertColor(toonMaterial.GetColor(MmdMaterialPropertyNames.RimColor), new Color(0.19f, 0.29f, 0.39f, 0.49f));
+                Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.RimBoundary), Is.EqualTo(0.72f).Within(0.00001f));
+                Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.RimFeather), Is.EqualTo(0.08f).Within(0.00001f));
+                Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.RimLightFollow), Is.EqualTo(0.65f).Within(0.00001f));
                 AssertColor(toonMaterial.GetColor(MmdMaterialPropertyNames.OutlineColor), new Color(0.72f, 0.61f, 0.5f, 0.39f));
                 Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.OutlineWidth), Is.EqualTo(1.75f).Within(0.00001f));
                 Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.OutlineVisible), Is.EqualTo(1.0f));
@@ -210,6 +222,10 @@ namespace Mmd.EditModeTests
                 Assert.That(material.stylizedSpecularColor, Is.EqualTo(new[] { 0.91f, 0.81f, 0.71f }));
                 Assert.That(material.stylizedSpecularBoundary, Is.EqualTo(0.90f).Within(0.00001f));
                 Assert.That(material.stylizedSpecularFeather, Is.EqualTo(0.03f).Within(0.00001f));
+                Assert.That(material.rimColor, Is.EqualTo(new[] { 0.19f, 0.29f, 0.39f }));
+                Assert.That(material.rimBoundary, Is.EqualTo(0.72f).Within(0.00001f));
+                Assert.That(material.rimFeather, Is.EqualTo(0.08f).Within(0.00001f));
+                Assert.That(material.rimLightFollow, Is.EqualTo(0.65f).Within(0.00001f));
                 Assert.That(material.edgeColor, Is.EqualTo(new[] { 0.72f, 0.61f, 0.5f, 0.39f }));
                 Assert.That(material.edgeSize, Is.EqualTo(1.75f).Within(0.00001f));
                 Assert.That(material.drawEdgeFlag, Is.True);
@@ -243,6 +259,10 @@ namespace Mmd.EditModeTests
                 Assert.That(binding.stylizedSpecularColor, Is.EqualTo(new[] { 0.91f, 0.81f, 0.71f }));
                 Assert.That(binding.stylizedSpecularBoundary, Is.EqualTo(0.90f).Within(0.00001f));
                 Assert.That(binding.stylizedSpecularFeather, Is.EqualTo(0.03f).Within(0.00001f));
+                Assert.That(binding.rimColor, Is.EqualTo(new[] { 0.19f, 0.29f, 0.39f }));
+                Assert.That(binding.rimBoundary, Is.EqualTo(0.72f).Within(0.00001f));
+                Assert.That(binding.rimFeather, Is.EqualTo(0.08f).Within(0.00001f));
+                Assert.That(binding.rimLightFollow, Is.EqualTo(0.65f).Within(0.00001f));
                 Assert.That(binding.edgeColor, Is.EqualTo(new[] { 0.72f, 0.61f, 0.5f, 0.39f }));
                 Assert.That(binding.edgeSize, Is.EqualTo(1.75f).Within(0.00001f));
                 Assert.That(binding.drawEdgeFlag, Is.True);
@@ -284,6 +304,14 @@ namespace Mmd.EditModeTests
                 stylizedSpecularBoundary = 0.90f,
                 hasStylizedSpecularFeather = true,
                 stylizedSpecularFeather = 0.03f,
+                hasRimColor = true,
+                rimColor = new Color(0.19f, 0.29f, 0.39f, 0.49f),
+                hasRimBoundary = true,
+                rimBoundary = 0.72f,
+                hasRimFeather = true,
+                rimFeather = 0.08f,
+                hasRimLightFollow = true,
+                rimLightFollow = 0.65f,
                 hasOutlineColor = true,
                 outlineColor = new Color(0.72f, 0.61f, 0.5f, 0.39f),
                 hasOutlineWidth = true,

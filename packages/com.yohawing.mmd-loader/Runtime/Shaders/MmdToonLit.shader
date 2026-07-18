@@ -26,6 +26,10 @@ Shader "MMD Toon Lit"
         _StylizedSpecularColor ("Stylized Specular Color", Color) = (1, 1, 1, 1)
         _StylizedSpecularBoundary ("Stylized Specular Boundary", Range(-1, 1)) = -1
         _StylizedSpecularFeather ("Stylized Specular Feather", Range(-1, 1)) = -1
+        _RimColor ("Rim Color", Color) = (1, 1, 1, 1)
+        _RimBoundary ("Rim Boundary", Range(-1, 1)) = -1
+        _RimFeather ("Rim Feather", Range(-1, 1)) = -1
+        _RimLightFollow ("Rim Light Follow", Range(0, 1)) = 0
         _OutlineColor ("Outline Color", Color) = (0, 0, 0, 1)
         _OutlineWidth ("Outline Width", Float) = 0
         _OutlineScreenSpaceWeight ("Outline Screen Space Weight", Float) = 0
@@ -141,6 +145,10 @@ Shader "MMD Toon Lit"
                 half4 _StylizedSpecularColor;
                 half _StylizedSpecularBoundary;
                 half _StylizedSpecularFeather;
+                half4 _RimColor;
+                half _RimBoundary;
+                half _RimFeather;
+                half _RimLightFollow;
             CBUFFER_END
 
             struct Attributes
@@ -309,6 +317,28 @@ Shader "MMD Toon Lit"
                     step(1e-4h, dot(normalWS, lightDirection));
             }
 
+            half ComputeMmdRimMask(half3 normalWS, half3 viewDirectionWS)
+            {
+                // The negative boundary is the sole compatibility sentinel.
+                if (_RimBoundary < -0.5h)
+                {
+                    return 0.0h;
+                }
+
+                // Cull Off materials must not turn their entire back face into rim light.
+                half rim = 1.0h - saturate(abs(dot(normalWS, viewDirectionWS)));
+                half boundary = saturate(_RimBoundary);
+                half feather = _RimFeather < -0.5h ? 0.0h : saturate(_RimFeather);
+                if (feather <= 1e-4h)
+                {
+                    return step(boundary, rim);
+                }
+
+                half lower = max(0.0h, boundary - feather);
+                half upper = min(1.0h, boundary + feather);
+                return smoothstep(lower, max(lower + 1e-4h, upper), rim);
+            }
+
             half4 ForwardFragment(Varyings input) : SV_Target
             {
                 UNITY_SETUP_INSTANCE_ID(input);
@@ -410,6 +440,17 @@ Shader "MMD Toon Lit"
                     half3 stylizedSpecularSrgb = LinearToSRGB(_StylizedSpecularColor.rgb) *
                         mainLightSrgb * selfShadowVisibility * specularMask;
                     litSrgb = saturate(litSrgb + stylizedSpecularSrgb);
+                }
+                if (_RimBoundary >= -0.5h)
+                {
+                    half3 viewDirectionWS = GetWorldSpaceNormalizeViewDir(input.positionWS);
+                    half rimMask = ComputeMmdRimMask(normalWS, viewDirectionWS);
+                    half3 fixedRimSrgb = LinearToSRGB(_RimColor.rgb) * rimMask;
+                    half lightFacing = saturate(dot(normalWS, lightDirection));
+                    half3 followRimSrgb = LinearToSRGB(_RimColor.rgb) * mainLightSrgb *
+                        lightFacing * selfShadowVisibility * rimMask;
+                    half3 rimSrgb = lerp(fixedRimSrgb, followRimSrgb, saturate(_RimLightFollow));
+                    litSrgb = saturate(litSrgb + rimSrgb);
                 }
                 half3 foggedLinear = MixFog(SRGBToLinear(litSrgb), input.fogFactor);
                 half4 color;

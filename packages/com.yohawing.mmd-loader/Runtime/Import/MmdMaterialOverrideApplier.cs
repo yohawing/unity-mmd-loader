@@ -281,6 +281,29 @@ namespace Mmd.UnityIntegration
                     NormalizeToonOptional(entry.stylizedSpecularFeather));
             }
 
+            if (entry.hasRimColor)
+            {
+                SetColorIfPresent(material, MmdMaterialPropertyNames.RimColor, entry.rimColor);
+            }
+
+            if (entry.hasRimBoundary)
+            {
+                SetFloatIfPresent(material, MmdMaterialPropertyNames.RimBoundary,
+                    NormalizeToonOptional(entry.rimBoundary));
+            }
+
+            if (entry.hasRimFeather)
+            {
+                SetFloatIfPresent(material, MmdMaterialPropertyNames.RimFeather,
+                    NormalizeToonOptional(entry.rimFeather));
+            }
+
+            if (entry.hasRimLightFollow)
+            {
+                SetFloatIfPresent(material, MmdMaterialPropertyNames.RimLightFollow,
+                    Clamp01(entry.rimLightFollow));
+            }
+
             if (entry.hasOutlineColor)
             {
                 SetColorIfPresent(material, MmdMaterialPropertyNames.OutlineColor, entry.outlineColor);
@@ -492,6 +515,31 @@ namespace Mmd.UnityIntegration
                 material.stylizedSpecularFeather = NormalizeToonOptional(entry.stylizedSpecularFeather);
             }
 
+            if (entry.hasRimColor)
+            {
+                material.rimColor = new[]
+                {
+                    Clamp01(entry.rimColor.r),
+                    Clamp01(entry.rimColor.g),
+                    Clamp01(entry.rimColor.b)
+                };
+            }
+
+            if (entry.hasRimBoundary)
+            {
+                material.rimBoundary = NormalizeToonOptional(entry.rimBoundary);
+            }
+
+            if (entry.hasRimFeather)
+            {
+                material.rimFeather = NormalizeToonOptional(entry.rimFeather);
+            }
+
+            if (entry.hasRimLightFollow)
+            {
+                material.rimLightFollow = Clamp01(entry.rimLightFollow);
+            }
+
             if (entry.hasOutlineColor)
             {
                 material.edgeColor = new[]
@@ -564,6 +612,31 @@ namespace Mmd.UnityIntegration
             if (entry.hasStylizedSpecularFeather)
             {
                 binding.stylizedSpecularFeather = NormalizeToonOptional(entry.stylizedSpecularFeather);
+            }
+
+            if (entry.hasRimColor)
+            {
+                binding.rimColor = new[]
+                {
+                    Clamp01(entry.rimColor.r),
+                    Clamp01(entry.rimColor.g),
+                    Clamp01(entry.rimColor.b)
+                };
+            }
+
+            if (entry.hasRimBoundary)
+            {
+                binding.rimBoundary = NormalizeToonOptional(entry.rimBoundary);
+            }
+
+            if (entry.hasRimFeather)
+            {
+                binding.rimFeather = NormalizeToonOptional(entry.rimFeather);
+            }
+
+            if (entry.hasRimLightFollow)
+            {
+                binding.rimLightFollow = Clamp01(entry.rimLightFollow);
             }
 
             if (entry.hasOutlineColor)

@@ -77,6 +77,18 @@ namespace Mmd
         public bool hasStylizedSpecularFeather;
         public float stylizedSpecularFeather = -1.0f;
 
+        public bool hasRimColor;
+        public Color rimColor = Color.white;
+
+        public bool hasRimBoundary;
+        public float rimBoundary = -1.0f;
+
+        public bool hasRimFeather;
+        public float rimFeather = -1.0f;
+
+        public bool hasRimLightFollow;
+        public float rimLightFollow;
+
         public bool hasOutlineColor;
         public Color outlineColor = Color.black;
 

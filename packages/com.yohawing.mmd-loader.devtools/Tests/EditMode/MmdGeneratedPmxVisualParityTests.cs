@@ -661,6 +661,60 @@ namespace Mmd.Tests
                 onStylizedSpecularFeather: 0.03f);
         }
 
+        [Test]
+        [Explicit("Run the S1c rim-light visual delta explicitly; FLIP artifacts still require human review.")]
+        [Category("VisualShadingTier")]
+        public void ToonRampToonLit_TracksRimLightWhileLegacyStaysInvariant()
+        {
+            RunToonAuthoringDeltaCase(
+                "rim-light",
+                offBoundary: -1.0f,
+                offFeather: -1.0f,
+                offBandCount: -1.0f,
+                onBoundary: -1.0f,
+                onFeather: -1.0f,
+                onBandCount: -1.0f,
+                artifactKind: "s1c-rim-light-delta",
+                caseSuffix: "rim-light",
+                feature: "rim-light-fixed",
+                intendedChange: "Only MMD Toon Lit consumes the explicit N·V fixed rim color, boundary, and feather; the boundary sentinel preserves the prior look and Legacy stays invariant.",
+                offRimColor: Color.white,
+                offRimBoundary: -1.0f,
+                offRimFeather: -1.0f,
+                offRimLightFollow: 0.0f,
+                onRimColor: new Color(1.0f, 0.75f, 0.35f, 1.0f),
+                onRimBoundary: 0.58f,
+                onRimFeather: 0.08f,
+                onRimLightFollow: 0.0f);
+        }
+
+        [Test]
+        [Explicit("Run the S1c rim-light follow visual delta explicitly; FLIP artifacts still require human review.")]
+        [Category("VisualShadingTier")]
+        public void ToonRampToonLit_TracksRimLightFollowWhileLegacyStaysInvariant()
+        {
+            RunToonAuthoringDeltaCase(
+                "rim-light-follow",
+                offBoundary: -1.0f,
+                offFeather: -1.0f,
+                offBandCount: -1.0f,
+                onBoundary: -1.0f,
+                onFeather: -1.0f,
+                onBandCount: -1.0f,
+                artifactKind: "s1c-rim-light-follow-delta",
+                caseSuffix: "rim-light-follow",
+                feature: "rim-light-follow",
+                intendedChange: "Only MMD Toon Lit consumes Rim Light Follow to blend fixed N·V rim into main-light-facing, shadowed rim response; Legacy stays invariant.",
+                offRimColor: Color.white,
+                offRimBoundary: 0.58f,
+                offRimFeather: 0.08f,
+                offRimLightFollow: 0.0f,
+                onRimColor: Color.white,
+                onRimBoundary: 0.58f,
+                onRimFeather: 0.08f,
+                onRimLightFollow: 1.0f);
+        }
+
         private static void RunToonAuthoringDeltaCase(
             string artifactStem,
             float offBoundary,
@@ -678,7 +732,15 @@ namespace Mmd.Tests
             float? offStylizedSpecularFeather = null,
             Color? onStylizedSpecularColor = null,
             float? onStylizedSpecularBoundary = null,
-            float? onStylizedSpecularFeather = null)
+            float? onStylizedSpecularFeather = null,
+            Color? offRimColor = null,
+            float? offRimBoundary = null,
+            float? offRimFeather = null,
+            float? offRimLightFollow = null,
+            Color? onRimColor = null,
+            float? onRimBoundary = null,
+            float? onRimFeather = null,
+            float? onRimLightFollow = null)
         {
             bool optedOut = string.Equals(
                 Environment.GetEnvironmentVariable("YMU_VISUAL_TIER_OPT_OUT"), "1",
@@ -713,16 +775,20 @@ namespace Mmd.Tests
 
             MmdGeneratedPmxVisualCaseReport legacyOff = RenderToonBoundaryCase(
                 visualCase, fixtureDirectory, legacyOffPath, MmdMaterialPreset.MmdToon, offBoundary, offFeather, offBandCount,
-                offStylizedSpecularColor, offStylizedSpecularBoundary, offStylizedSpecularFeather);
+                offStylizedSpecularColor, offStylizedSpecularBoundary, offStylizedSpecularFeather,
+                offRimColor, offRimBoundary, offRimFeather, offRimLightFollow);
             MmdGeneratedPmxVisualCaseReport legacyOn = RenderToonBoundaryCase(
                 visualCase, fixtureDirectory, legacyOnPath, MmdMaterialPreset.MmdToon, onBoundary, onFeather, onBandCount,
-                onStylizedSpecularColor, onStylizedSpecularBoundary, onStylizedSpecularFeather);
+                onStylizedSpecularColor, onStylizedSpecularBoundary, onStylizedSpecularFeather,
+                onRimColor, onRimBoundary, onRimFeather, onRimLightFollow);
             MmdGeneratedPmxVisualCaseReport toonLitOff = RenderToonBoundaryCase(
                 visualCase, fixtureDirectory, toonLitOffPath, MmdMaterialPreset.MmdToonLit, offBoundary, offFeather, offBandCount,
-                offStylizedSpecularColor, offStylizedSpecularBoundary, offStylizedSpecularFeather);
+                offStylizedSpecularColor, offStylizedSpecularBoundary, offStylizedSpecularFeather,
+                offRimColor, offRimBoundary, offRimFeather, offRimLightFollow);
             MmdGeneratedPmxVisualCaseReport toonLitOn = RenderToonBoundaryCase(
                 visualCase, fixtureDirectory, toonLitOnPath, MmdMaterialPreset.MmdToonLit, onBoundary, onFeather, onBandCount,
-                onStylizedSpecularColor, onStylizedSpecularBoundary, onStylizedSpecularFeather);
+                onStylizedSpecularColor, onStylizedSpecularBoundary, onStylizedSpecularFeather,
+                onRimColor, onRimBoundary, onRimFeather, onRimLightFollow);
 
             AssertCaptureEvidence(legacyOff, MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName, "Toon boundary Legacy off");
             AssertCaptureEvidence(legacyOn, MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName, "Toon boundary Legacy on");
@@ -732,6 +798,8 @@ namespace Mmd.Tests
             Assert.That(toonLitOn.toonBoundaryConfigured, Is.True, "Toon Lit on capture must expose both authoring properties.");
             Assert.That(toonLitOff.stylizedSpecularConfigured, Is.True, "Toon Lit off capture must expose stylized specular properties.");
             Assert.That(toonLitOn.stylizedSpecularConfigured, Is.True, "Toon Lit on capture must expose stylized specular properties.");
+            Assert.That(toonLitOff.rimConfigured, Is.True, "Toon Lit off capture must expose rim properties.");
+            Assert.That(toonLitOn.rimConfigured, Is.True, "Toon Lit on capture must expose rim properties.");
 
             float legacyDelta = MmdFlipHelper.ComputeMeanError(legacyOffPath, legacyOnPath, artifactsDir);
             string? legacyHeatmap = FindLatestFlipHeatmap(artifactsDir);
@@ -774,7 +842,11 @@ namespace Mmd.Tests
             float? toonBandCount,
             Color? stylizedSpecularColor = null,
             float? stylizedSpecularBoundary = null,
-            float? stylizedSpecularFeather = null)
+            float? stylizedSpecularFeather = null,
+            Color? rimColor = null,
+            float? rimBoundary = null,
+            float? rimFeather = null,
+            float? rimLightFollow = null)
         {
             return MmdEditorRenderingDiagnostics.RenderGeneratedPmxVisualCase(
                 visualCase,
@@ -790,7 +862,11 @@ namespace Mmd.Tests
                 toonBandCountOverride: toonBandCount,
                 stylizedSpecularColorOverride: stylizedSpecularColor,
                 stylizedSpecularBoundaryOverride: stylizedSpecularBoundary,
-                stylizedSpecularFeatherOverride: stylizedSpecularFeather);
+                stylizedSpecularFeatherOverride: stylizedSpecularFeather,
+                rimColorOverride: rimColor,
+                rimBoundaryOverride: rimBoundary,
+                rimFeatherOverride: rimFeather,
+                rimLightFollowOverride: rimLightFollow);
         }
 
         private static void WriteToonAuthoringDeltaManifest(
@@ -837,6 +913,7 @@ namespace Mmd.Tests
                             report.selectedMaterialPassValid &&
                             report.toonBoundaryConfigured &&
                             report.stylizedSpecularConfigured &&
+                            report.rimConfigured &&
                             legacyDelta <= 0.0001f &&
                             toonLitDelta > legacyDelta + minimumVisibleDelta,
                         shaderProfile = report.shaderName,
@@ -859,6 +936,12 @@ namespace Mmd.Tests
                         stylizedSpecularFeather = report.stylizedSpecularFeather,
                         stylizedSpecularConfigured = report.stylizedSpecularConfigured,
                         stylizedSpecularMode = report.stylizedSpecularMode,
+                        rimColor = report.rimColor,
+                        rimBoundary = report.rimBoundary,
+                        rimFeather = report.rimFeather,
+                        rimLightFollow = report.rimLightFollow,
+                        rimConfigured = report.rimConfigured,
+                        rimMode = report.rimMode,
                         cameraPosition = report.cameraPosition,
                         cameraTarget = report.cameraTarget,
                         cameraFieldOfView = report.cameraFieldOfView,
@@ -1599,6 +1682,12 @@ namespace Mmd.Tests
             public float stylizedSpecularFeather = -1.0f;
             public bool stylizedSpecularConfigured;
             public string stylizedSpecularMode = string.Empty;
+            public float[] rimColor = Array.Empty<float>();
+            public float rimBoundary = -1.0f;
+            public float rimFeather = -1.0f;
+            public float rimLightFollow;
+            public bool rimConfigured;
+            public string rimMode = string.Empty;
             public float[] cameraPosition = Array.Empty<float>();
             public float[] cameraTarget = Array.Empty<float>();
             public float cameraFieldOfView;
