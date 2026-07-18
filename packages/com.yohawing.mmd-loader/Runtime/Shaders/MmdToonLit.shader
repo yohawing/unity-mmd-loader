@@ -1,7 +1,7 @@
 Shader "MMD Toon Lit"
 {
-    // S1a is opt-in. Keep the Legacy MMD Toon shader byte-for-byte intact; this shader only
-    // changes the ForwardLit main-light input and reuses the Legacy outline/self-shadow/caster passes.
+    // MMD Toon Lit is opt-in. Keep the Legacy MMD Toon shader byte-for-byte intact; this shader
+    // connects ForwardLit to URP lighting/fog and reuses the Legacy outline/self-shadow/caster passes.
     Properties
     {
         _BaseMap ("Base Map", 2D) = "white" {}
@@ -69,6 +69,7 @@ Shader "MMD Toon Lit"
             #pragma multi_compile_instancing
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile_fragment _ _SHADOWS_SOFT_LOW _SHADOWS_SOFT_MEDIUM _SHADOWS_SOFT_HIGH
+            #pragma multi_compile_fog
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
@@ -131,6 +132,7 @@ Shader "MMD Toon Lit"
                 float3 positionWS : TEXCOORD2;
                 float3 tangentWS : TEXCOORD3;
                 float3 bitangentWS : TEXCOORD4;
+                half fogFactor : TEXCOORD5;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -141,6 +143,7 @@ Shader "MMD Toon Lit"
                 UNITY_TRANSFER_INSTANCE_ID(input, output);
                 float3 positionWS = TransformObjectToWorld(input.positionOS.xyz);
                 output.positionCS = TransformWorldToHClip(positionWS);
+                output.fogFactor = ComputeFogFactor(output.positionCS.z);
                 output.positionWS = positionWS;
                 output.normalWS = normalize(TransformObjectToWorldNormal(input.normalOS));
                 output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
@@ -255,7 +258,10 @@ Shader "MMD Toon Lit"
                     toonLight = min(toonLight, selfShadowToonLight);
                 }
 
-                half3 baseSrgb = saturate(LinearToSRGB(_BaseColor.rgb) * mainLightSrgb + LinearToSRGB(_AmbientColor.rgb));
+                half3 ambientShSrgb = LinearToSRGB(SampleSH(normalWS));
+                half3 baseSrgb = saturate(
+                    LinearToSRGB(_BaseColor.rgb) * (mainLightSrgb + ambientShSrgb)
+                    + LinearToSRGB(_AmbientColor.rgb));
                 half3 albedoSrgb = baseSrgb * LinearToSRGB(baseMap.rgb) * LinearToSRGB(_Color.rgb) * LinearToSRGB(_DiagnosticColor.rgb);
                 if (_SphereMode > 0.5h)
                 {
@@ -267,8 +273,9 @@ Shader "MMD Toon Lit"
 
                 half3 litSrgb = saturate(albedoSrgb * LinearToSRGB(toonLight));
                 litSrgb = lerp(litSrgb, saturate(albedoSrgb * _TextureFlatLightingValue), saturate(_BaseMapBound * _TextureFlatLightingWeight));
+                half3 foggedLinear = MixFog(SRGBToLinear(litSrgb), input.fogFactor);
                 half4 color;
-                color.rgb = _GammaTarget > 0.5h ? litSrgb : SRGBToLinear(litSrgb);
+                color.rgb = _GammaTarget > 0.5h ? LinearToSRGB(foggedLinear) : foggedLinear;
                 color.a = lerp(_Alpha, albedoAlpha, saturate(_TextureAlphaOutputWeight));
                 return color;
             }

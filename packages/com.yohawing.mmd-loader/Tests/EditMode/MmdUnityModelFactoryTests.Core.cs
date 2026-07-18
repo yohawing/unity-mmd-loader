@@ -87,6 +87,29 @@ namespace Mmd.Tests
             Assert.That(toonLitSource, Does.Contain("UsePass \"MMD Basic URP Toon/MmdSelfShadowCaster\""));
         }
         [Test]
+        public void MmdToonLitShaderUsesUrpAmbientShAndFogWithoutChangingLegacyShader()
+        {
+            string shaderDirectory = Path.Combine(MmdTestFixtures.PackageRoot, "Runtime", "Shaders");
+            string legacySource = File.ReadAllText(Path.Combine(shaderDirectory, "MmdBasicUrpToon.shader"));
+            string toonLitSource = File.ReadAllText(Path.Combine(shaderDirectory, "MmdToonLit.shader"));
+
+            Assert.That(legacySource, Does.Not.Contain("SampleSH("));
+            Assert.That(legacySource, Does.Not.Contain("#pragma multi_compile_fog"));
+            Assert.That(legacySource, Does.Not.Contain("ComputeFogFactor("));
+            Assert.That(legacySource, Does.Not.Contain("MixFog("));
+
+            Assert.That(toonLitSource, Does.Contain("half3 ambientShSrgb = LinearToSRGB(SampleSH(normalWS));"));
+            Assert.That(toonLitSource, Does.Contain("LinearToSRGB(_BaseColor.rgb) * (mainLightSrgb + ambientShSrgb)"));
+            Assert.That(toonLitSource, Does.Contain("#pragma multi_compile_fog"));
+            Assert.That(toonLitSource, Does.Contain("output.fogFactor = ComputeFogFactor(output.positionCS.z);"));
+            Assert.That(toonLitSource, Does.Contain("half3 foggedLinear = MixFog(SRGBToLinear(litSrgb), input.fogFactor);"));
+            Assert.That(toonLitSource, Does.Contain("_GammaTarget > 0.5h ? LinearToSRGB(foggedLinear) : foggedLinear"));
+
+            Shader toonLitShader = Shader.Find(MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName);
+            Assert.That(toonLitShader, Is.Not.Null);
+            Assert.That(toonLitShader!.name, Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName));
+        }
+        [Test]
         public void CreateStaticModelKeepsShadowCasterAndAddsHiddenSelfShadowTarget()
         {
 
