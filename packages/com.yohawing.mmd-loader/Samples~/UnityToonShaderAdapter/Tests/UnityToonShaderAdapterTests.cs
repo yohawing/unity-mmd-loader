@@ -291,6 +291,7 @@ namespace Mmd.Samples.UnityToonShader.Tests
                 Object.DestroyImmediate(baseTexture);
                 Object.DestroyImmediate(sphereTexture);
                 Object.DestroyImmediate(readback);
+                cameraObject.GetComponent<Camera>().targetTexture = null;
                 renderTexture.Release();
                 Object.DestroyImmediate(renderTexture);
                 Object.DestroyImmediate(geometry);
@@ -308,14 +309,14 @@ namespace Mmd.Samples.UnityToonShader.Tests
 
         private static Shader RequireInstalledUtsShader()
         {
-            Shader shader = Shader.Find(UnityToonShaderAdapter.ExpectedShaderName);
+            Shader? shader = Shader.Find(UnityToonShaderAdapter.ExpectedShaderName);
             if (shader == null)
             {
                 Assert.Ignore("Optional Unity Toon Shader is not installed.");
             }
 
-            AssertUtsShaderHealthy(shader);
-            return shader;
+            AssertUtsShaderHealthy(shader!);
+            return shader!;
         }
 
         private static void AssertUtsShaderHealthy(Shader shader)
