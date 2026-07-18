@@ -9,6 +9,7 @@ using UnityEditor.PackageManager;
 using UnityEngine;
 using UnityEngine.TestTools;
 using Mmd.Editor;
+using Mmd.Rendering;
 using Mmd.UnityIntegration;
 
 namespace Mmd.Tests
@@ -102,6 +103,151 @@ namespace Mmd.Tests
             LogAssert.NoUnexpectedReceived();
         }
 
+        [Test]
+        [Explicit("Run the S1a main-light visual delta explicitly; FLIP artifacts still require human review.")]
+        [Category("VisualShadingTier")]
+        public void ToonRampToonLit_TracksUnityMainLightWhileLegacyStaysInvariant()
+        {
+            bool optedOut = string.Equals(
+                Environment.GetEnvironmentVariable("YMU_VISUAL_TIER_OPT_OUT"), "1",
+                StringComparison.Ordinal);
+            var visualCase = new MmdGeneratedPmxVisualCase(
+                "mmd-toon-ramp-lit-box",
+                "mmd-toon-ramp-lit-box.pmx",
+                new Vector3(-0.06f, 0.6f, 3.3f),
+                new Vector3(-0.06f, 0.6f, 0.0f),
+                27.0f,
+                0.03f);
+
+            var availability = MmdFlipHelper.ProbeAvailability();
+            if (!availability.available)
+            {
+                RequireOrOptOut(optedOut, "FLIP not available: " + availability.unsupportedReason);
+            }
+
+            string fixtureDirectory = ResolveGeneratedPmxFixtureDirectory();
+            string pmxPath = Path.Combine(fixtureDirectory, visualCase.modelFileName);
+            if (!File.Exists(pmxPath))
+            {
+                RequireOrOptOut(optedOut, "Generated PMX fixture missing: " + pmxPath);
+            }
+
+            string artifactsDir = ResolveArtifactsDir();
+            Directory.CreateDirectory(artifactsDir);
+            Color changedLightColor = new Color(0.18f, 0.82f, 0.31f, 1.0f);
+            const float changedLightIntensity = 0.35f;
+            string legacyReference = Path.Combine(artifactsDir, visualCase.name + ".legacy-main-light-default.png");
+            string legacyCandidate = Path.Combine(artifactsDir, visualCase.name + ".legacy-main-light-changed.png");
+            string toonLitReference = Path.Combine(artifactsDir, visualCase.name + ".toon-lit-main-light-default.png");
+            string toonLitCandidate = Path.Combine(artifactsDir, visualCase.name + ".toon-lit-main-light-changed.png");
+
+            MmdGeneratedPmxVisualCaseReport legacyReferenceReport = MmdEditorRenderingDiagnostics.RenderGeneratedPmxVisualCase(
+                visualCase, fixtureDirectory, legacyReference,
+                backgroundEnabled: true, postProcessingEnabled: false,
+                materialPreset: MmdMaterialPreset.MmdToon,
+                ambientLightColorOverride: Color.black,
+                ambientLightIntensityOverride: 0.0f);
+            MmdGeneratedPmxVisualCaseReport legacyCandidateReport = MmdEditorRenderingDiagnostics.RenderGeneratedPmxVisualCase(
+                visualCase, fixtureDirectory, legacyCandidate,
+                backgroundEnabled: true, postProcessingEnabled: false,
+                materialPreset: MmdMaterialPreset.MmdToon,
+                directionalLightColorOverride: changedLightColor,
+                directionalLightIntensityOverride: changedLightIntensity,
+                ambientLightColorOverride: Color.black,
+                ambientLightIntensityOverride: 0.0f);
+            MmdGeneratedPmxVisualCaseReport toonLitReferenceReport = MmdEditorRenderingDiagnostics.RenderGeneratedPmxVisualCase(
+                visualCase, fixtureDirectory, toonLitReference,
+                backgroundEnabled: true, postProcessingEnabled: false,
+                materialPreset: MmdMaterialPreset.MmdToonLit,
+                ambientLightColorOverride: Color.black,
+                ambientLightIntensityOverride: 0.0f);
+            MmdGeneratedPmxVisualCaseReport toonLitCandidateReport = MmdEditorRenderingDiagnostics.RenderGeneratedPmxVisualCase(
+                visualCase, fixtureDirectory, toonLitCandidate,
+                backgroundEnabled: true, postProcessingEnabled: false,
+                materialPreset: MmdMaterialPreset.MmdToonLit,
+                directionalLightColorOverride: changedLightColor,
+                directionalLightIntensityOverride: changedLightIntensity,
+                ambientLightColorOverride: Color.black,
+                ambientLightIntensityOverride: 0.0f);
+
+            Assert.That(legacyReferenceReport.shaderName,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName));
+            Assert.That(legacyCandidateReport.shaderName,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName));
+            Assert.That(legacyReferenceReport.captureUsedStandardRequest,
+                Is.True,
+                "Legacy capture must use the same active SRP StandardRequest path as the Toon Lit comparison.");
+            Assert.That(legacyCandidateReport.captureUsedStandardRequest,
+                Is.True,
+                "Legacy capture must use the same active SRP StandardRequest path as the Toon Lit comparison.");
+            Assert.That(legacyReferenceReport.selectedMaterialPassValid,
+                Is.True,
+                "Legacy capture must select an enabled ForwardLit pass.");
+            Assert.That(legacyCandidateReport.selectedMaterialPassValid,
+                Is.True,
+                "Legacy capture must select an enabled ForwardLit pass.");
+            Assert.That(legacyReferenceReport.selectedMaterialLightMode,
+                Is.EqualTo("UniversalForward"));
+            Assert.That(legacyCandidateReport.selectedMaterialLightMode,
+                Is.EqualTo("UniversalForward"));
+            Assert.That(toonLitReferenceReport.shaderName,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName));
+            Assert.That(toonLitCandidateReport.shaderName,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName));
+            Assert.That(toonLitReferenceReport.captureUsedStandardRequest,
+                Is.True,
+                "S1a requires the active SRP StandardRequest path; Camera.Render fallback is not evidence of URP lighting.");
+            Assert.That(toonLitCandidateReport.captureUsedStandardRequest,
+                Is.True,
+                "S1a requires the active SRP StandardRequest path; Camera.Render fallback is not evidence of URP lighting.");
+            Assert.That(toonLitReferenceReport.selectedMaterialPassValid,
+                Is.True,
+                "S1a capture must select an enabled ForwardLit pass with a UniversalForward/UniversalForwardOnly LightMode tag.");
+            Assert.That(toonLitCandidateReport.selectedMaterialPassValid,
+                Is.True,
+                "S1a capture must select an enabled ForwardLit pass with a UniversalForward/UniversalForwardOnly LightMode tag.");
+            Assert.That(toonLitReferenceReport.selectedMaterialPassName,
+                Is.EqualTo("ForwardLit"));
+            Assert.That(toonLitCandidateReport.selectedMaterialPassName,
+                Is.EqualTo("ForwardLit"));
+            Assert.That(toonLitReferenceReport.selectedMaterialLightMode,
+                Is.EqualTo("UniversalForwardOnly"));
+            Assert.That(toonLitCandidateReport.selectedMaterialLightMode,
+                Is.EqualTo("UniversalForwardOnly"));
+            Assert.That(toonLitReferenceReport.loadedToonTextures, Is.GreaterThan(0));
+            Assert.That(toonLitReferenceReport.outlinePixelCount, Is.GreaterThan(0));
+
+            float profileDelta = MmdFlipHelper.ComputeMeanError(legacyReference, toonLitReference, artifactsDir);
+            string? profileHeatmap = FindLatestFlipHeatmap(artifactsDir);
+            float legacyDelta = MmdFlipHelper.ComputeMeanError(legacyReference, legacyCandidate, artifactsDir);
+            float toonLitDelta = MmdFlipHelper.ComputeMeanError(toonLitReference, toonLitCandidate, artifactsDir);
+            string? toonLitLightHeatmap = FindLatestFlipHeatmap(artifactsDir);
+            const float minimumVisibleDelta = 0.01f;
+            Assert.That(legacyDelta, Is.LessThanOrEqualTo(0.0001f),
+                "Legacy MMD Toon must remain invariant when only the Unity main light changes.");
+            Assert.That(toonLitDelta, Is.GreaterThan(legacyDelta + minimumVisibleDelta),
+                "MMD Toon Lit must visibly follow Unity main-light color and intensity. "
+                + $"Captured URP main-light default=({string.Join(",", toonLitReferenceReport.mainLightColor.Select(value => value.ToString("F3")))}) "
+                + $"changed=({string.Join(",", toonLitCandidateReport.mainLightColor.Select(value => value.ToString("F3")))}).");
+            WriteToonLitDeltaManifest(
+                artifactsDir,
+                visualCase,
+                legacyReference,
+                legacyCandidate,
+                toonLitReference,
+                toonLitCandidate,
+                profileDelta,
+                profileHeatmap,
+                legacyDelta,
+                toonLitDelta,
+                toonLitLightHeatmap,
+                minimumVisibleDelta,
+                toonLitCandidateReport);
+            TestContext.WriteLine(
+                $"[toon-lit-main-light] legacy={legacyDelta:F6} toon-lit={toonLitDelta:F6} humanSignoff=pending");
+            LogAssert.NoUnexpectedReceived();
+        }
+
         private static void WriteReviewManifest(
             string artifactsDir,
             MmdGeneratedPmxVisualCase visualCase,
@@ -135,6 +281,16 @@ namespace Mmd.Tests
                         flipCeiling = ceiling,
                         passed = flipMean <= ceiling,
                         shaderProfile = report.shaderName,
+                        selectedMaterialPassName = report.selectedMaterialPassName,
+                        selectedMaterialLightMode = report.selectedMaterialLightMode,
+                        selectedMaterialPassIndex = report.selectedMaterialPassIndex,
+                        selectedMaterialPassEnabled = report.selectedMaterialPassEnabled,
+                        selectedMaterialPassValid = report.selectedMaterialPassValid,
+                        captureRequestType = report.captureRequestType,
+                        captureRenderPath = report.captureRenderPath,
+                        captureUsedStandardRequest = report.captureUsedStandardRequest,
+                        renderPipelineName = report.renderPipelineName,
+                        mainLightColor = report.mainLightColor,
                         cameraPosition = report.cameraPosition,
                         cameraTarget = report.cameraTarget,
                         cameraFieldOfView = report.cameraFieldOfView,
@@ -153,6 +309,89 @@ namespace Mmd.Tests
             File.WriteAllText(
                 Path.Combine(artifactsDir, "manifest.json"),
                 JsonUtility.ToJson(manifest, prettyPrint: true));
+        }
+
+        private static void WriteToonLitDeltaManifest(
+            string artifactsDir,
+            MmdGeneratedPmxVisualCase visualCase,
+            string legacyReference,
+            string legacyCandidate,
+            string toonLitReference,
+            string toonLitCandidate,
+            float profileDelta,
+            string? profileHeatmap,
+            float legacyDelta,
+            float toonLitDelta,
+            string? toonLitLightHeatmap,
+            float minimumVisibleDelta,
+            MmdGeneratedPmxVisualCaseReport report)
+        {
+            PackageInfo? urp = PackageInfo.GetAllRegisteredPackages()
+                .FirstOrDefault(package => package.name == "com.unity.render-pipelines.universal");
+            var manifest = new VisualReviewManifest
+            {
+                artifactKind = "s1a-main-light-delta",
+                runId = new DirectoryInfo(artifactsDir).Name,
+                unityVersion = Application.unityVersion,
+                urpVersion = urp?.version ?? "unknown",
+                gpu = SystemInfo.graphicsDeviceName,
+                humanSignoff = "pending: FLIP pass is not human approval",
+                cases = new List<VisualReviewCase>
+                {
+                    new VisualReviewCase
+                    {
+                        id = visualCase.name + "-toon-lit-main-light",
+                        reference = Path.GetFileName(legacyReference),
+                        candidate = Path.GetFileName(toonLitReference),
+                        heatmap = profileHeatmap == null ? string.Empty : Path.GetFileName(profileHeatmap),
+                        flipMean = profileDelta,
+                        expectedDeltaFloor = minimumVisibleDelta,
+                        passed = toonLitDelta > legacyDelta + minimumVisibleDelta &&
+                            report.selectedMaterialPassValid &&
+                            report.captureUsedStandardRequest,
+                        shaderProfile = report.shaderName,
+                        selectedMaterialPassName = report.selectedMaterialPassName,
+                        selectedMaterialLightMode = report.selectedMaterialLightMode,
+                        selectedMaterialPassIndex = report.selectedMaterialPassIndex,
+                        selectedMaterialPassEnabled = report.selectedMaterialPassEnabled,
+                        selectedMaterialPassValid = report.selectedMaterialPassValid,
+                        captureRequestType = report.captureRequestType,
+                        captureRenderPath = report.captureRenderPath,
+                        captureUsedStandardRequest = report.captureUsedStandardRequest,
+                        renderPipelineName = report.renderPipelineName,
+                        mainLightColor = report.mainLightColor,
+                        cameraPosition = report.cameraPosition,
+                        cameraTarget = report.cameraTarget,
+                        cameraFieldOfView = report.cameraFieldOfView,
+                        ambientLightColor = report.ambientLightColor,
+                        ambientLightIntensity = report.ambientLightIntensity,
+                        directionalLightColor = report.directionalLightColor,
+                        directionalLightIntensity = report.directionalLightIntensity,
+                        directionalLightPosition = report.directionalLightPosition,
+                        directionalLightTarget = report.directionalLightTarget,
+                        directionalLightMode = report.directionalLightMode,
+                        volume = "disabled",
+                        intendedChange = "Only MMD Toon Lit follows Unity main-light color/intensity; Legacy stays invariant.",
+                        legacyReference = Path.GetFileName(legacyReference),
+                        legacyCandidate = Path.GetFileName(legacyCandidate),
+                        legacyFlipMean = legacyDelta,
+                        toonLitLightReference = Path.GetFileName(toonLitReference),
+                        toonLitLightCandidate = Path.GetFileName(toonLitCandidate),
+                        toonLitLightFlipMean = toonLitDelta,
+                        toonLitLightHeatmap = toonLitLightHeatmap == null ? string.Empty : Path.GetFileName(toonLitLightHeatmap)
+                    }
+                }
+            };
+            File.WriteAllText(
+                Path.Combine(artifactsDir, "manifest.json"),
+                JsonUtility.ToJson(manifest, prettyPrint: true));
+        }
+
+        private static string? FindLatestFlipHeatmap(string artifactsDir)
+        {
+            return Directory.GetFiles(artifactsDir, "flip*.png")
+                .OrderByDescending(File.GetLastWriteTimeUtc)
+                .FirstOrDefault();
         }
 
         private static void RequireOrOptOut(bool optedOut, string reason)
@@ -245,6 +484,7 @@ namespace Mmd.Tests
         private sealed class VisualReviewManifest
         {
             public int schemaVersion = 1;
+            public string artifactKind = "legacy-parity";
             public string runId = string.Empty;
             public string unityVersion = string.Empty;
             public string urpVersion = string.Empty;
@@ -262,8 +502,19 @@ namespace Mmd.Tests
             public string heatmap = string.Empty;
             public float flipMean;
             public float flipCeiling;
+            public float expectedDeltaFloor;
             public bool passed;
             public string shaderProfile = string.Empty;
+            public string selectedMaterialPassName = string.Empty;
+            public string selectedMaterialLightMode = string.Empty;
+            public int selectedMaterialPassIndex = -1;
+            public bool selectedMaterialPassEnabled;
+            public bool selectedMaterialPassValid;
+            public string captureRequestType = string.Empty;
+            public string captureRenderPath = string.Empty;
+            public bool captureUsedStandardRequest;
+            public string renderPipelineName = string.Empty;
+            public float[] mainLightColor = Array.Empty<float>();
             public float[] cameraPosition = Array.Empty<float>();
             public float[] cameraTarget = Array.Empty<float>();
             public float cameraFieldOfView;
@@ -276,6 +527,13 @@ namespace Mmd.Tests
             public string directionalLightMode = string.Empty;
             public string volume = string.Empty;
             public string intendedChange = string.Empty;
+            public string legacyReference = string.Empty;
+            public string legacyCandidate = string.Empty;
+            public float legacyFlipMean;
+            public string toonLitLightReference = string.Empty;
+            public string toonLitLightCandidate = string.Empty;
+            public float toonLitLightFlipMean;
+            public string toonLitLightHeatmap = string.Empty;
         }
     }
 }

@@ -26,6 +26,7 @@ namespace Mmd.Editor
         private static readonly Vector3 GeneratedPmxDirectionalLightPosition = new Vector3(2.5f, 5.0f, 4.0f);
         private static readonly Vector3 GeneratedPmxMmdLightTravelDirection = new Vector3(0.5f, -1.0f, -0.5f);
         private const string GeneratedPmxCameraCoordinatePolicy = "camera-x-mirrored-for-unity-handedness";
+        private static readonly int MainLightColorId = Shader.PropertyToID("_MainLightColor");
 
         public static MmdGeneratedPmxVisualCaseReport RenderGeneratedPmxVisualCase(
             MmdGeneratedPmxVisualCase visualCase,
@@ -33,7 +34,12 @@ namespace Mmd.Editor
             string capturePath,
             bool backgroundEnabled,
             bool postProcessingEnabled,
-            bool perturbShaderOutput = false)
+            bool perturbShaderOutput = false,
+            MmdMaterialPreset materialPreset = MmdMaterialPreset.MmdToon,
+            Color? directionalLightColorOverride = null,
+            float? directionalLightIntensityOverride = null,
+            Color? ambientLightColorOverride = null,
+            float? ambientLightIntensityOverride = null)
         {
             const int width = 1024;
             const int height = 1024;
@@ -47,15 +53,23 @@ namespace Mmd.Editor
             var lightObject = new GameObject("phase17-generated-pmx-light");
             RenderTexture? renderTexture = null;
             Texture2D? pixels = null;
-            MmdEditorPmxSceneLoadResult? loadResult = null;
             MmdUnityModelInstance? instance = null;
             MmdGeneratedPmxMaterialProxyStats? proxyStats = null;
+            string selectedMaterialPassName = string.Empty;
+            string selectedMaterialLightMode = string.Empty;
+            int selectedMaterialPassIndex = -1;
+            bool selectedMaterialPassEnabled = false;
+            bool selectedMaterialPassValid = false;
+            bool usedStandardRequest = false;
             Color previousAmbientLight = RenderSettings.ambientLight;
             AmbientMode previousAmbientMode = RenderSettings.ambientMode;
+            Light? previousSun = RenderSettings.sun;
+            Color captureAmbientLightColor = ambientLightColorOverride ?? GeneratedPmxAmbientLightColor;
+            float captureAmbientLightIntensity = ambientLightIntensityOverride ?? GeneratedPmxAmbientLightIntensity;
             try
             {
                 RenderSettings.ambientMode = AmbientMode.Flat;
-                RenderSettings.ambientLight = GeneratedPmxAmbientLightColor * GeneratedPmxAmbientLightIntensity;
+                RenderSettings.ambientLight = captureAmbientLightColor * captureAmbientLightIntensity;
 
                 Camera camera = cameraObject.AddComponent<Camera>();
                 camera.orthographic = false;
@@ -72,25 +86,53 @@ namespace Mmd.Editor
 
                 Light light = lightObject.AddComponent<Light>();
                 light.type = LightType.Directional;
-                light.color = GeneratedPmxDirectionalLightColor;
-                light.intensity = GeneratedPmxDirectionalLightIntensity;
+                light.color = directionalLightColorOverride ?? GeneratedPmxDirectionalLightColor;
+                light.intensity = directionalLightIntensityOverride ?? GeneratedPmxDirectionalLightIntensity;
                 // Orient the directional light to the MMD reference direction so the toon
                 // shading matches the GoldenOracle render's lit side.
                 Vector3 unityLightTravel = GeneratedPmxMmdLightTravelDirection.normalized;
                 lightObject.transform.position = GeneratedPmxDirectionalLightPosition;
                 lightObject.transform.rotation = Quaternion.LookRotation(unityLightTravel, Vector3.up);
-                // URP does not populate the main light for off-screen SubmitRenderRequest,
-                // so GetMainLight().direction in the toon shader ignores this scene light.
-                // Pass the world-space direction-to-light (== -light.forward) to the material
-                // so the toon shading follows the configured DirectionalLight.
+                // An off-screen StandardRequest does not reliably select a directional light as
+                // URP's main light unless the scene declares its sun explicitly. Preserve the
+                // user's scene setting and restore it in finally.
+                RenderSettings.sun = light;
+                // Keep the MMD direction override so Legacy remains byte-stable while this harness
+                // changes only Unity's main-light color/intensity for the S1a delta assertion.
                 Vector3 generatedPmxDirectionToLight = -lightObject.transform.forward;
 
-                loadResult = MmdEditorVerificationFacade.LoadPmxIntoScene(pmxPath);
-                instance = loadResult.Instance;
+                var parser = new NativeMmdParser();
+                MmdModelDefinition model = parser.LoadModel(File.ReadAllBytes(pmxPath));
+                instance = MmdUnityModelFactory.CreateSkinnedModel(
+                    model,
+                    pmxPath,
+                    importScale: 1.0f,
+                    preset: materialPreset);
                 instance.Root.transform.position = Vector3.zero;
                 instance.Root.transform.rotation = Quaternion.identity;
                 instance.Root.transform.localScale = Vector3.one;
                 proxyStats = EnableGeneratedPmxMaterialOrderProxies(instance, generatedPmxDirectionToLight);
+                if (instance.Materials.Length > 0 && instance.Materials[0] != null)
+                {
+                    Material captureMaterial = instance.Materials[0];
+                    selectedMaterialPassIndex = captureMaterial.FindPass("ForwardLit");
+                    if (selectedMaterialPassIndex >= 0)
+                    {
+                        selectedMaterialPassName = captureMaterial.GetPassName(selectedMaterialPassIndex);
+                        selectedMaterialLightMode = captureMaterial.shader.FindPassTagValue(
+                            selectedMaterialPassIndex,
+                            new ShaderTagId("LightMode")).name;
+                        selectedMaterialPassEnabled = !string.IsNullOrEmpty(selectedMaterialLightMode) &&
+                            captureMaterial.GetShaderPassEnabled(selectedMaterialLightMode);
+                        selectedMaterialPassValid = string.Equals(
+                                selectedMaterialPassName,
+                                "ForwardLit",
+                                StringComparison.Ordinal) &&
+                            (string.Equals(selectedMaterialLightMode, "UniversalForward", StringComparison.Ordinal) ||
+                                string.Equals(selectedMaterialLightMode, "UniversalForwardOnly", StringComparison.Ordinal)) &&
+                            selectedMaterialPassEnabled;
+                    }
+                }
                 if (perturbShaderOutput)
                 {
                     foreach (Material material in instance.Materials)
@@ -119,14 +161,17 @@ namespace Mmd.Editor
                 {
                     destination = renderTexture
                 };
-                if (UnityEngine.Rendering.RenderPipeline.SupportsRenderRequest(camera, renderRequest))
+                bool standardRequestSupported = UnityEngine.Rendering.RenderPipeline.SupportsRenderRequest(camera, renderRequest);
+                if (standardRequestSupported)
                 {
+                    usedStandardRequest = true;
                     UnityEngine.Rendering.RenderPipeline.SubmitRenderRequest(camera, renderRequest);
                 }
                 else
                 {
                     camera.Render();
                 }
+                Vector4 renderedMainLightColor = Shader.GetGlobalVector(MainLightColorId);
 
                 RenderTexture previous = RenderTexture.active;
                 RenderTexture.active = renderTexture;
@@ -144,7 +189,9 @@ namespace Mmd.Editor
 
                 File.WriteAllBytes(Path.GetFullPath(capturePath), pixels.EncodeToPNG());
 
-                bool passed = nonBlank > 0 && alpha > 0;
+                bool passed = nonBlank > 0 && alpha > 0 &&
+                    selectedMaterialPassValid &&
+                    usedStandardRequest;
                 return new MmdGeneratedPmxVisualCaseReport
                 {
                     caseName = "phase17-generated-pmx-" + visualCase.name,
@@ -155,7 +202,9 @@ namespace Mmd.Editor
                     actualImage = Path.GetFullPath(capturePath),
                     width = width,
                     height = height,
-                    shaderName = MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName,
+                    shaderName = instance.Materials.Length > 0 && instance.Materials[0] != null
+                        ? instance.Materials[0].shader.name
+                        : string.Empty,
                     renderTextureFormat = renderTexture.format.ToString(),
                     renderTextureGraphicsFormat = renderTexture.graphicsFormat.ToString(),
                     renderTextureSrgb = renderTexture.sRGB,
@@ -185,13 +234,29 @@ namespace Mmd.Editor
                     cameraForward = ToVector3Array(camera.transform.forward),
                     cameraUp = ToVector3Array(camera.transform.up),
                     cameraCoordinatePolicy = GeneratedPmxCameraCoordinatePolicy,
-                    ambientLightColor = ToColorArray(GeneratedPmxAmbientLightColor),
-                    ambientLightIntensity = GeneratedPmxAmbientLightIntensity,
-                    directionalLightColor = ToColorArray(GeneratedPmxDirectionalLightColor),
-                    directionalLightIntensity = GeneratedPmxDirectionalLightIntensity,
+                    ambientLightColor = ToColorArray(captureAmbientLightColor),
+                    ambientLightIntensity = captureAmbientLightIntensity,
+                    directionalLightColor = ToColorArray(light.color),
+                    directionalLightIntensity = light.intensity,
                     directionalLightPosition = ToVector3Array(GeneratedPmxDirectionalLightPosition),
                     directionalLightTarget = ToVector3Array(Vector3.zero),
                     directionalLightMode = "position-to-origin-urp-main-light",
+                    mainLightColor = ToVector4Array(renderedMainLightColor),
+                    selectedMaterialPassName = selectedMaterialPassName,
+                    selectedMaterialLightMode = selectedMaterialLightMode,
+                    selectedMaterialPassIndex = selectedMaterialPassIndex,
+                    selectedMaterialPassEnabled = selectedMaterialPassEnabled,
+                    selectedMaterialPassValid = selectedMaterialPassValid,
+                    captureRequestType = usedStandardRequest
+                        ? "RenderPipeline.StandardRequest"
+                        : "Camera.Render",
+                    captureRenderPath = usedStandardRequest
+                        ? "RenderPipeline.StandardRequest"
+                        : "Camera.Render-fallback",
+                    captureUsedStandardRequest = usedStandardRequest,
+                    renderPipelineName = GraphicsSettings.currentRenderPipeline != null
+                        ? GraphicsSettings.currentRenderPipeline.name
+                        : "BuiltInRenderPipeline",
                     nonBlankPixelCount = nonBlank,
                     alphaPixelCount = alpha,
                     transparentPixelCount = transparent,
@@ -206,6 +271,7 @@ namespace Mmd.Editor
             {
                 RenderSettings.ambientLight = previousAmbientLight;
                 RenderSettings.ambientMode = previousAmbientMode;
+                RenderSettings.sun = previousSun;
                 if (proxyStats != null)
                 {
                     foreach (Material clonedEdgeMaterial in proxyStats.clonedEdgeMaterials)
@@ -302,6 +368,11 @@ namespace Mmd.Editor
         private static float[] ToVector3Array(Vector3 vector)
         {
             return new[] { vector.x, vector.y, vector.z };
+        }
+
+        private static float[] ToVector4Array(Vector4 vector)
+        {
+            return new[] { vector.x, vector.y, vector.z, vector.w };
         }
 
         private static MmdGeneratedPmxMaterialProxyStats EnableGeneratedPmxMaterialOrderProxies(MmdUnityModelInstance instance, Vector3 directionToLight)
@@ -775,6 +846,16 @@ namespace Mmd.Editor
         public float[] directionalLightPosition = Array.Empty<float>();
         public float[] directionalLightTarget = Array.Empty<float>();
         public string directionalLightMode = string.Empty;
+        public float[] mainLightColor = Array.Empty<float>();
+        public string selectedMaterialPassName = string.Empty;
+        public string selectedMaterialLightMode = string.Empty;
+        public int selectedMaterialPassIndex = -1;
+        public bool selectedMaterialPassEnabled;
+        public bool selectedMaterialPassValid;
+        public string captureRequestType = string.Empty;
+        public string captureRenderPath = string.Empty;
+        public bool captureUsedStandardRequest;
+        public string renderPipelineName = string.Empty;
         public int nonBlankPixelCount;
         public int alphaPixelCount;
         public int transparentPixelCount;

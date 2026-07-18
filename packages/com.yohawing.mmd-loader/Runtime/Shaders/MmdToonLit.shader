@@ -56,7 +56,9 @@ Shader "MMD Toon Lit"
         Pass
         {
             Name "ForwardLit"
-            Tags { "LightMode" = "UniversalForward" }
+            // This shader has no UniversalGBuffer pass, so Deferred renderers must route it
+            // through the forward-only queue rather than fall back to an unrelated shader.
+            Tags { "LightMode" = "UniversalForwardOnly" }
 
             Cull [_Cull]
             ZWrite [_ZWrite]
@@ -227,6 +229,11 @@ Shader "MMD Toon Lit"
                     : mainLight.direction;
                 half3 mainLightSrgb = LinearToSRGB(_MmdLightColor.rgb) * LinearToSRGB(mainLight.color)
                     * mainLight.distanceAttenuation * mainLight.shadowAttenuation;
+                // Some PMX textures use the Legacy flat-lighting compatibility path.  Keep
+                // its white, intensity-1 result unchanged, but do not let it bypass Unity's
+                // main-light radiance or attenuation in the opt-in Toon Lit profile.
+                half3 unityMainLightSrgb = LinearToSRGB(mainLight.color)
+                    * mainLight.distanceAttenuation * mainLight.shadowAttenuation;
                 half selfShadowVisibility = SampleMmdSelfShadow(input.positionWS, _MmdSelfShadowReceive);
 
                 half3 normalWS;
@@ -272,7 +279,8 @@ Shader "MMD Toon Lit"
                 }
 
                 half3 litSrgb = saturate(albedoSrgb * LinearToSRGB(toonLight));
-                litSrgb = lerp(litSrgb, saturate(albedoSrgb * _TextureFlatLightingValue), saturate(_BaseMapBound * _TextureFlatLightingWeight));
+                half3 flatLitSrgb = saturate(albedoSrgb * _TextureFlatLightingValue * unityMainLightSrgb);
+                litSrgb = lerp(litSrgb, flatLitSrgb, saturate(_BaseMapBound * _TextureFlatLightingWeight));
                 half3 foggedLinear = MixFog(SRGBToLinear(litSrgb), input.fogFactor);
                 half4 color;
                 color.rgb = _GammaTarget > 0.5h ? LinearToSRGB(foggedLinear) : foggedLinear;
