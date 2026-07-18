@@ -27,6 +27,11 @@
       "displayName": "Humanoid Playback",
       "description": "Ready-to-play Humanoid PMX/FBX retarget-playback sample with a valid imported Avatar, Timeline binding, and redistributable source assets.",
       "path": "Samples~/HumanoidPlayback"
+    },
+    {
+      "displayName": "Unity Toon Shader Adapter",
+      "description": "Optional, conservative PMX material conversion for Unity Toon Shader 0.14.1-preview. This sample is not an MMD parity renderer.",
+      "path": "Samples~/UnityToonShaderAdapter"
     }
   ]
 }
