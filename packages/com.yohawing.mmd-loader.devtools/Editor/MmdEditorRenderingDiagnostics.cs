@@ -50,7 +50,8 @@ namespace Mmd.Editor
             bool realtimeShadowOccluderEnabled = false,
             bool? ambientShEnabledOverride = null,
             bool? fogEnabledOverride = null,
-            bool? ssaoEnabledOverride = null)
+            bool? ssaoEnabledOverride = null,
+            bool? reflectionProbeEnabledOverride = null)
         {
             const int width = 1024;
             const int height = 1024;
@@ -65,6 +66,9 @@ namespace Mmd.Editor
             GameObject? shadowOccluder = null;
             GameObject? ssaoOccluder = null;
             Material? ssaoOccluderMaterial = null;
+            GameObject? reflectionProbeObject = null;
+            ReflectionProbe? reflectionProbe = null;
+            Cubemap? reflectionProbeCubemap = null;
             RenderTexture? renderTexture = null;
             Texture2D? pixels = null;
             MmdUnityModelInstance? instance = null;
@@ -78,6 +82,9 @@ namespace Mmd.Editor
             bool ssaoAvailable = false;
             bool ssaoConfigured = !ssaoEnabledOverride.HasValue;
             bool ssaoEnabled = ssaoEnabledOverride == true;
+            bool reflectionProbeAvailable = false;
+            bool reflectionProbeConfigured = !reflectionProbeEnabledOverride.HasValue;
+            bool reflectionProbeEnabled = reflectionProbeEnabledOverride == true;
             List<UnityEngine.Object>? configuredSsaoFeatures = null;
             List<bool>? previousSsaoFeatureStates = null;
             Color previousAmbientLight = RenderSettings.ambientLight;
@@ -89,6 +96,9 @@ namespace Mmd.Editor
             float previousFogDensity = RenderSettings.fogDensity;
             float previousFogStartDistance = RenderSettings.fogStartDistance;
             float previousFogEndDistance = RenderSettings.fogEndDistance;
+            DefaultReflectionMode previousDefaultReflectionMode = RenderSettings.defaultReflectionMode;
+            Texture? previousCustomReflectionTexture = RenderSettings.customReflectionTexture;
+            float previousReflectionIntensity = RenderSettings.reflectionIntensity;
             Light? previousSun = RenderSettings.sun;
             Color captureAmbientLightColor = ambientLightColorOverride ?? GeneratedPmxAmbientLightColor;
             float captureAmbientLightIntensity = ambientLightIntensityOverride ?? GeneratedPmxAmbientLightIntensity;
@@ -140,6 +150,31 @@ namespace Mmd.Editor
 
                         ssaoConfigured = allFeaturesConfigured;
                     }
+                }
+
+                if (reflectionProbeEnabledOverride.HasValue)
+                {
+                    reflectionProbeCubemap = BuildReflectionProbeCubemap(reflectionProbeEnabled);
+                    reflectionProbeObject = new GameObject("phase17-generated-pmx-reflection-probe");
+                    reflectionProbeObject.transform.position = visualCase.cameraTarget;
+                    reflectionProbe = reflectionProbeObject.AddComponent<ReflectionProbe>();
+                    reflectionProbe.enabled = false;
+                    reflectionProbe.mode = ReflectionProbeMode.Custom;
+                    reflectionProbe.refreshMode = ReflectionProbeRefreshMode.ViaScripting;
+                    reflectionProbe.timeSlicingMode = ReflectionProbeTimeSlicingMode.NoTimeSlicing;
+                    reflectionProbe.boxProjection = true;
+                    reflectionProbe.size = new Vector3(4.0f, 4.0f, 4.0f);
+                    reflectionProbe.center = Vector3.zero;
+                    reflectionProbe.blendDistance = 0.0f;
+                    reflectionProbe.importance = 100;
+                    reflectionProbe.intensity = 1.0f;
+                    reflectionProbe.customBakedTexture = reflectionProbeCubemap;
+                    reflectionProbe.enabled = true;
+                    RenderSettings.defaultReflectionMode = DefaultReflectionMode.Custom;
+                    RenderSettings.customReflectionTexture = reflectionProbeCubemap;
+                    RenderSettings.reflectionIntensity = 1.0f;
+                    reflectionProbeAvailable = reflectionProbe.customBakedTexture != null;
+                    reflectionProbeConfigured = reflectionProbeAvailable;
                 }
 
                 Camera camera = cameraObject.AddComponent<Camera>();
@@ -235,6 +270,31 @@ namespace Mmd.Editor
                             selectedMaterialPassEnabled;
                     }
                 }
+                if (reflectionProbeEnabledOverride.HasValue)
+                {
+                    foreach (Renderer renderer in instance.Root.GetComponentsInChildren<Renderer>(includeInactive: true))
+                    {
+                        renderer.reflectionProbeUsage = ReflectionProbeUsage.Simple;
+                        renderer.probeAnchor = reflectionProbe != null ? reflectionProbe.transform : null;
+                    }
+
+                    bool anyReflectionMaterial = false;
+                    foreach (Material material in instance.Materials)
+                    {
+                        if (material == null || !material.HasProperty("_ReflectionProbeWeight"))
+                        {
+                            continue;
+                        }
+
+                        // Keep material response fixed so the visual delta proves that enabling the
+                        // local custom probe changes URP's bound environment, not merely that this
+                        // harness changed a shader property between captures.
+                        material.SetFloat("_ReflectionProbeWeight", 1.0f);
+                        anyReflectionMaterial = true;
+                    }
+
+                    reflectionProbeConfigured &= materialPreset != MmdMaterialPreset.MmdToonLit || anyReflectionMaterial;
+                }
                 if (perturbShaderOutput)
                 {
                     foreach (Material material in instance.Materials)
@@ -267,6 +327,13 @@ namespace Mmd.Editor
                 if (standardRequestSupported)
                 {
                     usedStandardRequest = true;
+                    if (reflectionProbeEnabledOverride.HasValue)
+                    {
+                        // Give the culling/probe system one complete SRP submission after the
+                        // temporary probe and explicit anchors are registered. The second submit
+                        // is the measured frame.
+                        UnityEngine.Rendering.RenderPipeline.SubmitRenderRequest(camera, renderRequest);
+                    }
                     UnityEngine.Rendering.RenderPipeline.SubmitRenderRequest(camera, renderRequest);
                 }
                 else
@@ -294,7 +361,9 @@ namespace Mmd.Editor
                 bool passed = nonBlank > 0 && alpha > 0 &&
                     selectedMaterialPassValid &&
                     usedStandardRequest &&
-                    (!ssaoEnabledOverride.HasValue || (ssaoAvailable && ssaoConfigured));
+                    (!ssaoEnabledOverride.HasValue || (ssaoAvailable && ssaoConfigured)) &&
+                    (!reflectionProbeEnabledOverride.HasValue ||
+                        (reflectionProbeAvailable && reflectionProbeConfigured));
                 return new MmdGeneratedPmxVisualCaseReport
                 {
                     caseName = "phase17-generated-pmx-" + visualCase.name,
@@ -361,6 +430,12 @@ namespace Mmd.Editor
                     ssaoMode = ssaoEnabledOverride.HasValue
                         ? (ssaoAvailable ? "renderer-feature" : "unavailable")
                         : "unchanged",
+                    reflectionProbeEnabled = reflectionProbeEnabled,
+                    reflectionProbeAvailable = reflectionProbeAvailable,
+                    reflectionProbeConfigured = reflectionProbeConfigured,
+                    reflectionProbeMode = reflectionProbeEnabledOverride.HasValue
+                        ? (reflectionProbeAvailable ? "custom-cubemap-probe-and-environment" : "unavailable")
+                        : "unchanged",
                     selectedMaterialPassName = selectedMaterialPassName,
                     selectedMaterialLightMode = selectedMaterialLightMode,
                     selectedMaterialPassIndex = selectedMaterialPassIndex,
@@ -397,6 +472,9 @@ namespace Mmd.Editor
                 RenderSettings.fogDensity = previousFogDensity;
                 RenderSettings.fogStartDistance = previousFogStartDistance;
                 RenderSettings.fogEndDistance = previousFogEndDistance;
+                RenderSettings.defaultReflectionMode = previousDefaultReflectionMode;
+                RenderSettings.customReflectionTexture = previousCustomReflectionTexture;
+                RenderSettings.reflectionIntensity = previousReflectionIntensity;
                 if (configuredSsaoFeatures != null && previousSsaoFeatureStates != null)
                 {
                     for (int i = 0; i < configuredSsaoFeatures.Count && i < previousSsaoFeatureStates.Count; i++)
@@ -432,6 +510,14 @@ namespace Mmd.Editor
                 if (ssaoOccluderMaterial != null)
                 {
                     UnityEngine.Object.DestroyImmediate(ssaoOccluderMaterial);
+                }
+                if (reflectionProbeObject != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(reflectionProbeObject);
+                }
+                if (reflectionProbeCubemap != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(reflectionProbeCubemap);
                 }
                 if (renderTexture != null)
                 {
@@ -528,6 +614,38 @@ namespace Mmd.Editor
             probe[1, 0] = color.g * intensity / sphericalHarmonicsL0;
             probe[2, 0] = color.b * intensity / sphericalHarmonicsL0;
             return probe;
+        }
+
+        private static Cubemap BuildReflectionProbeCubemap(bool colored)
+        {
+            const int size = 16;
+            var cubemap = new Cubemap(size, TextureFormat.RGBA32, mipChain: true);
+            var faceColors = colored ? new[]
+            {
+                new Color(0.95f, 0.12f, 0.08f, 1.0f),
+                new Color(0.08f, 0.22f, 0.95f, 1.0f),
+                new Color(0.10f, 0.85f, 0.25f, 1.0f),
+                new Color(0.90f, 0.75f, 0.08f, 1.0f),
+                new Color(0.75f, 0.12f, 0.90f, 1.0f),
+                new Color(0.08f, 0.85f, 0.85f, 1.0f)
+            } : new[]
+            {
+                Color.black, Color.black, Color.black,
+                Color.black, Color.black, Color.black
+            };
+            var pixels = new Color[size * size];
+            for (int faceIndex = 0; faceIndex < faceColors.Length; faceIndex++)
+            {
+                for (int pixelIndex = 0; pixelIndex < pixels.Length; pixelIndex++)
+                {
+                    pixels[pixelIndex] = faceColors[faceIndex];
+                }
+
+                cubemap.SetPixels(pixels, (CubemapFace)faceIndex);
+            }
+
+            cubemap.Apply(updateMipmaps: true, makeNoLongerReadable: false);
+            return cubemap;
         }
 
         private static void CountPixels(Texture2D pixels, Color backgroundColor, out int nonBlank, out int alpha, out int outline, out int transparent)
@@ -1093,6 +1211,10 @@ namespace Mmd.Editor
         public bool ssaoAvailable;
         public bool ssaoConfigured;
         public string ssaoMode = string.Empty;
+        public bool reflectionProbeEnabled;
+        public bool reflectionProbeAvailable;
+        public bool reflectionProbeConfigured;
+        public string reflectionProbeMode = string.Empty;
         public string selectedMaterialPassName = string.Empty;
         public string selectedMaterialLightMode = string.Empty;
         public int selectedMaterialPassIndex = -1;

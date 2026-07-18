@@ -30,6 +30,8 @@ Shader "MMD Toon Lit"
         _TextureFlatLightingValue ("Texture Flat Lighting Value", Float) = 2.12
         _MmdNormalMap ("Normal Map", 2D) = "bump" {}
         _MmdNormalMapBound ("Normal Map Bound", Float) = 0
+        // Reflection probes are opt-in so existing Toon Lit captures keep their current look.
+        _ReflectionProbeWeight ("Reflection Probe Weight", Range(0, 1)) = 0
         _AlphaClipThreshold ("Alpha Clip Threshold", Range(0, 1)) = 0
         _ShadowAlphaClipThreshold ("Shadow Alpha Clip Threshold", Range(0, 1)) = 0
         _Cull ("Cull", Float) = 2
@@ -73,11 +75,17 @@ Shader "MMD Toon Lit"
             #pragma multi_compile _ _CLUSTER_LIGHT_LOOP
             #pragma multi_compile_fragment _ _SHADOWS_SOFT_LOW _SHADOWS_SOFT_MEDIUM _SHADOWS_SOFT_HIGH
             #pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION
+            #pragma multi_compile_fragment _ _REFLECTION_PROBE_BLENDING
+            #pragma multi_compile_fragment _ _REFLECTION_PROBE_BOX_PROJECTION
+            #pragma multi_compile_fragment _ _REFLECTION_PROBE_ATLAS
+            #pragma multi_compile_fragment _ REFLECTION_PROBE_ROTATION
+            #pragma shader_feature_local_fragment _ENVIRONMENTREFLECTIONS_OFF
             #pragma shader_feature_local_fragment _SURFACE_TYPE_TRANSPARENT
             #pragma multi_compile_fog
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/AmbientOcclusion.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/GlobalIllumination.hlsl"
 
             TEXTURE2D(_BaseMap);
             SAMPLER(sampler_BaseMap);
@@ -119,6 +127,7 @@ Shader "MMD Toon Lit"
                 half _ShadowAlphaClipThreshold;
                 half _GammaTarget;
                 half _MmdNormalMapBound;
+                half _ReflectionProbeWeight;
             CBUFFER_END
 
             struct Attributes
@@ -280,8 +289,24 @@ Shader "MMD Toon Lit"
                     // Renderer Feature is toggled on or off.
                     ambientShSrgb *= aoFactor.indirectAmbientOcclusion;
                 #endif
+                half3 reflectionSrgb = half3(0.0h, 0.0h, 0.0h);
+                #if !defined(_SURFACE_TYPE_TRANSPARENT)
+                if (_ReflectionProbeWeight > 0.0h && _SphereMode <= 0.5h)
+                {
+                    half3 viewDirectionWS = GetWorldSpaceNormalizeViewDir(input.positionWS);
+                    half3 reflectionWS = reflect(-viewDirectionWS, normalWS);
+                    float2 reflectionScreenUV = GetNormalizedScreenSpaceUV(input.positionCS);
+                    half3 reflectionLinear = GlossyEnvironmentReflection(
+                        reflectionWS,
+                        input.positionWS,
+                        half(0.5h),
+                        half(1.0h),
+                        reflectionScreenUV);
+                    reflectionSrgb = LinearToSRGB(reflectionLinear) * _ReflectionProbeWeight;
+                }
+                #endif
                 half3 baseSrgb = saturate(
-                    LinearToSRGB(_BaseColor.rgb) * (mainLightSrgb + ambientShSrgb)
+                    LinearToSRGB(_BaseColor.rgb) * (mainLightSrgb + ambientShSrgb + reflectionSrgb)
                     + LinearToSRGB(_AmbientColor.rgb));
                 half3 albedoSrgb = baseSrgb * LinearToSRGB(baseMap.rgb) * LinearToSRGB(_Color.rgb) * LinearToSRGB(_DiagnosticColor.rgb);
                 if (_SphereMode > 0.5h)

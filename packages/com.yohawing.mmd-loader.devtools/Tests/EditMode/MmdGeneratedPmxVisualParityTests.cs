@@ -517,6 +517,195 @@ namespace Mmd.Tests
             LogAssert.NoUnexpectedReceived();
         }
 
+        [Test]
+        [Explicit("Run the S1b URP reflection-probe visual delta explicitly; FLIP artifacts still require human review.")]
+        [Category("VisualShadingTier")]
+        public void ToonRampToonLit_TracksReflectionProbeWhileLegacyStaysInvariant()
+        {
+            bool optedOut = string.Equals(
+                Environment.GetEnvironmentVariable("YMU_VISUAL_TIER_OPT_OUT"), "1",
+                StringComparison.Ordinal);
+            var visualCase = new MmdGeneratedPmxVisualCase(
+                "mmd-toon-ramp-lit-box",
+                "mmd-toon-ramp-lit-box.pmx",
+                new Vector3(-0.06f, 0.6f, 3.3f),
+                new Vector3(-0.06f, 0.6f, 0.0f),
+                27.0f,
+                0.03f);
+
+            var availability = MmdFlipHelper.ProbeAvailability();
+            if (!availability.available)
+            {
+                RequireOrOptOut(optedOut, "FLIP not available: " + availability.unsupportedReason);
+            }
+
+            string fixtureDirectory = ResolveGeneratedPmxFixtureDirectory();
+            string pmxPath = Path.Combine(fixtureDirectory, visualCase.modelFileName);
+            if (!File.Exists(pmxPath))
+            {
+                RequireOrOptOut(optedOut, "Generated PMX fixture missing: " + pmxPath);
+            }
+
+            string artifactsDir = ResolveArtifactsDir();
+            Directory.CreateDirectory(artifactsDir);
+            string legacyOffPath = Path.Combine(artifactsDir, visualCase.name + ".legacy-reflection-probe-off.png");
+            string legacyOnPath = Path.Combine(artifactsDir, visualCase.name + ".legacy-reflection-probe-on.png");
+            string toonLitOffPath = Path.Combine(artifactsDir, visualCase.name + ".toon-lit-reflection-probe-off.png");
+            string toonLitOnPath = Path.Combine(artifactsDir, visualCase.name + ".toon-lit-reflection-probe-on.png");
+
+            MmdGeneratedPmxVisualCaseReport legacyOff = RenderReflectionProbeCase(
+                visualCase, fixtureDirectory, legacyOffPath, MmdMaterialPreset.MmdToon, enabled: false);
+            MmdGeneratedPmxVisualCaseReport legacyOn = RenderReflectionProbeCase(
+                visualCase, fixtureDirectory, legacyOnPath, MmdMaterialPreset.MmdToon, enabled: true);
+            MmdGeneratedPmxVisualCaseReport toonLitOff = RenderReflectionProbeCase(
+                visualCase, fixtureDirectory, toonLitOffPath, MmdMaterialPreset.MmdToonLit, enabled: false);
+            MmdGeneratedPmxVisualCaseReport toonLitOn = RenderReflectionProbeCase(
+                visualCase, fixtureDirectory, toonLitOnPath, MmdMaterialPreset.MmdToonLit, enabled: true);
+
+            AssertCaptureEvidence(legacyOff, MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName, "Reflection Probe Legacy off");
+            AssertCaptureEvidence(legacyOn, MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName, "Reflection Probe Legacy on");
+            AssertCaptureEvidence(toonLitOff, MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName, "Reflection Probe Toon Lit off");
+            AssertCaptureEvidence(toonLitOn, MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName, "Reflection Probe Toon Lit on");
+            Assert.That(legacyOff.reflectionProbeAvailable, Is.True, "Reflection Probe off capture must configure the local probe.");
+            Assert.That(legacyOn.reflectionProbeAvailable, Is.True, "Reflection Probe on capture must configure the local probe.");
+            Assert.That(toonLitOff.reflectionProbeConfigured, Is.True, "Reflection Probe off capture must configure material binding.");
+            Assert.That(toonLitOn.reflectionProbeConfigured, Is.True, "Reflection Probe on capture must configure material binding.");
+
+            float legacyDelta = MmdFlipHelper.ComputeMeanError(legacyOffPath, legacyOnPath, artifactsDir);
+            string? legacyHeatmap = FindLatestFlipHeatmap(artifactsDir);
+            float toonLitDelta = MmdFlipHelper.ComputeMeanError(toonLitOffPath, toonLitOnPath, artifactsDir);
+            string? toonLitHeatmap = FindLatestFlipHeatmap(artifactsDir);
+            const float minimumVisibleDelta = 0.01f;
+            Assert.That(legacyDelta, Is.LessThanOrEqualTo(0.0001f),
+                "Legacy MMD Toon must remain invariant when only the shared custom reflection cubemap changes.");
+            Assert.That(toonLitDelta, Is.GreaterThan(legacyDelta + minimumVisibleDelta),
+                "MMD Toon Lit must visibly consume URP GlossyEnvironmentReflection.");
+            WriteReflectionProbeDeltaManifest(
+                artifactsDir,
+                visualCase,
+                legacyOffPath,
+                legacyOnPath,
+                toonLitOffPath,
+                toonLitOnPath,
+                legacyDelta,
+                toonLitDelta,
+                legacyHeatmap,
+                toonLitHeatmap,
+                minimumVisibleDelta,
+                toonLitOn);
+            TestContext.WriteLine(
+                $"[toon-lit-reflection-probe] legacy={legacyDelta:F6} toon-lit={toonLitDelta:F6} humanSignoff=pending");
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        private static MmdGeneratedPmxVisualCaseReport RenderReflectionProbeCase(
+            MmdGeneratedPmxVisualCase visualCase,
+            string fixtureDirectory,
+            string capturePath,
+            MmdMaterialPreset materialPreset,
+            bool enabled)
+        {
+            return MmdEditorRenderingDiagnostics.RenderGeneratedPmxVisualCase(
+                visualCase,
+                fixtureDirectory,
+                capturePath,
+                backgroundEnabled: true,
+                postProcessingEnabled: false,
+                materialPreset: materialPreset,
+                directionalLightColorOverride: Color.black,
+                directionalLightIntensityOverride: 0.0f,
+                ambientLightColorOverride: Color.black,
+                ambientLightIntensityOverride: 0.0f,
+                ambientShEnabledOverride: false,
+                fogEnabledOverride: false,
+                reflectionProbeEnabledOverride: enabled);
+        }
+
+        private static void WriteReflectionProbeDeltaManifest(
+            string artifactsDir,
+            MmdGeneratedPmxVisualCase visualCase,
+            string legacyOffPath,
+            string legacyOnPath,
+            string toonLitOffPath,
+            string toonLitOnPath,
+            float legacyDelta,
+            float toonLitDelta,
+            string? legacyHeatmap,
+            string? toonLitHeatmap,
+            float minimumVisibleDelta,
+            MmdGeneratedPmxVisualCaseReport report)
+        {
+            PackageInfo? urp = PackageInfo.GetAllRegisteredPackages()
+                .FirstOrDefault(package => package.name == "com.unity.render-pipelines.universal");
+            var manifest = new VisualReviewManifest
+            {
+                artifactKind = "s1b-reflection-probe-delta",
+                runId = new DirectoryInfo(artifactsDir).Name,
+                unityVersion = Application.unityVersion,
+                urpVersion = urp?.version ?? "unknown",
+                gpu = SystemInfo.graphicsDeviceName,
+                humanSignoff = "pending: FLIP pass is not human approval",
+                cases = new List<VisualReviewCase>
+                {
+                    new VisualReviewCase
+                    {
+                        id = visualCase.name + "-reflection-probe",
+                        feature = "reflection-probe",
+                        reference = Path.GetFileName(toonLitOffPath),
+                        candidate = Path.GetFileName(toonLitOnPath),
+                        heatmap = toonLitHeatmap == null ? string.Empty : Path.GetFileName(toonLitHeatmap),
+                        flipMean = toonLitDelta,
+                        expectedDeltaFloor = minimumVisibleDelta,
+                        passed = report.status == "passed" &&
+                            report.captureUsedStandardRequest &&
+                            report.selectedMaterialPassValid &&
+                            report.reflectionProbeAvailable &&
+                            report.reflectionProbeConfigured &&
+                            legacyDelta <= 0.0001f &&
+                            toonLitDelta > legacyDelta + minimumVisibleDelta,
+                        shaderProfile = report.shaderName,
+                        selectedMaterialPassName = report.selectedMaterialPassName,
+                        selectedMaterialLightMode = report.selectedMaterialLightMode,
+                        selectedMaterialPassIndex = report.selectedMaterialPassIndex,
+                        selectedMaterialPassEnabled = report.selectedMaterialPassEnabled,
+                        selectedMaterialPassValid = report.selectedMaterialPassValid,
+                        captureRequestType = report.captureRequestType,
+                        captureRenderPath = report.captureRenderPath,
+                        captureUsedStandardRequest = report.captureUsedStandardRequest,
+                        renderPipelineName = report.renderPipelineName,
+                        mainLightColor = report.mainLightColor,
+                        reflectionProbeEnabled = report.reflectionProbeEnabled,
+                        reflectionProbeAvailable = report.reflectionProbeAvailable,
+                        reflectionProbeConfigured = report.reflectionProbeConfigured,
+                        reflectionProbeMode = report.reflectionProbeMode,
+                        cameraPosition = report.cameraPosition,
+                        cameraTarget = report.cameraTarget,
+                        cameraFieldOfView = report.cameraFieldOfView,
+                        ambientLightColor = report.ambientLightColor,
+                        ambientLightIntensity = report.ambientLightIntensity,
+                        directionalLightColor = report.directionalLightColor,
+                        directionalLightIntensity = report.directionalLightIntensity,
+                        directionalLightPosition = report.directionalLightPosition,
+                        directionalLightTarget = report.directionalLightTarget,
+                        directionalLightMode = report.directionalLightMode,
+                        volume = "disabled",
+                        intendedChange = "Only MMD Toon Lit consumes URP GlossyEnvironmentReflection from the shared custom cubemap bound to the local probe and reflection environment; Legacy stays invariant.",
+                        legacyReference = Path.GetFileName(legacyOffPath),
+                        legacyCandidate = Path.GetFileName(legacyOnPath),
+                        legacyFlipMean = legacyDelta,
+                        legacyFeatureHeatmap = legacyHeatmap == null ? string.Empty : Path.GetFileName(legacyHeatmap),
+                        featureReference = Path.GetFileName(toonLitOffPath),
+                        featureCandidate = Path.GetFileName(toonLitOnPath),
+                        featureFlipMean = toonLitDelta,
+                        featureHeatmap = toonLitHeatmap == null ? string.Empty : Path.GetFileName(toonLitHeatmap)
+                    }
+                }
+            };
+            File.WriteAllText(
+                Path.Combine(artifactsDir, "manifest.json"),
+                JsonUtility.ToJson(manifest, prettyPrint: true));
+        }
+
         private static MmdGeneratedPmxVisualCaseReport RenderSsaoCase(
             MmdGeneratedPmxVisualCase visualCase,
             string fixtureDirectory,
@@ -1107,6 +1296,10 @@ namespace Mmd.Tests
             public bool ssaoAvailable;
             public bool ssaoConfigured;
             public string ssaoMode = string.Empty;
+            public bool reflectionProbeEnabled;
+            public bool reflectionProbeAvailable;
+            public bool reflectionProbeConfigured;
+            public string reflectionProbeMode = string.Empty;
             public float[] cameraPosition = Array.Empty<float>();
             public float[] cameraTarget = Array.Empty<float>();
             public float cameraFieldOfView;

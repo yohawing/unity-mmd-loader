@@ -137,6 +137,14 @@ namespace Mmd.Tests
             Assert.That(toonLitSource, Does.Contain("CreateAmbientOcclusionFactor("));
             Assert.That(toonLitSource, Does.Contain("aoFactor.indirectAmbientOcclusion"));
             Assert.That(toonLitSource, Does.Contain("ambientShSrgb *= aoFactor.indirectAmbientOcclusion;"));
+            Assert.That(toonLitSource, Does.Contain("ShaderLibrary/GlobalIllumination.hlsl"));
+            Assert.That(toonLitSource, Does.Contain("GlossyEnvironmentReflection("));
+            Assert.That(toonLitSource, Does.Contain("#pragma multi_compile_fragment _ _REFLECTION_PROBE_BLENDING"));
+            Assert.That(toonLitSource, Does.Contain("#pragma multi_compile_fragment _ _REFLECTION_PROBE_BOX_PROJECTION"));
+            Assert.That(toonLitSource, Does.Contain("#pragma multi_compile_fragment _ _REFLECTION_PROBE_ATLAS"));
+            Assert.That(toonLitSource, Does.Contain("_ReflectionProbeWeight"));
+            Assert.That(toonLitSource, Does.Contain("_ReflectionProbeWeight > 0.0h && _SphereMode <= 0.5h"));
+            Assert.That(toonLitSource, Does.Contain("#if !defined(_SURFACE_TYPE_TRANSPARENT)"));
         }
         [Test]
         public void CreateStaticModelKeepsShadowCasterAndAddsHiddenSelfShadowTarget()
