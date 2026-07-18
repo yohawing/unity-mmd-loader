@@ -72,6 +72,7 @@ $compileLog = Join-Path $ArtifactsPath "compile.log"
 $testLog = Join-Path $ArtifactsPath "editmode.log"
 $testResults = Join-Path $ArtifactsPath "editmode-results.xml"
 $visualCanaryPath = Join-Path $repositoryPath "artifacts\visual\uts-adapter-canary.png"
+$generatedPmxVisualPath = Join-Path $repositoryPath "artifacts\visual\uts-adapter-generated-pmx"
 $compileScript = Join-Path $PSScriptRoot "unity-compile.ps1"
 
 Assert-NoRunningUnityProject -ProjectPath $ProjectPath -OperationName "Unity Toon Shader adapter sample gate"
@@ -94,6 +95,7 @@ $versionSamplesPathExisted = Test-Path -LiteralPath $versionSamplesPath -PathTyp
 
 New-Item -ItemType Directory -Force -Path $versionSamplesPath, $ArtifactsPath | Out-Null
 Remove-Item -LiteralPath $compileLog, $testLog, $testResults, $visualCanaryPath -Force -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath $generatedPmxVisualPath -Recurse -Force -ErrorAction SilentlyContinue
 
 try {
     [System.IO.File]::WriteAllText($sampleImportMarkerPath, "temporary import owned by verify-unity-toon-shader-sample.ps1")
@@ -142,8 +144,19 @@ try {
         throw "Unity Toon Shader adapter visual canary PNG was not generated: $visualCanaryPath"
     }
 
-    Write-Host ("Unity Toon Shader adapter sample gate passed. total={0}; passed={1}; skipped={2}; results={3}; png={4}; log={5}" -f `
-        $totalCount, $testRun.GetAttribute("passed"), $testRun.GetAttribute("skipped"), $testResults, $visualCanaryPath, $testLog)
+    $generatedPmxCaptures = @(Get-ChildItem -LiteralPath $generatedPmxVisualPath -File -ErrorAction SilentlyContinue |
+        Where-Object Name -Match '-(legacy|uts)\.png$')
+    if ($generatedPmxCaptures.Count -ne 6) {
+        throw "Generated PMX UTS visual evidence must contain exactly 6 Legacy/UTS PNGs: $generatedPmxVisualPath"
+    }
+    foreach ($capture in $generatedPmxCaptures) {
+        if ($capture.Length -eq 0) {
+            throw "Generated PMX UTS visual evidence is empty: $($capture.FullName)"
+        }
+    }
+
+    Write-Host ("Unity Toon Shader adapter sample gate passed. total={0}; passed={1}; skipped={2}; results={3}; png={4}; generatedPmx={5}; log={6}" -f `
+        $totalCount, $testRun.GetAttribute("passed"), $testRun.GetAttribute("skipped"), $testResults, $visualCanaryPath, $generatedPmxVisualPath, $testLog)
 }
 finally {
     Assert-NoRunningUnityProject -ProjectPath $ProjectPath -OperationName "Unity Toon Shader adapter sample cleanup"
