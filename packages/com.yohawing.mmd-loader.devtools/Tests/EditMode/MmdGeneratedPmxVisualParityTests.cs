@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
 using UnityEditor.PackageManager;
 using UnityEngine;
@@ -78,14 +79,7 @@ namespace Mmd.Tests
                     perturbShaderOutput: true);
             }
 
-            try
-            {
-                File.Copy(goldenPath, Path.Combine(artifactsDir, visualCase.name + ".golden.png"), overwrite: true);
-            }
-            catch (IOException)
-            {
-                // Non-fatal: a locked/unreadable golden copy must not fail the parity check.
-            }
+            File.Copy(goldenPath, Path.Combine(artifactsDir, visualCase.name + ".golden.png"), overwrite: true);
 
             float mean = MmdFlipHelper.ComputeMeanError(goldenPath!, candidatePng, artifactsDir);
             TestContext.WriteLine($"[visual-shading-tier] {visualCase.name} mean={mean:F6} perturb={perturb}");
@@ -95,9 +89,70 @@ namespace Mmd.Tests
             Assert.That(entry, Is.Not.Null, "Tracked baseline entry is required for the explicit visual tier.");
             float tolerance = Mathf.Max(0.03f, entry!.maxMean * 0.10f);
             float ceiling = entry.maxMean + tolerance;
+            WriteReviewManifest(
+                artifactsDir,
+                visualCase,
+                firstReport,
+                Path.Combine(artifactsDir, visualCase.name + ".golden.png"),
+                candidatePng,
+                mean,
+                ceiling);
             Assert.That(mean, Is.LessThanOrEqualTo(ceiling),
                 $"{visualCase.name}: measured {mean:F6} > baseline {entry.maxMean:F6} + tol {tolerance:F6}");
             LogAssert.NoUnexpectedReceived();
+        }
+
+        private static void WriteReviewManifest(
+            string artifactsDir,
+            MmdGeneratedPmxVisualCase visualCase,
+            MmdGeneratedPmxVisualCaseReport report,
+            string referencePath,
+            string candidatePath,
+            float flipMean,
+            float ceiling)
+        {
+            PackageInfo? urp = PackageInfo.GetAllRegisteredPackages()
+                .FirstOrDefault(package => package.name == "com.unity.render-pipelines.universal");
+            string? heatmap = Directory.GetFiles(artifactsDir, "flip*.png")
+                .OrderByDescending(File.GetLastWriteTimeUtc)
+                .FirstOrDefault();
+            var manifest = new VisualReviewManifest
+            {
+                runId = new DirectoryInfo(artifactsDir).Name,
+                unityVersion = Application.unityVersion,
+                urpVersion = urp?.version ?? "unknown",
+                gpu = SystemInfo.graphicsDeviceName,
+                humanSignoff = "pending",
+                cases = new List<VisualReviewCase>
+                {
+                    new VisualReviewCase
+                    {
+                        id = visualCase.name,
+                        reference = Path.GetFileName(referencePath),
+                        candidate = Path.GetFileName(candidatePath),
+                        heatmap = heatmap == null ? string.Empty : Path.GetFileName(heatmap),
+                        flipMean = flipMean,
+                        flipCeiling = ceiling,
+                        passed = flipMean <= ceiling,
+                        shaderProfile = report.shaderName,
+                        cameraPosition = report.cameraPosition,
+                        cameraTarget = report.cameraTarget,
+                        cameraFieldOfView = report.cameraFieldOfView,
+                        ambientLightColor = report.ambientLightColor,
+                        ambientLightIntensity = report.ambientLightIntensity,
+                        directionalLightColor = report.directionalLightColor,
+                        directionalLightIntensity = report.directionalLightIntensity,
+                        directionalLightPosition = report.directionalLightPosition,
+                        directionalLightTarget = report.directionalLightTarget,
+                        directionalLightMode = report.directionalLightMode,
+                        volume = "disabled",
+                        intendedChange = "Legacy parity gate; no intended visual delta"
+                    }
+                }
+            };
+            File.WriteAllText(
+                Path.Combine(artifactsDir, "manifest.json"),
+                JsonUtility.ToJson(manifest, prettyPrint: true));
         }
 
         private static void RequireOrOptOut(bool optedOut, string reason)
@@ -184,6 +239,43 @@ namespace Mmd.Tests
                 }
                 return null;
             }
+        }
+
+        [Serializable]
+        private sealed class VisualReviewManifest
+        {
+            public int schemaVersion = 1;
+            public string runId = string.Empty;
+            public string unityVersion = string.Empty;
+            public string urpVersion = string.Empty;
+            public string gpu = string.Empty;
+            public string humanSignoff = string.Empty;
+            public List<VisualReviewCase> cases = new();
+        }
+
+        [Serializable]
+        private sealed class VisualReviewCase
+        {
+            public string id = string.Empty;
+            public string reference = string.Empty;
+            public string candidate = string.Empty;
+            public string heatmap = string.Empty;
+            public float flipMean;
+            public float flipCeiling;
+            public bool passed;
+            public string shaderProfile = string.Empty;
+            public float[] cameraPosition = Array.Empty<float>();
+            public float[] cameraTarget = Array.Empty<float>();
+            public float cameraFieldOfView;
+            public float[] ambientLightColor = Array.Empty<float>();
+            public float ambientLightIntensity;
+            public float[] directionalLightColor = Array.Empty<float>();
+            public float directionalLightIntensity;
+            public float[] directionalLightPosition = Array.Empty<float>();
+            public float[] directionalLightTarget = Array.Empty<float>();
+            public string directionalLightMode = string.Empty;
+            public string volume = string.Empty;
+            public string intendedChange = string.Empty;
         }
     }
 }
