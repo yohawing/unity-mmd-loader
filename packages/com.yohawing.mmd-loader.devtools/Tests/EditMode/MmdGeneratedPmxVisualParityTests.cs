@@ -299,6 +299,305 @@ namespace Mmd.Tests
             LogAssert.NoUnexpectedReceived();
         }
 
+        [Test]
+        [Explicit("Run the S1b Ambient SH and fog visual deltas explicitly; FLIP artifacts still require human review.")]
+        [Category("VisualShadingTier")]
+        public void ToonRampToonLit_TracksAmbientShAndFogWhileLegacyStaysInvariant()
+        {
+            bool optedOut = string.Equals(
+                Environment.GetEnvironmentVariable("YMU_VISUAL_TIER_OPT_OUT"), "1",
+                StringComparison.Ordinal);
+            var visualCase = new MmdGeneratedPmxVisualCase(
+                "mmd-toon-ramp-lit-box",
+                "mmd-toon-ramp-lit-box.pmx",
+                new Vector3(-0.06f, 0.6f, 3.3f),
+                new Vector3(-0.06f, 0.6f, 0.0f),
+                27.0f,
+                0.03f);
+
+            var availability = MmdFlipHelper.ProbeAvailability();
+            if (!availability.available)
+            {
+                RequireOrOptOut(optedOut, "FLIP not available: " + availability.unsupportedReason);
+            }
+
+            string fixtureDirectory = ResolveGeneratedPmxFixtureDirectory();
+            string pmxPath = Path.Combine(fixtureDirectory, visualCase.modelFileName);
+            if (!File.Exists(pmxPath))
+            {
+                RequireOrOptOut(optedOut, "Generated PMX fixture missing: " + pmxPath);
+            }
+
+            string artifactsDir = ResolveArtifactsDir();
+            Directory.CreateDirectory(artifactsDir);
+            string ambientLegacyOffPath = Path.Combine(artifactsDir, visualCase.name + ".legacy-ambient-sh-off.png");
+            string ambientLegacyOnPath = Path.Combine(artifactsDir, visualCase.name + ".legacy-ambient-sh-on.png");
+            string ambientToonLitOffPath = Path.Combine(artifactsDir, visualCase.name + ".toon-lit-ambient-sh-off.png");
+            string ambientToonLitOnPath = Path.Combine(artifactsDir, visualCase.name + ".toon-lit-ambient-sh-on.png");
+            string fogLegacyOffPath = Path.Combine(artifactsDir, visualCase.name + ".legacy-fog-off.png");
+            string fogLegacyOnPath = Path.Combine(artifactsDir, visualCase.name + ".legacy-fog-on.png");
+            string fogToonLitOffPath = Path.Combine(artifactsDir, visualCase.name + ".toon-lit-fog-off.png");
+            string fogToonLitOnPath = Path.Combine(artifactsDir, visualCase.name + ".toon-lit-fog-on.png");
+
+            MmdGeneratedPmxVisualCaseReport ambientLegacyOff = RenderAmbientFogCase(
+                visualCase, fixtureDirectory, ambientLegacyOffPath, MmdMaterialPreset.MmdToon,
+                ambientShEnabled: false, fogEnabled: false);
+            MmdGeneratedPmxVisualCaseReport ambientLegacyOn = RenderAmbientFogCase(
+                visualCase, fixtureDirectory, ambientLegacyOnPath, MmdMaterialPreset.MmdToon,
+                ambientShEnabled: true, fogEnabled: false);
+            MmdGeneratedPmxVisualCaseReport ambientToonLitOff = RenderAmbientFogCase(
+                visualCase, fixtureDirectory, ambientToonLitOffPath, MmdMaterialPreset.MmdToonLit,
+                ambientShEnabled: false, fogEnabled: false);
+            MmdGeneratedPmxVisualCaseReport ambientToonLitOn = RenderAmbientFogCase(
+                visualCase, fixtureDirectory, ambientToonLitOnPath, MmdMaterialPreset.MmdToonLit,
+                ambientShEnabled: true, fogEnabled: false);
+
+            MmdGeneratedPmxVisualCaseReport fogLegacyOff = RenderAmbientFogCase(
+                visualCase, fixtureDirectory, fogLegacyOffPath, MmdMaterialPreset.MmdToon,
+                ambientShEnabled: false, fogEnabled: false);
+            MmdGeneratedPmxVisualCaseReport fogLegacyOn = RenderAmbientFogCase(
+                visualCase, fixtureDirectory, fogLegacyOnPath, MmdMaterialPreset.MmdToon,
+                ambientShEnabled: false, fogEnabled: true);
+            MmdGeneratedPmxVisualCaseReport fogToonLitOff = RenderAmbientFogCase(
+                visualCase, fixtureDirectory, fogToonLitOffPath, MmdMaterialPreset.MmdToonLit,
+                ambientShEnabled: false, fogEnabled: false);
+            MmdGeneratedPmxVisualCaseReport fogToonLitOn = RenderAmbientFogCase(
+                visualCase, fixtureDirectory, fogToonLitOnPath, MmdMaterialPreset.MmdToonLit,
+                ambientShEnabled: false, fogEnabled: true);
+
+            AssertCaptureEvidence(ambientLegacyOff, MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName, "ambient Legacy off");
+            AssertCaptureEvidence(ambientLegacyOn, MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName, "ambient Legacy on");
+            AssertCaptureEvidence(ambientToonLitOff, MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName, "ambient Toon Lit off");
+            AssertCaptureEvidence(ambientToonLitOn, MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName, "ambient Toon Lit on");
+            AssertCaptureEvidence(fogLegacyOff, MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName, "fog Legacy off");
+            AssertCaptureEvidence(fogLegacyOn, MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName, "fog Legacy on");
+            AssertCaptureEvidence(fogToonLitOff, MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName, "fog Toon Lit off");
+            AssertCaptureEvidence(fogToonLitOn, MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName, "fog Toon Lit on");
+
+            float ambientLegacyDelta = MmdFlipHelper.ComputeMeanError(ambientLegacyOffPath, ambientLegacyOnPath, artifactsDir);
+            string? ambientHeatmap = FindLatestFlipHeatmap(artifactsDir);
+            float ambientToonLitDelta = MmdFlipHelper.ComputeMeanError(ambientToonLitOffPath, ambientToonLitOnPath, artifactsDir);
+            string? ambientToonLitHeatmap = FindLatestFlipHeatmap(artifactsDir);
+            float fogLegacyDelta = MmdFlipHelper.ComputeMeanError(fogLegacyOffPath, fogLegacyOnPath, artifactsDir);
+            string? fogHeatmap = FindLatestFlipHeatmap(artifactsDir);
+            float fogToonLitDelta = MmdFlipHelper.ComputeMeanError(fogToonLitOffPath, fogToonLitOnPath, artifactsDir);
+            string? fogToonLitHeatmap = FindLatestFlipHeatmap(artifactsDir);
+            const float minimumVisibleDelta = 0.01f;
+            Assert.That(ambientLegacyDelta, Is.LessThanOrEqualTo(0.0001f),
+                "Legacy MMD Toon must remain invariant when only Ambient SH changes.");
+            Assert.That(ambientToonLitDelta, Is.GreaterThan(ambientLegacyDelta + minimumVisibleDelta),
+                "MMD Toon Lit must visibly follow Ambient SH while Legacy stays invariant.");
+            Assert.That(fogLegacyDelta, Is.LessThanOrEqualTo(0.0001f),
+                "Legacy MMD Toon must remain invariant when only fog changes.");
+            Assert.That(fogToonLitDelta, Is.GreaterThan(fogLegacyDelta + minimumVisibleDelta),
+                "MMD Toon Lit must visibly follow fog while Legacy stays invariant.");
+            WriteAmbientFogDeltaManifest(
+                artifactsDir,
+                visualCase,
+                ambientLegacyOffPath,
+                ambientLegacyOnPath,
+                ambientToonLitOffPath,
+                ambientToonLitOnPath,
+                ambientLegacyDelta,
+                ambientToonLitDelta,
+                ambientHeatmap,
+                ambientToonLitHeatmap,
+                fogLegacyOffPath,
+                fogLegacyOnPath,
+                fogToonLitOffPath,
+                fogToonLitOnPath,
+                fogLegacyDelta,
+                fogToonLitDelta,
+                fogHeatmap,
+                fogToonLitHeatmap,
+                minimumVisibleDelta,
+                ambientToonLitOn,
+                fogToonLitOn);
+            TestContext.WriteLine(
+                $"[toon-lit-ambient-fog] ambient legacy={ambientLegacyDelta:F6} toon-lit={ambientToonLitDelta:F6} "
+                + $"fog legacy={fogLegacyDelta:F6} toon-lit={fogToonLitDelta:F6} humanSignoff=pending");
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        private static MmdGeneratedPmxVisualCaseReport RenderAmbientFogCase(
+            MmdGeneratedPmxVisualCase visualCase,
+            string fixtureDirectory,
+            string capturePath,
+            MmdMaterialPreset materialPreset,
+            bool ambientShEnabled,
+            bool fogEnabled)
+        {
+            return MmdEditorRenderingDiagnostics.RenderGeneratedPmxVisualCase(
+                visualCase,
+                fixtureDirectory,
+                capturePath,
+                backgroundEnabled: true,
+                postProcessingEnabled: false,
+                materialPreset: materialPreset,
+                directionalLightColorOverride: Color.black,
+                directionalLightIntensityOverride: 0.0f,
+                ambientLightColorOverride: Color.black,
+                ambientLightIntensityOverride: 0.0f,
+                ambientShEnabledOverride: ambientShEnabled,
+                fogEnabledOverride: fogEnabled);
+        }
+
+        private static void AssertCaptureEvidence(
+            MmdGeneratedPmxVisualCaseReport report,
+            string expectedShader,
+            string label)
+        {
+            Assert.That(report.status, Is.EqualTo("passed"), label + ": capture status must be passed.");
+            Assert.That(report.shaderName, Is.EqualTo(expectedShader), label + ": shader profile mismatch.");
+            Assert.That(report.captureUsedStandardRequest, Is.True, label + ": StandardRequest is required.");
+            Assert.That(report.selectedMaterialPassValid, Is.True, label + ": selected ForwardLit pass is invalid.");
+            Assert.That(report.selectedMaterialPassName, Is.EqualTo("ForwardLit"), label + ": pass name mismatch.");
+            string expectedLightMode = expectedShader == MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName
+                ? "UniversalForwardOnly"
+                : "UniversalForward";
+            Assert.That(report.selectedMaterialLightMode, Is.EqualTo(expectedLightMode), label + ": LightMode mismatch.");
+        }
+
+        private static void WriteAmbientFogDeltaManifest(
+            string artifactsDir,
+            MmdGeneratedPmxVisualCase visualCase,
+            string ambientLegacyOffPath,
+            string ambientLegacyOnPath,
+            string ambientToonLitOffPath,
+            string ambientToonLitOnPath,
+            float ambientLegacyDelta,
+            float ambientToonLitDelta,
+            string? ambientLegacyHeatmap,
+            string? ambientToonLitHeatmap,
+            string fogLegacyOffPath,
+            string fogLegacyOnPath,
+            string fogToonLitOffPath,
+            string fogToonLitOnPath,
+            float fogLegacyDelta,
+            float fogToonLitDelta,
+            string? fogLegacyHeatmap,
+            string? fogToonLitHeatmap,
+            float minimumVisibleDelta,
+            MmdGeneratedPmxVisualCaseReport ambientReport,
+            MmdGeneratedPmxVisualCaseReport fogReport)
+        {
+            PackageInfo? urp = PackageInfo.GetAllRegisteredPackages()
+                .FirstOrDefault(package => package.name == "com.unity.render-pipelines.universal");
+            var manifest = new VisualReviewManifest
+            {
+                artifactKind = "s1b-ambient-sh-fog-delta",
+                runId = new DirectoryInfo(artifactsDir).Name,
+                unityVersion = Application.unityVersion,
+                urpVersion = urp?.version ?? "unknown",
+                gpu = SystemInfo.graphicsDeviceName,
+                humanSignoff = "pending: FLIP pass is not human approval",
+                cases = new List<VisualReviewCase>
+                {
+                    BuildAmbientFogReviewCase(
+                        visualCase.name + "-ambient-sh",
+                        "Ambient SH only: MMD Toon Lit follows SampleSH; Legacy stays invariant.",
+                        ambientLegacyOffPath,
+                        ambientLegacyOnPath,
+                        ambientToonLitOffPath,
+                        ambientToonLitOnPath,
+                        ambientLegacyDelta,
+                        ambientToonLitDelta,
+                        ambientLegacyHeatmap,
+                        ambientToonLitHeatmap,
+                        minimumVisibleDelta,
+                        ambientReport),
+                    BuildAmbientFogReviewCase(
+                        visualCase.name + "-fog",
+                        "Fog only: MMD Toon Lit follows URP MixFog; Legacy stays invariant.",
+                        fogLegacyOffPath,
+                        fogLegacyOnPath,
+                        fogToonLitOffPath,
+                        fogToonLitOnPath,
+                        fogLegacyDelta,
+                        fogToonLitDelta,
+                        fogLegacyHeatmap,
+                        fogToonLitHeatmap,
+                        minimumVisibleDelta,
+                        fogReport)
+                }
+            };
+            File.WriteAllText(
+                Path.Combine(artifactsDir, "manifest.json"),
+                JsonUtility.ToJson(manifest, prettyPrint: true));
+        }
+
+        private static VisualReviewCase BuildAmbientFogReviewCase(
+            string id,
+            string intendedChange,
+            string legacyOffPath,
+            string legacyOnPath,
+            string toonLitOffPath,
+            string toonLitOnPath,
+            float legacyDelta,
+            float toonLitDelta,
+            string? legacyHeatmap,
+            string? toonLitHeatmap,
+            float minimumVisibleDelta,
+            MmdGeneratedPmxVisualCaseReport report)
+        {
+            return new VisualReviewCase
+            {
+                id = id,
+                feature = id.EndsWith("-ambient-sh", StringComparison.Ordinal) ? "ambient-sh" : "fog",
+                reference = Path.GetFileName(toonLitOffPath),
+                candidate = Path.GetFileName(toonLitOnPath),
+                heatmap = toonLitHeatmap == null ? string.Empty : Path.GetFileName(toonLitHeatmap),
+                flipMean = toonLitDelta,
+                expectedDeltaFloor = minimumVisibleDelta,
+                passed = report.status == "passed" &&
+                    report.captureUsedStandardRequest &&
+                    report.selectedMaterialPassValid &&
+                    legacyDelta <= 0.0001f &&
+                    toonLitDelta > legacyDelta + minimumVisibleDelta,
+                shaderProfile = report.shaderName,
+                selectedMaterialPassName = report.selectedMaterialPassName,
+                selectedMaterialLightMode = report.selectedMaterialLightMode,
+                selectedMaterialPassIndex = report.selectedMaterialPassIndex,
+                selectedMaterialPassEnabled = report.selectedMaterialPassEnabled,
+                selectedMaterialPassValid = report.selectedMaterialPassValid,
+                captureRequestType = report.captureRequestType,
+                captureRenderPath = report.captureRenderPath,
+                captureUsedStandardRequest = report.captureUsedStandardRequest,
+                renderPipelineName = report.renderPipelineName,
+                mainLightColor = report.mainLightColor,
+                ambientShEnabled = report.ambientShEnabled,
+                ambientShMode = report.ambientShMode,
+                ambientShColor = report.ambientShColor,
+                ambientShIntensity = report.ambientShIntensity,
+                fogEnabled = report.fogEnabled,
+                fogMode = report.fogMode,
+                fogColor = report.fogColor,
+                fogDensity = report.fogDensity,
+                fogStartDistance = report.fogStartDistance,
+                fogEndDistance = report.fogEndDistance,
+                cameraPosition = report.cameraPosition,
+                cameraTarget = report.cameraTarget,
+                cameraFieldOfView = report.cameraFieldOfView,
+                ambientLightColor = report.ambientLightColor,
+                ambientLightIntensity = report.ambientLightIntensity,
+                directionalLightColor = report.directionalLightColor,
+                directionalLightIntensity = report.directionalLightIntensity,
+                directionalLightPosition = report.directionalLightPosition,
+                directionalLightTarget = report.directionalLightTarget,
+                directionalLightMode = report.directionalLightMode,
+                volume = "disabled",
+                intendedChange = intendedChange,
+                legacyReference = Path.GetFileName(legacyOffPath),
+                legacyCandidate = Path.GetFileName(legacyOnPath),
+                legacyFlipMean = legacyDelta,
+                featureReference = Path.GetFileName(toonLitOffPath),
+                featureCandidate = Path.GetFileName(toonLitOnPath),
+                featureFlipMean = toonLitDelta,
+                featureHeatmap = toonLitHeatmap == null ? string.Empty : Path.GetFileName(toonLitHeatmap),
+                legacyFeatureHeatmap = legacyHeatmap == null ? string.Empty : Path.GetFileName(legacyHeatmap)
+            };
+        }
+
         private static void WriteReviewManifest(
             string artifactsDir,
             MmdGeneratedPmxVisualCase visualCase,
@@ -569,6 +868,7 @@ namespace Mmd.Tests
         private sealed class VisualReviewCase
         {
             public string id = string.Empty;
+            public string feature = string.Empty;
             public string reference = string.Empty;
             public string candidate = string.Empty;
             public string heatmap = string.Empty;
@@ -587,6 +887,16 @@ namespace Mmd.Tests
             public bool captureUsedStandardRequest;
             public string renderPipelineName = string.Empty;
             public float[] mainLightColor = Array.Empty<float>();
+            public bool ambientShEnabled;
+            public string ambientShMode = string.Empty;
+            public float[] ambientShColor = Array.Empty<float>();
+            public float ambientShIntensity;
+            public bool fogEnabled;
+            public string fogMode = string.Empty;
+            public float[] fogColor = Array.Empty<float>();
+            public float fogDensity;
+            public float fogStartDistance;
+            public float fogEndDistance;
             public float[] cameraPosition = Array.Empty<float>();
             public float[] cameraTarget = Array.Empty<float>();
             public float cameraFieldOfView;
@@ -606,6 +916,11 @@ namespace Mmd.Tests
             public string toonLitLightCandidate = string.Empty;
             public float toonLitLightFlipMean;
             public string toonLitLightHeatmap = string.Empty;
+            public string featureReference = string.Empty;
+            public string featureCandidate = string.Empty;
+            public float featureFlipMean;
+            public string featureHeatmap = string.Empty;
+            public string legacyFeatureHeatmap = string.Empty;
             public string profileReference = string.Empty;
             public string profileCandidate = string.Empty;
             public float profileFlipMean;

@@ -1,4 +1,4 @@
-param([string] $ManifestPath = "", [string] $OutputRoot = "")
+param([string] $ManifestPath = "", [string] $OutputRoot = "", [string] $CaseId = "")
 
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
@@ -8,8 +8,17 @@ if ([string]::IsNullOrEmpty($ManifestPath)) {
 $ManifestPath = [IO.Path]::GetFullPath($ManifestPath)
 if (-not (Test-Path -LiteralPath $ManifestPath)) { throw "Visual review manifest not found: $ManifestPath" }
 $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
-if ($manifest.schemaVersion -ne 1 -or $manifest.cases.Count -ne 1) {
-    throw "Visual review schema 1 currently requires exactly one case: $ManifestPath"
+if ($manifest.schemaVersion -ne 1) {
+    throw "Unsupported visual review schema: $($manifest.schemaVersion)"
+}
+if (-not [string]::IsNullOrEmpty($CaseId)) {
+    $selectedCases = @($manifest.cases | Where-Object { $_.id -eq $CaseId })
+    if ($selectedCases.Count -ne 1) {
+        throw "Visual review case '$CaseId' was not found exactly once: $ManifestPath"
+    }
+    $manifest.cases = $selectedCases
+} elseif ($manifest.cases.Count -ne 1) {
+    throw "Manifest has $($manifest.cases.Count) cases; select one with -CaseId: $ManifestPath"
 }
 if ([string]::IsNullOrEmpty($OutputRoot)) {
     $OutputRoot = Join-Path $repoRoot ("artifacts\visual-review\" + $manifest.runId)
@@ -46,12 +55,12 @@ body{margin:0;padding:24px}header,.toolbar,.meta,.decision{max-width:1500px;marg
 <div class="toolbar"><button data-mode="side" class="active">Side by side</button><button data-mode="blink">A/B blink</button><button data-mode="opacity">Opacity</button>
 <label>Zoom <input id="zoom" type="range" min="1" max="5" step=".1" value="1"></label><label>Candidate opacity <input id="opacity" type="range" min="0" max="1" step=".01" value=".5"></label><button id="reset">Reset pan</button></div>
 <main id="cases"></main><script>
-const manifest=__MANIFEST__,c=manifest.cases[0],key='mmd-visual-review:'+manifest.runId+':'+c.id,saved=JSON.parse(localStorage.getItem(key)||'{}');
+const manifest=__MANIFEST__,c=manifest.cases[0],key='mmd-visual-review:'+manifest.runId+':'+c.id,saved=JSON.parse(localStorage.getItem(key)||'{}'),deltaFloor=Number(c.expectedDeltaFloor||0),flipRule=deltaFloor>0?c.flipMean.toFixed(6)+' >= floor '+deltaFloor.toFixed(6):c.flipMean.toFixed(6)+' <= ceiling '+Number(c.flipCeiling||0).toFixed(6);
 document.querySelector('#run').textContent=manifest.runId+' · Unity '+manifest.unityVersion+' · URP '+manifest.urpVersion+' · '+manifest.gpu;
 document.querySelector('#cases').innerHTML=
 '<section id="compare" class="compare" data-mode="side"><div class="visual side"><h2>Reference</h2><img src="'+c.reference+'"></div><div class="visual side"><h2>Candidate</h2><img src="'+c.candidate+'"></div>'+
 '<div class="visual overlay"><h2>Reference / Candidate</h2><img src="'+c.reference+'"><img class="candidate" src="'+c.candidate+'"></div><div class="visual heatmap"><h2>FLIP heatmap</h2><img src="'+c.heatmap+'"></div></section>'+
-'<section class="meta"><div><b>Case</b>\n'+c.id+'</div><div><b>FLIP</b>\n'+c.flipMean.toFixed(6)+' / '+c.flipCeiling.toFixed(6)+' <span class="'+(c.passed?'pass':'fail')+'">'+(c.passed?'PASS':'FAIL')+'</span></div>'+
+'<section class="meta"><div><b>Case</b>\n'+c.id+'</div><div><b>FLIP</b>\n'+flipRule+' <span class="'+(c.passed?'pass':'fail')+'">'+(c.passed?'PASS':'FAIL')+'</span></div>'+
 '<div><b>Shader</b>\n'+c.shaderProfile+'</div><div><b>Intended change</b>\n'+c.intendedChange+'</div><div><b>Camera</b>\npos '+c.cameraPosition.join(', ')+'\ntarget '+c.cameraTarget.join(', ')+'\nFOV '+c.cameraFieldOfView+'</div>'+
 '<div><b>Ambient</b>\ncolor '+c.ambientLightColor.join(', ')+'\nintensity '+c.ambientLightIntensity+'</div><div><b>Main light</b>\ncolor '+c.directionalLightColor.join(', ')+'\nintensity '+c.directionalLightIntensity+'\npos '+c.directionalLightPosition.join(', ')+'\ntarget '+c.directionalLightTarget.join(', ')+'\n'+c.directionalLightMode+'</div><div><b>Volume</b>\n'+c.volume+'</div></section>'+
 '<section class="decision"><select id="decision"><option value="">Needs decision</option><option>Accept</option><option>Reject</option><option>Needs follow-up</option></select><textarea id="note" placeholder="Short review note"></textarea><button id="export">Export review.json</button></section>';

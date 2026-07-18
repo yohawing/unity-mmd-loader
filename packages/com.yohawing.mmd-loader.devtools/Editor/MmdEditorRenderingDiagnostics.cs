@@ -26,6 +26,11 @@ namespace Mmd.Editor
         private static readonly Vector3 GeneratedPmxDirectionalLightPosition = new Vector3(2.5f, 5.0f, 4.0f);
         private static readonly Vector3 GeneratedPmxMmdLightTravelDirection = new Vector3(0.5f, -1.0f, -0.5f);
         private const string GeneratedPmxCameraCoordinatePolicy = "camera-x-mirrored-for-unity-handedness";
+        private static readonly Color GeneratedPmxAmbientShColor = new Color(0.35f, 0.08f, 0.18f, 1.0f);
+        private const float GeneratedPmxAmbientShIntensity = 1.0f;
+        private static readonly Color GeneratedPmxFogColor = new Color(0.20f, 0.35f, 0.60f, 1.0f);
+        private const float GeneratedPmxFogStartDistance = 0.5f;
+        private const float GeneratedPmxFogEndDistance = 3.5f;
         private static readonly int MainLightColorId = Shader.PropertyToID("_MainLightColor");
 
         public static MmdGeneratedPmxVisualCaseReport RenderGeneratedPmxVisualCase(
@@ -40,7 +45,9 @@ namespace Mmd.Editor
             float? directionalLightIntensityOverride = null,
             Color? ambientLightColorOverride = null,
             float? ambientLightIntensityOverride = null,
-            bool realtimeShadowOccluderEnabled = false)
+            bool realtimeShadowOccluderEnabled = false,
+            bool? ambientShEnabledOverride = null,
+            bool? fogEnabledOverride = null)
         {
             const int width = 1024;
             const int height = 1024;
@@ -65,13 +72,38 @@ namespace Mmd.Editor
             bool usedStandardRequest = false;
             Color previousAmbientLight = RenderSettings.ambientLight;
             AmbientMode previousAmbientMode = RenderSettings.ambientMode;
+            SphericalHarmonicsL2 previousAmbientProbe = RenderSettings.ambientProbe;
+            bool previousFog = RenderSettings.fog;
+            FogMode previousFogMode = RenderSettings.fogMode;
+            Color previousFogColor = RenderSettings.fogColor;
+            float previousFogDensity = RenderSettings.fogDensity;
+            float previousFogStartDistance = RenderSettings.fogStartDistance;
+            float previousFogEndDistance = RenderSettings.fogEndDistance;
             Light? previousSun = RenderSettings.sun;
             Color captureAmbientLightColor = ambientLightColorOverride ?? GeneratedPmxAmbientLightColor;
             float captureAmbientLightIntensity = ambientLightIntensityOverride ?? GeneratedPmxAmbientLightIntensity;
+            bool ambientShConfigured = ambientShEnabledOverride.HasValue;
+            bool ambientShEnabled = ambientShEnabledOverride == true;
+            bool fogConfigured = fogEnabledOverride.HasValue;
+            bool fogEnabled = fogEnabledOverride == true;
             try
             {
-                RenderSettings.ambientMode = AmbientMode.Flat;
+                RenderSettings.ambientMode = ambientShConfigured
+                    ? AmbientMode.Custom
+                    : AmbientMode.Flat;
                 RenderSettings.ambientLight = captureAmbientLightColor * captureAmbientLightIntensity;
+                RenderSettings.ambientProbe = ambientShConfigured
+                    ? BuildAmbientProbe(ambientShEnabled ? GeneratedPmxAmbientShColor : Color.black, GeneratedPmxAmbientShIntensity)
+                    : previousAmbientProbe;
+                if (fogConfigured)
+                {
+                    RenderSettings.fog = fogEnabled;
+                    RenderSettings.fogMode = FogMode.Linear;
+                    RenderSettings.fogColor = GeneratedPmxFogColor;
+                    RenderSettings.fogStartDistance = GeneratedPmxFogStartDistance;
+                    RenderSettings.fogEndDistance = GeneratedPmxFogEndDistance;
+                    RenderSettings.fogDensity = 0.0f;
+                }
 
                 Camera camera = cameraObject.AddComponent<Camera>();
                 camera.orthographic = false;
@@ -257,6 +289,16 @@ namespace Mmd.Editor
                     directionalLightTarget = ToVector3Array(Vector3.zero),
                     directionalLightMode = "position-to-origin-urp-main-light",
                     mainLightColor = ToVector4Array(renderedMainLightColor),
+                    ambientShEnabled = ambientShEnabled,
+                    ambientShMode = ambientShConfigured ? AmbientMode.Custom.ToString() : RenderSettings.ambientMode.ToString(),
+                    ambientShColor = ToColorArray(ambientShEnabled ? GeneratedPmxAmbientShColor : Color.black),
+                    ambientShIntensity = ambientShEnabled ? GeneratedPmxAmbientShIntensity : 0.0f,
+                    fogEnabled = fogEnabled,
+                    fogMode = fogConfigured ? RenderSettings.fogMode.ToString() : string.Empty,
+                    fogColor = ToColorArray(fogConfigured ? RenderSettings.fogColor : Color.clear),
+                    fogDensity = fogConfigured ? RenderSettings.fogDensity : 0.0f,
+                    fogStartDistance = fogConfigured ? RenderSettings.fogStartDistance : 0.0f,
+                    fogEndDistance = fogConfigured ? RenderSettings.fogEndDistance : 0.0f,
                     selectedMaterialPassName = selectedMaterialPassName,
                     selectedMaterialLightMode = selectedMaterialLightMode,
                     selectedMaterialPassIndex = selectedMaterialPassIndex,
@@ -286,6 +328,13 @@ namespace Mmd.Editor
             {
                 RenderSettings.ambientLight = previousAmbientLight;
                 RenderSettings.ambientMode = previousAmbientMode;
+                RenderSettings.ambientProbe = previousAmbientProbe;
+                RenderSettings.fog = previousFog;
+                RenderSettings.fogMode = previousFogMode;
+                RenderSettings.fogColor = previousFogColor;
+                RenderSettings.fogDensity = previousFogDensity;
+                RenderSettings.fogStartDistance = previousFogStartDistance;
+                RenderSettings.fogEndDistance = previousFogEndDistance;
                 RenderSettings.sun = previousSun;
                 if (proxyStats != null)
                 {
@@ -315,6 +364,17 @@ namespace Mmd.Editor
                     UnityEngine.Object.DestroyImmediate(pixels);
                 }
             }
+        }
+
+        private static SphericalHarmonicsL2 BuildAmbientProbe(Color color, float intensity)
+        {
+            var probe = new SphericalHarmonicsL2();
+            probe.Clear();
+            const float sphericalHarmonicsL0 = 0.2820947918f;
+            probe[0, 0] = color.r * intensity / sphericalHarmonicsL0;
+            probe[1, 0] = color.g * intensity / sphericalHarmonicsL0;
+            probe[2, 0] = color.b * intensity / sphericalHarmonicsL0;
+            return probe;
         }
 
         private static void CountPixels(Texture2D pixels, Color backgroundColor, out int nonBlank, out int alpha, out int outline, out int transparent)
@@ -866,6 +926,16 @@ namespace Mmd.Editor
         public float[] directionalLightTarget = Array.Empty<float>();
         public string directionalLightMode = string.Empty;
         public float[] mainLightColor = Array.Empty<float>();
+        public bool ambientShEnabled;
+        public string ambientShMode = string.Empty;
+        public float[] ambientShColor = Array.Empty<float>();
+        public float ambientShIntensity;
+        public bool fogEnabled;
+        public string fogMode = string.Empty;
+        public float[] fogColor = Array.Empty<float>();
+        public float fogDensity;
+        public float fogStartDistance;
+        public float fogEndDistance;
         public string selectedMaterialPassName = string.Empty;
         public string selectedMaterialLightMode = string.Empty;
         public int selectedMaterialPassIndex = -1;
