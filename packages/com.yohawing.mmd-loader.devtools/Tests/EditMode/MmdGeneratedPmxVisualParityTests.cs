@@ -598,6 +598,189 @@ namespace Mmd.Tests
             LogAssert.NoUnexpectedReceived();
         }
 
+        [Test]
+        [Explicit("Run the S1c Toon boundary/feather visual delta explicitly; FLIP artifacts still require human review.")]
+        [Category("VisualShadingTier")]
+        public void ToonRampToonLit_TracksToonBoundaryAndFeatherWhileLegacyStaysInvariant()
+        {
+            bool optedOut = string.Equals(
+                Environment.GetEnvironmentVariable("YMU_VISUAL_TIER_OPT_OUT"), "1",
+                StringComparison.Ordinal);
+            var visualCase = new MmdGeneratedPmxVisualCase(
+                "mmd-toon-ramp-lit-box",
+                "mmd-toon-ramp-lit-box.pmx",
+                new Vector3(-0.06f, 0.6f, 3.3f),
+                new Vector3(-0.06f, 0.6f, 0.0f),
+                27.0f,
+                0.03f);
+
+            var availability = MmdFlipHelper.ProbeAvailability();
+            if (!availability.available)
+            {
+                RequireOrOptOut(optedOut, "FLIP not available: " + availability.unsupportedReason);
+            }
+
+            string fixtureDirectory = ResolveGeneratedPmxFixtureDirectory();
+            string pmxPath = Path.Combine(fixtureDirectory, visualCase.modelFileName);
+            if (!File.Exists(pmxPath))
+            {
+                RequireOrOptOut(optedOut, "Generated PMX fixture missing: " + pmxPath);
+            }
+
+            string artifactsDir = ResolveArtifactsDir();
+            Directory.CreateDirectory(artifactsDir);
+            string legacyOffPath = Path.Combine(artifactsDir, visualCase.name + ".legacy-toon-boundary-off.png");
+            string legacyOnPath = Path.Combine(artifactsDir, visualCase.name + ".legacy-toon-boundary-on.png");
+            string toonLitOffPath = Path.Combine(artifactsDir, visualCase.name + ".toon-lit-boundary-off.png");
+            string toonLitOnPath = Path.Combine(artifactsDir, visualCase.name + ".toon-lit-boundary-on.png");
+
+            MmdGeneratedPmxVisualCaseReport legacyOff = RenderToonBoundaryCase(
+                visualCase, fixtureDirectory, legacyOffPath, MmdMaterialPreset.MmdToon, -1.0f, -1.0f);
+            MmdGeneratedPmxVisualCaseReport legacyOn = RenderToonBoundaryCase(
+                visualCase, fixtureDirectory, legacyOnPath, MmdMaterialPreset.MmdToon, 0.55f, 0.12f);
+            MmdGeneratedPmxVisualCaseReport toonLitOff = RenderToonBoundaryCase(
+                visualCase, fixtureDirectory, toonLitOffPath, MmdMaterialPreset.MmdToonLit, -1.0f, -1.0f);
+            MmdGeneratedPmxVisualCaseReport toonLitOn = RenderToonBoundaryCase(
+                visualCase, fixtureDirectory, toonLitOnPath, MmdMaterialPreset.MmdToonLit, 0.55f, 0.12f);
+
+            AssertCaptureEvidence(legacyOff, MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName, "Toon boundary Legacy off");
+            AssertCaptureEvidence(legacyOn, MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName, "Toon boundary Legacy on");
+            AssertCaptureEvidence(toonLitOff, MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName, "Toon boundary Toon Lit off");
+            AssertCaptureEvidence(toonLitOn, MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName, "Toon boundary Toon Lit on");
+            Assert.That(toonLitOff.toonBoundaryConfigured, Is.True, "Toon Lit off capture must expose both authoring properties.");
+            Assert.That(toonLitOn.toonBoundaryConfigured, Is.True, "Toon Lit on capture must expose both authoring properties.");
+
+            float legacyDelta = MmdFlipHelper.ComputeMeanError(legacyOffPath, legacyOnPath, artifactsDir);
+            string? legacyHeatmap = FindLatestFlipHeatmap(artifactsDir);
+            float toonLitDelta = MmdFlipHelper.ComputeMeanError(toonLitOffPath, toonLitOnPath, artifactsDir);
+            string? toonLitHeatmap = FindLatestFlipHeatmap(artifactsDir);
+            const float minimumVisibleDelta = 0.01f;
+            Assert.That(legacyDelta, Is.LessThanOrEqualTo(0.0001f),
+                "Legacy MMD Toon must remain invariant when only Toon Lit authoring properties change.");
+            Assert.That(toonLitDelta, Is.GreaterThan(legacyDelta + minimumVisibleDelta),
+                "MMD Toon Lit must visibly consume Toon boundary and feather properties.");
+            WriteToonBoundaryDeltaManifest(
+                artifactsDir,
+                visualCase,
+                legacyOffPath,
+                legacyOnPath,
+                toonLitOffPath,
+                toonLitOnPath,
+                legacyDelta,
+                toonLitDelta,
+                legacyHeatmap,
+                toonLitHeatmap,
+                minimumVisibleDelta,
+                toonLitOn);
+            TestContext.WriteLine(
+                $"[toon-lit-toon-boundary] legacy={legacyDelta:F6} toon-lit={toonLitDelta:F6} humanSignoff=pending");
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        private static MmdGeneratedPmxVisualCaseReport RenderToonBoundaryCase(
+            MmdGeneratedPmxVisualCase visualCase,
+            string fixtureDirectory,
+            string capturePath,
+            MmdMaterialPreset materialPreset,
+            float? toonBoundary,
+            float? toonFeather)
+        {
+            return MmdEditorRenderingDiagnostics.RenderGeneratedPmxVisualCase(
+                visualCase,
+                fixtureDirectory,
+                capturePath,
+                backgroundEnabled: true,
+                postProcessingEnabled: false,
+                materialPreset: materialPreset,
+                ambientShEnabledOverride: false,
+                fogEnabledOverride: false,
+                toonBoundaryOverride: toonBoundary,
+                toonFeatherOverride: toonFeather);
+        }
+
+        private static void WriteToonBoundaryDeltaManifest(
+            string artifactsDir,
+            MmdGeneratedPmxVisualCase visualCase,
+            string legacyOffPath,
+            string legacyOnPath,
+            string toonLitOffPath,
+            string toonLitOnPath,
+            float legacyDelta,
+            float toonLitDelta,
+            string? legacyHeatmap,
+            string? toonLitHeatmap,
+            float minimumVisibleDelta,
+            MmdGeneratedPmxVisualCaseReport report)
+        {
+            PackageInfo? urp = PackageInfo.GetAllRegisteredPackages()
+                .FirstOrDefault(package => package.name == "com.unity.render-pipelines.universal");
+            var manifest = new VisualReviewManifest
+            {
+                artifactKind = "s1c-toon-boundary-feather-delta",
+                runId = new DirectoryInfo(artifactsDir).Name,
+                unityVersion = Application.unityVersion,
+                urpVersion = urp?.version ?? "unknown",
+                gpu = SystemInfo.graphicsDeviceName,
+                humanSignoff = "pending: FLIP pass is not human approval",
+                cases = new List<VisualReviewCase>
+                {
+                    new VisualReviewCase
+                    {
+                        id = visualCase.name + "-toon-boundary-feather",
+                        feature = "toon-boundary-feather",
+                        reference = Path.GetFileName(toonLitOffPath),
+                        candidate = Path.GetFileName(toonLitOnPath),
+                        heatmap = toonLitHeatmap == null ? string.Empty : Path.GetFileName(toonLitHeatmap),
+                        flipMean = toonLitDelta,
+                        expectedDeltaFloor = minimumVisibleDelta,
+                        passed = report.status == "passed" &&
+                            report.captureUsedStandardRequest &&
+                            report.selectedMaterialPassValid &&
+                            report.toonBoundaryConfigured &&
+                            legacyDelta <= 0.0001f &&
+                            toonLitDelta > legacyDelta + minimumVisibleDelta,
+                        shaderProfile = report.shaderName,
+                        selectedMaterialPassName = report.selectedMaterialPassName,
+                        selectedMaterialLightMode = report.selectedMaterialLightMode,
+                        selectedMaterialPassIndex = report.selectedMaterialPassIndex,
+                        selectedMaterialPassEnabled = report.selectedMaterialPassEnabled,
+                        selectedMaterialPassValid = report.selectedMaterialPassValid,
+                        captureRequestType = report.captureRequestType,
+                        captureRenderPath = report.captureRenderPath,
+                        captureUsedStandardRequest = report.captureUsedStandardRequest,
+                        renderPipelineName = report.renderPipelineName,
+                        toonBoundary = report.toonBoundary,
+                        toonFeather = report.toonFeather,
+                        toonBoundaryConfigured = report.toonBoundaryConfigured,
+                        toonBoundaryMode = report.toonBoundaryMode,
+                        cameraPosition = report.cameraPosition,
+                        cameraTarget = report.cameraTarget,
+                        cameraFieldOfView = report.cameraFieldOfView,
+                        ambientLightColor = report.ambientLightColor,
+                        ambientLightIntensity = report.ambientLightIntensity,
+                        directionalLightColor = report.directionalLightColor,
+                        directionalLightIntensity = report.directionalLightIntensity,
+                        directionalLightPosition = report.directionalLightPosition,
+                        directionalLightTarget = report.directionalLightTarget,
+                        directionalLightMode = report.directionalLightMode,
+                        volume = "disabled",
+                        intendedChange = "Only MMD Toon Lit consumes the explicit Toon boundary and feather properties; the -1 sentinel preserves the existing ramp and Legacy stays invariant.",
+                        legacyReference = Path.GetFileName(legacyOffPath),
+                        legacyCandidate = Path.GetFileName(legacyOnPath),
+                        legacyFlipMean = legacyDelta,
+                        legacyFeatureHeatmap = legacyHeatmap == null ? string.Empty : Path.GetFileName(legacyHeatmap),
+                        featureReference = Path.GetFileName(toonLitOffPath),
+                        featureCandidate = Path.GetFileName(toonLitOnPath),
+                        featureFlipMean = toonLitDelta,
+                        featureHeatmap = toonLitHeatmap == null ? string.Empty : Path.GetFileName(toonLitHeatmap)
+                    }
+                }
+            };
+            File.WriteAllText(
+                Path.Combine(artifactsDir, "manifest.json"),
+                JsonUtility.ToJson(manifest, prettyPrint: true));
+        }
+
         private static MmdGeneratedPmxVisualCaseReport RenderReflectionProbeCase(
             MmdGeneratedPmxVisualCase visualCase,
             string fixtureDirectory,
@@ -1300,6 +1483,10 @@ namespace Mmd.Tests
             public bool reflectionProbeAvailable;
             public bool reflectionProbeConfigured;
             public string reflectionProbeMode = string.Empty;
+            public float toonBoundary = -1.0f;
+            public float toonFeather = -1.0f;
+            public bool toonBoundaryConfigured;
+            public string toonBoundaryMode = string.Empty;
             public float[] cameraPosition = Array.Empty<float>();
             public float[] cameraTarget = Array.Empty<float>();
             public float cameraFieldOfView;

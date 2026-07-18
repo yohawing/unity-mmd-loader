@@ -51,7 +51,9 @@ namespace Mmd.Editor
             bool? ambientShEnabledOverride = null,
             bool? fogEnabledOverride = null,
             bool? ssaoEnabledOverride = null,
-            bool? reflectionProbeEnabledOverride = null)
+            bool? reflectionProbeEnabledOverride = null,
+            float? toonBoundaryOverride = null,
+            float? toonFeatherOverride = null)
         {
             const int width = 1024;
             const int height = 1024;
@@ -85,6 +87,9 @@ namespace Mmd.Editor
             bool reflectionProbeAvailable = false;
             bool reflectionProbeConfigured = !reflectionProbeEnabledOverride.HasValue;
             bool reflectionProbeEnabled = reflectionProbeEnabledOverride == true;
+            bool toonBoundaryConfigured = !toonBoundaryOverride.HasValue && !toonFeatherOverride.HasValue;
+            float toonBoundary = toonBoundaryOverride ?? -1.0f;
+            float toonFeather = toonFeatherOverride ?? -1.0f;
             List<UnityEngine.Object>? configuredSsaoFeatures = null;
             List<bool>? previousSsaoFeatureStates = null;
             Color previousAmbientLight = RenderSettings.ambientLight;
@@ -295,6 +300,38 @@ namespace Mmd.Editor
 
                     reflectionProbeConfigured &= materialPreset != MmdMaterialPreset.MmdToonLit || anyReflectionMaterial;
                 }
+                if (toonBoundaryOverride.HasValue || toonFeatherOverride.HasValue)
+                {
+                    bool anyToonBoundaryMaterial = false;
+                    bool allToonBoundaryMaterialsConfigured = true;
+                    foreach (Material material in instance.Materials)
+                    {
+                        if (material == null)
+                        {
+                            continue;
+                        }
+
+                        bool hasBoundary = material.HasProperty(MmdMaterialPropertyNames.ToonBoundary);
+                        bool hasFeather = material.HasProperty(MmdMaterialPropertyNames.ToonFeather);
+                        if (hasBoundary && toonBoundaryOverride.HasValue)
+                        {
+                            material.SetFloat(MmdMaterialPropertyNames.ToonBoundary, toonBoundary);
+                        }
+                        if (hasFeather && toonFeatherOverride.HasValue)
+                        {
+                            material.SetFloat(MmdMaterialPropertyNames.ToonFeather, toonFeather);
+                        }
+
+                        anyToonBoundaryMaterial |= hasBoundary || hasFeather;
+                        if (materialPreset == MmdMaterialPreset.MmdToonLit && (!hasBoundary || !hasFeather))
+                        {
+                            allToonBoundaryMaterialsConfigured = false;
+                        }
+                    }
+
+                    toonBoundaryConfigured = materialPreset != MmdMaterialPreset.MmdToonLit ||
+                        (anyToonBoundaryMaterial && allToonBoundaryMaterialsConfigured);
+                }
                 if (perturbShaderOutput)
                 {
                     foreach (Material material in instance.Materials)
@@ -363,7 +400,8 @@ namespace Mmd.Editor
                     usedStandardRequest &&
                     (!ssaoEnabledOverride.HasValue || (ssaoAvailable && ssaoConfigured)) &&
                     (!reflectionProbeEnabledOverride.HasValue ||
-                        (reflectionProbeAvailable && reflectionProbeConfigured));
+                        (reflectionProbeAvailable && reflectionProbeConfigured)) &&
+                    ((!toonBoundaryOverride.HasValue && !toonFeatherOverride.HasValue) || toonBoundaryConfigured);
                 return new MmdGeneratedPmxVisualCaseReport
                 {
                     caseName = "phase17-generated-pmx-" + visualCase.name,
@@ -435,6 +473,12 @@ namespace Mmd.Editor
                     reflectionProbeConfigured = reflectionProbeConfigured,
                     reflectionProbeMode = reflectionProbeEnabledOverride.HasValue
                         ? (reflectionProbeAvailable ? "custom-cubemap-probe-and-environment" : "unavailable")
+                        : "unchanged",
+                    toonBoundary = toonBoundary,
+                    toonFeather = toonFeather,
+                    toonBoundaryConfigured = toonBoundaryConfigured,
+                    toonBoundaryMode = toonBoundaryOverride.HasValue || toonFeatherOverride.HasValue
+                        ? (toonBoundaryConfigured ? "material-properties" : "unavailable")
                         : "unchanged",
                     selectedMaterialPassName = selectedMaterialPassName,
                     selectedMaterialLightMode = selectedMaterialLightMode,
@@ -1215,6 +1259,10 @@ namespace Mmd.Editor
         public bool reflectionProbeAvailable;
         public bool reflectionProbeConfigured;
         public string reflectionProbeMode = string.Empty;
+        public float toonBoundary = -1.0f;
+        public float toonFeather = -1.0f;
+        public bool toonBoundaryConfigured;
+        public string toonBoundaryMode = string.Empty;
         public string selectedMaterialPassName = string.Empty;
         public string selectedMaterialLightMode = string.Empty;
         public int selectedMaterialPassIndex = -1;

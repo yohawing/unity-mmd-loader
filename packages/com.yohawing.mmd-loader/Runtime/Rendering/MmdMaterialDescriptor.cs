@@ -18,6 +18,8 @@ namespace Mmd.Rendering
         public float alpha = 1.0f;
         public float[] diffuseColor = new[] { 1.0f, 1.0f, 1.0f };
         public float[] ambientColor = new[] { 0.25f, 0.25f, 0.25f };
+        public float toonBoundary = -1.0f;
+        public float toonFeather = -1.0f;
         public float[] edgeColor = new[] { 0.0f, 0.0f, 0.0f, 1.0f };
         public float edgeSize;
         public string sphereTextureMode = string.Empty;
@@ -58,6 +60,8 @@ namespace Mmd.Rendering
                     alpha = material.alpha,
                     diffuseColor = CopyColor(material.diffuseColor, 3, new[] { 1.0f, 1.0f, 1.0f }),
                     ambientColor = CopyColor(material.ambientColor, 3, new[] { 0.25f, 0.25f, 0.25f }),
+                    toonBoundary = -1.0f,
+                    toonFeather = -1.0f,
                     edgeColor = CopyColor(material.edgeColor, 4, new[] { 0.0f, 0.0f, 0.0f, 1.0f }),
                     edgeSize = ClampNonNegative(material.edgeSize),
                     sphereTextureMode = NormalizeOptionalString(material.sphereTextureMode),

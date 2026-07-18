@@ -60,6 +60,16 @@ namespace Mmd.UnityIntegration
                 material.SetColor("_AmbientColor", ambient);
             }
 
+            if (material.HasProperty(MmdMaterialPropertyNames.ToonBoundary))
+            {
+                material.SetFloat(MmdMaterialPropertyNames.ToonBoundary, source.toonBoundary);
+            }
+
+            if (material.HasProperty(MmdMaterialPropertyNames.ToonFeather))
+            {
+                material.SetFloat(MmdMaterialPropertyNames.ToonFeather, source.toonFeather);
+            }
+
             if (material.HasProperty("_OutlineColor"))
             {
                 material.SetColor("_OutlineColor", edge);

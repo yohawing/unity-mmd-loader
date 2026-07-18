@@ -145,6 +145,13 @@ namespace Mmd.Tests
             Assert.That(toonLitSource, Does.Contain("_ReflectionProbeWeight"));
             Assert.That(toonLitSource, Does.Contain("_ReflectionProbeWeight > 0.0h && _SphereMode <= 0.5h"));
             Assert.That(toonLitSource, Does.Contain("#if !defined(_SURFACE_TYPE_TRANSPARENT)"));
+            Assert.That(toonLitSource, Does.Contain("_ToonBoundary (\"Toon Boundary\", Range(-1, 1)) = -1"));
+            Assert.That(toonLitSource, Does.Contain("_ToonFeather (\"Toon Boundary Feather\", Range(-1, 1)) = -1"));
+            Assert.That(toonLitSource, Does.Contain("if (_ToonBoundary < -0.5h)"));
+            Assert.That(toonLitSource, Does.Contain("half toonRampVisibility = ApplyMmdToonBoundary(lightVisibility);"));
+            Assert.That(toonLitSource, Does.Contain("half toonVisibility = ApplyMmdToonBoundary(min(selfShadowVisibility, lightVisibility));"));
+            Assert.That(toonLitSource, Does.Contain("half3 mmdToonLight = lerp(selfShadowToon, half3(1.0h, 1.0h, 1.0h), toonRampVisibility);"));
+            Assert.That(toonLitSource, Does.Contain("half3 selfShadowMmdToonLight = lerp(selfShadowToon, half3(1.0h, 1.0h, 1.0h), toonVisibility);"));
         }
         [Test]
         public void CreateStaticModelKeepsShadowCasterAndAddsHiddenSelfShadowTarget()

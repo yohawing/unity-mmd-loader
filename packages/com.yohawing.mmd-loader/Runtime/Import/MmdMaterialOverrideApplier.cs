@@ -249,6 +249,16 @@ namespace Mmd.UnityIntegration
                 SetColorIfPresent(material, MmdMaterialPropertyNames.AmbientColor, entry.ambientColor);
             }
 
+            if (entry.hasToonBoundary)
+            {
+                SetFloatIfPresent(material, MmdMaterialPropertyNames.ToonBoundary, NormalizeToonOptional(entry.toonBoundary));
+            }
+
+            if (entry.hasToonFeather)
+            {
+                SetFloatIfPresent(material, MmdMaterialPropertyNames.ToonFeather, NormalizeToonOptional(entry.toonFeather));
+            }
+
             if (entry.hasOutlineColor)
             {
                 SetColorIfPresent(material, MmdMaterialPropertyNames.OutlineColor, entry.outlineColor);
@@ -425,6 +435,16 @@ namespace Mmd.UnityIntegration
                 material.ambientColor = new[] { Clamp01(entry.ambientColor.r), Clamp01(entry.ambientColor.g), Clamp01(entry.ambientColor.b) };
             }
 
+            if (entry.hasToonBoundary)
+            {
+                material.toonBoundary = NormalizeToonOptional(entry.toonBoundary);
+            }
+
+            if (entry.hasToonFeather)
+            {
+                material.toonFeather = NormalizeToonOptional(entry.toonFeather);
+            }
+
             if (entry.hasOutlineColor)
             {
                 material.edgeColor = new[]
@@ -462,6 +482,16 @@ namespace Mmd.UnityIntegration
             if (entry.hasAmbientColor)
             {
                 binding.ambientColor = new[] { Clamp01(entry.ambientColor.r), Clamp01(entry.ambientColor.g), Clamp01(entry.ambientColor.b) };
+            }
+
+            if (entry.hasToonBoundary)
+            {
+                binding.toonBoundary = NormalizeToonOptional(entry.toonBoundary);
+            }
+
+            if (entry.hasToonFeather)
+            {
+                binding.toonFeather = NormalizeToonOptional(entry.toonFeather);
             }
 
             if (entry.hasOutlineColor)
@@ -710,6 +740,11 @@ namespace Mmd.UnityIntegration
         private static float Clamp01(float value)
         {
             return IsFinite(value) ? Mathf.Clamp01(value) : 0.0f;
+        }
+
+        private static float NormalizeToonOptional(float value)
+        {
+            return IsFinite(value) ? Mathf.Clamp(value, -1.0f, 1.0f) : -1.0f;
         }
 
         private static bool IsFinite(float value)

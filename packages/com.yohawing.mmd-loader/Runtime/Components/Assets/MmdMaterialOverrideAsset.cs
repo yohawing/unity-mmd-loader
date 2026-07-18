@@ -60,6 +60,12 @@ namespace Mmd
         public bool hasAmbientColor;
         public Color ambientColor = new(0.25f, 0.25f, 0.25f, 1.0f);
 
+        public bool hasToonBoundary;
+        public float toonBoundary = -1.0f;
+
+        public bool hasToonFeather;
+        public float toonFeather = -1.0f;
+
         public bool hasOutlineColor;
         public Color outlineColor = Color.black;
 

@@ -19,6 +19,9 @@ Shader "MMD Toon Lit"
         _MmdLightColor ("MMD Light Color", Color) = (1, 1, 1, 1)
         [PerRendererData] [HideInInspector] _MmdSelfShadowReceive ("MMD Self Shadow Receive", Float) = 0
         _ToonStrength ("Toon Strength", Range(0, 1)) = 1
+        // Optional authoring controls. -1 keeps the current MMD visibility ramp exactly intact.
+        _ToonBoundary ("Toon Boundary", Range(-1, 1)) = -1
+        _ToonFeather ("Toon Boundary Feather", Range(-1, 1)) = -1
         _OutlineColor ("Outline Color", Color) = (0, 0, 0, 1)
         _OutlineWidth ("Outline Width", Float) = 0
         _OutlineScreenSpaceWeight ("Outline Screen Space Weight", Float) = 0
@@ -128,6 +131,8 @@ Shader "MMD Toon Lit"
                 half _GammaTarget;
                 half _MmdNormalMapBound;
                 half _ReflectionProbeWeight;
+                half _ToonBoundary;
+                half _ToonFeather;
             CBUFFER_END
 
             struct Attributes
@@ -228,6 +233,27 @@ Shader "MMD Toon Lit"
                 return visibility / tapCount;
             }
 
+            half ApplyMmdToonBoundary(half visibility)
+            {
+                // The negative sentinel is intentionally fail-open: existing Toon Lit
+                // materials retain the exact visibility ramp unless authoring opts in.
+                if (_ToonBoundary < -0.5h)
+                {
+                    return visibility;
+                }
+
+                half boundary = saturate(_ToonBoundary);
+                half feather = _ToonFeather < -0.5h ? 0.0h : saturate(_ToonFeather);
+                if (feather <= 1e-4h)
+                {
+                    return step(boundary, visibility);
+                }
+
+                half lower = max(0.0h, boundary - feather);
+                half upper = min(1.0h, boundary + feather);
+                return smoothstep(lower, max(lower + 1e-4h, upper), visibility);
+            }
+
             half4 ForwardFragment(Varyings input) : SV_Target
             {
                 UNITY_SETUP_INSTANCE_ID(input);
@@ -265,11 +291,12 @@ Shader "MMD Toon Lit"
 
                 half ndotl = saturate(dot(normalWS, lightDirection));
                 half lightVisibility = saturate(dot(normalWS, lightDirection) * 3.0h);
-                half toonVisibility = min(selfShadowVisibility, lightVisibility);
+                half toonRampVisibility = ApplyMmdToonBoundary(lightVisibility);
+                half toonVisibility = ApplyMmdToonBoundary(min(selfShadowVisibility, lightVisibility));
                 half3 fallbackSelfShadowToon = half3(1.0h, 1.0h, 1.0h);
                 half3 mappedSelfShadowToon = SAMPLE_TEXTURE2D(_ToonMap, sampler_ToonMap, float2(0.5, 0.22)).rgb;
                 half3 selfShadowToon = lerp(fallbackSelfShadowToon, mappedSelfShadowToon, saturate(_ToonMapBound));
-                half3 mmdToonLight = lerp(selfShadowToon, half3(1.0h, 1.0h, 1.0h), lightVisibility);
+                half3 mmdToonLight = lerp(selfShadowToon, half3(1.0h, 1.0h, 1.0h), toonRampVisibility);
                 half3 toonLight = lerp(ndotl.xxx, mmdToonLight, _ToonStrength);
                 if (selfShadowVisibility < 0.999h)
                 {

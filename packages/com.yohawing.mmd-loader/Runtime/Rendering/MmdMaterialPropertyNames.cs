@@ -28,6 +28,8 @@ namespace Mmd.Rendering
         public const string EmissionMap = "_EmissionMap";
         public const string Alpha = "_Alpha";
         public const string AmbientColor = "_AmbientColor";
+        public const string ToonBoundary = "_ToonBoundary";
+        public const string ToonFeather = "_ToonFeather";
         public const string OutlineColor = "_OutlineColor";
         public const string OutlineWidth = "_OutlineWidth";
         public const string OutlineVisible = "_OutlineVisible";

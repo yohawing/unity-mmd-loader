@@ -185,6 +185,8 @@ namespace Mmd.Rendering
                 alpha = source.alpha,
                 diffuseColor = CopyVector(source.diffuseColor),
                 ambientColor = CopyVector(source.ambientColor),
+                toonBoundary = source.toonBoundary,
+                toonFeather = source.toonFeather,
                 edgeColor = CopyVector(source.edgeColor),
                 edgeSize = source.edgeSize,
                 sphereTextureMode = source.sphereTextureMode,
