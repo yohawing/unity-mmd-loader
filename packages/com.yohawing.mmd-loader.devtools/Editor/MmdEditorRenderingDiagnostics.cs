@@ -509,6 +509,18 @@ namespace Mmd.Editor
                 if (standardRequestSupported)
                 {
                     usedStandardRequest = true;
+                    // A brand-new project's very first RenderPipeline.SubmitRenderRequest ever
+                    // issued in-process can come back with the destination still mostly/entirely
+                    // background (observed: a determinism-pair's first capture reads back as a
+                    // near-empty ~20KB PNG while the second, rendered moments later against the
+                    // same now-warm pipeline state, is the correct ~110KB toon-shaded capture --
+                    // byte-identical across repeated cold bootstraps, so it is not GPU/driver
+                    // flakiness). This mirrors the already-known reflection-probe warm-up need
+                    // below, just for whatever URP/RTHandle/shadow-atlas state only finishes
+                    // initializing after a first submission; always spend one throwaway submit
+                    // before the measured one(s) so the very first call site in a process is not
+                    // a second-class citizen.
+                    UnityEngine.Rendering.RenderPipeline.SubmitRenderRequest(camera, renderRequest);
                     if (reflectionProbeEnabledOverride.HasValue)
                     {
                         // Give the culling/probe system one complete SRP submission after the
