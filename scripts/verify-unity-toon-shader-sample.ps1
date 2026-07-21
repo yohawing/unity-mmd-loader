@@ -19,50 +19,6 @@ function Resolve-FullPath {
     return [System.IO.Path]::GetFullPath((Join-Path (Get-Location) $Path))
 }
 
-function Test-VisualReviewManifestSchema {
-    # Minimal structural check against the canonical visual review manifest schema
-    # (schemaVersion 1), whose single source of truth is the VisualReviewManifest /
-    # VisualReviewCase classes in
-    # packages/com.yohawing.mmd-loader.devtools/Tests/EditMode/MmdVisualReviewManifest.cs.
-    # This sample gate lives outside that package's asmdef graph and cannot reference
-    # those C# types directly, so it re-checks required-field presence by hand here.
-    # Keep this field list in sync with MmdVisualReviewManifest.cs if that schema
-    # changes. This does NOT validate FLIP-metric semantics (e.g. whether "passed"
-    # is a sound verdict) - only that the manifest has the shape reader tooling
-    # expects. "passed" is a machine-metric verdict only, never a human review
-    # decision.
-    param([Parameter(Mandatory = $true)][string] $ManifestPath)
-
-    if (-not (Test-Path -LiteralPath $ManifestPath -PathType Leaf)) {
-        return
-    }
-
-    $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
-    $manifestRequiredFields = @("schemaVersion", "runId", "cases")
-    foreach ($field in $manifestRequiredFields) {
-        if (-not ($manifest.PSObject.Properties.Name -contains $field)) {
-            throw "Visual review manifest is missing required field '$field': $ManifestPath"
-        }
-    }
-    if ($manifest.schemaVersion -ne 1) {
-        throw "Visual review manifest has an unsupported schemaVersion ($($manifest.schemaVersion)): $ManifestPath"
-    }
-
-    $cases = @($manifest.cases)
-    if ($cases.Count -lt 1) {
-        throw "Visual review manifest has no cases: $ManifestPath"
-    }
-
-    $caseRequiredFields = @("id", "reference", "candidate", "heatmap", "flipMean", "expectedDeltaFloor", "passed")
-    foreach ($case in $cases) {
-        foreach ($field in $caseRequiredFields) {
-            if (-not ($case.PSObject.Properties.Name -contains $field)) {
-                throw "Visual review manifest case '$($case.id)' is missing required field '$field': $ManifestPath"
-            }
-        }
-    }
-}
-
 function Remove-EmptyDirectoryCreatedByGate {
     param(
         [Parameter(Mandatory = $true)][string] $Path,
@@ -198,8 +154,6 @@ try {
             throw "Generated PMX UTS visual evidence is empty: $($capture.FullName)"
         }
     }
-
-    Test-VisualReviewManifestSchema -ManifestPath (Join-Path $generatedPmxVisualPath "manifest.json")
 
     Write-Host ("Unity Toon Shader adapter sample gate passed. total={0}; passed={1}; skipped={2}; results={3}; png={4}; generatedPmx={5}; log={6}" -f `
         $totalCount, $testRun.GetAttribute("passed"), $testRun.GetAttribute("skipped"), $testResults, $visualCanaryPath, $generatedPmxVisualPath, $testLog)

@@ -31,8 +31,6 @@ packages/com.yohawing.mmd-loader.devtools/Tests/EditMode/*
 !packages/com.yohawing.mmd-loader.devtools/Tests/EditMode/MmdFlipHelper.cs.meta
 !packages/com.yohawing.mmd-loader.devtools/Tests/EditMode/MmdGeneratedPmxVisualParityTests.cs
 !packages/com.yohawing.mmd-loader.devtools/Tests/EditMode/MmdGeneratedPmxVisualParityTests.cs.meta
-!packages/com.yohawing.mmd-loader.devtools/Tests/EditMode/MmdVisualReviewManifest.cs
-!packages/com.yohawing.mmd-loader.devtools/Tests/EditMode/MmdVisualReviewManifest.cs.meta
 !packages/com.yohawing.mmd-loader.devtools/Tests/EditMode/visual-parity-baseline.json
 !packages/com.yohawing.mmd-loader.devtools/Tests/EditMode/visual-parity-baseline.json.meta
 !packages/com.yohawing.mmd-loader.devtools/Tests/EditMode/mmd-toon-ramp-lit-box.golden.base64

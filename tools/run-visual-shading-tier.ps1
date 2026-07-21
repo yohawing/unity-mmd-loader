@@ -2,25 +2,7 @@ param(
     [string] $Unity = "C:\Program Files\Unity\Hub\Editor\6000.4.8f1\Editor\Unity.exe",
     [string] $ArtifactsRoot = "",
     [string] $ProjectPath = "",
-    [switch] $SkipPerturbationProof,
-    # When set, bypasses the default A/B/A determinism-vs-golden gate entirely and instead
-    # runs exactly one EditMode -testFilter pass (no perturbation proof) using the same
-    # bootstrap-project / capture-artifact plumbing. Used to reuse this script's Unity
-    # batchmode invocation for other Explicit capture tests (e.g. the S1c visual review
-    # delta cases) without touching the default gate behavior below.
-    [string] $TestFilter = "",
-    [string] $RunName = "custom",
-    # A cold batchmode process's very first
-    # MmdEditorRenderingDiagnostics.RenderGeneratedPmxVisualCase call returns an invalid
-    # Material.FindPass("ForwardLit") result (observed 2026-07-21 while wiring up the S1c
-    # batch review: the very first capture in a fresh Editor process reports
-    # selectedMaterialPassValid=false even though the same call succeeds a moment later in
-    # the same process) -- a Unity cold-domain quirk unrelated to any shader/test change.
-    # When set, this runs WarmupTestFilter joined with TestFilter via NUnit's "|" OR
-    # selector so the warm-up test absorbs that first-call failure in-process before the
-    # real target test runs. Comma-joining does NOT work here (Unity's -testFilter treats a
-    # comma-joined string as one literal name and matches zero tests); "|" is required.
-    [string] $WarmupTestFilter = ""
+    [switch] $SkipPerturbationProof
 )
 
 $ErrorActionPreference = "Stop"
@@ -302,12 +284,6 @@ namespace VisualShadingTierBootstrap
 }
 
 $testName = "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampOpaqueOutline_IsDeterministicAndMatchesGolden"
-if (-not [string]::IsNullOrEmpty($TestFilter)) {
-    $testName = $TestFilter
-    if (-not [string]::IsNullOrEmpty($WarmupTestFilter)) {
-        $testName = "$WarmupTestFilter|$TestFilter"
-    }
-}
 function Invoke-VisualTierRun {
     param(
         [Parameter(Mandatory = $true)][string] $Name,
@@ -372,15 +348,10 @@ function Invoke-VisualTierRun {
 }
 
 try {
-    if (-not [string]::IsNullOrEmpty($TestFilter)) {
-        Invoke-VisualTierRun -Name $RunName -Perturb $false -ExpectFailure $false
-    }
-    else {
-        Invoke-VisualTierRun -Name "green-before" -Perturb $false -ExpectFailure $false
-        if (-not $SkipPerturbationProof) {
-            Invoke-VisualTierRun -Name "red-perturbed" -Perturb $true -ExpectFailure $true
-            Invoke-VisualTierRun -Name "green-after" -Perturb $false -ExpectFailure $false
-        }
+    Invoke-VisualTierRun -Name "green-before" -Perturb $false -ExpectFailure $false
+    if (-not $SkipPerturbationProof) {
+        Invoke-VisualTierRun -Name "red-perturbed" -Perturb $true -ExpectFailure $true
+        Invoke-VisualTierRun -Name "green-after" -Perturb $false -ExpectFailure $false
     }
 }
 finally {
