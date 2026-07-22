@@ -22,13 +22,6 @@ namespace Mmd.Editor
             Both,
         }
 
-        private enum GroupState
-        {
-            Off,
-            On,
-            Mixed,
-        }
-
         public override void OnGUI(MaterialEditor materialEditor, MaterialProperty[] properties)
         {
             if (!TryValidateSelection(materialEditor, properties, out MmdToonInspectorProfile profile, out string warning))
@@ -42,17 +35,33 @@ namespace Mmd.Editor
             for (int i = 0; i < MmdToonLitShaderGUIState.Sections.Length; i++)
             {
                 MmdToonLitSectionDefinition definition = MmdToonLitShaderGUIState.Sections[i];
-                expanded[i] = EditorGUILayout.BeginFoldoutHeaderGroup(expanded[i], definition.DisplayName);
-                DrawGroupStateCheckbox(GetGroupState(definition.Section, profile, materialEditor, properties));
-                if (expanded[i])
+                if (!MmdToonLitShaderGUIState.SupportsSection(profile, definition.Section))
+                {
+                    continue;
+                }
+
+                expanded[i] = DrawSectionHeader(
+                    expanded[i], definition, materialEditor);
+                if (expanded[i] && ShouldDrawSectionContents(definition.Section, materialEditor))
                 {
                     EditorGUI.indentLevel++;
                     DrawSection(definition.Section, profile, materialEditor, properties);
                     EditorGUI.indentLevel--;
                 }
-
-                EditorGUILayout.EndFoldoutHeaderGroup();
             }
+        }
+
+        private static bool ShouldDrawSectionContents(
+            MmdToonLitInspectorSection section,
+            MaterialEditor materialEditor)
+        {
+            if (!TryGetFeature(section, out MmdToonFeature feature))
+            {
+                return true;
+            }
+
+            return MmdToonMaterialStateSync.GetFeatureState(GetMaterials(materialEditor), feature) !=
+                MmdToonFeatureState.Off;
         }
 
         private static bool TryValidateSelection(
@@ -101,97 +110,156 @@ namespace Mmd.Editor
             switch (section)
             {
                 case MmdToonLitInspectorSection.SurfaceOptions:
-                    DrawSurfaceOptions(profile, materialEditor, properties);
+                    DrawSurfaceOptions(materialEditor, properties);
                     break;
                 case MmdToonLitInspectorSection.SurfaceInputs:
                     DrawSurfaceInputs(materialEditor, properties);
                     break;
-                case MmdToonLitInspectorSection.DetailInputs:
-                    DrawDetailInputs(materialEditor, properties);
+                case MmdToonLitInspectorSection.ToonMap:
+                    DrawTextureMap(materialEditor, properties, "_ToonMap", "Toon Map");
+                    break;
+                case MmdToonLitInspectorSection.NormalMap:
+                    DrawTextureMap(materialEditor, properties, "_MmdNormalMap", "Normal Map");
+                    break;
+                case MmdToonLitInspectorSection.SphereMatCap:
+                    DrawSphereInputs(materialEditor, properties);
+                    break;
+                case MmdToonLitInspectorSection.ToonLighting:
+                    DrawToonLighting(profile, materialEditor, properties);
+                    break;
+                case MmdToonLitInspectorSection.StylizedSpecular:
+                    DrawStylizedSpecular(materialEditor, properties);
+                    break;
+                case MmdToonLitInspectorSection.RimLight:
+                    DrawRimLight(materialEditor, properties);
+                    break;
+                case MmdToonLitInspectorSection.Emission:
+                    DrawEmission(materialEditor, properties);
+                    break;
+                case MmdToonLitInspectorSection.Outline:
+                    DrawOutline(materialEditor, properties);
                     break;
                 case MmdToonLitInspectorSection.AdvancedOptions:
-                    DrawAdvancedOptions(profile, materialEditor, properties);
+                    materialEditor.RenderQueueField();
                     break;
             }
         }
 
-        private static void DrawGroupStateCheckbox(GroupState state)
+        private static bool DrawSectionHeader(
+            bool isExpanded,
+            MmdToonLitSectionDefinition definition,
+            MaterialEditor materialEditor)
         {
-            Rect headerRect = GUILayoutUtility.GetLastRect();
-            Rect checkboxRect = new(headerRect.xMax - 18.0f, headerRect.y + 2.0f, 16.0f, 16.0f);
-            bool previousMixed = EditorGUI.showMixedValue;
-            EditorGUI.showMixedValue = state == GroupState.Mixed;
-            using (new EditorGUI.DisabledScope(true))
+            Rect headerRect = EditorGUI.IndentedRect(
+                GUILayoutUtility.GetRect(
+                    GUIContent.none,
+                    EditorStyles.foldoutHeader,
+                    GUILayout.ExpandWidth(true),
+                    GUILayout.Height(EditorGUIUtility.singleLineHeight + 3.0f)));
+            if (Event.current.type == EventType.Repaint)
             {
-                EditorGUI.Toggle(checkboxRect, state == GroupState.On);
+                float backgroundTint = EditorGUIUtility.isProSkin ? 0.1f : 1.0f;
+                EditorGUI.DrawRect(
+                    headerRect,
+                    new Color(backgroundTint, backgroundTint, backgroundTint, 0.2f));
             }
 
-            EditorGUI.showMixedValue = previousMixed;
-        }
-
-        private static GroupState GetGroupState(
-            MmdToonLitInspectorSection section,
-            MmdToonInspectorProfile profile,
-            MaterialEditor materialEditor,
-            MaterialProperty[] properties)
-        {
-            return section switch
+            const float featureSpacing = 2.0f;
+            float lineHeight = EditorGUIUtility.singleLineHeight;
+            Rect titleRect = headerRect;
+            if (TryGetFeature(definition.Section, out MmdToonFeature feature))
             {
-                MmdToonLitInspectorSection.SurfaceOptions => MmdToonMaterialStateSync.GetSurfaceType(GetMaterials(materialEditor), out bool mixed) != MmdToonSurfaceType.Opaque
-                    ? (mixed ? GroupState.Mixed : GroupState.On)
-                    : (mixed ? GroupState.Mixed : GroupState.Off),
-                MmdToonLitInspectorSection.SurfaceInputs => GroupState.On,
-                MmdToonLitInspectorSection.DetailInputs => CombineGroupStates(
-                    GetPropertyState(properties, "_ToonMapBound", value => value > 0.5f),
-                    GetPropertyState(properties, "_SphereMode", value => value > 0.5f),
-                    GetPropertyState(properties, "_MmdNormalMapBound", value => value > 0.5f)),
-                MmdToonLitInspectorSection.AdvancedOptions => profile == MmdToonInspectorProfile.MmdToon
-                    ? CombineGroupStates(
-                        GetPropertyState(properties, "_ToonBoundary", value => value >= -0.5f),
-                        GetPropertyState(properties, "_StylizedSpecularBoundary", value => value >= -0.5f),
-                        GetPropertyState(properties, "_RimBoundary", value => value >= -0.5f),
-                        GetPropertyState(properties, "_MmdEmissionIntensity", value => value >= 0.0f))
-                    : GetPropertyState(properties, "_OutlineVisible", value => value > 0.5f),
-                _ => GroupState.Off,
-            };
-        }
-
-        private static GroupState GetPropertyState(
-            MaterialProperty[] properties,
-            string propertyName,
-            Func<float, bool> isEnabled)
-        {
-            MaterialProperty? property = FindProperty(propertyName, properties);
-            if (property == null)
-            {
-                return GroupState.Off;
-            }
-
-            return property.hasMixedValue
-                ? GroupState.Mixed
-                : isEnabled(property.floatValue) ? GroupState.On : GroupState.Off;
-        }
-
-        private static GroupState CombineGroupStates(params GroupState[] states)
-        {
-            bool anyOn = false;
-            bool anyOff = false;
-            for (int i = 0; i < states.Length; i++)
-            {
-                if (states[i] == GroupState.Mixed)
+                Material[] materials = GetMaterials(materialEditor);
+                MmdToonFeatureState state = MmdToonMaterialStateSync.GetFeatureState(materials, feature);
+                GUIContent stateContent = new(state switch
                 {
-                    return GroupState.Mixed;
+                    MmdToonFeatureState.On => "ON",
+                    MmdToonFeatureState.Mixed => "MIXED",
+                    _ => "OFF",
+                });
+                float stateLabelWidth = EditorStyles.miniLabel.CalcSize(stateContent).x;
+                float toggleSize = lineHeight;
+                float stateWidth = toggleSize + featureSpacing + stateLabelWidth;
+                Rect stateRect = headerRect;
+                stateRect.xMin = headerRect.xMax - stateWidth;
+                stateRect.yMin = headerRect.y + (headerRect.height - lineHeight) * 0.5f;
+                stateRect.height = lineHeight;
+                titleRect.xMax = Mathf.Max(titleRect.xMin, stateRect.xMin - featureSpacing);
+                Rect toggleRect = stateRect;
+                toggleRect.width = toggleSize;
+                Rect labelRect = stateRect;
+                labelRect.xMin = toggleRect.xMax + featureSpacing;
+
+                bool previousMixed = EditorGUI.showMixedValue;
+                try
+                {
+                    EditorGUI.showMixedValue = state == MmdToonFeatureState.Mixed;
+                    EditorGUI.BeginChangeCheck();
+                    bool enabled = EditorGUI.Toggle(toggleRect, state == MmdToonFeatureState.On);
+                    if (EditorGUI.EndChangeCheck())
+                    {
+                        MmdToonMaterialStateSync.SetFeatureEnabled(materials, feature, enabled);
+                    }
+                }
+                finally
+                {
+                    EditorGUI.showMixedValue = previousMixed;
                 }
 
-                anyOn |= states[i] == GroupState.On;
-                anyOff |= states[i] == GroupState.Off;
+                EditorGUI.LabelField(labelRect, stateContent, EditorStyles.miniLabel);
             }
 
-            return anyOn && anyOff ? GroupState.Mixed : anyOn ? GroupState.On : GroupState.Off;
+            Rect foldoutRect = titleRect;
+            foldoutRect.y += (headerRect.height - lineHeight) * 0.5f;
+            foldoutRect.height = lineHeight;
+            float arrowWidth = Mathf.Min(lineHeight, foldoutRect.width);
+            Rect arrowRect = foldoutRect;
+            arrowRect.width = arrowWidth;
+            bool nextExpanded = EditorGUI.Foldout(arrowRect, isExpanded, GUIContent.none, false);
+            Rect labelRectForTitle = foldoutRect;
+            labelRectForTitle.xMin = Mathf.Min(
+                labelRectForTitle.xMax,
+                arrowRect.xMax + featureSpacing);
+            EditorGUI.LabelField(
+                labelRectForTitle,
+                new GUIContent(definition.DisplayName),
+                EditorStyles.boldLabel);
+
+            if (Event.current.type == EventType.MouseDown &&
+                Event.current.button == 0 &&
+                labelRectForTitle.Contains(Event.current.mousePosition))
+            {
+                nextExpanded = !isExpanded;
+                Event.current.Use();
+                GUI.changed = true;
+            }
+
+            return nextExpanded;
+        }
+
+        private static bool TryGetFeature(MmdToonLitInspectorSection section, out MmdToonFeature feature)
+        {
+            feature = section switch
+            {
+                MmdToonLitInspectorSection.ToonMap => MmdToonFeature.ToonMap,
+                MmdToonLitInspectorSection.NormalMap => MmdToonFeature.NormalMap,
+                MmdToonLitInspectorSection.SphereMatCap => MmdToonFeature.SphereMatCap,
+                MmdToonLitInspectorSection.StylizedSpecular => MmdToonFeature.StylizedSpecular,
+                MmdToonLitInspectorSection.RimLight => MmdToonFeature.RimLight,
+                MmdToonLitInspectorSection.Emission => MmdToonFeature.Emission,
+                MmdToonLitInspectorSection.Outline => MmdToonFeature.Outline,
+                _ => default,
+            };
+            return section is MmdToonLitInspectorSection.ToonMap or
+                MmdToonLitInspectorSection.NormalMap or
+                MmdToonLitInspectorSection.SphereMatCap or
+                MmdToonLitInspectorSection.StylizedSpecular or
+                MmdToonLitInspectorSection.RimLight or
+                MmdToonLitInspectorSection.Emission or
+                MmdToonLitInspectorSection.Outline;
         }
 
         private static void DrawSurfaceOptions(
-            MmdToonInspectorProfile profile,
             MaterialEditor materialEditor,
             MaterialProperty[] properties)
         {
@@ -199,14 +267,12 @@ namespace Mmd.Editor
             DrawSurfaceType(materials);
             DrawRenderFace(materials);
             DrawCutoutThreshold(materialEditor, materials, properties);
-            DrawProperty(materialEditor, properties, "_ToonStrength", "Toon Strength");
-            materialEditor.RenderQueueField();
         }
 
         private static void DrawSurfaceInputs(MaterialEditor materialEditor, MaterialProperty[] properties)
         {
-            MaterialProperty? baseMap = FindProperty("_BaseMap", properties);
-            MaterialProperty? baseColor = FindProperty("_BaseColor", properties);
+            MaterialProperty? baseMap = FindOptionalProperty("_BaseMap", properties);
+            MaterialProperty? baseColor = FindOptionalProperty("_BaseColor", properties);
             if (baseMap != null && baseColor != null)
             {
                 materialEditor.TexturePropertySingleLine(new GUIContent("Base Map"), baseMap, baseColor);
@@ -216,53 +282,80 @@ namespace Mmd.Editor
             DrawProperty(materialEditor, properties, "_Alpha", "Alpha");
         }
 
-        private static void DrawDetailInputs(MaterialEditor materialEditor, MaterialProperty[] properties)
+        private static void DrawTextureMap(
+            MaterialEditor materialEditor,
+            MaterialProperty[] properties,
+            string propertyName,
+            string label)
         {
-            DrawTextureFeature(materialEditor, properties, "_ToonMapBound", "_ToonMap", "Toon Map");
-            DrawSphereFeature(materialEditor, properties);
-            DrawTextureFeature(materialEditor, properties, "_MmdNormalMapBound", "_MmdNormalMap", "Normal Map");
+            MaterialProperty? map = FindOptionalProperty(propertyName, properties);
+            if (map != null)
+            {
+                materialEditor.TexturePropertySingleLine(new GUIContent(label), map);
+            }
         }
 
-        private static void DrawAdvancedOptions(
+        private static void DrawToonLighting(
             MmdToonInspectorProfile profile,
             MaterialEditor materialEditor,
             MaterialProperty[] properties)
         {
-            EditorGUILayout.LabelField("MMD Lighting", EditorStyles.boldLabel);
+            DrawProperty(materialEditor, properties, "_ToonStrength", "Toon Strength");
             DrawProperty(materialEditor, properties, "_AmbientColor", "Ambient Color");
             DrawProperty(materialEditor, properties, "_MmdLightColor", "Light Color");
             DrawProperty(materialEditor, properties, "_MmdLightDirection", "Light Direction Override");
-            DrawProperty(materialEditor, properties, "_MmdSelfShadowReceive", "Receive MMD Self Shadow");
+            if (profile == MmdToonInspectorProfile.MmdToon)
+            {
+                DrawProperty(materialEditor, properties, "_ToonBoundary", "Toon Boundary");
+                DrawProperty(materialEditor, properties, "_ToonFeather", "Toon Boundary Feather");
+                DrawProperty(materialEditor, properties, "_ToonBandCount", "Toon Band Count");
+                DrawProperty(materialEditor, properties, "_ReflectionProbeWeight", "Reflection Probe Weight");
+            }
+        }
 
-            EditorGUILayout.Space(EditorGUIUtility.standardVerticalSpacing);
-            EditorGUILayout.LabelField("Outline", EditorStyles.boldLabel);
-            DrawProperty(materialEditor, properties, "_OutlineVisible", "Enabled");
+        private static void DrawStylizedSpecular(MaterialEditor materialEditor, MaterialProperty[] properties)
+        {
+            DrawProperty(materialEditor, properties, "_StylizedSpecularColor", "Color");
+            DrawProperty(materialEditor, properties, "_StylizedSpecularBoundary", "Boundary");
+            DrawProperty(materialEditor, properties, "_StylizedSpecularFeather", "Feather");
+        }
+
+        private static void DrawRimLight(MaterialEditor materialEditor, MaterialProperty[] properties)
+        {
+            DrawProperty(materialEditor, properties, "_RimColor", "Color");
+            DrawProperty(materialEditor, properties, "_RimBoundary", "Boundary");
+            DrawProperty(materialEditor, properties, "_RimFeather", "Feather");
+            DrawProperty(materialEditor, properties, "_RimLightFollow", "Light Follow");
+        }
+
+        private static void DrawEmission(MaterialEditor materialEditor, MaterialProperty[] properties)
+        {
+            DrawProperty(materialEditor, properties, "_MmdEmissionIntensity", "Intensity");
+            DrawProperty(materialEditor, properties, "_EmissionColor", "Color");
+            DrawTextureWithBound(materialEditor, properties, "_EmissionMap", "_MmdEmissionMapBound", "Emission Map");
+            DrawTextureWithBound(materialEditor, properties, "_MmdEmissionMask", "_MmdEmissionMaskBound", "Mask");
+        }
+
+        private static void DrawOutline(MaterialEditor materialEditor, MaterialProperty[] properties)
+        {
             DrawProperty(materialEditor, properties, "_OutlineColor", "Color");
             DrawProperty(materialEditor, properties, "_OutlineWidth", "Width");
             DrawProperty(materialEditor, properties, "_OutlineScreenSpaceWeight", "Screen Space Weight");
+        }
 
-            if (profile != MmdToonInspectorProfile.MmdToon)
+        private static void DrawTextureWithBound(
+            MaterialEditor materialEditor,
+            MaterialProperty[] properties,
+            string textureName,
+            string boundName,
+            string label)
+        {
+            MaterialProperty? texture = FindOptionalProperty(textureName, properties);
+            MaterialProperty? bound = FindOptionalProperty(boundName, properties);
+            if (texture != null)
             {
-                return;
+                materialEditor.TexturePropertySingleLine(new GUIContent(label), texture, bound);
             }
-
-            EditorGUILayout.Space(EditorGUIUtility.standardVerticalSpacing);
-            EditorGUILayout.LabelField("MMD URP Toon", EditorStyles.boldLabel);
-            DrawProperty(materialEditor, properties, "_ToonBoundary", "Toon Boundary");
-            DrawProperty(materialEditor, properties, "_ToonFeather", "Toon Boundary Feather");
-            DrawProperty(materialEditor, properties, "_ToonBandCount", "Toon Band Count");
-            DrawProperty(materialEditor, properties, "_ReflectionProbeWeight", "Reflection Probe Weight");
-            DrawProperty(materialEditor, properties, "_StylizedSpecularColor", "Stylized Specular Color");
-            DrawProperty(materialEditor, properties, "_StylizedSpecularBoundary", "Stylized Specular Boundary");
-            DrawProperty(materialEditor, properties, "_StylizedSpecularFeather", "Stylized Specular Feather");
-            DrawProperty(materialEditor, properties, "_RimColor", "Rim Color");
-            DrawProperty(materialEditor, properties, "_RimBoundary", "Rim Boundary");
-            DrawProperty(materialEditor, properties, "_RimFeather", "Rim Feather");
-            DrawProperty(materialEditor, properties, "_RimLightFollow", "Rim Light Follow");
-            DrawProperty(materialEditor, properties, "_MmdEmissionIntensity", "Emission Intensity");
-            DrawProperty(materialEditor, properties, "_EmissionColor", "Emission Color");
-            DrawProperty(materialEditor, properties, "_EmissionMap", "Emission Map");
-            DrawProperty(materialEditor, properties, "_MmdEmissionMask", "Emission Mask");
         }
 
         private static void DrawSurfaceType(Material[] materials)
@@ -315,7 +408,7 @@ namespace Mmd.Editor
                 return;
             }
 
-            MaterialProperty? threshold = FindProperty("_AlphaClipThreshold", properties);
+            MaterialProperty? threshold = FindOptionalProperty("_AlphaClipThreshold", properties);
             if (threshold == null)
             {
                 return;
@@ -325,68 +418,29 @@ namespace Mmd.Editor
             DrawProperty(materialEditor, properties, "_ShadowAlphaClipThreshold", "Shadow Alpha Clip Threshold");
         }
 
-        private static void DrawTextureFeature(
-            MaterialEditor materialEditor,
-            MaterialProperty[] properties,
-            string enabledPropertyName,
-            string texturePropertyName,
-            string label)
+        private static void DrawSphereInputs(MaterialEditor materialEditor, MaterialProperty[] properties)
         {
-            MaterialProperty? enabled = FindProperty(enabledPropertyName, properties);
-            MaterialProperty? texture = FindProperty(texturePropertyName, properties);
-            if (enabled == null || texture == null)
-            {
-                return;
-            }
-
-            bool isEnabled = enabled.floatValue > 0.5f;
-            bool previousMixed = EditorGUI.showMixedValue;
-            EditorGUI.showMixedValue = enabled.hasMixedValue;
-            EditorGUI.BeginChangeCheck();
-            bool updated = EditorGUILayout.Toggle(label, isEnabled);
-            if (EditorGUI.EndChangeCheck())
-            {
-                enabled.floatValue = updated ? 1.0f : 0.0f;
-                isEnabled = updated;
-            }
-
-            EditorGUI.showMixedValue = previousMixed;
-            if (isEnabled || enabled.hasMixedValue)
-            {
-                EditorGUI.indentLevel++;
-                materialEditor.TexturePropertySingleLine(GUIContent.none, texture);
-                EditorGUI.indentLevel--;
-            }
-        }
-
-        private static void DrawSphereFeature(MaterialEditor materialEditor, MaterialProperty[] properties)
-        {
-            MaterialProperty? mode = FindProperty("_SphereMode", properties);
-            MaterialProperty? map = FindProperty("_SphereMap", properties);
+            MaterialProperty? mode = FindOptionalProperty("_SphereMode", properties);
+            MaterialProperty? map = FindOptionalProperty("_SphereMap", properties);
             if (mode == null || map == null)
             {
                 return;
             }
 
-            string[] names = { "Off", "Multiply", "Add" };
-            int current = Mathf.Clamp(Mathf.RoundToInt(mode.floatValue), 0, names.Length - 1);
+            string[] names = { "Multiply", "Add" };
+            int current = Mathf.Clamp(Mathf.RoundToInt(mode.floatValue) - 1, 0, names.Length - 1);
             bool previousMixed = EditorGUI.showMixedValue;
             EditorGUI.showMixedValue = mode.hasMixedValue;
             EditorGUI.BeginChangeCheck();
-            int selected = EditorGUILayout.Popup("Sphere Map", current, names);
+            int selected = EditorGUILayout.Popup("Blend Mode", current, names);
             if (EditorGUI.EndChangeCheck())
             {
-                mode.floatValue = selected;
+                mode.floatValue = selected + 1;
                 current = selected;
             }
 
             EditorGUI.showMixedValue = previousMixed;
-            if (current > 0 || mode.hasMixedValue)
-            {
-                EditorGUI.indentLevel++;
-                materialEditor.TexturePropertySingleLine(GUIContent.none, map);
-                EditorGUI.indentLevel--;
-            }
+            materialEditor.TexturePropertySingleLine(new GUIContent("Sphere Map"), map);
         }
 
         private static RenderFace GetRenderFace(Material[] materials, out bool mixed)
@@ -426,7 +480,7 @@ namespace Mmd.Editor
             return materials;
         }
 
-        private static MaterialProperty? FindProperty(string name, MaterialProperty[] properties)
+        private static MaterialProperty? FindOptionalProperty(string name, MaterialProperty[] properties)
         {
             for (int i = 0; i < properties.Length; i++)
             {
@@ -445,7 +499,7 @@ namespace Mmd.Editor
             string propertyName,
             string label)
         {
-            MaterialProperty? property = FindProperty(propertyName, properties);
+            MaterialProperty? property = FindOptionalProperty(propertyName, properties);
             if (property == null)
             {
                 return;

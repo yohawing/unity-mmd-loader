@@ -11,7 +11,14 @@ namespace Mmd.Editor
     {
         SurfaceOptions,
         SurfaceInputs,
-        DetailInputs,
+        ToonMap,
+        NormalMap,
+        SphereMatCap,
+        ToonLighting,
+        StylizedSpecular,
+        RimLight,
+        Emission,
+        Outline,
         AdvancedOptions,
     }
 
@@ -26,6 +33,24 @@ namespace Mmd.Editor
         Opaque,
         Cutout,
         Transparent,
+    }
+
+    internal enum MmdToonFeature
+    {
+        ToonMap,
+        NormalMap,
+        SphereMatCap,
+        StylizedSpecular,
+        RimLight,
+        Emission,
+        Outline,
+    }
+
+    internal enum MmdToonFeatureState
+    {
+        Off,
+        On,
+        Mixed,
     }
 
     internal sealed class MmdToonLitSectionDefinition
@@ -58,7 +83,14 @@ namespace Mmd.Editor
         {
             new(MmdToonLitInspectorSection.SurfaceOptions, "Surface Options", true),
             new(MmdToonLitInspectorSection.SurfaceInputs, "Surface Inputs", true),
-            new(MmdToonLitInspectorSection.DetailInputs, "Detail Inputs", false),
+            new(MmdToonLitInspectorSection.ToonMap, "Toon Map", false),
+            new(MmdToonLitInspectorSection.NormalMap, "Normal Map", false),
+            new(MmdToonLitInspectorSection.SphereMatCap, "Sphere / MatCap", false),
+            new(MmdToonLitInspectorSection.ToonLighting, "Toon Lighting", false),
+            new(MmdToonLitInspectorSection.StylizedSpecular, "Stylized Specular", false),
+            new(MmdToonLitInspectorSection.RimLight, "Rim Light", false),
+            new(MmdToonLitInspectorSection.Emission, "Emission", false),
+            new(MmdToonLitInspectorSection.Outline, "Outline", false),
             new(MmdToonLitInspectorSection.AdvancedOptions, "Advanced Options", false),
         };
 
@@ -110,6 +142,20 @@ namespace Mmd.Editor
                 : BasicToonDisplayName;
         }
 
+        internal static bool SupportsSection(
+            MmdToonInspectorProfile profile,
+            MmdToonLitInspectorSection section)
+        {
+            if (profile == MmdToonInspectorProfile.MmdToon)
+            {
+                return true;
+            }
+
+            return section != MmdToonLitInspectorSection.StylizedSpecular &&
+                section != MmdToonLitInspectorSection.RimLight &&
+                section != MmdToonLitInspectorSection.Emission;
+        }
+
         internal static bool HasRequiredProperties(MaterialProperty[] properties, out string missing)
         {
             for (int i = 0; i < RequiredProperties.Length; i++)
@@ -141,7 +187,15 @@ namespace Mmd.Editor
     {
         internal const string AlphaClipThresholdBackup = "_MmdAlphaClipThresholdBackup";
         internal const string ShadowAlphaClipThresholdBackup = "_MmdShadowAlphaClipThresholdBackup";
+        internal const string SphereModeBackup = "_MmdSphereModeBackup";
+        internal const string StylizedSpecularBoundaryBackup = "_MmdStylizedSpecularBoundaryBackup";
+        internal const string RimBoundaryBackup = "_MmdRimBoundaryBackup";
+        internal const string EmissionIntensityBackup = "_MmdEmissionIntensityBackup";
         private const float DefaultAlphaClipThreshold = 0.01f;
+        private const float DefaultSphereMode = 1.0f;
+        private const float DefaultStylizedSpecularBoundary = 0.5f;
+        private const float DefaultRimBoundary = 0.5f;
+        private const float DefaultEmissionIntensity = 1.0f;
 
         internal static MmdToonSurfaceType GetSurfaceType(Material material)
         {
@@ -214,6 +268,170 @@ namespace Mmd.Editor
 
                 EditorUtility.SetDirty(material);
             }
+        }
+
+        internal static MmdToonFeatureState GetFeatureState(
+            Material[] materials,
+            MmdToonFeature feature)
+        {
+            if (materials == null || materials.Length == 0)
+            {
+                return MmdToonFeatureState.Off;
+            }
+
+            bool firstEnabled = IsFeatureEnabled(materials[0], feature);
+            for (int i = 1; i < materials.Length; i++)
+            {
+                if (IsFeatureEnabled(materials[i], feature) != firstEnabled)
+                {
+                    return MmdToonFeatureState.Mixed;
+                }
+            }
+
+            return firstEnabled ? MmdToonFeatureState.On : MmdToonFeatureState.Off;
+        }
+
+        internal static void SetFeatureEnabled(
+            Material[] materials,
+            MmdToonFeature feature,
+            bool enabled)
+        {
+            if (materials == null || materials.Length == 0)
+            {
+                return;
+            }
+
+            Undo.RecordObjects(materials, $"{(enabled ? "Enable" : "Disable")} MMD {feature}");
+            for (int i = 0; i < materials.Length; i++)
+            {
+                Material material = materials[i];
+                switch (feature)
+                {
+                    case MmdToonFeature.ToonMap:
+                        SetDirectFlag(material, "_ToonMapBound", enabled);
+                        break;
+                    case MmdToonFeature.NormalMap:
+                        SetDirectFlag(material, "_MmdNormalMapBound", enabled);
+                        break;
+                    case MmdToonFeature.SphereMatCap:
+                        SetSentinelFloat(
+                            material,
+                            "_SphereMode",
+                            SphereModeBackup,
+                            offValue: 0.0f,
+                            restoreDefault: DefaultSphereMode,
+                            enabled,
+                            isEnabled: value => value > 0.5f,
+                            isValidBackup: value => value > 0.5f);
+                        break;
+                    case MmdToonFeature.StylizedSpecular:
+                        SetSentinelFloat(
+                            material,
+                            "_StylizedSpecularBoundary",
+                            StylizedSpecularBoundaryBackup,
+                            offValue: -1.0f,
+                            restoreDefault: DefaultStylizedSpecularBoundary,
+                            enabled,
+                            isEnabled: value => value >= -0.5f,
+                            isValidBackup: value => value >= -0.5f);
+                        break;
+                    case MmdToonFeature.RimLight:
+                        SetSentinelFloat(
+                            material,
+                            "_RimBoundary",
+                            RimBoundaryBackup,
+                            offValue: -1.0f,
+                            restoreDefault: DefaultRimBoundary,
+                            enabled,
+                            isEnabled: value => value >= -0.5f,
+                            isValidBackup: value => value >= -0.5f);
+                        break;
+                    case MmdToonFeature.Emission:
+                        SetSentinelFloat(
+                            material,
+                            "_MmdEmissionIntensity",
+                            EmissionIntensityBackup,
+                            offValue: -1.0f,
+                            restoreDefault: DefaultEmissionIntensity,
+                            enabled,
+                            isEnabled: value => value >= 0.0f,
+                            isValidBackup: value => value >= 0.0f);
+                        break;
+                    case MmdToonFeature.Outline:
+                        SetDirectFlag(material, "_OutlineVisible", enabled);
+                        break;
+                }
+
+                EditorUtility.SetDirty(material);
+            }
+        }
+
+        private static bool IsFeatureEnabled(Material material, MmdToonFeature feature)
+        {
+            return feature switch
+            {
+                MmdToonFeature.ToonMap => material.GetFloat("_ToonMapBound") > 0.5f,
+                MmdToonFeature.NormalMap => material.GetFloat("_MmdNormalMapBound") > 0.5f,
+                MmdToonFeature.SphereMatCap => material.GetFloat("_SphereMode") > 0.5f,
+                MmdToonFeature.StylizedSpecular => material.GetFloat("_StylizedSpecularBoundary") >= -0.5f,
+                MmdToonFeature.RimLight => material.GetFloat("_RimBoundary") >= -0.5f,
+                MmdToonFeature.Emission => material.GetFloat("_MmdEmissionIntensity") >= 0.0f,
+                MmdToonFeature.Outline => material.GetFloat("_OutlineVisible") > 0.5f,
+                _ => false,
+            };
+        }
+
+        private static void SetDirectFlag(Material material, string propertyName, bool enabled)
+        {
+            if (material.HasProperty(propertyName))
+            {
+                material.SetFloat(propertyName, enabled ? 1.0f : 0.0f);
+            }
+        }
+
+        private static void SetSentinelFloat(
+            Material material,
+            string propertyName,
+            string backupPropertyName,
+            float offValue,
+            float restoreDefault,
+            bool enabled,
+            Func<float, bool> isEnabled,
+            Func<float, bool> isValidBackup)
+        {
+            if (!material.HasProperty(propertyName))
+            {
+                return;
+            }
+
+            float current = material.GetFloat(propertyName);
+            if (!enabled)
+            {
+                if (material.HasProperty(backupPropertyName) && isEnabled(current))
+                {
+                    material.SetFloat(backupPropertyName, current);
+                }
+
+                material.SetFloat(propertyName, offValue);
+                return;
+            }
+
+            if (isEnabled(current))
+            {
+                return;
+            }
+
+            float restored = restoreDefault;
+            if (material.HasProperty(backupPropertyName))
+            {
+                float backup = material.GetFloat(backupPropertyName);
+                if (isValidBackup(backup))
+                {
+                    restored = backup;
+                }
+            }
+
+            material.SetFloat(propertyName, restored);
         }
 
         private static int GetDefaultRenderQueue(MmdToonSurfaceType surfaceType)

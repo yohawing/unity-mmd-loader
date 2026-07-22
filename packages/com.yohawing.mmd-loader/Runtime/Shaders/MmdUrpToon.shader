@@ -50,6 +50,10 @@ Shader "MMD URP Toon"
         _ShadowAlphaClipThreshold ("Shadow Alpha Clip Threshold", Range(0, 1)) = 0
         [HideInInspector] _MmdAlphaClipThresholdBackup ("MMD Alpha Clip Threshold Backup", Float) = 0.01
         [HideInInspector] _MmdShadowAlphaClipThresholdBackup ("MMD Shadow Alpha Clip Threshold Backup", Float) = 0.01
+        [HideInInspector] _MmdSphereModeBackup ("MMD Sphere Mode Backup", Float) = 1
+        [HideInInspector] _MmdStylizedSpecularBoundaryBackup ("MMD Stylized Specular Boundary Backup", Float) = 0.5
+        [HideInInspector] _MmdRimBoundaryBackup ("MMD Rim Boundary Backup", Float) = 0.5
+        [HideInInspector] _MmdEmissionIntensityBackup ("MMD Emission Intensity Backup", Float) = 1
         _Cull ("Cull", Float) = 2
         _ZWrite ("ZWrite", Float) = 1
         _ZTest ("ZTest", Float) = 4

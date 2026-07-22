@@ -1,6 +1,7 @@
 #nullable enable
 
 using NUnit.Framework;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -15,7 +16,14 @@ namespace Mmd.Tests
             {
                 "Surface Options",
                 "Surface Inputs",
-                "Detail Inputs",
+                "Toon Map",
+                "Normal Map",
+                "Sphere / MatCap",
+                "Toon Lighting",
+                "Stylized Specular",
+                "Rim Light",
+                "Emission",
+                "Outline",
                 "Advanced Options",
             };
 
@@ -69,6 +77,36 @@ namespace Mmd.Tests
             Assert.That(
                 Mmd.Editor.MmdToonLitShaderGUIState.GetDisplayName(legacyBasicProfile),
                 Is.EqualTo("MMD Basic Toon"));
+        }
+
+        [Test]
+        public void ProfileSupportHidesMmdOnlyFeatureSectionsForBasicToon()
+        {
+            Assert.That(
+                Mmd.Editor.MmdToonLitShaderGUIState.SupportsSection(
+                    Mmd.Editor.MmdToonInspectorProfile.BasicToon,
+                    Mmd.Editor.MmdToonLitInspectorSection.StylizedSpecular),
+                Is.False);
+            Assert.That(
+                Mmd.Editor.MmdToonLitShaderGUIState.SupportsSection(
+                    Mmd.Editor.MmdToonInspectorProfile.BasicToon,
+                    Mmd.Editor.MmdToonLitInspectorSection.RimLight),
+                Is.False);
+            Assert.That(
+                Mmd.Editor.MmdToonLitShaderGUIState.SupportsSection(
+                    Mmd.Editor.MmdToonInspectorProfile.BasicToon,
+                    Mmd.Editor.MmdToonLitInspectorSection.Emission),
+                Is.False);
+            Assert.That(
+                Mmd.Editor.MmdToonLitShaderGUIState.SupportsSection(
+                    Mmd.Editor.MmdToonInspectorProfile.BasicToon,
+                    Mmd.Editor.MmdToonLitInspectorSection.Outline),
+                Is.True);
+            Assert.That(
+                Mmd.Editor.MmdToonLitShaderGUIState.SupportsSection(
+                    Mmd.Editor.MmdToonInspectorProfile.MmdToon,
+                    Mmd.Editor.MmdToonLitInspectorSection.Emission),
+                Is.True);
         }
 
         [Test]
@@ -155,6 +193,87 @@ namespace Mmd.Tests
             finally
             {
                 Object.DestroyImmediate(material);
+            }
+        }
+
+        [Test]
+        public void FeatureSentinelsAndDirectFlagsRoundTripWithoutLosingValues()
+        {
+            Material material = CreateMaterial("MMD URP Toon");
+            Mmd.Editor.MmdToonFeature[] features =
+            {
+                Mmd.Editor.MmdToonFeature.ToonMap,
+                Mmd.Editor.MmdToonFeature.NormalMap,
+                Mmd.Editor.MmdToonFeature.SphereMatCap,
+                Mmd.Editor.MmdToonFeature.StylizedSpecular,
+                Mmd.Editor.MmdToonFeature.RimLight,
+                Mmd.Editor.MmdToonFeature.Emission,
+                Mmd.Editor.MmdToonFeature.Outline,
+            };
+            try
+            {
+                material.SetFloat("_ToonMapBound", 1.0f);
+                material.SetFloat("_MmdNormalMapBound", 1.0f);
+                material.SetFloat("_SphereMode", 2.0f);
+                material.SetFloat("_StylizedSpecularBoundary", 0.72f);
+                material.SetFloat("_RimBoundary", 0.28f);
+                material.SetFloat("_MmdEmissionIntensity", 2.5f);
+                material.SetFloat("_OutlineVisible", 1.0f);
+
+                for (int i = 0; i < features.Length; i++)
+                {
+                    Mmd.Editor.MmdToonMaterialStateSync.SetFeatureEnabled(
+                        new[] { material }, features[i], false);
+                    Assert.That(
+                        Mmd.Editor.MmdToonMaterialStateSync.GetFeatureState(new[] { material }, features[i]),
+                        Is.EqualTo(Mmd.Editor.MmdToonFeatureState.Off));
+                    Mmd.Editor.MmdToonMaterialStateSync.SetFeatureEnabled(
+                        new[] { material }, features[i], true);
+                    Assert.That(
+                        Mmd.Editor.MmdToonMaterialStateSync.GetFeatureState(new[] { material }, features[i]),
+                        Is.EqualTo(Mmd.Editor.MmdToonFeatureState.On));
+                }
+
+                Assert.That(material.GetFloat("_SphereMode"), Is.EqualTo(2.0f).Within(0.00001f));
+                Assert.That(material.GetFloat("_StylizedSpecularBoundary"), Is.EqualTo(0.72f).Within(0.00001f));
+                Assert.That(material.GetFloat("_RimBoundary"), Is.EqualTo(0.28f).Within(0.00001f));
+                Assert.That(material.GetFloat("_MmdEmissionIntensity"), Is.EqualTo(2.5f).Within(0.00001f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(material);
+            }
+        }
+
+        [Test]
+        public void FeatureMixedSelectionCanBeEnabledTogetherAndUndoRestoresPreviousState()
+        {
+            Material first = CreateMaterial("MMD URP Toon");
+            Material second = CreateMaterial("MMD URP Toon");
+            try
+            {
+                first.SetFloat("_RimBoundary", 0.63f);
+                second.SetFloat("_RimBoundary", -1.0f);
+                Material[] materials = { first, second };
+
+                Assert.That(
+                    Mmd.Editor.MmdToonMaterialStateSync.GetFeatureState(
+                        materials, Mmd.Editor.MmdToonFeature.RimLight),
+                    Is.EqualTo(Mmd.Editor.MmdToonFeatureState.Mixed));
+
+                Mmd.Editor.MmdToonMaterialStateSync.SetFeatureEnabled(
+                    materials, Mmd.Editor.MmdToonFeature.RimLight, true);
+                Assert.That(first.GetFloat("_RimBoundary"), Is.EqualTo(0.63f).Within(0.00001f));
+                Assert.That(second.GetFloat("_RimBoundary"), Is.EqualTo(0.5f).Within(0.00001f));
+
+                Undo.PerformUndo();
+                Assert.That(first.GetFloat("_RimBoundary"), Is.EqualTo(0.63f).Within(0.00001f));
+                Assert.That(second.GetFloat("_RimBoundary"), Is.EqualTo(-1.0f).Within(0.00001f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(first);
+                Object.DestroyImmediate(second);
             }
         }
 
