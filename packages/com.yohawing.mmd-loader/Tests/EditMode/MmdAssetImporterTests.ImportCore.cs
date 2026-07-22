@@ -218,6 +218,34 @@ namespace Mmd.Tests
                 Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName));
         }
         [Test]
+        public void PmxImporterMmdUrpToonReimportPreservesBoundDiffuseTexture()
+        {
+            const string pmxPath = TempDirectory + "/mmd-texture-alpha-used-uv-cutout.pmx";
+            const string texturePath = TempDirectory + "/texture-alpha-cutout.png";
+            Directory.CreateDirectory(Path.Combine(ProjectRoot, TempDirectory));
+            File.Copy(
+                MmdTestFixtures.FixtureAssetPath("GeneratedPmx/mmd-texture-alpha-used-uv-cutout.pmx"),
+                Path.Combine(ProjectRoot, pmxPath),
+                overwrite: true);
+            File.Copy(
+                MmdTestFixtures.FixtureAssetPath("GeneratedPmx/texture-alpha-cutout.png"),
+                Path.Combine(ProjectRoot, texturePath),
+                overwrite: true);
+            AssetDatabase.ImportAsset(texturePath, ImportAssetOptions.ForceUpdate);
+            AssetDatabase.ImportAsset(pmxPath, ImportAssetOptions.ForceUpdate);
+
+            var importer = AssetImporter.GetAtPath(pmxPath) as MmdPmxScriptedImporter;
+            Assert.That(importer, Is.Not.Null);
+            var serializedImporter = new SerializedObject(importer!);
+            serializedImporter.FindProperty("shaderPreset").enumValueIndex = (int)MmdPmxShaderPreset.MmdToonLit;
+            serializedImporter.ApplyModifiedPropertiesWithoutUndo();
+            importer!.SaveAndReimport();
+
+            AssertMmdUrpToonDiffuseTextureIsBound(pmxPath, texturePath);
+            AssetDatabase.ImportAsset(pmxPath, ImportAssetOptions.ForceUpdate);
+            AssertMmdUrpToonDiffuseTextureIsBound(pmxPath, texturePath);
+        }
+        [Test]
         public void PmxImporterAppliesPersistentMaterialOverrideAssetAfterTextureBinding()
         {
             CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
@@ -415,7 +443,7 @@ namespace Mmd.Tests
             }
         }
         [Test]
-        public void PmxScriptedImporterVersionIsTwentySixForOutlineMaterialPolicy()
+        public void PmxScriptedImporterVersionIsTwentyEightForPublicToonTextureMigration()
         {
             object[] attributes = typeof(MmdPmxScriptedImporter).GetCustomAttributes(
                 typeof(ScriptedImporterAttribute),
@@ -423,8 +451,21 @@ namespace Mmd.Tests
 
             Assert.That(attributes, Has.Length.EqualTo(1));
             var attribute = (ScriptedImporterAttribute)attributes[0];
-            Assert.That(attribute.version, Is.EqualTo(27),
-                "PMX importer version must force reimport for the public Toon shader names.");
+            Assert.That(attribute.version, Is.EqualTo(28),
+                "PMX importer version must force a texture rebind after the public Toon shader migration.");
+        }
+
+        private static void AssertMmdUrpToonDiffuseTextureIsBound(string pmxPath, string texturePath)
+        {
+            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(pmxPath);
+            Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath);
+            Assert.That(pmxAsset, Is.Not.Null);
+            Assert.That(texture, Is.Not.Null);
+            Assert.That(pmxAsset.ImportedMaterials, Is.Not.Null.And.Not.Empty);
+            Material material = pmxAsset.ImportedMaterials[0];
+            Assert.That(material.shader.name, Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName));
+            Assert.That(material.GetTexture("_BaseMap"), Is.SameAs(texture));
+            Assert.That(material.GetFloat("_BaseMapBound"), Is.EqualTo(1.0f).Within(0.00001f));
         }
         [Test]
         public void PmxImporterImportScaleZeroDotOneFlowsToAssetInstanceAndScalesMeshBounds()

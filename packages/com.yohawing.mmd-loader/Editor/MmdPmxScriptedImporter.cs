@@ -43,7 +43,7 @@ namespace Mmd.Editor
         MmdToonLit = 2
     }
 
-    [ScriptedImporter(27, "pmx")]
+    [ScriptedImporter(28, "pmx")]
     public sealed class MmdPmxScriptedImporter : ScriptedImporter
     {
         [SerializeField] private float importScale = MmdPmxAsset.DefaultImportScale;
