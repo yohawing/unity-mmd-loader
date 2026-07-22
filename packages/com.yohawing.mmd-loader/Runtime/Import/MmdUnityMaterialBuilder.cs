@@ -50,6 +50,7 @@ namespace Mmd.UnityIntegration
             // actual shader independently for each material binding below.
             ResolveShader(ResolveRequestedShaderName(descriptor), out shaderDiagnostics);
             var materials = new Material[descriptor.materials.Count];
+            var textureTargets = new MmdMaterialTextureTargets[descriptor.materials.Count];
             try
             {
                 for (int i = 0; i < descriptor.materials.Count; i++)
@@ -58,13 +59,15 @@ namespace Mmd.UnityIntegration
                     Shader shader = ResolveShader(
                         ResolveRequestedShaderName(descriptor, source.materialIndex),
                         out _);
-                    Material material = materialMappers.Resolve(source.materialIndex)(source, shader);
+                    MmdMaterialMapperRegistration mapper = materialMappers.Resolve(source.materialIndex);
+                    Material material = mapper.Mapper(source, shader);
                     if (material == null)
                     {
                         throw new InvalidOperationException(
                             $"Material mapper returned null for MMD material index {source.materialIndex}.");
                     }
 
+                    textureTargets[i] = mapper.TextureTargets;
                     material.hideFlags = RuntimeGeneratedAssetHideFlags;
                     material.name = string.IsNullOrWhiteSpace(source.name)
                         ? $"MMD Material {source.materialIndex}"
@@ -79,21 +82,21 @@ namespace Mmd.UnityIntegration
                     }
                 }
 
-                BindDiffuseTextures(descriptor, materials, textureResolution);
+                BindDiffuseTextures(descriptor, materials, textureTargets, textureResolution);
                 BindDiagnosticTextures(
                     descriptor,
                     textureResolution.SphereTextures,
                     materials,
+                    textureTargets,
                     textureResolution.Diagnostics,
-                    "_SphereMap",
-                    "sphere");
+                    MmdMappedTextureKind.Sphere);
                 BindDiagnosticTextures(
                     descriptor,
                     textureResolution.ToonTextures,
                     materials,
+                    textureTargets,
                     textureResolution.Diagnostics,
-                    "_ToonMap",
-                    "toon");
+                    MmdMappedTextureKind.Toon);
 
                 return materials;
             }

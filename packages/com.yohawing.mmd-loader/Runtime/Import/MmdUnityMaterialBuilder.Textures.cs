@@ -12,6 +12,7 @@ namespace Mmd.UnityIntegration
         private static void BindDiffuseTextures(
             MmdRenderingDescriptor descriptor,
             Material[] materials,
+            MmdMaterialTextureTargets[] textureTargets,
             MmdRuntimeTextureResolution textureResolution)
         {
             var materialSlotsByIndex = new Dictionary<int, int>(descriptor.materials.Count);
@@ -29,23 +30,28 @@ namespace Mmd.UnityIntegration
                 }
 
                 Material material = materials[materialSlot];
+                MmdMaterialTextureTargets targets = textureTargets[materialSlot];
                 bool bound = false;
-                if (material.HasProperty("_BaseMap"))
+                foreach (string propertyName in targets.DiffuseTextureProperties)
                 {
-                    material.SetTexture("_BaseMap", resolvedTexture.Texture);
-                    ApplyDiffuseBoundSideEffects(material);
-                    bound = true;
-                }
-
-                if (material.HasProperty("_MainTex"))
-                {
-                    material.SetTexture("_MainTex", resolvedTexture.Texture);
-                    bound = true;
+                    if (material.HasProperty(propertyName))
+                    {
+                        material.SetTexture(propertyName, resolvedTexture.Texture);
+                        bound = true;
+                    }
                 }
 
                 if (!bound)
                 {
-                    textureResolution.Diagnostics.AddMessage($"Material {resolvedTexture.MaterialIndex} has no supported diffuse texture property.");
+                    textureResolution.Diagnostics.AddMessage(
+                        $"Material {resolvedTexture.MaterialIndex} has no declared diffuse texture property supported by shader '{material.shader.name}'.");
+                    continue;
+                }
+
+                if (!string.IsNullOrWhiteSpace(targets.DiffuseTextureBoundProperty) &&
+                    material.HasProperty(targets.DiffuseTextureBoundProperty))
+                {
+                    material.SetFloat(targets.DiffuseTextureBoundProperty, 1.0f);
                 }
             }
         }
@@ -54,10 +60,11 @@ namespace Mmd.UnityIntegration
             MmdRenderingDescriptor descriptor,
             IReadOnlyList<MmdResolvedTexture> resolvedTextures,
             Material[] materials,
+            MmdMaterialTextureTargets[] textureTargets,
             MmdTextureBindingDiagnostics diagnostics,
-            string propertyName,
-            string label)
+            MmdMappedTextureKind kind)
         {
+            string label = kind == MmdMappedTextureKind.Toon ? "toon" : "sphere";
             var materialSlotsByIndex = new Dictionary<int, int>(descriptor.materials.Count);
             for (int i = 0; i < descriptor.materials.Count; i++)
             {
@@ -73,14 +80,19 @@ namespace Mmd.UnityIntegration
                 }
 
                 Material material = materials[materialSlot];
-                if (!material.HasProperty(propertyName))
+                MmdMaterialTextureTargets targets = textureTargets[materialSlot];
+                string propertyName = kind == MmdMappedTextureKind.Toon
+                    ? targets.ToonTextureProperty
+                    : targets.SphereTextureProperty;
+                if (string.IsNullOrWhiteSpace(propertyName) || !material.HasProperty(propertyName))
                 {
-                    diagnostics.AddMessage($"Material {resolvedTexture.MaterialIndex} has no supported {label} diagnostic texture property.");
+                    diagnostics.AddMessage(
+                        $"Material {resolvedTexture.MaterialIndex} has no declared {label} texture property supported by shader '{material.shader.name}'.");
                     continue;
                 }
 
                 material.SetTexture(propertyName, resolvedTexture.Texture);
-                if (string.Equals(label, "toon", StringComparison.Ordinal))
+                if (kind == MmdMappedTextureKind.Toon)
                 {
                     // MMD/GoldenOracle samples the toon ramp with bilinear filtering, producing a
                     // smooth shade gradient from the stepped ramp texture. Clamp the wrap so the
@@ -92,20 +104,29 @@ namespace Mmd.UnityIntegration
                         resolvedTexture.Texture.wrapMode = TextureWrapMode.Clamp;
                     }
 
-                    if (material.HasProperty("_ToonMapBound"))
+                    if (!string.IsNullOrWhiteSpace(targets.ToonTextureBoundProperty) &&
+                        material.HasProperty(targets.ToonTextureBoundProperty))
                     {
-                        material.SetFloat("_ToonMapBound", 1.0f);
+                        material.SetFloat(targets.ToonTextureBoundProperty, 1.0f);
                     }
                 }
-                else if (string.Equals(label, "sphere", StringComparison.Ordinal) &&
-                    material.HasProperty("_SphereMode"))
+                else if (!string.IsNullOrWhiteSpace(targets.SphereModeProperty) &&
+                    material.HasProperty(targets.SphereModeProperty))
                 {
                     // Only enable the sphere blend once a sphere texture is actually bound: the
                     // default _SphereMap is black, so a multiply mode without a texture would
                     // zero the material out. 1 = multiply (.sph), 2 = additive (.spa).
-                    material.SetFloat("_SphereMode", ResolveSphereMode(descriptor.materials[materialSlot].sphereTextureMode));
+                    material.SetFloat(
+                        targets.SphereModeProperty,
+                        ResolveSphereMode(descriptor.materials[materialSlot].sphereTextureMode));
                 }
             }
+        }
+
+        private enum MmdMappedTextureKind
+        {
+            Sphere,
+            Toon
         }
 
         // Maps the descriptor's sphere-texture-mode hint onto the shader's _SphereMode enum:
