@@ -186,7 +186,7 @@ namespace Mmd.Editor
                     MmdToonFeatureState.Mixed => "MIXED",
                     _ => "OFF",
                 });
-                float stateLabelWidth = EditorStyles.miniLabel.CalcSize(stateContent).x;
+                float stateLabelWidth = EditorStyles.miniLabel.CalcSize(new GUIContent("MIXED")).x;
                 float toggleSize = lineHeight;
                 float stateWidth = toggleSize + featureSpacing + stateLabelWidth;
                 Rect stateRect = headerRect;
