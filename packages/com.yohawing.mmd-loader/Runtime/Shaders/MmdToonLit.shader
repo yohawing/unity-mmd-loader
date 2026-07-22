@@ -17,6 +17,9 @@ Shader "MMD Toon Lit"
         _AmbientColor ("Ambient Color", Color) = (0.25, 0.25, 0.25, 1)
         _MmdLightDirection ("Light Direction Override", Vector) = (0, 0, 0, 0)
         _MmdLightColor ("MMD Light Color", Color) = (1, 1, 1, 1)
+        // URP SSAO is opt-in for imported MMD character materials. Stage materials may
+        // enable this per material from the Inspector when ambient occlusion is desired.
+        [Toggle] _ReceiveSSAO ("Receive SSAO", Float) = 0
         [PerRendererData] [HideInInspector] _MmdSelfShadowReceive ("MMD Self Shadow Receive", Float) = 0
         _ToonStrength ("Toon Strength", Range(0, 1)) = 1
         // Optional authoring controls. -1 keeps the current MMD visibility ramp exactly intact.
@@ -138,6 +141,7 @@ Shader "MMD Toon Lit"
                 half4 _AmbientColor;
                 half4 _MmdLightDirection;
                 half4 _MmdLightColor;
+                half _ReceiveSSAO;
                 half _ToonStrength;
                 half _ToonMapBound;
                 half _SphereMode;
@@ -371,14 +375,27 @@ Shader "MMD Toon Lit"
                 half3 lightDirection = dot(_MmdLightDirection.xyz, _MmdLightDirection.xyz) > 0.0h
                     ? normalize(_MmdLightDirection.xyz)
                     : mainLight.direction;
+                // Keep light radiance (directional color and distance attenuation) separate
+                // from shadow visibility. Shadow visibility enters the toon ramp below rather
+                // than directly gray-multiplying the radiance.
                 half3 mainLightSrgb = LinearToSRGB(_MmdLightColor.rgb) * LinearToSRGB(mainLight.color)
-                    * mainLight.distanceAttenuation * mainLight.shadowAttenuation;
+                    * mainLight.distanceAttenuation;
                 // Some PMX textures use the Legacy flat-lighting compatibility path.  Keep
                 // its white, intensity-1 result unchanged, but do not let it bypass Unity's
                 // main-light radiance or attenuation in the opt-in Toon Lit profile.
                 half3 unityMainLightSrgb = LinearToSRGB(mainLight.color)
-                    * mainLight.distanceAttenuation * mainLight.shadowAttenuation;
+                    * mainLight.distanceAttenuation;
+                half mainLightShadowVisibility = saturate(mainLight.shadowAttenuation);
                 half selfShadowVisibility = SampleMmdSelfShadow(input.positionWS, _MmdSelfShadowReceive);
+                half combinedShadowVisibility = min(mainLightShadowVisibility, selfShadowVisibility);
+                // MMD Ramp materials without a bound toon map have no authoring shade color
+                // to receive the visibility ramp. Preserve the previous direct-shadow response
+                // only for that compatibility case; bound toon maps keep shadow in toon visibility.
+                if (_ToonMapBound <= 0.5h)
+                {
+                    mainLightSrgb *= mainLightShadowVisibility;
+                    unityMainLightSrgb *= mainLightShadowVisibility;
+                }
 
                 half3 normalWS;
                 if (_MmdNormalMapBound > 0.5h)
@@ -398,13 +415,13 @@ Shader "MMD Toon Lit"
                 half lightVisibility = saturate(dot(normalWS, lightDirection) * 3.0h);
                 half toonRampVisibility = ApplyMmdToonBoundary(ApplyMmdToonBandCount(lightVisibility));
                 half toonVisibility = ApplyMmdToonBoundary(
-                    ApplyMmdToonBandCount(min(selfShadowVisibility, lightVisibility)));
+                    ApplyMmdToonBandCount(min(combinedShadowVisibility, lightVisibility)));
                 half3 fallbackSelfShadowToon = half3(1.0h, 1.0h, 1.0h);
                 half3 mappedSelfShadowToon = SAMPLE_TEXTURE2D(_ToonMap, sampler_ToonMap, float2(0.5, 0.22)).rgb;
                 half3 selfShadowToon = lerp(fallbackSelfShadowToon, mappedSelfShadowToon, saturate(_ToonMapBound));
                 half3 mmdToonLight = lerp(selfShadowToon, half3(1.0h, 1.0h, 1.0h), toonRampVisibility);
                 half3 toonLight = lerp(ndotl.xxx, mmdToonLight, _ToonStrength);
-                if (selfShadowVisibility < 0.999h)
+                if (combinedShadowVisibility < 0.999h)
                 {
                     half3 selfShadowMmdToonLight = lerp(selfShadowToon, half3(1.0h, 1.0h, 1.0h), toonVisibility);
                     half3 selfShadowToonLight = lerp(ndotl.xxx, selfShadowMmdToonLight, _ToonStrength);
@@ -420,7 +437,10 @@ Shader "MMD Toon Lit"
                     // URP's AO factor is intentionally applied to indirect light only. The MMD
                     // direct/toon ramp and dedicated self-shadow remain unchanged when the
                     // Renderer Feature is toggled on or off.
-                    ambientShSrgb *= aoFactor.indirectAmbientOcclusion;
+                    if (_ReceiveSSAO > 0.5h)
+                    {
+                        ambientShSrgb *= aoFactor.indirectAmbientOcclusion;
+                    }
                 #endif
                 half3 reflectionSrgb = half3(0.0h, 0.0h, 0.0h);
                 #if !defined(_SURFACE_TYPE_TRANSPARENT)
@@ -458,7 +478,7 @@ Shader "MMD Toon Lit"
                     half3 viewDirectionWS = GetWorldSpaceNormalizeViewDir(input.positionWS);
                     half specularMask = ComputeMmdStylizedSpecularMask(normalWS, lightDirection, viewDirectionWS);
                     half3 stylizedSpecularSrgb = LinearToSRGB(_StylizedSpecularColor.rgb) *
-                        mainLightSrgb * selfShadowVisibility * specularMask;
+                        mainLightSrgb * combinedShadowVisibility * specularMask;
                     litSrgb = saturate(litSrgb + stylizedSpecularSrgb);
                 }
                 if (_RimBoundary >= -0.5h)
@@ -468,7 +488,7 @@ Shader "MMD Toon Lit"
                     half3 fixedRimSrgb = LinearToSRGB(_RimColor.rgb) * rimMask;
                     half lightFacing = saturate(dot(normalWS, lightDirection));
                     half3 followRimSrgb = LinearToSRGB(_RimColor.rgb) * mainLightSrgb *
-                        lightFacing * selfShadowVisibility * rimMask;
+                        lightFacing * combinedShadowVisibility * rimMask;
                     half3 rimSrgb = lerp(fixedRimSrgb, followRimSrgb, saturate(_RimLightFollow));
                     litSrgb = saturate(litSrgb + rimSrgb);
                 }

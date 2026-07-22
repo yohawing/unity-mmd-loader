@@ -16,6 +16,9 @@ Shader "MMD URP Toon"
         _AmbientColor ("Ambient Color", Color) = (0.25, 0.25, 0.25, 1)
         _MmdLightDirection ("Light Direction Override", Vector) = (0, 0, 0, 0)
         _MmdLightColor ("MMD Light Color", Color) = (1, 1, 1, 1)
+        // URP SSAO is opt-in for imported MMD character materials. Stage materials may
+        // enable this per material from the Inspector when ambient occlusion is desired.
+        [Toggle] _ReceiveSSAO ("Receive SSAO", Float) = 0
         [PerRendererData] [HideInInspector] _MmdSelfShadowReceive ("MMD Self Shadow Receive", Float) = 0
         _ToonStrength ("Toon Strength", Range(0, 1)) = 1
         _ToonBoundary ("Toon Boundary", Range(-1, 1)) = -1

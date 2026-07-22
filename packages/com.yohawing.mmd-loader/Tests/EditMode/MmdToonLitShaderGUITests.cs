@@ -80,6 +80,24 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void ReceiveSsaoIsUrpToonOnlyAndDefaultsOff()
+        {
+            Material urpToon = CreateMaterial("MMD URP Toon");
+            Material basicToon = CreateMaterial("MMD Basic Toon");
+            try
+            {
+                Assert.That(urpToon.HasProperty("_ReceiveSSAO"), Is.True);
+                Assert.That(urpToon.GetFloat("_ReceiveSSAO"), Is.Zero);
+                Assert.That(basicToon.HasProperty("_ReceiveSSAO"), Is.False);
+            }
+            finally
+            {
+                Object.DestroyImmediate(urpToon);
+                Object.DestroyImmediate(basicToon);
+            }
+        }
+
+        [Test]
         public void ProfileSupportHidesMmdOnlyFeatureSectionsForBasicToon()
         {
             Assert.That(

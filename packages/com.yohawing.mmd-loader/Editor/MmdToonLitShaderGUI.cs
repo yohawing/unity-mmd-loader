@@ -304,6 +304,7 @@ namespace Mmd.Editor
             DrawProperty(materialEditor, properties, "_MmdLightDirection", "Light Direction Override");
             if (profile == MmdToonInspectorProfile.MmdToon)
             {
+                DrawProperty(materialEditor, properties, "_ReceiveSSAO", "Receive SSAO");
                 DrawProperty(materialEditor, properties, "_ToonBoundary", "Toon Boundary");
                 DrawProperty(materialEditor, properties, "_ToonFeather", "Toon Boundary Feather");
                 DrawProperty(materialEditor, properties, "_ToonBandCount", "Toon Band Count");

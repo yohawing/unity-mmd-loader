@@ -85,6 +85,13 @@ namespace Mmd.Tests
             Assert.That(toonLitSource, Does.Contain("#pragma multi_compile_fragment _ _SHADOWS_SOFT_LOW _SHADOWS_SOFT_MEDIUM _SHADOWS_SOFT_HIGH"));
             Assert.That(toonLitSource, Does.Contain("GetMainLight(TransformWorldToShadowCoord(input.positionWS))"));
             Assert.That(toonLitSource, Does.Contain("mainLight.shadowAttenuation"));
+            Assert.That(toonLitSource, Does.Contain("half mainLightShadowVisibility = saturate(mainLight.shadowAttenuation);"));
+            Assert.That(toonLitSource, Does.Contain("half combinedShadowVisibility = min(mainLightShadowVisibility, selfShadowVisibility);"));
+            Assert.That(toonLitSource, Does.Contain("ApplyMmdToonBandCount(min(combinedShadowVisibility, lightVisibility))"));
+            Assert.That(toonLitSource, Does.Contain("if (_ToonMapBound <= 0.5h)"));
+            Assert.That(toonLitSource, Does.Contain("mainLightSrgb *= mainLightShadowVisibility;"));
+            Assert.That(toonLitSource, Does.Contain("unityMainLightSrgb *= mainLightShadowVisibility;"));
+            Assert.That(toonLitSource, Does.Not.Contain("mainLight.distanceAttenuation * mainLight.shadowAttenuation"));
             Assert.That(toonLitSource, Does.Contain("dot(_MmdLightDirection.xyz, _MmdLightDirection.xyz) > 0.0h"));
             Assert.That(toonLitSource, Does.Contain("LinearToSRGB(_MmdLightColor.rgb) * LinearToSRGB(mainLight.color)"));
             Assert.That(toonLitSource, Does.Contain("UsePass \"MMD Basic URP Toon/MmdSelfShadowCaster\""));
@@ -136,7 +143,11 @@ namespace Mmd.Tests
             Assert.That(toonLitSource, Does.Contain("ShaderLibrary/AmbientOcclusion.hlsl"));
             Assert.That(toonLitSource, Does.Contain("CreateAmbientOcclusionFactor("));
             Assert.That(toonLitSource, Does.Contain("aoFactor.indirectAmbientOcclusion"));
+            Assert.That(toonLitSource, Does.Contain("_ReceiveSSAO (\"Receive SSAO\", Float) = 0"));
+            Assert.That(toonLitSource, Does.Contain("if (_ReceiveSSAO > 0.5h)"));
             Assert.That(toonLitSource, Does.Contain("ambientShSrgb *= aoFactor.indirectAmbientOcclusion;"));
+            string publicUrpToonSource = File.ReadAllText(Path.Combine(shaderDirectory, "MmdUrpToon.shader"));
+            Assert.That(publicUrpToonSource, Does.Contain("_ReceiveSSAO (\"Receive SSAO\", Float) = 0"));
             Assert.That(toonLitSource, Does.Contain("ShaderLibrary/GlobalIllumination.hlsl"));
             Assert.That(toonLitSource, Does.Contain("GlossyEnvironmentReflection("));
             Assert.That(toonLitSource, Does.Contain("#pragma multi_compile_fragment _ _REFLECTION_PROBE_BLENDING"));
@@ -161,7 +172,7 @@ namespace Mmd.Tests
             Assert.That(toonLitSource, Does.Contain("half3 halfVector = SafeNormalize(lightDirection + viewDirectionWS);"));
             Assert.That(toonLitSource, Does.Contain("step(1e-4h, dot(normalWS, lightDirection))"));
             Assert.That(toonLitSource, Does.Contain("LinearToSRGB(_StylizedSpecularColor.rgb) *"));
-            Assert.That(toonLitSource, Does.Contain("mainLightSrgb * selfShadowVisibility * specularMask"));
+            Assert.That(toonLitSource, Does.Contain("mainLightSrgb * combinedShadowVisibility * specularMask"));
             Assert.That(toonLitSource, Does.Contain("_RimColor (\"Rim Color\", Color) = (1, 1, 1, 1)"));
             Assert.That(toonLitSource, Does.Contain("_RimBoundary (\"Rim Boundary\", Range(-1, 1)) = -1"));
             Assert.That(toonLitSource, Does.Contain("_RimFeather (\"Rim Feather\", Range(-1, 1)) = -1"));
@@ -170,7 +181,7 @@ namespace Mmd.Tests
             Assert.That(toonLitSource, Does.Contain("half rim = 1.0h - saturate(abs(dot(normalWS, viewDirectionWS)));"));
             Assert.That(toonLitSource, Does.Contain("half3 fixedRimSrgb = LinearToSRGB(_RimColor.rgb) * rimMask;"));
             Assert.That(toonLitSource, Does.Contain("half3 followRimSrgb = LinearToSRGB(_RimColor.rgb) * mainLightSrgb"));
-            Assert.That(toonLitSource, Does.Contain("lightFacing * selfShadowVisibility * rimMask"));
+            Assert.That(toonLitSource, Does.Contain("lightFacing * combinedShadowVisibility * rimMask"));
             Assert.That(toonLitSource, Does.Contain("[HDR] _EmissionColor (\"Emission Color\", Color) = (1, 1, 1, 1)"));
             Assert.That(toonLitSource, Does.Contain("_EmissionMap (\"Emission Map\", 2D) = \"white\" {}"));
             Assert.That(toonLitSource, Does.Contain("_MmdEmissionIntensity (\"MMD Emission Intensity\", Range(-1, 8)) = -1"));

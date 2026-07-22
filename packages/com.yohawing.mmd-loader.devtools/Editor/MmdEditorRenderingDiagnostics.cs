@@ -118,6 +118,8 @@ namespace Mmd.Editor
             float emissionIntensity = emissionIntensityOverride ?? -1.0f;
             List<UnityEngine.Object>? configuredSsaoFeatures = null;
             List<bool>? previousSsaoFeatureStates = null;
+            List<Material>? configuredSsaoMaterials = null;
+            List<float>? previousSsaoMaterialStates = null;
             Color previousAmbientLight = RenderSettings.ambientLight;
             AmbientMode previousAmbientMode = RenderSettings.ambientMode;
             SphericalHarmonicsL2 previousAmbientProbe = RenderSettings.ambientProbe;
@@ -280,6 +282,33 @@ namespace Mmd.Editor
                 instance.Root.transform.rotation = Quaternion.identity;
                 instance.Root.transform.localScale = Vector3.one;
                 proxyStats = EnableGeneratedPmxMaterialOrderProxies(instance, generatedPmxDirectionToLight);
+                if (ssaoEnabledOverride.HasValue && materialPreset == MmdMaterialPreset.MmdToonLit)
+                {
+                    configuredSsaoMaterials = new List<Material>(instance.Materials.Length);
+                    previousSsaoMaterialStates = new List<float>(instance.Materials.Length);
+                    bool anyMaterialConfigured = false;
+                    bool allMaterialsConfigured = true;
+                    foreach (Material material in instance.Materials)
+                    {
+                        if (material == null)
+                        {
+                            continue;
+                        }
+
+                        if (!material.HasProperty("_ReceiveSSAO"))
+                        {
+                            allMaterialsConfigured = false;
+                            continue;
+                        }
+
+                        anyMaterialConfigured = true;
+                        configuredSsaoMaterials.Add(material);
+                        previousSsaoMaterialStates.Add(material.GetFloat("_ReceiveSSAO"));
+                        material.SetFloat("_ReceiveSSAO", ssaoEnabled ? 1.0f : 0.0f);
+                    }
+
+                    ssaoConfigured &= anyMaterialConfigured && allMaterialsConfigured;
+                }
                 if (instance.Materials.Length > 0 && instance.Materials[0] != null)
                 {
                     Material captureMaterial = instance.Materials[0];
@@ -714,6 +743,16 @@ namespace Mmd.Editor
                         if (configuredSsaoFeatures[i] != null)
                         {
                             SetSsaoFeatureActive(configuredSsaoFeatures[i], previousSsaoFeatureStates[i]);
+                        }
+                    }
+                }
+                if (configuredSsaoMaterials != null && previousSsaoMaterialStates != null)
+                {
+                    for (int i = 0; i < configuredSsaoMaterials.Count && i < previousSsaoMaterialStates.Count; i++)
+                    {
+                        if (configuredSsaoMaterials[i] != null)
+                        {
+                            configuredSsaoMaterials[i].SetFloat("_ReceiveSSAO", previousSsaoMaterialStates[i]);
                         }
                     }
                 }
