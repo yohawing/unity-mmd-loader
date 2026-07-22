@@ -85,13 +85,15 @@ namespace Mmd.Tests
             Assert.That(toonLitSource, Does.Contain("#pragma multi_compile_fragment _ _SHADOWS_SOFT_LOW _SHADOWS_SOFT_MEDIUM _SHADOWS_SOFT_HIGH"));
             Assert.That(toonLitSource, Does.Contain("GetMainLight(TransformWorldToShadowCoord(input.positionWS))"));
             Assert.That(toonLitSource, Does.Contain("mainLight.shadowAttenuation"));
-            Assert.That(toonLitSource, Does.Contain("half mainLightShadowVisibility = saturate(mainLight.shadowAttenuation);"));
+            Assert.That(toonLitSource, Does.Contain("half receivesToonShadow = (_ToonAuthoringMode > 0.5h || _ToonMapBound > 0.5h)"));
+            Assert.That(toonLitSource, Does.Contain("saturate(mainLight.shadowAttenuation),"));
+            Assert.That(toonLitSource, Does.Contain("receivesToonShadow);"));
             Assert.That(toonLitSource, Does.Contain("half combinedShadowVisibility = min(mainLightShadowVisibility, selfShadowVisibility);"));
             Assert.That(toonLitSource, Does.Contain("ApplyMmdToonBandCount(min(combinedShadowVisibility, lightVisibility))"));
             Assert.That(toonLitSource, Does.Contain("half rawShadowWeight = 1.0h - saturate(_ToonStrength);"));
             Assert.That(toonLitSource, Does.Contain("half rawShadowAttenuation = lerp(1.0h, mainLightShadowVisibility, rawShadowWeight);"));
             Assert.That(toonLitSource, Does.Contain("half3 fallbackSelfShadowToon = half3(1.0h, 1.0h, 1.0h);"));
-            Assert.That(toonLitSource, Does.Contain("half3 fallbackCastShadowToon = saturate(LinearToSRGB(_AmbientColor.rgb));"));
+            Assert.That(toonLitSource, Does.Not.Contain("fallbackCastShadowToon"));
             Assert.That(toonLitSource, Does.Not.Contain("mainLight.distanceAttenuation * mainLight.shadowAttenuation"));
             Assert.That(toonLitSource, Does.Contain("dot(_MmdLightDirection.xyz, _MmdLightDirection.xyz) > 0.0h"));
             Assert.That(toonLitSource, Does.Contain("LinearToSRGB(_MmdLightColor.rgb) * LinearToSRGB(mainLight.color)"));

@@ -429,8 +429,17 @@ Shader "MMD Toon Lit"
                 // main-light radiance or attenuation in the opt-in Toon Lit profile.
                 half3 unityMainLightSrgb = LinearToSRGB(mainLight.color)
                     * mainLight.distanceAttenuation;
-                half mainLightShadowVisibility = saturate(mainLight.shadowAttenuation);
-                half selfShadowVisibility = SampleMmdSelfShadow(input.positionWS, _MmdSelfShadowReceive);
+                half receivesToonShadow = (_ToonAuthoringMode > 0.5h || _ToonMapBound > 0.5h)
+                    ? 1.0h
+                    : 0.0h;
+                half mainLightShadowVisibility = lerp(
+                    1.0h,
+                    saturate(mainLight.shadowAttenuation),
+                    receivesToonShadow);
+                half selfShadowVisibility = lerp(
+                    1.0h,
+                    SampleMmdSelfShadow(input.positionWS, _MmdSelfShadowReceive),
+                    receivesToonShadow);
                 half combinedShadowVisibility = min(mainLightShadowVisibility, selfShadowVisibility);
                 // Toon Strength blends between ordinary URP shading and the authored toon ramp.
                 // Hand raw URP attenuation back to the direct-light path as toon shading is disabled.
@@ -465,15 +474,8 @@ Shader "MMD Toon Lit"
                 half3 toonLight = lerp(ndotl.xxx, mmdToonLight, _ToonStrength);
                 if (combinedShadowVisibility < 0.999h)
                 {
-                    // Faces commonly omit a toon texture. Only inside a cast shadow, use the PMX
-                    // ambient color as their authored fallback shade instead of raw black attenuation.
-                    half3 fallbackCastShadowToon = saturate(LinearToSRGB(_AmbientColor.rgb));
-                    half3 castShadowToon = lerp(
-                        fallbackCastShadowToon,
-                        mappedSelfShadowToon,
-                        saturate(_ToonMapBound));
                     half3 selfShadowMmdToonLight = lerp(
-                        castShadowToon,
+                        selfShadowToon,
                         half3(1.0h, 1.0h, 1.0h),
                         toonVisibility);
                     half3 selfShadowToonLight = lerp(ndotl.xxx, selfShadowMmdToonLight, _ToonStrength);
