@@ -576,4 +576,6 @@ Shader "MMD Basic URP Toon"
     }
 
     Fallback "Universal Render Pipeline/Lit"
+
+    CustomEditor "Mmd.Editor.MmdToonLitShaderGUI"
 }

@@ -8,21 +8,14 @@ namespace Mmd.Tests
     public sealed class MmdToonLitShaderGUITests
     {
         [Test]
-        public void SectionsExposeRequiredAuthoringGroups()
+        public void SectionsMatchTheUrpLitLayout()
         {
             string[] expected =
             {
-                "Surface Rendering",
-                "Surface Maps",
-                "Toon Lighting",
-                "Shadow / MMD Self Shadow",
-                "Normal",
-                "Sphere / MatCap",
-                "Stylized Specular",
-                "Rim Light",
-                "Emission",
-                "Outline",
-                "Advanced / Diagnostics",
+                "Surface Options",
+                "Surface Inputs",
+                "Detail Inputs",
+                "Advanced Options",
             };
 
             Assert.That(Mmd.Editor.MmdToonLitShaderGUIState.Sections.Length, Is.EqualTo(expected.Length));
@@ -33,16 +26,16 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void SurfaceRenderingAndToonLightingAreTheOnlyDefaultOpenSections()
+        public void SurfaceOptionsAndInputsAreTheOnlyDefaultOpenSections()
         {
             bool[] expanded = Mmd.Editor.MmdToonLitShaderGUIState.CreateDefaultExpandedState();
 
-            Assert.That(expanded[(int)Mmd.Editor.MmdToonLitInspectorSection.SurfaceRendering], Is.True);
-            Assert.That(expanded[(int)Mmd.Editor.MmdToonLitInspectorSection.ToonLighting], Is.True);
+            Assert.That(expanded[(int)Mmd.Editor.MmdToonLitInspectorSection.SurfaceOptions], Is.True);
+            Assert.That(expanded[(int)Mmd.Editor.MmdToonLitInspectorSection.SurfaceInputs], Is.True);
             for (int i = 0; i < expanded.Length; i++)
             {
-                if (i == (int)Mmd.Editor.MmdToonLitInspectorSection.SurfaceRendering ||
-                    i == (int)Mmd.Editor.MmdToonLitInspectorSection.ToonLighting)
+                if (i == (int)Mmd.Editor.MmdToonLitInspectorSection.SurfaceOptions ||
+                    i == (int)Mmd.Editor.MmdToonLitInspectorSection.SurfaceInputs)
                 {
                     continue;
                 }
@@ -52,28 +45,29 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void InactiveFeatureDetailsCanBeHiddenWithoutBlockingMixedSelections()
+        public void PublicAndLegacyShaderNamesMapToFriendlyProfileNames()
         {
-            Assert.That(
-                Mmd.Editor.MmdToonLitShaderGUIState.ShouldDrawFeatureDetails(Mmd.Editor.MmdToonLitSectionState.Off),
-                Is.False);
-            Assert.That(
-                Mmd.Editor.MmdToonLitShaderGUIState.ShouldDrawFeatureDetails(Mmd.Editor.MmdToonLitSectionState.On),
-                Is.True);
-            Assert.That(
-                Mmd.Editor.MmdToonLitShaderGUIState.ShouldDrawFeatureDetails(Mmd.Editor.MmdToonLitSectionState.Mixed),
-                Is.True);
-        }
+            Shader? publicToon = Shader.Find("MMD URP Toon");
+            Shader? legacyToon = Shader.Find("MMD Toon Lit");
+            Shader? publicBasic = Shader.Find("MMD Basic Toon");
+            Shader? legacyBasic = Shader.Find("MMD Basic URP Toon");
 
-        [Test]
-        public void MmdToonLitShaderNameIsExplicitAndDoesNotClaimLegacyShader()
-        {
-            Assert.That(Mmd.Editor.MmdToonLitShaderGUIState.ShaderName, Is.EqualTo("MMD Toon Lit"));
-
-            Shader? toonLit = Shader.Find("MMD Toon Lit");
-            Shader? legacy = Shader.Find("MMD Basic URP Toon");
-            Assert.That(Mmd.Editor.MmdToonLitShaderGUIState.IsMmdToonLitShader(toonLit), Is.True);
-            Assert.That(Mmd.Editor.MmdToonLitShaderGUIState.IsMmdToonLitShader(legacy), Is.False);
+            Assert.That(Mmd.Editor.MmdToonLitShaderGUIState.TryGetProfile(publicToon, out var publicToonProfile), Is.True);
+            Assert.That(Mmd.Editor.MmdToonLitShaderGUIState.TryGetProfile(legacyToon, out var legacyToonProfile), Is.True);
+            Assert.That(Mmd.Editor.MmdToonLitShaderGUIState.TryGetProfile(publicBasic, out var publicBasicProfile), Is.True);
+            Assert.That(Mmd.Editor.MmdToonLitShaderGUIState.TryGetProfile(legacyBasic, out var legacyBasicProfile), Is.True);
+            Assert.That(
+                Mmd.Editor.MmdToonLitShaderGUIState.GetDisplayName(publicToonProfile),
+                Is.EqualTo("MMD URP Toon"));
+            Assert.That(
+                Mmd.Editor.MmdToonLitShaderGUIState.GetDisplayName(legacyToonProfile),
+                Is.EqualTo("MMD URP Toon"));
+            Assert.That(
+                Mmd.Editor.MmdToonLitShaderGUIState.GetDisplayName(publicBasicProfile),
+                Is.EqualTo("MMD Basic Toon"));
+            Assert.That(
+                Mmd.Editor.MmdToonLitShaderGUIState.GetDisplayName(legacyBasicProfile),
+                Is.EqualTo("MMD Basic Toon"));
         }
     }
 }

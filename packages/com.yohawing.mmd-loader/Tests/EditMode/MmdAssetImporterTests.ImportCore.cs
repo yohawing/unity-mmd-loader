@@ -64,7 +64,7 @@ namespace Mmd.Tests
 
             Assert.That(pmxAsset.ModelPreset, Is.EqualTo(nameof(MmdPmxModelPreset.Stage)));
             Assert.That(pmxAsset.AnimationType, Is.EqualTo(nameof(MmdPmxAnimationType.Generic)));
-            Assert.That(pmxAsset.ShaderPreset, Is.EqualTo(nameof(MmdPmxShaderPreset.MmdBasicUrpToon)));
+            Assert.That(pmxAsset.ShaderPreset, Is.EqualTo("MMD Basic Toon"));
             Assert.That(pmxAsset.ImportedAvatar, Is.Null);
             Assert.That(pmxAsset.HumanoidAvatarReadiness, Is.EqualTo("NotRequested"));
         }
@@ -151,7 +151,7 @@ namespace Mmd.Tests
             Assert.That(pmxAsset.ImportScale, Is.EqualTo(2.5f).Within(0.0001f));
             Assert.That(pmxAsset.ModelPreset, Is.EqualTo(nameof(MmdPmxModelPreset.Stage)));
             Assert.That(pmxAsset.AnimationType, Is.EqualTo(nameof(MmdPmxAnimationType.Humanoid)));
-            Assert.That(pmxAsset.ShaderPreset, Is.EqualTo(nameof(MmdPmxShaderPreset.MmdBasicUrpToon)));
+            Assert.That(pmxAsset.ShaderPreset, Is.EqualTo("MMD Basic Toon"));
             Assert.That(pmxAsset.HumanoidAvatarReadiness, Is.Not.EqualTo("NotRequested"));
             Assert.That(pmxAsset.ImportSummaryStatus, Is.EqualTo(MmdPmxImportSummaryStatus.Passed));
             Assert.That(pmxAsset.VertexCount, Is.EqualTo(TestOneBoneCubeVertexCount));
@@ -211,7 +211,7 @@ namespace Mmd.Tests
 
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
 
-            Assert.That(pmxAsset.ShaderPreset, Is.EqualTo(nameof(MmdPmxShaderPreset.MmdToonLit)));
+            Assert.That(pmxAsset.ShaderPreset, Is.EqualTo("MMD URP Toon"));
             Assert.That(pmxAsset.ImportedMaterials, Is.Not.Null.And.Not.Empty);
             Assert.That(pmxAsset.ImportedMaterials[0].shader, Is.Not.Null);
             Assert.That(pmxAsset.ImportedMaterials[0].shader.name,
@@ -423,8 +423,8 @@ namespace Mmd.Tests
 
             Assert.That(attributes, Has.Length.EqualTo(1));
             var attribute = (ScriptedImporterAttribute)attributes[0];
-            Assert.That(attribute.version, Is.EqualTo(26),
-                "PMX importer version must force reimport for outline material policy changes.");
+            Assert.That(attribute.version, Is.EqualTo(27),
+                "PMX importer version must force reimport for the public Toon shader names.");
         }
         [Test]
         public void PmxImporterImportScaleZeroDotOneFlowsToAssetInstanceAndScalesMeshBounds()

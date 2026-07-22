@@ -103,7 +103,9 @@ namespace Mmd.Samples.UnityToonShader
 
         private Material[] CreateRepresentativeMaterials()
         {
-            Shader? shader = Shader.Find("MMD Basic URP Toon") ?? Shader.Find("Universal Render Pipeline/Lit");
+            Shader? shader = Shader.Find("MMD Basic Toon")
+                ?? Shader.Find("MMD Basic URP Toon")
+                ?? Shader.Find("Universal Render Pipeline/Lit");
             if (shader == null)
             {
                 status = "No compatible source shader was found.";

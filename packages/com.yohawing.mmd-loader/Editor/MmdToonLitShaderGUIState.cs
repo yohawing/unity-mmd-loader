@@ -8,24 +8,16 @@ namespace Mmd.Editor
 {
     internal enum MmdToonLitInspectorSection
     {
-        SurfaceRendering,
-        SurfaceMaps,
-        ToonLighting,
-        ShadowMmdSelfShadow,
-        Normal,
-        SphereMatCap,
-        StylizedSpecular,
-        RimLight,
-        Emission,
-        Outline,
-        AdvancedDiagnostics,
+        SurfaceOptions,
+        SurfaceInputs,
+        DetailInputs,
+        AdvancedOptions,
     }
 
-    internal enum MmdToonLitSectionState
+    internal enum MmdToonInspectorProfile
     {
-        Off,
-        On,
-        Mixed,
+        BasicToon,
+        MmdToon,
     }
 
     internal sealed class MmdToonLitSectionDefinition
@@ -47,21 +39,19 @@ namespace Mmd.Editor
 
     internal static class MmdToonLitShaderGUIState
     {
-        internal const string ShaderName = "MMD Toon Lit";
+        internal const string MmdToonShaderName = "MMD URP Toon";
+        internal const string BasicToonShaderName = "MMD Basic Toon";
+        internal const string LegacyMmdToonShaderName = "MMD Toon Lit";
+        internal const string LegacyBasicToonShaderName = "MMD Basic URP Toon";
+        internal const string MmdToonDisplayName = "MMD URP Toon";
+        internal const string BasicToonDisplayName = "MMD Basic Toon";
 
         internal static readonly MmdToonLitSectionDefinition[] Sections =
         {
-            new(MmdToonLitInspectorSection.SurfaceRendering, "Surface Rendering", true),
-            new(MmdToonLitInspectorSection.SurfaceMaps, "Surface Maps", false),
-            new(MmdToonLitInspectorSection.ToonLighting, "Toon Lighting", true),
-            new(MmdToonLitInspectorSection.ShadowMmdSelfShadow, "Shadow / MMD Self Shadow", false),
-            new(MmdToonLitInspectorSection.Normal, "Normal", false),
-            new(MmdToonLitInspectorSection.SphereMatCap, "Sphere / MatCap", false),
-            new(MmdToonLitInspectorSection.StylizedSpecular, "Stylized Specular", false),
-            new(MmdToonLitInspectorSection.RimLight, "Rim Light", false),
-            new(MmdToonLitInspectorSection.Emission, "Emission", false),
-            new(MmdToonLitInspectorSection.Outline, "Outline", false),
-            new(MmdToonLitInspectorSection.AdvancedDiagnostics, "Advanced / Diagnostics", false),
+            new(MmdToonLitInspectorSection.SurfaceOptions, "Surface Options", true),
+            new(MmdToonLitInspectorSection.SurfaceInputs, "Surface Inputs", true),
+            new(MmdToonLitInspectorSection.DetailInputs, "Detail Inputs", false),
+            new(MmdToonLitInspectorSection.AdvancedOptions, "Advanced Options", false),
         };
 
         internal static readonly string[] RequiredProperties =
@@ -69,11 +59,6 @@ namespace Mmd.Editor
             "_BaseMap",
             "_BaseColor",
             "_ToonStrength",
-            "_ToonBoundary",
-            "_ToonBandCount",
-            "_StylizedSpecularBoundary",
-            "_RimBoundary",
-            "_MmdEmissionIntensity",
             "_OutlineWidth",
         };
 
@@ -88,16 +73,33 @@ namespace Mmd.Editor
             return expanded;
         }
 
-        internal static bool ShouldDrawFeatureDetails(MmdToonLitSectionState state)
+        internal static bool TryGetProfile(Shader? shader, out MmdToonInspectorProfile profile)
         {
-            // Mixed selections keep the controls visible because at least one target is enabled;
-            // Unity's mixed-value rendering communicates which targets differ.
-            return state != MmdToonLitSectionState.Off;
+            if (shader != null &&
+                (string.Equals(shader.name, MmdToonShaderName, StringComparison.Ordinal) ||
+                 string.Equals(shader.name, LegacyMmdToonShaderName, StringComparison.Ordinal)))
+            {
+                profile = MmdToonInspectorProfile.MmdToon;
+                return true;
+            }
+
+            if (shader != null &&
+                (string.Equals(shader.name, BasicToonShaderName, StringComparison.Ordinal) ||
+                 string.Equals(shader.name, LegacyBasicToonShaderName, StringComparison.Ordinal)))
+            {
+                profile = MmdToonInspectorProfile.BasicToon;
+                return true;
+            }
+
+            profile = default;
+            return false;
         }
 
-        internal static bool IsMmdToonLitShader(Shader? shader)
+        internal static string GetDisplayName(MmdToonInspectorProfile profile)
         {
-            return shader != null && string.Equals(shader.name, ShaderName, StringComparison.Ordinal);
+            return profile == MmdToonInspectorProfile.MmdToon
+                ? MmdToonDisplayName
+                : BasicToonDisplayName;
         }
 
         internal static bool HasRequiredProperties(MaterialProperty[] properties, out string missing)

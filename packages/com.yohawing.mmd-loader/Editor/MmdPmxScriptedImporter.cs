@@ -43,7 +43,7 @@ namespace Mmd.Editor
         MmdToonLit = 2
     }
 
-    [ScriptedImporter(26, "pmx")]
+    [ScriptedImporter(27, "pmx")]
     public sealed class MmdPmxScriptedImporter : ScriptedImporter
     {
         [SerializeField] private float importScale = MmdPmxAsset.DefaultImportScale;
@@ -159,7 +159,7 @@ namespace Mmd.Editor
                 resolvedSourcePath,
                 ImportScale,
                 effectiveModelPreset.ToString(),
-                shaderPreset.ToString(),
+                GetShaderPresetDisplayName(shaderPreset),
                 parseSummary,
                 generatedAssets,
                 materialRemaps,
@@ -294,6 +294,16 @@ namespace Mmd.Editor
                 MmdPmxShaderPreset.UrpLit => MmdMaterialPreset.UrpLit,
                 MmdPmxShaderPreset.MmdToonLit => MmdMaterialPreset.MmdToonLit,
                 _ => MmdMaterialPreset.MmdToon
+            };
+        }
+
+        private static string GetShaderPresetDisplayName(MmdPmxShaderPreset value)
+        {
+            return value switch
+            {
+                MmdPmxShaderPreset.MmdBasicUrpToon => "MMD Basic Toon",
+                MmdPmxShaderPreset.MmdToonLit => "MMD URP Toon",
+                _ => "URP Lit",
             };
         }
 

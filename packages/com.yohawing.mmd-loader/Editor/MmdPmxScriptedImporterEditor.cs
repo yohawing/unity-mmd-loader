@@ -35,6 +35,7 @@ namespace Mmd.Editor
 
         private int selectedTab;
         private static readonly string[] TabNames = { "Model", "Rig", "Materials" };
+        private static readonly string[] ShaderPresetDisplayNames = { "MMD Basic Toon", "URP Lit", "MMD URP Toon" };
 
         public override void OnEnable()
         {
@@ -188,11 +189,20 @@ namespace Mmd.Editor
             {
                 if (shaderPresetProperty != null)
                 {
-                    EditorGUILayout.PropertyField(
-                        shaderPresetProperty,
+                    int selectedPreset = Mathf.Clamp(
+                        shaderPresetProperty.enumValueIndex,
+                        0,
+                        ShaderPresetDisplayNames.Length - 1);
+                    int updatedPreset = EditorGUILayout.Popup(
                         new GUIContent(
                             "Shader Preset",
-                            "Selects the target shader family for material generation. Available presets are MMD Basic URP Toon and URP Lit. The value is an importer setting; it is summarized on the imported asset after Apply/Reimport. This UI is not a full Material Editor and does not mutate generated materials."));
+                            "MMD Basic Toon preserves the original MMD parity shading. MMD URP Toon adds URP lighting, fog, SSAO, reflection probes, and opt-in stylized controls. This is an importer setting and does not mutate generated materials until Apply/Reimport."),
+                        selectedPreset,
+                        ShaderPresetDisplayNames);
+                    if (updatedPreset != selectedPreset)
+                    {
+                        shaderPresetProperty.enumValueIndex = updatedPreset;
+                    }
                 }
             }
 
