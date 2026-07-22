@@ -180,24 +180,13 @@ namespace Mmd.Editor
             {
                 Material[] materials = GetMaterials(materialEditor);
                 MmdToonFeatureState state = MmdToonMaterialStateSync.GetFeatureState(materials, feature);
-                GUIContent stateContent = new(state switch
-                {
-                    MmdToonFeatureState.On => "ON",
-                    MmdToonFeatureState.Mixed => "MIXED",
-                    _ => "OFF",
-                });
-                float stateLabelWidth = EditorStyles.miniLabel.CalcSize(new GUIContent("MIXED")).x;
                 float toggleSize = lineHeight;
-                float stateWidth = toggleSize + featureSpacing + stateLabelWidth;
-                Rect stateRect = headerRect;
-                stateRect.xMin = headerRect.xMax - stateWidth;
-                stateRect.yMin = headerRect.y + (headerRect.height - lineHeight) * 0.5f;
-                stateRect.height = lineHeight;
-                titleRect.xMax = Mathf.Max(titleRect.xMin, stateRect.xMin - featureSpacing);
-                Rect toggleRect = stateRect;
+                Rect toggleRect = headerRect;
+                toggleRect.xMin = headerRect.xMax - toggleSize;
+                toggleRect.yMin = headerRect.y + (headerRect.height - lineHeight) * 0.5f;
                 toggleRect.width = toggleSize;
-                Rect labelRect = stateRect;
-                labelRect.xMin = toggleRect.xMax + featureSpacing;
+                toggleRect.height = lineHeight;
+                titleRect.xMax = Mathf.Max(titleRect.xMin, toggleRect.xMin - featureSpacing);
 
                 bool previousMixed = EditorGUI.showMixedValue;
                 try
@@ -214,8 +203,6 @@ namespace Mmd.Editor
                 {
                     EditorGUI.showMixedValue = previousMixed;
                 }
-
-                EditorGUI.LabelField(labelRect, stateContent, EditorStyles.miniLabel);
             }
 
             Rect labelRectForTitle = titleRect;
