@@ -432,14 +432,12 @@ Shader "MMD Toon Lit"
                 half mainLightShadowVisibility = saturate(mainLight.shadowAttenuation);
                 half selfShadowVisibility = SampleMmdSelfShadow(input.positionWS, _MmdSelfShadowReceive);
                 half combinedShadowVisibility = min(mainLightShadowVisibility, selfShadowVisibility);
-                // MMD Ramp materials without a bound toon map have no authoring shade color
-                // to receive the visibility ramp. Preserve the previous direct-shadow response
-                // only for that compatibility case; bound toon maps keep shadow in toon visibility.
-                if (_ToonAuthoringMode <= 0.5h && _ToonMapBound <= 0.5h)
-                {
-                    mainLightSrgb *= mainLightShadowVisibility;
-                    unityMainLightSrgb *= mainLightShadowVisibility;
-                }
+                // Toon Strength blends between ordinary URP shading and the authored toon ramp.
+                // Hand raw URP attenuation back to the direct-light path as toon shading is disabled.
+                half rawShadowWeight = 1.0h - saturate(_ToonStrength);
+                half rawShadowAttenuation = lerp(1.0h, mainLightShadowVisibility, rawShadowWeight);
+                mainLightSrgb *= rawShadowAttenuation;
+                unityMainLightSrgb *= rawShadowAttenuation;
 
                 half3 normalWS;
                 if (_MmdNormalMapBound > 0.5h)
@@ -467,7 +465,17 @@ Shader "MMD Toon Lit"
                 half3 toonLight = lerp(ndotl.xxx, mmdToonLight, _ToonStrength);
                 if (combinedShadowVisibility < 0.999h)
                 {
-                    half3 selfShadowMmdToonLight = lerp(selfShadowToon, half3(1.0h, 1.0h, 1.0h), toonVisibility);
+                    // Faces commonly omit a toon texture. Only inside a cast shadow, use the PMX
+                    // ambient color as their authored fallback shade instead of raw black attenuation.
+                    half3 fallbackCastShadowToon = saturate(LinearToSRGB(_AmbientColor.rgb));
+                    half3 castShadowToon = lerp(
+                        fallbackCastShadowToon,
+                        mappedSelfShadowToon,
+                        saturate(_ToonMapBound));
+                    half3 selfShadowMmdToonLight = lerp(
+                        castShadowToon,
+                        half3(1.0h, 1.0h, 1.0h),
+                        toonVisibility);
                     half3 selfShadowToonLight = lerp(ndotl.xxx, selfShadowMmdToonLight, _ToonStrength);
                     toonLight = min(toonLight, selfShadowToonLight);
                 }
