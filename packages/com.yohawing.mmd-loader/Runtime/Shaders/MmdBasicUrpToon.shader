@@ -34,6 +34,8 @@ Shader "MMD Basic URP Toon"
         _MmdNormalMapBound ("Normal Map Bound", Float) = 0
         _AlphaClipThreshold ("Alpha Clip Threshold", Range(0, 1)) = 0
         _ShadowAlphaClipThreshold ("Shadow Alpha Clip Threshold", Range(0, 1)) = 0
+        [HideInInspector] _MmdAlphaClipThresholdBackup ("MMD Alpha Clip Threshold Backup", Float) = 0.01
+        [HideInInspector] _MmdShadowAlphaClipThresholdBackup ("MMD Shadow Alpha Clip Threshold Backup", Float) = 0.01
         _Cull ("Cull", Float) = 2
         _ZWrite ("ZWrite", Float) = 1
         _ZTest ("ZTest", Float) = 4

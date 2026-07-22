@@ -2,6 +2,7 @@
 
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace Mmd.Tests
 {
@@ -68,6 +69,100 @@ namespace Mmd.Tests
             Assert.That(
                 Mmd.Editor.MmdToonLitShaderGUIState.GetDisplayName(legacyBasicProfile),
                 Is.EqualTo("MMD Basic Toon"));
+        }
+
+        [Test]
+        public void SurfaceTypeRecognizesOpaqueCutoutTransparentAndMixedSelections()
+        {
+            Material opaque = CreateMaterial("MMD Basic Toon");
+            Material cutout = CreateMaterial("MMD URP Toon");
+            try
+            {
+                cutout.SetFloat("_AlphaClipThreshold", 0.35f);
+                Assert.That(Mmd.Editor.MmdToonMaterialStateSync.GetSurfaceType(opaque),
+                    Is.EqualTo(Mmd.Editor.MmdToonSurfaceType.Opaque));
+                Assert.That(Mmd.Editor.MmdToonMaterialStateSync.GetSurfaceType(cutout),
+                    Is.EqualTo(Mmd.Editor.MmdToonSurfaceType.Cutout));
+
+                cutout.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
+                Assert.That(Mmd.Editor.MmdToonMaterialStateSync.GetSurfaceType(cutout),
+                    Is.EqualTo(Mmd.Editor.MmdToonSurfaceType.Transparent));
+                Mmd.Editor.MmdToonMaterialStateSync.GetSurfaceType(new[] { opaque, cutout }, out bool mixed);
+                Assert.That(mixed, Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(opaque);
+                Object.DestroyImmediate(cutout);
+            }
+        }
+
+        [Test]
+        public void SurfaceTypeRoundTripPreservesCutoutThresholdsAndManualQueue()
+        {
+            Material material = CreateMaterial("MMD URP Toon");
+            try
+            {
+                material.SetFloat("_AlphaClipThreshold", 0.35f);
+                material.SetFloat("_ShadowAlphaClipThreshold", 0.21f);
+                material.renderQueue = 2100;
+
+                Mmd.Editor.MmdToonMaterialStateSync.ApplySurfaceType(
+                    new[] { material }, Mmd.Editor.MmdToonSurfaceType.Opaque);
+                Assert.That(material.GetFloat("_AlphaClipThreshold"), Is.Zero);
+                Assert.That(material.GetFloat("_ShadowAlphaClipThreshold"), Is.Zero);
+                Assert.That(material.renderQueue, Is.EqualTo(2100));
+
+                Mmd.Editor.MmdToonMaterialStateSync.ApplySurfaceType(
+                    new[] { material }, Mmd.Editor.MmdToonSurfaceType.Cutout);
+                Assert.That(material.GetFloat("_AlphaClipThreshold"), Is.EqualTo(0.35f).Within(0.00001f));
+                Assert.That(material.GetFloat("_ShadowAlphaClipThreshold"), Is.EqualTo(0.21f).Within(0.00001f));
+                Assert.That(material.renderQueue, Is.EqualTo(2100));
+
+                Mmd.Editor.MmdToonMaterialStateSync.ApplySurfaceType(
+                    new[] { material }, Mmd.Editor.MmdToonSurfaceType.Transparent);
+                Assert.That(material.GetFloat("_AlphaClipThreshold"), Is.Zero);
+                Assert.That(material.GetFloat("_ShadowAlphaClipThreshold"), Is.EqualTo(0.21f).Within(0.00001f));
+                Assert.That(material.IsKeywordEnabled("_SURFACE_TYPE_TRANSPARENT"), Is.True);
+                Assert.That(material.renderQueue, Is.EqualTo(2100));
+            }
+            finally
+            {
+                Object.DestroyImmediate(material);
+            }
+        }
+
+        [Test]
+        public void SurfaceTypeMovesOnlyDefaultRenderQueuesAndKeepsMmdCutoutInGeometry()
+        {
+            Material material = CreateMaterial("MMD URP Toon");
+            try
+            {
+                Assert.That(material.renderQueue, Is.EqualTo((int)RenderQueue.Geometry));
+
+                Mmd.Editor.MmdToonMaterialStateSync.ApplySurfaceType(
+                    new[] { material }, Mmd.Editor.MmdToonSurfaceType.Cutout);
+                Assert.That(material.renderQueue, Is.EqualTo((int)RenderQueue.Geometry));
+
+                Mmd.Editor.MmdToonMaterialStateSync.ApplySurfaceType(
+                    new[] { material }, Mmd.Editor.MmdToonSurfaceType.Transparent);
+                Assert.That(material.renderQueue, Is.EqualTo((int)RenderQueue.Transparent));
+
+                Mmd.Editor.MmdToonMaterialStateSync.ApplySurfaceType(
+                    new[] { material }, Mmd.Editor.MmdToonSurfaceType.Opaque);
+                Assert.That(material.renderQueue, Is.EqualTo((int)RenderQueue.Geometry));
+            }
+            finally
+            {
+                Object.DestroyImmediate(material);
+            }
+        }
+
+        private static Material CreateMaterial(string shaderName)
+        {
+            Shader shader = Shader.Find(shaderName);
+            Assert.That(shader, Is.Not.Null, $"Shader '{shaderName}' must be available for the Inspector test.");
+            return new Material(shader);
         }
     }
 }

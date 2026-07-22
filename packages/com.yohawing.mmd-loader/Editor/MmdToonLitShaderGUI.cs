@@ -15,12 +15,6 @@ namespace Mmd.Editor
     {
         private bool[]? expanded;
 
-        private enum SurfaceType
-        {
-            Opaque,
-            Transparent,
-        }
-
         private enum RenderFace
         {
             Front,
@@ -143,7 +137,7 @@ namespace Mmd.Editor
         {
             return section switch
             {
-                MmdToonLitInspectorSection.SurfaceOptions => GetSurfaceType(materialEditor, out bool mixed) == SurfaceType.Transparent
+                MmdToonLitInspectorSection.SurfaceOptions => MmdToonMaterialStateSync.GetSurfaceType(GetMaterials(materialEditor), out bool mixed) != MmdToonSurfaceType.Opaque
                     ? (mixed ? GroupState.Mixed : GroupState.On)
                     : (mixed ? GroupState.Mixed : GroupState.Off),
                 MmdToonLitInspectorSection.SurfaceInputs => GroupState.On,
@@ -160,11 +154,6 @@ namespace Mmd.Editor
                     : GetPropertyState(properties, "_OutlineVisible", value => value > 0.5f),
                 _ => GroupState.Off,
             };
-        }
-
-        private static SurfaceType GetSurfaceType(MaterialEditor materialEditor, out bool mixed)
-        {
-            return GetSurfaceType(GetMaterials(materialEditor), out mixed);
         }
 
         private static GroupState GetPropertyState(
@@ -207,9 +196,9 @@ namespace Mmd.Editor
             MaterialProperty[] properties)
         {
             Material[] materials = GetMaterials(materialEditor);
-            DrawSurfaceType(profile, materials);
+            DrawSurfaceType(materials);
             DrawRenderFace(materials);
-            DrawAlphaClipping(properties);
+            DrawCutoutThreshold(materialEditor, materials, properties);
             DrawProperty(materialEditor, properties, "_ToonStrength", "Toon Strength");
             materialEditor.RenderQueueField();
         }
@@ -276,16 +265,16 @@ namespace Mmd.Editor
             DrawProperty(materialEditor, properties, "_MmdEmissionMask", "Emission Mask");
         }
 
-        private static void DrawSurfaceType(MmdToonInspectorProfile profile, Material[] materials)
+        private static void DrawSurfaceType(Material[] materials)
         {
-            SurfaceType current = GetSurfaceType(materials, out bool mixed);
+            MmdToonSurfaceType current = MmdToonMaterialStateSync.GetSurfaceType(materials, out bool mixed);
             bool previousMixed = EditorGUI.showMixedValue;
             EditorGUI.showMixedValue = mixed;
             EditorGUI.BeginChangeCheck();
-            SurfaceType selected = (SurfaceType)EditorGUILayout.EnumPopup("Surface Type", current);
+            MmdToonSurfaceType selected = (MmdToonSurfaceType)EditorGUILayout.EnumPopup("Surface Type", current);
             if (EditorGUI.EndChangeCheck())
             {
-                ApplySurfaceType(profile, materials, selected);
+                MmdToonMaterialStateSync.ApplySurfaceType(materials, selected);
             }
 
             EditorGUI.showMixedValue = previousMixed;
@@ -316,25 +305,24 @@ namespace Mmd.Editor
             EditorGUI.showMixedValue = previousMixed;
         }
 
-        private static void DrawAlphaClipping(MaterialProperty[] properties)
+        private static void DrawCutoutThreshold(
+            MaterialEditor materialEditor,
+            Material[] materials,
+            MaterialProperty[] properties)
         {
+            if (MmdToonMaterialStateSync.GetSurfaceType(materials, out bool mixed) != MmdToonSurfaceType.Cutout && !mixed)
+            {
+                return;
+            }
+
             MaterialProperty? threshold = FindProperty("_AlphaClipThreshold", properties);
             if (threshold == null)
             {
                 return;
             }
 
-            bool current = threshold.floatValue > 0.0f;
-            bool previousMixed = EditorGUI.showMixedValue;
-            EditorGUI.showMixedValue = threshold.hasMixedValue;
-            EditorGUI.BeginChangeCheck();
-            bool selected = EditorGUILayout.Toggle("Alpha Clipping", current);
-            if (EditorGUI.EndChangeCheck())
-            {
-                threshold.floatValue = selected ? Mathf.Max(threshold.floatValue, 0.01f) : 0.0f;
-            }
-
-            EditorGUI.showMixedValue = previousMixed;
+            materialEditor.ShaderProperty(threshold, new GUIContent("Alpha Clip Threshold"));
+            DrawProperty(materialEditor, properties, "_ShadowAlphaClipThreshold", "Shadow Alpha Clip Threshold");
         }
 
         private static void DrawTextureFeature(
@@ -401,22 +389,6 @@ namespace Mmd.Editor
             }
         }
 
-        private static SurfaceType GetSurfaceType(Material[] materials, out bool mixed)
-        {
-            SurfaceType result = IsTransparent(materials[0]) ? SurfaceType.Transparent : SurfaceType.Opaque;
-            mixed = false;
-            for (int i = 1; i < materials.Length; i++)
-            {
-                if ((IsTransparent(materials[i]) ? SurfaceType.Transparent : SurfaceType.Opaque) != result)
-                {
-                    mixed = true;
-                    break;
-                }
-            }
-
-            return result;
-        }
-
         private static RenderFace GetRenderFace(Material[] materials, out bool mixed)
         {
             RenderFace result = ToRenderFace(materials[0].GetFloat("_Cull"));
@@ -431,45 +403,6 @@ namespace Mmd.Editor
             }
 
             return result;
-        }
-
-        private static void ApplySurfaceType(MmdToonInspectorProfile profile, Material[] materials, SurfaceType selected)
-        {
-            Undo.RecordObjects(materials, "Change MMD Toon Surface Type");
-            for (int i = 0; i < materials.Length; i++)
-            {
-                Material material = materials[i];
-                bool wasTransparent = IsTransparent(material);
-                bool isTransparent = selected == SurfaceType.Transparent;
-                material.SetFloat("_SrcBlend", isTransparent ? (float)BlendMode.SrcAlpha : (float)BlendMode.One);
-                material.SetFloat("_DstBlend", isTransparent ? (float)BlendMode.OneMinusSrcAlpha : (float)BlendMode.Zero);
-                material.SetFloat("_ZWrite", 1.0f);
-                if (profile == MmdToonInspectorProfile.MmdToon)
-                {
-                    if (isTransparent)
-                    {
-                        material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-                    }
-                    else
-                    {
-                        material.DisableKeyword("_SURFACE_TYPE_TRANSPARENT");
-                    }
-                }
-
-                int oldDefaultQueue = wasTransparent ? (int)RenderQueue.Transparent : (int)RenderQueue.Geometry;
-                if (material.renderQueue == oldDefaultQueue)
-                {
-                    material.renderQueue = isTransparent ? (int)RenderQueue.Transparent : (int)RenderQueue.Geometry;
-                }
-
-                EditorUtility.SetDirty(material);
-            }
-        }
-
-        private static bool IsTransparent(Material material)
-        {
-            return material.GetFloat("_DstBlend") != (float)BlendMode.Zero ||
-                material.IsKeywordEnabled("_SURFACE_TYPE_TRANSPARENT");
         }
 
         private static RenderFace ToRenderFace(float cull)
