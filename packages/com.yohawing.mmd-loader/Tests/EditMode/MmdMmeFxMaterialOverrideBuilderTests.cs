@@ -83,6 +83,31 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void BuildMaterialOverrides_SkipsAmbiguousBasenameFallback()
+        {
+            MmdMaterialDescriptor[] materials =
+            {
+                new MmdMaterialDescriptor { materialIndex = 0, name = "body" }
+            };
+            MmeFxEffectDescriptor[] effectDescriptors =
+            {
+                new MmeFxEffectDescriptor
+                {
+                    sourcePath = Path.Combine(ProjectRoot, TempDirectory, "fx_a", "body.fx")
+                },
+                new MmeFxEffectDescriptor
+                {
+                    sourcePath = Path.Combine(ProjectRoot, TempDirectory, "fx_b", "body.fx")
+                }
+            };
+
+            MmdMaterialOverrideEntry[] entries =
+                MmdMmeFxMaterialOverrideBuilder.BuildMaterialOverrides(materials, effectDescriptors);
+
+            Assert.That(entries, Is.Empty);
+        }
+
+        [Test]
         public void BuildMaterialOverrides_ResolvesNextToFxNormalMap()
         {
             string effectDirectory = Path.Combine(ToAbsolutePath(TempDirectory), "normal_map");
@@ -121,6 +146,54 @@ namespace Mmd.Tests
             Assert.That(entries[0].normalMap, Is.SameAs(expectedNormalMap));
             Assert.That(entries[0].hasNormalScale, Is.False);
             Assert.That(entries[0].normalScale, Is.EqualTo(1.0f).Within(1e-6f));
+        }
+
+        [TestCase(true, TestName = "MmeNormalMapPostprocessor_NormalizesTextureNormalMapImporter")]
+        [TestCase(false, TestName = "MmeNormalMapPostprocessor_NormalizesNormalMapFileImporter")]
+        public void MmeNormalMapPostprocessor_NormalizesExplicitNormalMapImporterBeforeBuilderBinds(
+            bool useTextureNormalMap)
+        {
+            string effectDirectory = Path.Combine(ToAbsolutePath(TempDirectory), "normal_map_importer");
+            Directory.CreateDirectory(effectDirectory);
+            string normalMapAssetPath = $"Assets/__MmdMmeFxMaterialOverrideBuilderTests/normal_map_importer/normal.png";
+            string normalMapAbsolutePath = ToAbsolutePath(normalMapAssetPath);
+            string effectSourcePath = Path.Combine(effectDirectory, "body.fx");
+
+            File.WriteAllText(
+                effectSourcePath,
+                useTextureNormalMap
+                    ? "#define TEXTURE_NORMALMAP \"normal.png\""
+                    : "#define NORMAL_MAP_FILE \"normal.png\"");
+            WriteNormalMapTexture(normalMapAbsolutePath);
+            AssetDatabase.Refresh();
+            AssetDatabase.ImportAsset(normalMapAssetPath, ImportAssetOptions.ForceSynchronousImport);
+
+            MmdMaterialDescriptor[] materials =
+            {
+                new MmdMaterialDescriptor { materialIndex = 0, name = "body" }
+            };
+            MmeFxEffectDescriptor[] effectDescriptors =
+            {
+                new MmeFxEffectDescriptor
+                {
+                    sourcePath = effectSourcePath,
+                    normalMapTexture = useTextureNormalMap ? "normal.png" : null,
+                    normalMapFile = useTextureNormalMap ? null : "normal.png",
+                    useNormalMap = useTextureNormalMap
+                }
+            };
+
+            MmdMaterialOverrideEntry[] entries =
+                MmdMmeFxMaterialOverrideBuilder.BuildMaterialOverrides(materials, effectDescriptors);
+
+            Assert.That(entries, Has.Length.EqualTo(1));
+            Assert.That(entries[0].hasNormalMap, Is.True);
+            Assert.That(entries[0].normalMap, Is.Not.Null);
+
+            TextureImporter? normalizedImporter = AssetImporter.GetAtPath(normalMapAssetPath) as TextureImporter;
+            Assert.That(normalizedImporter, Is.Not.Null);
+            Assert.That(normalizedImporter!.textureType, Is.EqualTo(TextureImporterType.NormalMap));
+            Assert.That(normalizedImporter.sRGBTexture, Is.False);
         }
 
         [Test]

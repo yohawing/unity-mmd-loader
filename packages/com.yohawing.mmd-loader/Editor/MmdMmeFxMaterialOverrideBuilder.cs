@@ -108,6 +108,12 @@ namespace Mmd.Editor
                     continue;
                 }
 
+                if (!requireMaterialIndex &&
+                    HasAmbiguousBasenameMatch(materialDescriptors, effectDescriptors, matchedMaterial))
+                {
+                    continue;
+                }
+
                 if (!assignedMaterialIndices.Add(matchedMaterial.materialIndex))
                 {
                     continue;
@@ -176,6 +182,38 @@ namespace Mmd.Editor
             return null;
         }
 
+        private static bool HasAmbiguousBasenameMatch(
+            IReadOnlyList<MmdMaterialDescriptor> materialDescriptors,
+            IReadOnlyList<MmeFxEffectDescriptor> effectDescriptors,
+            MmdMaterialDescriptor matchedMaterial)
+        {
+            int matchCount = 0;
+            for (int i = 0; i < effectDescriptors.Count; i++)
+            {
+                MmeFxEffectDescriptor? candidate = effectDescriptors[i];
+                if (candidate == null || candidate.materialIndex >= 0 || IsEmdDescriptor(candidate))
+                {
+                    continue;
+                }
+
+                MmdMaterialDescriptor? candidateMaterial = TryFindMaterialByName(
+                    materialDescriptors,
+                    Path.GetFileNameWithoutExtension(candidate.sourcePath ?? string.Empty));
+                if (candidateMaterial == null || candidateMaterial.materialIndex != matchedMaterial.materialIndex)
+                {
+                    continue;
+                }
+
+                matchCount++;
+                if (matchCount > 1)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static MmdMaterialDescriptor? TryFindMaterialByName(
             IReadOnlyList<MmdMaterialDescriptor> materialDescriptors,
             string materialName)
@@ -214,8 +252,8 @@ namespace Mmd.Editor
             }
 
             if (!MmdAssetPathUtility.TryResolveProjectRelativeAssetPath(
-                    sourcePath,
-                    relativeReference,
+                sourcePath,
+                relativeReference!,
                     out string candidateAssetPath))
             {
                 return null;
@@ -268,7 +306,7 @@ namespace Mmd.Editor
             if (string.IsNullOrWhiteSpace(sourcePath) || string.IsNullOrWhiteSpace(relativeReference) ||
                 !MmdAssetPathUtility.TryResolveProjectRelativeAssetPath(
                     sourcePath,
-                    relativeReference,
+                    relativeReference!,
                     out string candidateAssetPath))
             {
                 return;
