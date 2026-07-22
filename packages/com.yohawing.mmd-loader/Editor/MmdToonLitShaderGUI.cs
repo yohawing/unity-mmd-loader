@@ -150,16 +150,26 @@ namespace Mmd.Editor
             MmdToonLitSectionDefinition definition,
             MaterialEditor materialEditor)
         {
+            const float headerHeight = 17.0f;
+            const float headerIndent = 15.0f;
+            const float foldoutSize = 13.0f;
             Rect headerRect = GUILayoutUtility.GetRect(
-                GUIContent.none,
-                EditorStyles.foldoutHeader,
-                GUILayout.ExpandWidth(true),
-                GUILayout.Height(EditorGUIUtility.singleLineHeight + 3.0f));
+                1.0f,
+                headerHeight,
+                GUILayout.ExpandWidth(true));
+            if (headerRect.xMin != 0.0f)
+            {
+                headerRect.xMin = 1.0f + headerIndent * (EditorGUI.indentLevel + 1);
+            }
+
             if (Event.current.type == EventType.Repaint)
             {
                 float backgroundTint = EditorGUIUtility.isProSkin ? 0.1f : 1.0f;
+                Rect backgroundRect = headerRect;
+                backgroundRect.xMin = 0.0f;
+                backgroundRect.width += 4.0f;
                 EditorGUI.DrawRect(
-                    headerRect,
+                    backgroundRect,
                     new Color(backgroundTint, backgroundTint, backgroundTint, 0.2f));
             }
 
@@ -208,12 +218,34 @@ namespace Mmd.Editor
                 EditorGUI.LabelField(labelRect, stateContent, EditorStyles.miniLabel);
             }
 
-            return EditorGUI.Foldout(
-                titleRect,
-                isExpanded,
+            Rect labelRectForTitle = titleRect;
+            labelRectForTitle.xMin += 16.0f;
+            EditorGUI.LabelField(
+                labelRectForTitle,
                 new GUIContent(definition.DisplayName),
-                true,
-                EditorStyles.foldoutHeader);
+                EditorStyles.boldLabel);
+
+            Rect foldoutRect = headerRect;
+            foldoutRect.x = labelRectForTitle.xMin + headerIndent * (EditorGUI.indentLevel - 1);
+            foldoutRect.y += 1.0f;
+            foldoutRect.width = foldoutSize;
+            foldoutRect.height = foldoutSize;
+            bool nextExpanded = GUI.Toggle(
+                foldoutRect,
+                isExpanded,
+                GUIContent.none,
+                EditorStyles.foldout);
+
+            if (Event.current.type == EventType.MouseDown &&
+                Event.current.button == 0 &&
+                labelRectForTitle.Contains(Event.current.mousePosition))
+            {
+                nextExpanded = !isExpanded;
+                Event.current.Use();
+                GUI.changed = true;
+            }
+
+            return nextExpanded;
         }
 
         private static bool TryGetFeature(MmdToonLitInspectorSection section, out MmdToonFeature feature)
