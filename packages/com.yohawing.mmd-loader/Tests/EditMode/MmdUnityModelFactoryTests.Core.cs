@@ -107,9 +107,13 @@ namespace Mmd.Tests
             Assert.That(legacySource, Does.Not.Contain("#pragma multi_compile_fog"));
             Assert.That(legacySource, Does.Not.Contain("ComputeFogFactor("));
             Assert.That(legacySource, Does.Not.Contain("MixFog("));
+            Assert.That(legacySource, Does.Not.Contain("half3 ambientSrgb = ambientShSrgb"));
 
             Assert.That(toonLitSource, Does.Contain("half3 ambientShSrgb = LinearToSRGB(SampleSH(normalWS));"));
-            Assert.That(toonLitSource, Does.Contain("LinearToSRGB(_BaseColor.rgb) * (mainLightSrgb + ambientShSrgb)"));
+            Assert.That(toonLitSource, Does.Contain("half3 diffuseSrgb = LinearToSRGB(_BaseColor.rgb) * (mainLightSrgb + reflectionSrgb);"));
+            Assert.That(toonLitSource, Does.Contain("half3 ambientSrgb = ambientShSrgb * LinearToSRGB(_AmbientColor.rgb);"));
+            Assert.That(toonLitSource, Does.Contain("half3 baseSrgb = saturate(diffuseSrgb + ambientSrgb);"));
+            Assert.That(toonLitSource, Does.Not.Contain("LinearToSRGB(_BaseColor.rgb) * (mainLightSrgb + ambientShSrgb + reflectionSrgb)"));
             Assert.That(toonLitSource, Does.Contain("#pragma multi_compile_fog"));
             Assert.That(toonLitSource, Does.Contain("output.fogFactor = ComputeFogFactor(output.positionCS.z);"));
             Assert.That(toonLitSource, Does.Contain("half3 foggedLinear = MixFog(SRGBToLinear(litSrgb), input.fogFactor);"));

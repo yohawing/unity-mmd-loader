@@ -508,9 +508,12 @@ Shader "MMD Toon Lit"
                     reflectionSrgb = LinearToSRGB(reflectionLinear) * _ReflectionProbeWeight;
                 }
                 #endif
-                half3 baseSrgb = saturate(
-                    LinearToSRGB(_BaseColor.rgb) * (mainLightSrgb + ambientShSrgb + reflectionSrgb)
-                    + LinearToSRGB(_AmbientColor.rgb));
+                // Keep direct and reflection radiance under the diffuse/base color. PMX ambient
+                // color modulates URP SH ambient instead of being added as an unconditional
+                // constant that can saturate and wash out directional-light color response.
+                half3 diffuseSrgb = LinearToSRGB(_BaseColor.rgb) * (mainLightSrgb + reflectionSrgb);
+                half3 ambientSrgb = ambientShSrgb * LinearToSRGB(_AmbientColor.rgb);
+                half3 baseSrgb = saturate(diffuseSrgb + ambientSrgb);
                 half3 albedoSrgb = baseSrgb * LinearToSRGB(baseMap.rgb) * LinearToSRGB(_Color.rgb) * LinearToSRGB(_DiagnosticColor.rgb);
                 if (_SphereMode > 0.5h)
                 {
