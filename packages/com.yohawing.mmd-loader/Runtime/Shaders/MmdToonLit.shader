@@ -22,6 +22,14 @@ Shader "MMD Toon Lit"
         [Toggle] _ReceiveSSAO ("Receive SSAO", Float) = 0
         [PerRendererData] [HideInInspector] _MmdSelfShadowReceive ("MMD Self Shadow Receive", Float) = 0
         _ToonStrength ("Toon Strength", Range(0, 1)) = 1
+        [Enum(MMD Toon Ramp, 0, Shade Colors, 1)] _ToonAuthoringMode ("Toon Authoring Mode", Float) = 0
+        _ShadeBaseColor ("Base Shade Color", Color) = (1,1,1,1)
+        _FirstShadeColor ("1st Shade Color", Color) = (0.5,0.5,0.5,1)
+        _SecondShadeColor ("2nd Shade Color", Color) = (0.1,0.1,0.1,1)
+        _BaseToFirstShadeBoundary ("Base / 1st Boundary", Range(0,1)) = 0.5
+        _BaseToFirstShadeFeather ("Base / 1st Feather", Range(0,1)) = 0.1
+        _FirstToSecondShadeBoundary ("1st / 2nd Boundary", Range(0,1)) = 0.25
+        _FirstToSecondShadeFeather ("1st / 2nd Feather", Range(0,1)) = 0.1
         // Optional authoring controls. -1 keeps the current MMD visibility ramp exactly intact.
         _ToonBoundary ("Toon Boundary", Range(-1, 1)) = -1
         _ToonFeather ("Toon Boundary Feather", Range(-1, 1)) = -1
@@ -143,6 +151,14 @@ Shader "MMD Toon Lit"
                 half4 _MmdLightColor;
                 half _ReceiveSSAO;
                 half _ToonStrength;
+                half _ToonAuthoringMode;
+                half4 _ShadeBaseColor;
+                half4 _FirstShadeColor;
+                half4 _SecondShadeColor;
+                half _BaseToFirstShadeBoundary;
+                half _BaseToFirstShadeFeather;
+                half _FirstToSecondShadeBoundary;
+                half _FirstToSecondShadeFeather;
                 half _ToonMapBound;
                 half _SphereMode;
                 half4 _OutlineColor;
@@ -312,6 +328,34 @@ Shader "MMD Toon Lit"
                 return floor(saturate(visibility) * (bandCount - 1.0h) + 0.5h) / (bandCount - 1.0h);
             }
 
+            half ApplyMmdShadeThreshold(half visibility, half boundary, half feather)
+            {
+                boundary = saturate(boundary);
+                feather = saturate(feather);
+                if (feather <= 1e-4h)
+                {
+                    return step(boundary, visibility);
+                }
+
+                half lower = max(0.0h, boundary - feather);
+                half upper = min(1.0h, boundary + feather);
+                return smoothstep(lower, max(lower + 1e-4h, upper), visibility);
+            }
+
+            half3 ApplyMmdShadeColors(half visibility)
+            {
+                half baseToFirst = ApplyMmdShadeThreshold(
+                    visibility,
+                    _BaseToFirstShadeBoundary,
+                    _BaseToFirstShadeFeather);
+                half firstToSecond = ApplyMmdShadeThreshold(
+                    visibility,
+                    _FirstToSecondShadeBoundary,
+                    _FirstToSecondShadeFeather);
+                half3 secondToFirst = lerp(_SecondShadeColor.rgb, _FirstShadeColor.rgb, firstToSecond);
+                return lerp(secondToFirst, _ShadeBaseColor.rgb, baseToFirst);
+            }
+
             half ComputeMmdStylizedSpecularMask(
                 half3 normalWS,
                 half3 lightDirection,
@@ -391,7 +435,7 @@ Shader "MMD Toon Lit"
                 // MMD Ramp materials without a bound toon map have no authoring shade color
                 // to receive the visibility ramp. Preserve the previous direct-shadow response
                 // only for that compatibility case; bound toon maps keep shadow in toon visibility.
-                if (_ToonMapBound <= 0.5h)
+                if (_ToonAuthoringMode <= 0.5h && _ToonMapBound <= 0.5h)
                 {
                     mainLightSrgb *= mainLightShadowVisibility;
                     unityMainLightSrgb *= mainLightShadowVisibility;
@@ -426,6 +470,12 @@ Shader "MMD Toon Lit"
                     half3 selfShadowMmdToonLight = lerp(selfShadowToon, half3(1.0h, 1.0h, 1.0h), toonVisibility);
                     half3 selfShadowToonLight = lerp(ndotl.xxx, selfShadowMmdToonLight, _ToonStrength);
                     toonLight = min(toonLight, selfShadowToonLight);
+                }
+                if (_ToonAuthoringMode > 0.5h)
+                {
+                    half shadeVisibility = min(combinedShadowVisibility, lightVisibility);
+                    half3 shadeColorToonLight = ApplyMmdShadeColors(shadeVisibility);
+                    toonLight = lerp(ndotl.xxx, shadeColorToonLight, _ToonStrength);
                 }
 
                 half3 ambientShSrgb = LinearToSRGB(SampleSH(normalWS));

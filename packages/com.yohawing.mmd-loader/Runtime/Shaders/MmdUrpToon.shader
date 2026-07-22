@@ -21,6 +21,14 @@ Shader "MMD URP Toon"
         [Toggle] _ReceiveSSAO ("Receive SSAO", Float) = 0
         [PerRendererData] [HideInInspector] _MmdSelfShadowReceive ("MMD Self Shadow Receive", Float) = 0
         _ToonStrength ("Toon Strength", Range(0, 1)) = 1
+        [Enum(MMD Toon Ramp, 0, Shade Colors, 1)] _ToonAuthoringMode ("Toon Authoring Mode", Float) = 0
+        _ShadeBaseColor ("Base Shade Color", Color) = (1,1,1,1)
+        _FirstShadeColor ("1st Shade Color", Color) = (0.5,0.5,0.5,1)
+        _SecondShadeColor ("2nd Shade Color", Color) = (0.1,0.1,0.1,1)
+        _BaseToFirstShadeBoundary ("Base / 1st Boundary", Range(0,1)) = 0.5
+        _BaseToFirstShadeFeather ("Base / 1st Feather", Range(0,1)) = 0.1
+        _FirstToSecondShadeBoundary ("1st / 2nd Boundary", Range(0,1)) = 0.25
+        _FirstToSecondShadeFeather ("1st / 2nd Feather", Range(0,1)) = 0.1
         _ToonBoundary ("Toon Boundary", Range(-1, 1)) = -1
         _ToonFeather ("Toon Boundary Feather", Range(-1, 1)) = -1
         _ToonBandCount ("Toon Band Count", Range(-1, 8)) = -1

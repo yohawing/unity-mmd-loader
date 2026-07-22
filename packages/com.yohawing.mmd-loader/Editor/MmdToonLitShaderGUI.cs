@@ -298,6 +298,14 @@ namespace Mmd.Editor
             MaterialEditor materialEditor,
             MaterialProperty[] properties)
         {
+            MaterialProperty? authoringMode = profile == MmdToonInspectorProfile.MmdToon
+                ? FindOptionalProperty("_ToonAuthoringMode", properties)
+                : null;
+            if (authoringMode != null)
+            {
+                materialEditor.ShaderProperty(authoringMode, new GUIContent("Toon Authoring Mode"));
+            }
+
             DrawProperty(materialEditor, properties, "_ToonStrength", "Toon Strength");
             DrawProperty(materialEditor, properties, "_AmbientColor", "Ambient Color");
             DrawProperty(materialEditor, properties, "_MmdLightColor", "Light Color");
@@ -305,9 +313,27 @@ namespace Mmd.Editor
             if (profile == MmdToonInspectorProfile.MmdToon)
             {
                 DrawProperty(materialEditor, properties, "_ReceiveSSAO", "Receive SSAO");
-                DrawProperty(materialEditor, properties, "_ToonBoundary", "Toon Boundary");
-                DrawProperty(materialEditor, properties, "_ToonFeather", "Toon Boundary Feather");
-                DrawProperty(materialEditor, properties, "_ToonBandCount", "Toon Band Count");
+                bool shadeColorsSelected = authoringMode != null && authoringMode.floatValue > 0.5f;
+                bool showMmdRampProperties = authoringMode == null ||
+                    authoringMode.hasMixedValue || !shadeColorsSelected;
+                bool showShadeColorProperties = authoringMode != null &&
+                    (authoringMode.hasMixedValue || shadeColorsSelected);
+                if (showMmdRampProperties)
+                {
+                    DrawProperty(materialEditor, properties, "_ToonBoundary", "Toon Boundary");
+                    DrawProperty(materialEditor, properties, "_ToonFeather", "Toon Boundary Feather");
+                    DrawProperty(materialEditor, properties, "_ToonBandCount", "Toon Band Count");
+                }
+                if (showShadeColorProperties)
+                {
+                    DrawProperty(materialEditor, properties, "_ShadeBaseColor", "Base Shade Color");
+                    DrawProperty(materialEditor, properties, "_FirstShadeColor", "1st Shade Color");
+                    DrawProperty(materialEditor, properties, "_SecondShadeColor", "2nd Shade Color");
+                    DrawProperty(materialEditor, properties, "_BaseToFirstShadeBoundary", "Base / 1st Boundary");
+                    DrawProperty(materialEditor, properties, "_BaseToFirstShadeFeather", "Base / 1st Feather");
+                    DrawProperty(materialEditor, properties, "_FirstToSecondShadeBoundary", "1st / 2nd Boundary");
+                    DrawProperty(materialEditor, properties, "_FirstToSecondShadeFeather", "1st / 2nd Feather");
+                }
                 DrawProperty(materialEditor, properties, "_ReflectionProbeWeight", "Reflection Probe Weight");
             }
         }

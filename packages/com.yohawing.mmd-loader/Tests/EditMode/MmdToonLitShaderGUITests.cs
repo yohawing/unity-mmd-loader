@@ -98,6 +98,47 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void ShadeColorsAuthoringIsUrpToonOnlyAndMmdRampIsTheDefault()
+        {
+            Material urpToon = CreateMaterial("MMD URP Toon");
+            Material legacyToon = CreateMaterial("MMD Toon Lit");
+            Material basicToon = CreateMaterial("MMD Basic Toon");
+            string[] shadeProperties =
+            {
+                "_ToonAuthoringMode",
+                "_ShadeBaseColor",
+                "_FirstShadeColor",
+                "_SecondShadeColor",
+                "_BaseToFirstShadeBoundary",
+                "_BaseToFirstShadeFeather",
+                "_FirstToSecondShadeBoundary",
+                "_FirstToSecondShadeFeather",
+            };
+            try
+            {
+                for (int i = 0; i < shadeProperties.Length; i++)
+                {
+                    Assert.That(urpToon.HasProperty(shadeProperties[i]), Is.True);
+                    Assert.That(legacyToon.HasProperty(shadeProperties[i]), Is.True);
+                    Assert.That(basicToon.HasProperty(shadeProperties[i]), Is.False);
+                }
+
+                Assert.That(urpToon.GetFloat("_ToonAuthoringMode"), Is.Zero);
+                Assert.That(legacyToon.GetFloat("_ToonAuthoringMode"), Is.Zero);
+                Assert.That(urpToon.GetFloat("_BaseToFirstShadeBoundary"), Is.EqualTo(0.5f).Within(0.00001f));
+                Assert.That(urpToon.GetFloat("_BaseToFirstShadeFeather"), Is.EqualTo(0.1f).Within(0.00001f));
+                Assert.That(urpToon.GetFloat("_FirstToSecondShadeBoundary"), Is.EqualTo(0.25f).Within(0.00001f));
+                Assert.That(urpToon.GetFloat("_FirstToSecondShadeFeather"), Is.EqualTo(0.1f).Within(0.00001f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(urpToon);
+                Object.DestroyImmediate(legacyToon);
+                Object.DestroyImmediate(basicToon);
+            }
+        }
+
+        [Test]
         public void ProfileSupportHidesMmdOnlyFeatureSectionsForBasicToon()
         {
             Assert.That(
