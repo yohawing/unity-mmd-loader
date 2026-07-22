@@ -167,6 +167,7 @@ namespace Mmd.Editor
             if (asset != null)
             {
                 DrawRemappedMaterials(asset);
+                DrawExtractMaterialsAction(asset);
             }
             else
             {
@@ -207,6 +208,128 @@ namespace Mmd.Editor
             }
 
             DrawPendingImportSettingsWarning(HasModified());
+        }
+
+        private void DrawExtractMaterialsAction(MmdPmxAsset asset)
+        {
+            Material[] importedMaterials = asset.ImportedMaterials ?? System.Array.Empty<Material>();
+            if (importedMaterials.Length == 0 || materialRemapsProperty == null)
+            {
+                return;
+            }
+
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField(
+                "Embedded Materials",
+                "Copy importer-owned materials to independent project assets without extracting textures.");
+            using (new EditorGUI.DisabledScope(HasModified()))
+            {
+                if (!GUILayout.Button("Extract Materials..."))
+                {
+                    return;
+                }
+
+                string importerAssetPath = target is AssetImporter selectedImporter
+                    ? selectedImporter.assetPath
+                    : string.Empty;
+                Material[] existingRemaps = ReadMaterialRemaps(importedMaterials.Length);
+                MmdPmxMaterialExtractor.Result result = MmdPmxMaterialExtractor.TryExtractToSiblingMaterialsFolder(
+                    importerAssetPath,
+                    importedMaterials,
+                    existingRemaps,
+                    out Material[] updatedRemaps);
+                if (!result.Success)
+                {
+                    EditorUtility.DisplayDialog("Materials Not Extracted", result.Message, "OK");
+                    return;
+                }
+
+                try
+                {
+                    Undo.RecordObject(target, "Extract PMX Materials");
+                    materialRemapsProperty.arraySize = updatedRemaps.Length;
+                    for (int i = 0; i < updatedRemaps.Length; i++)
+                    {
+                        materialRemapsProperty.GetArrayElementAtIndex(i).objectReferenceValue = updatedRemaps[i];
+                    }
+
+                    serializedObject.ApplyModifiedProperties();
+                    if (target is AssetImporter importer)
+                    {
+                        importer.SaveAndReimport();
+                    }
+
+                    cachedAsset = null;
+                    EditorUtility.DisplayDialog("Materials Extracted", result.Message, "OK");
+                }
+                catch (System.Exception exception)
+                {
+                    // The extractor has already committed only the newly-created
+                    // assets. If importer persistence fails, remove those assets
+                    // and restore the prior slot remaps before surfacing the error.
+                    for (int i = result.CreatedAssetPaths.Count - 1; i >= 0; i--)
+                    {
+                        AssetDatabase.DeleteAsset(result.CreatedAssetPaths[i]);
+                    }
+
+                    cachedAsset = null;
+                    RestoreMaterialRemaps(importerAssetPath, existingRemaps);
+                    EditorUtility.DisplayDialog(
+                        "Materials Not Extracted",
+                        $"Material remap persistence failed: {exception.Message}",
+                        "OK");
+                }
+            }
+        }
+
+        private Material[] ReadMaterialRemaps(int materialCount)
+        {
+            Material[] remaps = new Material[materialCount];
+            if (materialRemapsProperty == null)
+            {
+                return remaps;
+            }
+
+            int copyCount = Mathf.Min(materialRemapsProperty.arraySize, materialCount);
+            for (int i = 0; i < copyCount; i++)
+            {
+                remaps[i] = materialRemapsProperty.GetArrayElementAtIndex(i).objectReferenceValue as Material;
+            }
+
+            return remaps;
+        }
+
+        private static void RestoreMaterialRemaps(string importerAssetPath, Material[] remaps)
+        {
+            if (string.IsNullOrWhiteSpace(importerAssetPath))
+            {
+                return;
+            }
+
+            // SaveAndReimport can invalidate the inspector target. Resolve the
+            // importer from its stable asset path and persist only the rollback
+            // setting; do not recursively invoke another reimport here.
+            AssetImporter? importer = AssetImporter.GetAtPath(importerAssetPath);
+            if (importer == null)
+            {
+                return;
+            }
+
+            SerializedObject rollbackObject = new SerializedObject(importer);
+            SerializedProperty? rollbackProperty = rollbackObject.FindProperty("materialRemaps");
+            if (rollbackProperty == null)
+            {
+                return;
+            }
+
+            rollbackProperty.arraySize = remaps.Length;
+            for (int i = 0; i < remaps.Length; i++)
+            {
+                rollbackProperty.GetArrayElementAtIndex(i).objectReferenceValue = remaps[i];
+            }
+
+            rollbackObject.ApplyModifiedPropertiesWithoutUndo();
+            AssetDatabase.WriteImportSettingsIfDirty(importerAssetPath);
         }
 
         private void DrawRigTab(MmdPmxAsset? asset)
