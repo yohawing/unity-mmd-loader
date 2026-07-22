@@ -654,4 +654,6 @@ Shader "MMD Toon Lit"
         UsePass "MMD Basic URP Toon/MmdSelfShadowCaster"
         UsePass "MMD Basic URP Toon/ShadowCaster"
     }
+
+    CustomEditor "Mmd.Editor.MmdToonLitShaderGUI"
 }
