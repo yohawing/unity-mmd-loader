@@ -307,6 +307,79 @@ namespace Mmd.Tests
             Assert.That(importedMaterial.GetFloat(MmdMaterialPropertyNames.BumpScale),
                 Is.EqualTo(0.33f).Within(0.00001f));
         }
+
+        [Test]
+        public void PmxImporterAutoDiscoversMmeNormalMapAndExplicitOverrideWins()
+        {
+            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+
+            string autoFxAssetPath = TempDirectory + "/auto.fx";
+            string autoEmdAssetPath = TempDirectory + "/test_1bone_cube.emd";
+            string autoNormalMapAssetPath = TempDirectory + "/auto_normal.png";
+            string explicitNormalMapAssetPath = TempDirectory + "/explicit_normal.png";
+
+            WritePng(Path.Combine(ProjectRoot, autoNormalMapAssetPath), new Color(0.2f, 0.8f, 0.4f, 1.0f));
+            WritePng(Path.Combine(ProjectRoot, explicitNormalMapAssetPath), new Color(0.8f, 0.3f, 0.1f, 1.0f));
+            File.WriteAllText(
+                Path.Combine(ProjectRoot, autoFxAssetPath),
+                "#define USE_NORMALMAP\n#define TEXTURE_NORMALMAP \"auto_normal.png\"\n#include \"AlternativeFull.fxsub\"\n");
+            File.WriteAllText(
+                Path.Combine(ProjectRoot, autoEmdAssetPath),
+                "[Effect]\nObj[0] = auto.fx\n");
+
+            AssetDatabase.Refresh();
+            AssetDatabase.ImportAsset(autoNormalMapAssetPath, ImportAssetOptions.ForceUpdate);
+            AssetDatabase.ImportAsset(explicitNormalMapAssetPath, ImportAssetOptions.ForceUpdate);
+            AssetDatabase.ImportAsset(TempPmxPath, ImportAssetOptions.ForceUpdate);
+
+            MmdPmxScriptedImporter importer = AssetImporter.GetAtPath(TempPmxPath) as MmdPmxScriptedImporter;
+            Assert.That(importer, Is.Not.Null);
+            var serializedImporter = new SerializedObject(importer!);
+            serializedImporter.FindProperty("shaderPreset").enumValueIndex = (int)MmdPmxShaderPreset.MmdToonLit;
+            serializedImporter.ApplyModifiedPropertiesWithoutUndo();
+            importer!.SaveAndReimport();
+
+            Texture2D autoNormalMap = AssetDatabase.LoadAssetAtPath<Texture2D>(autoNormalMapAssetPath);
+            Assert.That(autoNormalMap, Is.Not.Null);
+            MmdPmxAsset autoImportedAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+            Assert.That(autoImportedAsset, Is.Not.Null);
+            Assert.That(autoImportedAsset.ShaderPreset, Is.EqualTo(nameof(MmdPmxShaderPreset.MmdToonLit)));
+            Assert.That(autoImportedAsset.ImportedMaterials, Is.Not.Null.And.Not.Empty);
+            Material autoImportedMaterial = autoImportedAsset.ImportedMaterials[0];
+            Assert.That(autoImportedMaterial.shader, Is.Not.Null);
+            Assert.That(autoImportedMaterial.shader.name,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName));
+            Assert.That(autoImportedMaterial.GetTexture(MmdMaterialPropertyNames.MmdNormalMap), Is.SameAs(autoNormalMap));
+            Assert.That(autoImportedMaterial.GetFloat(MmdMaterialPropertyNames.MmdNormalMapBound), Is.EqualTo(1.0f).Within(0.00001f));
+
+            Texture2D explicitNormalMap = AssetDatabase.LoadAssetAtPath<Texture2D>(explicitNormalMapAssetPath);
+            Assert.That(explicitNormalMap, Is.Not.Null);
+            MmdMaterialOverrideAsset overrideAsset = ScriptableObject.CreateInstance<MmdMaterialOverrideAsset>();
+            overrideAsset.entries = new[]
+            {
+                new MmdMaterialOverrideEntry
+                {
+                    materialIndex = 0,
+                    hasNormalMap = true,
+                    normalMap = explicitNormalMap
+                }
+            };
+            AssetDatabase.CreateAsset(overrideAsset, TempMaterialOverridePath);
+            AssetDatabase.ImportAsset(TempMaterialOverridePath, ImportAssetOptions.ForceUpdate);
+            MmdMaterialOverrideAsset persistedOverride =
+                AssetDatabase.LoadAssetAtPath<MmdMaterialOverrideAsset>(TempMaterialOverridePath);
+            Assert.That(persistedOverride, Is.Not.Null);
+
+            serializedImporter.FindProperty("materialOverrideAsset").objectReferenceValue = persistedOverride;
+            serializedImporter.ApplyModifiedPropertiesWithoutUndo();
+            importer!.SaveAndReimport();
+
+            MmdPmxAsset explicitImportedAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+            Material explicitImportedMaterial = explicitImportedAsset.ImportedMaterials[0];
+            Assert.That(explicitImportedMaterial.GetTexture(MmdMaterialPropertyNames.MmdNormalMap), Is.SameAs(explicitNormalMap));
+            Assert.That(explicitImportedMaterial.GetFloat(MmdMaterialPropertyNames.MmdNormalMapBound), Is.EqualTo(1.0f).Within(0.00001f));
+        }
+
         [Test]
         public void PmxImporterNormalizesInvalidImportScaleOnReimport()
         {

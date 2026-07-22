@@ -5,7 +5,9 @@ using System.Collections.Generic;
 using System.IO;
 using Mmd.Mme;
 using Mmd.Rendering;
+using Mmd.UnityIntegration;
 using UnityEditor;
+using UnityEditor.AssetImporters;
 using UnityEngine;
 
 namespace Mmd.Editor
@@ -13,6 +15,53 @@ namespace Mmd.Editor
     public static class MmdMmeFxMaterialOverrideBuilder
     {
         private const string DotEmdExtension = ".emd";
+
+        /// <summary>
+        /// Scans the MME files next to a PMX source and applies the resulting
+        /// material overrides to the importer-owned descriptor and materials.
+        /// The temporary override asset is intentionally not persisted; source
+        /// files and resolvable texture references are tracked as importer
+        /// dependencies instead.
+        /// </summary>
+        internal static void ApplyScannedMaterialOverrides(
+            AssetImportContext ctx,
+            string modelSourcePath,
+            MmdRenderingDescriptor? renderingDescriptor,
+            Material[]? materials)
+        {
+            if (ctx == null ||
+                string.IsNullOrWhiteSpace(modelSourcePath) ||
+                renderingDescriptor?.materials == null ||
+                renderingDescriptor.materials.Count == 0 ||
+                materials == null ||
+                materials.Length == 0)
+            {
+                return;
+            }
+
+            IReadOnlyList<MmeFxEffectDescriptor> effectDescriptors =
+                MmeFxScanner.ScanFromModelPath(modelSourcePath, renderingDescriptor.materials.Count);
+            RegisterImportDependencies(ctx, modelSourcePath, effectDescriptors);
+
+            MmdMaterialOverrideEntry[] entries =
+                BuildMaterialOverrides(renderingDescriptor.materials, effectDescriptors);
+            if (entries.Length == 0)
+            {
+                return;
+            }
+
+            var overrideAsset = ScriptableObject.CreateInstance<MmdMaterialOverrideAsset>();
+            try
+            {
+                overrideAsset.entries = entries;
+                MmdMaterialOverrideApplier.ApplyToRenderingDescriptor(overrideAsset, renderingDescriptor);
+                MmdMaterialOverrideApplier.Apply(overrideAsset, materials);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(overrideAsset);
+            }
+        }
 
         public static MmdMaterialOverrideEntry[] BuildMaterialOverrides(
             IReadOnlyList<MmdMaterialDescriptor>? materialDescriptors,
@@ -184,6 +233,82 @@ namespace Mmd.Editor
             }
 
             scalar = value.Value;
+            return true;
+        }
+
+        private static void RegisterImportDependencies(
+            AssetImportContext ctx,
+            string modelSourcePath,
+            IReadOnlyList<MmeFxEffectDescriptor> effectDescriptors)
+        {
+            RegisterDependency(ctx, Path.ChangeExtension(modelSourcePath, DotEmdExtension));
+            for (int i = 0; i < effectDescriptors.Count; i++)
+            {
+                MmeFxEffectDescriptor? descriptor = effectDescriptors[i];
+                if (descriptor == null)
+                {
+                    continue;
+                }
+
+                RegisterDependency(ctx, descriptor.sourcePath);
+                RegisterReferencedTexture(ctx, descriptor.sourcePath, descriptor.normalMapTexture);
+                RegisterReferencedTexture(ctx, descriptor.sourcePath, descriptor.normalMapFile);
+                RegisterReferencedTexture(ctx, descriptor.sourcePath, descriptor.thresholdTexture);
+                RegisterReferencedTexture(ctx, descriptor.sourcePath, descriptor.albedoMapTexture);
+                RegisterReferencedTexture(ctx, descriptor.sourcePath, descriptor.smoothnessMapFile);
+                RegisterReferencedTexture(ctx, descriptor.sourcePath, descriptor.metalnessMapFile);
+            }
+        }
+
+        private static void RegisterReferencedTexture(
+            AssetImportContext ctx,
+            string sourcePath,
+            string? relativeReference)
+        {
+            if (string.IsNullOrWhiteSpace(sourcePath) || string.IsNullOrWhiteSpace(relativeReference) ||
+                !MmdAssetPathUtility.TryResolveProjectRelativeAssetPath(
+                    sourcePath,
+                    relativeReference,
+                    out string candidateAssetPath))
+            {
+                return;
+            }
+
+            RegisterDependency(ctx, candidateAssetPath);
+        }
+
+        private static void RegisterDependency(AssetImportContext ctx, string? path)
+        {
+            if (!TryGetProjectRelativeAssetPath(path, out string assetPath))
+            {
+                return;
+            }
+
+            ctx.DependsOnSourceAsset(assetPath);
+        }
+
+        private static bool TryGetProjectRelativeAssetPath(
+            string? path,
+            out string assetPath)
+        {
+            assetPath = string.Empty;
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return false;
+            }
+
+            string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            string candidateAbsolutePath = Path.IsPathRooted(path)
+                ? Path.GetFullPath(path)
+                : Path.GetFullPath(Path.Combine(projectRoot, path));
+            string relativePath = Path.GetRelativePath(projectRoot, candidateAbsolutePath).Replace('\\', '/');
+            if (!relativePath.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase) ||
+                !File.Exists(candidateAbsolutePath))
+            {
+                return false;
+            }
+
+            assetPath = relativePath;
             return true;
         }
     }

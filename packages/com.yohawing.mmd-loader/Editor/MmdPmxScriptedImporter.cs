@@ -113,7 +113,7 @@ namespace Mmd.Editor
                 ImportScale,
                 MmdPmxModelPresetAutoDetector.IsCharacter(effectiveModelPreset),
                 MapMaterialPreset(shaderPreset),
-                materialOverrideAsset);
+                materialOverride: null);
             transaction.Track(generatedAssets.Root, hierarchyRoot: true);
             transaction.Track(generatedAssets.Mesh);
             foreach (Material material in generatedAssets.Materials)
@@ -151,7 +151,13 @@ namespace Mmd.Editor
                     importedMaterials);
             }
 
-            ApplyMaterialOverrideAsset(ctx, importedMaterials);
+            MmdMmeFxMaterialOverrideBuilder.ApplyScannedMaterialOverrides(
+                ctx,
+                resolvedSourcePath,
+                generatedAssets.RenderingDescriptor,
+                importedMaterials);
+
+            ApplyMaterialOverrideAsset(ctx, generatedAssets.RenderingDescriptor, importedMaterials);
 
             MmdPmxAsset asset = MmdPmxImportedAssetBuilder.CreateAndInitializeImportedAsset(
                 bytes,
@@ -307,7 +313,10 @@ namespace Mmd.Editor
             };
         }
 
-        private void ApplyMaterialOverrideAsset(AssetImportContext ctx, Material[] importedMaterials)
+        private void ApplyMaterialOverrideAsset(
+            AssetImportContext ctx,
+            MmdRenderingDescriptor renderingDescriptor,
+            Material[] importedMaterials)
         {
             if (materialOverrideAsset == null)
             {
@@ -315,12 +324,12 @@ namespace Mmd.Editor
             }
 
             string overrideAssetPath = AssetDatabase.GetAssetPath(materialOverrideAsset);
-            if (string.IsNullOrEmpty(overrideAssetPath))
+            if (!string.IsNullOrEmpty(overrideAssetPath))
             {
-                return;
+                ctx.DependsOnSourceAsset(overrideAssetPath);
             }
 
-            ctx.DependsOnSourceAsset(overrideAssetPath);
+            MmdMaterialOverrideApplier.ApplyToRenderingDescriptor(materialOverrideAsset, renderingDescriptor);
             MmdMaterialOverrideApplier.Apply(materialOverrideAsset, importedMaterials);
         }
 
