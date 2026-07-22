@@ -42,25 +42,25 @@ namespace Mmd.Editor
 
                 expanded[i] = DrawSectionHeader(
                     expanded[i], definition, materialEditor);
-                if (expanded[i] && ShouldDrawSectionContents(definition.Section, materialEditor))
+                if (expanded[i])
                 {
                     EditorGUI.indentLevel++;
-                    DrawSection(definition.Section, profile, materialEditor, properties);
+                    using (new EditorGUI.DisabledScope(
+                        !IsSectionContentEditable(definition.Section, materialEditor)))
+                    {
+                        DrawSection(definition.Section, profile, materialEditor, properties);
+                    }
                     EditorGUI.indentLevel--;
                 }
             }
         }
 
-        private static bool ShouldDrawSectionContents(
+        private static bool IsSectionContentEditable(
             MmdToonLitInspectorSection section,
             MaterialEditor materialEditor)
         {
-            if (!TryGetFeature(section, out MmdToonFeature feature))
-            {
-                return true;
-            }
-
-            return MmdToonMaterialStateSync.GetFeatureState(GetMaterials(materialEditor), feature) !=
+            return !TryGetFeature(section, out MmdToonFeature feature) ||
+                MmdToonMaterialStateSync.GetFeatureState(GetMaterials(materialEditor), feature) !=
                 MmdToonFeatureState.Off;
         }
 
@@ -150,12 +150,11 @@ namespace Mmd.Editor
             MmdToonLitSectionDefinition definition,
             MaterialEditor materialEditor)
         {
-            Rect headerRect = EditorGUI.IndentedRect(
-                GUILayoutUtility.GetRect(
-                    GUIContent.none,
-                    EditorStyles.foldoutHeader,
-                    GUILayout.ExpandWidth(true),
-                    GUILayout.Height(EditorGUIUtility.singleLineHeight + 3.0f)));
+            Rect headerRect = GUILayoutUtility.GetRect(
+                GUIContent.none,
+                EditorStyles.foldoutHeader,
+                GUILayout.ExpandWidth(true),
+                GUILayout.Height(EditorGUIUtility.singleLineHeight + 3.0f));
             if (Event.current.type == EventType.Repaint)
             {
                 float backgroundTint = EditorGUIUtility.isProSkin ? 0.1f : 1.0f;
@@ -209,32 +208,12 @@ namespace Mmd.Editor
                 EditorGUI.LabelField(labelRect, stateContent, EditorStyles.miniLabel);
             }
 
-            Rect foldoutRect = titleRect;
-            foldoutRect.y += (headerRect.height - lineHeight) * 0.5f;
-            foldoutRect.height = lineHeight;
-            float arrowWidth = Mathf.Min(lineHeight, foldoutRect.width);
-            Rect arrowRect = foldoutRect;
-            arrowRect.width = arrowWidth;
-            bool nextExpanded = EditorGUI.Foldout(arrowRect, isExpanded, GUIContent.none, false);
-            Rect labelRectForTitle = foldoutRect;
-            labelRectForTitle.xMin = Mathf.Min(
-                labelRectForTitle.xMax,
-                arrowRect.xMax + featureSpacing);
-            EditorGUI.LabelField(
-                labelRectForTitle,
+            return EditorGUI.Foldout(
+                titleRect,
+                isExpanded,
                 new GUIContent(definition.DisplayName),
-                EditorStyles.boldLabel);
-
-            if (Event.current.type == EventType.MouseDown &&
-                Event.current.button == 0 &&
-                labelRectForTitle.Contains(Event.current.mousePosition))
-            {
-                nextExpanded = !isExpanded;
-                Event.current.Use();
-                GUI.changed = true;
-            }
-
-            return nextExpanded;
+                true,
+                EditorStyles.foldoutHeader);
         }
 
         private static bool TryGetFeature(MmdToonLitInspectorSection section, out MmdToonFeature feature)
