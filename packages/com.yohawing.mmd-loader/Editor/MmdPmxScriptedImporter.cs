@@ -114,9 +114,10 @@ namespace Mmd.Editor
                 MmdPmxModelPresetAutoDetector.IsCharacter(effectiveModelPreset),
                 MapMaterialPreset(shaderPreset),
                 materialOverride: null);
+            Material[] generatedMaterials = generatedAssets.Materials;
             transaction.Track(generatedAssets.Root, hierarchyRoot: true);
             transaction.Track(generatedAssets.Mesh);
-            foreach (Material material in generatedAssets.Materials)
+            foreach (Material material in generatedMaterials)
             {
                 transaction.Track(material);
             }
@@ -127,7 +128,7 @@ namespace Mmd.Editor
             MmdPmxImportFaultInjection.ThrowIfRequested(ctx.assetPath, MmdPmxImportStage.AssetCacheCreated);
 
             Mesh importedMesh = generatedAssets.Mesh;
-            Material[] importedMaterials = generatedAssets.Materials;
+            Material[] importedMaterials = generatedMaterials;
 
             MmdPmxProjectTextureBindingSummary textureBindingSummary =
                 MmdPmxProjectTextureBinder.BindProjectTextureAssetsToMaterials(
@@ -158,6 +159,16 @@ namespace Mmd.Editor
                 importedMaterials);
 
             ApplyMaterialOverrideAsset(ctx, generatedAssets.RenderingDescriptor, importedMaterials);
+
+            generatedAssets = MmdUnityModelFactory.ApplyMaterialRemaps(generatedAssets, materialRemaps);
+            importedMaterials = generatedAssets.Materials;
+            for (int i = 0; i < generatedMaterials.Length; i++)
+            {
+                if (HasMaterialRemap(materialRemaps, i))
+                {
+                    transaction.Discard(generatedMaterials[i]);
+                }
+            }
 
             MmdPmxAsset asset = MmdPmxImportedAssetBuilder.CreateAndInitializeImportedAsset(
                 bytes,
@@ -258,7 +269,10 @@ namespace Mmd.Editor
             transaction.TransferToContext(ctx, "Mesh", importedMesh);
             for (int i = 0; i < importedMaterials.Length; i++)
             {
-                transaction.TransferToContext(ctx, "Material_" + i, importedMaterials[i]);
+                if (!HasMaterialRemap(materialRemaps, i))
+                {
+                    transaction.TransferToContext(ctx, "Material_" + i, importedMaterials[i]);
+                }
             }
             for (int i = 0; i < textureBindingSummary.OwnedSubAssets.Count; i++)
             {
@@ -285,6 +299,11 @@ namespace Mmd.Editor
             MmdPmxImportFaultInjection.ThrowIfRequested(ctx.assetPath, MmdPmxImportStage.MainObjectSet);
 
             transaction.Complete();
+        }
+
+        private static bool HasMaterialRemap(Material[]? remaps, int slot)
+        {
+            return remaps != null && slot >= 0 && slot < remaps.Length && remaps[slot] != null;
         }
 
         private static float NormalizeImportScale(float value)

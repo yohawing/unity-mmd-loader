@@ -2,6 +2,7 @@
 
 using System;
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -206,6 +207,14 @@ namespace Mmd.Tests
             Assert.That(after, Is.Not.Null);
             Assert.That(extracted, Is.Not.Null);
             Assert.That(after!.MaterialRemaps[0], Is.SameAs(extracted));
+            Assert.That(after.ImportedMaterials[0], Is.SameAs(extracted),
+                "ImportedMaterials must expose the external remapped Material directly");
+            Renderer? importedRenderer = after.ImportedRoot!.GetComponentInChildren<Renderer>(includeInactive: true);
+            Assert.That(importedRenderer, Is.Not.Null);
+            Assert.That(importedRenderer!.sharedMaterials[0], Is.SameAs(extracted),
+                "the imported hierarchy must bind the external remapped Material directly");
+            Assert.That(AssetDatabase.LoadAllAssetsAtPath(PmxPath).OfType<Material>(), Is.Empty,
+                "a remapped slot must not retain its generated Material sub-asset");
 
             MmdPmxMaterialExtractor.Result reuse = MmdPmxMaterialExtractor.TryExtractToSiblingMaterialsFolder(
                 PmxPath,
@@ -245,6 +254,8 @@ namespace Mmd.Tests
             Assert.That(GetMainColor(extractedAfterReimport!), Is.EqualTo(Color.magenta));
             MmdPmxAsset finalAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(PmxPath);
             Assert.That(finalAsset.MaterialRemaps[0], Is.SameAs(extractedAfterReimport));
+            Assert.That(finalAsset.ImportedMaterials[0], Is.SameAs(extractedAfterReimport));
+            Assert.That(AssetDatabase.LoadAllAssetsAtPath(PmxPath).OfType<Material>(), Is.Empty);
         }
 
         private static void SetImporterRemapsAndReimport(MmdPmxScriptedImporter importer, Material[] remaps)
