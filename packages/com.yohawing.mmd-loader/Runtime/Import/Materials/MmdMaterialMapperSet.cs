@@ -30,6 +30,13 @@ namespace Mmd.UnityIntegration
             sphereModeProperty: "_SphereMode",
             toonTextureBoundProperty: "_ToonMapBound");
 
+        /// <summary>
+        /// Texture destinations used by the URP PBR Lit escape-hatch mapper. MMD sphere and toon
+        /// ramps are intentionally left undeclared so their skipped status is diagnosable.
+        /// </summary>
+        public static MmdMaterialTextureTargets UrpLit { get; } = new MmdMaterialTextureTargets(
+            new[] { "_BaseMap" });
+
         public IReadOnlyList<string> DiffuseTextureProperties => _diffuseTextureProperties;
 
         public string SphereTextureProperty { get; }
@@ -76,6 +83,25 @@ namespace Mmd.UnityIntegration
     {
         public static MmdMaterialRenderingTargets BuiltIn { get; } = new MmdMaterialRenderingTargets(
             validatePropertyPresence: false);
+
+        /// <summary>
+        /// Rendering targets for Unity's URP PBR Lit escape-hatch mapper. The mapper keeps base
+        /// color, alpha, culling, surface and blend state, while declaring MMD-only shading
+        /// features that the PBR shader does not own as unsupported.
+        /// </summary>
+        public static MmdMaterialRenderingTargets UrpLit { get; } = new MmdMaterialRenderingTargets(
+            colorProperty: null,
+            ambientColorProperty: null,
+            alphaProperty: null,
+            alphaClipThresholdProperty: "_Cutoff",
+            shadowAlphaClipThresholdProperty: null,
+            textureAlphaOutputWeightProperty: null,
+            outlineColorProperty: null,
+            outlineWidthProperty: null,
+            outlineVisibleProperty: null,
+            outlineScreenSpaceWeightProperty: null,
+            outlineZTestProperty: null,
+            unsupportedFeatures: new[] { "ambient-color", "sphere-texture", "toon-texture", "outline" });
 
         private readonly IReadOnlyList<string> _unsupportedFeatures;
 
@@ -201,6 +227,23 @@ namespace Mmd.UnityIntegration
             BuiltInMapper,
             MmdMaterialTextureTargets.BuiltIn,
             MmdMaterialRenderingTargets.BuiltIn);
+
+        /// <summary>
+        /// Creates the built-in mapper contract for a material preset. Explicit mapper sets still
+        /// take precedence at the factory boundary; this is only the default preset wiring.
+        /// </summary>
+        public static MmdMaterialMapperSet ForPreset(MmdMaterialPreset preset)
+        {
+            return preset switch
+            {
+                MmdMaterialPreset.UrpLit => new MmdMaterialMapperSet(
+                    BuiltInMapper,
+                    MmdMaterialTextureTargets.UrpLit,
+                    MmdMaterialRenderingTargets.UrpLit),
+                MmdMaterialPreset.MmdToonLit => BuiltIn,
+                _ => BuiltIn
+            };
+        }
 
         public MmdMaterialMapper DefaultMapper { get; }
 

@@ -51,7 +51,7 @@ namespace Mmd.UnityIntegration
                 importScale,
                 preset,
                 materialOverride,
-                MmdMaterialMapperSet.BuiltIn);
+                MmdMaterialMapperSet.ForPreset(preset));
         }
 
         public static MmdUnityModelInstance CreateStaticModel(
@@ -120,7 +120,7 @@ namespace Mmd.UnityIntegration
                 scale,
                 includeSelfShadowTarget,
                 materialOverride,
-                materialMappers ?? MmdMaterialMapperSet.BuiltIn);
+                materialMappers ?? MmdMaterialMapperSet.ForPreset(preset));
         }
 
         public static MmdUnityModelInstance CreateStaticModel(MmdRenderingDescriptor descriptor, string modelName)
@@ -186,7 +186,7 @@ namespace Mmd.UnityIntegration
                 importScale,
                 preset,
                 materialOverride,
-                MmdMaterialMapperSet.BuiltIn);
+                MmdMaterialMapperSet.ForPreset(preset));
         }
 
         public static MmdUnityModelInstance CreateSkinnedModel(
@@ -260,7 +260,7 @@ namespace Mmd.UnityIntegration
                 scale,
                 includeSelfShadowTarget,
                 materialOverride,
-                materialMappers ?? MmdMaterialMapperSet.BuiltIn);
+                materialMappers ?? MmdMaterialMapperSet.ForPreset(preset));
         }
 
         public static MmdUnityModelInstance CreateExistingSkinnedModelInstance(
