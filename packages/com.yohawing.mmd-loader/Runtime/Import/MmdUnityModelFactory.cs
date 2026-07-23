@@ -509,6 +509,7 @@ namespace Mmd.UnityIntegration
             var root = new GameObject(ResolveModelName(modelName));
             Mesh? mesh = null;
             Material[] materials = Array.Empty<Material>();
+            MmdMaterialRenderingTargets[] materialRenderingTargets = Array.Empty<MmdMaterialRenderingTargets>();
             MmdRuntimeTextureResolution? textureResolution = null;
             try
             {
@@ -519,7 +520,8 @@ namespace Mmd.UnityIntegration
                     descriptor,
                     textureResolution,
                     materialMappers ?? MmdMaterialMapperSet.BuiltIn,
-                    out MmdShaderBindingDiagnostics shaderDiagnostics);
+                    out MmdShaderBindingDiagnostics shaderDiagnostics,
+                    out materialRenderingTargets);
                 MmdMaterialOverrideApplier.Apply(materialOverride, materials);
                 Transform[] boneTransforms = BuildBoneTransforms(modelRoot, bones, importScale);
                 MmdUnityPhysicsBody[] physicsBodies = BuildPhysicsBodies(modelRoot, bones, boneTransforms, physics, importScale);
@@ -545,7 +547,8 @@ namespace Mmd.UnityIntegration
                     GetOwnedTextures(textureResolution),
                     textureResolution.Diagnostics,
                     shaderDiagnostics,
-                    importScale);
+                    importScale,
+                    materialRenderingTargets);
             }
             catch
             {
@@ -571,6 +574,7 @@ namespace Mmd.UnityIntegration
             var root = new GameObject(ResolveModelName(modelName));
             Mesh? mesh = null;
             Material[] materials = Array.Empty<Material>();
+            MmdMaterialRenderingTargets[] materialRenderingTargets = Array.Empty<MmdMaterialRenderingTargets>();
             MmdRuntimeTextureResolution? textureResolution = null;
             try
             {
@@ -585,7 +589,8 @@ namespace Mmd.UnityIntegration
                     descriptor,
                     textureResolution,
                     materialMappers ?? MmdMaterialMapperSet.BuiltIn,
-                    out MmdShaderBindingDiagnostics shaderDiagnostics);
+                    out MmdShaderBindingDiagnostics shaderDiagnostics,
+                    out materialRenderingTargets);
                 MmdMaterialOverrideApplier.Apply(materialOverride, materials);
 
                 var renderer = modelRoot.gameObject.AddComponent<SkinnedMeshRenderer>();
@@ -609,7 +614,8 @@ namespace Mmd.UnityIntegration
                     GetOwnedTextures(textureResolution),
                     textureResolution.Diagnostics,
                     shaderDiagnostics,
-                    importScale);
+                    importScale,
+                    materialRenderingTargets);
             }
             catch
             {

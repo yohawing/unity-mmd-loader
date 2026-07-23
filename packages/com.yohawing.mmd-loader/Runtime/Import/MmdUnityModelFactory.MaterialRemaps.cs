@@ -63,7 +63,8 @@ namespace Mmd.UnityIntegration
                 instance.OwnedTextures,
                 instance.TextureDiagnostics,
                 instance.ShaderDiagnostics,
-                instance.ImportScale);
+                instance.ImportScale,
+                instance.MaterialRenderingTargets);
         }
     }
 }

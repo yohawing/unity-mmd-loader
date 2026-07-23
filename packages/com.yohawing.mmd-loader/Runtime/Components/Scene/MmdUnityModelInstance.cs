@@ -22,7 +22,8 @@ namespace Mmd.UnityIntegration
             Texture2D[] ownedTextures,
             MmdTextureBindingDiagnostics textureDiagnostics,
             MmdShaderBindingDiagnostics shaderDiagnostics,
-            float importScale = 1.0f)
+            float importScale = 1.0f,
+            MmdMaterialRenderingTargets[]? materialRenderingTargets = null)
         {
             Root = root;
             Mesh = mesh;
@@ -36,6 +37,7 @@ namespace Mmd.UnityIntegration
             OwnedTextures = ownedTextures;
             TextureDiagnostics = textureDiagnostics;
             ShaderDiagnostics = shaderDiagnostics;
+            MaterialRenderingTargets = BuildMaterialRenderingTargets(materials.Length, materialRenderingTargets);
             MaterialBindingDiagnostics = BuildMaterialBindingDiagnostics(renderingDescriptor, materials);
             ImportScale = (float.IsFinite(importScale) && importScale > 0.0f) ? importScale : 1.0f;
             BindLocalPositions = new Vector3[boneTransforms.Length];
@@ -108,6 +110,8 @@ namespace Mmd.UnityIntegration
 
         public MmdShaderBindingDiagnostics ShaderDiagnostics { get; }
 
+        public MmdMaterialRenderingTargets[] MaterialRenderingTargets { get; }
+
         public MmdUnityMaterialBindingDiagnostic[] MaterialBindingDiagnostics { get; private set; }
 
         public IReadOnlyDictionary<string, int> BlendShapeIndexMap { get; }
@@ -137,6 +141,26 @@ namespace Mmd.UnityIntegration
         public int SkippedToonTextureReferenceCount { get; }
 
         public int SkippedTextureReferenceCount { get; }
+
+        private static MmdMaterialRenderingTargets[] BuildMaterialRenderingTargets(
+            int materialCount,
+            MmdMaterialRenderingTargets[]? materialRenderingTargets)
+        {
+            if (materialRenderingTargets != null && materialRenderingTargets.Length != materialCount)
+            {
+                throw new ArgumentException(
+                    "Material rendering targets must have one entry per material.",
+                    nameof(materialRenderingTargets));
+            }
+
+            var result = new MmdMaterialRenderingTargets[materialCount];
+            for (int i = 0; i < result.Length; i++)
+            {
+                result[i] = materialRenderingTargets?[i] ?? MmdMaterialRenderingTargets.BuiltIn;
+            }
+
+            return result;
+        }
 
         private static MmdUnityMaterialBindingDiagnostic[] BuildMaterialBindingDiagnostics(
             MmdRenderingDescriptor descriptor,
