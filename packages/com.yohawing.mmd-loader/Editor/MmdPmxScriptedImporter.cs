@@ -119,6 +119,10 @@ namespace Mmd.Editor
                 ResolveMaterialPresetForImport(ctx, out MmdMaterialMapperSet? materialMappers),
                 materialOverride: null,
                 materialMappers: materialMappers);
+            if (shaderPreset == MmdPmxShaderPreset.CustomProfile && materialMappers != null)
+            {
+                LogCustomProfileDiagnostics(ctx, generatedAssets);
+            }
             Material[] generatedMaterials = generatedAssets.Materials;
             transaction.Track(generatedAssets.Root, hierarchyRoot: true);
             transaction.Track(generatedAssets.Mesh);
@@ -370,6 +374,28 @@ namespace Mmd.Editor
             }
 
             return MmdMaterialPreset.MmdToon;
+        }
+
+        private static void LogCustomProfileDiagnostics(
+            AssetImportContext ctx,
+            MmdUnityModelInstance generatedAssets)
+        {
+            foreach (MmdUnityMaterialBindingDiagnostic diagnostic in generatedAssets.MaterialBindingDiagnostics)
+            {
+                if (diagnostic.unsupportedFeatures.Length > 0)
+                {
+                    ctx.LogImportWarning(
+                        $"PMX material {diagnostic.materialIndex} custom profile unsupported features: " +
+                        string.Join(", ", diagnostic.unsupportedFeatures));
+                }
+
+                foreach (MmdUnityMaterialMissingPropertyDiagnostic missingProperty in diagnostic.missingProperties)
+                {
+                    ctx.LogImportWarning(
+                        $"PMX material {diagnostic.materialIndex} custom profile missing property " +
+                        $"'{missingProperty.property}' for {missingProperty.feature}.");
+                }
+            }
         }
 
         private void ApplyMaterialOverrideAsset(
