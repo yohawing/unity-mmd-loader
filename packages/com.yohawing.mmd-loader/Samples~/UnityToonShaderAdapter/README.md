@@ -12,6 +12,11 @@ Import this sample through Package Manager, open `Scenes/UnityToonShaderAdapterD
 
 UTS is optional. When `Toon/Toon` is missing or fails schema validation, the right side intentionally retains the original MMD Toon materials and the overlay reports `UTS_FALLBACK_MMD_TOON`; the scene remains playable and does not throw. No external or licensed MMD asset is required.
 
+While the scene is playing, expand `Legacy MMD Toon` or `UTS converted` in the Hierarchy and
+select a generated child. The `Mesh Renderer > Materials` field opens the corresponding Legacy or
+UTS material in the Material Inspector for side-by-side property/pass inspection. Generated
+objects and materials are transient and are destroyed when the demo component is disabled.
+
 ```csharp
 var diagnostics = new List<UnityToonShaderDiagnostic>();
 if (UnityToonShaderAdapter.TryConvertMaterials(

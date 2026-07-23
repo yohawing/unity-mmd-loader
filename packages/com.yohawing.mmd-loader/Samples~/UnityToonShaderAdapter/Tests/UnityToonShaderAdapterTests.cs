@@ -58,6 +58,7 @@ namespace Mmd.Samples.UnityToonShader.Tests
             Assert.That(source, Does.Contain("ambientStateCaptured"));
             Assert.That(usage, Does.Contain("UnityToonShaderAdapterDemo.unity"));
             Assert.That(usage, Does.Contain("UTS_FALLBACK_MMD_TOON"));
+            Assert.That(usage, Does.Contain("Material Inspector"));
         }
 
         [Test]
