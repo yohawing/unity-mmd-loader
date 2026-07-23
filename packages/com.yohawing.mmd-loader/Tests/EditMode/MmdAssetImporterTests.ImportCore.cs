@@ -263,6 +263,76 @@ namespace Mmd.Tests
             Assert.That(pmxAsset.ImportedMaterials[0].shader.name,
                 Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName));
             Assert.That(pmxAsset.ImportedMaterials[0].IsKeywordEnabled("_SURFACE_TYPE_TRANSPARENT"), Is.True);
+            Assert.That(AssetDatabase.GetDependencies(TempPmxPath), Does.Contain(TempMaterialProfilePath));
+        }
+
+        [Test]
+        public void PmxImporterCustomProfileUsesUtsShaderAndDeclaredMaterialStates()
+        {
+            Shader? utsShader = Shader.Find("Toon/Toon");
+            if (utsShader == null)
+            {
+                Assert.Ignore("Optional Unity Toon Shader is not installed.");
+            }
+
+            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            var profile = ScriptableObject.CreateInstance<MmdMaterialProfileAsset>();
+            profile.shader = utsShader;
+            profile.textureTargets = new MmdMaterialProfileTextureTargets
+            {
+                diffuseTextureProperties = new[] { "_BaseMap", "_MainTex" },
+                sphereTextureProperty = "_MatCap_Sampler",
+                sphereModeProperty = "_Is_BlendAddToMatCap"
+            };
+            profile.renderingTargets = new MmdMaterialProfileRenderingTargets
+            {
+                baseColorProperty = "_BaseColor",
+                colorProperty = "_Color",
+                ambientColorProperty = string.Empty,
+                alphaProperty = string.Empty,
+                alphaClipThresholdProperty = "_Clipping_Level",
+                shadowAlphaClipThresholdProperty = string.Empty,
+                textureAlphaOutputWeightProperty = string.Empty,
+                cullProperty = "_CullMode",
+                surfaceProperty = string.Empty,
+                blendProperty = string.Empty,
+                sourceBlendProperty = string.Empty,
+                destinationBlendProperty = string.Empty,
+                zWriteProperty = "_ZWrite",
+                outlineColorProperty = "_Outline_Color",
+                outlineWidthProperty = "_Outline_Width",
+                outlineVisibleProperty = "_OUTLINE",
+                outlineScreenSpaceWeightProperty = string.Empty,
+                outlineZTestProperty = string.Empty,
+                requiredKeywords = new[] { "_OUTLINE_NML" },
+                requiredPasses = new[] { "SRPDefaultUnlit" },
+                unsupportedFeatures = new[] { "toon-texture", "self-shadow", "material-morph" },
+                supportsMaterialMorphs = false
+            };
+            AssetDatabase.Refresh();
+            AssetDatabase.CreateAsset(profile, TempMaterialProfilePath);
+            AssetDatabase.SaveAssets();
+
+            var importer = AssetImporter.GetAtPath(TempPmxPath) as MmdPmxScriptedImporter;
+            Assert.That(importer, Is.Not.Null);
+            var serializedImporter = new SerializedObject(importer!);
+            serializedImporter.FindProperty("shaderPreset").enumValueIndex = (int)MmdPmxShaderPreset.CustomProfile;
+            serializedImporter.FindProperty("materialProfileAsset").objectReferenceValue = profile;
+            serializedImporter.ApplyModifiedPropertiesWithoutUndo();
+            importer!.SaveAndReimport();
+
+            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+            Material material = pmxAsset.ImportedMaterials[0];
+            Assert.That(material.shader, Is.SameAs(utsShader));
+            Assert.That(material.IsKeywordEnabled("_OUTLINE_NML"), Is.True);
+            Assert.That(material.GetShaderPassEnabled("SRPDefaultUnlit"), Is.True);
+            Assert.That(material.HasProperty("_BaseColor"), Is.True);
+            Assert.That(material.HasProperty("_CullMode"), Is.True);
+            Assert.That(material.HasProperty("_Clipping_Level"), Is.True);
+            Assert.That(material.HasProperty("_Outline_Width"), Is.True);
+            Assert.That(material.HasProperty("_MatCap_Sampler"), Is.True);
+            Assert.That(pmxAsset.ShaderPreset, Is.EqualTo("Custom Profile"));
+            Assert.That(AssetDatabase.GetDependencies(TempPmxPath), Does.Contain(TempMaterialProfilePath));
         }
         [Test]
         public void PmxImporterMmdUrpToonReimportPreservesBoundDiffuseTexture()
