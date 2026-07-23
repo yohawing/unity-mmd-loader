@@ -370,7 +370,8 @@ namespace Mmd.UnityIntegration
             int materialRenderOrder,
             string? diffuseReference,
             string? diffuseResolvedPath,
-            Texture2D? diffuseTextureForAlpha)
+            Texture2D? diffuseTextureForAlpha,
+            MmdMaterialRenderingTargets? renderingTargets = null)
         {
             if (material == null || descriptor == null || source == null) return;
             string? textureExtension = !string.IsNullOrEmpty(diffuseResolvedPath)
@@ -390,7 +391,7 @@ namespace Mmd.UnityIntegration
                 MapTransparencyMode(mode),
                 source.cullingPolicy,
                 materialRenderOrder,
-                MmdMaterialRenderingTargets.BuiltIn);
+                renderingTargets ?? MmdMaterialRenderingTargets.BuiltIn);
         }
     }
 }

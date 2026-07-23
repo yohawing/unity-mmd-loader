@@ -1,6 +1,7 @@
 #nullable enable
 
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEditor;
 using UnityEditor.AssetImporters;
@@ -13,7 +14,13 @@ namespace Mmd.Editor
     /// <summary>Bind existing project Texture2D assets to importer-generated Material sub-assets.</summary>
     internal static class MmdPmxProjectTextureBinder
     {
-        internal static MmdPmxProjectTextureBindingSummary BindProjectTextureAssetsToMaterials(MmdModelDefinition model, string pmxAssetPath, Material[] materials, MmdRenderingDescriptor? descriptor = null, AssetImportContext? ctx = null)
+        internal static MmdPmxProjectTextureBindingSummary BindProjectTextureAssetsToMaterials(
+            MmdModelDefinition model,
+            string pmxAssetPath,
+            Material[] materials,
+            MmdRenderingDescriptor? descriptor = null,
+            AssetImportContext? ctx = null,
+            MmdMaterialMapperSet? materialMappers = null)
         {
             if (model?.materials == null || materials == null)
             {
@@ -37,12 +44,36 @@ namespace Mmd.Editor
                         continue;
                     }
 
-                summary.Record(i, "diffuse", matDef.texture, BindOneTextureReference(matDef.texture, pmxAssetPath, mat, ctx, "_BaseMap", "_MainTex"));
+                MmdMaterialTextureTargets textureTargets = MmdMaterialTextureTargets.BuiltIn;
+                MmdMaterialRenderingTargets renderingTargets = MmdMaterialRenderingTargets.BuiltIn;
+                if (materialMappers != null)
+                {
+                    MmdMaterialMapperRegistration mapper = materialMappers.Resolve(matDef.index);
+                    textureTargets = mapper.TextureTargets;
+                    renderingTargets = mapper.RenderingTargets;
+                }
+
+                summary.Record(i, "diffuse", matDef.texture, BindOneTextureReference(
+                    matDef.texture,
+                    pmxAssetPath,
+                    mat,
+                    ctx,
+                    textureTargets.DiffuseTextureProperties.ToArray()));
                 MmdUnityMaterialBuilder.ApplyDiffuseBoundSideEffects(mat);
 
-                summary.Record(i, "sphere", matDef.sphereTexture, BindOneTextureReference(matDef.sphereTexture, pmxAssetPath, mat, ctx, "_SphereMap"));
+                summary.Record(i, "sphere", matDef.sphereTexture, BindOneTextureReference(
+                    matDef.sphereTexture,
+                    pmxAssetPath,
+                    mat,
+                    ctx,
+                    OptionalTextureProperty(textureTargets.SphereTextureProperty)));
 
-                TextureReferenceBindStatus toonStatus = BindOneTextureReference(matDef.toonTexture, pmxAssetPath, mat, ctx, "_ToonMap");
+                TextureReferenceBindStatus toonStatus = BindOneTextureReference(
+                    matDef.toonTexture,
+                    pmxAssetPath,
+                    mat,
+                    ctx,
+                    OptionalTextureProperty(textureTargets.ToonTextureProperty));
                 bool toonBound = toonStatus == TextureReferenceBindStatus.Resolved;
                 if (!toonBound &&
                     ctx != null &&
@@ -104,7 +135,14 @@ namespace Mmd.Editor
                     try
                     {
                         MmdUnityMaterialBuilder.ReapplyImportedMaterialTransparency(
-                            mat, descriptor, source, i, matDef.texture, diffuseAssetPath, decodedAlphaTexture);
+                            mat,
+                            descriptor,
+                            source,
+                            i,
+                            matDef.texture,
+                            diffuseAssetPath,
+                            decodedAlphaTexture,
+                            renderingTargets);
                     }
                     finally
                     {
@@ -192,6 +230,13 @@ namespace Mmd.Editor
             }
 
             return TextureReferenceBindStatus.Resolved;
+        }
+
+        private static string[] OptionalTextureProperty(string propertyName)
+        {
+            return string.IsNullOrWhiteSpace(propertyName)
+                ? System.Array.Empty<string>()
+                : new[] { propertyName };
         }
 
         private enum TextureReferenceBindStatus

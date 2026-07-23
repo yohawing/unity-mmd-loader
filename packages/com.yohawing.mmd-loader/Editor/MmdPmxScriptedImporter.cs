@@ -145,7 +145,8 @@ namespace Mmd.Editor
                     ctx.assetPath,
                     importedMaterials,
                     generatedAssets.RenderingDescriptor,
-                    ctx);
+                    ctx,
+                    materialMappers);
             foreach (MmdPmxOwnedTextureSubAsset ownedTexture in textureBindingSummary.OwnedSubAssets)
             {
                 transaction.Track(ownedTexture.Texture);
