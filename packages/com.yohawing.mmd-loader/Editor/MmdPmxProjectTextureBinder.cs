@@ -61,12 +61,19 @@ namespace Mmd.Editor
                     textureTargets.DiffuseTextureProperties.ToArray()));
                 MmdUnityMaterialBuilder.ApplyDiffuseBoundSideEffects(mat);
 
-                summary.Record(i, "sphere", matDef.sphereTexture, BindOneTextureReference(
+                TextureReferenceBindStatus sphereStatus = BindOneTextureReference(
                     matDef.sphereTexture,
                     pmxAssetPath,
                     mat,
                     ctx,
-                    OptionalTextureProperty(textureTargets.SphereTextureProperty)));
+                    OptionalTextureProperty(textureTargets.SphereTextureProperty));
+                summary.Record(i, "sphere", matDef.sphereTexture, sphereStatus);
+                if (sphereStatus == TextureReferenceBindStatus.Resolved &&
+                    !string.IsNullOrWhiteSpace(textureTargets.SphereTextureBoundProperty) &&
+                    mat.HasProperty(textureTargets.SphereTextureBoundProperty))
+                {
+                    mat.SetFloat(textureTargets.SphereTextureBoundProperty, 1.0f);
+                }
 
                 TextureReferenceBindStatus toonStatus = BindOneTextureReference(
                     matDef.toonTexture,

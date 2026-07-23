@@ -41,6 +41,7 @@ namespace Mmd.Samples.UnityToonShader
             {
                 diffuseTextureProperties = new[] { "_BaseMap", "_MainTex" },
                 sphereTextureProperty = "_MatCap_Sampler",
+                sphereTextureBoundProperty = "_MatCap",
                 toonTextureProperty = string.Empty,
                 diffuseTextureBoundProperty = string.Empty,
                 sphereModeProperty = "_Is_BlendAddToMatCap",
@@ -55,6 +56,8 @@ namespace Mmd.Samples.UnityToonShader
                 alphaClipThresholdProperty = "_Clipping_Level",
                 shadowAlphaClipThresholdProperty = string.Empty,
                 textureAlphaOutputWeightProperty = string.Empty,
+                textureAlphaClipMaskProperty = "_IsBaseMapAlphaAsClippingMask",
+                alphaClipModeProperty = "_ClippingMode",
                 cullProperty = "_CullMode",
                 surfaceProperty = string.Empty,
                 blendProperty = string.Empty,
@@ -78,7 +81,10 @@ namespace Mmd.Samples.UnityToonShader
                 requiredKeywords = new[]
                 {
                     "_OUTLINE_NML",
+                    "_MatCap",
                     "_IS_CLIPPING_OFF",
+                    "_IS_CLIPPING_TRANSMODE",
+                    "_IS_TRANSCLIPPING_ON",
                     "_IS_OUTLINE_CLIPPING_NO"
                 },
                 requiredPasses = new[]

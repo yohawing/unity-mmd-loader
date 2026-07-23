@@ -58,6 +58,18 @@ namespace Mmd.UnityIntegration
                     : 0.0f);
             }
 
+            if (HasProperty(material, targets.TextureAlphaClipMaskProperty))
+            {
+                material.SetFloat(targets.TextureAlphaClipMaskProperty,
+                    transparencyMode == MmdMaterialTransparencyMode.Opaque ? 0.0f : 1.0f);
+            }
+
+            if (HasProperty(material, targets.AlphaClipModeProperty))
+            {
+                material.SetFloat(targets.AlphaClipModeProperty,
+                    transparencyMode == MmdMaterialTransparencyMode.Opaque ? 0.0f : 2.0f);
+            }
+
             ApplyMaterialCullingPolicy(material, cullingPolicy, targets.CullProperty);
 
             if (transparencyMode == MmdMaterialTransparencyMode.Opaque ||

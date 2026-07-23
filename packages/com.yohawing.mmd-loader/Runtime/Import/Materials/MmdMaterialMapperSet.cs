@@ -45,6 +45,8 @@ namespace Mmd.UnityIntegration
 
         public string DiffuseTextureBoundProperty { get; }
 
+        public string SphereTextureBoundProperty { get; }
+
         public string SphereModeProperty { get; }
 
         public string ToonTextureBoundProperty { get; }
@@ -55,7 +57,8 @@ namespace Mmd.UnityIntegration
             string? toonTextureProperty = null,
             string? diffuseTextureBoundProperty = null,
             string? sphereModeProperty = null,
-            string? toonTextureBoundProperty = null)
+            string? toonTextureBoundProperty = null,
+            string? sphereTextureBoundProperty = null)
         {
             _diffuseTextureProperties = Array.AsReadOnly(
                 (diffuseTextureProperties ?? Array.Empty<string>())
@@ -65,6 +68,7 @@ namespace Mmd.UnityIntegration
             SphereTextureProperty = NormalizeOptionalProperty(sphereTextureProperty);
             ToonTextureProperty = NormalizeOptionalProperty(toonTextureProperty);
             DiffuseTextureBoundProperty = NormalizeOptionalProperty(diffuseTextureBoundProperty);
+            SphereTextureBoundProperty = NormalizeOptionalProperty(sphereTextureBoundProperty);
             SphereModeProperty = NormalizeOptionalProperty(sphereModeProperty);
             ToonTextureBoundProperty = NormalizeOptionalProperty(toonTextureBoundProperty);
         }
@@ -120,6 +124,10 @@ namespace Mmd.UnityIntegration
         public string ShadowAlphaClipThresholdProperty { get; }
 
         public string TextureAlphaOutputWeightProperty { get; }
+
+        public string TextureAlphaClipMaskProperty { get; }
+
+        public string AlphaClipModeProperty { get; }
 
         public string CullProperty { get; }
 
@@ -189,7 +197,9 @@ namespace Mmd.UnityIntegration
             bool validatePropertyPresence = true,
             IEnumerable<string>? requiredKeywords = null,
             IEnumerable<string>? requiredPasses = null,
-            bool supportsMaterialMorphs = true)
+            bool supportsMaterialMorphs = true,
+            string? textureAlphaClipMaskProperty = null,
+            string? alphaClipModeProperty = null)
         {
             BaseColorProperty = NormalizeOptionalProperty(baseColorProperty);
             ColorProperty = NormalizeOptionalProperty(colorProperty);
@@ -198,6 +208,8 @@ namespace Mmd.UnityIntegration
             AlphaClipThresholdProperty = NormalizeOptionalProperty(alphaClipThresholdProperty);
             ShadowAlphaClipThresholdProperty = NormalizeOptionalProperty(shadowAlphaClipThresholdProperty);
             TextureAlphaOutputWeightProperty = NormalizeOptionalProperty(textureAlphaOutputWeightProperty);
+            TextureAlphaClipMaskProperty = NormalizeOptionalProperty(textureAlphaClipMaskProperty);
+            AlphaClipModeProperty = NormalizeOptionalProperty(alphaClipModeProperty);
             CullProperty = NormalizeOptionalProperty(cullProperty);
             SurfaceProperty = NormalizeOptionalProperty(surfaceProperty);
             BlendProperty = NormalizeOptionalProperty(blendProperty);

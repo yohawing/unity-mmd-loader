@@ -13,6 +13,7 @@ namespace Mmd
         public string sphereTextureProperty = string.Empty;
         public string toonTextureProperty = string.Empty;
         public string diffuseTextureBoundProperty = string.Empty;
+        public string sphereTextureBoundProperty = string.Empty;
         public string sphereModeProperty = string.Empty;
         public string toonTextureBoundProperty = string.Empty;
 
@@ -24,7 +25,8 @@ namespace Mmd
                 toonTextureProperty,
                 diffuseTextureBoundProperty,
                 sphereModeProperty,
-                toonTextureBoundProperty);
+                toonTextureBoundProperty,
+                sphereTextureBoundProperty);
         }
     }
 
@@ -38,6 +40,8 @@ namespace Mmd
         public string alphaClipThresholdProperty = "_AlphaClipThreshold";
         public string shadowAlphaClipThresholdProperty = "_ShadowAlphaClipThreshold";
         public string textureAlphaOutputWeightProperty = "_TextureAlphaOutputWeight";
+        public string textureAlphaClipMaskProperty = string.Empty;
+        public string alphaClipModeProperty = string.Empty;
         public string cullProperty = "_Cull";
         public string surfaceProperty = "_Surface";
         public string blendProperty = "_Blend";
@@ -82,7 +86,9 @@ namespace Mmd
                 validatePropertyPresence,
                 requiredKeywords,
                 requiredPasses,
-                supportsMaterialMorphs);
+                supportsMaterialMorphs,
+                textureAlphaClipMaskProperty,
+                alphaClipModeProperty);
         }
     }
 

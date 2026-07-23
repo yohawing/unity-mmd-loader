@@ -92,6 +92,13 @@ namespace Mmd.UnityIntegration
                 }
 
                 material.SetTexture(propertyName, resolvedTexture.Texture);
+                if (kind == MmdMappedTextureKind.Sphere &&
+                    !string.IsNullOrWhiteSpace(targets.SphereTextureBoundProperty) &&
+                    material.HasProperty(targets.SphereTextureBoundProperty))
+                {
+                    material.SetFloat(targets.SphereTextureBoundProperty, 1.0f);
+                }
+
                 if (kind == MmdMappedTextureKind.Toon)
                 {
                     // MMD/GoldenOracle samples the toon ramp with bilinear filtering, producing a
