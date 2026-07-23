@@ -22,12 +22,15 @@ namespace Mmd.Tests
                 {
                     diffuseTextureProperties = new[] { "_BaseMap" },
                     sphereTextureProperty = string.Empty,
+                    sphereTextureBoundProperty = "_MatCap",
                     toonTextureProperty = string.Empty
                 };
                 profile.renderingTargets = new MmdMaterialProfileRenderingTargets
                 {
                     baseColorProperty = "_BaseColor",
                     alphaClipThresholdProperty = "_Cutoff",
+                    textureAlphaClipMaskProperty = "_AlphaMask",
+                    alphaClipModeProperty = "_ClipMode",
                     outlineColorProperty = string.Empty,
                     unsupportedFeatures = new[] { "sphere-texture", "toon-texture", "outline" },
                     requiredKeywords = new[] { "_PROFILE_KEYWORD" },
@@ -39,7 +42,10 @@ namespace Mmd.Tests
                     reason);
                 Assert.That(mapperSet, Is.Not.Null);
                 Assert.That(mapperSet!.DefaultTextureTargets.SphereTextureProperty, Is.Empty);
+                Assert.That(mapperSet.DefaultTextureTargets.SphereTextureBoundProperty, Is.EqualTo("_MatCap"));
                 Assert.That(mapperSet.DefaultRenderingTargets.AlphaClipThresholdProperty, Is.EqualTo("_Cutoff"));
+                Assert.That(mapperSet.DefaultRenderingTargets.TextureAlphaClipMaskProperty, Is.EqualTo("_AlphaMask"));
+                Assert.That(mapperSet.DefaultRenderingTargets.AlphaClipModeProperty, Is.EqualTo("_ClipMode"));
                 Assert.That(mapperSet.DefaultRenderingTargets.UnsupportedFeatures,
                     Is.EqualTo(new[] { "sphere-texture", "toon-texture", "outline", "material-morph" }));
                 Assert.That(mapperSet.DefaultRenderingTargets.RequiredKeywords,

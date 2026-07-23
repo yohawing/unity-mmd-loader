@@ -55,7 +55,9 @@ Select `Custom Profile` and this asset in the PMX Importer. The profile declares
 ## Mapping and non-parity scope
 
 - PMX diffuse color and base texture map to UTS Base Color/Base Map.
-- PMX alpha classification, culling, render queue and Z-write are preserved conservatively.
+- PMX alpha classification, culling, render queue and Z-write are preserved conservatively. The
+  profile also maps UTS base-map alpha clipping (`_IsBaseMapAlphaAsClippingMask` and
+  `_ClippingMode`) so the alpha-cutout fixture exercises the actual UTS clipping branch.
 - `.spa`/additive sphere maps and `.sph`/multiply sphere maps map to UTS MatCap. UTS has no exact MMD multiply-sphere equation, so `.sph` is an approximation.
 - Opaque PMX edge color/size map to UTS outline color/width. PMX screen-pixel width and UTS outline width use different spaces, so width is an approximation. UTS Inspector normalization disables color writes for transparent outlines; the adapter reports this instead of promising a visible transparent edge.
 - MMD toon ramps are not transferred. UTS shade colors use a conservative diffuse-derived approximation.
