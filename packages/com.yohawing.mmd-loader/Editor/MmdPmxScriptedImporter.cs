@@ -40,7 +40,8 @@ namespace Mmd.Editor
     {
         MmdBasicUrpToon = 0,
         UrpLit = 1,
-        MmdToonLit = 2
+        MmdToonLit = 2,
+        CustomProfile = 3
     }
 
     [ScriptedImporter(28, "pmx")]
@@ -56,6 +57,7 @@ namespace Mmd.Editor
 #pragma warning restore CS0414
         [SerializeField] private MmdPmxAnimationType animationType = MmdPmxAnimationType.Generic;
         [SerializeField] private MmdPmxShaderPreset shaderPreset = MmdPmxShaderPreset.MmdBasicUrpToon;
+        [SerializeField] private MmdMaterialProfileAsset? materialProfileAsset;
         [SerializeField] private MmdMaterialOverrideAsset? materialOverrideAsset;
         [SerializeField] private Material[] materialRemaps = System.Array.Empty<Material>();
         [SerializeField] private MmdHumanoidBoneMappingOverride[] humanoidBoneMappingOverrides =
@@ -82,6 +84,8 @@ namespace Mmd.Editor
         public MmdPmxAnimationType AnimationType => animationType;
 
         public MmdPmxShaderPreset ShaderPreset => shaderPreset;
+
+        public MmdMaterialProfileAsset? MaterialProfileAsset => materialProfileAsset;
 
         public Material[] MaterialRemaps => materialRemaps;
 
@@ -112,8 +116,9 @@ namespace Mmd.Editor
                 model,
                 ImportScale,
                 MmdPmxModelPresetAutoDetector.IsCharacter(effectiveModelPreset),
-                MapMaterialPreset(shaderPreset),
-                materialOverride: null);
+                ResolveMaterialPresetForImport(ctx, out MmdMaterialMapperSet? materialMappers),
+                materialOverride: null,
+                materialMappers: materialMappers);
             Material[] generatedMaterials = generatedAssets.Materials;
             transaction.Track(generatedAssets.Root, hierarchyRoot: true);
             transaction.Track(generatedAssets.Mesh);
@@ -328,8 +333,43 @@ namespace Mmd.Editor
             {
                 MmdPmxShaderPreset.MmdBasicUrpToon => "MMD Basic Toon",
                 MmdPmxShaderPreset.MmdToonLit => "MMD URP Toon",
+                MmdPmxShaderPreset.CustomProfile => "Custom Profile",
                 _ => "URP Lit",
             };
+        }
+
+        private MmdMaterialPreset ResolveMaterialPresetForImport(
+            AssetImportContext ctx,
+            out MmdMaterialMapperSet? materialMappers)
+        {
+            materialMappers = null;
+            if (shaderPreset != MmdPmxShaderPreset.CustomProfile)
+            {
+                return MapMaterialPreset(shaderPreset);
+            }
+
+            if (materialProfileAsset == null)
+            {
+                ctx.LogImportWarning(
+                    "Custom Profile is selected but no MMD Material Profile asset is assigned. Falling back to MMD Basic Toon.");
+                return MmdMaterialPreset.MmdToon;
+            }
+
+            string profilePath = AssetDatabase.GetAssetPath(materialProfileAsset);
+            if (!string.IsNullOrWhiteSpace(profilePath))
+            {
+                ctx.DependsOnSourceAsset(profilePath);
+            }
+
+            if (!materialProfileAsset.TryCreateMapperSet(out materialMappers, out string reason))
+            {
+                ctx.LogImportWarning(
+                    $"MMD Material Profile '{materialProfileAsset.name}' is invalid ({reason}). Falling back to MMD Basic Toon.");
+                materialMappers = null;
+                return MmdMaterialPreset.MmdToon;
+            }
+
+            return MmdMaterialPreset.MmdToon;
         }
 
         private void ApplyMaterialOverrideAsset(

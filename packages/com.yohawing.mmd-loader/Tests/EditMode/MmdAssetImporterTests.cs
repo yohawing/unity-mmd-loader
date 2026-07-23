@@ -30,6 +30,7 @@ namespace Mmd.Tests
         private const string TempScenePath = TempDirectory + "/test_1bone_cube_scene.unity";
         private const string TempRemapMaterialPath = TempDirectory + "/remapped_body.mat";
         private const string TempMaterialOverridePath = TempDirectory + "/material_override.asset";
+        private const string TempMaterialProfilePath = TempDirectory + "/material_profile.asset";
         private const string TempMmeMaterialOverridePath = TempDirectory + "/mme_material_override.asset";
         private const string TempNormalMapPath = TempDirectory + "/normal_map.png";
         private const int TestOneBoneCubeVertexCount = 14;

@@ -218,6 +218,50 @@ namespace Mmd.Tests
             Assert.That(pmxAsset.ImportedMaterials[0].shader.name,
                 Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName));
         }
+
+        [Test]
+        public void PmxImporterCustomProfileUsesProfileShaderAndPreservesPresetSummary()
+        {
+            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            var profile = ScriptableObject.CreateInstance<MmdMaterialProfileAsset>();
+            profile.shader = Shader.Find(MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName);
+            profile.textureTargets = new MmdMaterialProfileTextureTargets
+            {
+                diffuseTextureProperties = new[] { "_BaseMap" }
+            };
+            profile.renderingTargets = new MmdMaterialProfileRenderingTargets
+            {
+                colorProperty = string.Empty,
+                ambientColorProperty = string.Empty,
+                alphaProperty = string.Empty,
+                alphaClipThresholdProperty = "_Cutoff",
+                outlineColorProperty = string.Empty,
+                outlineWidthProperty = string.Empty,
+                outlineVisibleProperty = string.Empty,
+                outlineScreenSpaceWeightProperty = string.Empty,
+                outlineZTestProperty = string.Empty,
+                unsupportedFeatures = new[] { "sphere-texture", "toon-texture", "outline" }
+            };
+            AssetDatabase.Refresh();
+            AssetDatabase.CreateAsset(profile, TempMaterialProfilePath);
+            AssetDatabase.SaveAssets();
+
+            var importer = AssetImporter.GetAtPath(TempPmxPath) as MmdPmxScriptedImporter;
+            Assert.That(importer, Is.Not.Null);
+            var serializedImporter = new SerializedObject(importer!);
+            serializedImporter.FindProperty("shaderPreset").enumValueIndex = (int)MmdPmxShaderPreset.CustomProfile;
+            serializedImporter.FindProperty("materialProfileAsset").objectReferenceValue = profile;
+            serializedImporter.ApplyModifiedPropertiesWithoutUndo();
+            importer!.SaveAndReimport();
+
+            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+
+            Assert.That(pmxAsset.ShaderPreset, Is.EqualTo("Custom Profile"));
+            Assert.That(pmxAsset.ImportedMaterials, Is.Not.Null.And.Not.Empty);
+            Assert.That(pmxAsset.ImportedMaterials[0].shader, Is.Not.Null);
+            Assert.That(pmxAsset.ImportedMaterials[0].shader.name,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName));
+        }
         [Test]
         public void PmxImporterMmdUrpToonReimportPreservesBoundDiffuseTexture()
         {
