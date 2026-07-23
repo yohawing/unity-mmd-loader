@@ -69,6 +69,100 @@ namespace Mmd.UnityIntegration
     }
 
     /// <summary>
+    /// Declares the material properties and render-state capabilities owned by a material mapper.
+    /// Empty properties explicitly mean that the mapped shader does not support that write target.
+    /// </summary>
+    public sealed class MmdMaterialRenderingTargets
+    {
+        public static MmdMaterialRenderingTargets BuiltIn { get; } = new MmdMaterialRenderingTargets();
+
+        public string BaseColorProperty { get; }
+
+        public string ColorProperty { get; }
+
+        public string AmbientColorProperty { get; }
+
+        public string AlphaProperty { get; }
+
+        public string AlphaClipThresholdProperty { get; }
+
+        public string ShadowAlphaClipThresholdProperty { get; }
+
+        public string TextureAlphaOutputWeightProperty { get; }
+
+        public string CullProperty { get; }
+
+        public string SurfaceProperty { get; }
+
+        public string BlendProperty { get; }
+
+        public string SourceBlendProperty { get; }
+
+        public string DestinationBlendProperty { get; }
+
+        public string ZWriteProperty { get; }
+
+        public string OutlineColorProperty { get; }
+
+        public string OutlineWidthProperty { get; }
+
+        public string OutlineVisibleProperty { get; }
+
+        public string OutlineScreenSpaceWeightProperty { get; }
+
+        public string OutlineZTestProperty { get; }
+
+        public bool SupportsRenderQueue { get; }
+
+        public MmdMaterialRenderingTargets(
+            string? baseColorProperty = "_BaseColor",
+            string? colorProperty = "_Color",
+            string? ambientColorProperty = "_AmbientColor",
+            string? alphaProperty = "_Alpha",
+            string? alphaClipThresholdProperty = "_AlphaClipThreshold",
+            string? shadowAlphaClipThresholdProperty = "_ShadowAlphaClipThreshold",
+            string? textureAlphaOutputWeightProperty = "_TextureAlphaOutputWeight",
+            string? cullProperty = "_Cull",
+            string? surfaceProperty = "_Surface",
+            string? blendProperty = "_Blend",
+            string? sourceBlendProperty = "_SrcBlend",
+            string? destinationBlendProperty = "_DstBlend",
+            string? zWriteProperty = "_ZWrite",
+            string? outlineColorProperty = "_OutlineColor",
+            string? outlineWidthProperty = "_OutlineWidth",
+            string? outlineVisibleProperty = "_OutlineVisible",
+            string? outlineScreenSpaceWeightProperty = "_OutlineScreenSpaceWeight",
+            string? outlineZTestProperty = "_OutlineZTest",
+            bool supportsRenderQueue = true)
+        {
+            BaseColorProperty = NormalizeOptionalProperty(baseColorProperty);
+            ColorProperty = NormalizeOptionalProperty(colorProperty);
+            AmbientColorProperty = NormalizeOptionalProperty(ambientColorProperty);
+            AlphaProperty = NormalizeOptionalProperty(alphaProperty);
+            AlphaClipThresholdProperty = NormalizeOptionalProperty(alphaClipThresholdProperty);
+            ShadowAlphaClipThresholdProperty = NormalizeOptionalProperty(shadowAlphaClipThresholdProperty);
+            TextureAlphaOutputWeightProperty = NormalizeOptionalProperty(textureAlphaOutputWeightProperty);
+            CullProperty = NormalizeOptionalProperty(cullProperty);
+            SurfaceProperty = NormalizeOptionalProperty(surfaceProperty);
+            BlendProperty = NormalizeOptionalProperty(blendProperty);
+            SourceBlendProperty = NormalizeOptionalProperty(sourceBlendProperty);
+            DestinationBlendProperty = NormalizeOptionalProperty(destinationBlendProperty);
+            ZWriteProperty = NormalizeOptionalProperty(zWriteProperty);
+            OutlineColorProperty = NormalizeOptionalProperty(outlineColorProperty);
+            OutlineWidthProperty = NormalizeOptionalProperty(outlineWidthProperty);
+            OutlineVisibleProperty = NormalizeOptionalProperty(outlineVisibleProperty);
+            OutlineScreenSpaceWeightProperty = NormalizeOptionalProperty(outlineScreenSpaceWeightProperty);
+            OutlineZTestProperty = NormalizeOptionalProperty(outlineZTestProperty);
+            SupportsRenderQueue = supportsRenderQueue;
+        }
+
+        private static string NormalizeOptionalProperty(string? value)
+        {
+            return string.IsNullOrWhiteSpace(value) ? string.Empty : value;
+        }
+    }
+
+    /// <summary>
     /// Immutable material mapper selection with a default mapper and optional material-index overrides.
     /// Material creation and texture destinations are mapper-owned; texture loading remains loader-owned.
     /// </summary>
@@ -79,11 +173,14 @@ namespace Mmd.UnityIntegration
 
         public static MmdMaterialMapperSet BuiltIn { get; } = new MmdMaterialMapperSet(
             BuiltInMapper,
-            MmdMaterialTextureTargets.BuiltIn);
+            MmdMaterialTextureTargets.BuiltIn,
+            MmdMaterialRenderingTargets.BuiltIn);
 
         public MmdMaterialMapper DefaultMapper { get; }
 
         public MmdMaterialTextureTargets DefaultTextureTargets { get; }
+
+        public MmdMaterialRenderingTargets DefaultRenderingTargets { get; }
 
         public MmdMaterialMapperSet(MmdMaterialMapper defaultMapper)
             : this(defaultMapper, MmdMaterialTextureTargets.BuiltIn)
@@ -93,9 +190,18 @@ namespace Mmd.UnityIntegration
         public MmdMaterialMapperSet(
             MmdMaterialMapper defaultMapper,
             MmdMaterialTextureTargets defaultTextureTargets)
+            : this(defaultMapper, defaultTextureTargets, MmdMaterialRenderingTargets.BuiltIn)
+        {
+        }
+
+        public MmdMaterialMapperSet(
+            MmdMaterialMapper defaultMapper,
+            MmdMaterialTextureTargets defaultTextureTargets,
+            MmdMaterialRenderingTargets defaultRenderingTargets)
             : this(
                 defaultMapper,
                 defaultTextureTargets,
+                defaultRenderingTargets,
                 new Dictionary<int, MmdMaterialMapperRegistration>())
         {
         }
@@ -103,10 +209,12 @@ namespace Mmd.UnityIntegration
         private MmdMaterialMapperSet(
             MmdMaterialMapper defaultMapper,
             MmdMaterialTextureTargets defaultTextureTargets,
+            MmdMaterialRenderingTargets defaultRenderingTargets,
             Dictionary<int, MmdMaterialMapperRegistration> materialOverrides)
         {
             DefaultMapper = defaultMapper ?? throw new ArgumentNullException(nameof(defaultMapper));
             DefaultTextureTargets = defaultTextureTargets ?? throw new ArgumentNullException(nameof(defaultTextureTargets));
+            DefaultRenderingTargets = defaultRenderingTargets ?? throw new ArgumentNullException(nameof(defaultRenderingTargets));
             _materialOverrides = materialOverrides;
         }
 
@@ -122,13 +230,22 @@ namespace Mmd.UnityIntegration
                 throw new ArgumentNullException(nameof(mapper));
             }
 
-            return WithMaterialOverride(materialIndex, mapper, DefaultTextureTargets);
+            return WithMaterialOverride(materialIndex, mapper, DefaultTextureTargets, DefaultRenderingTargets);
         }
 
         public MmdMaterialMapperSet WithMaterialOverride(
             int materialIndex,
             MmdMaterialMapper mapper,
             MmdMaterialTextureTargets textureTargets)
+        {
+            return WithMaterialOverride(materialIndex, mapper, textureTargets, DefaultRenderingTargets);
+        }
+
+        public MmdMaterialMapperSet WithMaterialOverride(
+            int materialIndex,
+            MmdMaterialMapper mapper,
+            MmdMaterialTextureTargets textureTargets,
+            MmdMaterialRenderingTargets renderingTargets)
         {
             if (materialIndex < 0)
             {
@@ -145,18 +262,23 @@ namespace Mmd.UnityIntegration
                 throw new ArgumentNullException(nameof(textureTargets));
             }
 
+            if (renderingTargets == null)
+            {
+                throw new ArgumentNullException(nameof(renderingTargets));
+            }
+
             var overrides = new Dictionary<int, MmdMaterialMapperRegistration>(_materialOverrides)
             {
-                [materialIndex] = new MmdMaterialMapperRegistration(mapper, textureTargets)
+                [materialIndex] = new MmdMaterialMapperRegistration(mapper, textureTargets, renderingTargets)
             };
-            return new MmdMaterialMapperSet(DefaultMapper, DefaultTextureTargets, overrides);
+            return new MmdMaterialMapperSet(DefaultMapper, DefaultTextureTargets, DefaultRenderingTargets, overrides);
         }
 
         internal MmdMaterialMapperRegistration Resolve(int materialIndex)
         {
             return _materialOverrides.TryGetValue(materialIndex, out MmdMaterialMapperRegistration registration)
                 ? registration
-                : new MmdMaterialMapperRegistration(DefaultMapper, DefaultTextureTargets);
+                : new MmdMaterialMapperRegistration(DefaultMapper, DefaultTextureTargets, DefaultRenderingTargets);
         }
 
         private static Material CreateBuiltInMaterial(
@@ -171,14 +293,18 @@ namespace Mmd.UnityIntegration
     {
         public MmdMaterialMapperRegistration(
             MmdMaterialMapper mapper,
-            MmdMaterialTextureTargets textureTargets)
+            MmdMaterialTextureTargets textureTargets,
+            MmdMaterialRenderingTargets renderingTargets)
         {
             Mapper = mapper;
             TextureTargets = textureTargets;
+            RenderingTargets = renderingTargets;
         }
 
         public MmdMaterialMapper Mapper { get; }
 
         public MmdMaterialTextureTargets TextureTargets { get; }
+
+        public MmdMaterialRenderingTargets RenderingTargets { get; }
     }
 }

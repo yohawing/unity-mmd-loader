@@ -166,5 +166,64 @@ namespace Mmd.Tests
                 scope.Instance.TextureDiagnostics.Messages,
                 Does.Contain("Material 0 has no declared diffuse texture property supported by shader 'MMD Basic Toon'."));
         }
+
+        [Test]
+        public void MaterialMapperCanDeclareRenderingPropertyTargets()
+        {
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.materials[0].diffuseColor = new[] { 0.2f, 0.4f, 0.6f };
+            model.materials[0].ambientColor = new[] { 0.7f, 0.8f, 0.9f };
+            model.materials[0].alpha = 0.5f;
+            model.materials[0].edgeColor = new[] { 0.1f, 0.2f, 0.3f, 0.4f };
+            model.materials[0].drawEdgeFlag = true;
+            model.materials[0].edgeSize = 2.0f;
+            model.materials[0].cullingPolicy = "double-sided";
+
+            var renderingTargets = new MmdMaterialRenderingTargets(
+                baseColorProperty: "_Color",
+                colorProperty: null,
+                alphaProperty: "_BaseMapBound",
+                outlineColorProperty: "_AmbientColor",
+                outlineWidthProperty: "_OutlineScreenSpaceWeight",
+                outlineVisibleProperty: "_OutlineVisible",
+                outlineScreenSpaceWeightProperty: "_OutlineWidth",
+                outlineZTestProperty: "_OutlineZWrite",
+                supportsRenderQueue: false);
+            var materialMappers = new MmdMaterialMapperSet(
+                (source, defaultShader) => new Material(defaultShader),
+                MmdMaterialTextureTargets.BuiltIn,
+                renderingTargets);
+
+            using var scope = new MmdTestInstanceScope(
+                MmdUnityModelFactory.CreateStaticModel(
+                    model,
+                    sourcePath: null,
+                    importScale: 1.0f,
+                    preset: MmdMaterialPreset.MmdToon,
+                    materialOverride: null,
+                    materialMappers: materialMappers));
+            Material material = scope.Instance.Materials[0];
+
+            Color mappedDiffuse = material.GetColor("_Color");
+            Assert.That(mappedDiffuse.r, Is.EqualTo(0.2f).Within(0.00001f));
+            Assert.That(mappedDiffuse.g, Is.EqualTo(0.4f).Within(0.00001f));
+            Assert.That(mappedDiffuse.b, Is.EqualTo(0.6f).Within(0.00001f));
+            Assert.That(mappedDiffuse.a, Is.EqualTo(0.5f).Within(0.00001f));
+            Color untouchedBaseColor = material.GetColor("_BaseColor");
+            Assert.That(untouchedBaseColor.r, Is.EqualTo(1.0f).Within(0.00001f));
+            Assert.That(untouchedBaseColor.g, Is.EqualTo(1.0f).Within(0.00001f));
+            Assert.That(untouchedBaseColor.b, Is.EqualTo(1.0f).Within(0.00001f));
+            Color mappedOutline = material.GetColor("_AmbientColor");
+            Assert.That(mappedOutline.r, Is.EqualTo(0.1f).Within(0.00001f));
+            Assert.That(mappedOutline.g, Is.EqualTo(0.2f).Within(0.00001f));
+            Assert.That(mappedOutline.b, Is.EqualTo(0.3f).Within(0.00001f));
+            Assert.That(mappedOutline.a, Is.EqualTo(0.4f).Within(0.00001f));
+            Assert.That(material.GetFloat("_BaseMapBound"), Is.EqualTo(0.5f).Within(0.00001f));
+            Assert.That(material.GetFloat("_Cull"), Is.EqualTo((float)UnityEngine.Rendering.CullMode.Off));
+            Assert.That(material.GetFloat("_OutlineScreenSpaceWeight"), Is.EqualTo(2.0f).Within(0.00001f));
+            Assert.That(material.GetFloat("_OutlineWidth"), Is.EqualTo(1.0f).Within(0.00001f));
+            Assert.That(material.GetFloat("_OutlineZWrite"), Is.EqualTo(2.0f).Within(0.00001f));
+            Assert.That(material.renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Geometry));
+        }
     }
 }

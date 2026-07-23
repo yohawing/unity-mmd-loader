@@ -22,64 +22,65 @@ namespace Mmd.UnityIntegration
             float alpha,
             MmdMaterialTransparencyMode transparencyMode,
             string cullingPolicy,
-            int materialRenderOrder)
+            int materialRenderOrder,
+            MmdMaterialRenderingTargets targets)
         {
             if (!IsFinite(alpha) || alpha < 0.0f || alpha > 1.0f)
             {
                 throw new ArgumentException("Material alpha must be finite and between 0 and 1.");
             }
 
-            SetColorAlpha(material, "_BaseColor", alpha);
-            SetColorAlpha(material, "_Color", alpha);
-            if (material.HasProperty("_Alpha"))
+            SetColorAlpha(material, targets.BaseColorProperty, alpha);
+            SetColorAlpha(material, targets.ColorProperty, alpha);
+            if (HasProperty(material, targets.AlphaProperty))
             {
-                material.SetFloat("_Alpha", alpha);
+                material.SetFloat(targets.AlphaProperty, alpha);
             }
 
-            if (material.HasProperty("_AlphaClipThreshold"))
+            if (HasProperty(material, targets.AlphaClipThresholdProperty))
             {
-                material.SetFloat("_AlphaClipThreshold", transparencyMode == MmdMaterialTransparencyMode.AlphaTest
+                material.SetFloat(targets.AlphaClipThresholdProperty, transparencyMode == MmdMaterialTransparencyMode.AlphaTest
                     ? AlphaClipThreshold
                     : 0.0f);
             }
 
-            if (material.HasProperty("_ShadowAlphaClipThreshold"))
+            if (HasProperty(material, targets.ShadowAlphaClipThresholdProperty))
             {
-                material.SetFloat("_ShadowAlphaClipThreshold", transparencyMode == MmdMaterialTransparencyMode.Opaque
+                material.SetFloat(targets.ShadowAlphaClipThresholdProperty, transparencyMode == MmdMaterialTransparencyMode.Opaque
                     ? 0.0f
                     : AlphaClipThreshold);
             }
 
-            if (material.HasProperty("_TextureAlphaOutputWeight"))
+            if (HasProperty(material, targets.TextureAlphaOutputWeightProperty))
             {
-                material.SetFloat("_TextureAlphaOutputWeight", transparencyMode == MmdMaterialTransparencyMode.AlphaBlend
+                material.SetFloat(targets.TextureAlphaOutputWeightProperty, transparencyMode == MmdMaterialTransparencyMode.AlphaBlend
                     ? 1.0f
                     : 0.0f);
             }
 
-            ApplyMaterialCullingPolicy(material, cullingPolicy);
+            ApplyMaterialCullingPolicy(material, cullingPolicy, targets.CullProperty);
 
             if (transparencyMode == MmdMaterialTransparencyMode.Opaque ||
                 transparencyMode == MmdMaterialTransparencyMode.AlphaTest)
             {
-                if (material.HasProperty("_Surface"))
+                if (HasProperty(material, targets.SurfaceProperty))
                 {
-                    material.SetFloat("_Surface", 0.0f);
+                    material.SetFloat(targets.SurfaceProperty, 0.0f);
                 }
 
-                if (material.HasProperty("_SrcBlend"))
+                if (HasProperty(material, targets.SourceBlendProperty))
                 {
-                    material.SetFloat("_SrcBlend", (float)BlendMode.One);
+                    material.SetFloat(targets.SourceBlendProperty, (float)BlendMode.One);
                 }
 
-                if (material.HasProperty("_DstBlend"))
+                if (HasProperty(material, targets.DestinationBlendProperty))
                 {
-                    material.SetFloat("_DstBlend", (float)BlendMode.Zero);
+                    material.SetFloat(targets.DestinationBlendProperty, (float)BlendMode.Zero);
                 }
 
-                if (material.HasProperty("_ZWrite"))
+                if (HasProperty(material, targets.ZWriteProperty))
                 {
-                    material.SetFloat("_ZWrite", 1.0f);
+                    material.SetFloat(targets.ZWriteProperty, 1.0f);
                 }
 
                 if (transparencyMode == MmdMaterialTransparencyMode.AlphaTest)
@@ -87,54 +88,63 @@ namespace Mmd.UnityIntegration
                     material.EnableKeyword("_ALPHATEST_ON");
                 }
 
-                material.renderQueue = OpaqueRenderQueue;
+                if (targets.SupportsRenderQueue)
+                {
+                    material.renderQueue = OpaqueRenderQueue;
+                }
                 return;
             }
 
-            if (material.HasProperty("_Surface"))
+            if (HasProperty(material, targets.SurfaceProperty))
             {
-                material.SetFloat("_Surface", 1.0f);
+                material.SetFloat(targets.SurfaceProperty, 1.0f);
             }
 
-            if (material.HasProperty("_Blend"))
+            if (HasProperty(material, targets.BlendProperty))
             {
-                material.SetFloat("_Blend", 0.0f);
+                material.SetFloat(targets.BlendProperty, 0.0f);
             }
 
-            if (material.HasProperty("_SrcBlend"))
+            if (HasProperty(material, targets.SourceBlendProperty))
             {
-                material.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
+                material.SetFloat(targets.SourceBlendProperty, (float)BlendMode.SrcAlpha);
             }
 
-            if (material.HasProperty("_DstBlend"))
+            if (HasProperty(material, targets.DestinationBlendProperty))
             {
-                material.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
+                material.SetFloat(targets.DestinationBlendProperty, (float)BlendMode.OneMinusSrcAlpha);
             }
 
-            if (material.HasProperty("_ZWrite"))
+            if (HasProperty(material, targets.ZWriteProperty))
             {
-                material.SetFloat("_ZWrite", 1.0f);
+                material.SetFloat(targets.ZWriteProperty, 1.0f);
             }
 
             material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
             material.EnableKeyword("_ALPHABLEND_ON");
-            material.renderQueue = TransparentRenderQueueBase + materialRenderOrder;
+            if (targets.SupportsRenderQueue)
+            {
+                material.renderQueue = TransparentRenderQueueBase + materialRenderOrder;
+            }
         }
 
-        private static void ApplyMaterialCullingPolicy(Material material, string cullingPolicy)
+        private static void ApplyMaterialCullingPolicy(
+            Material material,
+            string cullingPolicy,
+            string cullProperty)
         {
-            if (!material.HasProperty("_Cull"))
+            if (!HasProperty(material, cullProperty))
             {
                 return;
             }
 
             if (string.Equals(cullingPolicy, "double-sided", StringComparison.Ordinal))
             {
-                material.SetFloat("_Cull", (float)CullMode.Off);
+                material.SetFloat(cullProperty, (float)CullMode.Off);
             }
             else if (string.Equals(cullingPolicy, "backface-culling", StringComparison.Ordinal))
             {
-                material.SetFloat("_Cull", (float)CullMode.Back);
+                material.SetFloat(cullProperty, (float)CullMode.Back);
             }
         }
 
@@ -374,7 +384,13 @@ namespace Mmd.UnityIntegration
             }
             string mode = MmdMaterialTransparencyPolicy.ResolveMaterialTransparencyMode(
                 source.alpha, effectiveMaterialName, textureExtension, alphaValues);
-            ApplyMaterialRenderingPolicy(material, source.alpha, MapTransparencyMode(mode), source.cullingPolicy, materialRenderOrder);
+            ApplyMaterialRenderingPolicy(
+                material,
+                source.alpha,
+                MapTransparencyMode(mode),
+                source.cullingPolicy,
+                materialRenderOrder,
+                MmdMaterialRenderingTargets.BuiltIn);
         }
     }
 }

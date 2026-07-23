@@ -73,9 +73,15 @@ namespace Mmd.UnityIntegration
                         ? $"MMD Material {source.materialIndex}"
                         : source.name;
                     materials[i] = material;
-                    ApplyMaterialColors(material, source);
+                    ApplyMaterialColors(material, source, mapper.RenderingTargets);
                     MmdMaterialTransparencyMode transparencyMode = ResolveMaterialTransparencyMode(descriptor, source, textureResolution);
-                    ApplyMaterialRenderingPolicy(material, source.alpha, transparencyMode, source.cullingPolicy, i);
+                    ApplyMaterialRenderingPolicy(
+                        material,
+                        source.alpha,
+                        transparencyMode,
+                        source.cullingPolicy,
+                        i,
+                        mapper.RenderingTargets);
                     if (IsUrpLitShader(material.shader))
                     {
                         ApplyUrpLitDefaults(new[] { material });
