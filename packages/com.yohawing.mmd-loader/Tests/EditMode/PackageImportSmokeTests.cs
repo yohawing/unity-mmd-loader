@@ -115,18 +115,22 @@ namespace Mmd.Tests
             string packageRoot = MmdTestFixtures.PackageRoot;
             string sampleRoot = Path.Combine(packageRoot, "Samples~", "UnityToonShaderAdapter");
             string sourcePath = Path.Combine(sampleRoot, "Assets", "UnityToonShaderAdapter.cs");
+            string profileSourcePath = Path.Combine(sampleRoot, "Assets", "UnityToonShaderMaterialProfile.cs");
             string assemblyPath = Path.Combine(sampleRoot, "Assets", "Mmd.UnityToonShaderAdapter.asmdef");
             string testsAssemblyPath = Path.Combine(sampleRoot, "Tests", "Mmd.UnityToonShaderAdapter.Tests.asmdef");
             string readmePath = Path.Combine(sampleRoot, "README.md");
             string packageJsonPath = Path.Combine(packageRoot, "package.json");
 
             Assert.That(sourcePath, Does.Exist, "UTS adapter source must be bundled in the sample.");
+            Assert.That(profileSourcePath, Does.Exist, "UTS material profile factory must be bundled in the sample.");
             Assert.That(assemblyPath, Does.Exist, "UTS adapter sample must define an importable assembly.");
             Assert.That(testsAssemblyPath, Does.Exist, "UTS adapter conversion/schema tests must be bundled.");
             Assert.That(readmePath, Does.Exist, "UTS adapter limitations must be documented.");
 
             string source = File.ReadAllText(sourcePath);
+            string profileSource = File.ReadAllText(profileSourcePath);
             string assembly = File.ReadAllText(assemblyPath);
+            string readme = File.ReadAllText(readmePath);
             string packageJson = File.ReadAllText(packageJsonPath);
             Assert.That(packageJson, Does.Contain("Samples~/UnityToonShaderAdapter"));
             Assert.That(assembly, Does.Not.Contain("com.unity.toonshader"),
@@ -135,6 +139,12 @@ namespace Mmd.Tests
                 "UTS must be resolved at runtime when no shader is injected");
             Assert.That(source, Does.Contain("UTS_FALLBACK_MMD_TOON"),
                 "the all-slots fallback must be explicit");
+            Assert.That(profileSource, Does.Contain("MmdMaterialProfileAsset.CurrentSchemaVersion"),
+                "the UTS profile must pin the loader profile schema");
+            Assert.That(profileSource, Does.Contain("UTS_PROFILE_FALLBACK_MMD_TOON"),
+                "the profile factory must fail closed when UTS is unavailable");
+            Assert.That(readme, Does.Contain("Custom Material Profile"),
+                "the sample must document the importer profile connection");
         }
 
         [Test]

@@ -33,6 +33,25 @@ else
 
 The caller owns successful replacement materials and must destroy them when they are no longer used. Do not destroy the loader-owned original materials.
 
+### Connecting the importer through a Custom Material Profile
+
+Create an `MMD/Material Profile` asset, then configure it from a validated UTS shader before assigning it to the PMX Scripted Importer:
+
+```csharp
+var profile = ScriptableObject.CreateInstance<MmdMaterialProfileAsset>();
+var diagnostics = new List<UnityToonShaderDiagnostic>();
+if (UnityToonShaderMaterialProfile.TryConfigure(
+        profile,
+        Shader.Find(UnityToonShaderAdapter.ExpectedShaderName),
+        diagnostics))
+{
+    AssetDatabase.CreateAsset(profile, "Assets/Mmd UTS Profile.asset");
+    AssetDatabase.SaveAssets();
+}
+```
+
+Select `Custom Profile` and this asset in the PMX Importer. The profile declares UTS texture, render-state, keyword, pass, and unsupported-feature targets; if UTS is absent or its schema changes, keep the importer on MMD Basic Toon and retain the diagnostics.
+
 ## Mapping and non-parity scope
 
 - PMX diffuse color and base texture map to UTS Base Color/Base Map.
