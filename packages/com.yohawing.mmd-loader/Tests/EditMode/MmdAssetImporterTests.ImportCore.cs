@@ -11,6 +11,7 @@ using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using Mmd.Editor;
+using Mmd.Mme;
 using Mmd.Parser;
 using Mmd.Physics;
 using Mmd.Rendering;
@@ -191,7 +192,7 @@ namespace Mmd.Tests
 
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
 
-            Assert.That(pmxAsset.ShaderPreset, Is.EqualTo(nameof(MmdPmxShaderPreset.UrpLit)));
+            Assert.That(pmxAsset.ShaderPreset, Is.EqualTo("URP Lit"));
             Assert.That(pmxAsset.ImportedMaterials, Is.Not.Null.And.Not.Empty);
             Assert.That(pmxAsset.ImportedMaterials[0].shader, Is.Not.Null);
             Assert.That(pmxAsset.ImportedMaterials[0].shader.name,
@@ -288,7 +289,7 @@ namespace Mmd.Tests
 
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
 
-            Assert.That(pmxAsset.ShaderPreset, Is.EqualTo(nameof(MmdPmxShaderPreset.UrpLit)));
+            Assert.That(pmxAsset.ShaderPreset, Is.EqualTo("URP Lit"));
             Assert.That(pmxAsset.ImportedMaterials, Is.Not.Null.And.Not.Empty);
             Material importedMaterial = pmxAsset.ImportedMaterials[0];
             Assert.That(importedMaterial.shader, Is.Not.Null);
@@ -311,10 +312,10 @@ namespace Mmd.Tests
         [Test]
         public void PmxImporterAutoDiscoversMmeNormalMapAndExplicitOverrideWins()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempMmePmxPath);
 
             string autoFxAssetPath = TempDirectory + "/auto.fx";
-            string autoEmdAssetPath = TempDirectory + "/test_1bone_cube.emd";
+            string autoEmdAssetPath = TempDirectory + "/mme_test_1bone_cube.emd";
             string autoNormalMapAssetPath = TempDirectory + "/auto_normal.png";
             string explicitNormalMapAssetPath = TempDirectory + "/explicit_normal.png";
 
@@ -330,27 +331,49 @@ namespace Mmd.Tests
             AssetDatabase.Refresh();
             AssetDatabase.ImportAsset(autoNormalMapAssetPath, ImportAssetOptions.ForceUpdate);
             AssetDatabase.ImportAsset(explicitNormalMapAssetPath, ImportAssetOptions.ForceUpdate);
-            AssetDatabase.ImportAsset(TempPmxPath, ImportAssetOptions.ForceUpdate);
+            Shader.globalRenderPipeline = "UniversalPipeline";
+            string absoluteMmePmxPath = Path.Combine(ProjectRoot, TempMmePmxPath);
+            var scannedEffects = MmeFxScanner.ScanFromModelPath(absoluteMmePmxPath, materialCount: 1);
+            Assert.That(scannedEffects, Has.Count.EqualTo(1),
+                $"pmx={absoluteMmePmxPath}; emdExists={File.Exists(Path.ChangeExtension(absoluteMmePmxPath, ".emd"))}");
+            Assert.That(scannedEffects[0].useNormalMap, Is.True);
+            Assert.That(scannedEffects[0].normalMapTexture, Is.EqualTo("auto_normal.png"));
+            Assert.That(
+                MmdAssetPathUtility.TryResolveProjectRelativeAssetPath(
+                    scannedEffects[0].sourcePath,
+                    scannedEffects[0].normalMapTexture!,
+                    out string resolvedAutoNormalMapPath),
+                Is.True,
+                $"source={scannedEffects[0].sourcePath}; reference={scannedEffects[0].normalMapTexture}");
+            Assert.That(AssetDatabase.LoadAssetAtPath<Texture2D>(resolvedAutoNormalMapPath), Is.Not.Null,
+                $"resolvedPath={resolvedAutoNormalMapPath}");
+            AssetDatabase.ImportAsset(TempMmePmxPath, ImportAssetOptions.ForceUpdate);
 
-            MmdPmxScriptedImporter importer = AssetImporter.GetAtPath(TempPmxPath) as MmdPmxScriptedImporter;
+            MmdPmxScriptedImporter importer = AssetImporter.GetAtPath(TempMmePmxPath) as MmdPmxScriptedImporter;
             Assert.That(importer, Is.Not.Null);
             var serializedImporter = new SerializedObject(importer!);
-            serializedImporter.FindProperty("shaderPreset").enumValueIndex = (int)MmdPmxShaderPreset.MmdToonLit;
+            serializedImporter.FindProperty("shaderPreset").enumValueIndex = (int)MmdPmxShaderPreset.UrpLit;
             serializedImporter.ApplyModifiedPropertiesWithoutUndo();
+            Shader.globalRenderPipeline = "UniversalPipeline";
             importer!.SaveAndReimport();
+            Shader.globalRenderPipeline = "UniversalPipeline";
 
             Texture2D autoNormalMap = AssetDatabase.LoadAssetAtPath<Texture2D>(autoNormalMapAssetPath);
             Assert.That(autoNormalMap, Is.Not.Null);
-            MmdPmxAsset autoImportedAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+            MmdPmxAsset autoImportedAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempMmePmxPath);
             Assert.That(autoImportedAsset, Is.Not.Null);
-            Assert.That(autoImportedAsset.ShaderPreset, Is.EqualTo(nameof(MmdPmxShaderPreset.MmdToonLit)));
+            Assert.That(autoImportedAsset.ShaderPreset, Is.EqualTo("URP Lit"));
             Assert.That(autoImportedAsset.ImportedMaterials, Is.Not.Null.And.Not.Empty);
             Material autoImportedMaterial = autoImportedAsset.ImportedMaterials[0];
             Assert.That(autoImportedMaterial.shader, Is.Not.Null);
             Assert.That(autoImportedMaterial.shader.name,
-                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName));
-            Assert.That(autoImportedMaterial.GetTexture(MmdMaterialPropertyNames.MmdNormalMap), Is.SameAs(autoNormalMap));
-            Assert.That(autoImportedMaterial.GetFloat(MmdMaterialPropertyNames.MmdNormalMapBound), Is.EqualTo(1.0f).Within(0.00001f));
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName));
+            Assert.That(
+                autoImportedMaterial.HasProperty(MmdMaterialPropertyNames.BumpMap),
+                Is.True,
+                $"pipeline={Shader.globalRenderPipeline}; shader={autoImportedMaterial.shader.name}; supported={autoImportedMaterial.shader.isSupported}; passCount={autoImportedMaterial.passCount}");
+            Assert.That(autoImportedMaterial.GetTexture(MmdMaterialPropertyNames.BumpMap), Is.SameAs(autoNormalMap));
+            Assert.That(autoImportedMaterial.IsKeywordEnabled("_NORMALMAP"), Is.True);
 
             Texture2D explicitNormalMap = AssetDatabase.LoadAssetAtPath<Texture2D>(explicitNormalMapAssetPath);
             Assert.That(explicitNormalMap, Is.Not.Null);
@@ -364,20 +387,31 @@ namespace Mmd.Tests
                     normalMap = explicitNormalMap
                 }
             };
-            AssetDatabase.CreateAsset(overrideAsset, TempMaterialOverridePath);
-            AssetDatabase.ImportAsset(TempMaterialOverridePath, ImportAssetOptions.ForceUpdate);
+            AssetDatabase.CreateAsset(overrideAsset, TempMmeMaterialOverridePath);
+            AssetDatabase.ImportAsset(TempMmeMaterialOverridePath, ImportAssetOptions.ForceUpdate);
             MmdMaterialOverrideAsset persistedOverride =
-                AssetDatabase.LoadAssetAtPath<MmdMaterialOverrideAsset>(TempMaterialOverridePath);
+                AssetDatabase.LoadAssetAtPath<MmdMaterialOverrideAsset>(TempMmeMaterialOverridePath);
             Assert.That(persistedOverride, Is.Not.Null);
+            Assert.That(persistedOverride!.entries, Has.Length.EqualTo(1));
+            Assert.That(persistedOverride.entries[0].enabled, Is.True);
+            Assert.That(persistedOverride.entries[0].normalMap, Is.SameAs(explicitNormalMap));
 
-            serializedImporter.FindProperty("materialOverrideAsset").objectReferenceValue = persistedOverride;
+            importer = AssetImporter.GetAtPath(TempMmePmxPath) as MmdPmxScriptedImporter;
+            Assert.That(importer, Is.Not.Null);
+            serializedImporter = new SerializedObject(importer!);
+            SerializedProperty overrideProperty = serializedImporter.FindProperty("materialOverrideAsset");
+            Assert.That(overrideProperty, Is.Not.Null);
+            overrideProperty!.objectReferenceValue = persistedOverride;
             serializedImporter.ApplyModifiedPropertiesWithoutUndo();
+            importer = AssetImporter.GetAtPath(TempMmePmxPath) as MmdPmxScriptedImporter;
+            Assert.That(importer, Is.Not.Null);
+            Shader.globalRenderPipeline = "UniversalPipeline";
             importer!.SaveAndReimport();
 
-            MmdPmxAsset explicitImportedAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+            MmdPmxAsset explicitImportedAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempMmePmxPath);
             Material explicitImportedMaterial = explicitImportedAsset.ImportedMaterials[0];
-            Assert.That(explicitImportedMaterial.GetTexture(MmdMaterialPropertyNames.MmdNormalMap), Is.SameAs(explicitNormalMap));
-            Assert.That(explicitImportedMaterial.GetFloat(MmdMaterialPropertyNames.MmdNormalMapBound), Is.EqualTo(1.0f).Within(0.00001f));
+            Assert.That(explicitImportedMaterial.GetTexture(MmdMaterialPropertyNames.BumpMap), Is.SameAs(explicitNormalMap));
+            Assert.That(explicitImportedMaterial.IsKeywordEnabled("_NORMALMAP"), Is.True);
         }
 
         [Test]

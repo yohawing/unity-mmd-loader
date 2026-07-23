@@ -6,6 +6,7 @@ using System.Linq;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.TestTools;
 using Mmd.Editor;
 using Mmd.UnityIntegration;
 
@@ -120,6 +121,14 @@ namespace Mmd.Tests
         public void ExistingDirectoryPathIsTreatedAsCollision()
         {
             string directoryCollisionPath = MaterialOutputDirectory + "/Body.mat";
+            var postprocessorNullReference =
+                new System.Text.RegularExpressions.Regex("NullReferenceException: Object reference not set to an instance of an object");
+            // Unity 6's BuiltIn and URP material postprocessors treat a deliberately-created
+            // folder ending in .mat as a Material and log one exception each. The folder is the
+            // collision fixture this test is exercising, so consume those editor-level diagnostics
+            // without weakening the extraction assertions below.
+            LogAssert.Expect(LogType.Exception, postprocessorNullReference);
+            LogAssert.Expect(LogType.Exception, postprocessorNullReference);
             string folderGuid = AssetDatabase.CreateFolder(MaterialOutputDirectory, "Body.mat");
             Assert.That(folderGuid, Is.Not.Null.And.Not.Empty);
             Assert.That(AssetDatabase.IsValidFolder(directoryCollisionPath), Is.True);
