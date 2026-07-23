@@ -143,10 +143,9 @@ if (-not (Test-Path -LiteralPath (Join-Path $ProjectPath "Packages\manifest.json
     # resolves when the built-in Physics module package is present. A manifest with only the
     # two file: packages + test-framework fails to compile ("error CS1069: ... Collider ...
     # Enable the built in package 'Physics'", plus missing Unity.Timeline/URP assembly refs).
-    # Mirror the built-in module + package set from the known-working local consumer project
-    # (unity-mmd/Packages/manifest.json), minus its git-URL package (io.github.hatayama.
-    # uloopmcp), which is what originally broke offline/batchmode package resolution here
-    # ("Failed to resolve packages: The \"path\" argument must be of type string.").
+    # Mirror the built-in module + package set required by the known-working local consumer
+    # project. Keep the temporary verification project registry/local-package-only so offline
+    # and batchmode package resolution remains deterministic.
     $manifest = [ordered]@{
         dependencies = [ordered]@{
             "com.unity.test-framework" = "1.6.0"
