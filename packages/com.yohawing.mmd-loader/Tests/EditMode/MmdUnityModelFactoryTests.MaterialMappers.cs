@@ -89,5 +89,82 @@ namespace Mmd.Tests
             Assert.That(material.GetTexture("_BaseMap"), Is.Null);
             Assert.That(material.GetFloat("_ToonMapBound"), Is.EqualTo(1.0f).Within(0.00001f));
         }
+
+        [Test]
+        public void MixedShaderMaterialsUseSlotSpecificMapperTextureDeclarations()
+        {
+            using var temp = new MmdTestTempScope();
+
+            string pmxPath = Path.Combine(temp.Path, "mixed-mapper.pmx");
+            string texturePath = Path.Combine(temp.Path, "diffuse.png");
+            File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
+            WriteRgbPng(texturePath);
+
+            MmdModelDefinition model = CreateTwoTransparentTriangleModel();
+            model.materials[0].texture = "diffuse.png";
+            model.materials[1].texture = "diffuse.png";
+            var slotOneTargets = new MmdMaterialTextureTargets(new[] { "_BaseMap" });
+            MmdMaterialMapperSet materialMappers = MmdMaterialMapperSet.BuiltIn.WithMaterialOverride(
+                1,
+                (source, defaultShader) =>
+                {
+                    Shader urpLitShader = Shader.Find(MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName);
+                    Assert.That(urpLitShader, Is.Not.Null);
+                    return new Material(urpLitShader) { enableInstancing = true };
+                },
+                slotOneTargets);
+
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(
+                model,
+                pmxPath,
+                importScale: 1.0f,
+                preset: MmdMaterialPreset.MmdToon,
+                materialOverride: null,
+                materialMappers: materialMappers));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            Assert.That(instance.Materials[0].shader.name,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName));
+            Assert.That(instance.Materials[1].shader.name,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName));
+            Assert.That(instance.Materials[1].enableInstancing, Is.True);
+            Assert.That(instance.Materials[0].GetTexture("_BaseMap"), Is.EqualTo(instance.OwnedTextures[0]));
+            Assert.That(instance.Materials[1].GetTexture("_BaseMap"), Is.EqualTo(instance.OwnedTextures[1]));
+            Assert.That(instance.MaterialBindingDiagnostics[0].resolvedShaderName,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName));
+            Assert.That(instance.MaterialBindingDiagnostics[1].resolvedShaderName,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName));
+        }
+
+        [Test]
+        public void MaterialMapperMissingDeclaredDiffusePropertyIsReported()
+        {
+            using var temp = new MmdTestTempScope();
+
+            string pmxPath = Path.Combine(temp.Path, "missing-target.pmx");
+            string texturePath = Path.Combine(temp.Path, "diffuse.png");
+            File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
+            WriteRgbPng(texturePath);
+
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.materials[0].texture = "diffuse.png";
+            var materialMappers = new MmdMaterialMapperSet(
+                (source, defaultShader) => new Material(defaultShader),
+                new MmdMaterialTextureTargets(new[] { "_MissingDiffuseProperty" }));
+
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(
+                model,
+                pmxPath,
+                importScale: 1.0f,
+                preset: MmdMaterialPreset.MmdToon,
+                materialOverride: null,
+                materialMappers: materialMappers));
+
+            Assert.That(scope.Instance.LoadedDiffuseTextureCount, Is.EqualTo(1));
+            Assert.That(scope.Instance.Materials[0].GetTexture("_BaseMap"), Is.Null);
+            Assert.That(
+                scope.Instance.TextureDiagnostics.Messages,
+                Does.Contain("Material 0 has no declared diffuse texture property supported by shader 'MMD Basic Toon'."));
+        }
     }
 }
