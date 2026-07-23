@@ -104,10 +104,17 @@ namespace Mmd.Tests
             RenderTexture renderTexture = new(256, 256, 24, RenderTextureFormat.ARGB32);
             Texture2D readback = new(256, 256, TextureFormat.RGBA32, mipChain: false);
             RenderTexture? previousActive = RenderTexture.active;
+            AmbientMode previousAmbientMode = RenderSettings.ambientMode;
+            Color previousAmbientLight = RenderSettings.ambientLight;
+            float previousAmbientIntensity = RenderSettings.ambientIntensity;
+            Light? previousSun = RenderSettings.sun;
             Color background = new(0.055f, 0.065f, 0.09f, 1.0f);
             List<Material>? instanceMaterials = null;
             try
             {
+                RenderSettings.ambientMode = AmbientMode.Flat;
+                RenderSettings.ambientLight = new Color(0.16f, 0.16f, 0.16f, 1.0f);
+                RenderSettings.ambientIntensity = 1.0f;
                 SetLayerRecursively(instance.transform, UtsVisualLayer);
                 Bounds bounds = ResolveWorldBounds(instance);
                 Vector3 target = bounds.center;
@@ -133,6 +140,7 @@ namespace Mmd.Tests
                 light.intensity = 1.2f;
                 light.cullingMask = 1 << UtsVisualLayer;
                 lightObject.transform.rotation = Quaternion.Euler(35.0f, -30.0f, 0.0f);
+                RenderSettings.sun = light;
 
                 renderTexture.Create();
                 instanceMaterials = ResolveInstanceMaterials(instance);
@@ -191,6 +199,10 @@ namespace Mmd.Tests
             finally
             {
                 RenderTexture.active = previousActive;
+                RenderSettings.ambientMode = previousAmbientMode;
+                RenderSettings.ambientLight = previousAmbientLight;
+                RenderSettings.ambientIntensity = previousAmbientIntensity;
+                RenderSettings.sun = previousSun;
                 Camera? camera = cameraObject.GetComponent<Camera>();
                 if (camera != null)
                 {
