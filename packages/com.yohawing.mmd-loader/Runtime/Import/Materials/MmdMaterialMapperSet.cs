@@ -74,7 +74,10 @@ namespace Mmd.UnityIntegration
     /// </summary>
     public sealed class MmdMaterialRenderingTargets
     {
-        public static MmdMaterialRenderingTargets BuiltIn { get; } = new MmdMaterialRenderingTargets();
+        public static MmdMaterialRenderingTargets BuiltIn { get; } = new MmdMaterialRenderingTargets(
+            validatePropertyPresence: false);
+
+        private readonly IReadOnlyList<string> _unsupportedFeatures;
 
         public string BaseColorProperty { get; }
 
@@ -114,6 +117,20 @@ namespace Mmd.UnityIntegration
 
         public bool SupportsRenderQueue { get; }
 
+        /// <summary>
+        /// Feature identifiers that the mapper intentionally does not implement for this shader.
+        /// The loader preserves these declarations in per-material binding diagnostics so a mixed
+        /// mapper set can explain which MMD features were dropped.
+        /// </summary>
+        public IReadOnlyList<string> UnsupportedFeatures => _unsupportedFeatures;
+
+        /// <summary>
+        /// Enables diagnostics when a non-empty declared rendering property is absent from the
+        /// resolved shader. Built-in targets disable this because their optional property aliases
+        /// intentionally cover several shader families.
+        /// </summary>
+        public bool ValidatePropertyPresence { get; }
+
         public MmdMaterialRenderingTargets(
             string? baseColorProperty = "_BaseColor",
             string? colorProperty = "_Color",
@@ -133,7 +150,9 @@ namespace Mmd.UnityIntegration
             string? outlineVisibleProperty = "_OutlineVisible",
             string? outlineScreenSpaceWeightProperty = "_OutlineScreenSpaceWeight",
             string? outlineZTestProperty = "_OutlineZTest",
-            bool supportsRenderQueue = true)
+            bool supportsRenderQueue = true,
+            IEnumerable<string>? unsupportedFeatures = null,
+            bool validatePropertyPresence = true)
         {
             BaseColorProperty = NormalizeOptionalProperty(baseColorProperty);
             ColorProperty = NormalizeOptionalProperty(colorProperty);
@@ -154,6 +173,13 @@ namespace Mmd.UnityIntegration
             OutlineScreenSpaceWeightProperty = NormalizeOptionalProperty(outlineScreenSpaceWeightProperty);
             OutlineZTestProperty = NormalizeOptionalProperty(outlineZTestProperty);
             SupportsRenderQueue = supportsRenderQueue;
+            _unsupportedFeatures = Array.AsReadOnly(
+                (unsupportedFeatures ?? Array.Empty<string>())
+                    .Where(feature => !string.IsNullOrWhiteSpace(feature))
+                    .Select(feature => feature.Trim())
+                    .Distinct(StringComparer.Ordinal)
+                    .ToArray());
+            ValidatePropertyPresence = validatePropertyPresence;
         }
 
         private static string NormalizeOptionalProperty(string? value)

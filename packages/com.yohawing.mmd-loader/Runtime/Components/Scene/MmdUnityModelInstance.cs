@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using Mmd.Rendering;
 
@@ -38,7 +39,10 @@ namespace Mmd.UnityIntegration
             TextureDiagnostics = textureDiagnostics;
             ShaderDiagnostics = shaderDiagnostics;
             MaterialRenderingTargets = BuildMaterialRenderingTargets(materials.Length, materialRenderingTargets);
-            MaterialBindingDiagnostics = BuildMaterialBindingDiagnostics(renderingDescriptor, materials);
+            MaterialBindingDiagnostics = BuildMaterialBindingDiagnostics(
+                renderingDescriptor,
+                materials,
+                MaterialRenderingTargets);
             ImportScale = (float.IsFinite(importScale) && importScale > 0.0f) ? importScale : 1.0f;
             BindLocalPositions = new Vector3[boneTransforms.Length];
             BindLocalRotations = new Quaternion[boneTransforms.Length];
@@ -164,7 +168,8 @@ namespace Mmd.UnityIntegration
 
         private static MmdUnityMaterialBindingDiagnostic[] BuildMaterialBindingDiagnostics(
             MmdRenderingDescriptor descriptor,
-            Material[] materials)
+            Material[] materials,
+            MmdMaterialRenderingTargets[] renderingTargets)
         {
             var diagnostics = new MmdUnityMaterialBindingDiagnostic[descriptor.materials.Count];
             for (int i = 0; i < diagnostics.Length; i++)
@@ -173,6 +178,9 @@ namespace Mmd.UnityIntegration
                 MmdUrpMaterialBindingDescriptor? binding = FindBinding(descriptor, materialDescriptor.materialIndex);
                 MmdSubmeshDescriptor? submesh = FindSubmesh(descriptor, materialDescriptor.materialIndex);
                 Material? material = i < materials.Length ? materials[i] : null;
+                MmdMaterialRenderingTargets targets = i < renderingTargets.Length
+                    ? renderingTargets[i]
+                    : MmdMaterialRenderingTargets.BuiltIn;
                 string transparencyMode = ResolveTransparencyMode(material, materialDescriptor);
                 bool transparent = transparencyMode != "opaque";
                 int transparentOrder = transparencyMode == "alphaBlend" && material != null && material.renderQueue >= 3000
@@ -220,7 +228,9 @@ namespace Mmd.UnityIntegration
                     sphereTexture = binding?.sphereTexture ?? string.Empty,
                     toonTexture = binding?.toonTexture ?? string.Empty,
                     sphereTextureModeHint = binding?.sphereTextureModeHint ?? string.Empty,
-                    toonTextureSourceHint = binding?.toonTextureSourceHint ?? string.Empty
+                    toonTextureSourceHint = binding?.toonTextureSourceHint ?? string.Empty,
+                    unsupportedFeatures = targets.UnsupportedFeatures.ToArray(),
+                    missingProperties = BuildMissingPropertyDiagnostics(material, targets)
                 };
             }
 
@@ -236,7 +246,60 @@ namespace Mmd.UnityIntegration
         /// </summary>
         internal void RefreshMaterialBindingDiagnostics()
         {
-            MaterialBindingDiagnostics = BuildMaterialBindingDiagnostics(RenderingDescriptor, Materials);
+            MaterialBindingDiagnostics = BuildMaterialBindingDiagnostics(
+                RenderingDescriptor,
+                Materials,
+                MaterialRenderingTargets);
+        }
+
+        private static MmdUnityMaterialMissingPropertyDiagnostic[] BuildMissingPropertyDiagnostics(
+            Material? material,
+            MmdMaterialRenderingTargets targets)
+        {
+            if (!targets.ValidatePropertyPresence || material == null)
+            {
+                return Array.Empty<MmdUnityMaterialMissingPropertyDiagnostic>();
+            }
+
+            var diagnostics = new List<MmdUnityMaterialMissingPropertyDiagnostic>();
+            AddMissingProperty(diagnostics, material, "base-color", targets.BaseColorProperty);
+            AddMissingProperty(diagnostics, material, "color", targets.ColorProperty);
+            AddMissingProperty(diagnostics, material, "ambient-color", targets.AmbientColorProperty);
+            AddMissingProperty(diagnostics, material, "alpha", targets.AlphaProperty);
+            AddMissingProperty(diagnostics, material, "alpha-clip", targets.AlphaClipThresholdProperty);
+            AddMissingProperty(diagnostics, material, "shadow-alpha-clip", targets.ShadowAlphaClipThresholdProperty);
+            AddMissingProperty(diagnostics, material, "texture-alpha-output", targets.TextureAlphaOutputWeightProperty);
+            AddMissingProperty(diagnostics, material, "culling", targets.CullProperty);
+            AddMissingProperty(diagnostics, material, "surface", targets.SurfaceProperty);
+            AddMissingProperty(diagnostics, material, "blend", targets.BlendProperty);
+            AddMissingProperty(diagnostics, material, "source-blend", targets.SourceBlendProperty);
+            AddMissingProperty(diagnostics, material, "destination-blend", targets.DestinationBlendProperty);
+            AddMissingProperty(diagnostics, material, "z-write", targets.ZWriteProperty);
+            AddMissingProperty(diagnostics, material, "outline-color", targets.OutlineColorProperty);
+            AddMissingProperty(diagnostics, material, "outline-width", targets.OutlineWidthProperty);
+            AddMissingProperty(diagnostics, material, "outline-visible", targets.OutlineVisibleProperty);
+            AddMissingProperty(diagnostics, material, "outline-screen-space", targets.OutlineScreenSpaceWeightProperty);
+            AddMissingProperty(diagnostics, material, "outline-z-test", targets.OutlineZTestProperty);
+            return diagnostics.ToArray();
+        }
+
+        private static void AddMissingProperty(
+            List<MmdUnityMaterialMissingPropertyDiagnostic> diagnostics,
+            Material material,
+            string feature,
+            string property)
+        {
+            if (string.IsNullOrEmpty(property) || material.HasProperty(property))
+            {
+                return;
+            }
+
+            diagnostics.Add(new MmdUnityMaterialMissingPropertyDiagnostic
+            {
+                feature = feature,
+                property = property,
+                reason = "declared-property-not-found"
+            });
         }
 
         private static string ResolveTransparencyMode(Material? material, MmdMaterialDescriptor materialDescriptor)
@@ -441,6 +504,14 @@ namespace Mmd.UnityIntegration
     }
 
     [System.Serializable]
+    public sealed class MmdUnityMaterialMissingPropertyDiagnostic
+    {
+        public string feature = string.Empty;
+        public string property = string.Empty;
+        public string reason = string.Empty;
+    }
+
+    [System.Serializable]
     public sealed class MmdUnityMaterialBindingDiagnostic
     {
         public int materialIndex;
@@ -484,6 +555,9 @@ namespace Mmd.UnityIntegration
         public string toonTexture = string.Empty;
         public string sphereTextureModeHint = string.Empty;
         public string toonTextureSourceHint = string.Empty;
+        public string[] unsupportedFeatures = Array.Empty<string>();
+        public MmdUnityMaterialMissingPropertyDiagnostic[] missingProperties =
+            Array.Empty<MmdUnityMaterialMissingPropertyDiagnostic>();
     }
 
     internal static class MmdMeshIndexCountExtensions

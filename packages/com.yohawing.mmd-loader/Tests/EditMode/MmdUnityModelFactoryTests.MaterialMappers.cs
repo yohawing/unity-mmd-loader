@@ -1,6 +1,7 @@
 #nullable enable
 
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
 using Mmd.Parser;
@@ -224,6 +225,46 @@ namespace Mmd.Tests
             Assert.That(material.GetFloat("_OutlineWidth"), Is.EqualTo(1.0f).Within(0.00001f));
             Assert.That(material.GetFloat("_OutlineZWrite"), Is.EqualTo(2.0f).Within(0.00001f));
             Assert.That(material.renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Geometry));
+        }
+
+        [Test]
+        public void MaterialMapperBindingDiagnosticsReportUnsupportedFeaturesAndMissingProperties()
+        {
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.materials[0].alpha = 0.5f;
+            model.materials[0].cullingPolicy = "double-sided";
+            model.materials[0].drawEdgeFlag = true;
+            model.materials[0].edgeSize = 1.0f;
+            var renderingTargets = new MmdMaterialRenderingTargets(
+                baseColorProperty: "_MissingBaseColor",
+                alphaProperty: "_MissingAlpha",
+                cullProperty: "_MissingCull",
+                outlineColorProperty: "_MissingOutlineColor",
+                unsupportedFeatures: new[] { "sphere-texture", "toon-texture" });
+            var materialMappers = new MmdMaterialMapperSet(
+                (source, defaultShader) => new Material(defaultShader),
+                MmdMaterialTextureTargets.BuiltIn,
+                renderingTargets);
+
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(
+                model,
+                sourcePath: null,
+                importScale: 1.0f,
+                preset: MmdMaterialPreset.MmdToon,
+                materialOverride: null,
+                materialMappers: materialMappers));
+            MmdUnityMaterialBindingDiagnostic diagnostic = scope.Instance.MaterialBindingDiagnostics[0];
+
+            Assert.That(diagnostic.unsupportedFeatures,
+                Is.EqualTo(new[] { "sphere-texture", "toon-texture" }));
+            Assert.That(diagnostic.missingProperties.Any(item =>
+                item.feature == "base-color" && item.property == "_MissingBaseColor"), Is.True);
+            Assert.That(diagnostic.missingProperties.Any(item =>
+                item.feature == "alpha" && item.property == "_MissingAlpha"), Is.True);
+            Assert.That(diagnostic.missingProperties.Any(item =>
+                item.feature == "culling" && item.property == "_MissingCull"), Is.True);
+            Assert.That(diagnostic.missingProperties.Any(item =>
+                item.feature == "outline-color" && item.property == "_MissingOutlineColor"), Is.True);
         }
     }
 }
