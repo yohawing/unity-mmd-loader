@@ -106,6 +106,7 @@ namespace Mmd.UnityIntegration
                     {
                         ApplyUrpLitDefaults(new[] { material });
                     }
+                    ApplyMapperShaderState(material, mapper.RenderingTargets);
                 }
 
                 BindDiffuseTextures(descriptor, materials, textureTargets, textureResolution);

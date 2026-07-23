@@ -8,6 +8,21 @@ namespace Mmd.UnityIntegration
 {
     internal static partial class MmdUnityMaterialBuilder
     {
+        private static void ApplyMapperShaderState(
+            Material material,
+            MmdMaterialRenderingTargets targets)
+        {
+            foreach (string keyword in targets.RequiredKeywords)
+            {
+                material.EnableKeyword(keyword);
+            }
+
+            foreach (string passName in targets.RequiredPasses)
+            {
+                material.SetShaderPassEnabled(passName, true);
+            }
+        }
+
         private static void ApplyUrpLitDefaults(Material[] materials)
         {
             foreach (Material material in materials)

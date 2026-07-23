@@ -29,7 +29,10 @@ namespace Mmd.Tests
                     baseColorProperty = "_BaseColor",
                     alphaClipThresholdProperty = "_Cutoff",
                     outlineColorProperty = string.Empty,
-                    unsupportedFeatures = new[] { "sphere-texture", "toon-texture", "outline" }
+                    unsupportedFeatures = new[] { "sphere-texture", "toon-texture", "outline" },
+                    requiredKeywords = new[] { "_PROFILE_KEYWORD" },
+                    requiredPasses = new[] { "ForwardLit" },
+                    supportsMaterialMorphs = false
                 };
 
                 Assert.That(profile.TryCreateMapperSet(out MmdMaterialMapperSet? mapperSet, out string reason), Is.True,
@@ -38,7 +41,12 @@ namespace Mmd.Tests
                 Assert.That(mapperSet!.DefaultTextureTargets.SphereTextureProperty, Is.Empty);
                 Assert.That(mapperSet.DefaultRenderingTargets.AlphaClipThresholdProperty, Is.EqualTo("_Cutoff"));
                 Assert.That(mapperSet.DefaultRenderingTargets.UnsupportedFeatures,
-                    Is.EqualTo(new[] { "sphere-texture", "toon-texture", "outline" }));
+                    Is.EqualTo(new[] { "sphere-texture", "toon-texture", "outline", "material-morph" }));
+                Assert.That(mapperSet.DefaultRenderingTargets.RequiredKeywords,
+                    Is.EqualTo(new[] { "_PROFILE_KEYWORD" }));
+                Assert.That(mapperSet.DefaultRenderingTargets.RequiredPasses,
+                    Is.EqualTo(new[] { "ForwardLit" }));
+                Assert.That(mapperSet.DefaultRenderingTargets.SupportsMaterialMorphs, Is.False);
 
                 Material material = mapperSet.DefaultMapper(
                     new MmdMaterialDescriptor(),

@@ -52,6 +52,9 @@ namespace Mmd
         public bool supportsRenderQueue = true;
         public string[] unsupportedFeatures = Array.Empty<string>();
         public bool validatePropertyPresence = true;
+        public string[] requiredKeywords = Array.Empty<string>();
+        public string[] requiredPasses = Array.Empty<string>();
+        public bool supportsMaterialMorphs = true;
 
         internal MmdMaterialRenderingTargets ToRuntimeTargets()
         {
@@ -76,7 +79,10 @@ namespace Mmd
                 outlineZTestProperty,
                 supportsRenderQueue,
                 unsupportedFeatures,
-                validatePropertyPresence);
+                validatePropertyPresence,
+                requiredKeywords,
+                requiredPasses,
+                supportsMaterialMorphs);
         }
     }
 

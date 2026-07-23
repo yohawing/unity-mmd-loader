@@ -240,7 +240,8 @@ namespace Mmd.Tests
                 outlineVisibleProperty = string.Empty,
                 outlineScreenSpaceWeightProperty = string.Empty,
                 outlineZTestProperty = string.Empty,
-                unsupportedFeatures = new[] { "sphere-texture", "toon-texture", "outline" }
+                unsupportedFeatures = new[] { "sphere-texture", "toon-texture", "outline" },
+                requiredKeywords = new[] { "_SURFACE_TYPE_TRANSPARENT" }
             };
             AssetDatabase.Refresh();
             AssetDatabase.CreateAsset(profile, TempMaterialProfilePath);
@@ -261,6 +262,7 @@ namespace Mmd.Tests
             Assert.That(pmxAsset.ImportedMaterials[0].shader, Is.Not.Null);
             Assert.That(pmxAsset.ImportedMaterials[0].shader.name,
                 Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName));
+            Assert.That(pmxAsset.ImportedMaterials[0].IsKeywordEnabled("_SURFACE_TYPE_TRANSPARENT"), Is.True);
         }
         [Test]
         public void PmxImporterMmdUrpToonReimportPreservesBoundDiffuseTexture()

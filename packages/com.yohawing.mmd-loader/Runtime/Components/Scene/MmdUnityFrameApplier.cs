@@ -381,6 +381,10 @@ namespace Mmd.UnityIntegration
                 MmdMaterialRenderingTargets targets = i < instance.MaterialRenderingTargets.Length
                     ? instance.MaterialRenderingTargets[i]
                     : MmdMaterialRenderingTargets.BuiltIn;
+                if (!targets.SupportsMaterialMorphs)
+                {
+                    continue;
+                }
 
                 // Diffuse color with alpha.
                 Color diffuse = ToUnityColor(modified.diffuseColor, modified.alpha, Color.white);

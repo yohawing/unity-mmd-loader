@@ -429,6 +429,41 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void ApplyFrameWithUnsupportedMaterialMorphTargetsLeavesMaterialUntouched()
+        {
+            MmdModelDefinition model = CreateMaterialMorphTriangleModel();
+            var renderingTargets = new MmdMaterialRenderingTargets(
+                supportsMaterialMorphs: false,
+                unsupportedFeatures: new[] { "material-morph" });
+            var materialMappers = new MmdMaterialMapperSet(
+                (source, defaultShader) => new Material(defaultShader),
+                MmdMaterialTextureTargets.BuiltIn,
+                renderingTargets);
+
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(
+                model,
+                sourcePath: null,
+                importScale: 1.0f,
+                MmdMaterialPreset.MmdToon,
+                materialOverride: null,
+                materialMappers));
+            MmdUnityModelInstance instance = scope.Instance;
+            Color baseColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "color-change", weight = 1.0f });
+
+            MmdUnityFrameApplier.ApplyFrame(instance, frame);
+
+            Color unchangedColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
+            Assert.That(instance.MaterialBindingDiagnostics[0].unsupportedFeatures,
+                Does.Contain("material-morph"));
+            Assert.That(unchangedColor.r, Is.EqualTo(baseColor.r).Within(0.00001f));
+            Assert.That(unchangedColor.g, Is.EqualTo(baseColor.g).Within(0.00001f));
+            Assert.That(unchangedColor.b, Is.EqualTo(baseColor.b).Within(0.00001f));
+            Assert.That(unchangedColor.a, Is.EqualTo(baseColor.a).Within(0.00001f));
+        }
+
+        [Test]
         public void ApplyMaterialMorphTwiceDoesNotAccumulate()
         {
 

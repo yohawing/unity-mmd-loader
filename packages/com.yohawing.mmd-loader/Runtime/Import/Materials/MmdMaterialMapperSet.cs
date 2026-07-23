@@ -104,6 +104,8 @@ namespace Mmd.UnityIntegration
             unsupportedFeatures: new[] { "ambient-color", "sphere-texture", "toon-texture", "outline" });
 
         private readonly IReadOnlyList<string> _unsupportedFeatures;
+        private readonly IReadOnlyList<string> _requiredKeywords;
+        private readonly IReadOnlyList<string> _requiredPasses;
 
         public string BaseColorProperty { get; }
 
@@ -157,6 +159,12 @@ namespace Mmd.UnityIntegration
         /// </summary>
         public bool ValidatePropertyPresence { get; }
 
+        public IReadOnlyList<string> RequiredKeywords => _requiredKeywords;
+
+        public IReadOnlyList<string> RequiredPasses => _requiredPasses;
+
+        public bool SupportsMaterialMorphs { get; }
+
         public MmdMaterialRenderingTargets(
             string? baseColorProperty = "_BaseColor",
             string? colorProperty = "_Color",
@@ -178,7 +186,10 @@ namespace Mmd.UnityIntegration
             string? outlineZTestProperty = "_OutlineZTest",
             bool supportsRenderQueue = true,
             IEnumerable<string>? unsupportedFeatures = null,
-            bool validatePropertyPresence = true)
+            bool validatePropertyPresence = true,
+            IEnumerable<string>? requiredKeywords = null,
+            IEnumerable<string>? requiredPasses = null,
+            bool supportsMaterialMorphs = true)
         {
             BaseColorProperty = NormalizeOptionalProperty(baseColorProperty);
             ColorProperty = NormalizeOptionalProperty(colorProperty);
@@ -199,13 +210,28 @@ namespace Mmd.UnityIntegration
             OutlineScreenSpaceWeightProperty = NormalizeOptionalProperty(outlineScreenSpaceWeightProperty);
             OutlineZTestProperty = NormalizeOptionalProperty(outlineZTestProperty);
             SupportsRenderQueue = supportsRenderQueue;
-            _unsupportedFeatures = Array.AsReadOnly(
-                (unsupportedFeatures ?? Array.Empty<string>())
-                    .Where(feature => !string.IsNullOrWhiteSpace(feature))
-                    .Select(feature => feature.Trim())
+            var normalizedUnsupportedFeatures = new List<string>(NormalizeFeatureList(unsupportedFeatures));
+            if (!supportsMaterialMorphs &&
+                !normalizedUnsupportedFeatures.Contains("material-morph", StringComparer.Ordinal))
+            {
+                normalizedUnsupportedFeatures.Add("material-morph");
+            }
+
+            _unsupportedFeatures = Array.AsReadOnly(normalizedUnsupportedFeatures.ToArray());
+            _requiredKeywords = NormalizeFeatureList(requiredKeywords);
+            _requiredPasses = NormalizeFeatureList(requiredPasses);
+            ValidatePropertyPresence = validatePropertyPresence;
+            SupportsMaterialMorphs = supportsMaterialMorphs;
+        }
+
+        private static IReadOnlyList<string> NormalizeFeatureList(IEnumerable<string>? values)
+        {
+            return Array.AsReadOnly(
+                (values ?? Array.Empty<string>())
+                    .Where(value => !string.IsNullOrWhiteSpace(value))
+                    .Select(value => value.Trim())
                     .Distinct(StringComparer.Ordinal)
                     .ToArray());
-            ValidatePropertyPresence = validatePropertyPresence;
         }
 
         private static string NormalizeOptionalProperty(string? value)
