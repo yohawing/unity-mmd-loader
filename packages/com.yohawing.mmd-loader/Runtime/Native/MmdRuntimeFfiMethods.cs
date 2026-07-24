@@ -8,7 +8,7 @@ namespace Mmd.Native
     internal static class MmdRuntimeFfiMethods
     {
         internal const string LibraryName = "mmd_runtime_ffi";
-        internal const uint ExpectedAbiVersion = 2;
+        internal const uint ExpectedAbiVersion = 3;
         internal const uint FeatureSplitPhysicsEvaluation = 1u << 0;
         internal const uint FeaturePhysicsBulletNative = 1u << 1;
         internal const uint FeatureReducedPoseGenericCurves = 1u << 4;
