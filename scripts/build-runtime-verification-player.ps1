@@ -10,6 +10,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "unity-process-environment.ps1")
+Initialize-UnityProcessEnvironment
+
 function Resolve-AbsolutePath {
     param([Parameter(Mandatory = $true)][string] $Path)
 

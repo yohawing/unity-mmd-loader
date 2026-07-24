@@ -8,6 +8,8 @@ param(
 $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "unity-project-guard.ps1")
+. (Join-Path $PSScriptRoot "unity-process-environment.ps1")
+Initialize-UnityProcessEnvironment
 
 function Resolve-OutputPath {
     param([Parameter(Mandatory = $true)][string] $Path)

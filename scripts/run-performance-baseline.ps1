@@ -15,6 +15,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+. (Join-Path $PSScriptRoot 'unity-process-environment.ps1')
+Initialize-UnityProcessEnvironment
+
 function Write-SkipReport {
     param([string]$Reason)
 

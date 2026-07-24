@@ -2,7 +2,9 @@
 unity-mmd/
 
 # Local development automation (not part of the distributed UPM package)
-scripts/
+scripts/*
+!scripts/unity-lts-compatibility-gate.ps1
+!scripts/unity-process-environment.ps1
 packages/com.yohawing.mmd-loader.devtools/
 
 # Tracked minimum visual shading tier. Keep the rest of DevTools local-only.
