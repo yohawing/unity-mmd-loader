@@ -189,28 +189,28 @@ namespace Mmd.Tests
                 typeof(IntPtr).MakeByRefType());
             AssertRuntimeFfiSignature("ReducedPoseFree", typeof(void), typeof(IntPtr));
             AssertRuntimeFfiSignature(
-                "ReducedPoseUnityCurveCount",
+                "ReducedPoseGenericCurveInfo",
                 typeof(int),
                 typeof(IntPtr),
-                typeof(float),
-                typeof(byte),
+                typeof(MmdRuntimeFfiMethods.GenericCurveInfo).MakeByRefType());
+            AssertRuntimeFfiSignature(
+                "ReducedPoseGenericCurveCount",
+                typeof(int),
+                typeof(IntPtr),
                 typeof(IntPtr).MakeByRefType());
             AssertRuntimeFfiSignature(
-                "ReducedPoseUnityCurveDescriptor",
+                "ReducedPoseGenericCurveDescriptor",
                 typeof(int),
                 typeof(IntPtr),
-                typeof(float),
-                typeof(byte),
                 typeof(IntPtr),
-                typeof(MmdRuntimeFfiMethods.UnityCurveDescriptor).MakeByRefType());
+                typeof(MmdRuntimeFfiMethods.GenericCurveDescriptor).MakeByRefType());
             AssertRuntimeFfiSignature(
-                "ReducedPoseUnityCurveKeys",
+                "ReducedPoseGenericCurveKeys",
                 typeof(int),
                 typeof(IntPtr),
-                typeof(float),
-                typeof(byte),
                 typeof(IntPtr),
-                typeof(MmdRuntimeFfiMethods.UnityCurveKey[]),
+                typeof(MmdRuntimeFfiMethods.GenericCurveKey[]),
+                typeof(IntPtr),
                 typeof(IntPtr),
                 typeof(IntPtr).MakeByRefType());
             Assert.That(
@@ -218,32 +218,42 @@ namespace Mmd.Tests
                     "ReducedPoseSample", BindingFlags.NonPublic | BindingFlags.Static),
                 Is.Null,
                 "the transitional dense reduced-pose sampler must not have a managed binding");
-            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.ReductionTolerances>(), Is.EqualTo(20));
-            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.UnityCurveKey>(), Is.EqualTo(16));
             Assert.That(
-                Marshal.SizeOf<MmdRuntimeFfiMethods.UnityCurveDescriptor>(),
-                Is.EqualTo(IntPtr.Size == 8 ? 24 : 16));
+                typeof(MmdRuntimeFfiMethods).GetMethod(
+                    "ReducedPoseUnityCurveCount", BindingFlags.NonPublic | BindingFlags.Static),
+                Is.Null,
+                "the deprecated Unity-specific curve ABI must not remain bound");
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.ReductionTolerances>(), Is.EqualTo(20));
+            Assert.That(
+                Marshal.SizeOf<MmdRuntimeFfiMethods.GenericCurveInfo>(),
+                Is.EqualTo(IntPtr.Size == 8 ? 72 : 64));
+            Assert.That(
+                Marshal.SizeOf<MmdRuntimeFfiMethods.GenericCurveDescriptor>(),
+                Is.EqualTo(IntPtr.Size == 8 ? 40 : 36));
+            Assert.That(
+                Marshal.SizeOf<MmdRuntimeFfiMethods.GenericCurveKey>(),
+                Is.EqualTo(IntPtr.Size == 8 ? 128 : 120));
             Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.ReductionTolerances>("localPosition").ToInt32(), Is.EqualTo(0));
             Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.ReductionTolerances>("localRotationRadians").ToInt32(), Is.EqualTo(4));
             Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.ReductionTolerances>("worldPosition").ToInt32(), Is.EqualTo(8));
             Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.ReductionTolerances>("worldRotationRadians").ToInt32(), Is.EqualTo(12));
             Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.ReductionTolerances>("morphWeight").ToInt32(), Is.EqualTo(16));
-            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.UnityCurveDescriptor>("semantic").ToInt32(), Is.EqualTo(0));
-            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.UnityCurveDescriptor>("targetIndex").ToInt32(), Is.EqualTo(4));
-            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.UnityCurveDescriptor>("axis").ToInt32(), Is.EqualTo(8));
-            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.UnityCurveDescriptor>("keyCount").ToInt32(), Is.EqualTo(IntPtr.Size == 8 ? 16 : 12));
-            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.UnityCurveKey>("timeSeconds").ToInt32(), Is.EqualTo(0));
-            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.UnityCurveKey>("value").ToInt32(), Is.EqualTo(4));
-            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.UnityCurveKey>("inTangent").ToInt32(), Is.EqualTo(8));
-            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.UnityCurveKey>("outTangent").ToInt32(), Is.EqualTo(12));
+            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.GenericCurveInfo>("modelIdentity").ToInt32(), Is.EqualTo(32));
+            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.GenericCurveInfo>("frameCount").ToInt32(), Is.EqualTo(48));
+            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.GenericCurveDescriptor>("targetIndex").ToInt32(), Is.EqualTo(12));
+            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.GenericCurveDescriptor>("keyCount").ToInt32(), Is.EqualTo(32));
+            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.GenericCurveKey>("frame").ToInt32(), Is.EqualTo(IntPtr.Size));
+            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.GenericCurveKey>("rotationX").ToInt32(), Is.EqualTo(IntPtr.Size == 8 ? 24 : 20));
+            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.GenericCurveKey>("segmentCurrentInScalar").ToInt32(), Is.EqualTo(IntPtr.Size == 8 ? 120 : 116));
 
             foreach (string methodName in new[]
                      {
                          "ReducedPoseCreateFromDense",
                          "ReducedPoseFree",
-                         "ReducedPoseUnityCurveCount",
-                         "ReducedPoseUnityCurveDescriptor",
-                         "ReducedPoseUnityCurveKeys"
+                         "ReducedPoseGenericCurveInfo",
+                         "ReducedPoseGenericCurveCount",
+                         "ReducedPoseGenericCurveDescriptor",
+                         "ReducedPoseGenericCurveKeys"
                      })
             {
                 DllImportAttribute import = GetRuntimeFfiMethod(methodName).GetCustomAttribute<DllImportAttribute>()!;
@@ -256,9 +266,9 @@ namespace Mmd.Tests
         [Test]
         public void ReducedPoseZeroKeyBufferUsesSharedEmptyArray()
         {
-            MmdRuntimeFfiMethods.UnityCurveKey[] keys =
-                MmdRuntimeReducedPose.AllocateUnityCurveKeyBuffer(IntPtr.Zero);
-            Assert.That(keys, Is.SameAs(Array.Empty<MmdRuntimeFfiMethods.UnityCurveKey>()));
+            MmdRuntimeFfiMethods.GenericCurveKey[] keys =
+                MmdRuntimeReducedPose.AllocateGenericCurveKeyBuffer(IntPtr.Zero);
+            Assert.That(keys, Is.SameAs(Array.Empty<MmdRuntimeFfiMethods.GenericCurveKey>()));
         }
 
         [Test]
@@ -360,21 +370,24 @@ namespace Mmd.Tests
 
             try
             {
-                int curveCount = reducedPose.GetUnityCurveCount(30.0f, true);
-                Assert.That(curveCount, Is.EqualTo(6), "one bone exposes translation XYZ and Euler XYZ");
-                for (int curveIndex = 0; curveIndex < curveCount; curveIndex++)
+                MmdRuntimeFfiMethods.GenericCurveInfo info = reducedPose.GetGenericCurveInfo();
+                Assert.That(info.abiVersion, Is.EqualTo(MmdRuntimeFfiMethods.GenericCurveAbiVersionV1));
+                Assert.That(info.boneCount.ToInt64(), Is.EqualTo(1));
+                int trackCount = reducedPose.GetGenericCurveCount();
+                Assert.That(trackCount, Is.EqualTo(1), "one bone exposes one generic transform track");
+                for (int trackIndex = 0; trackIndex < trackCount; trackIndex++)
                 {
-                    MmdRuntimeFfiMethods.UnityCurveDescriptor descriptor =
-                        reducedPose.GetUnityCurveDescriptor(30.0f, true, curveIndex);
-                    MmdRuntimeFfiMethods.UnityCurveKey[] keys =
-                        reducedPose.GetUnityCurveKeys(30.0f, true, curveIndex);
+                    MmdRuntimeFfiMethods.GenericCurveDescriptor descriptor =
+                        reducedPose.GetGenericCurveDescriptor(trackIndex);
+                    MmdRuntimeFfiMethods.GenericCurveKey[] keys =
+                        reducedPose.GetGenericCurveKeys(trackIndex);
                     Assert.That(keys.Length, Is.EqualTo(descriptor.keyCount.ToInt64()));
                     Assert.That(keys, Is.Not.Empty);
                     Assert.That(keys.All(key =>
-                        float.IsFinite(key.timeSeconds) &&
-                        float.IsFinite(key.value) &&
-                        float.IsFinite(key.inTangent) &&
-                        float.IsFinite(key.outTangent)), Is.True);
+                        float.IsFinite(key.frame) &&
+                        float.IsFinite(key.translationX) &&
+                        float.IsFinite(key.rotationW) &&
+                        float.IsFinite(key.segmentCurrentInRotationZ)), Is.True);
                 }
             }
             finally
