@@ -193,14 +193,14 @@ namespace Mmd.Tests
                 typeof(int),
                 typeof(IntPtr),
                 typeof(float),
-                typeof(bool),
+                typeof(byte),
                 typeof(IntPtr).MakeByRefType());
             AssertRuntimeFfiSignature(
                 "ReducedPoseUnityCurveDescriptor",
                 typeof(int),
                 typeof(IntPtr),
                 typeof(float),
-                typeof(bool),
+                typeof(byte),
                 typeof(IntPtr),
                 typeof(MmdRuntimeFfiMethods.UnityCurveDescriptor).MakeByRefType());
             AssertRuntimeFfiSignature(
@@ -208,7 +208,7 @@ namespace Mmd.Tests
                 typeof(int),
                 typeof(IntPtr),
                 typeof(float),
-                typeof(bool),
+                typeof(byte),
                 typeof(IntPtr),
                 typeof(MmdRuntimeFfiMethods.UnityCurveKey[]),
                 typeof(IntPtr),
@@ -251,18 +251,6 @@ namespace Mmd.Tests
                 Assert.That(import.CallingConvention, Is.EqualTo(CallingConvention.Cdecl), methodName);
             }
 
-            foreach (string methodName in new[]
-                     {
-                         "ReducedPoseUnityCurveCount",
-                         "ReducedPoseUnityCurveDescriptor",
-                         "ReducedPoseUnityCurveKeys"
-                     })
-            {
-                ParameterInfo flipZ = GetRuntimeFfiMethod(methodName).GetParameters()[2];
-                MarshalAsAttribute marshalAs = flipZ.GetCustomAttribute<MarshalAsAttribute>()!;
-                Assert.That(marshalAs, Is.Not.Null, methodName + " flipZ");
-                Assert.That(marshalAs.Value, Is.EqualTo(UnmanagedType.I1), methodName + " flipZ");
-            }
         }
 
         [Test]

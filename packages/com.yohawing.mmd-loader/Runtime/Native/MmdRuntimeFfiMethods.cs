@@ -266,14 +266,14 @@ namespace Mmd.Native
         internal static extern int ReducedPoseUnityCurveCount(
             IntPtr reducedPose,
             float framesPerSecond,
-            [MarshalAs(UnmanagedType.I1)] bool flipZ,
+            byte flipZ,
             out IntPtr curveCount);
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_reduced_pose_unity_curve_descriptor", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int ReducedPoseUnityCurveDescriptor(
             IntPtr reducedPose,
             float framesPerSecond,
-            [MarshalAs(UnmanagedType.I1)] bool flipZ,
+            byte flipZ,
             IntPtr curveIndex,
             out UnityCurveDescriptor descriptor);
 
@@ -281,7 +281,7 @@ namespace Mmd.Native
         internal static extern int ReducedPoseUnityCurveKeys(
             IntPtr reducedPose,
             float framesPerSecond,
-            [MarshalAs(UnmanagedType.I1)] bool flipZ,
+            byte flipZ,
             IntPtr curveIndex,
             [Out] UnityCurveKey[]? keys,
             IntPtr keyCapacity,
@@ -585,7 +585,7 @@ namespace Mmd.Native
         {
             ThrowIfDisposed();
             int status = MmdRuntimeFfiMethods.ReducedPoseUnityCurveCount(
-                handle, framesPerSecond, flipZ, out IntPtr count);
+                handle, framesPerSecond, flipZ ? (byte)1 : (byte)0, out IntPtr count);
             ThrowForStatus(status, "curve count");
             return MmdFfiMarshal.CheckedIntPtrToInt(count, "reduced pose curve count");
         }
@@ -599,7 +599,7 @@ namespace Mmd.Native
             int status = MmdRuntimeFfiMethods.ReducedPoseUnityCurveDescriptor(
                 handle,
                 framesPerSecond,
-                flipZ,
+                flipZ ? (byte)1 : (byte)0,
                 new IntPtr(curveIndex),
                 out MmdRuntimeFfiMethods.UnityCurveDescriptor descriptor);
             ThrowForStatus(status, "curve descriptor");
@@ -615,7 +615,7 @@ namespace Mmd.Native
             int status = MmdRuntimeFfiMethods.ReducedPoseUnityCurveKeys(
                 handle,
                 framesPerSecond,
-                flipZ,
+                flipZ ? (byte)1 : (byte)0,
                 new IntPtr(curveIndex),
                 null,
                 IntPtr.Zero,
@@ -634,7 +634,7 @@ namespace Mmd.Native
             status = MmdRuntimeFfiMethods.ReducedPoseUnityCurveKeys(
                 handle,
                 framesPerSecond,
-                flipZ,
+                flipZ ? (byte)1 : (byte)0,
                 new IntPtr(curveIndex),
                 keys,
                 new IntPtr(keys.Length),
