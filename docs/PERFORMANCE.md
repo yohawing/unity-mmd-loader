@@ -1,6 +1,6 @@
 # Performance baseline (P0)
 
-`scripts/run-performance-baseline.ps1` は、tracked fixture を使った load / animation / playback の基準値を Unity batchmode から取得する唯一の P0 入口です。出力は caller が指定した JSON path（既定は `artifacts/performance/performance-baseline.json`）へ書き込まれます。
+`scripts/run-performance-baseline.ps1` は、tracked fixture と tracked 最小 consumer project `tools/performance-unity/` を使い、load / animation / playback の基準値を Unity batchmode から取得する唯一の P0 入口です。出力は caller が指定した JSON path（既定は `artifacts/performance/performance-baseline.json`）へ書き込まれます。
 
 ```powershell
 .\scripts\run-performance-baseline.ps1

@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "com.unity.render-pipelines.universal": "17.4.0",
+    "com.unity.timeline": "1.8.12",
+    "com.yohawing.mmd-loader": "file:../../../packages/com.yohawing.mmd-loader"
+  },
+  "testables": [
+    "com.yohawing.mmd-loader"
+  ]
+}

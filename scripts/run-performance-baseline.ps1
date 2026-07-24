@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$ProjectPath = (Join-Path $PSScriptRoot '..\unity-mmd'),
+    [string]$ProjectPath = (Join-Path $PSScriptRoot '..\tools\performance-unity'),
     [string]$OutputPath = (Join-Path $PSScriptRoot '..\artifacts\performance\performance-baseline.json'),
     [string]$PmxPath = (Join-Path $PSScriptRoot '..\packages\com.yohawing.mmd-loader\Tests\Fixtures\Assets\test_1bone_cube.pmx'),
     [string]$VmdPath = (Join-Path $PSScriptRoot '..\packages\com.yohawing.mmd-loader\Tests\Fixtures\Assets\test_1bone_cube_motion.vmd'),
@@ -50,6 +50,7 @@ $OutputPath = [IO.Path]::GetFullPath($OutputPath)
 $PmxPath = [IO.Path]::GetFullPath($PmxPath)
 $VmdPath = [IO.Path]::GetFullPath($VmdPath)
 $PhysicsPmxPath = [IO.Path]::GetFullPath($PhysicsPmxPath)
+$UnityLogPath = [IO.Path]::ChangeExtension($OutputPath, '.unity.log')
 
 $guardPath = Join-Path $PSScriptRoot 'unity-project-guard.ps1'
 if (-not (Test-Path -LiteralPath $guardPath -PathType Leaf)) {
@@ -96,6 +97,7 @@ $unityArguments = @(
     '-batchmode',
     '-quit',
     '-projectPath', $ProjectPath,
+    '-logFile', $UnityLogPath,
     '-executeMethod', 'Mmd.Editor.MmdPerformanceBaselineCli.RunFromCommandLine',
     '-repoRoot', $repoRoot,
     '-out', $OutputPath,
@@ -112,8 +114,15 @@ if (-not [string]::IsNullOrWhiteSpace($BaselinePath)) {
     $unityArguments += @('-baseline', $BaselinePath)
 }
 
-& $UnityPath @unityArguments
-$unityExitCode = $LASTEXITCODE
+Remove-Item -LiteralPath $OutputPath, $UnityLogPath -Force -ErrorAction SilentlyContinue
+
+$unityProcess = Start-Process `
+    -FilePath $UnityPath `
+    -ArgumentList $unityArguments `
+    -Wait `
+    -PassThru `
+    -WindowStyle Hidden
+$unityExitCode = $unityProcess.ExitCode
 
 if (-not (Test-Path -LiteralPath $OutputPath -PathType Leaf)) {
     Write-SkipReport "Unity did not produce a report (license or batchmode infrastructure unavailable; exit code $unityExitCode)."
