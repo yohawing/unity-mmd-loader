@@ -31,6 +31,8 @@ namespace Mmd.Editor
             {
                 var parser = new NativeMmdParser();
                 MmdModelDefinition physicsModel = parser.LoadModel(File.ReadAllBytes(physicsPath));
+                int removedPureWorldAnchors = physicsModel.physics.joints.RemoveAll(
+                    joint => joint.rigidbodyAIndex < 0 && joint.rigidbodyBIndex < 0);
                 MmdMotionDefinition motion = parser.LoadMotion(vmdBytes);
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
                     physicsModel,
@@ -50,7 +52,7 @@ namespace Mmd.Editor
                 for (int i = 0; i < options.measurementFrames; i++)
                 {
                     long start = Stopwatch.GetTimestamp();
-                    binding.ApplyFrame(i, options.frameRate);
+                    binding.ApplyFrame(options.warmupFrames + i, options.frameRate);
                     samples.Add(ElapsedMs(start));
                 }
                 report.phases.Add(MmdPerformanceBaseline.BuildPhase(
@@ -58,7 +60,8 @@ namespace Mmd.Editor
                     samples,
                     GC.GetAllocatedBytesForCurrentThread() - allocatedBefore,
                     options.measurementFrames,
-                    "Binding ApplyFrame combines live physics evaluate, sync, step, and pose application."));
+                    "Binding ApplyFrame combines live physics evaluate, sync, step, and pose application; " +
+                    removedPureWorldAnchors + " unsupported pure world-anchor joints were excluded."));
             }
             catch (Exception exception)
             {
@@ -172,7 +175,7 @@ namespace Mmd.Editor
         {
             using FileStream stream = File.OpenRead(path);
             using SHA256 sha = SHA256.Create();
-            return Convert.ToHexString(sha.ComputeHash(stream)).ToLowerInvariant();
+            return BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", string.Empty).ToLowerInvariant();
         }
 
         private static bool IsNativeCapabilityUnavailable(Exception exception)
@@ -192,7 +195,7 @@ namespace Mmd.Editor
             if (!string.IsNullOrWhiteSpace(directory))
                 Directory.CreateDirectory(directory);
             File.WriteAllText(fullPath, JsonUtility.ToJson(report, true));
-            Debug.Log("MMD performance baseline report: " + fullPath + " (" + report.status + ")");
+            UnityEngine.Debug.Log("MMD performance baseline report: " + fullPath + " (" + report.status + ")");
         }
 
         private static string DefaultOutputPath() => Path.Combine(DiscoverRepoRoot(), "artifacts", "performance", "performance-baseline.json");

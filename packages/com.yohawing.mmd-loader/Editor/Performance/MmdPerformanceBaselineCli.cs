@@ -118,8 +118,9 @@ namespace Mmd.Editor
             {
                 applyInstance = MmdUnityModelFactory.CreateSkinnedModel(model, pmxPath);
                 var session = new MmdRuntimeSession(model, motion, pmxPath, vmdPath);
-                var frames = new List<MmdEvaluatedFrame>(options.measurementFrames);
-                for (int i = 0; i < options.measurementFrames; i++)
+                int totalFrames = options.warmupFrames + options.measurementFrames;
+                var frames = new List<MmdEvaluatedFrame>(totalFrames);
+                for (int i = 0; i < totalFrames; i++)
                     frames.Add(session.EvaluateFrame(i, MmdPlaybackTime.ToTime(i, options.frameRate)));
                 for (int i = 0; i < options.warmupFrames; i++)
                     MmdUnityFrameApplier.ApplyFrame(applyInstance, frames[i % frames.Count]);
@@ -131,7 +132,7 @@ namespace Mmd.Editor
                 for (int i = 0; i < options.measurementFrames; i++)
                 {
                     long start = Stopwatch.GetTimestamp();
-                    MmdUnityFrameApplier.ApplyFrame(applyInstance, frames[i]);
+                    MmdUnityFrameApplier.ApplyFrame(applyInstance, frames[options.warmupFrames + i]);
                     samples.Add(ElapsedMs(start));
                 }
                 report.phases.Add(MmdPerformanceBaseline.BuildPhase(
@@ -204,11 +205,12 @@ namespace Mmd.Editor
             ulong checksum = MmdPerformanceBaseline.ChecksumSeed;
             for (int i = 0; i < options.measurementFrames; i++)
             {
+                int frame = options.warmupFrames + i;
                 long start = Stopwatch.GetTimestamp();
-                session.EvaluateAndCopy(i, worldMatrices, morphWeights, ikEnabled);
+                session.EvaluateAndCopy(frame, worldMatrices, morphWeights, ikEnabled);
                 double elapsed = ElapsedMs(start);
                 samples.Add(elapsed);
-                MmdPerformanceBaseline.MixChecksum(ref checksum, i, worldMatrices, morphWeights, ikEnabled);
+                MmdPerformanceBaseline.MixChecksum(ref checksum, frame, worldMatrices, morphWeights, ikEnabled);
             }
 
             report.deterministicResultChecksum = MmdPerformanceBaseline.FinishChecksum(checksum);

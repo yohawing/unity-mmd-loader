@@ -21,6 +21,8 @@
 
 phase は `pmx-load`、`pmx-parse`、`vmd-load-parse`、`unity-asset-build`、`native-evaluate-copy`、`unity-pose-morph-apply`、`live-physics-total` を持ちます。Live Physics の evaluate / sync / step / apply は現在の production binding が一つの `ApplyFrame` にまとめているため、`live-physics-evaluate`、`live-physics-sync`、`live-physics-step`、`live-physics-apply` を `UNAVAILABLE` とし、推測値を記録しません。
 
+`test_hair_physics.pmx` に含まれる両 endpoint が `-1` の pure world-anchor joint は current production validator が非対応として拒否するため、既存 Live Physics regression test と同じく benchmark 用の in-memory model から除外します。fixture file と SHA-256 は変更しません。
+
 `native-evaluate-copy` は内部 `MmdRuntimeFfiPlaybackSession` を一度生成し、world matrix / morph / IK の caller-owned buffer を再利用します。計測中の timer は `Stopwatch.GetTimestamp()` だけを使うため、benchmark 自身の Stopwatch オブジェクト生成を GC bytes/frame に混ぜません。
 
 `PASS` phase の分位点は、昇順サンプル列に対する線形補間です。`UNAVAILABLE` は独立計測不能、`SKIP` は fixture・license・native backend などの実行条件不足を表します。`SKIP` を `PASS` として扱うことは禁止です。
