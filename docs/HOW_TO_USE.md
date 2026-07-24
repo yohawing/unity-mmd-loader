@@ -23,7 +23,7 @@ Open **Window > Package Manager** in Unity, and enter the following into **Add p
 https://github.com/yohawing/unity-mmd-loader.git?path=packages/com.yohawing.mmd-loader
 ```
 
-The release target is Unity 6000.4 with URP 17 on Windows x86_64.
+The release target is Unity 6000.0 LTS or newer with URP 17 on Windows x86_64.
 
 ## Import a PMX
 

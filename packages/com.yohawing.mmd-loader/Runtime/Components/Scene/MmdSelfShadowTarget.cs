@@ -179,7 +179,7 @@ namespace Mmd.UnityIntegration
             if (!Application.isPlaying && ActiveTargets.Count == 0)
             {
                 MmdSelfShadowTarget[] sceneTargets =
-                    Object.FindObjectsByType<MmdSelfShadowTarget>(FindObjectsInactive.Exclude);
+                    Object.FindObjectsByType<MmdSelfShadowTarget>(FindObjectsSortMode.None);
                 for (int i = 0; i < sceneTargets.Length; i++)
                 {
                     if (!ActiveTargets.Contains(sceneTargets[i]))
@@ -413,7 +413,7 @@ namespace Mmd.UnityIntegration
             MmdSceneEnvironmentBinding? fallbackEnvironment = null;
             bool hasAmbiguousFallback = false;
             MmdSceneEnvironmentBinding[] environments =
-                Object.FindObjectsByType<MmdSceneEnvironmentBinding>(FindObjectsInactive.Exclude);
+                Object.FindObjectsByType<MmdSceneEnvironmentBinding>(FindObjectsSortMode.None);
             for (int i = 0; i < environments.Length; i++)
             {
                 MmdSceneEnvironmentBinding environment = environments[i];

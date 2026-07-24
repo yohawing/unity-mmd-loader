@@ -19,8 +19,17 @@ namespace Mmd.Tests
         internal static string RepositoryRoot =>
             Path.GetFullPath(Path.Combine(ProjectRoot, ".."));
 
-        internal static string PackageRoot =>
-            Path.Combine(RepositoryRoot, "packages", "com.yohawing.mmd-loader");
+        internal static string PackageRoot
+        {
+            get
+            {
+                UnityEditor.PackageManager.PackageInfo? package =
+                    UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(MmdTestFixtures).Assembly);
+                return package != null && !string.IsNullOrWhiteSpace(package.resolvedPath)
+                    ? Path.GetFullPath(package.resolvedPath)
+                    : Path.Combine(RepositoryRoot, "packages", "com.yohawing.mmd-loader");
+            }
+        }
 
         internal static string FixturesRoot =>
             Path.Combine(PackageRoot, "Tests", "Fixtures");

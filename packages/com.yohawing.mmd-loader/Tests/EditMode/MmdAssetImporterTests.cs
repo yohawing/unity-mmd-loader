@@ -249,8 +249,6 @@ namespace Mmd.Tests
 
         private static string ProjectRoot => Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
 
-        private static string RepositoryRoot => Path.GetFullPath(Path.Combine(ProjectRoot, ".."));
-
         private static int CountMaterials(MmdModelDefinition model, Func<MmdMaterialDefinition, bool> predicate)
         {
             int count = 0;

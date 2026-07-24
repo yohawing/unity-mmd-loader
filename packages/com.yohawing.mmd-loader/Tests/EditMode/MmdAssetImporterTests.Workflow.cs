@@ -80,7 +80,7 @@ namespace Mmd.Tests
                 MmdPmxAsset sceneReloadedPmx = nullableSceneReloadedPmx!;
 
                 MmdUnityPlaybackController[] sceneControllers =
-                    Object.FindObjectsByType<MmdUnityPlaybackController>();
+                    Object.FindObjectsByType<MmdUnityPlaybackController>(FindObjectsSortMode.None);
                 Assert.That(sceneControllers, Has.Length.EqualTo(1));
                 Assert.That(sceneControllers[0].ModelAssetSource, Is.Not.Null,
                     "scene controller ModelAssetSource must not become Missing after PMX SaveAndReimport");

@@ -904,7 +904,10 @@ namespace Mmd
 
             // rootMotionBoneName: Hips if available, otherwise root name.
             bool hasHips = proxyRig.BoneMap.ContainsKey(HumanBodyBones.Hips);
-            humanDescription.rootMotionBoneName = hasHips ? "Hips" : root.name;
+            string rootMotionBoneName = hasHips ? "Hips" : root.name;
+#if UNITY_6000_1_OR_NEWER
+            humanDescription.rootMotionBoneName = rootMotionBoneName;
+#endif
 
             MmdHumanoidRetargetQualitySettings settings =
                 retargetQualitySettings ?? MmdHumanoidRetargetQualitySettings.Default;
@@ -912,7 +915,7 @@ namespace Mmd
 
             diagnostics.Add("avatar-build: skeleton bones=" + skeletonList.Count +
                             " human bones=" + humanBoneList.Count +
-                            " rootMotion=" + humanDescription.rootMotionBoneName);
+                            " rootMotion=" + rootMotionBoneName);
 
             // Call AvatarBuilder.
             Avatar? avatar = null;

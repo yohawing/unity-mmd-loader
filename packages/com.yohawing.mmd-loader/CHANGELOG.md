@@ -20,6 +20,7 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 
 ### Changed
 
+- Lowered the minimum supported Unity version to Unity 6000.0 LTS while retaining compatibility with current Unity 6000.4 editors.
 - Humanoid AnimationClip bake now uses only the Avatar and retarget mapping persisted by PMX Humanoid import; the duplicate setup-asset workflow and creation UI have been removed. The obsolete `MmdHumanoidSetupAsset` type, preset enum, serialized field layout, original MonoScript GUID, and builder signatures remain as read-only/source-compatible bridges for existing assets and integrations. The builder no longer creates assets and instead directs callers to reimport with `Animation Type = Humanoid`.
 - Live physics now uses the bundled `mmd-anim` Bullet runtime, with the package native runtime aligned to `mmd-anim` `v0.3.0` / remote `main` commit `c3a35e0`.
 - PMX and VMD inspectors now expose a smaller, asset-focused action surface, and no-op importer settings and duplicate scene-action buttons have been removed.
@@ -27,6 +28,7 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 
 ### Fixed
 
+- Unity launch scripts now restore missing Windows common-application-data environment values before starting UPM, avoiding misleading local-package `path ... undefined` failures.
 - Generic and Humanoid AnimationClip writers reject oversized dense bake ranges before allocating unbounded managed key buffers, and failed Humanoid writes now release unreturned clips.
 - Generic sparse AnimationClip bake now preserves Unity coordinate conversion and accepts Euler rotation curves in parity checks.
 - Humanoid AnimationClip bake now preserves frame-wise body pose and root-motion fidelity.
