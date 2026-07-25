@@ -23,113 +23,75 @@ namespace Mmd.Tests
     public sealed partial class MmdAssetImporterTests
     {
         [Test]
-        public void ImportedPmxAssetCarriesGameObjectHierarchySubAsset()
+        public void D1_LoadAssetAtPathPmxImportContract()
         {
             CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
 
-            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
-            Object[] allSubAssets = AssetDatabase.LoadAllAssetsAtPath(TempPmxPath);
+            GameObject? mainGameObject = AssetDatabase.LoadAssetAtPath<GameObject>(TempPmxPath);
+            Assert.That(mainGameObject, Is.Not.Null,
+                "LoadAssetAtPath<GameObject> must return the imported hierarchy root main object");
+            GameObject mainGo = mainGameObject!;
+            Assert.That(mainGo.transform.parent, Is.Null,
+                "main GameObject must be a root transform (no parent)");
 
-            // Count all GameObjects in sub-assets (root + Model + bones)
-            GameObject? hierarchyRoot = null;
+            MmdPmxAsset? pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+            Assert.That(pmxAsset, Is.Not.Null,
+                "Legacy LoadAssetAtPath<MmdPmxAsset> must still resolve the metadata sub-asset");
+            MmdPmxAsset loadedPmxAsset = pmxAsset!;
+            Assert.That(loadedPmxAsset.VertexCount, Is.GreaterThan(0),
+                "retrieved MmdPmxAsset must carry valid parse data");
+
+            Object[] allSubAssets = AssetDatabase.LoadAllAssetsAtPath(TempPmxPath);
+            Assert.That(allSubAssets, Is.Not.Null);
+            int pmxAssetCount = 0;
             int gameObjectCount = 0;
+            int meshCount = 0;
+            int materialCount = 0;
+            int textureCount = 0;
+            GameObject? hierarchyRoot = null;
             foreach (Object o in allSubAssets)
             {
-                if (o is GameObject go)
+                if (o is MmdPmxAsset) pmxAssetCount++;
+                else if (o is GameObject go)
                 {
                     gameObjectCount++;
-                    // The top-level root has no parent Transform
                     if (go.transform.parent == null)
                     {
                         hierarchyRoot = go;
                     }
                 }
-            }
-
-            Assert.That(gameObjectCount, Is.GreaterThanOrEqualTo(1),
-                "at least one GameObject hierarchy sub-asset under .pmx");
-            Assert.That(hierarchyRoot, Is.Not.Null,
-                "top-level root GameObject must exist among sub-assets");
-            Assert.That(pmxAsset.ImportedRoot, Is.Not.Null);
-            Assert.That(pmxAsset.ImportedRoot, Is.SameAs(hierarchyRoot),
-                "pmxAsset.ImportedRoot must reference the top-level hierarchy sub-asset from LoadAll");
-
-            // D1: LoadAssetAtPath<GameObject> returns the hierarchy root main object.
-            GameObject? mainGameObject = AssetDatabase.LoadAssetAtPath<GameObject>(TempPmxPath);
-            Assert.That(mainGameObject, Is.Not.Null,
-                "LoadAssetAtPath<GameObject> must return the imported hierarchy root main object");
-            Assert.That(mainGameObject, Is.SameAs(hierarchyRoot),
-                "GameObject main object must match the hierarchy root sub-asset");
-        }
-        [Test]
-        public void D1_LoadAssetAtPathGameObjectReturnsMainObjectHierarchyRoot()
-        {
-            // D1: The .pmx main object is the importer-owned hierarchy root GameObject.
-            // AssetDatabase.LoadAssetAtPath<GameObject> must resolve it.
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
-
-            GameObject? mainGo = AssetDatabase.LoadAssetAtPath<GameObject>(TempPmxPath);
-            Assert.That(mainGo, Is.Not.Null,
-                "LoadAssetAtPath<GameObject> must return the .pmx hierarchy root");
-            Assert.That(mainGo.transform.parent, Is.Null,
-                "main GameObject must be a root transform (no parent)");
-
-            // The GameObject main object is the same as pmxAsset.ImportedRoot
-            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
-            Assert.That(pmxAsset, Is.Not.Null,
-                "LoadAssetAtPath<MmdPmxAsset> still resolves the metadata sub-asset");
-            Assert.That(pmxAsset.ImportedRoot, Is.SameAs(mainGo),
-                "pmxAsset.ImportedRoot must be the same as the GameObject main object");
-        }
-        [Test]
-        public void D1_LoadAssetAtPathMmdPmxAssetStillReturnsMetadataSubAsset()
-        {
-            // D1 backward compatibility: AssetDatabase.LoadAssetAtPath<MmdPmxAsset> continues to work.
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
-
-            MmdPmxAsset? pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
-            Assert.That(pmxAsset, Is.Not.Null,
-                "Legacy LoadAssetAtPath<MmdPmxAsset> must still resolve the metadata sub-asset");
-            Assert.That(pmxAsset.VertexCount, Is.GreaterThan(0),
-                "retrieved MmdPmxAsset must carry valid parse data");
-        }
-        [Test]
-        public void D1_MetadataImportedRootIsGameObjectMainObject()
-        {
-            // D1: metadata.ImportedRoot is the GameObject main object.
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
-
-            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
-            GameObject? mainGo = AssetDatabase.LoadAssetAtPath<GameObject>(TempPmxPath);
-
-            Assert.That(pmxAsset.ImportedRoot, Is.Not.Null);
-            Assert.That(mainGo, Is.Not.Null);
-            Assert.That(pmxAsset.ImportedRoot, Is.SameAs(mainGo),
-                "metadata.ImportedRoot must be the GameObject main object");
-        }
-        [Test]
-        public void D1_SubAssetCountsRemainStable()
-        {
-            // D1: Mesh/Material/MmdPmxAsset counts remain stable after main object swap.
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
-
-            Object[] allSubAssets = AssetDatabase.LoadAllAssetsAtPath(TempPmxPath);
-            int pmxAssetCount = 0;
-            int gameObjectCount = 0;
-            int meshCount = 0;
-            int materialCount = 0;
-            foreach (Object o in allSubAssets)
-            {
-                if (o is MmdPmxAsset) pmxAssetCount++;
-                else if (o is GameObject) gameObjectCount++;
                 else if (o is Mesh) meshCount++;
                 else if (o is Material) materialCount++;
+                else if (o is Texture2D) textureCount++;
             }
 
             Assert.That(pmxAssetCount, Is.EqualTo(1), "exactly 1 MmdPmxAsset sub-asset");
             Assert.That(gameObjectCount, Is.GreaterThanOrEqualTo(1), "at least 1 GameObject (hierarchy root)");
+            Assert.That(hierarchyRoot, Is.Not.Null,
+                "top-level root GameObject must exist among sub-assets");
             Assert.That(meshCount, Is.EqualTo(1), "exactly 1 Mesh sub-asset");
             Assert.That(materialCount, Is.GreaterThanOrEqualTo(1), "at least 1 Material sub-asset");
+            Assert.That(textureCount, Is.EqualTo(0), "no Texture sub-assets under .pmx");
+
+            Assert.That(loadedPmxAsset.ImportedRoot, Is.Not.Null);
+            Assert.That(loadedPmxAsset.ImportedRoot, Is.SameAs(hierarchyRoot),
+                "pmxAsset.ImportedRoot must reference the top-level hierarchy sub-asset from LoadAll");
+            Assert.That(loadedPmxAsset.ImportedRoot, Is.SameAs(mainGo),
+                "metadata.ImportedRoot must be the GameObject main object");
+
+            Assert.That(loadedPmxAsset.ImportedMesh, Is.Not.Null);
+            Mesh importedMesh = loadedPmxAsset.ImportedMesh!;
+            Assert.That(AssetDatabase.Contains(importedMesh), Is.True);
+            Assert.That(AssetDatabase.GetAssetPath(importedMesh), Is.EqualTo(TempPmxPath));
+            Assert.That(importedMesh.vertexCount, Is.EqualTo(loadedPmxAsset.VertexCount));
+            Assert.That(importedMesh.subMeshCount, Is.GreaterThanOrEqualTo(1));
+            Assert.That(loadedPmxAsset.ImportedMaterials, Has.Length.EqualTo(loadedPmxAsset.MaterialCount));
+            Assert.That(loadedPmxAsset.ImportedMaterials[0], Is.Not.Null);
+            Assert.That(AssetDatabase.Contains(loadedPmxAsset.ImportedMaterials[0]), Is.True);
+            Assert.That(AssetDatabase.GetAssetPath(loadedPmxAsset.ImportedMaterials[0]), Is.EqualTo(TempPmxPath));
+            Assert.That(loadedPmxAsset.ImportedMaterials[0].shader, Is.Not.Null);
+            Assert.That(loadedPmxAsset.ImportedMaterials[0].shader.name,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName));
         }
         [Test]
         public void D1_VmdImportBoundary_PmxImportDoesNotCreateVmdOrTimelineSubAssets()

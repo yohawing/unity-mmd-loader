@@ -771,52 +771,5 @@ namespace Mmd.Tests
             Assert.That(pmxAsset.RigidbodyCount, Is.GreaterThanOrEqualTo(0));
             Assert.That(pmxAsset.JointCount, Is.GreaterThanOrEqualTo(0));
         }
-        [Test]
-        public void PmxImporterGeneratesMeshAndMaterialSubAssets()
-        {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
-
-            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
-
-            // D1 contract evidence via LoadAllAssetsAtPath:
-            // - main object under .pmx is the importer-owned GameObject hierarchy root
-            // - MmdPmxAsset is a metadata sub-asset (resolves via LoadAssetAtPath<MmdPmxAsset>)
-            // - exactly one importer-owned Mesh sub-asset (for this fixture)
-            // - zero or more Material sub-assets
-            Object[] allSubAssets = AssetDatabase.LoadAllAssetsAtPath(TempPmxPath);
-            Assert.That(allSubAssets, Is.Not.Null);
-            int pmxAssetCount = 0;
-            int gameObjectCount = 0;
-            int meshSubCount = 0;
-            int materialSubCount = 0;
-            int textureSubCount = 0;
-            foreach (Object o in allSubAssets)
-            {
-                if (o is MmdPmxAsset) pmxAssetCount++;
-                else if (o is GameObject) gameObjectCount++;
-                else if (o is Mesh) meshSubCount++;
-                else if (o is Material) materialSubCount++;
-                else if (o is Texture2D) textureSubCount++;
-            }
-            Assert.That(pmxAssetCount, Is.EqualTo(1), "MmdPmxAsset must exist as a sub-asset");
-            Assert.That(gameObjectCount, Is.GreaterThanOrEqualTo(1), "at least one GameObject in sub-assets (hierarchy root main object)");
-            Assert.That(meshSubCount, Is.EqualTo(1));
-            Assert.That(materialSubCount, Is.GreaterThanOrEqualTo(0)); // fixture creates 1
-            Assert.That(textureSubCount, Is.EqualTo(0), "no Texture sub-assets under .pmx");
-
-            Assert.That(pmxAsset.ImportedMesh, Is.Not.Null);
-            Mesh importedMesh = pmxAsset.ImportedMesh!;
-            Assert.That(AssetDatabase.Contains(importedMesh), Is.True);
-            Assert.That(AssetDatabase.GetAssetPath(importedMesh), Is.EqualTo(TempPmxPath));
-            Assert.That(importedMesh.vertexCount, Is.EqualTo(pmxAsset.VertexCount));
-            Assert.That(importedMesh.subMeshCount, Is.GreaterThanOrEqualTo(1));
-            Assert.That(pmxAsset.ImportedMaterials, Has.Length.EqualTo(pmxAsset.MaterialCount));
-            Assert.That(pmxAsset.ImportedMaterials[0], Is.Not.Null);
-            Assert.That(AssetDatabase.Contains(pmxAsset.ImportedMaterials[0]), Is.True);
-            Assert.That(AssetDatabase.GetAssetPath(pmxAsset.ImportedMaterials[0]), Is.EqualTo(TempPmxPath));
-            Assert.That(pmxAsset.ImportedMaterials[0].shader, Is.Not.Null);
-            Assert.That(pmxAsset.ImportedMaterials[0].shader.name,
-                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName));
-        }
     }
 }
