@@ -32,12 +32,6 @@ namespace Mmd.UnityIntegration
             }
 
             DisposeFastRuntime();
-            if (model.HasDeformAfterPhysicsBones)
-            {
-                reason = "mmd-runtime fast playback does not support PMX deformAfterPhysics two-pass bone evaluation; managed playback remains active.";
-                return false;
-            }
-
             try
             {
                 MmdRuntimeFfiPlaybackSession candidate = MmdRuntimeFfiPlaybackSession.Create(pmxBytes, vmdBytes);

@@ -98,7 +98,7 @@ namespace Mmd.Motion
             MmdSampledMotion preAppendMotion,
             MmdSampledMotion appendedMotion)
         {
-            return SolveCore(model, preAppendMotion, appendedMotion, pass: null);
+            return SolveCore(model, preAppendMotion, appendedMotion, pass: null, validateModel: true);
         }
 
         public MmdSampledMotion Solve(
@@ -107,21 +107,37 @@ namespace Mmd.Motion
             MmdSampledMotion appendedMotion,
             MmdBoneEvaluationPass pass)
         {
-            return SolveCore(model, preAppendMotion, appendedMotion, pass);
+            return SolveCore(model, preAppendMotion, appendedMotion, pass, validateModel: true);
+        }
+
+        /// <summary>
+        /// Solves IK for a model whose structural validation was already completed by the owning runtime binding.
+        /// </summary>
+        internal MmdSampledMotion SolveValidated(
+            MmdModelDefinition model,
+            MmdSampledMotion preAppendMotion,
+            MmdSampledMotion appendedMotion,
+            MmdBoneEvaluationPass pass)
+        {
+            return SolveCore(model, preAppendMotion, appendedMotion, pass, validateModel: false);
         }
 
         private MmdSampledMotion SolveCore(
             MmdModelDefinition model,
             MmdSampledMotion preAppendMotion,
             MmdSampledMotion appendedMotion,
-            MmdBoneEvaluationPass? pass)
+            MmdBoneEvaluationPass? pass,
+            bool validateModel)
         {
             if (model == null)
             {
                 throw new ArgumentNullException(nameof(model));
             }
 
-            MmdModelValidator.ThrowIfInvalid(model);
+            if (validateModel)
+            {
+                MmdModelValidator.ThrowIfInvalid(model);
+            }
             MmdSampledMotion result = CopySampledMotion(appendedMotion);
             HashSet<int> sourceBoneIndices = SolveChains(model, result, model.ik, pass);
             return pass.HasValue

@@ -1102,6 +1102,33 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void TryEnableFastRuntimeAcceptsModelsWithDeformAfterPhysicsBones()
+        {
+            MmdUnityPlaybackBinding? binding = null;
+            try
+            {
+                byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes(PlaybackPmxId);
+                byte[] vmdBytes = MmdTestFixtures.ReadFixtureAssetBytes(PlaybackVmdId);
+                var parser = new NativeMmdParser();
+                MmdModelDefinition model = parser.LoadModel(pmxBytes);
+                model.bones[0].deformAfterPhysics = true;
+                MmdMotionDefinition motion = parser.LoadMotion(vmdBytes);
+                binding = MmdUnityPlaybackBinding.CreateSkinned(model, motion, PlaybackPmxId, PlaybackVmdId);
+
+                bool enabled = binding.TryEnableFastRuntime(pmxBytes, vmdBytes, out string reason);
+
+                Assert.That(model.HasDeformAfterPhysicsBones, Is.True);
+                Assert.That(enabled, Is.True, reason);
+                Assert.That(reason, Is.Empty);
+                Assert.DoesNotThrow(() => binding.ApplyFrame(10, 30.0f));
+            }
+            finally
+            {
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
+            }
+        }
+
+        [Test]
         public void ConfigureFromAssetsAttemptsFastRuntimeBeforeInitialFrameByDefault()
         {
             MmdPmxAsset? pmxAsset = null;

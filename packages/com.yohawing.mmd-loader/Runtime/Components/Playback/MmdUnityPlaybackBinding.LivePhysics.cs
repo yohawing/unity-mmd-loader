@@ -263,7 +263,7 @@ namespace Mmd.UnityIntegration
                 model,
                 postPhysicsPose,
                 MmdBoneEvaluationPass.AfterPhysics);
-            MmdSampledMotion afterIk = new MmdIkSolver().Solve(
+            MmdSampledMotion afterIk = new MmdIkSolver().SolveValidated(
                 model,
                 postPhysicsPose,
                 afterAppend,
