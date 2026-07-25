@@ -79,11 +79,9 @@ namespace Mmd.Editor
             MmdPmxAsset? pmxAsset,
             MmdVmdAsset? vmdAsset)
         {
-            return "Assets/"
-                   + GetSourceStem(pmxAsset?.SourceId, "PMX")
-                   + "_"
-                   + GetSourceStem(vmdAsset?.SourceId, "VMD")
-                   + ".anim";
+            return MmdAssetPathUtility.GetDefaultAnimationOutputPath(
+                pmxAsset?.SourceId,
+                vmdAsset?.SourceId);
         }
 
         public static bool TryNormalizeAndValidateOutputPath(
@@ -277,8 +275,8 @@ namespace Mmd.Editor
                 var clip = new AnimationClip();
                 ownedClip = clip;
                 clip.name = "H6_HumanoidProxyClip_"
-                            + NormalizeIdentifier(pmxAsset.SourceId) + "_"
-                            + NormalizeIdentifier(vmdAsset.SourceId) + "_"
+                            + MmdAssetPathUtility.NormalizeIdentifier(pmxAsset.SourceId) + "_"
+                            + MmdAssetPathUtility.NormalizeIdentifier(vmdAsset.SourceId) + "_"
                             + startFrame + "_"
                             + effectiveEndFrame
                             + "_" + frameRate + "fps";
@@ -967,27 +965,6 @@ namespace Mmd.Editor
             return forward.sqrMagnitude > 0.0f && up.sqrMagnitude > 0.0f
                 ? Quaternion.LookRotation(forward.normalized, up.normalized)
                 : Quaternion.identity;
-        }
-
-        private static string NormalizeIdentifier(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return "asset";
-            }
-
-            return value.Replace('/', '_')
-                .Replace('\\', '_')
-                .Replace(':', '_')
-                .Replace('.', '_');
-        }
-
-        private static string GetSourceStem(string? sourceId, string fallback)
-        {
-            string fileName = string.IsNullOrWhiteSpace(sourceId)
-                ? fallback
-                : Path.GetFileNameWithoutExtension(sourceId!.Replace('\\', '/')) ?? fallback;
-            return NormalizeIdentifier(fileName);
         }
 
         private static string ProjectRoot => Path.GetFullPath(Path.Combine(Application.dataPath, ".."));

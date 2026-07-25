@@ -235,8 +235,9 @@ namespace Mmd.Editor
 
         public static string GetDefaultOutputPath(MmdPmxAsset? pmxAsset, MmdVmdAsset? vmdAsset)
         {
-            return "Assets/" + GetSourceStem(pmxAsset?.SourceId, "PMX") + "_"
-                   + GetSourceStem(vmdAsset?.SourceId, "VMD") + ".anim";
+            return MmdAssetPathUtility.GetDefaultAnimationOutputPath(
+                pmxAsset?.SourceId,
+                vmdAsset?.SourceId);
         }
 
         private static AnimationClip BakeDenseClip(
@@ -255,8 +256,8 @@ namespace Mmd.Editor
             int frameCount = endFrame - startFrame + 1;
             var clip = new AnimationClip
             {
-                name = "MmdGenericClip_" + NormalizeIdentifier(pmxAsset.SourceId) + "_"
-                       + NormalizeIdentifier(vmdAsset.SourceId) + "_" + startFrame + "_" + endFrame,
+                name = "MmdGenericClip_" + MmdAssetPathUtility.NormalizeIdentifier(pmxAsset.SourceId) + "_"
+                       + MmdAssetPathUtility.NormalizeIdentifier(vmdAsset.SourceId) + "_" + startFrame + "_" + endFrame,
                 frameRate = frameRate
             };
 
@@ -1113,20 +1114,6 @@ namespace Mmd.Editor
                 if (texture != null && destroyedTextures.Add(texture)) UnityEngine.Object.DestroyImmediate(texture);
         }
 
-        private static string NormalizeIdentifier(string value)
-        {
-            return string.IsNullOrWhiteSpace(value)
-                ? "asset"
-                : value.Replace('/', '_').Replace('\\', '_').Replace(':', '_').Replace('.', '_');
-        }
-
-        private static string GetSourceStem(string? sourceId, string fallback)
-        {
-            string fileName = string.IsNullOrWhiteSpace(sourceId)
-                ? fallback
-                : Path.GetFileNameWithoutExtension(sourceId!.Replace('\\', '/')) ?? fallback;
-            return NormalizeIdentifier(fileName);
-        }
     }
 
     public sealed class MmdGenericAnimationClipWriterResult

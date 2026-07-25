@@ -60,6 +60,27 @@ namespace Mmd.Editor
                 out resolvedAssetPath);
         }
 
+        internal static string GetDefaultAnimationOutputPath(
+            string? pmxSourceId,
+            string? vmdSourceId)
+        {
+            return "Assets/" + GetSourceStem(pmxSourceId, "PMX") + "_"
+                   + GetSourceStem(vmdSourceId, "VMD") + ".anim";
+        }
+
+        internal static string NormalizeIdentifier(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return "asset";
+            }
+
+            return value.Replace('/', '_')
+                .Replace('\\', '_')
+                .Replace(':', '_')
+                .Replace('.', '_');
+        }
+
         internal static bool TryValidateProjectRelativeOutputPath(
             string outputPath,
             string requiredExtension,
@@ -172,6 +193,14 @@ namespace Mmd.Editor
 
             resolvedAssetPath = Path.GetRelativePath(projectRoot, candidatePath).Replace('\\', '/');
             return resolvedAssetPath.StartsWith("Assets/", System.StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string GetSourceStem(string? sourceId, string fallback)
+        {
+            string fileName = string.IsNullOrWhiteSpace(sourceId)
+                ? fallback
+                : Path.GetFileNameWithoutExtension(sourceId!.Replace('\\', '/')) ?? fallback;
+            return NormalizeIdentifier(fileName);
         }
     }
 }
