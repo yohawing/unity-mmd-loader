@@ -2040,21 +2040,6 @@ namespace Mmd.Tests
             return model;
         }
 
-        private static int FindFirstValidStaticPhysicsBone(MmdModelDefinition model, MmdUnityPlaybackBinding binding)
-        {
-            foreach (MmdRigidbodyDefinition body in model.physics.rigidbodies)
-            {
-                if (string.Equals(body.physicsKind, "static", StringComparison.Ordinal) &&
-                    body.boneIndex >= 0 &&
-                    body.boneIndex < binding.Instance.BoneTransforms.Length)
-                {
-                    return body.boneIndex;
-                }
-            }
-
-            return -1;
-        }
-
         private static int FindFirstValidStaticPhysicsBone(MmdModelDefinition model, MmdUnityModelInstance instance)
         {
             foreach (MmdRigidbodyDefinition body in model.physics.rigidbodies)
@@ -2068,24 +2053,6 @@ namespace Mmd.Tests
             }
 
             return -1;
-        }
-
-        private static HashSet<int> CollectNonStaticPhysicsBoneSlots(
-            MmdModelDefinition model,
-            MmdUnityPlaybackBinding binding)
-        {
-            var slots = new HashSet<int>();
-            foreach (MmdRigidbodyDefinition body in model.physics.rigidbodies)
-            {
-                if (!string.Equals(body.physicsKind, "static", StringComparison.Ordinal) &&
-                    body.boneIndex >= 0 &&
-                    body.boneIndex < binding.Instance.BoneTransforms.Length)
-                {
-                    slots.Add(body.boneIndex);
-                }
-            }
-
-            return slots;
         }
 
         private static HashSet<int> CollectNonStaticPhysicsBoneSlots(

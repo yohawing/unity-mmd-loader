@@ -349,13 +349,6 @@ namespace Mmd.Tests
             return model;
         }
 
-        private static string CreateTempDirectory()
-        {
-            string tempRoot = Path.Combine(Path.GetTempPath(), "yohawing-mmd-unity-importer-tests", Path.GetRandomFileName());
-            Directory.CreateDirectory(tempRoot);
-            return tempRoot;
-        }
-
         private static void WritePng(string path, Color color)
         {
             var texture = new Texture2D(2, 2, TextureFormat.RGBA32, mipChain: false);
