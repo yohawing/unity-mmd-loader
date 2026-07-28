@@ -145,6 +145,126 @@ namespace Mmd.Editor
                 throw new ArgumentOutOfRangeException(nameof(options.frameRate));
         }
 
+        /// <summary>
+        /// Validates the serializable report contract before a report is used as a
+        /// baseline or published as a performance result.  The comparer also runs
+        /// this validation so malformed JSON cannot silently turn into a green gate.
+        /// </summary>
+        public static IReadOnlyList<string> ValidateReport(MmdPerformanceBaselineReport? report)
+        {
+            var errors = new List<string>();
+            if (report == null)
+            {
+                errors.Add("report is null.");
+                return errors;
+            }
+
+            if (report.schemaVersion != SchemaVersion)
+                errors.Add("unsupported performance baseline schema version.");
+            if (!string.Equals(report.schema, SchemaName, StringComparison.Ordinal))
+                errors.Add("performance baseline schema name is missing or unsupported.");
+            if (!IsKnownStatus(report.status))
+                errors.Add("report status is missing or unsupported: " + report.status + ".");
+            if (report.warmupFrames < DefaultWarmupFrames)
+                errors.Add("warmupFrames must be at least " + DefaultWarmupFrames + ".");
+            if (report.measurementFrames != DefaultMeasurementFrames)
+                errors.Add("measurementFrames must be exactly " + DefaultMeasurementFrames + ".");
+            if (report.frameRate <= 0.0f || float.IsNaN(report.frameRate) || float.IsInfinity(report.frameRate))
+                errors.Add("frameRate must be finite and greater than zero.");
+
+            if (string.Equals(report.status, MmdPerformanceStatus.Pass, StringComparison.OrdinalIgnoreCase))
+            {
+                RequireText(errors, report.fixtureSha256, "fixtureSha256");
+                RequireText(errors, report.vmdFixtureSha256, "vmdFixtureSha256");
+                RequireText(errors, report.physicsFixtureSha256, "physicsFixtureSha256");
+                RequireText(errors, report.backend, "backend");
+                RequireText(errors, report.deterministicResultChecksum, "deterministicResultChecksum");
+            }
+
+            if (report.phases == null)
+            {
+                errors.Add("phase list is missing.");
+                return errors;
+            }
+
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            foreach (MmdPerformancePhaseReport? phase in report.phases)
+            {
+                if (phase == null)
+                {
+                    errors.Add("phase list contains a null entry.");
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(phase.name))
+                    errors.Add("phase name is missing.");
+                else if (!names.Add(phase.name))
+                    errors.Add("phase is duplicated: " + phase.name + ".");
+                if (!IsKnownStatus(phase.status))
+                    errors.Add("phase status is missing or unsupported: " + phase.name + ".");
+                if (phase.sampleCount < 0)
+                    errors.Add("phase sampleCount is negative: " + phase.name + ".");
+                if (phase.samplesMs == null)
+                {
+                    errors.Add("phase samples are missing: " + phase.name + ".");
+                    continue;
+                }
+                if (phase.sampleCount != phase.samplesMs.Count)
+                    errors.Add("phase sampleCount does not match samplesMs: " + phase.name + ".");
+
+                foreach (double sample in phase.samplesMs)
+                    if (double.IsNaN(sample) || double.IsInfinity(sample) || sample < 0.0)
+                        errors.Add("phase contains an invalid timing sample: " + phase.name + ".");
+
+                if (string.Equals(phase.status, MmdPerformanceStatus.Pass, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (phase.sampleCount <= 0)
+                        errors.Add("PASS phase has no samples: " + phase.name + ".");
+                    ValidateMetric(errors, phase.p50Ms, phase.name, "p50Ms");
+                    ValidateMetric(errors, phase.p95Ms, phase.name, "p95Ms");
+                    ValidateMetric(errors, phase.p99Ms, phase.name, "p99Ms");
+                    ValidateMetric(errors, phase.gcBytesPerFrame, phase.name, "gcBytesPerFrame");
+                    if (phase.p50Ms > phase.p95Ms || phase.p95Ms > phase.p99Ms)
+                        errors.Add("phase percentile ordering is invalid: " + phase.name + ".");
+                }
+            }
+
+            if (string.Equals(report.status, MmdPerformanceStatus.Pass, StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (string requiredName in RequiredPhaseNames)
+                {
+                    MmdPerformancePhaseReport[] matches = report.phases.FindAll(phase => phase != null && phase.name == requiredName).ToArray();
+                    if (matches.Length == 0)
+                        errors.Add("required phase is missing: " + requiredName + ".");
+                    else if (matches.Length == 1 && !string.Equals(matches[0].status, MmdPerformanceStatus.Pass, StringComparison.OrdinalIgnoreCase))
+                        errors.Add("required phase is not PASS: " + requiredName + ".");
+                }
+            }
+
+            return errors;
+        }
+
+        private static bool IsKnownStatus(string? status)
+        {
+            return string.Equals(status, MmdPerformanceStatus.Pass, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(status, MmdPerformanceStatus.Fail, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(status, MmdPerformanceStatus.Skip, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(status, MmdPerformanceStatus.Unavailable, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(status, MmdPerformanceStatus.Error, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static void RequireText(List<string> errors, string? value, string fieldName)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                errors.Add(fieldName + " is required for a PASS report.");
+        }
+
+        private static void ValidateMetric(List<string> errors, double value, string phaseName, string metricName)
+        {
+            if (double.IsNaN(value) || double.IsInfinity(value) || value < 0.0)
+                errors.Add("phase metric is invalid: " + phaseName + "." + metricName + ".");
+        }
+
     }
 
     public static class MmdPerformanceStatus

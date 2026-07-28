@@ -28,6 +28,10 @@ namespace Mmd.Editor
 
             options ??= new MmdPerformanceComparerOptions();
             var result = new MmdPerformanceComparisonResult { passed = true };
+            foreach (string error in MmdPerformanceBaseline.ValidateReport(baseline))
+                AddViolation(result, "baseline report invalid: " + error);
+            foreach (string error in MmdPerformanceBaseline.ValidateReport(candidate))
+                AddViolation(result, "candidate report invalid: " + error);
             CheckTopLevel(result, baseline, candidate);
             CheckRequiredPhases(result, baseline, "baseline");
             CheckRequiredPhases(result, candidate, "candidate");

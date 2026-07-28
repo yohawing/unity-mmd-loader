@@ -125,6 +125,35 @@ namespace Mmd.Tests.Performance
         }
 
         [Test]
+        public void ReportValidationRejectsMalformedSchemaAndMetrics()
+        {
+            var report = ReportWithAllRequiredPhases(10.0);
+            report.schemaVersion = 99;
+            report.phases[0].sampleCount = 1;
+            report.phases[0].samplesMs.Add(double.NaN);
+
+            IReadOnlyList<string> errors = MmdPerformanceBaseline.ValidateReport(report);
+
+            Assert.That(errors, Is.Not.Empty);
+            Assert.That(errors[0], Does.Contain("schema version"));
+            Assert.That(string.Join(" ", errors), Does.Contain("sampleCount"));
+            Assert.That(string.Join(" ", errors), Does.Contain("invalid timing sample"));
+        }
+
+        [Test]
+        public void ComparerRejectsMalformedReportBeforeThresholdComparison()
+        {
+            var baseline = ReportWithAllRequiredPhases(10.0);
+            var candidate = ReportWithAllRequiredPhases(10.0);
+            candidate.phases[0].p95Ms = double.PositiveInfinity;
+
+            MmdPerformanceComparisonResult result = MmdPerformanceBaselineComparer.Compare(baseline, candidate);
+
+            Assert.That(result.passed, Is.False);
+            Assert.That(result.reason, Does.Contain("candidate report invalid"));
+        }
+
+        [Test]
         public void ChecksumIsDeterministicForEquivalentNativeBuffers()
         {
             ulong first = MmdPerformanceBaseline.ChecksumSeed;

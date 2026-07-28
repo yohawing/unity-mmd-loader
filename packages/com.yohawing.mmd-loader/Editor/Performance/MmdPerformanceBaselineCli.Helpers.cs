@@ -126,6 +126,9 @@ namespace Mmd.Editor
             MmdPerformanceBaselineReport? baseline = JsonUtility.FromJson<MmdPerformanceBaselineReport>(File.ReadAllText(path));
             if (baseline == null || baseline.schemaVersion != MmdPerformanceBaseline.SchemaVersion || baseline.schema != MmdPerformanceBaseline.SchemaName)
                 throw new InvalidDataException("Baseline schema is missing or unsupported.");
+            IReadOnlyList<string> validationErrors = MmdPerformanceBaseline.ValidateReport(baseline);
+            if (validationErrors.Count > 0)
+                throw new InvalidDataException("Baseline report is malformed: " + string.Join(" ", validationErrors));
             return baseline;
         }
 
