@@ -111,34 +111,6 @@ namespace Mmd.Tests
             }
         }
 
-        [Test]
-        public void ParserFfiParseOncePmxGeometryHandleMatchesLegacyBuffers()
-        {
-            byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube.pmx");
-            IntPtr geometry = MmdParserFfiMethods.CreatePmxGeometry(pmxBytes);
-            Assert.That(geometry, Is.Not.EqualTo(IntPtr.Zero), "geometry handle");
-            try
-            {
-                CollectionAssert.AreEqual(MmdParserFfiMethods.ParsePmxPositions(pmxBytes), MmdParserFfiMethods.ParsePmxGeometryPositions(geometry));
-                CollectionAssert.AreEqual(MmdParserFfiMethods.ParsePmxNormals(pmxBytes), MmdParserFfiMethods.ParsePmxGeometryNormals(geometry));
-                CollectionAssert.AreEqual(MmdParserFfiMethods.ParsePmxUvs(pmxBytes), MmdParserFfiMethods.ParsePmxGeometryUvs(geometry));
-                CollectionAssert.AreEqual(MmdParserFfiMethods.ParsePmxEdgeScale(pmxBytes), MmdParserFfiMethods.ParsePmxGeometryEdgeScale(geometry));
-                CollectionAssert.AreEqual(MmdParserFfiMethods.ParsePmxIndices(pmxBytes), MmdParserFfiMethods.ParsePmxGeometryIndices(geometry));
-                CollectionAssert.AreEqual(MmdParserFfiMethods.ParsePmxSkinIndices(pmxBytes), MmdParserFfiMethods.ParsePmxGeometrySkinIndices(geometry));
-                CollectionAssert.AreEqual(MmdParserFfiMethods.ParsePmxSkinWeights(pmxBytes), MmdParserFfiMethods.ParsePmxGeometrySkinWeights(geometry));
-                CollectionAssert.AreEqual(MmdParserFfiMethods.ParsePmxSdefEnabled(pmxBytes), MmdParserFfiMethods.ParsePmxGeometrySdefEnabled(geometry));
-                CollectionAssert.AreEqual(MmdParserFfiMethods.ParsePmxSdefC(pmxBytes), MmdParserFfiMethods.ParsePmxGeometrySdefC(geometry));
-                CollectionAssert.AreEqual(MmdParserFfiMethods.ParsePmxSdefR0(pmxBytes), MmdParserFfiMethods.ParsePmxGeometrySdefR0(geometry));
-                CollectionAssert.AreEqual(MmdParserFfiMethods.ParsePmxSdefR1(pmxBytes), MmdParserFfiMethods.ParsePmxGeometrySdefR1(geometry));
-                Assert.That(MmdParserFfiMethods.ParsePmxGeometrySkinningModesJson(geometry),
-                    Is.EqualTo(MmdParserFfiMethods.ParsePmxSkinningModesJson(pmxBytes)));
-            }
-            finally
-            {
-                MmdParserFfiMethods.FreePmxGeometry(geometry);
-            }
-        }
-
         [TestCase("test_1bone_cube.pmx", 1, false)]
         [TestCase("GeneratedPmx/mixed-deform-types.pmx", 3, true)]
         public void ParseOnceHandleAndLegacyFallbackBuildEquivalentModel(
