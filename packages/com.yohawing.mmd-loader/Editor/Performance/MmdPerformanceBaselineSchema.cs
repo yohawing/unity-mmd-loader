@@ -8,12 +8,21 @@ namespace Mmd.Editor
 {
     public static class MmdPerformanceBaseline
     {
-        public const int SchemaVersion = 1;
+        public const int SchemaVersion = 3;
         public const int DefaultWarmupFrames = 5;
         public const int DefaultMeasurementFrames = 120;
         public const float DefaultFrameRate = 30.0f;
         public const string SchemaName = "mmd-performance-baseline";
         public const ulong ChecksumSeed = 14695981039346656037UL;
+
+        public static readonly IReadOnlyList<string> LivePhysicsPhaseNames = new[]
+        {
+            "live-physics-total",
+            "live-physics-evaluate",
+            "live-physics-sync",
+            "live-physics-step",
+            "live-physics-apply",
+        };
 
         public static readonly IReadOnlyList<string> RequiredPhaseNames = new[]
         {
@@ -23,8 +32,7 @@ namespace Mmd.Editor
             "unity-asset-build",
             "native-evaluate-copy",
             "unity-pose-morph-apply",
-            "live-physics-total",
-        };
+        }.Concat(LivePhysicsPhaseNames).ToArray();
 
         public static double Percentile(IReadOnlyList<double> samples, double percentile)
         {
@@ -73,6 +81,17 @@ namespace Mmd.Editor
             phase.p50Ms = Percentile(phase.samplesMs, 0.50);
             phase.p95Ms = Percentile(phase.samplesMs, 0.95);
             phase.p99Ms = Percentile(phase.samplesMs, 0.99);
+            return phase;
+        }
+
+        public static MmdPerformancePhaseReport BuildTimingPhase(
+            string name,
+            IReadOnlyList<double> samplesMs,
+            int frameCount,
+            string reason = "")
+        {
+            MmdPerformancePhaseReport phase = BuildPhase(name, samplesMs, 0, frameCount, reason);
+            phase.gcBytesMeasured = false;
             return phase;
         }
 
@@ -220,10 +239,13 @@ namespace Mmd.Editor
                 {
                     if (phase.sampleCount <= 0)
                         errors.Add("PASS phase has no samples: " + phase.name + ".");
+                    if (phase.sampleCount != report.measurementFrames)
+                        errors.Add("PASS phase sampleCount does not match measurementFrames: " + phase.name + ".");
                     ValidateMetric(errors, phase.p50Ms, phase.name, "p50Ms");
                     ValidateMetric(errors, phase.p95Ms, phase.name, "p95Ms");
                     ValidateMetric(errors, phase.p99Ms, phase.name, "p99Ms");
-                    ValidateMetric(errors, phase.gcBytesPerFrame, phase.name, "gcBytesPerFrame");
+                    if (phase.gcBytesMeasured)
+                        ValidateMetric(errors, phase.gcBytesPerFrame, phase.name, "gcBytesPerFrame");
                     if (phase.p50Ms > phase.p95Ms || phase.p95Ms > phase.p99Ms)
                         errors.Add("phase percentile ordering is invalid: " + phase.name + ".");
                 }
@@ -288,6 +310,7 @@ namespace Mmd.Editor
         public double p95Ms;
         public double p99Ms;
         public double gcBytesPerFrame;
+        public bool gcBytesMeasured = true;
     }
 
     [Serializable]

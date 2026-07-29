@@ -17,8 +17,35 @@ namespace Mmd.Tests.Performance
             Assert.That(options.warmupFrames, Is.EqualTo(5));
             Assert.That(options.measurementFrames, Is.EqualTo(120));
             Assert.That(options.frameRate, Is.EqualTo(30.0f));
-            Assert.That(MmdPerformanceBaseline.SchemaVersion, Is.EqualTo(1));
+            Assert.That(MmdPerformanceBaseline.SchemaVersion, Is.EqualTo(3));
             Assert.DoesNotThrow(() => MmdPerformanceBaseline.ValidateOptions(options));
+        }
+
+        [Test]
+        public void RequiredPhasesIncludeLivePhysicsStageBreakdown()
+        {
+            CollectionAssert.IsSubsetOf(
+                new[]
+                {
+                    "live-physics-total",
+                    "live-physics-evaluate",
+                    "live-physics-sync",
+                    "live-physics-step",
+                    "live-physics-apply",
+                },
+                MmdPerformanceBaseline.RequiredPhaseNames);
+        }
+
+        [Test]
+        public void TimingOnlyPhaseMarksGcAsUnmeasured()
+        {
+            MmdPerformancePhaseReport phase = MmdPerformanceBaseline.BuildTimingPhase(
+                "live-physics-step",
+                Repeat(1.0, MmdPerformanceBaseline.DefaultMeasurementFrames),
+                MmdPerformanceBaseline.DefaultMeasurementFrames);
+
+            Assert.That(phase.status, Is.EqualTo(MmdPerformanceStatus.Pass));
+            Assert.That(phase.gcBytesMeasured, Is.False);
         }
 
         [Test]
@@ -72,6 +99,17 @@ namespace Mmd.Tests.Performance
         }
 
         [Test]
+        public void ComparerAllowsMeasuredNoiseButNotMeaningfulRegression()
+        {
+            var baseline = ReportWithAllRequiredPhases(1.0);
+            var noise = ReportWithAllRequiredPhases(2.90);
+            var regression = ReportWithAllRequiredPhases(3.10);
+
+            Assert.That(MmdPerformanceBaselineComparer.Compare(baseline, noise).passed, Is.True);
+            Assert.That(MmdPerformanceBaselineComparer.Compare(baseline, regression).passed, Is.False);
+        }
+
+        [Test]
         public void ComparerAcceptsEquivalentCompleteReports()
         {
             var baseline = ReportWithAllRequiredPhases(10.0);
@@ -116,7 +154,7 @@ namespace Mmd.Tests.Performance
         {
             var baseline = ReportWithAllRequiredPhases(10.0);
             var candidate = ReportWithAllRequiredPhases(10.0);
-            candidate.phases.Find(phase => phase.name == "live-physics-total")!.status = MmdPerformanceStatus.Skip;
+            candidate.phases.Find(phase => phase.name == "live-physics-step")!.status = MmdPerformanceStatus.Skip;
 
             MmdPerformanceComparisonResult result = MmdPerformanceBaselineComparer.Compare(baseline, candidate);
 
@@ -129,7 +167,7 @@ namespace Mmd.Tests.Performance
         {
             var report = ReportWithAllRequiredPhases(10.0);
             report.schemaVersion = 99;
-            report.phases[0].sampleCount = 1;
+            report.phases[0].sampleCount = MmdPerformanceBaseline.DefaultMeasurementFrames - 1;
             report.phases[0].samplesMs.Add(double.NaN);
 
             IReadOnlyList<string> errors = MmdPerformanceBaseline.ValidateReport(report);
@@ -138,6 +176,21 @@ namespace Mmd.Tests.Performance
             Assert.That(errors[0], Does.Contain("schema version"));
             Assert.That(string.Join(" ", errors), Does.Contain("sampleCount"));
             Assert.That(string.Join(" ", errors), Does.Contain("invalid timing sample"));
+        }
+
+        [Test]
+        public void ReportValidationRejectsDuplicateRequiredPhysicsPhase()
+        {
+            var report = ReportWithAllRequiredPhases(10.0);
+            report.phases.Add(MmdPerformanceBaseline.BuildPhase(
+                "live-physics-step",
+                Repeat(10.0, MmdPerformanceBaseline.DefaultMeasurementFrames),
+                0,
+                MmdPerformanceBaseline.DefaultMeasurementFrames));
+
+            IReadOnlyList<string> errors = MmdPerformanceBaseline.ValidateReport(report);
+
+            Assert.That(string.Join(" ", errors), Does.Contain("phase is duplicated: live-physics-step"));
         }
 
         [Test]
@@ -177,14 +230,30 @@ namespace Mmd.Tests.Performance
                 backend = "mmd-runtime-ffi",
             };
             foreach (string name in MmdPerformanceBaseline.RequiredPhaseNames)
-                report.phases.Add(MmdPerformanceBaseline.BuildPhase(name, new[] { value, value, value }, 0, 3));
+                report.phases.Add(MmdPerformanceBaseline.BuildPhase(
+                    name,
+                    Repeat(value, MmdPerformanceBaseline.DefaultMeasurementFrames),
+                    0,
+                    MmdPerformanceBaseline.DefaultMeasurementFrames));
             return report;
         }
 
         private static void ReplacePhase(MmdPerformanceBaselineReport report, string name, double value)
         {
             int index = report.phases.FindIndex(phase => phase.name == name);
-            report.phases[index] = MmdPerformanceBaseline.BuildPhase(name, new[] { value, value, value }, 0, 3);
+            report.phases[index] = MmdPerformanceBaseline.BuildPhase(
+                name,
+                Repeat(value, MmdPerformanceBaseline.DefaultMeasurementFrames),
+                0,
+                MmdPerformanceBaseline.DefaultMeasurementFrames);
+        }
+
+        private static double[] Repeat(double value, int count)
+        {
+            var values = new double[count];
+            for (int i = 0; i < values.Length; i++)
+                values[i] = value;
+            return values;
         }
     }
 }

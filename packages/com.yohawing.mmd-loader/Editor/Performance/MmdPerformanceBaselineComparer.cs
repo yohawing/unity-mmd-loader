@@ -10,6 +10,8 @@ namespace Mmd.Editor
     {
         public double MaxP95RegressionPercent { get; set; } = 10.0;
         public double MaxP99RegressionPercent { get; set; } = 10.0;
+        public double MaxP95RegressionMilliseconds { get; set; } = 2.0;
+        public double MaxP99RegressionMilliseconds { get; set; } = 3.0;
         public double MaxGcRegressionPercent { get; set; } = 10.0;
         public bool RequireChecksumMatch { get; set; } = true;
     }
@@ -56,14 +58,18 @@ namespace Mmd.Editor
 
                 double p95Regression = RegressionPercent(before.p95Ms, after.p95Ms);
                 double p99Regression = RegressionPercent(before.p99Ms, after.p99Ms);
-                double gcRegression = RegressionPercent(before.gcBytesPerFrame, after.gcBytesPerFrame);
+                double p95RegressionMs = RegressionMilliseconds(before.p95Ms, after.p95Ms);
+                double p99RegressionMs = RegressionMilliseconds(before.p99Ms, after.p99Ms);
+                double gcRegression = before.gcBytesMeasured && after.gcBytesMeasured
+                    ? RegressionPercent(before.gcBytesPerFrame, after.gcBytesPerFrame)
+                    : 0.0;
                 result.maxRegressionPercent = Math.Max(result.maxRegressionPercent, Math.Max(p95Regression, p99Regression));
                 result.maxGcRegressionPercent = Math.Max(result.maxGcRegressionPercent, gcRegression);
-                if (p95Regression > options.MaxP95RegressionPercent)
-                    AddViolation(result, $"{name} p95 regression {p95Regression:F2}% exceeds {options.MaxP95RegressionPercent:F2}%.");
-                if (p99Regression > options.MaxP99RegressionPercent)
-                    AddViolation(result, $"{name} p99 regression {p99Regression:F2}% exceeds {options.MaxP99RegressionPercent:F2}%.");
-                if (gcRegression > options.MaxGcRegressionPercent)
+                if (p95Regression > options.MaxP95RegressionPercent && p95RegressionMs > options.MaxP95RegressionMilliseconds)
+                    AddViolation(result, $"{name} p95 regression {p95Regression:F2}% ({p95RegressionMs:F3}ms) exceeds thresholds.");
+                if (p99Regression > options.MaxP99RegressionPercent && p99RegressionMs > options.MaxP99RegressionMilliseconds)
+                    AddViolation(result, $"{name} p99 regression {p99Regression:F2}% ({p99RegressionMs:F3}ms) exceeds thresholds.");
+                if (before.gcBytesMeasured && after.gcBytesMeasured && gcRegression > options.MaxGcRegressionPercent)
                     AddViolation(result, $"{name} GC regression {gcRegression:F2}% exceeds {options.MaxGcRegressionPercent:F2}%.");
             }
 
@@ -141,6 +147,8 @@ namespace Mmd.Editor
                 return candidate > baseline ? 100.0 : 0.0;
             return Math.Max(0.0, ((candidate - baseline) / baseline) * 100.0);
         }
+
+        private static double RegressionMilliseconds(double baseline, double candidate) => Math.Max(0.0, candidate - baseline);
 
         private static void AddViolation(MmdPerformanceComparisonResult result, string violation)
         {

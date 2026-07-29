@@ -24,7 +24,7 @@ function Write-SkipReport {
     $outputDirectory = Split-Path -Parent ([IO.Path]::GetFullPath($OutputPath))
     New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
     $report = [ordered]@{
-        schemaVersion = 1
+        schemaVersion = 3
         schema = 'mmd-performance-baseline'
         status = 'SKIP'
         skipReason = $Reason

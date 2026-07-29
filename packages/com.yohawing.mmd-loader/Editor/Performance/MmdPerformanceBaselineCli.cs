@@ -57,13 +57,19 @@ namespace Mmd.Editor
             MmdMotionDefinition motion;
             try
             {
-                report.phases.Add(MeasureSingle("pmx-load", () => File.ReadAllBytes(pmxPath).Length));
-                long parseStart = Stopwatch.GetTimestamp();
-                model = parser.LoadModel(pmxBytes);
-                report.phases.Add(MmdPerformanceBaseline.BuildPhase("pmx-parse", new[] { ElapsedMs(parseStart) }, 0, 1));
-                parseStart = Stopwatch.GetTimestamp();
-                motion = parser.LoadMotion(vmdBytes);
-                report.phases.Add(MmdPerformanceBaseline.BuildPhase("vmd-load-parse", new[] { ElapsedMs(parseStart) }, 0, 1));
+                report.phases.Add(MeasureRepeated("pmx-load", options, () => File.ReadAllBytes(pmxPath)));
+                MmdModelDefinition? measuredModel = null;
+                report.phases.Add(MeasureRepeated("pmx-parse", options, () =>
+                {
+                    measuredModel = parser.LoadModel(pmxBytes);
+                }));
+                model = measuredModel ?? throw new InvalidOperationException("PMX parse produced no model.");
+                MmdMotionDefinition? measuredMotion = null;
+                report.phases.Add(MeasureRepeated("vmd-load-parse", options, () =>
+                {
+                    measuredMotion = parser.LoadMotion(vmdBytes);
+                }));
+                motion = measuredMotion ?? throw new InvalidOperationException("VMD parse produced no motion.");
                 MmdModelValidator.ThrowIfInvalid(model);
                 MmdMotionValidator.ThrowIfInvalid(motion);
             }
@@ -76,17 +82,9 @@ namespace Mmd.Editor
                 return report;
             }
 
-            MmdUnityModelInstance? builtInstance = null;
             try
             {
-                long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
-                long buildStart = Stopwatch.GetTimestamp();
-                builtInstance = MmdUnityModelFactory.CreateSkinnedModel(model, pmxPath);
-                report.phases.Add(MmdPerformanceBaseline.BuildPhase(
-                    "unity-asset-build",
-                    new[] { ElapsedMs(buildStart) },
-                    GC.GetAllocatedBytesForCurrentThread() - allocatedBefore,
-                    1));
+                report.phases.Add(MeasureUnityAssetBuild(model, pmxPath, options));
             }
             catch (Exception exception)
             {
@@ -94,11 +92,6 @@ namespace Mmd.Editor
                 report.status = MmdPerformanceStatus.Error;
                 report.skipReason = "Unity asset build failed: " + exception.Message;
             }
-            finally
-            {
-                DestroyInstance(builtInstance);
-            }
-
             try
             {
                 MeasureNativeEvaluateCopy(report, options, pmxBytes, vmdBytes);
@@ -227,18 +220,63 @@ namespace Mmd.Editor
             foreach (string name in MmdPerformanceBaseline.RequiredPhaseNames)
                 if (!report.phases.Exists(phase => phase.name == name))
                     report.phases.Add(MmdPerformanceBaseline.SkipPhase(name, reason));
-            report.phases.Add(MmdPerformanceBaseline.UnavailablePhase("live-physics-evaluate", reason));
-            report.phases.Add(MmdPerformanceBaseline.UnavailablePhase("live-physics-sync", reason));
-            report.phases.Add(MmdPerformanceBaseline.UnavailablePhase("live-physics-step", reason));
-            report.phases.Add(MmdPerformanceBaseline.UnavailablePhase("live-physics-apply", reason));
         }
 
-        private static MmdPerformancePhaseReport MeasureSingle(string name, Func<int> action)
+        private static MmdPerformancePhaseReport MeasureRepeated(
+            string name,
+            MmdPerformanceBaselineOptions options,
+            Action action)
         {
+            for (int i = 0; i < options.warmupFrames; i++)
+                action();
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            var samples = new List<double>(options.measurementFrames);
             long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
-            long start = Stopwatch.GetTimestamp();
-            action();
-            return MmdPerformanceBaseline.BuildPhase(name, new[] { ElapsedMs(start) }, GC.GetAllocatedBytesForCurrentThread() - allocatedBefore, 1);
+            for (int i = 0; i < options.measurementFrames; i++)
+            {
+                long start = Stopwatch.GetTimestamp();
+                action();
+                samples.Add(ElapsedMs(start));
+            }
+
+            return MmdPerformanceBaseline.BuildPhase(
+                name,
+                samples,
+                GC.GetAllocatedBytesForCurrentThread() - allocatedBefore,
+                options.measurementFrames);
+        }
+
+        private static MmdPerformancePhaseReport MeasureUnityAssetBuild(
+            MmdModelDefinition model,
+            string pmxPath,
+            MmdPerformanceBaselineOptions options)
+        {
+            for (int i = 0; i < options.warmupFrames; i++)
+            {
+                MmdUnityModelInstance instance = MmdUnityModelFactory.CreateSkinnedModel(model, pmxPath);
+                DestroyInstance(instance);
+            }
+
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            var samples = new List<double>(options.measurementFrames);
+            long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+            for (int i = 0; i < options.measurementFrames; i++)
+            {
+                long start = Stopwatch.GetTimestamp();
+                MmdUnityModelInstance instance = MmdUnityModelFactory.CreateSkinnedModel(model, pmxPath);
+                samples.Add(ElapsedMs(start));
+                DestroyInstance(instance);
+            }
+
+            return MmdPerformanceBaseline.BuildPhase(
+                "unity-asset-build",
+                samples,
+                GC.GetAllocatedBytesForCurrentThread() - allocatedBefore,
+                options.measurementFrames);
         }
     }
 }

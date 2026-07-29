@@ -48,27 +48,46 @@ namespace Mmd.Editor
                 GC.WaitForPendingFinalizers();
                 GC.Collect();
                 var samples = new List<double>(options.measurementFrames);
+                var evaluateSamples = new List<double>(options.measurementFrames);
+                var syncSamples = new List<double>(options.measurementFrames);
+                var stepSamples = new List<double>(options.measurementFrames);
+                var applySamples = new List<double>(options.measurementFrames);
                 long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
                 for (int i = 0; i < options.measurementFrames; i++)
                 {
                     long start = Stopwatch.GetTimestamp();
                     binding.ApplyFrame(options.warmupFrames + i, options.frameRate);
                     samples.Add(ElapsedMs(start));
+                    MmdLivePhysicsFrameDiagnostics? diagnostics = binding.LastLivePhysicsDiagnostics;
+                    if (diagnostics == null)
+                        throw new InvalidOperationException("Live physics frame did not produce diagnostics.");
+                    evaluateSamples.Add(diagnostics.evaluateFrameMs);
+                    syncSamples.Add(diagnostics.syncBoneDrivenBodiesMs);
+                    stepSamples.Add(diagnostics.stepPhysicsMs);
+                    applySamples.Add(diagnostics.applyPhysicsBodiesMs);
                 }
+                long allocatedBytes = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
                 report.phases.Add(MmdPerformanceBaseline.BuildPhase(
                     "live-physics-total",
                     samples,
-                    GC.GetAllocatedBytesForCurrentThread() - allocatedBefore,
+                    allocatedBytes,
                     options.measurementFrames,
-                    "Binding ApplyFrame combines live physics evaluate, sync, step, and pose application; " +
+                    "Binding ApplyFrame total; " +
                     removedPureWorldAnchors + " unsupported pure world-anchor joints were excluded."));
+                report.phases.Add(MmdPerformanceBaseline.BuildTimingPhase("live-physics-evaluate", evaluateSamples, options.measurementFrames));
+                report.phases.Add(MmdPerformanceBaseline.BuildTimingPhase("live-physics-sync", syncSamples, options.measurementFrames));
+                report.phases.Add(MmdPerformanceBaseline.BuildTimingPhase("live-physics-step", stepSamples, options.measurementFrames));
+                report.phases.Add(MmdPerformanceBaseline.BuildTimingPhase("live-physics-apply", applySamples, options.measurementFrames));
             }
             catch (Exception exception)
             {
                 bool unavailable = IsNativeCapabilityUnavailable(exception);
-                report.phases.Add(unavailable
-                    ? MmdPerformanceBaseline.SkipPhase("live-physics-total", exception.Message)
-                    : MmdPerformanceBaseline.ErrorPhase("live-physics-total", exception.Message));
+                foreach (string phaseName in MmdPerformanceBaseline.LivePhysicsPhaseNames)
+                {
+                    report.phases.Add(unavailable
+                        ? MmdPerformanceBaseline.SkipPhase(phaseName, exception.Message)
+                        : MmdPerformanceBaseline.ErrorPhase(phaseName, exception.Message));
+                }
                 report.status = unavailable ? MmdPerformanceStatus.Skip : MmdPerformanceStatus.Error;
                 report.skipReason = (unavailable ? "Live Physics unavailable: " : "Live Physics failed: ") + exception.Message;
             }
@@ -78,10 +97,6 @@ namespace Mmd.Editor
                 DestroyInstance(instance);
             }
 
-            report.phases.Add(MmdPerformanceBaseline.UnavailablePhase("live-physics-evaluate", "Production binding combines evaluate with sync/step; no independent instrumentation in P0."));
-            report.phases.Add(MmdPerformanceBaseline.UnavailablePhase("live-physics-sync", "Production binding combines sync with evaluate/step; no independent instrumentation in P0."));
-            report.phases.Add(MmdPerformanceBaseline.UnavailablePhase("live-physics-step", "Production binding combines step with evaluate/sync; no independent instrumentation in P0."));
-            report.phases.Add(MmdPerformanceBaseline.UnavailablePhase("live-physics-apply", "Production binding combines pose apply with evaluate/sync/step; no independent instrumentation in P0."));
         }
 
         private static MmdPerformanceBaselineOptions CreateOptions()
