@@ -66,9 +66,10 @@ namespace Mmd.Motion
 
             MmdModelValidator.ThrowIfInvalid(model);
             MmdSampledMotion result = CopySampledMotion(sampledMotion);
-            MmdBoneDefinition?[] indexedBones = BuildIndexedBones(model);
-            IReadOnlyList<int>[] indexedChildren = BuildIndexedChildren(indexedBones);
-            float[][] translations = CaptureLocalTranslations(model, indexedBones, result);
+            MmdTopologyPlan topologyPlan = MmdTopologyPlan.CreateFromValidatedModel(model);
+            MmdBoneDefinition?[] indexedBones = topologyPlan.IndexedBones;
+            IReadOnlyList<int>[] indexedChildren = topologyPlan.IndexedChildren;
+            float[][] translations = CaptureLocalTranslations(topologyPlan, result);
             float[][] baseRotations = CaptureIndexedRotations(indexedBones, result);
             var ikRotations = new float[indexedBones.Length][];
             for (int i = 0; i < indexedBones.Length; i++)
@@ -81,7 +82,7 @@ namespace Mmd.Motion
             var chainChangedBoneIndices = new HashSet<int>(indexedBones.Length);
             foreach (MmdIkDefinition ik in model.ik)
             {
-                if (pass.HasValue && !ShouldEvaluateIkInPass(model, ik, pass.Value))
+                if (pass.HasValue && !ShouldEvaluateIkInPass(indexedBones, ik, pass.Value))
                 {
                     continue;
                 }
@@ -122,12 +123,44 @@ namespace Mmd.Motion
             return SolveCore(model, preAppendMotion, appendedMotion, pass, validateModel: false);
         }
 
+        internal MmdSampledMotion SolveValidated(
+            MmdModelDefinition model,
+            MmdSampledMotion preAppendMotion,
+            MmdSampledMotion appendedMotion,
+            MmdBoneEvaluationPass pass,
+            MmdTopologyPlan topologyPlan)
+        {
+            if (topologyPlan == null)
+            {
+                throw new ArgumentNullException(nameof(topologyPlan));
+            }
+
+            topologyPlan.EnsureModel(model);
+            return SolveCore(model, preAppendMotion, appendedMotion, pass, validateModel: false, topologyPlan);
+        }
+
+        internal MmdSampledMotion SolveWithValidatedTopology(
+            MmdModelDefinition model,
+            MmdSampledMotion preAppendMotion,
+            MmdSampledMotion appendedMotion,
+            MmdBoneEvaluationPass pass,
+            MmdTopologyPlan topologyPlan)
+        {
+            if (topologyPlan == null)
+            {
+                throw new ArgumentNullException(nameof(topologyPlan));
+            }
+
+            return SolveCore(model, preAppendMotion, appendedMotion, pass, validateModel: false, topologyPlan);
+        }
+
         private MmdSampledMotion SolveCore(
             MmdModelDefinition model,
             MmdSampledMotion preAppendMotion,
             MmdSampledMotion appendedMotion,
             MmdBoneEvaluationPass? pass,
-            bool validateModel)
+            bool validateModel,
+            MmdTopologyPlan? topologyPlan = null)
         {
             if (model == null)
             {
@@ -138,8 +171,9 @@ namespace Mmd.Motion
             {
                 MmdModelValidator.ThrowIfInvalid(model);
             }
+            topologyPlan ??= MmdTopologyPlan.CreateFromValidatedModel(model);
             MmdSampledMotion result = CopySampledMotion(appendedMotion);
-            HashSet<int> sourceBoneIndices = SolveChains(model, result, model.ik, pass);
+            HashSet<int> sourceBoneIndices = SolveChains(model, result, model.ik, pass, topologyPlan);
             return pass.HasValue
                 ? MmdAppendTransformEvaluator.ReapplyAppendTransformsForSources(model, preAppendMotion, result, sourceBoneIndices, pass.Value)
                 : MmdAppendTransformEvaluator.ReapplyAppendTransformsForSources(model, preAppendMotion, result, sourceBoneIndices);
@@ -188,6 +222,16 @@ namespace Mmd.Motion
             MmdModelDefinition model,
             MmdSampledMotion result,
             IReadOnlyList<MmdIkDefinition> chains,
+            MmdBoneEvaluationPass? pass,
+            MmdTopologyPlan topologyPlan)
+        {
+            return SolveChains(model, result, chains, pass, breakdown: null, topologyPlan);
+        }
+
+        private static HashSet<int> SolveChains(
+            MmdModelDefinition model,
+            MmdSampledMotion result,
+            IReadOnlyList<MmdIkDefinition> chains,
             MmdIkSolveBreakdownAccumulator? breakdown)
         {
             return SolveChains(model, result, chains, pass: null, breakdown);
@@ -198,12 +242,14 @@ namespace Mmd.Motion
             MmdSampledMotion result,
             IReadOnlyList<MmdIkDefinition> chains,
             MmdBoneEvaluationPass? pass,
-            MmdIkSolveBreakdownAccumulator? breakdown)
+            MmdIkSolveBreakdownAccumulator? breakdown,
+            MmdTopologyPlan? topologyPlan = null)
         {
             long setupStarted = breakdown != null ? Stopwatch.GetTimestamp() : 0;
-            MmdBoneDefinition?[] indexedBones = BuildIndexedBones(model);
-            IReadOnlyList<int>[] indexedChildren = BuildIndexedChildren(indexedBones);
-            float[][] translations = CaptureLocalTranslations(model, indexedBones, result);
+            topologyPlan ??= MmdTopologyPlan.CreateFromValidatedModel(model);
+            MmdBoneDefinition?[] indexedBones = topologyPlan.IndexedBones;
+            IReadOnlyList<int>[] indexedChildren = topologyPlan.IndexedChildren;
+            float[][] translations = CaptureLocalTranslations(topologyPlan, result);
             float[][] baseRotations = CaptureIndexedRotations(indexedBones, result);
             var ikRotations = new float[indexedBones.Length][];
             for (int i = 0; i < indexedBones.Length; i++)
@@ -222,7 +268,7 @@ namespace Mmd.Motion
 
             foreach (MmdIkDefinition ik in chains)
             {
-                if (pass.HasValue && !ShouldEvaluateIkInPass(model, ik, pass.Value))
+                if (pass.HasValue && !ShouldEvaluateIkInPass(indexedBones, ik, pass.Value))
                 {
                     continue;
                 }
@@ -246,9 +292,9 @@ namespace Mmd.Motion
             return changedBoneIndices;
         }
 
-        private static bool ShouldEvaluateIkInPass(MmdModelDefinition model, MmdIkDefinition ik, MmdBoneEvaluationPass pass)
+        private static bool ShouldEvaluateIkInPass(IReadOnlyList<MmdBoneDefinition?> indexedBones, MmdIkDefinition ik, MmdBoneEvaluationPass pass)
         {
-            MmdBoneDefinition? bone = FindBone(model, ik.boneIndex);
+            MmdBoneDefinition? bone = FindBone(indexedBones, ik.boneIndex);
             if (bone == null)
             {
                 return false;
@@ -273,8 +319,8 @@ namespace Mmd.Motion
             HashSet<int> changedBoneIndices,
             MmdIkSolveBreakdownAccumulator? breakdown = null)
         {
-            MmdBoneDefinition? goal = FindBone(model, ik.boneIndex);
-            MmdBoneDefinition? effector = FindBone(model, ik.targetBoneIndex);
+            MmdBoneDefinition? goal = FindBone(indexedBones, ik.boneIndex);
+            MmdBoneDefinition? effector = FindBone(indexedBones, ik.targetBoneIndex);
             if (goal == null || effector == null || ik.links.Count == 0)
             {
                 if (breakdown != null)
@@ -360,7 +406,7 @@ namespace Mmd.Motion
                     }
 
                     MmdIkLinkDefinition link = ik.links[linkIndex];
-                    MmdBoneDefinition? linkBone = FindBone(model, link.boneIndex);
+                    MmdBoneDefinition? linkBone = FindBone(indexedBones, link.boneIndex);
                     if (linkBone == null || link.boneIndex == ik.targetBoneIndex)
                     {
                         continue;
@@ -465,7 +511,7 @@ namespace Mmd.Motion
                 }
                 else
                 {
-                    RestoreLinkRotations(model, result, baseRotations, ikRotations, rotations, ik, savedLinkRotations);
+                    RestoreLinkRotations(indexedBones, result, baseRotations, ikRotations, rotations, ik, savedLinkRotations);
                     long fullRebuildStarted = chainBreakdown != null ? Stopwatch.GetTimestamp() : 0;
                     ComposeWorldMatricesInto(indexedBones, translations, rotations, worldMatrices);
                     if (chainBreakdown != null)
@@ -571,7 +617,7 @@ namespace Mmd.Motion
         }
 
         private static void RestoreLinkRotations(
-            MmdModelDefinition model,
+            IReadOnlyList<MmdBoneDefinition?> indexedBones,
             MmdSampledMotion result,
             IReadOnlyList<float[]> baseRotations,
             IList<float[]> ikRotations,
@@ -581,7 +627,7 @@ namespace Mmd.Motion
         {
             for (int linkIndex = 0; linkIndex < ik.links.Count; linkIndex++)
             {
-                MmdBoneDefinition? linkBone = FindBone(model, ik.links[linkIndex].boneIndex);
+                MmdBoneDefinition? linkBone = FindBone(indexedBones, ik.links[linkIndex].boneIndex);
                 if (linkBone == null || linkBone.index < 0 || linkBone.index >= rotations.Count)
                 {
                     continue;
@@ -690,78 +736,28 @@ namespace Mmd.Motion
             return EulerToQuaternion(clamped[0], clamped[1], clamped[2], order);
         }
 
-        private static MmdBoneDefinition?[] BuildIndexedBones(MmdModelDefinition model)
+        private static float[][] CaptureLocalTranslations(MmdTopologyPlan topologyPlan, MmdSampledMotion result)
         {
-            int maxIndex = -1;
-            for (int i = 0; i < model.bones.Count; i++)
+            var translations = new float[topologyPlan.IndexedBones.Length][];
+            for (int index = 0; index < topologyPlan.IndexedBones.Length; index++)
             {
-                if (model.bones[i].index > maxIndex)
-                {
-                    maxIndex = model.bones[i].index;
-                }
-            }
-
-            var bones = new MmdBoneDefinition?[Math.Max(maxIndex + 1, 0)];
-            foreach (MmdBoneDefinition bone in model.bones)
-            {
-                if (bone.index >= 0 && bone.index < bones.Length)
-                {
-                    bones[bone.index] = bone;
-                }
-            }
-
-            return bones;
-        }
-
-        private static IReadOnlyList<int>[] BuildIndexedChildren(IReadOnlyList<MmdBoneDefinition?> indexedBones)
-        {
-            var children = new IReadOnlyList<int>[indexedBones.Count];
-            var mutableChildren = new List<int>[indexedBones.Count];
-            for (int index = 0; index < indexedBones.Count; index++)
-            {
-                mutableChildren[index] = new List<int>();
-            }
-
-            for (int index = 0; index < indexedBones.Count; index++)
-            {
-                int parentIndex = indexedBones[index]?.parentIndex ?? -1;
-                if (parentIndex >= 0 && parentIndex < indexedBones.Count)
-                {
-                    mutableChildren[parentIndex].Add(index);
-                }
-            }
-
-            for (int index = 0; index < indexedBones.Count; index++)
-            {
-                children[index] = mutableChildren[index];
-            }
-
-            return children;
-        }
-
-        private static float[][] CaptureLocalTranslations(
-            MmdModelDefinition model,
-            IReadOnlyList<MmdBoneDefinition?> indexedBones,
-            MmdSampledMotion result)
-        {
-            var translations = new float[indexedBones.Count][];
-            for (int i = 0; i < indexedBones.Count; i++)
-            {
-                translations[i] = new[] { 0.0f, 0.0f, 0.0f };
-            }
-
-            for (int index = 0; index < indexedBones.Count; index++)
-            {
-                MmdBoneDefinition? bone = indexedBones[index];
+                MmdBoneDefinition? bone = topologyPlan.IndexedBones[index];
                 if (bone == null)
                 {
+                    translations[index] = new[] { 0.0f, 0.0f, 0.0f };
                     continue;
                 }
 
                 MmdBonePoseSample pose = result.Bones.TryGetValue(bone.name, out MmdBonePoseSample found)
                     ? found
                     : MmdBonePoseSample.Identity;
-                translations[index] = MmdPoseEvaluator.GetLocalTranslation(model, bone, pose);
+                float[] bindOffset = topologyPlan.BindOffsets[index];
+                translations[index] = new[]
+                {
+                    bindOffset[0] + pose.Translation[0],
+                    bindOffset[1] + pose.Translation[1],
+                    bindOffset[2] + pose.Translation[2]
+                };
             }
 
             return translations;
@@ -834,17 +830,9 @@ namespace Mmd.Motion
             result.Bones[bone.name] = new MmdBonePoseSample(current.Translation, rotation);
         }
 
-        private static MmdBoneDefinition? FindBone(MmdModelDefinition model, int index)
+        private static MmdBoneDefinition? FindBone(IReadOnlyList<MmdBoneDefinition?> indexedBones, int index)
         {
-            for (int i = 0; i < model.bones.Count; i++)
-            {
-                if (model.bones[i].index == index)
-                {
-                    return model.bones[i];
-                }
-            }
-
-            return null;
+            return index >= 0 && index < indexedBones.Count ? indexedBones[index] : null;
         }
 
         private static float[] MatrixTranslation(float[] matrices, int index)

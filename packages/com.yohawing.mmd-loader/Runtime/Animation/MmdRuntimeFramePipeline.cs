@@ -45,6 +45,7 @@ namespace Mmd
             bool collectTiming = false,
             MmdTopologyPlan? topologyPlan = null)
         {
+            topologyPlan?.EnsureModel(model);
             ikSolver ??= new MmdIkSolver();
             MmdRuntimeFrameTiming? timing = collectTiming ? new MmdRuntimeFrameTiming() : null;
             long started;
@@ -71,7 +72,14 @@ namespace Mmd
 
             started = Stopwatch.GetTimestamp();
             MmdSampledMotion ikMotion = ikSolver is MmdIkSolver mmdIkSolver
-                ? mmdIkSolver.Solve(model, boneMorphedMotion, appendedMotion, MmdBoneEvaluationPass.BeforePhysics)
+                ? topologyPlan != null
+                    ? mmdIkSolver.SolveWithValidatedTopology(
+                        model,
+                        boneMorphedMotion,
+                        appendedMotion,
+                        MmdBoneEvaluationPass.BeforePhysics,
+                        topologyPlan)
+                    : mmdIkSolver.Solve(model, boneMorphedMotion, appendedMotion, MmdBoneEvaluationPass.BeforePhysics)
                 : ikSolver.Solve(model, appendedMotion);
             RecordTiming(timing, started, ticks => timing!.IkSolveTicks = ticks);
 
@@ -96,7 +104,14 @@ namespace Mmd
 
                 started = Stopwatch.GetTimestamp();
                 MmdSampledMotion afterIkMotion = ikSolver is MmdIkSolver afterPassIkSolver
-                    ? afterPassIkSolver.Solve(model, ikMotion, afterAppendMotion, MmdBoneEvaluationPass.AfterPhysics)
+                    ? topologyPlan != null
+                        ? afterPassIkSolver.SolveWithValidatedTopology(
+                            model,
+                            ikMotion,
+                            afterAppendMotion,
+                            MmdBoneEvaluationPass.AfterPhysics,
+                            topologyPlan)
+                        : afterPassIkSolver.Solve(model, ikMotion, afterAppendMotion, MmdBoneEvaluationPass.AfterPhysics)
                     : ikSolver.Solve(model, afterAppendMotion);
                 finalMotion = MergeAfterPhysicsMotion(model, ikMotion, afterIkMotion);
                 RecordTiming(timing, started, ticks => timing!.IkSolveTicks += ticks);

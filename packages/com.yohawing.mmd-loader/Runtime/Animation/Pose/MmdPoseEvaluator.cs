@@ -13,17 +13,20 @@ namespace Mmd.Pose
         private MmdTopologyPlan(
             MmdModelDefinition model,
             MmdBoneDefinition?[] indexedBones,
+            IReadOnlyList<int>[] indexedChildren,
             float[][] bindOffsets,
             ulong sourceFingerprint)
         {
             Model = model;
             IndexedBones = indexedBones;
+            IndexedChildren = indexedChildren;
             BindOffsets = bindOffsets;
             SourceFingerprint = sourceFingerprint;
         }
 
         internal MmdModelDefinition Model { get; }
         internal MmdBoneDefinition?[] IndexedBones { get; }
+        internal IReadOnlyList<int>[] IndexedChildren { get; }
         internal float[][] BindOffsets { get; }
         private ulong SourceFingerprint { get; }
 
@@ -65,9 +68,12 @@ namespace Mmd.Pose
                 indexedBones[bone.index] = bone;
             }
 
+            var mutableChildren = new List<int>[indexedBones.Length];
+            var indexedChildren = new IReadOnlyList<int>[indexedBones.Length];
             var bindOffsets = new float[indexedBones.Length][];
             for (int index = 0; index < indexedBones.Length; index++)
             {
+                mutableChildren[index] = new List<int>();
                 bindOffsets[index] = new[] { 0.0f, 0.0f, 0.0f };
             }
 
@@ -80,6 +86,10 @@ namespace Mmd.Pose
                 }
 
                 int parentIndex = bone.parentIndex;
+                if (parentIndex >= 0)
+                {
+                    mutableChildren[parentIndex].Add(index);
+                }
                 float[] origin = OriginOrZero(bone);
                 float[] parentOrigin = parentIndex >= 0 ? OriginOrZero(indexedBones[parentIndex]) : Zero();
                 bindOffsets[index] = new[]
@@ -90,8 +100,13 @@ namespace Mmd.Pose
                 };
             }
 
+            for (int index = 0; index < indexedBones.Length; index++)
+            {
+                indexedChildren[index] = mutableChildren[index];
+            }
+
             ValidateAcyclic(indexedBones);
-            return new MmdTopologyPlan(model, indexedBones, bindOffsets, ComputeSourceFingerprint(model));
+            return new MmdTopologyPlan(model, indexedBones, indexedChildren, bindOffsets, ComputeSourceFingerprint(model));
         }
 
         internal void EnsureModel(MmdModelDefinition model)

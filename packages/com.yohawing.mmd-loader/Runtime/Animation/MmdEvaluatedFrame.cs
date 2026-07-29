@@ -103,12 +103,12 @@ namespace Mmd
         {
             ValidateFrame(frame);
             ValidateTime(time);
-            topologyPlan.EnsureModel(model);
             if (ikSolver != null)
             {
                 return EvaluateManagedFrame(model, motion, frame, time, includeMaterials: false, physicsBackend, ikSolver, topologyPlan);
             }
 
+            topologyPlan.EnsureModel(model);
             return EvaluateNativeFrame(model, motion, frame, time, includeMaterials: false);
         }
 
@@ -143,12 +143,12 @@ namespace Mmd
             // This is equivalent to the old "before physics" stage.
             ValidateFrame(frame);
             ValidateTime(time);
-            topologyPlan.EnsureModel(model);
             if (ikSolver != null)
             {
                 return EvaluateManagedFrame(model, motion, frame, time, includeMaterials: false, physicsBackend, ikSolver, topologyPlan);
             }
 
+            topologyPlan.EnsureModel(model);
             return EvaluateNativeFrame(model, motion, frame, time, includeMaterials: false);
         }
 

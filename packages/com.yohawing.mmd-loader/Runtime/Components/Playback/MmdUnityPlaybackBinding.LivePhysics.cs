@@ -281,11 +281,14 @@ namespace Mmd.UnityIntegration
                 model,
                 postPhysicsPose,
                 MmdBoneEvaluationPass.AfterPhysics);
-            MmdSampledMotion afterIk = new MmdIkSolver().SolveValidated(
+            MmdTopologyPlan topologyPlan = session.TopologyPlan;
+            topologyPlan.EnsureModel(model);
+            MmdSampledMotion afterIk = new MmdIkSolver().SolveWithValidatedTopology(
                 model,
                 postPhysicsPose,
                 afterAppend,
-                MmdBoneEvaluationPass.AfterPhysics);
+                MmdBoneEvaluationPass.AfterPhysics,
+                topologyPlan);
             ApplyBoneTransformsOnly(afterIk, bone => bone.deformAfterPhysics);
         }
 
