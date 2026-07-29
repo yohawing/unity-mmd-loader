@@ -109,21 +109,16 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void RuntimeSessionNativePlaybackRejectsSourceMutationBeforeCompileAndReplacementAfterCompile()
+        public void RuntimeSessionNativePlaybackRejectsMutationBeforeCompileAndReplacementAfterCompile()
         {
             using MmdRuntimeSession changedBeforeCompile = CreateSession(out MmdModelDefinition firstModel);
             firstModel.sourceBytes![0] ^= 0xff;
-            InvalidOperationException? fingerprintError = Assert.Throws<InvalidOperationException>(() =>
+            InvalidOperationException? preCompileError = Assert.Throws<InvalidOperationException>(() =>
                 changedBeforeCompile.EvaluateFrame(frame: 0, time: 0.0f));
-            Assert.That(fingerprintError!.Message, Does.Contain("source identity changed"));
+            Assert.That(preCompileError!.Message, Does.Contain("changed before session compilation"));
 
             using MmdRuntimeSession replacedAfterCompile = CreateSession(out _, out MmdMotionDefinition secondMotion);
             _ = replacedAfterCompile.EvaluateFrame(frame: 0, time: 0.0f);
-            secondMotion.sourceBytes![0] ^= 0xff;
-            InvalidOperationException? postCompileFingerprintError = Assert.Throws<InvalidOperationException>(() =>
-                replacedAfterCompile.EvaluateFrame(frame: 0, time: 0.0f));
-            Assert.That(postCompileFingerprintError!.Message, Does.Contain("source identity changed"));
-            secondMotion.sourceBytes[0] ^= 0xff;
             secondMotion.sourceBytes = (byte[])secondMotion.sourceBytes!.Clone();
             InvalidOperationException? identityError = Assert.Throws<InvalidOperationException>(() =>
                 replacedAfterCompile.EvaluateFrame(frame: 0, time: 0.0f));

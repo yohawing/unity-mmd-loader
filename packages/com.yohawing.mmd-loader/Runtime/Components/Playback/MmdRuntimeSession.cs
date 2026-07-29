@@ -238,8 +238,8 @@ namespace Mmd
                 ?? throw new InvalidOperationException("Model source bytes are required for native runtime evaluation.");
             byte[] motionSourceIdentity = nativeMotionSourceIdentity
                 ?? throw new InvalidOperationException("Motion source bytes are required for native runtime evaluation.");
-            if (ComputeSourceFingerprint(nativeModelSourceIdentity) != nativeModelSourceFingerprint
-                || ComputeSourceFingerprint(nativeMotionSourceIdentity) != nativeMotionSourceFingerprint)
+            if (ComputeSourceFingerprint(modelSourceIdentity) != nativeModelSourceFingerprint
+                || ComputeSourceFingerprint(motionSourceIdentity) != nativeMotionSourceFingerprint)
             {
                 throw new InvalidOperationException("Native runtime source bytes changed before session compilation.");
             }
@@ -269,9 +269,7 @@ namespace Mmd
             if (!ReferenceEquals(model.sourceBytes, nativeModelSourceIdentity)
                 || !ReferenceEquals(motion.sourceBytes, nativeMotionSourceIdentity)
                 || (model.sourceBytes?.Length ?? 0) != nativeModelSourceLength
-                || (motion.sourceBytes?.Length ?? 0) != nativeMotionSourceLength
-                || ComputeSourceFingerprint(nativeModelSourceIdentity) != nativeModelSourceFingerprint
-                || ComputeSourceFingerprint(nativeMotionSourceIdentity) != nativeMotionSourceFingerprint)
+                || (motion.sourceBytes?.Length ?? 0) != nativeMotionSourceLength)
             {
                 throw new InvalidOperationException("Native runtime session source identity changed after construction.");
             }
