@@ -739,27 +739,27 @@ namespace Mmd.UnityIntegration
 
         private static Texture2D[] GetOwnedTextures(MmdRuntimeTextureResolution textureResolution)
         {
-            var textures = new Texture2D[
-                textureResolution.DiffuseTextures.Count
-                + textureResolution.SphereTextures.Count
-                + textureResolution.ToonTextures.Count];
-            int index = 0;
+            var textures = new List<Texture2D>();
+            var seen = new HashSet<int>();
             for (int i = 0; i < textureResolution.DiffuseTextures.Count; i++)
             {
-                textures[index++] = textureResolution.DiffuseTextures[i].Texture;
+                Texture2D texture = textureResolution.DiffuseTextures[i].Texture;
+                if (seen.Add(texture.GetInstanceID())) textures.Add(texture);
             }
 
             for (int i = 0; i < textureResolution.SphereTextures.Count; i++)
             {
-                textures[index++] = textureResolution.SphereTextures[i].Texture;
+                Texture2D texture = textureResolution.SphereTextures[i].Texture;
+                if (seen.Add(texture.GetInstanceID())) textures.Add(texture);
             }
 
             for (int i = 0; i < textureResolution.ToonTextures.Count; i++)
             {
-                textures[index++] = textureResolution.ToonTextures[i].Texture;
+                Texture2D texture = textureResolution.ToonTextures[i].Texture;
+                if (seen.Add(texture.GetInstanceID())) textures.Add(texture);
             }
 
-            return textures;
+            return textures.ToArray();
         }
 
         private static string ResolveModelName(string modelName)

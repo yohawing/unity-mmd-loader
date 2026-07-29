@@ -152,6 +152,7 @@ namespace Mmd.UnityIntegration
             var diffuseTextures = new List<MmdResolvedTexture>(descriptor.materials.Count);
             var sphereTextures = new List<MmdResolvedTexture>(descriptor.materials.Count);
             var toonTextures = new List<MmdResolvedTexture>(descriptor.materials.Count);
+            var decodedTextures = new Dictionary<string, Texture2D>(StringComparer.OrdinalIgnoreCase);
 
             foreach (MmdMaterialDescriptor material in descriptor.materials)
             {
@@ -165,7 +166,8 @@ namespace Mmd.UnityIntegration
                     MmdTextureUsage.Diffuse,
                     material.texture,
                     sourceContext,
-                    diagnostics);
+                    diagnostics,
+                    decodedTextures);
                 if (diffuseTexture != null)
                 {
                     diffuseTextures.Add(diffuseTexture);
@@ -178,7 +180,8 @@ namespace Mmd.UnityIntegration
                     material.sphereTexture,
                     sourceContext,
                     sphereTextures,
-                    diagnostics);
+                    diagnostics,
+                    decodedTextures);
                 int toonCountBeforeLoad = toonTextures.Count;
                 LoadLaterPhaseTexture(
                     material.materialIndex,
@@ -186,7 +189,8 @@ namespace Mmd.UnityIntegration
                     material.toonTexture,
                     sourceContext,
                     toonTextures,
-                    diagnostics);
+                    diagnostics,
+                    decodedTextures);
 
                 // MMD shared toon (toon01..toon10) materials carry only an index, not a texture
                 // path, so the path-based load above never resolves them. Substitute the built-in
@@ -238,7 +242,8 @@ namespace Mmd.UnityIntegration
             string? textureReference,
             MmdUnityModelSourceContext? sourceContext,
             List<MmdResolvedTexture> destination,
-            MmdTextureBindingDiagnostics diagnostics)
+            MmdTextureBindingDiagnostics diagnostics,
+            Dictionary<string, Texture2D> decodedTextures)
         {
             string normalizedReference = NormalizeTextureReference(textureReference);
             if (normalizedReference.Length == 0)
@@ -260,7 +265,8 @@ namespace Mmd.UnityIntegration
                 usage,
                 normalizedReference,
                 sourceContext,
-                diagnostics);
+                diagnostics,
+                decodedTextures);
             if (resolvedTexture == null)
             {
                 return;
@@ -284,7 +290,8 @@ namespace Mmd.UnityIntegration
             MmdTextureUsage usage,
             string? rawTextureReference,
             MmdUnityModelSourceContext? sourceContext,
-            MmdTextureBindingDiagnostics diagnostics)
+            MmdTextureBindingDiagnostics diagnostics,
+            Dictionary<string, Texture2D> decodedTextures)
         {
             string textureReference = NormalizeTextureReference(rawTextureReference);
             string diagnosticReference = GetDiagnosticReference(textureReference);
@@ -358,7 +365,15 @@ namespace Mmd.UnityIntegration
                 return null;
             }
 
+            string cacheKey = usage + "|" + resolvedPath;
             Texture2D? texture;
+            if (decodedTextures.TryGetValue(cacheKey, out texture))
+            {
+                diagnostics.AddTextureReference(CreateReferenceDiagnostic(
+                    materialIndex, usage, diagnosticReference, diagnosticPath, status: "loaded", reason: string.Empty));
+                return new MmdResolvedTexture(materialIndex, usage, textureReference, resolvedPath, texture);
+            }
+
             try
             {
                 byte[] bytes = MmdTextureDecodeBudget.Default.ReadFileBytes(resolvedPath);
@@ -393,6 +408,7 @@ namespace Mmd.UnityIntegration
             }
 
             texture.hideFlags = HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild;
+            decodedTextures.Add(cacheKey, texture);
             diagnostics.AddTextureReference(CreateReferenceDiagnostic(
                 materialIndex,
                 usage,
