@@ -388,16 +388,20 @@ namespace Mmd.UnityIntegration
 
                 // Diffuse color with alpha.
                 Color diffuse = ToUnityColor(modified.diffuseColor, modified.alpha, Color.white);
-                if (HasMaterialProperty(material, targets.BaseColorProperty))
+                if (HasMaterialProperty(material, targets.BaseColorProperty) &&
+                    material.GetColor(targets.BaseColorProperty) != diffuse)
                 {
                     material.SetColor(targets.BaseColorProperty, diffuse);
+                    instance.RecordMaterialMorphPropertyWrite();
                 }
 
                 // Ambient color.
                 Color ambient = ToUnityColor(modified.ambientColor, 1.0f, new Color(0.25f, 0.25f, 0.25f, 1.0f));
-                if (HasMaterialProperty(material, targets.AmbientColorProperty))
+                if (HasMaterialProperty(material, targets.AmbientColorProperty) &&
+                    material.GetColor(targets.AmbientColorProperty) != ambient)
                 {
                     material.SetColor(targets.AmbientColorProperty, ambient);
+                    instance.RecordMaterialMorphPropertyWrite();
                 }
 
                 // Edge color with alpha.
@@ -405,39 +409,42 @@ namespace Mmd.UnityIntegration
                     ? modified.edgeColor[3]
                     : 1.0f;
                 Color edge = ToUnityColor(modified.edgeColor, edgeAlpha, Color.black);
-                if (HasMaterialProperty(material, targets.OutlineColorProperty))
+                if (HasMaterialProperty(material, targets.OutlineColorProperty) &&
+                    material.GetColor(targets.OutlineColorProperty) != edge)
                 {
                     material.SetColor(targets.OutlineColorProperty, edge);
+                    instance.RecordMaterialMorphPropertyWrite();
                 }
 
                 // Edge width matches initial creation: the raw PMX edgeSize is the screen-space
                 // pixel width consumed by the outline shader (no object-space scale). A material
                 // with the draw-edge flag off collapses to zero so no silhouette ring appears.
-                if (HasMaterialProperty(material, targets.OutlineWidthProperty))
+                float outlineWidth = modified.drawEdgeFlag ? modified.edgeSize : 0.0f;
+                if (HasMaterialProperty(material, targets.OutlineWidthProperty) &&
+                    material.GetFloat(targets.OutlineWidthProperty) != outlineWidth)
                 {
-                    material.SetFloat(
-                        targets.OutlineWidthProperty,
-                        modified.drawEdgeFlag ? modified.edgeSize : 0.0f);
+                    material.SetFloat(targets.OutlineWidthProperty, outlineWidth);
+                    instance.RecordMaterialMorphPropertyWrite();
                 }
 
-                // Apply alpha to _BaseColor and _Color if the diffuse alpha changed.
-                if (HasMaterialProperty(material, targets.BaseColorProperty))
-                {
-                    Color c = material.GetColor(targets.BaseColorProperty);
-                    c.a = modified.alpha;
-                    material.SetColor(targets.BaseColorProperty, c);
-                }
-
+                // BaseColor already carries the resolved diffuse alpha. Color is a separate
+                // compatibility target: preserve its RGB and update only its alpha when needed.
                 if (HasMaterialProperty(material, targets.ColorProperty))
                 {
                     Color c = material.GetColor(targets.ColorProperty);
-                    c.a = modified.alpha;
-                    material.SetColor(targets.ColorProperty, c);
+                    if (c.a != modified.alpha)
+                    {
+                        c.a = modified.alpha;
+                        material.SetColor(targets.ColorProperty, c);
+                        instance.RecordMaterialMorphPropertyWrite();
+                    }
                 }
 
-                if (HasMaterialProperty(material, targets.AlphaProperty))
+                if (HasMaterialProperty(material, targets.AlphaProperty) &&
+                    material.GetFloat(targets.AlphaProperty) != modified.alpha)
                 {
                     material.SetFloat(targets.AlphaProperty, modified.alpha);
+                    instance.RecordMaterialMorphPropertyWrite();
                 }
             }
         }

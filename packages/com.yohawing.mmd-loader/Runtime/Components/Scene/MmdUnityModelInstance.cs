@@ -124,6 +124,13 @@ namespace Mmd.UnityIntegration
 
         internal float[] LastBlendShapeBoundsWeights { get; }
 
+        internal int MaterialMorphPropertyWriteCount { get; private set; }
+
+        internal void RecordMaterialMorphPropertyWrite()
+        {
+            MaterialMorphPropertyWriteCount++;
+        }
+
         public int VertexCount { get; }
 
         public int IndexCount { get; }

@@ -323,6 +323,44 @@ namespace Mmd.Tests
             Assert.That(restored1Color.a, Is.EqualTo(base1Color.a).Within(0.00001f), "Zero weight should restore material 1 alpha");
             Assert.That(restored0Outline, Is.EqualTo(base0Outline).Within(0.00001f), "Zero weight should restore material 0 outline width");
         }
+
+        [Test]
+        public void ApplyMaterialMorphSkipsUnchangedPropertyWritesAndWritesBaseOnRestore()
+        {
+            MmdModelDefinition model = CreateMaterialMorphMultiplyModel();
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
+            Color baseColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
+
+            MmdEvaluatedFrame active = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            active.morphs.Add(new MmdEvaluatedMorphWeight { name = "multiply-change", weight = 1.0f });
+            MmdUnityFrameApplier.ApplyFrame(instance, active);
+            int writesAfterFirstApply = instance.MaterialMorphPropertyWriteCount;
+            Color firstColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
+
+            MmdUnityFrameApplier.ApplyFrame(instance, active);
+            Assert.That(instance.MaterialMorphPropertyWriteCount, Is.EqualTo(writesAfterFirstApply),
+                "Unchanged resolved material morph values must not write Unity Material properties again.");
+            Assert.That(ReadMaterialColor(instance.Materials[0], "_BaseColor"), Is.EqualTo(firstColor));
+
+            instance.Materials[0].SetColor("_BaseColor", Color.magenta);
+            MmdUnityFrameApplier.ApplyFrame(instance, active);
+            Assert.That(ReadMaterialColor(instance.Materials[0], "_BaseColor"), Is.EqualTo(firstColor),
+                "External material edits must not leave the resolved morph value stale.");
+            int writesAfterExternalEdit = instance.MaterialMorphPropertyWriteCount;
+
+            MmdEvaluatedFrame zero = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            zero.morphs.Add(new MmdEvaluatedMorphWeight { name = "multiply-change", weight = 0.0f });
+            MmdUnityFrameApplier.ApplyFrame(instance, zero);
+
+            Assert.That(instance.MaterialMorphPropertyWriteCount, Is.GreaterThan(writesAfterExternalEdit),
+                "Returning to zero weight must write the base material values.");
+            Color restoredColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
+            Assert.That(restoredColor.r, Is.EqualTo(baseColor.r).Within(0.00001f));
+            Assert.That(restoredColor.g, Is.EqualTo(baseColor.g).Within(0.00001f));
+            Assert.That(restoredColor.b, Is.EqualTo(baseColor.b).Within(0.00001f));
+            Assert.That(restoredColor.a, Is.EqualTo(baseColor.a).Within(0.00001f));
+        }
         [Test]
         public void ApplyFrameExpandsFlipMorphWeightToTargetVertexMorph()
         {
