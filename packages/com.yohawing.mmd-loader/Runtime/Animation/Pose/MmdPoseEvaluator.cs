@@ -14,6 +14,7 @@ namespace Mmd.Pose
         {
             BoneIndex = link.boneIndex;
             HasLimit = link.hasLimit;
+            HasCompleteLimit = link.minimumAngle?.Length >= 3 && link.maximumAngle?.Length >= 3;
             MinimumX = ComponentOrZero(link.minimumAngle, 0);
             MinimumY = ComponentOrZero(link.minimumAngle, 1);
             MinimumZ = ComponentOrZero(link.minimumAngle, 2);
@@ -24,12 +25,29 @@ namespace Mmd.Pose
 
         internal int BoneIndex { get; }
         internal bool HasLimit { get; }
+        internal bool HasCompleteLimit { get; }
         internal float MinimumX { get; }
         internal float MinimumY { get; }
         internal float MinimumZ { get; }
         internal float MaximumX { get; }
         internal float MaximumY { get; }
         internal float MaximumZ { get; }
+
+        internal float GetMinimumAngle(int axis) => axis switch
+        {
+            0 => MinimumX,
+            1 => MinimumY,
+            2 => MinimumZ,
+            _ => throw new ArgumentOutOfRangeException(nameof(axis))
+        };
+
+        internal float GetMaximumAngle(int axis) => axis switch
+        {
+            0 => MaximumX,
+            1 => MaximumY,
+            2 => MaximumZ,
+            _ => throw new ArgumentOutOfRangeException(nameof(axis))
+        };
 
         private static float ComponentOrZero(float[]? values, int index)
         {

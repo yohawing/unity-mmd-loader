@@ -80,7 +80,7 @@ namespace Mmd.Motion
             float[] worldMatrices = ComposeWorldMatrices(indexedBones, translations, rotations);
 
             var chainChangedBoneIndices = new HashSet<int>(indexedBones.Length);
-            foreach (MmdIkDefinition ik in model.ik)
+            foreach (MmdIkChainTopology ik in topologyPlan.IkChains)
             {
                 if (pass.HasValue && !ShouldEvaluateIkInPass(indexedBones, ik, pass.Value))
                 {
@@ -173,7 +173,8 @@ namespace Mmd.Motion
             }
             topologyPlan ??= MmdTopologyPlan.CreateFromValidatedModel(model);
             MmdSampledMotion result = CopySampledMotion(appendedMotion);
-            HashSet<int> sourceBoneIndices = SolveChains(model, result, model.ik, pass, topologyPlan);
+            HashSet<int> sourceBoneIndices = SolveChains(
+                model, result, topologyPlan.IkChains, pass, null, topologyPlan);
             return pass.HasValue
                 ? MmdAppendTransformEvaluator.ReapplyAppendTransformsForSources(model, preAppendMotion, result, sourceBoneIndices, pass.Value)
                 : MmdAppendTransformEvaluator.ReapplyAppendTransformsForSources(model, preAppendMotion, result, sourceBoneIndices);
@@ -196,51 +197,17 @@ namespace Mmd.Motion
             }
 
             MmdModelValidator.ThrowIfInvalid(model);
+            MmdTopologyPlan topologyPlan = MmdTopologyPlan.CreateFromValidatedModel(model);
             MmdSampledMotion result = CopySampledMotion(appendedMotion);
-            HashSet<int> sourceBoneIndices = SolveChains(model, result, model.ik, breakdown);
+            HashSet<int> sourceBoneIndices = SolveChains(
+                model, result, topologyPlan.IkChains, null, breakdown, topologyPlan);
             return MmdAppendTransformEvaluator.ReapplyAppendTransformsForSources(model, preAppendMotion, result, sourceBoneIndices);
         }
 
         private static HashSet<int> SolveChains(
             MmdModelDefinition model,
             MmdSampledMotion result,
-            IReadOnlyList<MmdIkDefinition> chains)
-        {
-            return SolveChains(model, result, chains, pass: null, breakdown: null);
-        }
-
-        private static HashSet<int> SolveChains(
-            MmdModelDefinition model,
-            MmdSampledMotion result,
-            IReadOnlyList<MmdIkDefinition> chains,
-            MmdBoneEvaluationPass? pass)
-        {
-            return SolveChains(model, result, chains, pass, breakdown: null);
-        }
-
-        private static HashSet<int> SolveChains(
-            MmdModelDefinition model,
-            MmdSampledMotion result,
-            IReadOnlyList<MmdIkDefinition> chains,
-            MmdBoneEvaluationPass? pass,
-            MmdTopologyPlan topologyPlan)
-        {
-            return SolveChains(model, result, chains, pass, breakdown: null, topologyPlan);
-        }
-
-        private static HashSet<int> SolveChains(
-            MmdModelDefinition model,
-            MmdSampledMotion result,
-            IReadOnlyList<MmdIkDefinition> chains,
-            MmdIkSolveBreakdownAccumulator? breakdown)
-        {
-            return SolveChains(model, result, chains, pass: null, breakdown);
-        }
-
-        private static HashSet<int> SolveChains(
-            MmdModelDefinition model,
-            MmdSampledMotion result,
-            IReadOnlyList<MmdIkDefinition> chains,
+            IReadOnlyList<MmdIkChainTopology> chains,
             MmdBoneEvaluationPass? pass,
             MmdIkSolveBreakdownAccumulator? breakdown,
             MmdTopologyPlan? topologyPlan = null)
@@ -266,7 +233,7 @@ namespace Mmd.Motion
                 breakdown.SetupMs += ToMilliseconds(Stopwatch.GetTimestamp() - setupStarted);
             }
 
-            foreach (MmdIkDefinition ik in chains)
+            foreach (MmdIkChainTopology ik in chains)
             {
                 if (pass.HasValue && !ShouldEvaluateIkInPass(indexedBones, ik, pass.Value))
                 {
@@ -292,9 +259,9 @@ namespace Mmd.Motion
             return changedBoneIndices;
         }
 
-        private static bool ShouldEvaluateIkInPass(IReadOnlyList<MmdBoneDefinition?> indexedBones, MmdIkDefinition ik, MmdBoneEvaluationPass pass)
+        private static bool ShouldEvaluateIkInPass(IReadOnlyList<MmdBoneDefinition?> indexedBones, MmdIkChainTopology ik, MmdBoneEvaluationPass pass)
         {
-            MmdBoneDefinition? bone = FindBone(indexedBones, ik.boneIndex);
+            MmdBoneDefinition? bone = FindBone(indexedBones, ik.BoneIndex);
             if (bone == null)
             {
                 return false;
@@ -315,13 +282,13 @@ namespace Mmd.Motion
             float[][] ikRotations,
             float[][] rotations,
             float[] worldMatrices,
-            MmdIkDefinition ik,
+            MmdIkChainTopology ik,
             HashSet<int> changedBoneIndices,
             MmdIkSolveBreakdownAccumulator? breakdown = null)
         {
-            MmdBoneDefinition? goal = FindBone(indexedBones, ik.boneIndex);
-            MmdBoneDefinition? effector = FindBone(indexedBones, ik.targetBoneIndex);
-            if (goal == null || effector == null || ik.links.Count == 0)
+            MmdBoneDefinition? goal = FindBone(indexedBones, ik.BoneIndex);
+            MmdBoneDefinition? effector = FindBone(indexedBones, ik.TargetBoneIndex);
+            if (goal == null || effector == null || ik.Links.Count == 0)
             {
                 if (breakdown != null)
                 {
@@ -341,7 +308,7 @@ namespace Mmd.Motion
                 return EmptyChangedBoneIndices;
             }
 
-            int iterationCount = Math.Min(Math.Max(ik.iterationCount, 0), MaxIkLoopCount);
+            int iterationCount = Math.Min(Math.Max(ik.IterationCount, 0), MaxIkLoopCount);
             MmdIkChainBreakdownAccumulator? chainBreakdown = null;
             if (breakdown != null)
             {
@@ -355,13 +322,13 @@ namespace Mmd.Motion
                     goal.name,
                     goal.index,
                     effector.index,
-                    ik.links.Count,
-                    ik.iterationCount,
+                    ik.Links.Count,
+                    ik.IterationCount,
                     iterationCount);
             }
 
-            float limitAngle = ik.angleLimit > 0.0f ? ik.angleLimit : float.PositiveInfinity;
-            int linkCount = ik.links.Count;
+            float limitAngle = ik.AngleLimit > 0.0f ? ik.AngleLimit : float.PositiveInfinity;
+            int linkCount = ik.Links.Count;
             float[][] previousEulerAngles = new float[linkCount][];
             for (int linkIndex = 0; linkIndex < linkCount; linkIndex++)
             {
@@ -372,7 +339,7 @@ namespace Mmd.Motion
             float[][] savedLinkRotations = new float[linkCount][];
             for (int linkIndex = 0; linkIndex < linkCount; linkIndex++)
             {
-                int boneIndex = ik.links[linkIndex].boneIndex;
+                int boneIndex = ik.Links[linkIndex].BoneIndex;
                 savedLinkRotations[linkIndex] = boneIndex >= 0 && boneIndex < ikRotations.Length
                     ? CopyQuaternion(ikRotations[boneIndex])
                     : CopyQuaternion(MmdBonePoseSample.Identity.Rotation);
@@ -398,16 +365,16 @@ namespace Mmd.Motion
                     break;
                 }
 
-                for (int linkIndex = 0; linkIndex < ik.links.Count; linkIndex++)
+                for (int linkIndex = 0; linkIndex < ik.Links.Count; linkIndex++)
                 {
                     if (chainBreakdown != null)
                     {
                         chainBreakdown.linkVisitCount++;
                     }
 
-                    MmdIkLinkDefinition link = ik.links[linkIndex];
-                    MmdBoneDefinition? linkBone = FindBone(indexedBones, link.boneIndex);
-                    if (linkBone == null || link.boneIndex == ik.targetBoneIndex)
+                    MmdIkLinkTopology link = ik.Links[linkIndex];
+                    MmdBoneDefinition? linkBone = FindBone(indexedBones, link.BoneIndex);
+                    if (linkBone == null || link.BoneIndex == ik.TargetBoneIndex)
                     {
                         continue;
                     }
@@ -447,7 +414,7 @@ namespace Mmd.Motion
                     float[] nextRotation = MmdQuaternionMath.Multiply(
                         MmdQuaternionMath.Multiply(ikRotations[linkBone.index], baseRotations[linkBone.index]),
                         delta);
-                    if (link.hasLimit)
+                    if (link.HasLimit)
                     {
                         long clampStarted = chainBreakdown != null ? Stopwatch.GetTimestamp() : 0;
                         nextRotation = ClampToLinkLimit(
@@ -490,9 +457,9 @@ namespace Mmd.Motion
                 {
                     float improvement = bestDistance - currentDistance;
                     bestDistance = currentDistance;
-                    for (int linkIndex = 0; linkIndex < ik.links.Count; linkIndex++)
+                    for (int linkIndex = 0; linkIndex < ik.Links.Count; linkIndex++)
                     {
-                        int boneIndex = ik.links[linkIndex].boneIndex;
+                        int boneIndex = ik.Links[linkIndex].BoneIndex;
                         if (boneIndex >= 0 && boneIndex < ikRotations.Length)
                         {
                             savedLinkRotations[linkIndex] = CopyQuaternion(ikRotations[boneIndex]);
@@ -588,17 +555,18 @@ namespace Mmd.Motion
             return result;
         }
 
-        private static bool TryGetSingleLimitAxis(MmdIkLinkDefinition link, out int axis)
+        private static bool TryGetSingleLimitAxis(MmdIkLinkTopology link, out int axis)
         {
             axis = -1;
-            if (link.minimumAngle.Length < 3 || link.maximumAngle.Length < 3)
+            if (!link.HasCompleteLimit)
             {
                 return false;
             }
 
             for (int index = 0; index < 3; index++)
             {
-                bool active = MathF.Abs(link.minimumAngle[index]) > 1e-6f || MathF.Abs(link.maximumAngle[index]) > 1e-6f;
+                bool active = MathF.Abs(link.GetMinimumAngle(index)) > 1e-6f
+                    || MathF.Abs(link.GetMaximumAngle(index)) > 1e-6f;
                 if (!active)
                 {
                     continue;
@@ -622,12 +590,12 @@ namespace Mmd.Motion
             IReadOnlyList<float[]> baseRotations,
             IList<float[]> ikRotations,
             IList<float[]> rotations,
-            MmdIkDefinition ik,
+            MmdIkChainTopology ik,
             IReadOnlyList<float[]> savedLinkRotations)
         {
-            for (int linkIndex = 0; linkIndex < ik.links.Count; linkIndex++)
+            for (int linkIndex = 0; linkIndex < ik.Links.Count; linkIndex++)
             {
-                MmdBoneDefinition? linkBone = FindBone(indexedBones, ik.links[linkIndex].boneIndex);
+                MmdBoneDefinition? linkBone = FindBone(indexedBones, ik.Links[linkIndex].BoneIndex);
                 if (linkBone == null || linkBone.index < 0 || linkBone.index >= rotations.Count)
                 {
                     continue;
@@ -645,7 +613,7 @@ namespace Mmd.Motion
             float[] worldMatrices,
             int linkBoneIndex,
             MmdBoneDefinition linkBone,
-            MmdIkLinkDefinition link,
+            MmdIkLinkTopology link,
             IReadOnlyList<MmdBoneDefinition?> indexedBones,
             bool useAxis,
             float limitAngle,
@@ -693,7 +661,7 @@ namespace Mmd.Motion
 
         private static float[] ResolveCcdAxis(
             MmdBoneDefinition linkBone,
-            MmdIkLinkDefinition link,
+            MmdIkLinkTopology link,
             float[] localCross,
             float[] worldCross,
             float[] worldMatrices,
@@ -705,7 +673,7 @@ namespace Mmd.Motion
                 return Normalize(new[] { linkBone.fixedAxisVector[0], linkBone.fixedAxisVector[1], linkBone.fixedAxisVector[2] });
             }
 
-            if (link.hasLimit && useAxis && TryGetSingleLimitAxis(link, out int limitAxis))
+            if (link.HasLimit && useAxis && TryGetSingleLimitAxis(link, out int limitAxis))
             {
                 float[] parentAxis = ParentWorldAxis(linkBone, worldMatrices, indexedBones, limitAxis);
                 float sign = Dot(worldCross, parentAxis) >= 0.0f ? 1.0f : -1.0f;
@@ -715,9 +683,9 @@ namespace Mmd.Motion
             return Normalize(localCross);
         }
 
-        private static float[] ClampToLinkLimit(float[] rotation, MmdIkLinkDefinition link, float[] previousEuler, bool useAxis)
+        private static float[] ClampToLinkLimit(float[] rotation, MmdIkLinkTopology link, float[] previousEuler, bool useAxis)
         {
-            if (link.minimumAngle.Length < 3 || link.maximumAngle.Length < 3)
+            if (!link.HasCompleteLimit)
             {
                 return rotation;
             }
@@ -726,9 +694,9 @@ namespace Mmd.Motion
             float[] euler = DecomposeEuler(QuaternionToRotation3(rotation), order);
             float[] clamped =
             {
-                LimitAngle(euler[0], link.minimumAngle[0], link.maximumAngle[0], useAxis),
-                LimitAngle(euler[1], link.minimumAngle[1], link.maximumAngle[1], useAxis),
-                LimitAngle(euler[2], link.minimumAngle[2], link.maximumAngle[2], useAxis)
+                LimitAngle(euler[0], link.MinimumX, link.MaximumX, useAxis),
+                LimitAngle(euler[1], link.MinimumY, link.MaximumY, useAxis),
+                LimitAngle(euler[2], link.MinimumZ, link.MaximumZ, useAxis)
             };
             previousEuler[0] = clamped[0];
             previousEuler[1] = clamped[1];
@@ -918,12 +886,12 @@ namespace Mmd.Motion
             };
         }
 
-        private static EulerRotationOrder ResolveRotationOrder(MmdIkLinkDefinition link)
+        private static EulerRotationOrder ResolveRotationOrder(MmdIkLinkTopology link)
         {
-            float minX = Math.Min(link.minimumAngle[0], link.maximumAngle[0]);
-            float maxX = Math.Max(link.minimumAngle[0], link.maximumAngle[0]);
-            float minY = Math.Min(link.minimumAngle[1], link.maximumAngle[1]);
-            float maxY = Math.Max(link.minimumAngle[1], link.maximumAngle[1]);
+            float minX = Math.Min(link.MinimumX, link.MaximumX);
+            float maxX = Math.Max(link.MinimumX, link.MaximumX);
+            float minY = Math.Min(link.MinimumY, link.MaximumY);
+            float maxY = Math.Max(link.MinimumY, link.MaximumY);
             if (-HalfPi < minX && maxX < HalfPi)
             {
                 return EulerRotationOrder.Yxz;
