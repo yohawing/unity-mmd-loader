@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -67,6 +68,120 @@ namespace Mmd.Tests
             AssertPrivateFfiSignatureReturnName("ParsePmxSdefR0Buffer", "ByteBuffer", typeof(byte[]), typeof(IntPtr));
             AssertPrivateFfiSignatureReturnName("ParsePmxSdefR1Buffer", "ByteBuffer", typeof(byte[]), typeof(IntPtr));
             AssertPrivateFfiSignatureReturnName("ParsePmxSkinningModesJsonBuffer", "ByteBuffer", typeof(byte[]), typeof(IntPtr));
+        }
+
+        [Test]
+        public void ParserFfiPinsParseOncePmxGeometryHandleEntrypoints()
+        {
+            Assert.That(MmdParserFfiMethods.PmxGeometryCreateEntryPoint, Is.EqualTo("mmd_runtime_pmx_geometry_create"));
+            Assert.That(MmdParserFfiMethods.PmxGeometryFreeEntryPoint, Is.EqualTo("mmd_runtime_pmx_geometry_free"));
+            Assert.That(MmdParserFfiMethods.PmxGeometryPositionsBufferEntryPoint, Is.EqualTo("mmd_runtime_pmx_geometry_positions_buffer"));
+            Assert.That(MmdParserFfiMethods.PmxGeometryNormalsBufferEntryPoint, Is.EqualTo("mmd_runtime_pmx_geometry_normals_buffer"));
+            Assert.That(MmdParserFfiMethods.PmxGeometryUvsBufferEntryPoint, Is.EqualTo("mmd_runtime_pmx_geometry_uvs_buffer"));
+            Assert.That(MmdParserFfiMethods.PmxGeometryEdgeScaleBufferEntryPoint, Is.EqualTo("mmd_runtime_pmx_geometry_edge_scale_buffer"));
+            Assert.That(MmdParserFfiMethods.PmxGeometryIndicesBufferEntryPoint, Is.EqualTo("mmd_runtime_pmx_geometry_indices_buffer"));
+            Assert.That(MmdParserFfiMethods.PmxGeometrySkinIndicesBufferEntryPoint, Is.EqualTo("mmd_runtime_pmx_geometry_skin_indices_buffer"));
+            Assert.That(MmdParserFfiMethods.PmxGeometrySkinWeightsBufferEntryPoint, Is.EqualTo("mmd_runtime_pmx_geometry_skin_weights_buffer"));
+            Assert.That(MmdParserFfiMethods.PmxGeometrySdefEnabledBufferEntryPoint, Is.EqualTo("mmd_runtime_pmx_geometry_sdef_enabled_buffer"));
+            Assert.That(MmdParserFfiMethods.PmxGeometrySdefCBufferEntryPoint, Is.EqualTo("mmd_runtime_pmx_geometry_sdef_c_buffer"));
+            Assert.That(MmdParserFfiMethods.PmxGeometrySdefR0BufferEntryPoint, Is.EqualTo("mmd_runtime_pmx_geometry_sdef_r0_buffer"));
+            Assert.That(MmdParserFfiMethods.PmxGeometrySdefR1BufferEntryPoint, Is.EqualTo("mmd_runtime_pmx_geometry_sdef_r1_buffer"));
+            Assert.That(MmdParserFfiMethods.PmxGeometrySkinningModesJsonEntryPoint, Is.EqualTo("mmd_runtime_pmx_geometry_skinning_modes_json"));
+
+            AssertPrivateFfiSignature("PmxGeometryCreate", typeof(IntPtr), typeof(byte[]), typeof(IntPtr));
+            AssertPrivateFfiSignature("PmxGeometryFree", typeof(void), typeof(IntPtr));
+            foreach (string methodName in new[]
+                     {
+                         "PmxGeometryPositionsBuffer",
+                         "PmxGeometryNormalsBuffer",
+                         "PmxGeometryUvsBuffer",
+                         "PmxGeometryEdgeScaleBuffer",
+                         "PmxGeometryIndicesBuffer",
+                         "PmxGeometrySkinIndicesBuffer",
+                         "PmxGeometrySkinWeightsBuffer",
+                         "PmxGeometrySdefEnabledBuffer",
+                         "PmxGeometrySdefCBuffer",
+                         "PmxGeometrySdefR0Buffer",
+                         "PmxGeometrySdefR1Buffer",
+                         "PmxGeometrySkinningModesJsonBuffer"
+                     })
+            {
+                AssertPrivateFfiSignatureReturnName(methodName, "ByteBuffer", typeof(IntPtr));
+            }
+        }
+
+        [Test]
+        public void ParserFfiParseOncePmxGeometryHandleMatchesLegacyBuffers()
+        {
+            byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube.pmx");
+            IntPtr geometry = MmdParserFfiMethods.CreatePmxGeometry(pmxBytes);
+            Assert.That(geometry, Is.Not.EqualTo(IntPtr.Zero), "geometry handle");
+            try
+            {
+                CollectionAssert.AreEqual(MmdParserFfiMethods.ParsePmxPositions(pmxBytes), MmdParserFfiMethods.ParsePmxGeometryPositions(geometry));
+                CollectionAssert.AreEqual(MmdParserFfiMethods.ParsePmxNormals(pmxBytes), MmdParserFfiMethods.ParsePmxGeometryNormals(geometry));
+                CollectionAssert.AreEqual(MmdParserFfiMethods.ParsePmxUvs(pmxBytes), MmdParserFfiMethods.ParsePmxGeometryUvs(geometry));
+                CollectionAssert.AreEqual(MmdParserFfiMethods.ParsePmxEdgeScale(pmxBytes), MmdParserFfiMethods.ParsePmxGeometryEdgeScale(geometry));
+                CollectionAssert.AreEqual(MmdParserFfiMethods.ParsePmxIndices(pmxBytes), MmdParserFfiMethods.ParsePmxGeometryIndices(geometry));
+                CollectionAssert.AreEqual(MmdParserFfiMethods.ParsePmxSkinIndices(pmxBytes), MmdParserFfiMethods.ParsePmxGeometrySkinIndices(geometry));
+                CollectionAssert.AreEqual(MmdParserFfiMethods.ParsePmxSkinWeights(pmxBytes), MmdParserFfiMethods.ParsePmxGeometrySkinWeights(geometry));
+                CollectionAssert.AreEqual(MmdParserFfiMethods.ParsePmxSdefEnabled(pmxBytes), MmdParserFfiMethods.ParsePmxGeometrySdefEnabled(geometry));
+                CollectionAssert.AreEqual(MmdParserFfiMethods.ParsePmxSdefC(pmxBytes), MmdParserFfiMethods.ParsePmxGeometrySdefC(geometry));
+                CollectionAssert.AreEqual(MmdParserFfiMethods.ParsePmxSdefR0(pmxBytes), MmdParserFfiMethods.ParsePmxGeometrySdefR0(geometry));
+                CollectionAssert.AreEqual(MmdParserFfiMethods.ParsePmxSdefR1(pmxBytes), MmdParserFfiMethods.ParsePmxGeometrySdefR1(geometry));
+                Assert.That(MmdParserFfiMethods.ParsePmxGeometrySkinningModesJson(geometry),
+                    Is.EqualTo(MmdParserFfiMethods.ParsePmxSkinningModesJson(pmxBytes)));
+            }
+            finally
+            {
+                MmdParserFfiMethods.FreePmxGeometry(geometry);
+            }
+        }
+
+        [Test]
+        public void NativeParserUsesOneGeometryHandleAndFreesItAfterAllAccessors()
+        {
+            var reader = new CountingPmxGeometryReader();
+
+            var geometry = NativeMmdParser.CreatePmxGeometryFromNativeHandle(new byte[] { 1 }, reader);
+
+            Assert.That(reader.CreateCount, Is.EqualTo(1));
+            Assert.That(reader.FreeCount, Is.EqualTo(1));
+            foreach (string accessor in CountingPmxGeometryReader.AccessorNames)
+            {
+                Assert.That(reader.AccessorCallCount(accessor), Is.EqualTo(1), accessor);
+            }
+
+            CollectionAssert.AreEqual(new[] { 1.0f, 2.0f, 3.0f }, geometry.positions);
+            CollectionAssert.AreEqual(new uint[] { 0, 0, 0 }, geometry.indices);
+            CollectionAssert.AreEqual(new[] { "bdef1" }, geometry.skinningModes);
+        }
+
+        [Test]
+        public void NativeParserFreesGeometryHandleWhenAnAccessorFails()
+        {
+            var reader = new CountingPmxGeometryReader { ThrowOnAccessor = "normals" };
+
+            Assert.Throws<InvalidOperationException>(() =>
+                NativeMmdParser.CreatePmxGeometryFromNativeHandle(new byte[] { 1 }, reader));
+
+            Assert.That(reader.CreateCount, Is.EqualTo(1));
+            Assert.That(reader.AccessorCallCount("positions"), Is.EqualTo(1));
+            Assert.That(reader.AccessorCallCount("normals"), Is.EqualTo(1));
+            Assert.That(reader.FreeCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void NativeParserRejectsNullGeometryHandleWithoutFreeingIt()
+        {
+            var reader = new CountingPmxGeometryReader { CreatedHandle = IntPtr.Zero };
+
+            InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+                NativeMmdParser.CreatePmxGeometryFromNativeHandle(new byte[] { 1 }, reader))!;
+
+            Assert.That(exception.Message, Does.Contain("returned null"));
+            Assert.That(reader.CreateCount, Is.EqualTo(1));
+            Assert.That(reader.FreeCount, Is.EqualTo(0));
         }
 
         [Test]
@@ -578,6 +693,80 @@ namespace Mmd.Tests
             Assert.That(values[3], Is.EqualTo(0.5f).Within(0.0001f), "direction.x");
             Assert.That(values[4], Is.EqualTo(-0.5f).Within(0.0001f), "direction.y");
             Assert.That(values[5], Is.EqualTo(0.0f).Within(0.0001f), "direction.z");
+        }
+
+        private sealed class CountingPmxGeometryReader : IPmxGeometryReader
+        {
+            internal static readonly string[] AccessorNames =
+            {
+                "positions", "normals", "uvs", "edgeScale", "indices", "skinIndices", "skinWeights",
+                "sdefEnabled", "sdefC", "sdefR0", "sdefR1", "skinningModesJson"
+            };
+
+            private readonly Dictionary<string, int> accessorCalls = new Dictionary<string, int>();
+
+            internal int CreateCount { get; private set; }
+            internal int FreeCount { get; private set; }
+            internal string ThrowOnAccessor { get; set; } = string.Empty;
+            internal IntPtr CreatedHandle { get; set; } = new IntPtr(1);
+
+            public IntPtr Create(byte[] data)
+            {
+                CreateCount++;
+                return CreatedHandle;
+            }
+
+            public void Free(IntPtr geometry)
+            {
+                FreeCount++;
+            }
+
+            public float[] Positions(IntPtr geometry) => Float("positions", 1.0f, 2.0f, 3.0f);
+            public float[] Normals(IntPtr geometry) => Float("normals", 0.0f, 1.0f, 0.0f);
+            public float[] Uvs(IntPtr geometry) => Float("uvs", 0.0f, 1.0f);
+            public float[] EdgeScale(IntPtr geometry) => Float("edgeScale", 1.0f);
+            public uint[] Indices(IntPtr geometry) => Uint("indices", 0, 0, 0);
+            public uint[] SkinIndices(IntPtr geometry) => Uint("skinIndices", 0, 0, 0, 0);
+            public float[] SkinWeights(IntPtr geometry) => Float("skinWeights", 1.0f, 0.0f, 0.0f, 0.0f);
+            public bool[] SdefEnabled(IntPtr geometry) => Bool("sdefEnabled", false);
+            public float[] SdefC(IntPtr geometry) => Float("sdefC", 0.0f, 0.0f, 0.0f);
+            public float[] SdefR0(IntPtr geometry) => Float("sdefR0", 0.0f, 0.0f, 0.0f);
+            public float[] SdefR1(IntPtr geometry) => Float("sdefR1", 0.0f, 0.0f, 0.0f);
+            public string SkinningModesJson(IntPtr geometry)
+            {
+                Record("skinningModesJson");
+                return "{\"skinningModes\":[\"bdef1\"]}";
+            }
+
+            internal int AccessorCallCount(string name)
+                => accessorCalls.TryGetValue(name, out int count) ? count : 0;
+
+            private float[] Float(string name, params float[] values)
+            {
+                Record(name);
+                return values;
+            }
+
+            private uint[] Uint(string name, params uint[] values)
+            {
+                Record(name);
+                return values;
+            }
+
+            private bool[] Bool(string name, params bool[] values)
+            {
+                Record(name);
+                return values;
+            }
+
+            private void Record(string name)
+            {
+                accessorCalls[name] = AccessorCallCount(name) + 1;
+                if (string.Equals(name, ThrowOnAccessor, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("simulated accessor failure");
+                }
+            }
         }
 
     }
