@@ -34,6 +34,8 @@ namespace Mmd.UnityIntegration
         private int lastForwardPlaybackFrame = -1;
         private MmdPlaybackSnapshot? lastLiveSnapshot;
         private MmdLivePhysicsFrameDiagnostics? lastLivePhysicsDiagnostics;
+        private int livePhysicsReadbackTransformCount;
+        private int livePhysicsReadbackShapeTypeCount;
         private MmdPhysicsMode physicsMode = MmdPhysicsMode.Off;
         private MmdRuntimeFfiPlaybackSession? fastSession;
         private float[]? fastWorldMatrices;

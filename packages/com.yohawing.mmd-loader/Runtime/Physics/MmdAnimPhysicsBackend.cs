@@ -22,6 +22,8 @@ namespace Mmd.Physics
 
         MmdPhysicsBodyTransform GetRigidbodyTransform(int bodyIndex);
 
+        void CopyRigidbodyTransform(int bodyIndex, float[] position, float[] rotation);
+
         string GetRigidbodyShapeType(int bodyIndex);
 
         void SyncInterpolationAndZeroVelocity();
@@ -273,14 +275,23 @@ namespace Mmd.Physics
 
         public MmdPhysicsBodyTransform GetRigidbodyTransform(int bodyIndex)
         {
+            var result = new MmdPhysicsBodyTransform
+            {
+                position = new float[3],
+                rotation = new float[4]
+            };
+            CopyRigidbodyTransform(bodyIndex, result.position, result.rotation);
+            return result;
+        }
+
+        public void CopyRigidbodyTransform(int bodyIndex, float[] position, float[] rotation)
+        {
             ThrowIfDisposed();
             ValidateBodyIndex(bodyIndex);
+            ValidateTransformDestination(position, rotation);
             int offset = checked(bodyIndex * TransformFloatCount);
-            return new MmdPhysicsBodyTransform
-            {
-                position = new[] { rigidbodyStates[offset], rigidbodyStates[offset + 1], rigidbodyStates[offset + 2] },
-                rotation = new[] { rigidbodyStates[offset + 3], rigidbodyStates[offset + 4], rigidbodyStates[offset + 5], rigidbodyStates[offset + 6] }
-            };
+            Array.Copy(rigidbodyStates, offset, position, 0, 3);
+            Array.Copy(rigidbodyStates, offset + 3, rotation, 0, 4);
         }
 
         public string GetRigidbodyShapeType(int bodyIndex)
@@ -402,6 +413,19 @@ namespace Mmd.Physics
             }
         }
 
+        private static void ValidateTransformDestination(float[] position, float[] rotation)
+        {
+            if (position == null || position.Length != 3)
+            {
+                throw new ArgumentException("Rigidbody position destination must contain three values.", nameof(position));
+            }
+
+            if (rotation == null || rotation.Length != 4)
+            {
+                throw new ArgumentException("Rigidbody rotation destination must contain four values.", nameof(rotation));
+            }
+        }
+
         private void ThrowIfDisposed()
         {
             if (disposed)
@@ -464,6 +488,9 @@ namespace Mmd.Physics
         public void SetRigidbodyTransform(int bodyIndex, float[] position, float[] rotation) => backend.SetRigidbodyTransform(bodyIndex, position, rotation);
 
         public MmdPhysicsBodyTransform GetRigidbodyTransform(int bodyIndex) => backend.GetRigidbodyTransform(bodyIndex);
+
+        public void CopyRigidbodyTransform(int bodyIndex, float[] position, float[] rotation) =>
+            backend.CopyRigidbodyTransform(bodyIndex, position, rotation);
 
         public string GetRigidbodyShapeType(int bodyIndex) => backend.GetRigidbodyShapeType(bodyIndex);
 

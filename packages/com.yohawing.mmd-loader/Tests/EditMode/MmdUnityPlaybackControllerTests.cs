@@ -738,6 +738,7 @@ namespace Mmd.Tests
                 MmdLivePhysicsFrameDiagnostics? seedDiagnostics = binding.LastLivePhysicsDiagnostics;
                 Assert.That(seedDiagnostics, Is.Not.Null);
                 Assert.That(seedDiagnostics!.frame, Is.EqualTo(0));
+                Assert.That(seedDiagnostics.readbackShapeTypeCount, Is.EqualTo(2));
                 Assert.That(seedDiagnostics.pinnedBodies.pinnedBodyCount, Is.EqualTo(2));
                 Assert.That(seedDiagnostics.pinnedBodies.staticPinnedBodyCount, Is.EqualTo(1));
                 Assert.That(seedDiagnostics.pinnedBodies.dynamicOrientationPinnedBodyCount, Is.EqualTo(1),
@@ -748,6 +749,10 @@ namespace Mmd.Tests
                 MmdLivePhysicsFrameDiagnostics? diagnostics = binding.LastLivePhysicsDiagnostics;
                 Assert.That(diagnostics, Is.Not.Null);
                 Assert.That(diagnostics!.frame, Is.EqualTo(LivePhysicsPlaybackFrame));
+                Assert.That(diagnostics.readbackTransformCount, Is.EqualTo(3),
+                    "One pinned-body sync plus one shared post-step readback per body is expected.");
+                Assert.That(diagnostics.readbackShapeTypeCount, Is.Zero,
+                    "Shape metadata must be cached after the backend's first frame.");
                 Assert.That(diagnostics.comparisonSpace, Is.EqualTo("runtime-forward-playback-diagnostics"));
                 Assert.That(diagnostics.importScale, Is.EqualTo(1.0f).Within(0.0001f));
                 Assert.That(diagnostics.pinnedBodies.pinnedBodyCount, Is.EqualTo(1));
@@ -765,6 +770,9 @@ namespace Mmd.Tests
                 Assert.That(body0.boneName, Is.EqualTo(rootBoneName));
                 Assert.That(body0.physicsKind, Is.EqualTo("static"));
                 Assert.That(body0.shapeType, Is.EqualTo("sphere"));
+                Assert.That(body0.nativeShapeType, Is.EqualTo(body0.shapeType));
+                Assert.That(body0.debugColliderType, Is.EqualTo(body0.shapeType));
+                Assert.That(body0.debugColliderSize, Is.EqualTo(new Vector3(0.25f, 0.25f, 0.25f)));
                 Assert.That(body0.mass, Is.EqualTo(0.0f));
                 Assert.That(body0.descriptorPosition, Is.EqualTo(Vector3.zero));
                 Assert.That(body0.descriptorRotation, Is.EqualTo(Vector3.zero));
@@ -781,6 +789,9 @@ namespace Mmd.Tests
                 Assert.That(body1.boneName, Is.EqualTo(rootBoneName));
                 Assert.That(body1.physicsKind, Is.EqualTo("dynamic-orientation"));
                 Assert.That(body1.shapeType, Is.EqualTo("box"));
+                Assert.That(body1.nativeShapeType, Is.EqualTo(body1.shapeType));
+                Assert.That(body1.debugColliderType, Is.EqualTo(body1.shapeType));
+                Assert.That(body1.debugColliderSize, Is.EqualTo(new Vector3(1.0f, 1.0f, 1.0f)));
                 Assert.That(body1.mass, Is.EqualTo(1.0f));
                 // Descriptor position is offset from root
                 Assert.That(body1.descriptorPosition.x, Is.EqualTo(0.5f).Within(0.0001f));
