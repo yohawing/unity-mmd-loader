@@ -487,6 +487,7 @@ namespace Mmd.Tests
                     model, motion, "test_hair_physics.pmx", "rest-pose", pmxPath);
 
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.LivePhysicsBodyDiagnosticsSampleInterval = 1;
                 controller.Configure(binding, 30.0f, playOnStart: false);
                 yield return null;
 
@@ -1996,6 +1997,7 @@ namespace Mmd.Tests
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
                     model, motion, "test_hair_physics.pmx", "rest-pose", pmxPath, importScale);
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.LivePhysicsBodyDiagnosticsSampleInterval = 1;
                 controller.Configure(binding, 30.0f, playOnStart: false);
                 controller.SetPhysicsMode(MmdPhysicsMode.Live);
 

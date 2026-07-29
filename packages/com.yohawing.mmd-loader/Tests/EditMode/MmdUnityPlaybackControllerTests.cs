@@ -663,6 +663,11 @@ namespace Mmd.Tests
                 Assert.That(diagnostics.pinnedBodies.maxPinnedBodySyncDistance, Is.LessThan(0.0001f));
                 Assert.That(diagnostics.stepPhysicsMs, Is.GreaterThanOrEqualTo(0.0));
                 Assert.That(diagnostics.totalMs, Is.GreaterThanOrEqualTo(diagnostics.stepPhysicsMs));
+                Assert.That(diagnostics.bodyDiagnosticsFrame, Is.EqualTo(-1),
+                    "Detailed body diagnostics must be disabled by default.");
+                Assert.That(diagnostics.bodyDiagnostics, Is.Empty);
+                Assert.That(diagnostics.readbackShapeTypeCount, Is.EqualTo(0),
+                    "Disabled detailed diagnostics must not query native shape metadata.");
                 Assert.That(binding.Instance.PhysicsBodies, Has.Length.EqualTo(1));
                 Assert.That(
                     Vector3.Distance(binding.Instance.PhysicsBodies[0].transform.position, binding.Instance.BoneTransforms[rootBoneIndex].position),
@@ -732,12 +737,14 @@ namespace Mmd.Tests
                 binding = CreatePhysicsPlaybackBinding(model, "body-diagnostics.vmd");
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f);
+                controller.LivePhysicsBodyDiagnosticsSampleInterval = 1;
                 controller.SetPhysicsMode(MmdPhysicsMode.Live);
 
                 controller.ApplyFrame(0);
                 MmdLivePhysicsFrameDiagnostics? seedDiagnostics = binding.LastLivePhysicsDiagnostics;
                 Assert.That(seedDiagnostics, Is.Not.Null);
                 Assert.That(seedDiagnostics!.frame, Is.EqualTo(0));
+                Assert.That(seedDiagnostics.bodyDiagnosticsFrame, Is.EqualTo(0));
                 Assert.That(seedDiagnostics.readbackShapeTypeCount, Is.EqualTo(2));
                 Assert.That(seedDiagnostics.pinnedBodies.pinnedBodyCount, Is.EqualTo(2));
                 Assert.That(seedDiagnostics.pinnedBodies.staticPinnedBodyCount, Is.EqualTo(1));
@@ -761,6 +768,7 @@ namespace Mmd.Tests
                     "Mode-2 dynamic-orientation bodies must not be re-pinned on normal forward frames");
                 Assert.That(diagnostics.bodyDiagnostics, Is.Not.Null);
                 Assert.That(diagnostics.bodyDiagnostics.Length, Is.EqualTo(2));
+                Assert.That(diagnostics.bodyDiagnosticsFrame, Is.EqualTo(LivePhysicsPlaybackFrame));
 
                 // --- body 0: static ---
                 MmdLivePhysicsBodyDiagnostics body0 = diagnostics.bodyDiagnostics[0];
@@ -811,6 +819,29 @@ namespace Mmd.Tests
 
                 // Instance must report importScale=1
                 Assert.That(binding.Instance.ImportScale, Is.EqualTo(1.0f).Within(0.0001f));
+
+                MmdLivePhysicsBodyDiagnostics[] latestSample = diagnostics.bodyDiagnostics;
+                controller.LivePhysicsBodyDiagnosticsSampleInterval = 2;
+                controller.ApplyFrame(LivePhysicsPlaybackFrame + 1);
+                diagnostics = binding.LastLivePhysicsDiagnostics;
+                Assert.That(diagnostics, Is.Not.Null);
+                Assert.That(diagnostics!.frame, Is.EqualTo(LivePhysicsPlaybackFrame + 1));
+                Assert.That(diagnostics.bodyDiagnosticsFrame, Is.EqualTo(LivePhysicsPlaybackFrame));
+                Assert.That(diagnostics.bodyDiagnostics, Is.SameAs(latestSample),
+                    "Non-sampled frames must retain the latest detailed diagnostics rather than rebuilding them.");
+                Assert.That(diagnostics.readbackShapeTypeCount, Is.EqualTo(0),
+                    "Cached detailed metadata must not re-query native shapes on a later sample interval frame.");
+
+                var serializedController = new SerializedObject(controller);
+                SerializedProperty sampleInterval = serializedController.FindProperty("livePhysicsBodyDiagnosticsSampleInterval");
+                sampleInterval.intValue = -2;
+                serializedController.ApplyModifiedPropertiesWithoutUndo();
+                typeof(MmdUnityPlaybackController)
+                    .GetMethod("OnValidate", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                    .Invoke(controller, null);
+                Assert.That(controller.LivePhysicsBodyDiagnosticsSampleInterval, Is.Zero);
+                Assert.That(binding.LivePhysicsBodyDiagnosticsSampleInterval, Is.Zero,
+                    "Serialized interval changes must be clamped and synchronized to the active binding.");
             }
             finally
             {

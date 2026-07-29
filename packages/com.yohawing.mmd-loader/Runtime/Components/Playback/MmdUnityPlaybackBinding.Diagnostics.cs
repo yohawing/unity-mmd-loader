@@ -21,6 +21,7 @@ namespace Mmd.UnityIntegration
         public double refreshSnapshotFrameMs;
         public int readbackTransformCount;
         public int readbackShapeTypeCount;
+        public int bodyDiagnosticsFrame = -1;
         public int unsupportedWorldAnchorJointCount;
         public string comparisonSpace = "runtime-forward-playback-diagnostics";
         public float importScale = 1.0f;

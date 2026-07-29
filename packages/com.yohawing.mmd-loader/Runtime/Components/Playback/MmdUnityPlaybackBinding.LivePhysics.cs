@@ -18,6 +18,7 @@ namespace Mmd.UnityIntegration
         private IMmdLivePhysicsBackend? livePhysicsMetadataBackend;
         private LivePhysicsBodyMetadata[]? livePhysicsBodyMetadata;
         private MmdPhysicsBodyTransform[]? livePhysicsReadbackTransforms;
+        private int livePhysicsBodyDiagnosticsSampleInterval;
 
         /// <summary>
         /// Drives Timeline playback while Live physics is enabled. Only a forward-advancing frame steps
@@ -104,6 +105,7 @@ namespace Mmd.UnityIntegration
             lastForwardPlaybackFrame = -1;
             lastLiveSnapshot = null;
             lastLivePhysicsDiagnostics = null;
+            ClearLivePhysicsBodyDiagnostics();
         }
 
         /// <summary>
@@ -119,6 +121,7 @@ namespace Mmd.UnityIntegration
             lastLiveFrame = -1;
             lastLiveSnapshot = null;
             lastLivePhysicsDiagnostics = null;
+            ClearLivePhysicsBodyDiagnostics();
         }
 
         private MmdPlaybackSnapshot ApplyLivePhysicsFrame(int frame, float frameRate, bool allowArbitraryStart = false)
@@ -229,8 +232,12 @@ namespace Mmd.UnityIntegration
             double applyPhysicsBodiesMs = stageWatch.Elapsed.TotalMilliseconds;
             stageWatch.Restart();
             ApplyAfterPhysicsBoneEvaluationFromUnityTransforms();
-            ApplyPhysicsBodyDebugTransforms(backend);
-            MmdLivePhysicsBodyDiagnostics[] bodyDiagnostics = BuildBodyDiagnostics(backend);
+            if (ShouldSampleLivePhysicsBodyDiagnostics(sequenceFrame))
+            {
+                ApplyPhysicsBodyDebugTransforms(backend);
+                lastLivePhysicsBodyDiagnostics = BuildBodyDiagnostics(backend);
+                lastLivePhysicsBodyDiagnosticsFrame = sequenceFrame;
+            }
             if (evaluatedFrame != null)
             {
                 RefreshEvaluatedFrameFromUnityTransforms(evaluatedFrame);
@@ -256,7 +263,8 @@ namespace Mmd.UnityIntegration
                 unsupportedWorldAnchorJointCount = backend.SkippedWorldAnchorJointCount,
                 comparisonSpace = "runtime-forward-playback-diagnostics",
                 importScale = playbackInstance.ImportScale,
-                bodyDiagnostics = bodyDiagnostics
+                bodyDiagnosticsFrame = lastLivePhysicsBodyDiagnosticsFrame,
+                bodyDiagnostics = lastLivePhysicsBodyDiagnostics
             };
             return lastLivePhysicsDiagnostics;
         }
@@ -347,6 +355,7 @@ namespace Mmd.UnityIntegration
                 lastLiveFrame = -1;
                 lastLiveSnapshot = null;
                 lastLivePhysicsDiagnostics = null;
+                ClearLivePhysicsBodyDiagnostics();
             }
 
             if (preferNativeAnimationClip &&
@@ -537,7 +546,6 @@ namespace Mmd.UnityIntegration
                 }
             }
 
-            GetLivePhysicsBodyMetadata(backend);
             for (int i = 0; i < count; i++)
             {
                 MmdPhysicsBodyTransform destination = livePhysicsReadbackTransforms[i];
@@ -681,6 +689,18 @@ namespace Mmd.UnityIntegration
             }
 
             return livePhysicsReadbackTransforms;
+        }
+
+        private bool ShouldSampleLivePhysicsBodyDiagnostics(int frame)
+        {
+            return livePhysicsBodyDiagnosticsSampleInterval > 0 &&
+                   frame % livePhysicsBodyDiagnosticsSampleInterval == 0;
+        }
+
+        private void ClearLivePhysicsBodyDiagnostics()
+        {
+            lastLivePhysicsBodyDiagnostics = Array.Empty<MmdLivePhysicsBodyDiagnostics>();
+            lastLivePhysicsBodyDiagnosticsFrame = -1;
         }
 
         private LivePhysicsBodyMetadata[] GetLivePhysicsBodyMetadata(IMmdLivePhysicsBackend backend)

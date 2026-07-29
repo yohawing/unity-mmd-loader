@@ -34,6 +34,8 @@ namespace Mmd.UnityIntegration
         private int lastForwardPlaybackFrame = -1;
         private MmdPlaybackSnapshot? lastLiveSnapshot;
         private MmdLivePhysicsFrameDiagnostics? lastLivePhysicsDiagnostics;
+        private MmdLivePhysicsBodyDiagnostics[] lastLivePhysicsBodyDiagnostics = Array.Empty<MmdLivePhysicsBodyDiagnostics>();
+        private int lastLivePhysicsBodyDiagnosticsFrame = -1;
         private int livePhysicsReadbackTransformCount;
         private int livePhysicsReadbackShapeTypeCount;
         private MmdPhysicsMode physicsMode = MmdPhysicsMode.Off;
@@ -82,6 +84,24 @@ namespace Mmd.UnityIntegration
         public MmdPhysicsMode PhysicsMode => physicsMode;
 
         public MmdLivePhysicsFrameDiagnostics? LastLivePhysicsDiagnostics => lastLivePhysicsDiagnostics;
+
+        /// <summary>
+        /// Controls detailed per-body Live physics diagnostics. Zero disables sampling; positive values sample
+        /// only frames divisible by the interval. Summary diagnostics remain available every frame.
+        /// </summary>
+        public int LivePhysicsBodyDiagnosticsSampleInterval
+        {
+            get => livePhysicsBodyDiagnosticsSampleInterval;
+            set
+            {
+                if (value < 0)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(value), "Live physics body diagnostics sample interval must be non-negative.");
+                }
+
+                livePhysicsBodyDiagnosticsSampleInterval = value;
+            }
+        }
 
         public bool IsFastRuntimeEnabled => fastSession != null;
 
