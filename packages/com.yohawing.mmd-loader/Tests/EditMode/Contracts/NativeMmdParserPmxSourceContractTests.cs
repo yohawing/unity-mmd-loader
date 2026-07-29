@@ -334,5 +334,16 @@ namespace Mmd.Tests
             Assert.IsNotNull(model, "LoadModel must return a non-null definition.");
         }
 
+        [Test]
+        public void LoadModelRejectsInvalidNonGeometryJsonBeforeGeometryFallback()
+        {
+            var parser = new NativeMmdParser(
+                _ => throw new AssertionException("VMD JSON parser must not be used when loading PMX."),
+                _ => string.Empty,
+                _ => throw new AssertionException("Invalid PMX must be rejected before geometry fallback."));
+
+            Assert.Throws<InvalidOperationException>(() => parser.LoadModel(new byte[] { 9, 8, 7 }));
+        }
+
     }
 }
