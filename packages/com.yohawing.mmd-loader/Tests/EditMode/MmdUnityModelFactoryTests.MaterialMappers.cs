@@ -129,8 +129,9 @@ namespace Mmd.Tests
             Assert.That(instance.Materials[1].shader.name,
                 Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName));
             Assert.That(instance.Materials[1].enableInstancing, Is.True);
+            Assert.That(instance.OwnedTextures, Has.Length.EqualTo(1));
             Assert.That(instance.Materials[0].GetTexture("_BaseMap"), Is.EqualTo(instance.OwnedTextures[0]));
-            Assert.That(instance.Materials[1].GetTexture("_BaseMap"), Is.EqualTo(instance.OwnedTextures[1]));
+            Assert.That(instance.Materials[1].GetTexture("_BaseMap"), Is.EqualTo(instance.OwnedTextures[0]));
             Assert.That(instance.MaterialBindingDiagnostics[0].resolvedShaderName,
                 Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName));
             Assert.That(instance.MaterialBindingDiagnostics[1].resolvedShaderName,
