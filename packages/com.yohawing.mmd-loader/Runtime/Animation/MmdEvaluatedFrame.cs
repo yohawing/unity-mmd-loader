@@ -261,7 +261,7 @@ namespace Mmd
             return BuildFrameFromManagedEvaluation(model, frame, time, evaluation, includeMaterials);
         }
 
-        private static MmdEvaluatedFrame BuildFrameFromNative(
+        internal static MmdEvaluatedFrame BuildFrameFromNative(
             MmdModelDefinition model,
             int frame,
             float time,

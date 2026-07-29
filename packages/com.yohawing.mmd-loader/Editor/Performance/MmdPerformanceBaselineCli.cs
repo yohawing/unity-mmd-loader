@@ -110,7 +110,7 @@ namespace Mmd.Editor
             try
             {
                 applyInstance = MmdUnityModelFactory.CreateSkinnedModel(model, pmxPath);
-                var session = new MmdRuntimeSession(model, motion, pmxPath, vmdPath);
+                using var session = new MmdRuntimeSession(model, motion, pmxPath, vmdPath);
                 int totalFrames = options.warmupFrames + options.measurementFrames;
                 var frames = new List<MmdEvaluatedFrame>(totalFrames);
                 for (int i = 0; i < totalFrames; i++)

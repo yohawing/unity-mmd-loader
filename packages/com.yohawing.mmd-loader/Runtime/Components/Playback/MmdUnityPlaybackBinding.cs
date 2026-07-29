@@ -667,21 +667,28 @@ namespace Mmd.UnityIntegration
             }
             finally
             {
-                if (instanceOwnership == MmdUnityModelInstanceOwnership.Owned)
+                try
                 {
-                    DestroyOwnedInstance(playbackInstance);
+                    if (instanceOwnership == MmdUnityModelInstanceOwnership.Owned)
+                    {
+                        DestroyOwnedInstance(playbackInstance);
+                    }
+                    else
+                    {
+                        try
+                        {
+                            borrowedMutationLease?.Dispose();
+                        }
+                        finally
+                        {
+                            borrowedSourceMutation?.Dispose();
+                            playbackInstance = Instance;
+                        }
+                    }
                 }
-                else
+                finally
                 {
-                    try
-                    {
-                        borrowedMutationLease?.Dispose();
-                    }
-                    finally
-                    {
-                        borrowedSourceMutation?.Dispose();
-                        playbackInstance = Instance;
-                    }
+                    session.Dispose();
                 }
             }
         }
