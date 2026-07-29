@@ -7,6 +7,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using NUnit.Framework;
+using UnityEngine;
 using Mmd.Native;
 using Mmd.Parser;
 
@@ -138,6 +139,34 @@ namespace Mmd.Tests
             }
         }
 
+        [TestCase("test_1bone_cube.pmx", 1, false)]
+        [TestCase("GeneratedPmx/mixed-deform-types.pmx", 3, true)]
+        public void ParseOnceHandleAndLegacyFallbackBuildEquivalentModel(
+            string fixtureName,
+            int minimumDistinctSkinningModes,
+            bool requireMultiBoneWeighting)
+        {
+            byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes(fixtureName);
+            MmdModelDefinition handleModel = new NativeMmdParser().LoadModel(pmxBytes);
+
+            string nonGeometryJson = MmdParserFfiMethods.ParsePmxNonGeometryJson(pmxBytes);
+            NativeMmdParser.PmxModelSourceSnapshot legacySnapshot =
+                JsonUtility.FromJson<NativeMmdParser.PmxModelSourceSnapshot>(nonGeometryJson)
+                ?? new NativeMmdParser.PmxModelSourceSnapshot();
+            legacySnapshot.geometry = NativeMmdParser.CreatePmxGeometryFromLegacyBuffers(pmxBytes);
+            MmdModelDefinition legacyModel = NativeMmdParser.BuildModelDefinition(legacySnapshot);
+
+            AssertModelGeometryAndSkinningParity(handleModel, legacyModel, fixtureName);
+
+            Assert.That(handleModel.vertices.Select(vertex => vertex.skinningMode).Distinct().Count(),
+                Is.GreaterThanOrEqualTo(minimumDistinctSkinningModes),
+                fixtureName + " must retain the expected number of skinning modes.");
+            Assert.That(handleModel.vertices.Any(vertex => vertex.boneIndices.Length > 1 &&
+                vertex.boneWeights.Skip(1).Any(weight => weight > 0.0f)),
+                Is.EqualTo(requireMultiBoneWeighting),
+                fixtureName + " multi-bone weighting expectation.");
+        }
+
         [Test]
         public void NativeParserUsesOneGeometryHandleAndFreesItAfterAllAccessors()
         {
@@ -228,6 +257,63 @@ namespace Mmd.Tests
 
             // skinning modes JSON must be a non-empty JSON payload
             Assert.That(modesJson, Is.Not.Null.And.Not.Empty, "skinningModesJson non-empty");
+        }
+
+        private static void AssertModelGeometryAndSkinningParity(
+            MmdModelDefinition expected,
+            MmdModelDefinition actual,
+            string fixtureName)
+        {
+            Assert.That(actual.vertices.Count, Is.EqualTo(expected.vertices.Count), fixtureName + " vertex count");
+            Assert.That(actual.indices, Is.EqualTo(expected.indices), fixtureName + " indices");
+            for (int i = 0; i < expected.vertices.Count; i++)
+            {
+                MmdVertexDefinition expectedVertex = expected.vertices[i];
+                MmdVertexDefinition actualVertex = actual.vertices[i];
+                AssertFloatArraysEqual(expectedVertex.position, actualVertex.position, fixtureName + " position[" + i + "]");
+                AssertFloatArraysEqual(expectedVertex.normal, actualVertex.normal, fixtureName + " normal[" + i + "]");
+                AssertFloatArraysEqual(expectedVertex.uv, actualVertex.uv, fixtureName + " uv[" + i + "]");
+                AssertFloatEqualNaNAware(expectedVertex.edgeScale, actualVertex.edgeScale, fixtureName + " edgeScale[" + i + "]");
+                Assert.That(actualVertex.skinningMode, Is.EqualTo(expectedVertex.skinningMode), fixtureName + " skinningMode[" + i + "]");
+                Assert.That(actualVertex.boneIndices, Is.EqualTo(expectedVertex.boneIndices), fixtureName + " boneIndices[" + i + "]");
+                AssertFloatArraysEqual(expectedVertex.boneWeights, actualVertex.boneWeights, fixtureName + " boneWeights[" + i + "]");
+                Assert.That(actualVertex.hasSdefParameters, Is.EqualTo(expectedVertex.hasSdefParameters), fixtureName + " hasSdef[" + i + "]");
+                AssertFloatArraysEqual(expectedVertex.sdefC, actualVertex.sdefC, fixtureName + " sdefC[" + i + "]");
+                AssertFloatArraysEqual(expectedVertex.sdefR0, actualVertex.sdefR0, fixtureName + " sdefR0[" + i + "]");
+                AssertFloatArraysEqual(expectedVertex.sdefR1, actualVertex.sdefR1, fixtureName + " sdefR1[" + i + "]");
+            }
+        }
+
+        private static void AssertFloatArraysEqual(float[] expected, float[] actual, string label)
+        {
+            Assert.That(actual.Length, Is.EqualTo(expected.Length), label + " length");
+            for (int i = 0; i < expected.Length; i++)
+            {
+                if (float.IsNaN(expected[i]))
+                {
+                    Assert.That(actual[i], Is.NaN, label + "[" + i + "]");
+                }
+                else
+                {
+                    Assert.That(actual[i], Is.EqualTo(expected[i]).Within(0.000001f), label + "[" + i + "]");
+                }
+            }
+        }
+
+        private static void AssertFloatEqualNaNAware(float expected, float actual, string label)
+        {
+            if (float.IsNaN(expected))
+            {
+                Assert.That(actual, Is.NaN, label);
+            }
+            else if (float.IsInfinity(expected))
+            {
+                Assert.That(actual, Is.EqualTo(expected), label);
+            }
+            else
+            {
+                Assert.That(actual, Is.EqualTo(expected).Within(0.000001f), label);
+            }
         }
 
         [Test]

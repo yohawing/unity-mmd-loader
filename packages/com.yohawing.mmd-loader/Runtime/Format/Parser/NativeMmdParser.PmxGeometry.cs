@@ -94,7 +94,9 @@ namespace Mmd.Parser
             }
         }
 
-        private static PmxModelSourceGeometry CreatePmxGeometryFromLegacyBuffers(byte[] data)
+        // Kept internal so the EditMode contract can compare the compatibility path
+        // with the parse-once handle path against tracked PMX fixtures.
+        internal static PmxModelSourceGeometry CreatePmxGeometryFromLegacyBuffers(byte[] data)
         {
             return CreatePmxGeometry(
                 MmdParserFfiMethods.ParsePmxSkinningModesJson(data),
