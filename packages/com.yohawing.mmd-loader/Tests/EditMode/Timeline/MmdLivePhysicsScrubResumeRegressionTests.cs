@@ -649,6 +649,7 @@ namespace Mmd.Tests
                 binding = CreateMode1ChainBinding(model, motion, importScale);
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f, playOnStart: false);
+                controller.LivePhysicsBodyDiagnosticsSampleInterval = 1;
                 controller.SetPhysicsMode(MmdPhysicsMode.Live);
 
                 for (int frame = 0; frame <= 5; frame++)
