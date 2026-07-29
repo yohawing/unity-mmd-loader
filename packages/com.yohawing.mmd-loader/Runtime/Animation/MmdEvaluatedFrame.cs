@@ -256,7 +256,8 @@ namespace Mmd
             ValidateTime(time);
 
             physicsBackend ??= new NullMmdPhysicsBackend();
-            MmdRuntimeFrameEvaluation evaluation = MmdRuntimeFramePipeline.Evaluate(model, motion, frame, physicsBackend, ikSolver, topologyPlan: topologyPlan);
+            MmdRuntimeFrameEvaluation evaluation = MmdRuntimeFramePipeline.EvaluateWithOptions(
+                model, motion, frame, physicsBackend, ikSolver, topologyPlan: topologyPlan);
             return BuildFrameFromManagedEvaluation(model, frame, time, evaluation, includeMaterials);
         }
 

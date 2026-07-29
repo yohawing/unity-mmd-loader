@@ -12,11 +12,11 @@ namespace Mmd
     internal sealed class MmdRuntimeFrameEvaluation
     {
         public MmdSampledMotion SampledMotion { get; init; } = new();
-        public Dictionary<int, float[]> SampledWorldMatrices { get; init; } = new();
+        public Dictionary<int, float[]>? SampledWorldMatrices { get; init; }
         public MmdSampledMotion AppendedMotion { get; init; } = new();
-        public Dictionary<int, float[]> AppendedWorldMatrices { get; init; } = new();
+        public Dictionary<int, float[]>? AppendedWorldMatrices { get; init; }
         public MmdSampledMotion IkMotion { get; init; } = new();
-        public Dictionary<int, float[]> IkWorldMatrices { get; init; } = new();
+        public Dictionary<int, float[]>? IkWorldMatrices { get; init; }
         public MmdSampledMotion FinalMotion { get; init; } = new();
         public Dictionary<int, float[]> WorldMatrices { get; init; } = new();
         public MmdRuntimeFrameTiming? Timing { get; init; }
@@ -42,7 +42,26 @@ namespace Mmd
             int frame,
             IMmdPhysicsBackend physicsBackend,
             IMmdIkSolver? ikSolver = null,
+            bool collectTiming = false)
+        {
+            return EvaluateWithOptions(
+                model,
+                motion,
+                frame,
+                physicsBackend,
+                ikSolver,
+                collectTiming,
+                captureCheckpoints: true);
+        }
+
+        internal static MmdRuntimeFrameEvaluation EvaluateWithOptions(
+            MmdModelDefinition model,
+            MmdMotionDefinition motion,
+            int frame,
+            IMmdPhysicsBackend physicsBackend,
+            IMmdIkSolver? ikSolver = null,
             bool collectTiming = false,
+            bool captureCheckpoints = false,
             MmdTopologyPlan? topologyPlan = null)
         {
             topologyPlan?.EnsureModel(model);
@@ -55,7 +74,8 @@ namespace Mmd
             RecordTiming(timing, started, ticks => timing!.MotionSamplingTicks = ticks);
 
             started = Stopwatch.GetTimestamp();
-            Dictionary<int, float[]> sampledWorldMatrices = EvaluateWorldMatrices(model, topologyPlan, sampledMotion);
+            Dictionary<int, float[]>? sampledWorldMatrices = captureCheckpoints || collectTiming
+                ? EvaluateWorldMatrices(model, topologyPlan, sampledMotion) : null;
             RecordTiming(timing, started, ticks => timing!.SampledWorldTicks = ticks);
 
             started = Stopwatch.GetTimestamp();
@@ -67,7 +87,8 @@ namespace Mmd
             RecordTiming(timing, started, ticks => timing!.AppendTransformTicks = ticks);
 
             started = Stopwatch.GetTimestamp();
-            Dictionary<int, float[]> appendedWorldMatrices = EvaluateWorldMatrices(model, topologyPlan, appendedMotion);
+            Dictionary<int, float[]>? appendedWorldMatrices = captureCheckpoints || collectTiming
+                ? EvaluateWorldMatrices(model, topologyPlan, appendedMotion) : null;
             RecordTiming(timing, started, ticks => timing!.AppendedWorldTicks = ticks);
 
             started = Stopwatch.GetTimestamp();
@@ -84,7 +105,8 @@ namespace Mmd
             RecordTiming(timing, started, ticks => timing!.IkSolveTicks = ticks);
 
             started = Stopwatch.GetTimestamp();
-            Dictionary<int, float[]> ikWorldMatrices = EvaluateWorldMatrices(model, topologyPlan, ikMotion);
+            Dictionary<int, float[]>? ikWorldMatrices = captureCheckpoints || collectTiming
+                ? EvaluateWorldMatrices(model, topologyPlan, ikMotion) : null;
             RecordTiming(timing, started, ticks => timing!.IkWorldTicks = ticks);
 
             started = Stopwatch.GetTimestamp();
@@ -92,7 +114,9 @@ namespace Mmd
             RecordTiming(timing, started, ticks => timing!.PhysicsStepTicks = ticks);
 
             MmdSampledMotion finalMotion = ikMotion;
-            Dictionary<int, float[]> finalWorldMatrices = ikWorldMatrices;
+            Dictionary<int, float[]> finalWorldMatrices = captureCheckpoints || collectTiming
+                ? ikWorldMatrices!
+                : EvaluateWorldMatrices(model, topologyPlan, ikMotion);
             if (model.HasDeformAfterPhysicsBones)
             {
                 started = Stopwatch.GetTimestamp();

@@ -150,7 +150,8 @@ namespace Mmd
             IMmdPhysicsBackend physicsBackend,
             IMmdIkSolver? ikSolver)
         {
-            MmdRuntimeFrameEvaluation evaluation = MmdRuntimeFramePipeline.Evaluate(model, motion, frame, physicsBackend, ikSolver);
+            MmdRuntimeFrameEvaluation evaluation = MmdRuntimeFramePipeline.EvaluateWithOptions(
+                model, motion, frame, physicsBackend, ikSolver, captureCheckpoints: true);
             trace.frames.Add(MmdTraceBuilder.BuildMotionSamplingFrame(model, evaluation.SampledMotion, evaluation.SampledWorldMatrices, frame, time));
 
             trace.frames.Add(MmdTraceBuilder.BuildAppendTransformFrame(model, evaluation.AppendedMotion, evaluation.AppendedWorldMatrices, frame, time));
