@@ -8,6 +8,59 @@ using Mmd.Parser;
 
 namespace Mmd.Pose
 {
+    internal readonly struct MmdIkLinkTopology
+    {
+        internal MmdIkLinkTopology(MmdIkLinkDefinition link)
+        {
+            BoneIndex = link.boneIndex;
+            HasLimit = link.hasLimit;
+            MinimumX = ComponentOrZero(link.minimumAngle, 0);
+            MinimumY = ComponentOrZero(link.minimumAngle, 1);
+            MinimumZ = ComponentOrZero(link.minimumAngle, 2);
+            MaximumX = ComponentOrZero(link.maximumAngle, 0);
+            MaximumY = ComponentOrZero(link.maximumAngle, 1);
+            MaximumZ = ComponentOrZero(link.maximumAngle, 2);
+        }
+
+        internal int BoneIndex { get; }
+        internal bool HasLimit { get; }
+        internal float MinimumX { get; }
+        internal float MinimumY { get; }
+        internal float MinimumZ { get; }
+        internal float MaximumX { get; }
+        internal float MaximumY { get; }
+        internal float MaximumZ { get; }
+
+        private static float ComponentOrZero(float[]? values, int index)
+        {
+            return values != null && index < values.Length ? values[index] : 0.0f;
+        }
+    }
+
+    internal sealed class MmdIkChainTopology
+    {
+        internal MmdIkChainTopology(MmdIkDefinition ik)
+        {
+            BoneIndex = ik.boneIndex;
+            TargetBoneIndex = ik.targetBoneIndex;
+            IterationCount = ik.iterationCount;
+            AngleLimit = ik.angleLimit;
+            var links = new MmdIkLinkTopology[ik.links.Count];
+            for (int i = 0; i < links.Length; i++)
+            {
+                links[i] = new MmdIkLinkTopology(ik.links[i]);
+            }
+
+            Links = Array.AsReadOnly(links);
+        }
+
+        internal int BoneIndex { get; }
+        internal int TargetBoneIndex { get; }
+        internal int IterationCount { get; }
+        internal float AngleLimit { get; }
+        internal IReadOnlyList<MmdIkLinkTopology> Links { get; }
+    }
+
     internal sealed class MmdTopologyPlan
     {
         private MmdTopologyPlan(
@@ -15,12 +68,14 @@ namespace Mmd.Pose
             MmdBoneDefinition?[] indexedBones,
             IReadOnlyList<int>[] indexedChildren,
             float[][] bindOffsets,
+            IReadOnlyList<MmdIkChainTopology> ikChains,
             ulong sourceFingerprint)
         {
             Model = model;
             IndexedBones = indexedBones;
             IndexedChildren = indexedChildren;
             BindOffsets = bindOffsets;
+            IkChains = ikChains;
             SourceFingerprint = sourceFingerprint;
         }
 
@@ -28,6 +83,7 @@ namespace Mmd.Pose
         internal MmdBoneDefinition?[] IndexedBones { get; }
         internal IReadOnlyList<int>[] IndexedChildren { get; }
         internal float[][] BindOffsets { get; }
+        internal IReadOnlyList<MmdIkChainTopology> IkChains { get; }
         private ulong SourceFingerprint { get; }
 
         internal static MmdTopologyPlan CreateFromValidatedModel(MmdModelDefinition model)
@@ -106,7 +162,19 @@ namespace Mmd.Pose
             }
 
             ValidateAcyclic(indexedBones);
-            return new MmdTopologyPlan(model, indexedBones, indexedChildren, bindOffsets, ComputeSourceFingerprint(model));
+            var ikChains = new MmdIkChainTopology[model.ik.Count];
+            for (int i = 0; i < ikChains.Length; i++)
+            {
+                ikChains[i] = new MmdIkChainTopology(model.ik[i]);
+            }
+
+            return new MmdTopologyPlan(
+                model,
+                indexedBones,
+                indexedChildren,
+                bindOffsets,
+                Array.AsReadOnly(ikChains),
+                ComputeSourceFingerprint(model));
         }
 
         internal void EnsureModel(MmdModelDefinition model)
@@ -134,7 +202,11 @@ namespace Mmd.Pose
                 MmdBoneDefinition bone = model.bones[i];
                 Add(ref hash, RuntimeHelpers.GetHashCode(bone), prime);
                 Add(ref hash, bone.index, prime);
+                Add(ref hash, bone.name, prime);
                 Add(ref hash, bone.parentIndex, prime);
+                Add(ref hash, bone.fixedAxis ? 1 : 0, prime);
+                AddFloatArray(ref hash, bone.fixedAxisVector, prime);
+                Add(ref hash, bone.deformAfterPhysics ? 1 : 0, prime);
                 Add(ref hash, bone.origin?.Length ?? -1, prime);
                 if (bone.origin != null)
                 {
@@ -145,7 +217,56 @@ namespace Mmd.Pose
                 }
             }
 
+            Add(ref hash, model.ik.Count, prime);
+            for (int i = 0; i < model.ik.Count; i++)
+            {
+                MmdIkDefinition ik = model.ik[i];
+                Add(ref hash, RuntimeHelpers.GetHashCode(ik), prime);
+                Add(ref hash, ik.boneIndex, prime);
+                Add(ref hash, ik.targetBoneIndex, prime);
+                Add(ref hash, ik.iterationCount, prime);
+                Add(ref hash, BitConverter.SingleToInt32Bits(ik.angleLimit), prime);
+                Add(ref hash, ik.links.Count, prime);
+                for (int linkIndex = 0; linkIndex < ik.links.Count; linkIndex++)
+                {
+                    MmdIkLinkDefinition link = ik.links[linkIndex];
+                    Add(ref hash, RuntimeHelpers.GetHashCode(link), prime);
+                    Add(ref hash, link.boneIndex, prime);
+                    Add(ref hash, link.hasLimit ? 1 : 0, prime);
+                    AddFloatArray(ref hash, link.minimumAngle, prime);
+                    AddFloatArray(ref hash, link.maximumAngle, prime);
+                }
+            }
+
             return hash;
+        }
+
+        private static void AddFloatArray(ref ulong hash, float[]? values, ulong prime)
+        {
+            Add(ref hash, values?.Length ?? -1, prime);
+            if (values == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < values.Length; i++)
+            {
+                Add(ref hash, BitConverter.SingleToInt32Bits(values[i]), prime);
+            }
+        }
+
+        private static void Add(ref ulong hash, string? value, ulong prime)
+        {
+            Add(ref hash, value?.Length ?? -1, prime);
+            if (value == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < value.Length; i++)
+            {
+                Add(ref hash, value[i], prime);
+            }
         }
 
         private static void Add(ref ulong hash, int value, ulong prime)

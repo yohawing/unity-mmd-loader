@@ -4,6 +4,7 @@ using System;
 using System.Reflection;
 using Mmd.Motion;
 using Mmd.Parser;
+using Mmd.Pose;
 using NUnit.Framework;
 
 namespace Mmd.Tests
@@ -146,6 +147,69 @@ namespace Mmd.Tests
             Assert.Throws<ObjectDisposedException>(() => session.BuildSnapshot(frame: 0, time: 0.0f));
         }
 
+        [Test]
+        public void TopologyPlanCompilesIkChainsAndLinksAsImmutableSourceOrderedValues()
+        {
+            MmdModelDefinition model = CreateIkTopologyModel();
+            MmdTopologyPlan plan = MmdTopologyPlan.CreateFromValidatedModel(model);
+
+            Assert.That(plan.IkChains, Has.Count.EqualTo(2));
+            Assert.That(plan.IkChains[0].BoneIndex, Is.EqualTo(2));
+            Assert.That(plan.IkChains[0].TargetBoneIndex, Is.EqualTo(1));
+            Assert.That(plan.IkChains[0].IterationCount, Is.EqualTo(8));
+            Assert.That(plan.IkChains[0].AngleLimit, Is.EqualTo(0.5f));
+            Assert.That(plan.IkChains[0].Links, Has.Count.EqualTo(2));
+            Assert.That(plan.IkChains[0].Links[0].BoneIndex, Is.EqualTo(0));
+            Assert.That(plan.IkChains[0].Links[1].BoneIndex, Is.EqualTo(1));
+            Assert.That(plan.IkChains[1].BoneIndex, Is.EqualTo(1));
+            Assert.That(plan.IkChains[0].Links[0].MinimumX, Is.EqualTo(-0.25f));
+            Assert.That(plan.IkChains[0].Links[0].MaximumZ, Is.EqualTo(0.75f));
+
+            model.ik[0].boneIndex = 0;
+            model.ik[0].links[0].minimumAngle[0] = -9.0f;
+            Assert.That(plan.IkChains[0].BoneIndex, Is.EqualTo(2));
+            Assert.That(plan.IkChains[0].Links[0].MinimumX, Is.EqualTo(-0.25f));
+        }
+
+        [TestCase("ik-definition")]
+        [TestCase("ik-link")]
+        [TestCase("ik-link-limit")]
+        [TestCase("fixed-axis")]
+        [TestCase("deform-after")]
+        [TestCase("name")]
+        public void TopologyPlanRejectsIkRelevantSourceMutation(string mutation)
+        {
+            MmdModelDefinition model = CreateIkTopologyModel();
+            MmdTopologyPlan plan = MmdTopologyPlan.CreateFromValidatedModel(model);
+
+            switch (mutation)
+            {
+                case "ik-definition":
+                    model.ik[0].iterationCount++;
+                    break;
+                case "ik-link":
+                    model.ik[0].links[0].boneIndex = 1;
+                    break;
+                case "ik-link-limit":
+                    model.ik[0].links[0].maximumAngle[2] += 0.125f;
+                    break;
+                case "fixed-axis":
+                    model.bones[0].fixedAxisVector[1] = 1.0f;
+                    break;
+                case "deform-after":
+                    model.bones[2].deformAfterPhysics = !model.bones[2].deformAfterPhysics;
+                    break;
+                case "name":
+                    model.bones[2].name = "renamed-goal";
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(mutation));
+            }
+
+            InvalidOperationException? error = Assert.Throws<InvalidOperationException>(() => plan.EnsureModel(model));
+            Assert.That(error!.Message, Does.Contain("topology changed"));
+        }
+
         private static MmdRuntimeSession CreateSession(out MmdModelDefinition model)
         {
             return CreateSession(out model, out _);
@@ -160,6 +224,66 @@ namespace Mmd.Tests
             motion = parser.LoadMotion(
                 MmdTestFixtures.ReadFixtureAssetBytes("test_append_bone.vmd"));
             return new MmdRuntimeSession(model, motion, "model", "motion");
+        }
+
+        private static MmdModelDefinition CreateIkTopologyModel()
+        {
+            var model = new MmdModelDefinition();
+            model.bones.Add(new MmdBoneDefinition
+            {
+                index = 0,
+                name = "root",
+                parentIndex = -1,
+                origin = new[] { 0.0f, 0.0f, 0.0f },
+                fixedAxis = true,
+                fixedAxisVector = new[] { 1.0f, 0.0f, 0.0f }
+            });
+            model.bones.Add(new MmdBoneDefinition
+            {
+                index = 1,
+                name = "effector",
+                parentIndex = 0,
+                origin = new[] { 0.0f, 1.0f, 0.0f }
+            });
+            model.bones.Add(new MmdBoneDefinition
+            {
+                index = 2,
+                name = "goal",
+                parentIndex = 0,
+                origin = new[] { 1.0f, 1.0f, 0.0f },
+                deformAfterPhysics = true
+            });
+
+            model.ik.Add(new MmdIkDefinition
+            {
+                boneIndex = 2,
+                targetBoneIndex = 1,
+                iterationCount = 8,
+                angleLimit = 0.5f,
+                links = new System.Collections.Generic.List<MmdIkLinkDefinition>
+                {
+                    new MmdIkLinkDefinition
+                    {
+                        boneIndex = 0,
+                        hasLimit = true,
+                        minimumAngle = new[] { -0.25f, -0.5f, -0.75f },
+                        maximumAngle = new[] { 0.25f, 0.5f, 0.75f }
+                    },
+                    new MmdIkLinkDefinition { boneIndex = 1 }
+                }
+            });
+            model.ik.Add(new MmdIkDefinition
+            {
+                boneIndex = 1,
+                targetBoneIndex = 0,
+                iterationCount = 2,
+                angleLimit = 0.25f,
+                links = new System.Collections.Generic.List<MmdIkLinkDefinition>
+                {
+                    new MmdIkLinkDefinition { boneIndex = 2 }
+                }
+            });
+            return model;
         }
 
         private static FieldInfo RequirePrivateField(string name)
