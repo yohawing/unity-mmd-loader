@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using Mmd.Motion;
 using Mmd.Parser;
 using Mmd.Physics;
+using Mmd.Pose;
 using Mmd.Rendering;
 using Mmd.Tracing;
 
@@ -16,6 +17,7 @@ namespace Mmd
         private readonly MmdMotionDefinition motion;
         private readonly string modelId;
         private readonly string motionId;
+        private MmdTopologyPlan? topologyPlan;
 
         public MmdRuntimeSession(
             MmdModelDefinition model,
@@ -55,6 +57,8 @@ namespace Mmd
 
         internal byte[]? MotionSourceBytes => motion.sourceBytes;
 
+        internal MmdTopologyPlan TopologyPlan => topologyPlan ??= MmdTopologyPlan.CreateFromValidatedModel(model);
+
         public MmdTrace EvaluateTrace(int frame, float time, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
         {
             return MmdRuntimeTraceEvaluator.EvaluatePhaseOneTrace(model, motion, frame, time, modelId, motionId, physicsBackend, ikSolver);
@@ -78,12 +82,16 @@ namespace Mmd
 
         public MmdEvaluatedFrame EvaluateFrame(int frame, float time, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
         {
-            return MmdRuntimeFrameEvaluator.EvaluateValidatedPhaseOnePlaybackFrame(model, motion, frame, time, physicsBackend, ikSolver);
+            return ikSolver != null
+                ? MmdRuntimeFrameEvaluator.EvaluateValidatedPhaseOnePlaybackFrame(model, motion, frame, time, TopologyPlan, physicsBackend, ikSolver)
+                : MmdRuntimeFrameEvaluator.EvaluateValidatedPhaseOnePlaybackFrame(model, motion, frame, time, physicsBackend, ikSolver);
         }
 
         internal MmdEvaluatedFrame EvaluateBeforePhysicsFrame(int frame, float time, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
         {
-            return MmdRuntimeFrameEvaluator.EvaluateValidatedBeforePhysicsPlaybackFrame(model, motion, frame, time, physicsBackend, ikSolver);
+            return ikSolver != null
+                ? MmdRuntimeFrameEvaluator.EvaluateValidatedBeforePhysicsPlaybackFrame(model, motion, frame, time, TopologyPlan, physicsBackend, ikSolver)
+                : MmdRuntimeFrameEvaluator.EvaluateValidatedBeforePhysicsPlaybackFrame(model, motion, frame, time, physicsBackend, ikSolver);
         }
 
         public MmdEvaluatedFrame EvaluateFrameAtTime(float time, float frameRate, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
@@ -131,5 +139,6 @@ namespace Mmd
         {
             return MmdAnimationBakePlanner.BuildTransformBakeSummary(this, startFrame, endFrame, frameRate, outputPath);
         }
+
     }
 }

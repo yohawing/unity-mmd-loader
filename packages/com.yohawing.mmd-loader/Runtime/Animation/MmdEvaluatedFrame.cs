@@ -92,6 +92,26 @@ namespace Mmd
             return EvaluateNativeFrame(model, motion, frame, time, includeMaterials: false);
         }
 
+        internal static MmdEvaluatedFrame EvaluateValidatedPhaseOnePlaybackFrame(
+            MmdModelDefinition model,
+            MmdMotionDefinition motion,
+            int frame,
+            float time,
+            MmdTopologyPlan topologyPlan,
+            IMmdPhysicsBackend? physicsBackend = null,
+            IMmdIkSolver? ikSolver = null)
+        {
+            ValidateFrame(frame);
+            ValidateTime(time);
+            topologyPlan.EnsureModel(model);
+            if (ikSolver != null)
+            {
+                return EvaluateManagedFrame(model, motion, frame, time, includeMaterials: false, physicsBackend, ikSolver, topologyPlan);
+            }
+
+            return EvaluateNativeFrame(model, motion, frame, time, includeMaterials: false);
+        }
+
         internal static MmdEvaluatedFrame EvaluateValidatedBeforePhysicsPlaybackFrame(
             MmdModelDefinition model,
             MmdMotionDefinition motion,
@@ -100,13 +120,33 @@ namespace Mmd
             IMmdPhysicsBackend? physicsBackend = null,
             IMmdIkSolver? ikSolver = null)
         {
-            // Native evaluation produces the animation-only result (no physics).
-            // This is equivalent to the old "before physics" stage.
             ValidateFrame(frame);
             ValidateTime(time);
             if (ikSolver != null)
             {
                 return EvaluateManagedFrame(model, motion, frame, time, includeMaterials: false, physicsBackend, ikSolver);
+            }
+
+            return EvaluateNativeFrame(model, motion, frame, time, includeMaterials: false);
+        }
+
+        internal static MmdEvaluatedFrame EvaluateValidatedBeforePhysicsPlaybackFrame(
+            MmdModelDefinition model,
+            MmdMotionDefinition motion,
+            int frame,
+            float time,
+            MmdTopologyPlan topologyPlan,
+            IMmdPhysicsBackend? physicsBackend = null,
+            IMmdIkSolver? ikSolver = null)
+        {
+            // Native evaluation produces the animation-only result (no physics).
+            // This is equivalent to the old "before physics" stage.
+            ValidateFrame(frame);
+            ValidateTime(time);
+            topologyPlan.EnsureModel(model);
+            if (ikSolver != null)
+            {
+                return EvaluateManagedFrame(model, motion, frame, time, includeMaterials: false, physicsBackend, ikSolver, topologyPlan);
             }
 
             return EvaluateNativeFrame(model, motion, frame, time, includeMaterials: false);
@@ -208,14 +248,15 @@ namespace Mmd
             float time,
             bool includeMaterials,
             IMmdPhysicsBackend? physicsBackend,
-            IMmdIkSolver ikSolver)
+            IMmdIkSolver ikSolver,
+            MmdTopologyPlan? topologyPlan = null)
         {
             ValidateInputs(model, motion);
             ValidateFrame(frame);
             ValidateTime(time);
 
             physicsBackend ??= new NullMmdPhysicsBackend();
-            MmdRuntimeFrameEvaluation evaluation = MmdRuntimeFramePipeline.Evaluate(model, motion, frame, physicsBackend, ikSolver);
+            MmdRuntimeFrameEvaluation evaluation = MmdRuntimeFramePipeline.Evaluate(model, motion, frame, physicsBackend, ikSolver, topologyPlan: topologyPlan);
             return BuildFrameFromManagedEvaluation(model, frame, time, evaluation, includeMaterials);
         }
 
