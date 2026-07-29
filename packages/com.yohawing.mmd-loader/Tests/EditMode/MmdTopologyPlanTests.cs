@@ -49,29 +49,16 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void RuntimeSessionNativeAndSnapshotPathsKeepTopologyLazy()
+        public void RuntimeSessionNativePlaybackIsLazyAndReusesStateWithoutManagedTopology()
         {
             using MmdRuntimeSession session = CreateSession(out _);
-            FieldInfo? field = typeof(MmdRuntimeSession).GetField(
-                "topologyPlan",
-                BindingFlags.Instance | BindingFlags.NonPublic);
-
-            Assert.That(field, Is.Not.Null);
-            Assert.That(field!.GetValue(session), Is.Null);
-            _ = session.EvaluateFrame(frame: 0, time: 0.0f);
-            _ = session.BuildSnapshot(frame: 0, time: 0.0f);
-            Assert.That(field.GetValue(session), Is.Null);
-        }
-
-        [Test]
-        public void RuntimeSessionNativePlaybackIsLazyAndReusesHandleAndScratchBuffers()
-        {
-            using MmdRuntimeSession session = CreateSession(out _);
+            FieldInfo topologyField = RequirePrivateField("topologyPlan");
             FieldInfo playbackField = RequirePrivateField("nativePlaybackSession");
             FieldInfo worldField = RequirePrivateField("nativeWorldMatrices");
             FieldInfo morphField = RequirePrivateField("nativeMorphWeights");
             FieldInfo ikField = RequirePrivateField("nativeIkEnabled");
 
+            Assert.That(topologyField.GetValue(session), Is.Null);
             Assert.That(playbackField.GetValue(session), Is.Null);
             Assert.That(worldField.GetValue(session), Is.Null);
             Assert.That(morphField.GetValue(session), Is.Null);
@@ -83,7 +70,9 @@ namespace Mmd.Tests
             object morph = morphField.GetValue(session)!;
             object ik = ikField.GetValue(session)!;
             _ = session.EvaluateBeforePhysicsFrame(frame: 1, time: 1.0f / 30.0f);
+            _ = session.BuildSnapshot(frame: 0, time: 0.0f);
 
+            Assert.That(topologyField.GetValue(session), Is.Null);
             Assert.That(playbackField.GetValue(session), Is.SameAs(playback));
             Assert.That(worldField.GetValue(session), Is.SameAs(world));
             Assert.That(morphField.GetValue(session), Is.SameAs(morph));

@@ -202,7 +202,6 @@ namespace Mmd.Pose
                 throw new ArgumentException("Topology plan belongs to a different model.", nameof(model));
             }
 
-
             if (ComputeSourceFingerprint(model) != SourceFingerprint)
             {
                 throw new InvalidOperationException("Model topology changed after the plan was compiled; recreate the runtime session.");
@@ -225,14 +224,7 @@ namespace Mmd.Pose
                 Add(ref hash, bone.fixedAxis ? 1 : 0, prime);
                 AddFloatArray(ref hash, bone.fixedAxisVector, prime);
                 Add(ref hash, bone.deformAfterPhysics ? 1 : 0, prime);
-                Add(ref hash, bone.origin?.Length ?? -1, prime);
-                if (bone.origin != null)
-                {
-                    for (int component = 0; component < bone.origin.Length; component++)
-                    {
-                        Add(ref hash, BitConverter.SingleToInt32Bits(bone.origin[component]), prime);
-                    }
-                }
+                AddFloatArray(ref hash, bone.origin, prime);
             }
 
             Add(ref hash, model.ik.Count, prime);
