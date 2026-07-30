@@ -1,6 +1,5 @@
 #nullable enable
 
-using System;
 using System.Collections.Generic;
 using System.IO;
 using NUnit.Framework;
@@ -17,37 +16,15 @@ namespace Mmd.Tests
     {
         private const int UtsVisualLayer = 31;
 
-        [Serializable]
-        private sealed class UtsVisualManifest
-        {
-            public int schemaVersion = 1;
-            public UtsVisualManifestEntry[] entries = Array.Empty<UtsVisualManifestEntry>();
-        }
-
-        [Serializable]
-        private sealed class UtsVisualManifestEntry
-        {
-            public string fixture = string.Empty;
-            public string feature = string.Empty;
-            public string texture = string.Empty;
-            public string artifact = string.Empty;
-            public int nonBackgroundPixels;
-            public float maximumBackgroundDelta;
-            public int targetChangedPixels;
-            public float targetMaximumDelta;
-        }
-
         private readonly struct UtsVisualCapture
         {
-            public UtsVisualCapture(Color[] pixels, int nonBackgroundPixels, float maximumBackgroundDelta)
+            public UtsVisualCapture(Color[] pixels, float maximumBackgroundDelta)
             {
                 Pixels = pixels;
-                NonBackgroundPixels = nonBackgroundPixels;
                 MaximumBackgroundDelta = maximumBackgroundDelta;
             }
 
             public Color[] Pixels { get; }
-            public int NonBackgroundPixels { get; }
             public float MaximumBackgroundDelta { get; }
         }
 
@@ -183,17 +160,6 @@ namespace Mmd.Tests
                 Directory.CreateDirectory(Path.GetDirectoryName(artifactPath)!);
                 File.WriteAllBytes(artifactPath, enabledPng);
                 Assert.That(new FileInfo(artifactPath).Length, Is.GreaterThan(0));
-                WriteVisualManifest(new UtsVisualManifestEntry
-                {
-                    fixture = fixtureName,
-                    feature = feature,
-                    texture = textureName ?? string.Empty,
-                    artifact = "artifacts/visual/uts-profile-import/" + feature + ".png",
-                    nonBackgroundPixels = enabledCapture.NonBackgroundPixels,
-                    maximumBackgroundDelta = enabledCapture.MaximumBackgroundDelta,
-                    targetChangedPixels = targetChangedPixels,
-                    targetMaximumDelta = targetMaximumDelta
-                });
                 Debug.Log($"UTS profile visual smoke ({feature}): {artifactPath}");
             }
             finally
@@ -239,7 +205,6 @@ namespace Mmd.Tests
             readback.Apply(updateMipmaps: false, makeNoLongerReadable: false);
 
             Color[] pixels = readback.GetPixels();
-            int nonBackgroundPixels = 0;
             float maximumBackgroundDelta = 0.0f;
             foreach (Color pixel in pixels)
             {
@@ -252,13 +217,9 @@ namespace Mmd.Tests
                     Mathf.Abs(pixel.g - background.g),
                     Mathf.Abs(pixel.b - background.b));
                 maximumBackgroundDelta = Mathf.Max(maximumBackgroundDelta, delta);
-                if (delta > 0.01f)
-                {
-                    nonBackgroundPixels++;
-                }
             }
 
-            return new UtsVisualCapture(pixels, nonBackgroundPixels, maximumBackgroundDelta);
+            return new UtsVisualCapture(pixels, maximumBackgroundDelta);
         }
 
         private static List<Material> ResolveInstanceMaterials(GameObject instance)
@@ -281,10 +242,7 @@ namespace Mmd.Tests
                         name = sharedMaterial.name + " (UTS visual comparison)"
                     };
                     clonedMaterials[i] = clone;
-                    if (!materials.Contains(clone))
-                    {
-                        materials.Add(clone);
-                    }
+                    materials.Add(clone);
                 }
 
                 renderer.sharedMaterials = clonedMaterials;
@@ -379,22 +337,6 @@ namespace Mmd.Tests
             return changedPixels;
         }
 
-        private static void WriteVisualManifest(UtsVisualManifestEntry entry)
-        {
-            string directory = Path.Combine(ProjectRoot, "artifacts", "visual", "uts-profile-import");
-            Directory.CreateDirectory(directory);
-            string path = Path.Combine(directory, "manifest.json");
-            UtsVisualManifest manifest = File.Exists(path)
-                ? JsonUtility.FromJson<UtsVisualManifest>(File.ReadAllText(path)) ?? new UtsVisualManifest()
-                : new UtsVisualManifest();
-            var entries = new List<UtsVisualManifestEntry>(manifest.entries ?? Array.Empty<UtsVisualManifestEntry>());
-            entries.RemoveAll(existing => existing.feature == entry.feature);
-            entries.Add(entry);
-            entries.Sort((left, right) => string.CompareOrdinal(left.feature, right.feature));
-            manifest.entries = entries.ToArray();
-            File.WriteAllText(path, JsonUtility.ToJson(manifest, prettyPrint: true));
-        }
-
         private static void CopyFixtureWithOptionalTexture(
             string fixtureName,
             string? textureName,
@@ -420,56 +362,6 @@ namespace Mmd.Tests
             }
 
             AssetDatabase.ImportAsset(destinationPmxPath, ImportAssetOptions.ForceUpdate);
-        }
-
-        private static void CreateUtsProfileAsset(Shader utsShader)
-        {
-            var profile = ScriptableObject.CreateInstance<MmdMaterialProfileAsset>();
-            profile.shader = utsShader;
-            profile.textureTargets = new MmdMaterialProfileTextureTargets
-            {
-                diffuseTextureProperties = new[] { "_BaseMap", "_MainTex" },
-                sphereTextureProperty = "_MatCap_Sampler",
-                sphereTextureBoundProperty = "_MatCap",
-                sphereModeProperty = "_Is_BlendAddToMatCap"
-            };
-            profile.renderingTargets = new MmdMaterialProfileRenderingTargets
-            {
-                baseColorProperty = "_BaseColor",
-                colorProperty = "_Color",
-                ambientColorProperty = string.Empty,
-                alphaProperty = string.Empty,
-                alphaClipThresholdProperty = "_Clipping_Level",
-                shadowAlphaClipThresholdProperty = string.Empty,
-                textureAlphaOutputWeightProperty = string.Empty,
-                textureAlphaClipMaskProperty = "_IsBaseMapAlphaAsClippingMask",
-                alphaClipModeProperty = "_ClippingMode",
-                cullProperty = "_CullMode",
-                surfaceProperty = string.Empty,
-                blendProperty = string.Empty,
-                sourceBlendProperty = string.Empty,
-                destinationBlendProperty = string.Empty,
-                zWriteProperty = "_ZWrite",
-                outlineColorProperty = "_Outline_Color",
-                outlineWidthProperty = "_Outline_Width",
-                outlineVisibleProperty = "_OUTLINE",
-                outlineScreenSpaceWeightProperty = string.Empty,
-                outlineZTestProperty = string.Empty,
-                requiredKeywords = new[]
-                {
-                    "_OUTLINE_NML",
-                    "_MatCap",
-                    "_IS_CLIPPING_OFF",
-                    "_IS_CLIPPING_TRANSMODE",
-                    "_IS_TRANSCLIPPING_ON",
-                    "_IS_OUTLINE_CLIPPING_NO"
-                },
-                requiredPasses = new[] { "SRPDefaultUnlit" },
-                unsupportedFeatures = new[] { "toon-texture", "self-shadow", "material-morph" },
-                supportsMaterialMorphs = false
-            };
-            AssetDatabase.CreateAsset(profile, TempMaterialProfilePath);
-            AssetDatabase.SaveAssets();
         }
 
         private static void ConfigureCustomProfileImporter(string pmxPath)

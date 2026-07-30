@@ -53,22 +53,30 @@ namespace Mmd.Editor
                     renderingTargets = mapper.RenderingTargets;
                 }
 
-                summary.Record(i, "diffuse", matDef.texture, BindOneTextureReference(
+                TextureReferenceBindStatus diffuseStatus = BindOneTextureReference(
                     matDef.texture,
                     pmxAssetPath,
                     mat,
                     ctx,
-                    textureTargets.DiffuseTextureProperties.ToArray()));
-                MmdUnityMaterialBuilder.ApplyDiffuseBoundSideEffects(mat);
+                    out bool diffuseBound,
+                    textureTargets.DiffuseTextureProperties.ToArray());
+                summary.Record(i, "diffuse", matDef.texture, diffuseStatus);
+                if (diffuseBound &&
+                    !string.IsNullOrWhiteSpace(textureTargets.DiffuseTextureBoundProperty) &&
+                    mat.HasProperty(textureTargets.DiffuseTextureBoundProperty))
+                {
+                    mat.SetFloat(textureTargets.DiffuseTextureBoundProperty, 1.0f);
+                }
 
                 TextureReferenceBindStatus sphereStatus = BindOneTextureReference(
                     matDef.sphereTexture,
                     pmxAssetPath,
                     mat,
                     ctx,
+                    out bool sphereBound,
                     OptionalTextureProperty(textureTargets.SphereTextureProperty));
                 summary.Record(i, "sphere", matDef.sphereTexture, sphereStatus);
-                if (sphereStatus == TextureReferenceBindStatus.Resolved &&
+                if (sphereBound &&
                     !string.IsNullOrWhiteSpace(textureTargets.SphereTextureBoundProperty) &&
                     mat.HasProperty(textureTargets.SphereTextureBoundProperty))
                 {
@@ -80,9 +88,11 @@ namespace Mmd.Editor
                     pmxAssetPath,
                     mat,
                     ctx,
+                    out bool toonBound,
                     OptionalTextureProperty(textureTargets.ToonTextureProperty));
-                bool toonBound = toonStatus == TextureReferenceBindStatus.Resolved;
                 if (!toonBound &&
+                    !string.IsNullOrWhiteSpace(textureTargets.ToonTextureProperty) &&
+                    mat.HasProperty(textureTargets.ToonTextureProperty) &&
                     ctx != null &&
                     matDef.toonShared &&
                     MmdSharedToonTextures.IsSharedToonIndex(matDef.sharedToonIndex))
@@ -95,21 +105,23 @@ namespace Mmd.Editor
                         matDef.sharedToonIndex,
                         sharedToonSubAssets,
                         ownedSubAssets);
-                    if (sharedToon != null && mat.HasProperty("_ToonMap"))
+                    if (sharedToon != null)
                     {
-                        mat.SetTexture("_ToonMap", sharedToon);
+                        mat.SetTexture(textureTargets.ToonTextureProperty, sharedToon);
                         toonBound = true;
                     }
                 }
 
                 summary.Record(i, "toon", matDef.toonTexture, toonBound ? TextureReferenceBindStatus.Resolved : toonStatus);
 
-                if (toonBound && mat.HasProperty("_ToonMapBound"))
+                if (toonBound &&
+                    !string.IsNullOrWhiteSpace(textureTargets.ToonTextureBoundProperty) &&
+                    mat.HasProperty(textureTargets.ToonTextureBoundProperty))
                 {
                     // The runtime builder sets this when it binds a toon texture; the importer's
                     // separate project-texture bind must do the same or the shader treats the
                     // material as having no toon ramp (flat lighting).
-                    mat.SetFloat("_ToonMapBound", 1.0f);
+                    mat.SetFloat(textureTargets.ToonTextureBoundProperty, 1.0f);
                 }
 
                 // Re-run transparency classification using the on-disk diffuse texture alpha, so
@@ -204,8 +216,15 @@ namespace Mmd.Editor
             return texture;
         }
 
-        private static TextureReferenceBindStatus BindOneTextureReference(string? reference, string pmxAssetPath, Material material, AssetImportContext? ctx, params string[] propertyNames)
+        private static TextureReferenceBindStatus BindOneTextureReference(
+            string? reference,
+            string pmxAssetPath,
+            Material material,
+            AssetImportContext? ctx,
+            out bool bound,
+            params string[] propertyNames)
         {
+            bound = false;
             if (string.IsNullOrWhiteSpace(reference) || material == null)
             {
                 return TextureReferenceBindStatus.NoReference;
@@ -233,6 +252,7 @@ namespace Mmd.Editor
                 if (material.HasProperty(prop))
                 {
                     material.SetTexture(prop, tex);
+                    bound = true;
                 }
             }
 

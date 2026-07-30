@@ -154,29 +154,6 @@ namespace Mmd.UnityIntegration
             return 0.0f;
         }
 
-        /// <summary>
-        /// Shared side-effect applicator for diffuse texture bind (runtime + importer parity).
-        /// Sets _BaseMapBound when a _BaseMap texture is present. Matches the previous inline
-        /// logic in BindDiffuseTextures; importer post-bind path calls this after SetTexture so
-        /// that importer Material sub-assets receive equivalent parameters without embedding
-        /// Texture2D sub-assets under .pmx.
-        /// </summary>
-        public static void ApplyDiffuseBoundSideEffects(Material material)
-        {
-            if (material == null)
-            {
-                return;
-            }
-
-            if (material.HasProperty("_BaseMap") && material.GetTexture("_BaseMap") != null)
-            {
-                if (material.HasProperty("_BaseMapBound"))
-                {
-                    material.SetFloat("_BaseMapBound", 1.0f);
-                }
-            }
-        }
-
         private static MmdResolvedTexture? FindResolvedDiffuseTexture(
             MmdRuntimeTextureResolution textureResolution,
             int materialIndex)

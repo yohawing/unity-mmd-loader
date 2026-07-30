@@ -276,50 +276,8 @@ namespace Mmd.Tests
             }
 
             CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
-            var profile = ScriptableObject.CreateInstance<MmdMaterialProfileAsset>();
-            profile.shader = utsShader;
-            profile.textureTargets = new MmdMaterialProfileTextureTargets
-            {
-                diffuseTextureProperties = new[] { "_BaseMap", "_MainTex" },
-                sphereTextureProperty = "_MatCap_Sampler",
-                sphereModeProperty = "_Is_BlendAddToMatCap"
-            };
-            profile.renderingTargets = new MmdMaterialProfileRenderingTargets
-            {
-                baseColorProperty = "_BaseColor",
-                colorProperty = "_Color",
-                ambientColorProperty = string.Empty,
-                alphaProperty = string.Empty,
-                alphaClipThresholdProperty = "_Clipping_Level",
-                shadowAlphaClipThresholdProperty = string.Empty,
-                textureAlphaOutputWeightProperty = string.Empty,
-                cullProperty = "_CullMode",
-                surfaceProperty = string.Empty,
-                blendProperty = string.Empty,
-                sourceBlendProperty = string.Empty,
-                destinationBlendProperty = string.Empty,
-                zWriteProperty = "_ZWrite",
-                outlineColorProperty = "_Outline_Color",
-                outlineWidthProperty = "_Outline_Width",
-                outlineVisibleProperty = "_OUTLINE",
-                outlineScreenSpaceWeightProperty = string.Empty,
-                outlineZTestProperty = string.Empty,
-                requiredKeywords = new[] { "_OUTLINE_NML" },
-                requiredPasses = new[] { "SRPDefaultUnlit" },
-                unsupportedFeatures = new[] { "toon-texture", "self-shadow", "material-morph" },
-                supportsMaterialMorphs = false
-            };
-            AssetDatabase.Refresh();
-            AssetDatabase.CreateAsset(profile, TempMaterialProfilePath);
-            AssetDatabase.SaveAssets();
-
-            var importer = AssetImporter.GetAtPath(TempPmxPath) as MmdPmxScriptedImporter;
-            Assert.That(importer, Is.Not.Null);
-            var serializedImporter = new SerializedObject(importer!);
-            serializedImporter.FindProperty("shaderPreset").enumValueIndex = (int)MmdPmxShaderPreset.CustomProfile;
-            serializedImporter.FindProperty("materialProfileAsset").objectReferenceValue = profile;
-            serializedImporter.ApplyModifiedPropertiesWithoutUndo();
-            importer!.SaveAndReimport();
+            CreateUtsProfileAsset(utsShader!);
+            ConfigureCustomProfileImporter(TempPmxPath);
 
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             Material material = pmxAsset.ImportedMaterials[0];
@@ -676,6 +634,56 @@ namespace Mmd.Tests
             var attribute = (ScriptedImporterAttribute)attributes[0];
             Assert.That(attribute.version, Is.EqualTo(28),
                 "PMX importer version must force a texture rebind after the public Toon shader migration.");
+        }
+
+        private static void CreateUtsProfileAsset(Shader utsShader)
+        {
+            var profile = ScriptableObject.CreateInstance<MmdMaterialProfileAsset>();
+            profile.shader = utsShader;
+            profile.textureTargets = new MmdMaterialProfileTextureTargets
+            {
+                diffuseTextureProperties = new[] { "_BaseMap", "_MainTex" },
+                sphereTextureProperty = "_MatCap_Sampler",
+                sphereTextureBoundProperty = "_MatCap",
+                sphereModeProperty = "_Is_BlendAddToMatCap"
+            };
+            profile.renderingTargets = new MmdMaterialProfileRenderingTargets
+            {
+                baseColorProperty = "_BaseColor",
+                colorProperty = "_Color",
+                ambientColorProperty = string.Empty,
+                alphaProperty = string.Empty,
+                alphaClipThresholdProperty = "_Clipping_Level",
+                shadowAlphaClipThresholdProperty = string.Empty,
+                textureAlphaOutputWeightProperty = string.Empty,
+                textureAlphaClipMaskProperty = "_IsBaseMapAlphaAsClippingMask",
+                alphaClipModeProperty = "_ClippingMode",
+                cullProperty = "_CullMode",
+                surfaceProperty = string.Empty,
+                blendProperty = string.Empty,
+                sourceBlendProperty = string.Empty,
+                destinationBlendProperty = string.Empty,
+                zWriteProperty = "_ZWrite",
+                outlineColorProperty = "_Outline_Color",
+                outlineWidthProperty = "_Outline_Width",
+                outlineVisibleProperty = "_OUTLINE",
+                outlineScreenSpaceWeightProperty = string.Empty,
+                outlineZTestProperty = string.Empty,
+                requiredKeywords = new[]
+                {
+                    "_OUTLINE_NML",
+                    "_MatCap",
+                    "_IS_CLIPPING_OFF",
+                    "_IS_CLIPPING_TRANSMODE",
+                    "_IS_TRANSCLIPPING_ON",
+                    "_IS_OUTLINE_CLIPPING_NO"
+                },
+                requiredPasses = new[] { "SRPDefaultUnlit" },
+                unsupportedFeatures = new[] { "toon-texture", "self-shadow", "material-morph" },
+                supportsMaterialMorphs = false
+            };
+            AssetDatabase.CreateAsset(profile, TempMaterialProfilePath);
+            AssetDatabase.SaveAssets();
         }
 
         private static void AssertMmdUrpToonDiffuseTextureIsBound(string pmxPath, string texturePath)
