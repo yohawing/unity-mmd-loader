@@ -1,7 +1,6 @@
 #nullable enable
 
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -17,18 +16,6 @@ namespace Mmd.Tests
     public sealed class NativeInteropContractTests
     {
         [Test]
-        public void ParserFfiPinsActiveJsonEntrypoints()
-        {
-            Assert.That(MmdParserFfiMethods.LibraryName, Is.EqualTo("mmd_runtime_ffi"));
-            Assert.That(MmdParserFfiMethods.ByteBufferFreeEntryPoint, Is.EqualTo("mmd_runtime_byte_buffer_free"));
-            Assert.That(MmdParserFfiMethods.ParseVmdJsonEntryPoint, Is.EqualTo("mmd_runtime_parse_vmd_json"));
-            Assert.That(MmdParserFfiMethods.ParsePmxNonGeometryJsonEntryPoint, Is.EqualTo("mmd_runtime_parse_pmx_non_geometry_json"));
-
-            AssertPrivateFfiSignatureReturnName("ParseVmdJsonBuffer", "ByteBuffer", typeof(byte[]), typeof(IntPtr));
-            AssertPrivateFfiSignatureReturnName("ParsePmxNonGeometryJsonBuffer", "ByteBuffer", typeof(byte[]), typeof(IntPtr));
-        }
-
-        [Test]
         public void ParserFfiParsesPmxNonGeometryJsonFromPackageFixture()
         {
             string json = MmdParserFfiMethods.ParsePmxNonGeometryJson(
@@ -38,77 +25,6 @@ namespace Mmd.Tests
             Assert.That(json, Does.Contain("\"materials\""));
             Assert.That(json, Does.Contain("\"skeleton\""));
             Assert.That(json, Does.Not.Contain("\"geometry\""));
-        }
-
-        [Test]
-        public void ParserFfiPinsPmxGeometryBufferEntrypoints()
-        {
-            // Static contract checks only; no native functions are invoked.
-            // These must pass even against the current locked package DLL.
-            Assert.That(MmdParserFfiMethods.ParsePmxPositionsBufferEntryPoint, Is.EqualTo("mmd_runtime_parse_pmx_positions_buffer"));
-            Assert.That(MmdParserFfiMethods.ParsePmxNormalsBufferEntryPoint, Is.EqualTo("mmd_runtime_parse_pmx_normals_buffer"));
-            Assert.That(MmdParserFfiMethods.ParsePmxUvsBufferEntryPoint, Is.EqualTo("mmd_runtime_parse_pmx_uvs_buffer"));
-            Assert.That(MmdParserFfiMethods.ParsePmxIndicesBufferEntryPoint, Is.EqualTo("mmd_runtime_parse_pmx_indices_buffer"));
-            Assert.That(MmdParserFfiMethods.ParsePmxSkinIndicesBufferEntryPoint, Is.EqualTo("mmd_runtime_parse_pmx_skin_indices_buffer"));
-            Assert.That(MmdParserFfiMethods.ParsePmxSkinWeightsBufferEntryPoint, Is.EqualTo("mmd_runtime_parse_pmx_skin_weights_buffer"));
-            Assert.That(MmdParserFfiMethods.ParsePmxSdefEnabledBufferEntryPoint, Is.EqualTo("mmd_runtime_parse_pmx_sdef_enabled_buffer"));
-            Assert.That(MmdParserFfiMethods.ParsePmxSdefCBufferEntryPoint, Is.EqualTo("mmd_runtime_parse_pmx_sdef_c_buffer"));
-            Assert.That(MmdParserFfiMethods.ParsePmxSdefR0BufferEntryPoint, Is.EqualTo("mmd_runtime_parse_pmx_sdef_r0_buffer"));
-            Assert.That(MmdParserFfiMethods.ParsePmxSdefR1BufferEntryPoint, Is.EqualTo("mmd_runtime_parse_pmx_sdef_r1_buffer"));
-            Assert.That(MmdParserFfiMethods.ParsePmxSkinningModesJsonEntryPoint, Is.EqualTo("mmd_runtime_parse_pmx_skinning_modes_json"));
-
-            // Private DllImport signature checks (reflection-based, no invocation).
-            AssertPrivateFfiSignatureReturnName("ParsePmxPositionsBuffer", "ByteBuffer", typeof(byte[]), typeof(IntPtr));
-            AssertPrivateFfiSignatureReturnName("ParsePmxNormalsBuffer", "ByteBuffer", typeof(byte[]), typeof(IntPtr));
-            AssertPrivateFfiSignatureReturnName("ParsePmxUvsBuffer", "ByteBuffer", typeof(byte[]), typeof(IntPtr));
-            AssertPrivateFfiSignatureReturnName("ParsePmxIndicesBuffer", "ByteBuffer", typeof(byte[]), typeof(IntPtr));
-            AssertPrivateFfiSignatureReturnName("ParsePmxSkinIndicesBuffer", "ByteBuffer", typeof(byte[]), typeof(IntPtr));
-            AssertPrivateFfiSignatureReturnName("ParsePmxSkinWeightsBuffer", "ByteBuffer", typeof(byte[]), typeof(IntPtr));
-            AssertPrivateFfiSignatureReturnName("ParsePmxSdefEnabledBuffer", "ByteBuffer", typeof(byte[]), typeof(IntPtr));
-            AssertPrivateFfiSignatureReturnName("ParsePmxSdefCBuffer", "ByteBuffer", typeof(byte[]), typeof(IntPtr));
-            AssertPrivateFfiSignatureReturnName("ParsePmxSdefR0Buffer", "ByteBuffer", typeof(byte[]), typeof(IntPtr));
-            AssertPrivateFfiSignatureReturnName("ParsePmxSdefR1Buffer", "ByteBuffer", typeof(byte[]), typeof(IntPtr));
-            AssertPrivateFfiSignatureReturnName("ParsePmxSkinningModesJsonBuffer", "ByteBuffer", typeof(byte[]), typeof(IntPtr));
-        }
-
-        [Test]
-        public void ParserFfiPinsParseOncePmxGeometryHandleEntrypoints()
-        {
-            Assert.That(MmdParserFfiMethods.PmxGeometryCreateEntryPoint, Is.EqualTo("mmd_runtime_pmx_geometry_create"));
-            Assert.That(MmdParserFfiMethods.PmxGeometryFreeEntryPoint, Is.EqualTo("mmd_runtime_pmx_geometry_free"));
-            Assert.That(MmdParserFfiMethods.PmxGeometryPositionsBufferEntryPoint, Is.EqualTo("mmd_runtime_pmx_geometry_positions_buffer"));
-            Assert.That(MmdParserFfiMethods.PmxGeometryNormalsBufferEntryPoint, Is.EqualTo("mmd_runtime_pmx_geometry_normals_buffer"));
-            Assert.That(MmdParserFfiMethods.PmxGeometryUvsBufferEntryPoint, Is.EqualTo("mmd_runtime_pmx_geometry_uvs_buffer"));
-            Assert.That(MmdParserFfiMethods.PmxGeometryEdgeScaleBufferEntryPoint, Is.EqualTo("mmd_runtime_pmx_geometry_edge_scale_buffer"));
-            Assert.That(MmdParserFfiMethods.PmxGeometryIndicesBufferEntryPoint, Is.EqualTo("mmd_runtime_pmx_geometry_indices_buffer"));
-            Assert.That(MmdParserFfiMethods.PmxGeometrySkinIndicesBufferEntryPoint, Is.EqualTo("mmd_runtime_pmx_geometry_skin_indices_buffer"));
-            Assert.That(MmdParserFfiMethods.PmxGeometrySkinWeightsBufferEntryPoint, Is.EqualTo("mmd_runtime_pmx_geometry_skin_weights_buffer"));
-            Assert.That(MmdParserFfiMethods.PmxGeometrySdefEnabledBufferEntryPoint, Is.EqualTo("mmd_runtime_pmx_geometry_sdef_enabled_buffer"));
-            Assert.That(MmdParserFfiMethods.PmxGeometrySdefCBufferEntryPoint, Is.EqualTo("mmd_runtime_pmx_geometry_sdef_c_buffer"));
-            Assert.That(MmdParserFfiMethods.PmxGeometrySdefR0BufferEntryPoint, Is.EqualTo("mmd_runtime_pmx_geometry_sdef_r0_buffer"));
-            Assert.That(MmdParserFfiMethods.PmxGeometrySdefR1BufferEntryPoint, Is.EqualTo("mmd_runtime_pmx_geometry_sdef_r1_buffer"));
-            Assert.That(MmdParserFfiMethods.PmxGeometrySkinningModesJsonEntryPoint, Is.EqualTo("mmd_runtime_pmx_geometry_skinning_modes_json"));
-
-            AssertPrivateFfiSignature("PmxGeometryCreate", typeof(IntPtr), typeof(byte[]), typeof(IntPtr));
-            AssertPrivateFfiSignature("PmxGeometryFree", typeof(void), typeof(IntPtr));
-            foreach (string methodName in new[]
-                     {
-                         "PmxGeometryPositionsBuffer",
-                         "PmxGeometryNormalsBuffer",
-                         "PmxGeometryUvsBuffer",
-                         "PmxGeometryEdgeScaleBuffer",
-                         "PmxGeometryIndicesBuffer",
-                         "PmxGeometrySkinIndicesBuffer",
-                         "PmxGeometrySkinWeightsBuffer",
-                         "PmxGeometrySdefEnabledBuffer",
-                         "PmxGeometrySdefCBuffer",
-                         "PmxGeometrySdefR0Buffer",
-                         "PmxGeometrySdefR1Buffer",
-                         "PmxGeometrySkinningModesJsonBuffer"
-                     })
-            {
-                AssertPrivateFfiSignatureReturnName(methodName, "ByteBuffer", typeof(IntPtr));
-            }
         }
 
         [TestCase("test_1bone_cube.pmx", 1, false)]
@@ -147,11 +63,8 @@ namespace Mmd.Tests
             var geometry = NativeMmdParser.CreatePmxGeometryFromNativeHandle(new byte[] { 1 }, reader);
 
             Assert.That(reader.CreateCount, Is.EqualTo(1));
+            Assert.That(reader.ReadAllCount, Is.EqualTo(1));
             Assert.That(reader.FreeCount, Is.EqualTo(1));
-            foreach (string accessor in CountingPmxGeometryReader.AccessorNames)
-            {
-                Assert.That(reader.AccessorCallCount(accessor), Is.EqualTo(1), accessor);
-            }
 
             CollectionAssert.AreEqual(new[] { 1.0f, 2.0f, 3.0f }, geometry.positions);
             CollectionAssert.AreEqual(new uint[] { 0, 0, 0 }, geometry.indices);
@@ -159,16 +72,15 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void NativeParserFreesGeometryHandleWhenAnAccessorFails()
+        public void NativeParserFreesGeometryHandleWhenReadAllFails()
         {
-            var reader = new CountingPmxGeometryReader { ThrowOnAccessor = "normals" };
+            var reader = new CountingPmxGeometryReader { ThrowOnReadAll = true };
 
             Assert.Throws<InvalidOperationException>(() =>
                 NativeMmdParser.CreatePmxGeometryFromNativeHandle(new byte[] { 1 }, reader));
 
             Assert.That(reader.CreateCount, Is.EqualTo(1));
-            Assert.That(reader.AccessorCallCount("positions"), Is.EqualTo(1));
-            Assert.That(reader.AccessorCallCount("normals"), Is.EqualTo(1));
+            Assert.That(reader.ReadAllCount, Is.EqualTo(1));
             Assert.That(reader.FreeCount, Is.EqualTo(1));
         }
 
@@ -186,49 +98,60 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void ParserFfiParsesAllPmxGeometryBuffersFromPackageFixture()
+        public void ParserFfiParsesPmxGeometryHandleFromPackageFixture()
         {
             byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube.pmx");
+            IntPtr geometry = MmdParserFfiMethods.CreatePmxGeometry(pmxBytes);
+            Assert.That(geometry, Is.Not.EqualTo(IntPtr.Zero), "parse-once PMX geometry handle");
 
-            float[] positions = MmdParserFfiMethods.ParsePmxPositions(pmxBytes);
-            float[] normals = MmdParserFfiMethods.ParsePmxNormals(pmxBytes);
-            float[] uvs = MmdParserFfiMethods.ParsePmxUvs(pmxBytes);
-            uint[] indices = MmdParserFfiMethods.ParsePmxIndices(pmxBytes);
-            uint[] skinIndices = MmdParserFfiMethods.ParsePmxSkinIndices(pmxBytes);
-            float[] skinWeights = MmdParserFfiMethods.ParsePmxSkinWeights(pmxBytes);
-            bool[] sdefEnabled = MmdParserFfiMethods.ParsePmxSdefEnabled(pmxBytes);
-            float[] sdefC = MmdParserFfiMethods.ParsePmxSdefC(pmxBytes);
-            float[] sdefR0 = MmdParserFfiMethods.ParsePmxSdefR0(pmxBytes);
-            float[] sdefR1 = MmdParserFfiMethods.ParsePmxSdefR1(pmxBytes);
-            string modesJson = MmdParserFfiMethods.ParsePmxSkinningModesJson(pmxBytes);
+            try
+            {
+                float[] positions = MmdParserFfiMethods.ParsePmxGeometryPositions(geometry);
+                float[] normals = MmdParserFfiMethods.ParsePmxGeometryNormals(geometry);
+                float[] uvs = MmdParserFfiMethods.ParsePmxGeometryUvs(geometry);
+                float[] edgeScale = MmdParserFfiMethods.ParsePmxGeometryEdgeScale(geometry);
+                uint[] indices = MmdParserFfiMethods.ParsePmxGeometryIndices(geometry);
+                uint[] skinIndices = MmdParserFfiMethods.ParsePmxGeometrySkinIndices(geometry);
+                float[] skinWeights = MmdParserFfiMethods.ParsePmxGeometrySkinWeights(geometry);
+                bool[] sdefEnabled = MmdParserFfiMethods.ParsePmxGeometrySdefEnabled(geometry);
+                float[] sdefC = MmdParserFfiMethods.ParsePmxGeometrySdefC(geometry);
+                float[] sdefR0 = MmdParserFfiMethods.ParsePmxGeometrySdefR0(geometry);
+                float[] sdefR1 = MmdParserFfiMethods.ParsePmxGeometrySdefR1(geometry);
+                string modesJson = MmdParserFfiMethods.ParsePmxGeometrySkinningModesJson(geometry);
 
-            // positions: flat xyz, non-zero multiple of 3
-            Assert.That(positions.Length % 3, Is.EqualTo(0), "positions.Length % 3");
-            Assert.That(positions.Length, Is.GreaterThan(0), "positions vertex count");
-            int vertexCount = positions.Length / 3;
+                // positions: flat xyz, non-zero multiple of 3
+                Assert.That(positions.Length % 3, Is.EqualTo(0), "positions.Length % 3");
+                Assert.That(positions.Length, Is.GreaterThan(0), "positions vertex count");
+                int vertexCount = positions.Length / 3;
 
-            // normals: same flat xyz layout as positions
-            Assert.That(normals.Length, Is.EqualTo(positions.Length), "normals.Length == positions.Length");
+                // normals: same flat xyz layout as positions
+                Assert.That(normals.Length, Is.EqualTo(positions.Length), "normals.Length == positions.Length");
 
-            // uvs: flat uv pairs
-            Assert.That(uvs.Length, Is.EqualTo(vertexCount * 2), "uvs.Length == vertexCount*2");
+                // uvs: flat uv pairs
+                Assert.That(uvs.Length, Is.EqualTo(vertexCount * 2), "uvs.Length == vertexCount*2");
+                Assert.That(edgeScale.Length, Is.EqualTo(vertexCount), "edgeScale.Length == vertexCount");
 
-            // indices: triangles, non-zero multiple of 3
-            Assert.That(indices.Length % 3, Is.EqualTo(0), "indices.Length % 3");
-            Assert.That(indices.Length, Is.GreaterThan(0), "indices non-empty");
+                // indices: triangles, non-zero multiple of 3
+                Assert.That(indices.Length % 3, Is.EqualTo(0), "indices.Length % 3");
+                Assert.That(indices.Length, Is.GreaterThan(0), "indices non-empty");
 
-            // skinning: 4 values per vertex
-            Assert.That(skinIndices.Length, Is.EqualTo(vertexCount * 4), "skinIndices.Length == vertexCount*4");
-            Assert.That(skinWeights.Length, Is.EqualTo(vertexCount * 4), "skinWeights.Length == vertexCount*4");
+                // skinning: 4 values per vertex
+                Assert.That(skinIndices.Length, Is.EqualTo(vertexCount * 4), "skinIndices.Length == vertexCount*4");
+                Assert.That(skinWeights.Length, Is.EqualTo(vertexCount * 4), "skinWeights.Length == vertexCount*4");
 
-            // SDEF: one bool per vertex, xyz triples for C/R0/R1
-            Assert.That(sdefEnabled.Length, Is.EqualTo(vertexCount), "sdefEnabled.Length == vertexCount");
-            Assert.That(sdefC.Length, Is.EqualTo(vertexCount * 3), "sdefC.Length == vertexCount*3");
-            Assert.That(sdefR0.Length, Is.EqualTo(vertexCount * 3), "sdefR0.Length == vertexCount*3");
-            Assert.That(sdefR1.Length, Is.EqualTo(vertexCount * 3), "sdefR1.Length == vertexCount*3");
+                // SDEF: one bool per vertex, xyz triples for C/R0/R1
+                Assert.That(sdefEnabled.Length, Is.EqualTo(vertexCount), "sdefEnabled.Length == vertexCount");
+                Assert.That(sdefC.Length, Is.EqualTo(vertexCount * 3), "sdefC.Length == vertexCount*3");
+                Assert.That(sdefR0.Length, Is.EqualTo(vertexCount * 3), "sdefR0.Length == vertexCount*3");
+                Assert.That(sdefR1.Length, Is.EqualTo(vertexCount * 3), "sdefR1.Length == vertexCount*3");
 
-            // skinning modes JSON must be a non-empty JSON payload
-            Assert.That(modesJson, Is.Not.Null.And.Not.Empty, "skinningModesJson non-empty");
+                // skinning modes JSON must be a non-empty JSON payload
+                Assert.That(modesJson, Is.Not.Null.And.Not.Empty, "skinningModesJson non-empty");
+            }
+            finally
+            {
+                MmdParserFfiMethods.FreePmxGeometry(geometry);
+            }
         }
 
         private static void AssertModelGeometryAndSkinningParity(
@@ -691,27 +614,6 @@ namespace Mmd.Tests
             Assert.That(Path.Combine(pluginRoot, "yohawing_mmd_unity_native.dll.meta"), Does.Not.Exist);
         }
 
-        private static void AssertPrivateFfiSignature(string methodName, Type returnType, params Type[] parameterTypes)
-        {
-            MethodInfo method = GetPrivateFfiMethod(methodName);
-            Assert.That(method.ReturnType, Is.EqualTo(returnType), methodName);
-            CollectionAssert.AreEqual(parameterTypes, method.GetParameters().Select(parameter => parameter.ParameterType).ToArray(), methodName);
-        }
-
-        private static void AssertPrivateFfiSignatureReturnName(string methodName, string returnTypeName, params Type[] parameterTypes)
-        {
-            MethodInfo method = GetPrivateFfiMethod(methodName);
-            Assert.That(method.ReturnType.Name, Is.EqualTo(returnTypeName), methodName);
-            CollectionAssert.AreEqual(parameterTypes, method.GetParameters().Select(parameter => parameter.ParameterType).ToArray(), methodName);
-        }
-
-        private static MethodInfo GetPrivateFfiMethod(string methodName)
-        {
-            MethodInfo method = typeof(MmdParserFfiMethods).GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Static);
-            Assert.That(method, Is.Not.Null, methodName);
-            return method;
-        }
-
         private static void AssertRuntimeFfiSignature(string methodName, Type returnType, params Type[] parameterTypes)
         {
             MethodInfo method = GetRuntimeFfiMethod(methodName);
@@ -755,17 +657,10 @@ namespace Mmd.Tests
 
         private sealed class CountingPmxGeometryReader : IPmxGeometryReader
         {
-            internal static readonly string[] AccessorNames =
-            {
-                "positions", "normals", "uvs", "edgeScale", "indices", "skinIndices", "skinWeights",
-                "sdefEnabled", "sdefC", "sdefR0", "sdefR1", "skinningModesJson"
-            };
-
-            private readonly Dictionary<string, int> accessorCalls = new Dictionary<string, int>();
-
             internal int CreateCount { get; private set; }
+            internal int ReadAllCount { get; private set; }
             internal int FreeCount { get; private set; }
-            internal string ThrowOnAccessor { get; set; } = string.Empty;
+            internal bool ThrowOnReadAll { get; set; }
             internal IntPtr CreatedHandle { get; set; } = new IntPtr(1);
 
             public IntPtr Create(byte[] data)
@@ -774,56 +669,34 @@ namespace Mmd.Tests
                 return CreatedHandle;
             }
 
+            public PmxGeometryData ReadAll(IntPtr geometry)
+            {
+                ReadAllCount++;
+                if (ThrowOnReadAll)
+                {
+                    throw new InvalidOperationException("simulated geometry read failure");
+                }
+
+                return new PmxGeometryData
+                {
+                    skinningModesJson = "{\"skinningModes\":[\"bdef1\"]}",
+                    positions = new[] { 1.0f, 2.0f, 3.0f },
+                    normals = new[] { 0.0f, 1.0f, 0.0f },
+                    uvs = new[] { 0.0f, 1.0f },
+                    edgeScale = new[] { 1.0f },
+                    indices = new uint[] { 0, 0, 0 },
+                    skinIndices = new uint[] { 0, 0, 0, 0 },
+                    skinWeights = new[] { 1.0f, 0.0f, 0.0f, 0.0f },
+                    hasSdefParameters = new[] { false },
+                    sdefC = new[] { 0.0f, 0.0f, 0.0f },
+                    sdefR0 = new[] { 0.0f, 0.0f, 0.0f },
+                    sdefR1 = new[] { 0.0f, 0.0f, 0.0f },
+                };
+            }
+
             public void Free(IntPtr geometry)
             {
                 FreeCount++;
-            }
-
-            public float[] Positions(IntPtr geometry) => Float("positions", 1.0f, 2.0f, 3.0f);
-            public float[] Normals(IntPtr geometry) => Float("normals", 0.0f, 1.0f, 0.0f);
-            public float[] Uvs(IntPtr geometry) => Float("uvs", 0.0f, 1.0f);
-            public float[] EdgeScale(IntPtr geometry) => Float("edgeScale", 1.0f);
-            public uint[] Indices(IntPtr geometry) => Uint("indices", 0, 0, 0);
-            public uint[] SkinIndices(IntPtr geometry) => Uint("skinIndices", 0, 0, 0, 0);
-            public float[] SkinWeights(IntPtr geometry) => Float("skinWeights", 1.0f, 0.0f, 0.0f, 0.0f);
-            public bool[] SdefEnabled(IntPtr geometry) => Bool("sdefEnabled", false);
-            public float[] SdefC(IntPtr geometry) => Float("sdefC", 0.0f, 0.0f, 0.0f);
-            public float[] SdefR0(IntPtr geometry) => Float("sdefR0", 0.0f, 0.0f, 0.0f);
-            public float[] SdefR1(IntPtr geometry) => Float("sdefR1", 0.0f, 0.0f, 0.0f);
-            public string SkinningModesJson(IntPtr geometry)
-            {
-                Record("skinningModesJson");
-                return "{\"skinningModes\":[\"bdef1\"]}";
-            }
-
-            internal int AccessorCallCount(string name)
-                => accessorCalls.TryGetValue(name, out int count) ? count : 0;
-
-            private float[] Float(string name, params float[] values)
-            {
-                Record(name);
-                return values;
-            }
-
-            private uint[] Uint(string name, params uint[] values)
-            {
-                Record(name);
-                return values;
-            }
-
-            private bool[] Bool(string name, params bool[] values)
-            {
-                Record(name);
-                return values;
-            }
-
-            private void Record(string name)
-            {
-                accessorCalls[name] = AccessorCallCount(name) + 1;
-                if (string.Equals(name, ThrowOnAccessor, StringComparison.Ordinal))
-                {
-                    throw new InvalidOperationException("simulated accessor failure");
-                }
             }
         }
 

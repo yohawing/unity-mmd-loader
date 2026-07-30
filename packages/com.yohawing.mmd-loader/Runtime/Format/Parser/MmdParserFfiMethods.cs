@@ -10,39 +10,6 @@ namespace Mmd.Parser
     internal static class MmdParserFfiMethods
     {
         internal const string LibraryName = "mmd_runtime_ffi";
-        internal const string ByteBufferFreeEntryPoint = "mmd_runtime_byte_buffer_free";
-        internal const string ParseVmdJsonEntryPoint = "mmd_runtime_parse_vmd_json";
-        internal const string ParsePmxNonGeometryJsonEntryPoint = "mmd_runtime_parse_pmx_non_geometry_json";
-
-        // --- PMX geometry typed-buffer entrypoints ---
-        internal const string ParsePmxPositionsBufferEntryPoint = "mmd_runtime_parse_pmx_positions_buffer";
-        internal const string ParsePmxNormalsBufferEntryPoint = "mmd_runtime_parse_pmx_normals_buffer";
-        internal const string ParsePmxUvsBufferEntryPoint = "mmd_runtime_parse_pmx_uvs_buffer";
-        internal const string ParsePmxEdgeScaleBufferEntryPoint = "mmd_runtime_parse_pmx_edge_scale_buffer";
-        internal const string ParsePmxIndicesBufferEntryPoint = "mmd_runtime_parse_pmx_indices_buffer";
-        internal const string ParsePmxSkinIndicesBufferEntryPoint = "mmd_runtime_parse_pmx_skin_indices_buffer";
-        internal const string ParsePmxSkinWeightsBufferEntryPoint = "mmd_runtime_parse_pmx_skin_weights_buffer";
-        internal const string ParsePmxSdefEnabledBufferEntryPoint = "mmd_runtime_parse_pmx_sdef_enabled_buffer";
-        internal const string ParsePmxSdefCBufferEntryPoint = "mmd_runtime_parse_pmx_sdef_c_buffer";
-        internal const string ParsePmxSdefR0BufferEntryPoint = "mmd_runtime_parse_pmx_sdef_r0_buffer";
-        internal const string ParsePmxSdefR1BufferEntryPoint = "mmd_runtime_parse_pmx_sdef_r1_buffer";
-        internal const string ParsePmxSkinningModesJsonEntryPoint = "mmd_runtime_parse_pmx_skinning_modes_json";
-
-        // --- PMX geometry parse-once handle entrypoints ---
-        internal const string PmxGeometryCreateEntryPoint = "mmd_runtime_pmx_geometry_create";
-        internal const string PmxGeometryFreeEntryPoint = "mmd_runtime_pmx_geometry_free";
-        internal const string PmxGeometryPositionsBufferEntryPoint = "mmd_runtime_pmx_geometry_positions_buffer";
-        internal const string PmxGeometryNormalsBufferEntryPoint = "mmd_runtime_pmx_geometry_normals_buffer";
-        internal const string PmxGeometryUvsBufferEntryPoint = "mmd_runtime_pmx_geometry_uvs_buffer";
-        internal const string PmxGeometryEdgeScaleBufferEntryPoint = "mmd_runtime_pmx_geometry_edge_scale_buffer";
-        internal const string PmxGeometryIndicesBufferEntryPoint = "mmd_runtime_pmx_geometry_indices_buffer";
-        internal const string PmxGeometrySkinIndicesBufferEntryPoint = "mmd_runtime_pmx_geometry_skin_indices_buffer";
-        internal const string PmxGeometrySkinWeightsBufferEntryPoint = "mmd_runtime_pmx_geometry_skin_weights_buffer";
-        internal const string PmxGeometrySdefEnabledBufferEntryPoint = "mmd_runtime_pmx_geometry_sdef_enabled_buffer";
-        internal const string PmxGeometrySdefCBufferEntryPoint = "mmd_runtime_pmx_geometry_sdef_c_buffer";
-        internal const string PmxGeometrySdefR0BufferEntryPoint = "mmd_runtime_pmx_geometry_sdef_r0_buffer";
-        internal const string PmxGeometrySdefR1BufferEntryPoint = "mmd_runtime_pmx_geometry_sdef_r1_buffer";
-        internal const string PmxGeometrySkinningModesJsonEntryPoint = "mmd_runtime_pmx_geometry_skinning_modes_json";
 
         [StructLayout(LayoutKind.Sequential)]
         private readonly struct ByteBuffer
@@ -51,91 +18,91 @@ namespace Mmd.Parser
             public readonly IntPtr Length;
         }
 
-        [DllImport(LibraryName, EntryPoint = ByteBufferFreeEntryPoint, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_byte_buffer_free", CallingConvention = CallingConvention.Cdecl)]
         private static extern void ByteBufferFree(ByteBuffer buffer);
 
-        [DllImport(LibraryName, EntryPoint = ParseVmdJsonEntryPoint, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_parse_vmd_json", CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer ParseVmdJsonBuffer(byte[] data, IntPtr len);
 
-        [DllImport(LibraryName, EntryPoint = ParsePmxNonGeometryJsonEntryPoint, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_parse_pmx_non_geometry_json", CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer ParsePmxNonGeometryJsonBuffer(byte[] data, IntPtr len);
 
-        [DllImport(LibraryName, EntryPoint = ParsePmxPositionsBufferEntryPoint, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_parse_pmx_positions_buffer", CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer ParsePmxPositionsBuffer(byte[] data, IntPtr len);
 
-        [DllImport(LibraryName, EntryPoint = ParsePmxNormalsBufferEntryPoint, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_parse_pmx_normals_buffer", CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer ParsePmxNormalsBuffer(byte[] data, IntPtr len);
 
-        [DllImport(LibraryName, EntryPoint = ParsePmxUvsBufferEntryPoint, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_parse_pmx_uvs_buffer", CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer ParsePmxUvsBuffer(byte[] data, IntPtr len);
 
-        [DllImport(LibraryName, EntryPoint = ParsePmxEdgeScaleBufferEntryPoint, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_parse_pmx_edge_scale_buffer", CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer ParsePmxEdgeScaleBuffer(byte[] data, IntPtr len);
 
-        [DllImport(LibraryName, EntryPoint = ParsePmxIndicesBufferEntryPoint, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_parse_pmx_indices_buffer", CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer ParsePmxIndicesBuffer(byte[] data, IntPtr len);
 
-        [DllImport(LibraryName, EntryPoint = ParsePmxSkinIndicesBufferEntryPoint, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_parse_pmx_skin_indices_buffer", CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer ParsePmxSkinIndicesBuffer(byte[] data, IntPtr len);
 
-        [DllImport(LibraryName, EntryPoint = ParsePmxSkinWeightsBufferEntryPoint, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_parse_pmx_skin_weights_buffer", CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer ParsePmxSkinWeightsBuffer(byte[] data, IntPtr len);
 
-        [DllImport(LibraryName, EntryPoint = ParsePmxSdefEnabledBufferEntryPoint, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_parse_pmx_sdef_enabled_buffer", CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer ParsePmxSdefEnabledBuffer(byte[] data, IntPtr len);
 
-        [DllImport(LibraryName, EntryPoint = ParsePmxSdefCBufferEntryPoint, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_parse_pmx_sdef_c_buffer", CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer ParsePmxSdefCBuffer(byte[] data, IntPtr len);
 
-        [DllImport(LibraryName, EntryPoint = ParsePmxSdefR0BufferEntryPoint, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_parse_pmx_sdef_r0_buffer", CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer ParsePmxSdefR0Buffer(byte[] data, IntPtr len);
 
-        [DllImport(LibraryName, EntryPoint = ParsePmxSdefR1BufferEntryPoint, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_parse_pmx_sdef_r1_buffer", CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer ParsePmxSdefR1Buffer(byte[] data, IntPtr len);
 
-        [DllImport(LibraryName, EntryPoint = ParsePmxSkinningModesJsonEntryPoint, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_parse_pmx_skinning_modes_json", CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer ParsePmxSkinningModesJsonBuffer(byte[] data, IntPtr len);
 
-        [DllImport(LibraryName, EntryPoint = PmxGeometryCreateEntryPoint, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_pmx_geometry_create", CallingConvention = CallingConvention.Cdecl)]
         private static extern IntPtr PmxGeometryCreate(byte[] data, IntPtr len);
 
-        [DllImport(LibraryName, EntryPoint = PmxGeometryFreeEntryPoint, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_pmx_geometry_free", CallingConvention = CallingConvention.Cdecl)]
         private static extern void PmxGeometryFree(IntPtr geometry);
 
-        [DllImport(LibraryName, EntryPoint = PmxGeometryPositionsBufferEntryPoint, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_pmx_geometry_positions_buffer", CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer PmxGeometryPositionsBuffer(IntPtr geometry);
 
-        [DllImport(LibraryName, EntryPoint = PmxGeometryNormalsBufferEntryPoint, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_pmx_geometry_normals_buffer", CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer PmxGeometryNormalsBuffer(IntPtr geometry);
 
-        [DllImport(LibraryName, EntryPoint = PmxGeometryUvsBufferEntryPoint, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_pmx_geometry_uvs_buffer", CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer PmxGeometryUvsBuffer(IntPtr geometry);
 
-        [DllImport(LibraryName, EntryPoint = PmxGeometryEdgeScaleBufferEntryPoint, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_pmx_geometry_edge_scale_buffer", CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer PmxGeometryEdgeScaleBuffer(IntPtr geometry);
 
-        [DllImport(LibraryName, EntryPoint = PmxGeometryIndicesBufferEntryPoint, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_pmx_geometry_indices_buffer", CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer PmxGeometryIndicesBuffer(IntPtr geometry);
 
-        [DllImport(LibraryName, EntryPoint = PmxGeometrySkinIndicesBufferEntryPoint, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_pmx_geometry_skin_indices_buffer", CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer PmxGeometrySkinIndicesBuffer(IntPtr geometry);
 
-        [DllImport(LibraryName, EntryPoint = PmxGeometrySkinWeightsBufferEntryPoint, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_pmx_geometry_skin_weights_buffer", CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer PmxGeometrySkinWeightsBuffer(IntPtr geometry);
 
-        [DllImport(LibraryName, EntryPoint = PmxGeometrySdefEnabledBufferEntryPoint, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_pmx_geometry_sdef_enabled_buffer", CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer PmxGeometrySdefEnabledBuffer(IntPtr geometry);
 
-        [DllImport(LibraryName, EntryPoint = PmxGeometrySdefCBufferEntryPoint, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_pmx_geometry_sdef_c_buffer", CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer PmxGeometrySdefCBuffer(IntPtr geometry);
 
-        [DllImport(LibraryName, EntryPoint = PmxGeometrySdefR0BufferEntryPoint, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_pmx_geometry_sdef_r0_buffer", CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer PmxGeometrySdefR0Buffer(IntPtr geometry);
 
-        [DllImport(LibraryName, EntryPoint = PmxGeometrySdefR1BufferEntryPoint, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_pmx_geometry_sdef_r1_buffer", CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer PmxGeometrySdefR1Buffer(IntPtr geometry);
 
-        [DllImport(LibraryName, EntryPoint = PmxGeometrySkinningModesJsonEntryPoint, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_pmx_geometry_skinning_modes_json", CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer PmxGeometrySkinningModesJsonBuffer(IntPtr geometry);
 
         internal static string ParseVmdJson(byte[] data)

@@ -5,22 +5,27 @@ using System;
 
 namespace Mmd.Parser
 {
+    internal sealed class PmxGeometryData
+    {
+        internal string skinningModesJson = string.Empty;
+        internal float[] positions = Array.Empty<float>();
+        internal float[] normals = Array.Empty<float>();
+        internal float[] uvs = Array.Empty<float>();
+        internal float[] edgeScale = Array.Empty<float>();
+        internal uint[] indices = Array.Empty<uint>();
+        internal uint[] skinIndices = Array.Empty<uint>();
+        internal float[] skinWeights = Array.Empty<float>();
+        internal bool[] hasSdefParameters = Array.Empty<bool>();
+        internal float[] sdefC = Array.Empty<float>();
+        internal float[] sdefR0 = Array.Empty<float>();
+        internal float[] sdefR1 = Array.Empty<float>();
+    }
+
     internal interface IPmxGeometryReader
     {
         IntPtr Create(byte[] data);
+        PmxGeometryData ReadAll(IntPtr geometry);
         void Free(IntPtr geometry);
-        float[] Positions(IntPtr geometry);
-        float[] Normals(IntPtr geometry);
-        float[] Uvs(IntPtr geometry);
-        float[] EdgeScale(IntPtr geometry);
-        uint[] Indices(IntPtr geometry);
-        uint[] SkinIndices(IntPtr geometry);
-        float[] SkinWeights(IntPtr geometry);
-        bool[] SdefEnabled(IntPtr geometry);
-        float[] SdefC(IntPtr geometry);
-        float[] SdefR0(IntPtr geometry);
-        float[] SdefR1(IntPtr geometry);
-        string SkinningModesJson(IntPtr geometry);
     }
 
     public sealed partial class NativeMmdParser
@@ -31,18 +36,24 @@ namespace Mmd.Parser
 
             public IntPtr Create(byte[] data) => MmdParserFfiMethods.CreatePmxGeometry(data);
             public void Free(IntPtr geometry) => MmdParserFfiMethods.FreePmxGeometry(geometry);
-            public float[] Positions(IntPtr geometry) => MmdParserFfiMethods.ParsePmxGeometryPositions(geometry);
-            public float[] Normals(IntPtr geometry) => MmdParserFfiMethods.ParsePmxGeometryNormals(geometry);
-            public float[] Uvs(IntPtr geometry) => MmdParserFfiMethods.ParsePmxGeometryUvs(geometry);
-            public float[] EdgeScale(IntPtr geometry) => MmdParserFfiMethods.ParsePmxGeometryEdgeScale(geometry);
-            public uint[] Indices(IntPtr geometry) => MmdParserFfiMethods.ParsePmxGeometryIndices(geometry);
-            public uint[] SkinIndices(IntPtr geometry) => MmdParserFfiMethods.ParsePmxGeometrySkinIndices(geometry);
-            public float[] SkinWeights(IntPtr geometry) => MmdParserFfiMethods.ParsePmxGeometrySkinWeights(geometry);
-            public bool[] SdefEnabled(IntPtr geometry) => MmdParserFfiMethods.ParsePmxGeometrySdefEnabled(geometry);
-            public float[] SdefC(IntPtr geometry) => MmdParserFfiMethods.ParsePmxGeometrySdefC(geometry);
-            public float[] SdefR0(IntPtr geometry) => MmdParserFfiMethods.ParsePmxGeometrySdefR0(geometry);
-            public float[] SdefR1(IntPtr geometry) => MmdParserFfiMethods.ParsePmxGeometrySdefR1(geometry);
-            public string SkinningModesJson(IntPtr geometry) => MmdParserFfiMethods.ParsePmxGeometrySkinningModesJson(geometry);
+            public PmxGeometryData ReadAll(IntPtr geometry)
+            {
+                return new PmxGeometryData
+                {
+                    skinningModesJson = MmdParserFfiMethods.ParsePmxGeometrySkinningModesJson(geometry),
+                    positions = MmdParserFfiMethods.ParsePmxGeometryPositions(geometry),
+                    normals = MmdParserFfiMethods.ParsePmxGeometryNormals(geometry),
+                    uvs = MmdParserFfiMethods.ParsePmxGeometryUvs(geometry),
+                    edgeScale = MmdParserFfiMethods.ParsePmxGeometryEdgeScale(geometry),
+                    indices = MmdParserFfiMethods.ParsePmxGeometryIndices(geometry),
+                    skinIndices = MmdParserFfiMethods.ParsePmxGeometrySkinIndices(geometry),
+                    skinWeights = MmdParserFfiMethods.ParsePmxGeometrySkinWeights(geometry),
+                    hasSdefParameters = MmdParserFfiMethods.ParsePmxGeometrySdefEnabled(geometry),
+                    sdefC = MmdParserFfiMethods.ParsePmxGeometrySdefC(geometry),
+                    sdefR0 = MmdParserFfiMethods.ParsePmxGeometrySdefR0(geometry),
+                    sdefR1 = MmdParserFfiMethods.ParsePmxGeometrySdefR1(geometry),
+                };
+            }
         }
 
         internal static PmxModelSourceGeometry CreatePmxGeometryFromNativeBuffers(byte[] data)
@@ -73,20 +84,13 @@ namespace Mmd.Parser
 
             try
             {
-                string modesJson = reader.SkinningModesJson(geometry);
-                return CreatePmxGeometry(
-                    modesJson,
-                    reader.Positions(geometry),
-                    reader.Normals(geometry),
-                    reader.Uvs(geometry),
-                    reader.EdgeScale(geometry),
-                    reader.Indices(geometry),
-                    reader.SkinIndices(geometry),
-                    reader.SkinWeights(geometry),
-                    reader.SdefEnabled(geometry),
-                    reader.SdefC(geometry),
-                    reader.SdefR0(geometry),
-                    reader.SdefR1(geometry));
+                PmxGeometryData geometryData = reader.ReadAll(geometry);
+                if (geometryData == null)
+                {
+                    throw new InvalidOperationException("mmd-runtime PMX geometry read returned null.");
+                }
+
+                return CreatePmxGeometry(geometryData);
             }
             finally
             {
@@ -98,53 +102,43 @@ namespace Mmd.Parser
         // with the parse-once handle path against tracked PMX fixtures.
         internal static PmxModelSourceGeometry CreatePmxGeometryFromLegacyBuffers(byte[] data)
         {
-            return CreatePmxGeometry(
-                MmdParserFfiMethods.ParsePmxSkinningModesJson(data),
-                MmdParserFfiMethods.ParsePmxPositions(data),
-                MmdParserFfiMethods.ParsePmxNormals(data),
-                MmdParserFfiMethods.ParsePmxUvs(data),
-                MmdParserFfiMethods.ParsePmxEdgeScale(data),
-                MmdParserFfiMethods.ParsePmxIndices(data),
-                MmdParserFfiMethods.ParsePmxSkinIndices(data),
-                MmdParserFfiMethods.ParsePmxSkinWeights(data),
-                MmdParserFfiMethods.ParsePmxSdefEnabled(data),
-                MmdParserFfiMethods.ParsePmxSdefC(data),
-                MmdParserFfiMethods.ParsePmxSdefR0(data),
-                MmdParserFfiMethods.ParsePmxSdefR1(data));
+            return CreatePmxGeometry(new PmxGeometryData
+            {
+                skinningModesJson = MmdParserFfiMethods.ParsePmxSkinningModesJson(data),
+                positions = MmdParserFfiMethods.ParsePmxPositions(data),
+                normals = MmdParserFfiMethods.ParsePmxNormals(data),
+                uvs = MmdParserFfiMethods.ParsePmxUvs(data),
+                edgeScale = MmdParserFfiMethods.ParsePmxEdgeScale(data),
+                indices = MmdParserFfiMethods.ParsePmxIndices(data),
+                skinIndices = MmdParserFfiMethods.ParsePmxSkinIndices(data),
+                skinWeights = MmdParserFfiMethods.ParsePmxSkinWeights(data),
+                hasSdefParameters = MmdParserFfiMethods.ParsePmxSdefEnabled(data),
+                sdefC = MmdParserFfiMethods.ParsePmxSdefC(data),
+                sdefR0 = MmdParserFfiMethods.ParsePmxSdefR0(data),
+                sdefR1 = MmdParserFfiMethods.ParsePmxSdefR1(data),
+            });
         }
 
-        private static PmxModelSourceGeometry CreatePmxGeometry(
-            string modesJson,
-            float[] positions,
-            float[] normals,
-            float[] uvs,
-            float[] edgeScale,
-            uint[] indices,
-            uint[] skinIndices,
-            float[] skinWeights,
-            bool[] hasSdefParameters,
-            float[] sdefC,
-            float[] sdefR0,
-            float[] sdefR1)
+        private static PmxModelSourceGeometry CreatePmxGeometry(PmxGeometryData data)
         {
-            SkinningModesWrapper modesWrapper = string.IsNullOrWhiteSpace(modesJson)
+            SkinningModesWrapper modesWrapper = string.IsNullOrWhiteSpace(data.skinningModesJson)
                 ? new SkinningModesWrapper()
-                : (UnityEngine.JsonUtility.FromJson<SkinningModesWrapper>(modesJson) ?? new SkinningModesWrapper());
+                : (UnityEngine.JsonUtility.FromJson<SkinningModesWrapper>(data.skinningModesJson) ?? new SkinningModesWrapper());
 
             return new PmxModelSourceGeometry
             {
-                positions = positions,
-                normals = normals,
-                uvs = uvs,
-                edgeScale = edgeScale,
-                indices = indices,
+                positions = data.positions,
+                normals = data.normals,
+                uvs = data.uvs,
+                edgeScale = data.edgeScale,
+                indices = data.indices,
                 skinningModes = modesWrapper.skinningModes,
-                skinIndices = skinIndices,
-                skinWeights = skinWeights,
-                hasSdefParameters = hasSdefParameters,
-                sdefC = sdefC,
-                sdefR0 = sdefR0,
-                sdefR1 = sdefR1,
+                skinIndices = data.skinIndices,
+                skinWeights = data.skinWeights,
+                hasSdefParameters = data.hasSdefParameters,
+                sdefC = data.sdefC,
+                sdefR0 = data.sdefR0,
+                sdefR1 = data.sdefR1,
             };
         }
 
