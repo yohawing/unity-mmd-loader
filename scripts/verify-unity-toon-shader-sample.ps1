@@ -24,7 +24,8 @@ function Resolve-FullPath {
 function Get-GateContentManifest {
     param(
         [Parameter(Mandatory = $true)][string] $Path,
-        [Parameter(Mandatory = $true)][string] $SampleMetaPath
+        [Parameter(Mandatory = $true)][string] $SampleMetaPath,
+        [switch] $LegacyRootMetaHash
     )
 
     $entries = @()
@@ -47,9 +48,34 @@ function Get-GateContentManifest {
     }
 
     if (Test-Path -LiteralPath $SampleMetaPath -PathType Leaf) {
-        $meta = Get-Item -LiteralPath $SampleMetaPath
-        $metaHash = (Get-FileHash -LiteralPath $SampleMetaPath -Algorithm SHA256).Hash
-        $entries += "R|{0}|{1}" -f $meta.Length, $metaHash
+        if ($LegacyRootMetaHash) {
+            $meta = Get-Item -LiteralPath $SampleMetaPath
+            $metaHash = (Get-FileHash -LiteralPath $SampleMetaPath -Algorithm SHA256).Hash
+            $entries += "R|{0}|{1}" -f $meta.Length, $metaHash
+            return @($entries | Sort-Object)
+        }
+
+        $metaLines = @(Get-Content -LiteralPath $SampleMetaPath | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" })
+        $guidLine = @($metaLines | Where-Object { $_ -match '^guid: [0-9a-fA-F]{32}$' })
+        $defaultFolderMetaLines = @(
+            "fileFormatVersion: 2", "folderAsset: yes", "DefaultImporter:",
+            "externalObjects: {}", "userData:", "assetBundleName:", "assetBundleVariant:"
+        )
+        $nonGuidLines = @($metaLines | Where-Object { $_ -notmatch '^guid: [0-9a-fA-F]{32}$' })
+        $isInitialStub = $nonGuidLines.Count -eq 1 -and $nonGuidLines[0] -eq "fileFormatVersion: 2"
+        $isExpandedDefault = $nonGuidLines.Count -eq $defaultFolderMetaLines.Count -and
+            @(Compare-Object -ReferenceObject $defaultFolderMetaLines -DifferenceObject $nonGuidLines).Count -eq 0
+        if ($guidLine.Count -eq 1 -and ($isInitialStub -or $isExpandedDefault)) {
+            # Unity may expand the initial two-line folder .meta into its equivalent default
+            # importer form between compile and EditMode. Compare that representation by GUID,
+            # while any non-default importer/user setting still falls back to an exact hash.
+            $entries += "R|default-folder|{0}" -f $guidLine[0].Substring(6).ToLowerInvariant()
+        }
+        else {
+            $meta = Get-Item -LiteralPath $SampleMetaPath
+            $metaHash = (Get-FileHash -LiteralPath $SampleMetaPath -Algorithm SHA256).Hash
+            $entries += "R|exact|{0}|{1}" -f $meta.Length, $metaHash
+        }
     }
 
     return @($entries | Sort-Object)
@@ -63,7 +89,7 @@ function Write-GateOwnershipMarker {
     )
 
     $marker = [ordered]@{
-        schemaVersion = 2
+        schemaVersion = 3
         entries = @(Get-GateContentManifest -Path $SamplePath -SampleMetaPath $SampleMetaPath)
     }
     [System.IO.File]::WriteAllText(
@@ -89,12 +115,16 @@ function Remove-GateOwnedSampleIfUnchanged {
     catch {
         throw "Gate ownership marker is invalid; preserving the imported sample: $MarkerPath"
     }
-    if ([int] $marker.schemaVersion -ne 2) {
+    $schemaVersion = [int] $marker.schemaVersion
+    if ($schemaVersion -ne 2 -and $schemaVersion -ne 3) {
         throw "Gate ownership marker schema is unsupported; preserving the imported sample: $MarkerPath"
     }
 
     $expected = @($marker.entries | ForEach-Object { [string] $_ })
-    $actual = @(Get-GateContentManifest -Path $SamplePath -SampleMetaPath $SampleMetaPath)
+    $actual = @(Get-GateContentManifest `
+        -Path $SamplePath `
+        -SampleMetaPath $SampleMetaPath `
+        -LegacyRootMetaHash:($schemaVersion -eq 2))
     if (@(Compare-Object -ReferenceObject $expected -DifferenceObject $actual).Count -ne 0) {
         throw "Gate-owned sample content changed; preserving it for manual recovery: $SamplePath"
     }
