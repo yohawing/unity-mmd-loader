@@ -4,6 +4,14 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- Updated the packaged Windows native runtime and `native/mmd-anim` pin to `mmd-anim` `v0.3.3` / remote `main` commit `25c956d`, retaining runtime ABI version 3.
+
+### Fixed
+
+- Managed VMD sampling now uses MMD's registered interpolation layout and fixed-axis rotation projection when paired with a PMX model, matching the packaged native playback path.
+
 ### Removed
 
 - Removed the experimental Editable Rig post-processing layer and its public authoring types.

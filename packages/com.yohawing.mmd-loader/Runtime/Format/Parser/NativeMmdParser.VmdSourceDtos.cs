@@ -57,6 +57,7 @@ namespace Mmd.Parser
             public byte[] TranslationYInterpolation = Array.Empty<byte>();
             public byte[] TranslationZInterpolation = Array.Empty<byte>();
             public byte[] RotationInterpolation = Array.Empty<byte>();
+            public byte[] RawInterpolation = Array.Empty<byte>();
         }
 
         internal sealed class VmdMotionSourceMorphFrame

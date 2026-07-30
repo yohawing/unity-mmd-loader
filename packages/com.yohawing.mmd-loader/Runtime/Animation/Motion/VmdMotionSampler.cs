@@ -10,8 +10,28 @@ namespace Mmd.Motion
     public static class VmdMotionSampler
     {
         private static readonly ConditionalWeakTable<MmdMotionDefinition, MmdMotionSamplingCache> SamplingCaches = new();
+        private static readonly ConditionalWeakTable<MmdModelDefinition, MmdRegistrationPlan> RegistrationPlans = new();
 
         public static MmdSampledMotion Sample(MmdMotionDefinition motion, float frame)
+        {
+            return Sample(motion, frame, null, false);
+        }
+
+        public static MmdSampledMotion Sample(MmdMotionDefinition motion, MmdModelDefinition model, float frame)
+        {
+            if (model == null)
+            {
+                throw new System.ArgumentNullException(nameof(model));
+            }
+
+            return Sample(motion, frame, RegistrationPlans.GetValue(model, BuildRegistrationPlan), true);
+        }
+
+        private static MmdSampledMotion Sample(
+            MmdMotionDefinition motion,
+            float frame,
+            MmdRegistrationPlan? registrationPlan,
+            bool useRegisteredInterpolation)
         {
             var sampled = new MmdSampledMotion();
             if (float.IsNaN(frame) || float.IsInfinity(frame))
@@ -28,7 +48,14 @@ namespace Mmd.Motion
 
             foreach (string boneName in cache.BoneNames)
             {
-                sampled.Bones[boneName] = VmdBoneSampler.SampleSortedPose(cache.BoneKeyframesByName[boneName], boneName, frame);
+                float[]? fixedAxis = null;
+                registrationPlan?.FixedAxesByBoneName.TryGetValue(boneName, out fixedAxis);
+                sampled.Bones[boneName] = VmdBoneSampler.SampleSortedPose(
+                    cache.BoneKeyframesByName[boneName],
+                    boneName,
+                    frame,
+                    fixedAxis,
+                    useRegisteredInterpolation);
             }
 
             foreach (string morphName in cache.MorphNames)
@@ -45,6 +72,27 @@ namespace Mmd.Motion
             }
 
             return sampled;
+        }
+
+        private static MmdRegistrationPlan BuildRegistrationPlan(MmdModelDefinition model)
+        {
+            var fixedAxesByBoneName = new Dictionary<string, float[]>(System.StringComparer.Ordinal);
+            foreach (MmdBoneDefinition bone in model.bones ?? new List<MmdBoneDefinition>())
+            {
+                if (!bone.fixedAxis || string.IsNullOrWhiteSpace(bone.name) || bone.fixedAxisVector?.Length < 3)
+                {
+                    continue;
+                }
+
+                fixedAxesByBoneName[bone.name] = new[]
+                {
+                    bone.fixedAxisVector[0],
+                    bone.fixedAxisVector[1],
+                    bone.fixedAxisVector[2]
+                };
+            }
+
+            return new MmdRegistrationPlan(fixedAxesByBoneName);
         }
 
         private static MmdMotionSamplingCache BuildCache(MmdMotionDefinition motion)
@@ -172,6 +220,16 @@ namespace Mmd.Motion
             public IReadOnlyList<string> BoneNames { get; }
 
             public IReadOnlyList<string> MorphNames { get; }
+        }
+
+        private sealed class MmdRegistrationPlan
+        {
+            public MmdRegistrationPlan(IReadOnlyDictionary<string, float[]> fixedAxesByBoneName)
+            {
+                FixedAxesByBoneName = fixedAxesByBoneName;
+            }
+
+            public IReadOnlyDictionary<string, float[]> FixedAxesByBoneName { get; }
         }
     }
 }

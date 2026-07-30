@@ -258,6 +258,72 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void VmdMotionSamplerProjectsRegisteredRotationsToTheModelFixedAxis()
+        {
+            var model = new MmdModelDefinition();
+            model.bones.Add(new MmdBoneDefinition
+            {
+                index = 0,
+                name = "fixed",
+                parentIndex = -1,
+                fixedAxis = true,
+                fixedAxisVector = new[] { 1.0f, 0.0f, 0.0f }
+            });
+            var motion = new MmdMotionDefinition();
+            motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
+            {
+                boneName = "fixed",
+                frame = 0,
+                rotation = new[] { 0.3f, 0.4f, 0.0f, 0.8660254f }
+            });
+
+            MmdBonePoseSample raw = VmdMotionSampler.Sample(motion, 0.0f).Bones["fixed"];
+            MmdBonePoseSample registered = VmdMotionSampler.Sample(motion, model, 0.0f).Bones["fixed"];
+
+            Assert.That(raw.Rotation[1], Is.EqualTo(0.4f).Within(0.00001f));
+            Assert.That(registered.Rotation[0], Is.EqualTo(0.5f).Within(0.00001f));
+            Assert.That(registered.Rotation[1], Is.EqualTo(0.0f).Within(0.00001f));
+            Assert.That(registered.Rotation[2], Is.EqualTo(0.0f).Within(0.00001f));
+            Assert.That(registered.Rotation[3], Is.EqualTo(0.8660254f).Within(0.00001f));
+        }
+
+        [Test]
+        public void VmdMotionSamplerUsesRegisteredInterpolationOnlyWhenPairedWithAModel()
+        {
+            var model = new MmdModelDefinition();
+            model.bones.Add(new MmdBoneDefinition { index = 0, name = "root", parentIndex = -1 });
+            var registeredBlock = new byte[64];
+            registeredBlock[48] = 20;
+            registeredBlock[52] = 20;
+            registeredBlock[56] = 107;
+            registeredBlock[60] = 107;
+            var motion = new MmdMotionDefinition();
+            motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
+            {
+                boneName = "root",
+                frame = 0,
+                rotation = new[] { 0.0f, 0.0f, 0.0f, 1.0f }
+            });
+            motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
+            {
+                boneName = "root",
+                frame = 9,
+                rotation = new[] { -0.38268337f, 0.0f, 0.0f, 0.92387956f },
+                interpolation = new MmdBoneInterpolationDefinition
+                {
+                    rotation = new byte[] { 0, 0, 85, 127 }
+                },
+                rawInterpolation = registeredBlock
+            });
+
+            MmdBonePoseSample raw = VmdMotionSampler.Sample(motion, 1.0f).Bones["root"];
+            MmdBonePoseSample registered = VmdMotionSampler.Sample(motion, model, 1.0f).Bones["root"];
+
+            Assert.That(raw.Rotation[0], Is.EqualTo(-0.06206015f).Within(0.00001f));
+            Assert.That(registered.Rotation[0], Is.EqualTo(-0.04361939f).Within(0.00001f));
+        }
+
+        [Test]
         public void RuntimePipelineRunsCcdIkByDefault()
         {
             var model = new MmdModelDefinition();

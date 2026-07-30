@@ -70,7 +70,7 @@ namespace Mmd
             long started;
 
             started = Stopwatch.GetTimestamp();
-            MmdSampledMotion sampledMotion = VmdMotionSampler.Sample(motion, frame);
+            MmdSampledMotion sampledMotion = VmdMotionSampler.Sample(motion, model, frame);
             RecordTiming(timing, started, ticks => timing!.MotionSamplingTicks = ticks);
 
             started = Stopwatch.GetTimestamp();

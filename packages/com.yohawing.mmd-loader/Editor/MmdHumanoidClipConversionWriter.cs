@@ -848,7 +848,7 @@ namespace Mmd.Editor
             for (int frame = startFrame; frame <= endFrame; frame++)
             {
                 float time = (frame - startFrame) * sampleFrameToTimeFactor;
-                MmdSampledMotion sampledMotion = VmdMotionSampler.Sample(motion, frame);
+                MmdSampledMotion sampledMotion = VmdMotionSampler.Sample(motion, model, frame);
                 Dictionary<int, float[]> worldMatrices = MmdPoseEvaluator.EvaluateWorldMatrices(model, sampledMotion);
                 if (!worldMatrices.TryGetValue(hipsBone.index, out float[]? hipsMatrix))
                 {
