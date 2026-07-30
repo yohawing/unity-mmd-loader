@@ -4,19 +4,43 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-30
+
+### Added
+
+- Added an opt-in MMD Toon Lit material profile with dedicated inspectors and authoring for shade colors, toon boundaries and bands, stylized specular, rim lighting, HDR emission, cutout surfaces, ambient SH, fog, realtime shadows, SSAO, and reflection probes.
+- Added an optional Unity Toon Shader adapter sample with fail-closed shader capability diagnostics, custom material profile support, generated-material comparison coverage, and a self-contained demo scene.
+- Added extensible material mapper/profile contracts, per-shader property targets, material-morph routing, unsupported-feature diagnostics, external PMX material extraction/remaps, and automatic MME normal-map import.
+- Added tracked performance baseline tooling and a clean Unity 6000.0 LTS consumer compatibility gate.
+
 ### Changed
 
 - Updated the packaged Windows native runtime and `native/mmd-anim` pin to `mmd-anim` `v0.3.3` / remote `main` commit `25c956d`, retaining runtime ABI version 3.
+- Lowered the supported Unity floor to Unity 6000.0 LTS while retaining current Unity 6000.4 compatibility.
+- Migrated reduced-pose consumption to the runtime-neutral ABI 3 curve contract and aligned Unity handedness/tangent conversion with the native source.
+- Improved runtime throughput by reusing native playback sessions, compiled pose/IK topology, physics readback buffers, decoded textures, and unchanged material-morph state, while using the PMX geometry handle to reduce peak parser materialization.
+- Extracted imported PMX materials beside the source asset and persisted them through Unity material remaps instead of embedding them in the generated prefab.
 
 ### Fixed
 
 - Managed VMD sampling now uses MMD's registered interpolation layout and fixed-axis rotation projection when paired with a PMX model, matching the packaged native playback path.
+- Fixed fast runtime playback for deform-after-physics bones and preserved Humanoid root height after Timeline evaluation.
+- Fixed Toon Lit deferred/clustered-light routing, directional-light color, cast/received shadow policy, UTS alpha-cutout textures, public Toon texture rebinding, and MME normal-map import.
+- Hardened performance report validation, Unity project guards, and missing Windows common-application-data environment initialization used by UPM.
 
 ### Removed
 
 - Removed the experimental Editable Rig post-processing layer and its public authoring types.
 - Removed unused PMX/VMD Inspector readiness helpers, the unconnected Generic AnimationClip parity verifier, and the SelfShadow RendererFeature setup warning UI.
 - Removed automatic generated-model playback fallback, its transient runtime marker, and the public `allowRuntimeFallback` overload parameters; playback now requires a matching scene `SkinnedMeshRenderer`.
+
+### Known Limitations
+
+- macOS and Linux native binaries are not distributed in the package.
+- Timeline random access keeps physics off; Live physics is limited to Play Mode forward playback.
+- Raw VMD Timeline clips use deterministic hard-cut selection rather than weighted blending.
+- Humanoid bake does not include Live physics, facial morphs, or native MMD IK/helper behavior.
+- The Unity Toon Shader adapter remains optional and conservative; it falls back to MMD Toon when UTS is absent or its shader schema is unsupported.
 
 ## [0.2.0] - 2026-07-17
 

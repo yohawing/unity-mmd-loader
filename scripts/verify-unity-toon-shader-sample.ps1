@@ -113,13 +113,25 @@ try {
 
     Assert-NoRunningUnityProject -ProjectPath $ProjectPath -OperationName "Unity Toon Shader adapter sample tests"
 
-    & $Unity -batchmode -runTests `
-        -projectPath $ProjectPath `
-        -testPlatform EditMode `
-        -testFilter "Mmd.Samples.UnityToonShader.Tests" `
-        -testResults $testResults `
-        -logFile $testLog
-    $unityExitCode = if ($null -eq $LASTEXITCODE) { 0 } else { $LASTEXITCODE }
+    $testArguments = @(
+        "-batchmode",
+        "-runTests",
+        "-projectPath", $ProjectPath,
+        "-testPlatform", "EditMode",
+        "-testFilter", "Mmd.Samples.UnityToonShader.Tests",
+        "-testResults", $testResults,
+        "-logFile", $testLog
+    )
+    $testStartInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $testStartInfo.FileName = $Unity
+    $testStartInfo.UseShellExecute = $false
+    $testStartInfo.CreateNoWindow = $true
+    foreach ($argument in $testArguments) {
+        [void] $testStartInfo.ArgumentList.Add($argument)
+    }
+    $testProcess = [System.Diagnostics.Process]::Start($testStartInfo)
+    $testProcess.WaitForExit()
+    $unityExitCode = $testProcess.ExitCode
 
     if (-not (Test-Path -LiteralPath $testResults -PathType Leaf)) {
         throw "Unity Toon Shader adapter sample tests produced no results. exitCode=$unityExitCode; log=$testLog"
