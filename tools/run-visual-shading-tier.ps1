@@ -131,66 +131,50 @@ if (-not (Test-Path -LiteralPath (Join-Path $ProjectPath "Packages\manifest.json
         throw "Unity project bootstrap failed (ProjectSettings.asset never appeared). log=$bootstrapLog"
     }
 
-    # Use absolute paths for the file: dependencies (not a relative path from the bootstrap
-    # project's Packages folder): [IO.Path]::GetRelativePath is unavailable under Windows
-    # PowerShell 5.1's .NET Framework runtime, and an absolute file: URI works identically
-    # for Unity's package resolver without that compatibility risk.
+    # Preserve the module set selected by this Unity version and add only the packages this
+    # gate owns. Package dependencies (URP and Timeline) stay authoritative in package.json;
+    # duplicating their versions here made the gate drift from the package under test.
     $loaderPath = (Join-Path $repoRoot "packages\com.yohawing.mmd-loader").Replace('\', '/')
     $devToolsPath = (Join-Path $repoRoot "packages\com.yohawing.mmd-loader.devtools").Replace('\', '/')
-    # The devtools EditMode test assembly (Mmd.DevTools.EditModeTests) transitively references
-    # Mmd.Editor -> Mmd.Rendering.Universal (needs URP), and directly references Unity.Timeline
-    # (needs com.unity.timeline). Runtime code also uses UnityEngine.Collider, which only
-    # resolves when the built-in Physics module package is present. A manifest with only the
-    # two file: packages + test-framework fails to compile ("error CS1069: ... Collider ...
-    # Enable the built in package 'Physics'", plus missing Unity.Timeline/URP assembly refs).
-    # Mirror the built-in module + package set required by the known-working local consumer
-    # project. Keep the temporary verification project registry/local-package-only so offline
-    # and batchmode package resolution remains deterministic.
-    $manifest = [ordered]@{
-        dependencies = [ordered]@{
-            "com.unity.test-framework" = "1.6.0"
-            "com.unity.render-pipelines.universal" = "17.4.0"
-            "com.unity.timeline" = "1.8.12"
-            "com.yohawing.mmd-loader" = "file:$loaderPath"
-            "com.yohawing.mmd-loader.devtools" = "file:$devToolsPath"
-            "com.unity.modules.accessibility" = "1.0.0"
-            "com.unity.modules.adaptiveperformance" = "1.0.0"
-            "com.unity.modules.ai" = "1.0.0"
-            "com.unity.modules.androidjni" = "1.0.0"
-            "com.unity.modules.animation" = "1.0.0"
-            "com.unity.modules.assetbundle" = "1.0.0"
-            "com.unity.modules.audio" = "1.0.0"
-            "com.unity.modules.cloth" = "1.0.0"
-            "com.unity.modules.director" = "1.0.0"
-            "com.unity.modules.imageconversion" = "1.0.0"
-            "com.unity.modules.imgui" = "1.0.0"
-            "com.unity.modules.jsonserialize" = "1.0.0"
-            "com.unity.modules.particlesystem" = "1.0.0"
-            "com.unity.modules.physics" = "1.0.0"
-            "com.unity.modules.physics2d" = "1.0.0"
-            "com.unity.modules.screencapture" = "1.0.0"
-            "com.unity.modules.terrain" = "1.0.0"
-            "com.unity.modules.terrainphysics" = "1.0.0"
-            "com.unity.modules.tilemap" = "1.0.0"
-            "com.unity.modules.ui" = "1.0.0"
-            "com.unity.modules.uielements" = "1.0.0"
-            "com.unity.modules.umbra" = "1.0.0"
-            "com.unity.modules.unityanalytics" = "1.0.0"
-            "com.unity.modules.unitywebrequest" = "1.0.0"
-            "com.unity.modules.unitywebrequestassetbundle" = "1.0.0"
-            "com.unity.modules.unitywebrequestaudio" = "1.0.0"
-            "com.unity.modules.unitywebrequesttexture" = "1.0.0"
-            "com.unity.modules.unitywebrequestwww" = "1.0.0"
-            "com.unity.modules.vectorgraphics" = "1.0.0"
-            "com.unity.modules.vehicles" = "1.0.0"
-            "com.unity.modules.video" = "1.0.0"
-            "com.unity.modules.vr" = "1.0.0"
-            "com.unity.modules.wind" = "1.0.0"
-            "com.unity.modules.xr" = "1.0.0"
+    $loaderPackage = Get-Content -LiteralPath (Join-Path $repoRoot "packages\com.yohawing.mmd-loader\package.json") -Raw | ConvertFrom-Json
+    $editorManifestPath = Join-Path (Split-Path -Parent $Unity) "Data\Resources\PackageManager\Editor\manifest.json"
+    $editorManifest = Get-Content -LiteralPath $editorManifestPath -Raw | ConvertFrom-Json
+    $manifest = Get-Content -LiteralPath $bootstrapManifest -Raw | ConvertFrom-Json
+    $manifest.dependencies | Add-Member -NotePropertyName "com.unity.test-framework" -NotePropertyValue "1.6.0" -Force
+    foreach ($dependencyName in @("com.unity.render-pipelines.universal", "com.unity.timeline")) {
+        $dependencyVersion = $loaderPackage.dependencies.$dependencyName
+        if ([string]::IsNullOrEmpty($dependencyVersion)) {
+            throw "Loader package does not declare required visual-tier dependency: $dependencyName"
         }
-        testables = @("com.yohawing.mmd-loader.devtools")
+        # package.json declares the oldest supported line. A newer Editor can require its
+        # bundled package line (Unity 6000.4 requires URP 17.4, for example), so use the
+        # Editor's own manifest when it publishes an exact compatible version.
+        $editorDependency = $editorManifest.packages.$dependencyName
+        if ($null -ne $editorDependency -and -not [string]::IsNullOrEmpty($editorDependency.version)) {
+            $dependencyVersion = $editorDependency.version
+        }
+        $manifest.dependencies | Add-Member -NotePropertyName $dependencyName -NotePropertyValue $dependencyVersion -Force
     }
-    [IO.File]::WriteAllText((Join-Path $ProjectPath "Packages\manifest.json"), ($manifest | ConvertTo-Json -Depth 5))
+    $manifest.dependencies | Add-Member -NotePropertyName "com.yohawing.mmd-loader" -NotePropertyValue "file:$loaderPath" -Force
+    $manifest.dependencies | Add-Member -NotePropertyName "com.yohawing.mmd-loader.devtools" -NotePropertyValue "file:$devToolsPath" -Force
+    # `-createProject` emits no built-in module entries in batch mode. The package uses
+    # modular UnityEngine APIs across runtime/editor assemblies, so retain the known module
+    # surface explicitly; unlike registry package versions these module versions are fixed by
+    # the Editor and do not duplicate package.json policy.
+    $requiredUnityModules = @(
+        "accessibility", "adaptiveperformance", "ai", "androidjni", "animation",
+        "assetbundle", "audio", "cloth", "director", "imageconversion", "imgui",
+        "jsonserialize", "particlesystem", "physics", "physics2d", "screencapture",
+        "terrain", "terrainphysics", "tilemap", "ui", "uielements", "umbra",
+        "unityanalytics", "unitywebrequest", "unitywebrequestassetbundle",
+        "unitywebrequestaudio", "unitywebrequesttexture", "unitywebrequestwww",
+        "vectorgraphics", "vehicles", "video", "vr", "wind", "xr"
+    )
+    foreach ($moduleName in $requiredUnityModules) {
+        $manifest.dependencies | Add-Member -NotePropertyName "com.unity.modules.$moduleName" -NotePropertyValue "1.0.0" -Force
+    }
+    $manifest | Add-Member -NotePropertyName testables -NotePropertyValue @("com.yohawing.mmd-loader.devtools") -Force
+    [IO.File]::WriteAllText($bootstrapManifest, ($manifest | ConvertTo-Json -Depth 5))
 
     # A plain `-createProject` project has the URP *package* on disk as soon as it's in the
     # manifest, but Graphics Settings never gets a Universal Render Pipeline *asset* assigned
@@ -199,81 +183,17 @@ if (-not (Test-Path -LiteralPath (Join-Path $ProjectPath "Packages\manifest.json
     # no Built-in subshader and render as the pink/magenta error shader as a result -- this is
     # what produced a solid-magenta captured PNG instead of a toon-shaded box with an outline.
     #
-    # Fix it with a throwaway Editor script dropped straight into the bootstrap project itself
-    # (Assets/Editor, which lives entirely under gitignored artifacts/ -- not the tracked
-    # devtools package, keeping this fix scoped to bootstrap generation only). It creates a
-    # UniversalRenderPipelineAsset + UniversalRendererData and assigns them as the project's
-    # default render pipeline, then this single -executeMethod invocation also resolves the
-    # manifest's newly added packages (URP, Timeline) and compiles scripts for the first time.
-    #
-    # It also attaches Mmd.Rendering.Universal.MmdOutlineRendererFeature to the renderer data.
-    # unity-mmd's tracked golden-capture environment (Assets/Settings/PC_Renderer.asset) has
-    # this feature in its m_RendererFeatures list; a from-scratch UniversalRendererData has an
-    # empty feature list. The MMD outline is drawn entirely by this renderer feature's pass
-    # (not by a shader-level "Outline" LightMode pass), so without it outlinePixelCount is 0
-    # regardless of whether the shader/material/color-space are otherwise correct.
+    # The first empty-project import can terminate during package resolution before local
+    # packages are compiled. Seed the tracked bootstrap source into Assets/Editor so the next
+    # launch can both resolve packages and configure URP; do not generate C# inside PowerShell.
     $bootstrapEditorDir = Join-Path $ProjectPath "Assets\Editor"
     New-Item -ItemType Directory -Force -Path $bootstrapEditorDir | Out-Null
-    $bootstrapScript = @'
-using UnityEditor;
-using UnityEngine;
-using UnityEngine.Rendering;
-using UnityEngine.Rendering.Universal;
-
-namespace VisualShadingTierBootstrap
-{
-    public static class EnsureUniversalRenderPipeline
-    {
-        public static void Run()
-        {
-            if (GraphicsSettings.defaultRenderPipeline is UniversalRenderPipelineAsset)
-            {
-                return;
-            }
-
-            const string settingsDirectory = "Assets/Settings";
-            if (!AssetDatabase.IsValidFolder(settingsDirectory))
-            {
-                AssetDatabase.CreateFolder("Assets", "Settings");
-            }
-
-            var rendererData = ScriptableObject.CreateInstance<UniversalRendererData>();
-            AssetDatabase.CreateAsset(rendererData, settingsDirectory + "/VisualTierRenderer.asset");
-
-            // The golden capture's renderer (unity-mmd/Assets/Settings/PC_Renderer.asset) has
-            // Mmd.Rendering.Universal.MmdOutlineRendererFeature in its feature list -- that is
-            // what actually draws the MMD outline pass. Mirror it here so the outline gate has
-            // something to measure.
-            var outlineFeature = ScriptableObject.CreateInstance<Mmd.Rendering.Universal.MmdOutlineRendererFeature>();
-            outlineFeature.name = "MmdOutlineRendererFeature";
-            AssetDatabase.AddObjectToAsset(outlineFeature, rendererData);
-            rendererData.rendererFeatures.Add(outlineFeature);
-            EditorUtility.SetDirty(rendererData);
-
-            UniversalRenderPipelineAsset pipelineAsset = UniversalRenderPipelineAsset.Create(rendererData);
-            AssetDatabase.CreateAsset(pipelineAsset, settingsDirectory + "/VisualTierRenderPipelineAsset.asset");
-
-            GraphicsSettings.defaultRenderPipeline = pipelineAsset;
-            QualitySettings.renderPipeline = pipelineAsset;
-
-            EditorUtility.SetDirty(pipelineAsset);
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
-
-            if (!(GraphicsSettings.defaultRenderPipeline is UniversalRenderPipelineAsset))
-            {
-                Debug.LogError("EnsureUniversalRenderPipeline: failed to assign a UniversalRenderPipelineAsset as the default render pipeline.");
-            }
-        }
-    }
-}
-'@
-    [IO.File]::WriteAllText((Join-Path $bootstrapEditorDir "VisualShadingTierBootstrap.cs"), $bootstrapScript)
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "VisualShadingTierBootstrap.cs") -Destination $bootstrapEditorDir -Force
 
     $rpBootstrapLog = Join-Path $resultsRoot "bootstrap-urp.log"
     Invoke-UnityProcess -Arguments @(
         "-batchmode", "-quit", "-projectPath", $ProjectPath,
-        "-executeMethod", "VisualShadingTierBootstrap.EnsureUniversalRenderPipeline.Run",
+        "-executeMethod", "VisualShadingTierBootstrap.EnsureUniversalRenderPipeline",
         "-logFile", $rpBootstrapLog
     ) | Out-Null
     $rpAsset = Join-Path $ProjectPath "Assets\Settings\VisualTierRenderPipelineAsset.asset"
