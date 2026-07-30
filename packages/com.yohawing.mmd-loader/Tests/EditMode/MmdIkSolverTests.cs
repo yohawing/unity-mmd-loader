@@ -3,6 +3,7 @@
 using System;
 using Mmd.Motion;
 using Mmd.Parser;
+using Mmd.Physics;
 using Mmd.Pose;
 using NUnit.Framework;
 
@@ -23,21 +24,6 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void SolveValidatedSkipsRepeatedStructuralValidation()
-        {
-            MmdModelDefinition model = CreateModelWithInvalidGeometry();
-
-            MmdSampledMotion result = new MmdIkSolver().SolveValidated(
-                model,
-                new MmdSampledMotion(),
-                new MmdSampledMotion(),
-                MmdBoneEvaluationPass.AfterPhysics);
-
-            Assert.That(result, Is.Not.Null);
-            Assert.That(result.Bones, Is.Empty);
-        }
-
-        [Test]
         public void ValidatedTopologyPreservesSparseIkSolveParity()
         {
             MmdModelDefinition model = CreateSparseIkModel();
@@ -51,7 +37,7 @@ namespace Mmd.Tests
                 appended,
                 MmdBoneEvaluationPass.BeforePhysics);
             MmdTopologyPlan topology = MmdTopologyPlan.CreateFromValidatedModel(model);
-            MmdSampledMotion planned = solver.SolveValidated(
+            MmdSampledMotion planned = solver.SolveWithValidatedTopology(
                 model,
                 preAppend,
                 appended,
@@ -76,12 +62,12 @@ namespace Mmd.Tests
             model.bones[1].parentIndex = 7;
 
             InvalidOperationException? error = Assert.Throws<InvalidOperationException>(() =>
-                new MmdIkSolver().SolveValidated(
+                MmdRuntimeFramePipeline.EvaluateWithOptions(
                     model,
-                    new MmdSampledMotion(),
-                    new MmdSampledMotion(),
-                    MmdBoneEvaluationPass.BeforePhysics,
-                    topology));
+                    new MmdMotionDefinition(),
+                    frame: 0,
+                    physicsBackend: new NullMmdPhysicsBackend(),
+                    topologyPlan: topology));
 
             Assert.That(error!.Message, Does.Contain("topology changed"));
         }

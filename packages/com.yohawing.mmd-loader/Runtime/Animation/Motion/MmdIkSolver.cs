@@ -111,34 +111,6 @@ namespace Mmd.Motion
             return SolveCore(model, preAppendMotion, appendedMotion, pass, validateModel: true);
         }
 
-        /// <summary>
-        /// Solves IK for a model whose structural validation was already completed by the owning runtime binding.
-        /// </summary>
-        internal MmdSampledMotion SolveValidated(
-            MmdModelDefinition model,
-            MmdSampledMotion preAppendMotion,
-            MmdSampledMotion appendedMotion,
-            MmdBoneEvaluationPass pass)
-        {
-            return SolveCore(model, preAppendMotion, appendedMotion, pass, validateModel: false);
-        }
-
-        internal MmdSampledMotion SolveValidated(
-            MmdModelDefinition model,
-            MmdSampledMotion preAppendMotion,
-            MmdSampledMotion appendedMotion,
-            MmdBoneEvaluationPass pass,
-            MmdTopologyPlan topologyPlan)
-        {
-            if (topologyPlan == null)
-            {
-                throw new ArgumentNullException(nameof(topologyPlan));
-            }
-
-            topologyPlan.EnsureModel(model);
-            return SolveCore(model, preAppendMotion, appendedMotion, pass, validateModel: false, topologyPlan);
-        }
-
         internal MmdSampledMotion SolveWithValidatedTopology(
             MmdModelDefinition model,
             MmdSampledMotion preAppendMotion,
