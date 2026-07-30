@@ -21,6 +21,88 @@ function Resolve-FullPath {
     return [System.IO.Path]::GetFullPath((Join-Path (Get-Location) $Path))
 }
 
+function Get-GateContentManifest {
+    param(
+        [Parameter(Mandatory = $true)][string] $Path,
+        [Parameter(Mandatory = $true)][string] $SampleMetaPath
+    )
+
+    $entries = @()
+    if (Test-Path -LiteralPath $Path -PathType Container) {
+        $entries += @(
+            Get-ChildItem -LiteralPath $Path -Recurse -Directory |
+                ForEach-Object {
+                    $relativePath = [System.IO.Path]::GetRelativePath($Path, $_.FullName).Replace('\', '/')
+                    "D|$relativePath"
+                }
+        )
+        $entries += @(
+            Get-ChildItem -LiteralPath $Path -Recurse -File |
+                ForEach-Object {
+                    $relativePath = [System.IO.Path]::GetRelativePath($Path, $_.FullName).Replace('\', '/')
+                    $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+                    "F|{0}|{1}|{2}" -f $relativePath, $_.Length, $hash
+                }
+        )
+    }
+
+    if (Test-Path -LiteralPath $SampleMetaPath -PathType Leaf) {
+        $meta = Get-Item -LiteralPath $SampleMetaPath
+        $metaHash = (Get-FileHash -LiteralPath $SampleMetaPath -Algorithm SHA256).Hash
+        $entries += "R|{0}|{1}" -f $meta.Length, $metaHash
+    }
+
+    return @($entries | Sort-Object)
+}
+
+function Write-GateOwnershipMarker {
+    param(
+        [Parameter(Mandatory = $true)][string] $SamplePath,
+        [Parameter(Mandatory = $true)][string] $SampleMetaPath,
+        [Parameter(Mandatory = $true)][string] $MarkerPath
+    )
+
+    $marker = [ordered]@{
+        schemaVersion = 2
+        entries = @(Get-GateContentManifest -Path $SamplePath -SampleMetaPath $SampleMetaPath)
+    }
+    [System.IO.File]::WriteAllText(
+        $MarkerPath,
+        ($marker | ConvertTo-Json -Depth 3),
+        [System.Text.UTF8Encoding]::new($false))
+}
+
+function Remove-GateOwnedSampleIfUnchanged {
+    param(
+        [Parameter(Mandatory = $true)][string] $SamplePath,
+        [Parameter(Mandatory = $true)][string] $SampleMetaPath,
+        [Parameter(Mandatory = $true)][string] $MarkerPath
+    )
+
+    if (-not (Test-Path -LiteralPath $MarkerPath -PathType Leaf)) {
+        throw "Gate ownership marker is missing; preserving the imported sample: $SamplePath"
+    }
+
+    try {
+        $marker = Get-Content -LiteralPath $MarkerPath -Raw | ConvertFrom-Json
+    }
+    catch {
+        throw "Gate ownership marker is invalid; preserving the imported sample: $MarkerPath"
+    }
+    if ([int] $marker.schemaVersion -ne 2) {
+        throw "Gate ownership marker schema is unsupported; preserving the imported sample: $MarkerPath"
+    }
+
+    $expected = @($marker.entries | ForEach-Object { [string] $_ })
+    $actual = @(Get-GateContentManifest -Path $SamplePath -SampleMetaPath $SampleMetaPath)
+    if (@(Compare-Object -ReferenceObject $expected -DifferenceObject $actual).Count -ne 0) {
+        throw "Gate-owned sample content changed; preserving it for manual recovery: $SamplePath"
+    }
+
+    Remove-Item -LiteralPath $SamplePath -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $SampleMetaPath, $MarkerPath, ($MarkerPath + ".meta") -Force -ErrorAction SilentlyContinue
+}
+
 function Remove-EmptyDirectoryCreatedByGate {
     param(
         [Parameter(Mandatory = $true)][string] $Path,
@@ -87,8 +169,10 @@ path=$sampleImportPath
 "@
     }
 
-    Remove-Item -LiteralPath $sampleImportPath -Recurse -Force -ErrorAction SilentlyContinue
-    Remove-Item -LiteralPath $sampleImportMetaPath, $sampleImportMarkerPath, ($sampleImportMarkerPath + ".meta") -Force -ErrorAction SilentlyContinue
+    Remove-GateOwnedSampleIfUnchanged `
+        -SamplePath $sampleImportPath `
+        -SampleMetaPath $sampleImportMetaPath `
+        -MarkerPath $sampleImportMarkerPath
 }
 
 $samplesPathExisted = Test-Path -LiteralPath $samplesPath -PathType Container
@@ -99,9 +183,14 @@ New-Item -ItemType Directory -Force -Path $versionSamplesPath, $ArtifactsPath | 
 Remove-Item -LiteralPath $compileLog, $testLog, $testResults, $visualCanaryPath -Force -ErrorAction SilentlyContinue
 Remove-Item -LiteralPath $generatedPmxVisualPath -Recurse -Force -ErrorAction SilentlyContinue
 
+$markerCreated = $false
 try {
-    [System.IO.File]::WriteAllText($sampleImportMarkerPath, "temporary import owned by verify-unity-toon-shader-sample.ps1")
     Copy-Item -LiteralPath $sampleSourcePath -Destination $sampleImportPath -Recurse
+    Write-GateOwnershipMarker `
+        -SamplePath $sampleImportPath `
+        -SampleMetaPath $sampleImportMetaPath `
+        -MarkerPath $sampleImportMarkerPath
+    $markerCreated = $true
 
     & pwsh -NoProfile -File $compileScript `
         -Unity $Unity `
@@ -110,6 +199,10 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "Unity Toon Shader adapter sample compile failed. exitCode=$LASTEXITCODE; log=$compileLog"
     }
+    Write-GateOwnershipMarker `
+        -SamplePath $sampleImportPath `
+        -SampleMetaPath $sampleImportMetaPath `
+        -MarkerPath $sampleImportMarkerPath
 
     Assert-NoRunningUnityProject -ProjectPath $ProjectPath -OperationName "Unity Toon Shader adapter sample tests"
 
@@ -174,8 +267,12 @@ try {
 }
 finally {
     Assert-NoRunningUnityProject -ProjectPath $ProjectPath -OperationName "Unity Toon Shader adapter sample cleanup"
-    Remove-Item -LiteralPath $sampleImportPath -Recurse -Force -ErrorAction SilentlyContinue
-    Remove-Item -LiteralPath $sampleImportMetaPath, $sampleImportMarkerPath, ($sampleImportMarkerPath + ".meta") -Force -ErrorAction SilentlyContinue
+    if ($markerCreated -and (Test-Path -LiteralPath $sampleImportMarkerPath -PathType Leaf)) {
+        Remove-GateOwnedSampleIfUnchanged `
+            -SamplePath $sampleImportPath `
+            -SampleMetaPath $sampleImportMetaPath `
+            -MarkerPath $sampleImportMarkerPath
+    }
     Remove-EmptyDirectoryCreatedByGate -Path $versionSamplesPath -ExistedBeforeGate $versionSamplesPathExisted
     Remove-EmptyDirectoryCreatedByGate -Path $packageSamplesPath -ExistedBeforeGate $packageSamplesPathExisted
     Remove-EmptyDirectoryCreatedByGate -Path $samplesPath -ExistedBeforeGate $samplesPathExisted
