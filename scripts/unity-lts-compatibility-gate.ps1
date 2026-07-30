@@ -12,6 +12,7 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "unity-process-environment.ps1")
 Initialize-UnityProcessEnvironment
 . (Join-Path $PSScriptRoot "unity-project-guard.ps1")
+. (Join-Path $PSScriptRoot "read-nunit-test-result.ps1")
 
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $packageRoot = Join-Path $repoRoot "packages\com.yohawing.mmd-loader"
@@ -113,31 +114,18 @@ try {
         -PassThru
     $testExitCode = $unityProcess.ExitCode
 
-    if (-not (Test-Path -LiteralPath $testResults -PathType Leaf)) {
-        throw "Unity LTS compatibility gate failed. Results XML was not created. exitCode=$testExitCode; log=$testLog"
+    try {
+        $testSummary = Read-NUnitTestRunSummary -Path $testResults -Context "Unity LTS compatibility gate"
+    }
+    catch {
+        throw "Unity LTS compatibility gate failed. exitCode=$testExitCode; results=$testResults; log=$testLog; $($_.Exception.Message)"
     }
 
-    [xml] $resultsXml = Get-Content -LiteralPath $testResults -Raw
-    $testRun = $resultsXml.SelectSingleNode("//test-run")
-    if ($null -eq $testRun) {
-        throw "Unity LTS compatibility gate failed. Results XML has no <test-run> root: $testResults"
-    }
-    $failedCount = 0
-    $totalCount = 0
-    [void][int]::TryParse([string] $testRun.GetAttribute("failed"), [ref] $failedCount)
-    [void][int]::TryParse([string] $testRun.GetAttribute("total"), [ref] $totalCount)
-    $runResult = [string] $testRun.GetAttribute("result")
-    if ($testExitCode -ne 0 -or $totalCount -le 0 -or $failedCount -gt 0 -or $runResult -eq "Failed" -or $runResult -eq "Failed(Child)") {
+    if ($testExitCode -ne 0 -or $testSummary.Total -le 0 -or $testSummary.Failed -gt 0 -or $testSummary.HasFailedResult) {
         throw ("Unity LTS compatibility gate failed. exitCode={0}; result={1}; failed={2}; passed={3}; skipped={4}; total={5}; results={6}; log={7}" -f `
-            $testExitCode, $runResult, $testRun.GetAttribute("failed"), $testRun.GetAttribute("passed"), $testRun.GetAttribute("skipped"), $testRun.GetAttribute("total"), $testResults, $testLog)
+            $testExitCode, $testSummary.Result, $testSummary.Failed, $testSummary.Passed, $testSummary.Skipped, $testSummary.Total, $testResults, $testLog)
     }
 
-    $testSummary = [pscustomobject] @{
-        Result = $runResult
-        Passed = $testRun.GetAttribute("passed")
-        Skipped = $testRun.GetAttribute("skipped")
-        Total = $testRun.GetAttribute("total")
-    }
 }
 finally {
     [System.IO.File]::WriteAllBytes($manifestPath, $manifestOriginalBytes)

@@ -10,6 +10,7 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "unity-project-guard.ps1")
 . (Join-Path $PSScriptRoot "unity-process-environment.ps1")
 Initialize-UnityProcessEnvironment
+. (Join-Path $PSScriptRoot "read-nunit-test-result.ps1")
 
 function Resolve-OutputPath {
     param([Parameter(Mandatory = $true)][string] $Path)
@@ -107,22 +108,16 @@ if (-not (Test-Path -LiteralPath $LogFile)) {
     throw ("mmd-anim CLI parity report failed. exitCode={0}; log was not created: {1}" -f $unityExitCode, $LogFile)
 }
 
-if (-not (Test-Path -LiteralPath $ResultsFile)) {
-    throw ("mmd-anim CLI parity report failed. exitCode={0}; results file was not created: {1}; log={2}" -f $unityExitCode, $ResultsFile, $LogFile)
+try {
+    $testSummary = Read-NUnitTestRunSummary -Path $ResultsFile -Context "mmd-anim CLI parity report"
+}
+catch {
+    throw "mmd-anim CLI parity report failed. exitCode=$unityExitCode; results=$ResultsFile; log=$LogFile; $($_.Exception.Message)"
 }
 
-[xml] $resultsXml = Get-Content -LiteralPath $ResultsFile -Raw
-$testRun = $resultsXml.SelectSingleNode("//test-run")
-if ($null -eq $testRun) {
-    throw ("mmd-anim CLI parity report failed. results XML has no <test-run> root: {0}; log={1}" -f $ResultsFile, $LogFile)
-}
-
-$failedCount = 0
-[void][int]::TryParse([string] $testRun.GetAttribute("failed"), [ref] $failedCount)
-$runResult = [string] $testRun.GetAttribute("result")
-if ($unityExitCode -ne 0 -or $failedCount -gt 0 -or $runResult -eq "Failed") {
+if ($unityExitCode -ne 0 -or $testSummary.Failed -gt 0 -or $testSummary.HasFailedResult) {
     throw ("mmd-anim CLI parity report failed. exitCode={0}; result={1}; failed={2}; passed={3}; skipped={4}; total={5}; results={6}; log={7}" -f `
-        $unityExitCode, $runResult, $testRun.GetAttribute("failed"), $testRun.GetAttribute("passed"), $testRun.GetAttribute("skipped"), $testRun.GetAttribute("total"), $ResultsFile, $LogFile)
+        $unityExitCode, $testSummary.Result, $testSummary.Failed, $testSummary.Passed, $testSummary.Skipped, $testSummary.Total, $ResultsFile, $LogFile)
 }
 
 $reportPath = Join-Path (Split-Path -Parent $ResultsFile) "mmd-anim-cli-parity-report.json"

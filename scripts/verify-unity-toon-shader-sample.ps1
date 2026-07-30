@@ -10,6 +10,7 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "unity-project-guard.ps1")
 . (Join-Path $PSScriptRoot "unity-process-environment.ps1")
 Initialize-UnityProcessEnvironment
+. (Join-Path $PSScriptRoot "read-nunit-test-result.ps1")
 
 function Resolve-FullPath {
     param([Parameter(Mandatory = $true)][string] $Path)
@@ -256,26 +257,16 @@ try {
     $testProcess.WaitForExit()
     $unityExitCode = $testProcess.ExitCode
 
-    if (-not (Test-Path -LiteralPath $testResults -PathType Leaf)) {
-        throw "Unity Toon Shader adapter sample tests produced no results. exitCode=$unityExitCode; log=$testLog"
+    try {
+        $testSummary = Read-NUnitTestRunSummary -Path $testResults -Context "Unity Toon Shader adapter sample tests"
+    }
+    catch {
+        throw "Unity Toon Shader adapter sample tests failed. exitCode=$unityExitCode; results=$testResults; log=$testLog; $($_.Exception.Message)"
     }
 
-    [xml] $resultsXml = Get-Content -LiteralPath $testResults -Raw
-    $testRun = $resultsXml.SelectSingleNode("//test-run")
-    if ($null -eq $testRun) {
-        throw "Unity Toon Shader adapter sample results have no <test-run> root: $testResults"
-    }
-
-    $totalCount = 0
-    $failedCount = 0
-    $skippedCount = 0
-    [void][int]::TryParse([string] $testRun.GetAttribute("total"), [ref] $totalCount)
-    [void][int]::TryParse([string] $testRun.GetAttribute("failed"), [ref] $failedCount)
-    [void][int]::TryParse([string] $testRun.GetAttribute("skipped"), [ref] $skippedCount)
-    $runResult = [string] $testRun.GetAttribute("result")
-    if ($unityExitCode -ne 0 -or $totalCount -lt 6 -or $failedCount -gt 0 -or $skippedCount -gt 0 -or $runResult -eq "Failed") {
+    if ($unityExitCode -ne 0 -or $testSummary.Total -lt 6 -or $testSummary.Failed -gt 0 -or $testSummary.Skipped -gt 0 -or $testSummary.HasFailedResult) {
         throw ("Unity Toon Shader adapter sample tests failed. exitCode={0}; result={1}; total={2}; passed={3}; failed={4}; skipped={5}; results={6}; log={7}" -f `
-            $unityExitCode, $runResult, $totalCount, $testRun.GetAttribute("passed"), $failedCount, $testRun.GetAttribute("skipped"), $testResults, $testLog)
+            $unityExitCode, $testSummary.Result, $testSummary.Total, $testSummary.Passed, $testSummary.Failed, $testSummary.Skipped, $testResults, $testLog)
     }
     if (-not (Test-Path -LiteralPath $visualCanaryPath -PathType Leaf) -or (Get-Item -LiteralPath $visualCanaryPath).Length -eq 0) {
         throw "Unity Toon Shader adapter visual canary PNG was not generated: $visualCanaryPath"
@@ -293,7 +284,7 @@ try {
     }
 
     Write-Host ("Unity Toon Shader adapter sample gate passed. total={0}; passed={1}; skipped={2}; results={3}; png={4}; generatedPmx={5}; log={6}" -f `
-        $totalCount, $testRun.GetAttribute("passed"), $testRun.GetAttribute("skipped"), $testResults, $visualCanaryPath, $generatedPmxVisualPath, $testLog)
+        $testSummary.Total, $testSummary.Passed, $testSummary.Skipped, $testResults, $visualCanaryPath, $generatedPmxVisualPath, $testLog)
 }
 finally {
     Assert-NoRunningUnityProject -ProjectPath $ProjectPath -OperationName "Unity Toon Shader adapter sample cleanup"
