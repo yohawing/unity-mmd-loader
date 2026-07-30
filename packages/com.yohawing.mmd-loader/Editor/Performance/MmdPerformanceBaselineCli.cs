@@ -114,7 +114,7 @@ namespace Mmd.Editor
                 int totalFrames = options.warmupFrames + options.measurementFrames;
                 var frames = new List<MmdEvaluatedFrame>(totalFrames);
                 for (int i = 0; i < totalFrames; i++)
-                    frames.Add(session.EvaluateFrame(i, MmdPlaybackTime.ToTime(i, options.frameRate)));
+                    frames.Add(session.EvaluateNativeFrame(i, MmdPlaybackTime.ToTime(i, options.frameRate)));
                 for (int i = 0; i < options.warmupFrames; i++)
                     MmdUnityFrameApplier.ApplyFrame(applyInstance, frames[i % frames.Count]);
                 GC.Collect();

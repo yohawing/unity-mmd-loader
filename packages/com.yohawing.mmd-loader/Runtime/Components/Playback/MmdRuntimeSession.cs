@@ -116,17 +116,44 @@ namespace Mmd
         public MmdEvaluatedFrame EvaluateFrame(int frame, float time, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
         {
             ThrowIfDisposed();
-            return ikSolver != null
-                ? MmdRuntimeFrameEvaluator.EvaluateValidatedPhaseOnePlaybackFrame(model, motion, frame, time, TopologyPlan, physicsBackend, ikSolver)
-                : EvaluateNativeFrame(frame, time);
+            if (physicsBackend == null &&
+                ikSolver == null &&
+                nativeModelSourceIdentity != null &&
+                nativeMotionSourceIdentity != null)
+            {
+                return EvaluateNativeFrame(frame, time);
+            }
+
+            return MmdRuntimeFrameEvaluator.EvaluateValidatedPhaseOnePlaybackFrame(
+                model,
+                motion,
+                frame,
+                time,
+                TopologyPlan,
+                physicsBackend,
+                ikSolver);
         }
 
         internal MmdEvaluatedFrame EvaluateBeforePhysicsFrame(int frame, float time, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
         {
             ThrowIfDisposed();
-            return ikSolver != null
-                ? MmdRuntimeFrameEvaluator.EvaluateValidatedBeforePhysicsPlaybackFrame(model, motion, frame, time, TopologyPlan, physicsBackend, ikSolver)
-                : EvaluateNativeFrame(frame, time);
+            if (!model.HasDeformAfterPhysicsBones &&
+                physicsBackend == null &&
+                ikSolver == null &&
+                nativeModelSourceIdentity != null &&
+                nativeMotionSourceIdentity != null)
+            {
+                return EvaluateNativeFrame(frame, time);
+            }
+
+            return MmdRuntimeFrameEvaluator.EvaluateValidatedBeforePhysicsPlaybackFrame(
+                model,
+                motion,
+                frame,
+                time,
+                TopologyPlan,
+                physicsBackend,
+                ikSolver);
         }
 
         public MmdEvaluatedFrame EvaluateFrameAtTime(float time, float frameRate, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
@@ -206,8 +233,9 @@ namespace Mmd
             }
         }
 
-        private MmdEvaluatedFrame EvaluateNativeFrame(int frame, float time)
+        internal MmdEvaluatedFrame EvaluateNativeFrame(int frame, float time)
         {
+            ThrowIfDisposed();
             MmdPlaybackTime.ValidateFrame(frame);
             MmdPlaybackTime.ValidateTime(time);
             EnsureNativeSourcesUnchanged();

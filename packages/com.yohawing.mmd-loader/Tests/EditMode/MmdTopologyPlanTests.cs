@@ -4,6 +4,7 @@ using System;
 using System.Reflection;
 using Mmd.Motion;
 using Mmd.Parser;
+using Mmd.Physics;
 using Mmd.Pose;
 using NUnit.Framework;
 
@@ -49,6 +50,24 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void RuntimeSessionPublicEvaluationSupportsSyntheticIrAndUsesRequestedPhysicsBackend()
+        {
+            MmdModelDefinition model = CreateIkTopologyModel();
+            var motion = new MmdMotionDefinition();
+            using var session = new MmdRuntimeSession(model, motion, "synthetic.pmx", "synthetic.vmd");
+            var physics = new RecordingPhysicsBackend();
+
+            MmdEvaluatedFrame frame = session.EvaluateFrame(
+                frame: 0,
+                time: 0.0f,
+                physicsBackend: physics);
+
+            Assert.That(frame.bones, Has.Count.EqualTo(model.bones.Count));
+            Assert.That(physics.StepCount, Is.EqualTo(1));
+            Assert.That(RequirePrivateField("nativePlaybackSession").GetValue(session), Is.Null);
+        }
+
+        [Test]
         public void RuntimeSessionNativePlaybackIsLazyAndReusesStateWithoutManagedTopology()
         {
             using MmdRuntimeSession session = CreateSession(out _);
@@ -69,7 +88,7 @@ namespace Mmd.Tests
             object world = worldField.GetValue(session)!;
             object morph = morphField.GetValue(session)!;
             object ik = ikField.GetValue(session)!;
-            _ = session.EvaluateBeforePhysicsFrame(frame: 1, time: 1.0f / 30.0f);
+            _ = session.EvaluateFrame(frame: 1, time: 1.0f / 30.0f);
             _ = session.BuildSnapshot(frame: 0, time: 0.0f);
 
             Assert.That(topologyField.GetValue(session), Is.Null);
@@ -128,6 +147,7 @@ namespace Mmd.Tests
             Assert.That(playbackField.GetValue(session), Is.Null);
             Assert.That(worldField.GetValue(session), Is.Null);
             Assert.Throws<ObjectDisposedException>(() => session.EvaluateFrame(frame: 0, time: 0.0f));
+            Assert.Throws<ObjectDisposedException>(() => session.EvaluateNativeFrame(frame: 0, time: 0.0f));
             Assert.Throws<ObjectDisposedException>(() => session.BuildSnapshot(frame: 0, time: 0.0f));
         }
 
@@ -293,6 +313,24 @@ namespace Mmd.Tests
             for (int morph = 0; morph < expected.morphs.Count; morph++)
             {
                 Assert.That(actual.morphs[morph].weight, Is.EqualTo(expected.morphs[morph].weight));
+            }
+        }
+
+        private sealed class RecordingPhysicsBackend : IMmdPhysicsBackend
+        {
+            public string Name => "recording";
+
+            public bool IsDeterministic => true;
+
+            public int StepCount { get; private set; }
+
+            public void Reset()
+            {
+            }
+
+            public void Step(int frame, float deltaTime)
+            {
+                StepCount++;
             }
         }
     }

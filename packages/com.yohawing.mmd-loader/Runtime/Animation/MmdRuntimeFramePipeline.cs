@@ -62,7 +62,8 @@ namespace Mmd
             IMmdIkSolver? ikSolver = null,
             bool collectTiming = false,
             bool captureCheckpoints = false,
-            MmdTopologyPlan? topologyPlan = null)
+            MmdTopologyPlan? topologyPlan = null,
+            bool stopBeforePhysics = false)
         {
             topologyPlan?.EnsureModel(model);
             ikSolver ??= new MmdIkSolver();
@@ -108,6 +109,22 @@ namespace Mmd
             Dictionary<int, float[]>? ikWorldMatrices = captureCheckpoints || collectTiming
                 ? EvaluateWorldMatrices(model, topologyPlan, ikMotion) : null;
             RecordTiming(timing, started, ticks => timing!.IkWorldTicks = ticks);
+
+            if (stopBeforePhysics)
+            {
+                return new MmdRuntimeFrameEvaluation
+                {
+                    SampledMotion = sampledMotion,
+                    SampledWorldMatrices = sampledWorldMatrices,
+                    AppendedMotion = appendedMotion,
+                    AppendedWorldMatrices = appendedWorldMatrices,
+                    IkMotion = ikMotion,
+                    IkWorldMatrices = ikWorldMatrices,
+                    FinalMotion = ikMotion,
+                    WorldMatrices = ikWorldMatrices ?? EvaluateWorldMatrices(model, topologyPlan, ikMotion),
+                    Timing = timing
+                };
+            }
 
             started = Stopwatch.GetTimestamp();
             physicsBackend.Step(frame, deltaTime: 0.0f);
