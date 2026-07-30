@@ -11,7 +11,7 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 - Added an opt-in MMD Toon Lit material profile with dedicated inspectors and authoring for shade colors, toon boundaries and bands, stylized specular, rim lighting, HDR emission, cutout surfaces, ambient SH, fog, realtime shadows, SSAO, and reflection probes.
 - Added an optional Unity Toon Shader adapter sample with fail-closed shader capability diagnostics, custom material profile support, generated-material comparison coverage, and a self-contained demo scene.
 - Added extensible material mapper/profile contracts, per-shader property targets, material-morph routing, unsupported-feature diagnostics, external PMX material extraction/remaps, and automatic MME normal-map import.
-- Added tracked performance baseline tooling and a clean Unity 6000.0 LTS consumer compatibility gate.
+- Added a clean Unity 6000.0 LTS consumer compatibility gate.
 
 ### Changed
 
