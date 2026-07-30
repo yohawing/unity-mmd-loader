@@ -7,6 +7,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
+. (Join-Path $repoRoot "scripts\unity-process-environment.ps1")
+Initialize-UnityProcessEnvironment
+
 if ([string]::IsNullOrEmpty($ArtifactsRoot)) {
     $ArtifactsRoot = Join-Path $repoRoot "artifacts\visual-shading-tier"
 }
