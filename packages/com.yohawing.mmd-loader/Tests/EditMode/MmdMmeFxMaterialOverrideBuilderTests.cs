@@ -196,6 +196,37 @@ namespace Mmd.Tests
             Assert.That(normalizedImporter.sRGBTexture, Is.False);
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void MmeNormalMapPostprocessor_ReimportsTextureWhenFxIsAddedLater(bool useTextureSubdirectory)
+        {
+            const string directoryAssetPath = TempDirectory + "/normal_map_late_fx";
+            string directoryAbsolutePath = ToAbsolutePath(directoryAssetPath);
+            Directory.CreateDirectory(directoryAbsolutePath);
+            string textureReference = useTextureSubdirectory ? "textures/normal.png" : "normal.png";
+            string normalMapAssetPath = directoryAssetPath + "/" + textureReference;
+            string effectAssetPath = directoryAssetPath + "/body.fx";
+
+            Directory.CreateDirectory(Path.GetDirectoryName(ToAbsolutePath(normalMapAssetPath))!);
+            WriteNormalMapTexture(ToAbsolutePath(normalMapAssetPath));
+            AssetDatabase.ImportAsset(normalMapAssetPath, ImportAssetOptions.ForceSynchronousImport);
+            TextureImporter? initialImporter = AssetImporter.GetAtPath(normalMapAssetPath) as TextureImporter;
+            Assert.That(initialImporter, Is.Not.Null);
+            Assert.That(initialImporter!.textureType, Is.EqualTo(TextureImporterType.Default));
+
+            File.WriteAllText(
+                ToAbsolutePath(effectAssetPath),
+                $"#define TEXTURE_NORMALMAP \"{textureReference}\"");
+            AssetDatabase.ImportAsset(
+                effectAssetPath,
+                ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
+
+            TextureImporter? normalizedImporter = AssetImporter.GetAtPath(normalMapAssetPath) as TextureImporter;
+            Assert.That(normalizedImporter, Is.Not.Null);
+            Assert.That(normalizedImporter!.textureType, Is.EqualTo(TextureImporterType.NormalMap));
+            Assert.That(normalizedImporter.sRGBTexture, Is.False);
+        }
+
         [Test]
         public void BuildMaterialOverrides_SkipsAlternativeFullNormalMapWhenDisabled()
         {
