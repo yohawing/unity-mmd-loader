@@ -9,6 +9,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 . (Join-Path $repoRoot "scripts\unity-process-environment.ps1")
 Initialize-UnityProcessEnvironment
+. (Join-Path $repoRoot "scripts\read-nunit-test-result.ps1")
 
 if ([string]::IsNullOrEmpty($ArtifactsRoot)) {
     $ArtifactsRoot = Join-Path $repoRoot "artifacts\visual-shading-tier"
@@ -230,15 +231,9 @@ function Invoke-VisualTierRun {
     if (-not (Wait-ForFileToSettle -Path $results)) {
         throw "$Name did not produce test results. log=$log"
     }
-    [xml] $xml = Get-Content -LiteralPath $results -Raw
-    $testRun = $xml.SelectSingleNode("//test-run")
-    if ($null -eq $testRun) {
-        throw "$Name results have no test-run root. results=$results"
-    }
-    $failed = 0
-    $passed = 0
-    [void][int]::TryParse([string] $testRun.GetAttribute("failed"), [ref] $failed)
-    [void][int]::TryParse([string] $testRun.GetAttribute("passed"), [ref] $passed)
+    $testSummary = Read-NUnitTestRunSummary -Path $results -Context "$Name results"
+    $failed = $testSummary.Failed
+    $passed = $testSummary.Passed
 
     # A clean exit with an empty/no-op test-run (0 matched, 0 passed, 0 failed) is not a
     # green result -- it means -testFilter matched nothing and the gate never ran. Positively
