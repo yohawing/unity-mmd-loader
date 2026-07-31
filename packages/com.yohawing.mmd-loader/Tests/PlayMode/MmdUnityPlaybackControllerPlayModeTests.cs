@@ -408,7 +408,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator HairPhysicsFixtureWithPureWorldAnchorJointsIsRejectedByLivePhysics()
         {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
@@ -456,7 +456,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator HairPhysicsFixtureLiveForwardPlaybackProducesDiagnostics()
         {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
@@ -487,6 +487,7 @@ namespace Mmd.Tests
                     model, motion, "test_hair_physics.pmx", "rest-pose", pmxPath);
 
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.LivePhysicsBodyDiagnosticsSampleInterval = 1;
                 controller.Configure(binding, 30.0f, playOnStart: false);
                 yield return null;
 
@@ -642,7 +643,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator HairPhysicsFixtureImportScaleZeroDotOneKeepsNativeReadbackInMmdSpaceAndScalesUnityObjects()
         {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
@@ -668,7 +669,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator HumanoidRetargetLateUpdateStepsLivePhysicsFromCurrentPose()
         {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
@@ -859,7 +860,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator HumanoidRetargetLateUpdateCreatesModelOnlyPhysicsBindingFromModelAsset()
         {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
@@ -1018,7 +1019,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator HumanoidAnimationTrackSingleTrackMuscleClipDrivesProxyAndRetargetsAndStepsPhysics()
         {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
@@ -1559,7 +1560,7 @@ namespace Mmd.Tests
             // director.Evaluate(), so they cannot be distinguished — the Play Mode boundary is the contract
             // (scrubbing is an Editor/non-playing operation). Editor-side suppression (Application.isPlaying
             // == false) is covered by the EditMode timeline behaviour tests.
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
@@ -1627,7 +1628,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator ApplyLivePhysicsForwardFrameSeedsAtArbitraryStartFrame()
         {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
@@ -1741,7 +1742,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator TimelineForwardPlaybackEvaluationStepsLivePhysics()
         {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
@@ -1791,7 +1792,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator TimelineScrubSuspendsLivePhysicsAndResumeReseeds()
         {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
@@ -1846,7 +1847,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator TimelineForwardPlaybackPropagatesHairPhysicsToBones()
         {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
@@ -1996,6 +1997,7 @@ namespace Mmd.Tests
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
                     model, motion, "test_hair_physics.pmx", "rest-pose", pmxPath, importScale);
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.LivePhysicsBodyDiagnosticsSampleInterval = 1;
                 controller.Configure(binding, 30.0f, playOnStart: false);
                 controller.SetPhysicsMode(MmdPhysicsMode.Live);
 
@@ -2040,21 +2042,6 @@ namespace Mmd.Tests
             return model;
         }
 
-        private static int FindFirstValidStaticPhysicsBone(MmdModelDefinition model, MmdUnityPlaybackBinding binding)
-        {
-            foreach (MmdRigidbodyDefinition body in model.physics.rigidbodies)
-            {
-                if (string.Equals(body.physicsKind, "static", StringComparison.Ordinal) &&
-                    body.boneIndex >= 0 &&
-                    body.boneIndex < binding.Instance.BoneTransforms.Length)
-                {
-                    return body.boneIndex;
-                }
-            }
-
-            return -1;
-        }
-
         private static int FindFirstValidStaticPhysicsBone(MmdModelDefinition model, MmdUnityModelInstance instance)
         {
             foreach (MmdRigidbodyDefinition body in model.physics.rigidbodies)
@@ -2068,24 +2055,6 @@ namespace Mmd.Tests
             }
 
             return -1;
-        }
-
-        private static HashSet<int> CollectNonStaticPhysicsBoneSlots(
-            MmdModelDefinition model,
-            MmdUnityPlaybackBinding binding)
-        {
-            var slots = new HashSet<int>();
-            foreach (MmdRigidbodyDefinition body in model.physics.rigidbodies)
-            {
-                if (!string.Equals(body.physicsKind, "static", StringComparison.Ordinal) &&
-                    body.boneIndex >= 0 &&
-                    body.boneIndex < binding.Instance.BoneTransforms.Length)
-                {
-                    slots.Add(body.boneIndex);
-                }
-            }
-
-            return slots;
         }
 
         private static HashSet<int> CollectNonStaticPhysicsBoneSlots(

@@ -59,6 +59,23 @@ namespace Mmd.Tests
             Assert.That(asset, Is.Not.Null, "Borrowed persistent asset must survive a rejected ownership transfer.");
         }
 
+        [Test]
+        public void ImportObjectTransactionDiscardsTrackedGeneratedAssets()
+        {
+            Shader? shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            Assume.That(shader, Is.Not.Null, "test shader unavailable");
+            Material generated = new Material(shader!);
+
+            using (var transaction = new MmdImportObjectTransaction())
+            {
+                transaction.Track(generated);
+                transaction.Discard(generated);
+                Assert.That(generated == null, Is.True,
+                    "discarding an unused generated asset must destroy it immediately");
+                Assert.DoesNotThrow(transaction.Complete);
+            }
+        }
+
         private static void AssertFaultedReimportReturnsToBaseline(string assetPath, MmdPmxImportStage stage)
         {
             string[] baselineSubAssets = GetSubAssetSignature(assetPath);

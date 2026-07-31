@@ -1,0 +1,16 @@
+{
+  "name": "Mmd.UnityToonShaderAdapter.Sample",
+  "rootNamespace": "Mmd.Samples.UnityToonShader",
+  "references": [
+    "Mmd.Runtime"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

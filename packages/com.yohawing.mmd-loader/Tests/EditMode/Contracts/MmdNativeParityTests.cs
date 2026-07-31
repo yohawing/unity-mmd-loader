@@ -463,53 +463,8 @@ namespace Mmd.Tests.Contracts
             string dir = Path.Combine(MmdTestFixtures.RepositoryRoot, "artifacts", "parity");
             Directory.CreateDirectory(dir);
             string path = Path.Combine(dir, "scene-track-light-self-shadow.vmd");
-            File.WriteAllBytes(path, BuildSceneTrackVmdBytes());
+            File.WriteAllBytes(path, MmdTestFixtures.BuildSceneTrackVmdBytes("cli_parity"));
             return path;
-        }
-
-        private static byte[] BuildSceneTrackVmdBytes()
-        {
-            using var stream = new MemoryStream();
-            using var writer = new BinaryWriter(stream);
-            WriteFixedAscii(writer, "Vocaloid Motion Data 0002", 30);
-            WriteFixedAscii(writer, "cli_parity", 20);
-            writer.Write(0u); // bone frames
-            writer.Write(0u); // morph frames
-            writer.Write(0u); // camera frames
-            writer.Write(2u); // light frames
-            WriteLightFrame(writer, 10u, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f);
-            WriteLightFrame(writer, 30u, 1.0f, 0.5f, 0.0f, 0.0f, -1.0f, 0.0f);
-            writer.Write(2u); // self-shadow frames
-            WriteSelfShadowFrame(writer, 10u, 1, 0.2f);
-            WriteSelfShadowFrame(writer, 30u, 2, 0.4f);
-            writer.Write(0u); // property frames
-            return stream.ToArray();
-        }
-
-        private static void WriteLightFrame(BinaryWriter writer, uint frame, float r, float g, float b, float x, float y, float z)
-        {
-            writer.Write(frame);
-            writer.Write(r);
-            writer.Write(g);
-            writer.Write(b);
-            writer.Write(x);
-            writer.Write(y);
-            writer.Write(z);
-        }
-
-        private static void WriteSelfShadowFrame(BinaryWriter writer, uint frame, byte mode, float distance)
-        {
-            writer.Write(frame);
-            writer.Write(mode);
-            writer.Write(distance);
-        }
-
-        private static void WriteFixedAscii(BinaryWriter writer, string text, int byteLength)
-        {
-            byte[] bytes = new byte[byteLength];
-            byte[] source = Encoding.ASCII.GetBytes(text);
-            Array.Copy(source, bytes, Math.Min(source.Length, bytes.Length));
-            writer.Write(bytes);
         }
 
         private static string RunMmdAnimCli(string arguments)

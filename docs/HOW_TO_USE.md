@@ -4,26 +4,26 @@ This guide is for users who have added `com.yohawing.mmd-loader` to a Unity proj
 
 ## Contents
 
-- [How To Install](#add-the-package)
+- [How to install](#how-to-install)
 - [Import a PMX](#import-a-pmx)
 - [Place it in the Scene](#place-it-in-the-scene)
 - [Import a VMD](#import-a-vmd)
 - [Set up Humanoid](#set-up-humanoid)
 - [Set up rendering in URP](#set-up-rendering-in-urp)
-- [Set up the Camera / Light Motion](#set-up-the-camera--light-motion)
+- [Set up camera and light motion](#set-up-camera-and-light-motion)
 - [Credits](#credits)
 
-## How To Install
+## How to install
 
 ![howtouse1](./assets/howtouse1.png)
 
-Open **Window > Package Manager** in Unity, and enter the following into **Add package from git URL**.
+In Unity, open **Window > Package Manager** and enter the following URL under **Add package from git URL**.
 
 ```text
 https://github.com/yohawing/unity-mmd-loader.git?path=packages/com.yohawing.mmd-loader
 ```
 
-The release target is Unity 6000.4 with URP 17 on Windows x86_64.
+The release target is Unity 6000.0 LTS or newer with URP 17 on Windows x86_64.
 
 ## Import a PMX
 
@@ -47,7 +47,7 @@ This creates a playback object in the scene. Even when only a PMX is placed, the
 
 Add a `.vmd` file under your Unity project's `Assets/` folder.
 
-A VMD asset is referenced by Timeline clips and by the runtime playback source. It is not designed so that you create a separate, duplicated asset from the original VMD data through the normal workflow.
+A VMD asset is referenced by Timeline clips and runtime playback. In normal use, you do not need to create a separate asset that duplicates the original VMD data.
 
 Bind the scene's MMD playback object to the Timeline and create a VMD Timeline clip.
 
@@ -55,7 +55,7 @@ The available editor actions may change between package versions, but the basic 
 
 - A PMX asset creates the scene's playback controller.
 - A VMD asset is referenced from a Timeline clip.
-- A Timeline clip does not bake the VMD into an AnimationClip right away; it passes the playback time to MMD's runtime evaluation.
+- A Timeline clip does not immediately convert the VMD into an AnimationClip. It passes the playback time to the MMD runtime, which calculates the pose at that time.
 
 ## Set up Humanoid
 
@@ -73,7 +73,7 @@ In the PMX Import Settings, open the **Rig** tab, set **Animation Type** to **Hu
 
 Add an **MMD Humanoid Animation Track** and bind it to the scene's `MmdUnityPlaybackController`.
 
-> **Note:** Complex rigs are not supported. Models that rely on arm IK and similar setups will not retarget to a correct pose.
+> **Note:** Complex rigs are not supported. Models that rely heavily on arm IK or similar setups may not retarget to the correct pose.
 
 ## Set up rendering in URP
 
@@ -84,12 +84,12 @@ MMD Loader expects a URP project. If your project uses multiple URP assets or qu
 1. Open **Project Settings > Graphics** and confirm the active URP Asset.
 2. Open the Renderer Data asset referenced by that URP Asset.
 3. Add **MmdSelfShadowRendererFeature** to the Renderer Features list.
-4. Keep the feature enabled. The default shadow map size and bias are intended to be usable as a first setup.
+4. Keep the feature enabled. You can start with the default shadow map size and bias.
 5. If you use multiple Renderer Data assets, add the feature to each renderer that can render the MMD scene.
 
-## Set up the Camera / Light Motion
+## Set up camera and light motion
 
-Play the VMD camera and light motion on its own Timeline lane.
+Use a dedicated Timeline track to play VMD camera and light motion.
 
 **1. Bind the target Camera and Light to `MmdSceneEnvironmentBinding`.**
 

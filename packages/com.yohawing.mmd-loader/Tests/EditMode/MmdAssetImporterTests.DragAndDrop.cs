@@ -263,7 +263,7 @@ namespace Mmd.Tests
         [Test]
         public void SceneDragAndDropAcceptsSingleRawPmxPath()
         {
-            string pmxPath = Path.Combine(RepositoryRoot, "packages", "com.yohawing.mmd-loader", "Tests", "Fixtures", "Assets", "test_1bone_cube.pmx");
+            string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
 
             bool accepted = MmdSceneDragAndDrop.TryGetDraggedSources(
                 new Object[0],
@@ -282,7 +282,7 @@ namespace Mmd.Tests
         [Test]
         public void SceneDragAndDropFallsBackToRawPmxPathWhenObjectReferenceIsNotMmdAsset()
         {
-            string pmxPath = Path.Combine(RepositoryRoot, "packages", "com.yohawing.mmd-loader", "Tests", "Fixtures", "Assets", "test_1bone_cube.pmx");
+            string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
             var nonMmdReference = new Texture2D(1, 1);
 
             try
@@ -307,8 +307,8 @@ namespace Mmd.Tests
         [Test]
         public void SceneDragAndDropAcceptsRawPmxAndRawVmdPaths()
         {
-            string pmxPath = Path.Combine(RepositoryRoot, "packages", "com.yohawing.mmd-loader", "Tests", "Fixtures", "Assets", "test_1bone_cube.pmx");
-            string vmdPath = Path.Combine(RepositoryRoot, "packages", "com.yohawing.mmd-loader", "Tests", "Fixtures", "Assets", "test_1bone_cube_motion.vmd");
+            string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
+            string vmdPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
 
             bool accepted = MmdSceneDragAndDrop.TryGetDraggedSources(
                 new Object[0],
@@ -327,8 +327,8 @@ namespace Mmd.Tests
         [Test]
         public void SceneDragAndDropRejectsAmbiguousOrUnsupportedRawPaths()
         {
-            string pmxPath = Path.Combine(RepositoryRoot, "packages", "com.yohawing.mmd-loader", "Tests", "Fixtures", "Assets", "test_1bone_cube.pmx");
-            string vmdPath = Path.Combine(RepositoryRoot, "packages", "com.yohawing.mmd-loader", "Tests", "Fixtures", "Assets", "test_1bone_cube_motion.vmd");
+            string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
+            string vmdPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
             string unsupportedPath = Path.ChangeExtension(pmxPath, ".txt");
 
             Assert.That(
@@ -347,7 +347,7 @@ namespace Mmd.Tests
         [Test]
         public void SceneDragAndDropRejectsRawVmdPathWithoutRawPmxPath()
         {
-            string vmdPath = Path.Combine(RepositoryRoot, "packages", "com.yohawing.mmd-loader", "Tests", "Fixtures", "Assets", "test_1bone_cube_motion.vmd");
+            string vmdPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
 
             bool accepted = MmdSceneDragAndDrop.TryGetDraggedSources(
                 new Object[0],
@@ -368,7 +368,7 @@ namespace Mmd.Tests
         {
             CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
-            string vmdPath = Path.Combine(RepositoryRoot, "packages", "com.yohawing.mmd-loader", "Tests", "Fixtures", "Assets", "test_1bone_cube_motion.vmd");
+            string vmdPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
 
             bool accepted = MmdSceneDragAndDrop.TryGetDraggedSources(
                 new Object[] { pmxAsset },

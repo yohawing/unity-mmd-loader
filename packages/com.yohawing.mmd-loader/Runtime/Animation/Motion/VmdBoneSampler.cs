@@ -41,6 +41,16 @@ namespace Mmd.Motion
 
         public static MmdBonePoseSample SampleSortedPose(IReadOnlyList<MmdBoneKeyframeDefinition>? keyframes, string boneName, float frame)
         {
+            return SampleSortedPose(keyframes, boneName, frame, null, false);
+        }
+
+        internal static MmdBonePoseSample SampleSortedPose(
+            IReadOnlyList<MmdBoneKeyframeDefinition>? keyframes,
+            string boneName,
+            float frame,
+            float[]? fixedAxis,
+            bool useRegisteredInterpolation)
+        {
             ValidateInputs(keyframes, boneName, frame);
 
             int nextIndex = LowerBoundFrame(keyframes, frame);
@@ -54,7 +64,7 @@ namespace Mmd.Motion
             MmdBoneKeyframeDefinition? previous = previousIndex >= 0 ? keyframes[previousIndex] : null;
             MmdBoneKeyframeDefinition? next = nextIndex < keyframes.Count ? keyframes[nextIndex] : null;
 
-            return SampleBetween(previous, next, frame);
+            return SampleBetween(previous, next, frame, fixedAxis, useRegisteredInterpolation);
         }
 
         private static void ValidateInputs(
@@ -81,7 +91,9 @@ namespace Mmd.Motion
         private static MmdBonePoseSample SampleBetween(
             MmdBoneKeyframeDefinition? previous,
             MmdBoneKeyframeDefinition? next,
-            float frame)
+            float frame,
+            float[]? fixedAxis = null,
+            bool useRegisteredInterpolation = false)
         {
             if (previous == null && next == null)
             {
@@ -90,12 +102,12 @@ namespace Mmd.Motion
 
             if (previous == null)
             {
-                return FromKeyframe(next!);
+                return FromKeyframe(next!, fixedAxis);
             }
 
             if (next == null || previous.frame == next.frame)
             {
-                return FromKeyframe(previous);
+                return FromKeyframe(previous, fixedAxis);
             }
 
             float span = next.frame - previous.frame;
@@ -104,14 +116,14 @@ namespace Mmd.Motion
             return new MmdBonePoseSample(
                 new[]
                 {
-                    Lerp(Component(previous.translation, 0), Component(next.translation, 0), Interpolate(next.interpolation.translationX, normalizedFrame)),
-                    Lerp(Component(previous.translation, 1), Component(next.translation, 1), Interpolate(next.interpolation.translationY, normalizedFrame)),
-                    Lerp(Component(previous.translation, 2), Component(next.translation, 2), Interpolate(next.interpolation.translationZ, normalizedFrame))
+                    Lerp(Component(previous.translation, 0), Component(next.translation, 0), Interpolate(next, 0, next.interpolation.translationX, normalizedFrame, useRegisteredInterpolation)),
+                    Lerp(Component(previous.translation, 1), Component(next.translation, 1), Interpolate(next, 1, next.interpolation.translationY, normalizedFrame, useRegisteredInterpolation)),
+                    Lerp(Component(previous.translation, 2), Component(next.translation, 2), Interpolate(next, 2, next.interpolation.translationZ, normalizedFrame, useRegisteredInterpolation))
                 },
                 Slerp(
-                    QuaternionOrIdentity(previous.rotation),
-                    QuaternionOrIdentity(next.rotation),
-                    Interpolate(next.interpolation.rotation, normalizedFrame)));
+                    QuaternionOrIdentity(previous.rotation, fixedAxis),
+                    QuaternionOrIdentity(next.rotation, fixedAxis),
+                    Interpolate(next, 3, next.interpolation.rotation, normalizedFrame, useRegisteredInterpolation)));
         }
 
         private static int LowerBoundFrame(IReadOnlyList<MmdBoneKeyframeDefinition> keyframes, float frame)
@@ -134,7 +146,7 @@ namespace Mmd.Motion
             return left;
         }
 
-        private static MmdBonePoseSample FromKeyframe(MmdBoneKeyframeDefinition keyframe)
+        private static MmdBonePoseSample FromKeyframe(MmdBoneKeyframeDefinition keyframe, float[]? fixedAxis)
         {
             return new MmdBonePoseSample(
                 new[]
@@ -143,7 +155,7 @@ namespace Mmd.Motion
                     Component(keyframe.translation, 1),
                     Component(keyframe.translation, 2)
                 },
-                QuaternionOrIdentity(keyframe.rotation));
+                QuaternionOrIdentity(keyframe.rotation, fixedAxis));
         }
 
         private static float Interpolate(byte[]? controlPoints, float progress)
@@ -152,19 +164,77 @@ namespace Mmd.Motion
             return VmdBezier.Evaluate(points, progress);
         }
 
+        private static float Interpolate(
+            MmdBoneKeyframeDefinition keyframe,
+            int component,
+            byte[]? rawControlPoints,
+            float progress,
+            bool useRegisteredInterpolation)
+        {
+            byte[] source = keyframe.rawInterpolation;
+            int blockOffset = component * 16;
+            if (useRegisteredInterpolation && source.Length >= blockOffset + 13)
+            {
+                return VmdBezier.Evaluate(
+                    source[blockOffset],
+                    source[blockOffset + 4],
+                    source[blockOffset + 8],
+                    source[blockOffset + 12],
+                    progress);
+            }
+
+            return Interpolate(rawControlPoints, progress);
+        }
+
         private static float Component(float[]? values, int index)
         {
             return values != null && values.Length > index ? values[index] : 0.0f;
         }
 
-        private static float[] QuaternionOrIdentity(float[]? values)
+        private static float[] QuaternionOrIdentity(float[]? values, float[]? fixedAxis)
         {
             if (values == null || values.Length != 4)
             {
                 return new[] { 0.0f, 0.0f, 0.0f, 1.0f };
             }
 
-            return NormalizeQuaternion(values[0], values[1], values[2], values[3]);
+            float[] rotation = NormalizeQuaternion(values[0], values[1], values[2], values[3]);
+            return ProjectRotationToFixedAxis(rotation, fixedAxis);
+        }
+
+        private static float[] ProjectRotationToFixedAxis(float[] rotation, float[]? fixedAxis)
+        {
+            if (fixedAxis == null || fixedAxis.Length < 3)
+            {
+                return rotation;
+            }
+
+            float axisLength = MathF.Sqrt(
+                fixedAxis[0] * fixedAxis[0]
+                + fixedAxis[1] * fixedAxis[1]
+                + fixedAxis[2] * fixedAxis[2]);
+            if (!float.IsFinite(axisLength) || axisLength <= 1e-8f)
+            {
+                return rotation;
+            }
+
+            float axisX = fixedAxis[0] / axisLength;
+            float axisY = fixedAxis[1] / axisLength;
+            float axisZ = fixedAxis[2] / axisLength;
+            float vectorLength = MathF.Sqrt(
+                rotation[0] * rotation[0]
+                + rotation[1] * rotation[1]
+                + rotation[2] * rotation[2]);
+            float sign = rotation[0] * axisX + rotation[1] * axisY + rotation[2] * axisZ < 0.0f
+                ? -1.0f
+                : 1.0f;
+            return new[]
+            {
+                axisX * vectorLength * sign,
+                axisY * vectorLength * sign,
+                axisZ * vectorLength * sign,
+                rotation[3]
+            };
         }
 
         private static float[] Slerp(float[] from, float[] to, float t)

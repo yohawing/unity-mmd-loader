@@ -48,6 +48,15 @@ namespace Mmd
         public bool hasEmissionColor;
         public Color emissionColor = Color.black;
 
+        public bool hasEmissionIntensity;
+        public float emissionIntensity = -1.0f;
+
+        public bool hasEmissionMap;
+        public Texture2D? emissionMap;
+
+        public bool hasEmissionMask;
+        public Texture2D? emissionMask;
+
         public bool hasBaseColor;
         public Color baseColor = Color.white;
 
@@ -59,6 +68,35 @@ namespace Mmd
 
         public bool hasAmbientColor;
         public Color ambientColor = new(0.25f, 0.25f, 0.25f, 1.0f);
+
+        public bool hasToonBoundary;
+        public float toonBoundary = -1.0f;
+
+        public bool hasToonFeather;
+        public float toonFeather = -1.0f;
+        public bool hasToonBandCount;
+        public float toonBandCount = -1.0f;
+
+        public bool hasStylizedSpecularColor;
+        public Color stylizedSpecularColor = Color.white;
+
+        public bool hasStylizedSpecularBoundary;
+        public float stylizedSpecularBoundary = -1.0f;
+
+        public bool hasStylizedSpecularFeather;
+        public float stylizedSpecularFeather = -1.0f;
+
+        public bool hasRimColor;
+        public Color rimColor = Color.white;
+
+        public bool hasRimBoundary;
+        public float rimBoundary = -1.0f;
+
+        public bool hasRimFeather;
+        public float rimFeather = -1.0f;
+
+        public bool hasRimLightFollow;
+        public float rimLightFollow;
 
         public bool hasOutlineColor;
         public Color outlineColor = Color.black;

@@ -50,6 +50,177 @@ namespace Mmd.Tests
             Assert.That(instance.MaterialBindingDiagnostics[0].cullingPolicy, Is.EqualTo("unknown"));
         }
         [Test]
+        public void CreateStaticModelWithMmdToonLitUsesSeparateShaderAndKeepsMmdPasses()
+        {
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(
+                model,
+                sourcePath: null,
+                importScale: 1.0f,
+                preset: MmdMaterialPreset.MmdToonLit));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            Assert.That(instance.Materials[0].shader.name,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName));
+            Assert.That(instance.MaterialBindingDiagnostics[0].shaderName,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName));
+            Assert.That(instance.Materials[0].FindPass("Outline"), Is.GreaterThanOrEqualTo(0));
+            Assert.That(instance.Materials[0].FindPass("MmdSelfShadowCaster"), Is.GreaterThanOrEqualTo(0));
+            Assert.That(instance.Materials[0].FindPass("ShadowCaster"), Is.GreaterThanOrEqualTo(0));
+            Assert.That(instance.Materials[0].FindPass("DepthOnly"), Is.GreaterThanOrEqualTo(0));
+            Assert.That(instance.Materials[0].FindPass("DepthNormals"), Is.GreaterThanOrEqualTo(0));
+        }
+        [Test]
+        public void MmdToonLitShaderUsesUrpMainLightShadowsWithoutChangingLegacyShader()
+        {
+            string shaderDirectory = Path.Combine(MmdTestFixtures.PackageRoot, "Runtime", "Shaders");
+            string legacySource = File.ReadAllText(Path.Combine(shaderDirectory, "MmdBasicUrpToon.shader"));
+            string toonLitSource = File.ReadAllText(Path.Combine(shaderDirectory, "MmdToonLit.shader"));
+
+            Assert.That(legacySource, Does.Not.Contain("_MAIN_LIGHT_SHADOWS"));
+            Assert.That(legacySource, Does.Not.Contain("mainLight.shadowAttenuation"));
+            Assert.That(toonLitSource, Does.Contain("#pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN"));
+            Assert.That(toonLitSource, Does.Contain("#pragma multi_compile _ _CLUSTER_LIGHT_LOOP"));
+            Assert.That(toonLitSource, Does.Contain("#pragma multi_compile_fragment _ _SHADOWS_SOFT_LOW _SHADOWS_SOFT_MEDIUM _SHADOWS_SOFT_HIGH"));
+            Assert.That(toonLitSource, Does.Contain("GetMainLight(TransformWorldToShadowCoord(input.positionWS))"));
+            Assert.That(toonLitSource, Does.Contain("mainLight.shadowAttenuation"));
+            Assert.That(toonLitSource, Does.Contain("half receivesToonShadow = (_ToonAuthoringMode > 0.5h || _ToonMapBound > 0.5h)"));
+            Assert.That(toonLitSource, Does.Contain("saturate(mainLight.shadowAttenuation),"));
+            Assert.That(toonLitSource, Does.Contain("receivesToonShadow);"));
+            Assert.That(toonLitSource, Does.Contain("half combinedShadowVisibility = min(mainLightShadowVisibility, selfShadowVisibility);"));
+            Assert.That(toonLitSource, Does.Contain("ApplyMmdToonBandCount(min(combinedShadowVisibility, lightVisibility))"));
+            Assert.That(toonLitSource, Does.Contain("half rawShadowWeight = 1.0h - saturate(_ToonStrength);"));
+            Assert.That(toonLitSource, Does.Contain("half rawShadowAttenuation = lerp(1.0h, mainLightShadowVisibility, rawShadowWeight);"));
+            Assert.That(toonLitSource, Does.Contain("half3 fallbackSelfShadowToon = half3(1.0h, 1.0h, 1.0h);"));
+            Assert.That(toonLitSource, Does.Not.Contain("fallbackCastShadowToon"));
+            Assert.That(toonLitSource, Does.Not.Contain("mainLight.distanceAttenuation * mainLight.shadowAttenuation"));
+            Assert.That(toonLitSource, Does.Contain("dot(_MmdLightDirection.xyz, _MmdLightDirection.xyz) > 0.0h"));
+            Assert.That(toonLitSource, Does.Contain("LinearToSRGB(_MmdLightColor.rgb) * LinearToSRGB(mainLight.color)"));
+            Assert.That(toonLitSource, Does.Contain("UsePass \"MMD Basic URP Toon/MmdSelfShadowCaster\""));
+        }
+        [Test]
+        public void MmdToonLitShaderUsesUrpAmbientShAndFogWithoutChangingLegacyShader()
+        {
+            string shaderDirectory = Path.Combine(MmdTestFixtures.PackageRoot, "Runtime", "Shaders");
+            string legacySource = File.ReadAllText(Path.Combine(shaderDirectory, "MmdBasicUrpToon.shader"));
+            string toonLitSource = File.ReadAllText(Path.Combine(shaderDirectory, "MmdToonLit.shader"));
+
+            Assert.That(legacySource, Does.Not.Contain("SampleSH("));
+            Assert.That(legacySource, Does.Not.Contain("#pragma multi_compile_fog"));
+            Assert.That(legacySource, Does.Not.Contain("ComputeFogFactor("));
+            Assert.That(legacySource, Does.Not.Contain("MixFog("));
+            Assert.That(legacySource, Does.Not.Contain("half3 ambientSrgb = ambientShSrgb"));
+
+            Assert.That(toonLitSource, Does.Contain("half3 ambientShSrgb = LinearToSRGB(SampleSH(normalWS));"));
+            Assert.That(toonLitSource, Does.Contain("half3 diffuseSrgb = LinearToSRGB(_BaseColor.rgb) * (mainLightSrgb + reflectionSrgb);"));
+            Assert.That(toonLitSource, Does.Contain("half3 ambientSrgb = ambientShSrgb * LinearToSRGB(_AmbientColor.rgb);"));
+            Assert.That(toonLitSource, Does.Contain("half3 baseSrgb = saturate(diffuseSrgb + ambientSrgb);"));
+            Assert.That(toonLitSource, Does.Not.Contain("LinearToSRGB(_BaseColor.rgb) * (mainLightSrgb + ambientShSrgb + reflectionSrgb)"));
+            Assert.That(toonLitSource, Does.Contain("#pragma multi_compile_fog"));
+            Assert.That(toonLitSource, Does.Contain("output.fogFactor = ComputeFogFactor(output.positionCS.z);"));
+            Assert.That(toonLitSource, Does.Contain("half3 foggedLinear = MixFog(SRGBToLinear(litSrgb) + emissionLinear, input.fogFactor);"));
+            Assert.That(toonLitSource, Does.Contain("_GammaTarget > 0.5h ? LinearToSRGB(foggedLinear) : foggedLinear"));
+
+            Shader toonLitShader = Shader.Find(MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName);
+            Assert.That(toonLitShader, Is.Not.Null);
+            Assert.That(toonLitShader!.name, Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName));
+        }
+        [Test]
+        public void MmdToonLitShaderProvidesUrpDepthAndSsaoContractsWithoutChangingLegacyShader()
+        {
+            string shaderDirectory = Path.Combine(MmdTestFixtures.PackageRoot, "Runtime", "Shaders");
+            string legacySource = File.ReadAllText(Path.Combine(shaderDirectory, "MmdBasicUrpToon.shader"));
+            string toonLitSource = File.ReadAllText(Path.Combine(shaderDirectory, "MmdToonLit.shader"));
+
+            Assert.That(legacySource, Does.Not.Contain("Name \"DepthOnly\""));
+            Assert.That(legacySource, Does.Not.Contain("Name \"DepthNormals\""));
+            Assert.That(legacySource, Does.Not.Contain("_SCREEN_SPACE_OCCLUSION"));
+
+            Assert.That(toonLitSource, Does.Contain("Name \"DepthOnly\""));
+            Assert.That(toonLitSource, Does.Contain("\"LightMode\" = \"DepthOnly\""));
+            Assert.That(toonLitSource, Does.Contain("Name \"DepthNormals\""));
+            Assert.That(toonLitSource, Does.Contain("\"LightMode\" = \"DepthNormals\""));
+            Assert.That(toonLitSource, Does.Contain("Cull [_Cull]"));
+            Assert.That(toonLitSource, Does.Contain("clip(alpha - _AlphaClipThreshold);"));
+            Assert.That(toonLitSource, Does.Contain("_MmdNormalMapBound"));
+            Assert.That(toonLitSource, Does.Contain("UnpackNormal("));
+            Assert.That(toonLitSource, Does.Contain("#pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION"));
+            Assert.That(toonLitSource, Does.Contain("#pragma shader_feature_local_fragment _SURFACE_TYPE_TRANSPARENT"));
+            Assert.That(toonLitSource, Does.Contain("ShaderLibrary/AmbientOcclusion.hlsl"));
+            Assert.That(toonLitSource, Does.Contain("CreateAmbientOcclusionFactor("));
+            Assert.That(toonLitSource, Does.Contain("aoFactor.indirectAmbientOcclusion"));
+            Assert.That(toonLitSource, Does.Contain("_ReceiveSSAO (\"Receive SSAO\", Float) = 0"));
+            Assert.That(toonLitSource, Does.Contain("if (_ReceiveSSAO > 0.5h)"));
+            Assert.That(toonLitSource, Does.Contain("ambientShSrgb *= aoFactor.indirectAmbientOcclusion;"));
+            string publicUrpToonSource = File.ReadAllText(Path.Combine(shaderDirectory, "MmdUrpToon.shader"));
+            Assert.That(publicUrpToonSource, Does.Contain("_ReceiveSSAO (\"Receive SSAO\", Float) = 0"));
+            Assert.That(publicUrpToonSource, Does.Contain("[Enum(MMD Toon Ramp, 0, Shade Colors, 1)] _ToonAuthoringMode (\"Toon Authoring Mode\", Float) = 0"));
+            Assert.That(publicUrpToonSource, Does.Contain("_ShadeBaseColor (\"Base Shade Color\", Color) = (1,1,1,1)"));
+            Assert.That(publicUrpToonSource, Does.Contain("_FirstShadeColor (\"1st Shade Color\", Color) = (0.5,0.5,0.5,1)"));
+            Assert.That(publicUrpToonSource, Does.Contain("_SecondShadeColor (\"2nd Shade Color\", Color) = (0.1,0.1,0.1,1)"));
+            Assert.That(publicUrpToonSource, Does.Contain("_BaseToFirstShadeBoundary (\"Base / 1st Boundary\", Range(0,1)) = 0.5"));
+            Assert.That(publicUrpToonSource, Does.Contain("_BaseToFirstShadeFeather (\"Base / 1st Feather\", Range(0,1)) = 0.1"));
+            Assert.That(publicUrpToonSource, Does.Contain("_FirstToSecondShadeBoundary (\"1st / 2nd Boundary\", Range(0,1)) = 0.25"));
+            Assert.That(publicUrpToonSource, Does.Contain("_FirstToSecondShadeFeather (\"1st / 2nd Feather\", Range(0,1)) = 0.1"));
+            Assert.That(toonLitSource, Does.Contain("ShaderLibrary/GlobalIllumination.hlsl"));
+            Assert.That(toonLitSource, Does.Contain("GlossyEnvironmentReflection("));
+            Assert.That(toonLitSource, Does.Contain("#pragma multi_compile_fragment _ _REFLECTION_PROBE_BLENDING"));
+            Assert.That(toonLitSource, Does.Contain("#pragma multi_compile_fragment _ _REFLECTION_PROBE_BOX_PROJECTION"));
+            Assert.That(toonLitSource, Does.Contain("#pragma multi_compile_fragment _ _REFLECTION_PROBE_ATLAS"));
+            Assert.That(toonLitSource, Does.Contain("_ReflectionProbeWeight"));
+            Assert.That(toonLitSource, Does.Contain("_ReflectionProbeWeight > 0.0h && _SphereMode <= 0.5h"));
+            Assert.That(toonLitSource, Does.Contain("#if !defined(_SURFACE_TYPE_TRANSPARENT)"));
+            Assert.That(toonLitSource, Does.Contain("_ToonBoundary (\"Toon Boundary\", Range(-1, 1)) = -1"));
+            Assert.That(toonLitSource, Does.Contain("_ToonFeather (\"Toon Boundary Feather\", Range(-1, 1)) = -1"));
+            Assert.That(toonLitSource, Does.Contain("_ToonBandCount (\"Toon Band Count\", Range(-1, 8)) = -1"));
+            Assert.That(toonLitSource, Does.Contain("[Enum(MMD Toon Ramp, 0, Shade Colors, 1)] _ToonAuthoringMode (\"Toon Authoring Mode\", Float) = 0"));
+            Assert.That(toonLitSource, Does.Contain("_ShadeBaseColor (\"Base Shade Color\", Color) = (1,1,1,1)"));
+            Assert.That(toonLitSource, Does.Contain("_FirstShadeColor (\"1st Shade Color\", Color) = (0.5,0.5,0.5,1)"));
+            Assert.That(toonLitSource, Does.Contain("_SecondShadeColor (\"2nd Shade Color\", Color) = (0.1,0.1,0.1,1)"));
+            Assert.That(toonLitSource, Does.Contain("_BaseToFirstShadeBoundary (\"Base / 1st Boundary\", Range(0,1)) = 0.5"));
+            Assert.That(toonLitSource, Does.Contain("_BaseToFirstShadeFeather (\"Base / 1st Feather\", Range(0,1)) = 0.1"));
+            Assert.That(toonLitSource, Does.Contain("_FirstToSecondShadeBoundary (\"1st / 2nd Boundary\", Range(0,1)) = 0.25"));
+            Assert.That(toonLitSource, Does.Contain("_FirstToSecondShadeFeather (\"1st / 2nd Feather\", Range(0,1)) = 0.1"));
+            Assert.That(toonLitSource, Does.Contain("if (_ToonBoundary < -0.5h)"));
+            Assert.That(toonLitSource, Does.Contain("if (_ToonBandCount < 0.5h)"));
+            Assert.That(toonLitSource, Does.Contain("half toonRampVisibility = ApplyMmdToonBoundary(ApplyMmdToonBandCount(lightVisibility));"));
+            Assert.That(toonLitSource, Does.Contain("half3 ApplyMmdShadeColors(half visibility)"));
+            Assert.That(toonLitSource, Does.Contain("half shadeVisibility = min(combinedShadowVisibility, lightVisibility);"));
+            Assert.That(toonLitSource, Does.Contain("half3 shadeColorToonLight = ApplyMmdShadeColors(shadeVisibility);"));
+            Assert.That(toonLitSource, Does.Contain("if (_ToonAuthoringMode > 0.5h)"));
+            Assert.That(toonLitSource, Does.Contain("half3 mmdToonLight = lerp(selfShadowToon, half3(1.0h, 1.0h, 1.0h), toonRampVisibility);"));
+            Assert.That(toonLitSource, Does.Contain("half3 selfShadowMmdToonLight = lerp("));
+            Assert.That(toonLitSource, Does.Contain("half3 selfShadowToonLight = lerp(ndotl.xxx, selfShadowMmdToonLight, _ToonStrength);"));
+            Assert.That(toonLitSource, Does.Contain("_StylizedSpecularColor (\"Stylized Specular Color\", Color) = (1, 1, 1, 1)"));
+            Assert.That(toonLitSource, Does.Contain("_StylizedSpecularBoundary (\"Stylized Specular Boundary\", Range(-1, 1)) = -1"));
+            Assert.That(toonLitSource, Does.Contain("_StylizedSpecularFeather (\"Stylized Specular Feather\", Range(-1, 1)) = -1"));
+            Assert.That(toonLitSource, Does.Contain("if (_StylizedSpecularBoundary < -0.5h)"));
+            Assert.That(toonLitSource, Does.Contain("half3 halfVector = SafeNormalize(lightDirection + viewDirectionWS);"));
+            Assert.That(toonLitSource, Does.Contain("step(1e-4h, dot(normalWS, lightDirection))"));
+            Assert.That(toonLitSource, Does.Contain("LinearToSRGB(_StylizedSpecularColor.rgb) *"));
+            Assert.That(toonLitSource, Does.Contain("mainLightSrgb * combinedShadowVisibility * specularMask"));
+            Assert.That(toonLitSource, Does.Contain("_RimColor (\"Rim Color\", Color) = (1, 1, 1, 1)"));
+            Assert.That(toonLitSource, Does.Contain("_RimBoundary (\"Rim Boundary\", Range(-1, 1)) = -1"));
+            Assert.That(toonLitSource, Does.Contain("_RimFeather (\"Rim Feather\", Range(-1, 1)) = -1"));
+            Assert.That(toonLitSource, Does.Contain("_RimLightFollow (\"Rim Light Follow\", Range(0, 1)) = 0"));
+            Assert.That(toonLitSource, Does.Contain("if (_RimBoundary < -0.5h)"));
+            Assert.That(toonLitSource, Does.Contain("half rim = 1.0h - saturate(abs(dot(normalWS, viewDirectionWS)));"));
+            Assert.That(toonLitSource, Does.Contain("half3 fixedRimSrgb = LinearToSRGB(_RimColor.rgb) * rimMask;"));
+            Assert.That(toonLitSource, Does.Contain("half3 followRimSrgb = LinearToSRGB(_RimColor.rgb) * mainLightSrgb"));
+            Assert.That(toonLitSource, Does.Contain("lightFacing * combinedShadowVisibility * rimMask"));
+            Assert.That(toonLitSource, Does.Contain("[HDR] _EmissionColor (\"Emission Color\", Color) = (1, 1, 1, 1)"));
+            Assert.That(toonLitSource, Does.Contain("_EmissionMap (\"Emission Map\", 2D) = \"white\" {}"));
+            Assert.That(toonLitSource, Does.Contain("_MmdEmissionIntensity (\"MMD Emission Intensity\", Range(-1, 8)) = -1"));
+            Assert.That(toonLitSource, Does.Contain("_MmdEmissionMapBound"));
+            Assert.That(toonLitSource, Does.Contain("_MmdEmissionMask (\"MMD Emission Mask\", 2D) = \"white\" {}"));
+            Assert.That(toonLitSource, Does.Contain("_MmdEmissionMaskBound"));
+            Assert.That(toonLitSource, Does.Contain("if (_MmdEmissionIntensity >= 0.0h)"));
+            Assert.That(toonLitSource, Does.Contain("SAMPLE_TEXTURE2D(_MmdEmissionMask, sampler_MmdEmissionMask, input.uv).r"));
+            Assert.That(toonLitSource, Does.Contain("emissionLinear = max(_EmissionColor.rgb, 0.0h) *"));
+            Assert.That(toonLitSource, Does.Contain("MixFog(SRGBToLinear(litSrgb) + emissionLinear"));
+        }
+        [Test]
         public void CreateStaticModelKeepsShadowCasterAndAddsHiddenSelfShadowTarget()
         {
 

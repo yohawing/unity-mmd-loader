@@ -13,6 +13,7 @@ namespace Mmd.Editor
         private SerializedProperty? importScaleProperty;
         private SerializedProperty? modelPresetProperty;
         private SerializedProperty? shaderPresetProperty;
+        private SerializedProperty? materialProfileAssetProperty;
         private SerializedProperty? materialOverrideAssetProperty;
         private SerializedProperty? materialRemapsProperty;
         private SerializedProperty? animationTypeProperty;
@@ -35,6 +36,7 @@ namespace Mmd.Editor
 
         private int selectedTab;
         private static readonly string[] TabNames = { "Model", "Rig", "Materials" };
+        private static readonly string[] ShaderPresetDisplayNames = { "MMD Basic Toon", "URP Lit", "MMD URP Toon", "Custom Profile" };
 
         public override void OnEnable()
         {
@@ -42,6 +44,7 @@ namespace Mmd.Editor
             importScaleProperty = serializedObject.FindProperty("importScale");
             modelPresetProperty = serializedObject.FindProperty("modelPreset");
             shaderPresetProperty = serializedObject.FindProperty("shaderPreset");
+            materialProfileAssetProperty = serializedObject.FindProperty("materialProfileAsset");
             materialOverrideAssetProperty = serializedObject.FindProperty("materialOverrideAsset");
             materialRemapsProperty = serializedObject.FindProperty("materialRemaps");
             animationTypeProperty = serializedObject.FindProperty("animationType");
@@ -166,6 +169,7 @@ namespace Mmd.Editor
             if (asset != null)
             {
                 DrawRemappedMaterials(asset);
+                DrawExtractMaterialsAction(asset);
             }
             else
             {
@@ -188,15 +192,157 @@ namespace Mmd.Editor
             {
                 if (shaderPresetProperty != null)
                 {
-                    EditorGUILayout.PropertyField(
-                        shaderPresetProperty,
+                    int selectedPreset = Mathf.Clamp(
+                        shaderPresetProperty.enumValueIndex,
+                        0,
+                        ShaderPresetDisplayNames.Length - 1);
+                    int updatedPreset = EditorGUILayout.Popup(
                         new GUIContent(
                             "Shader Preset",
-                            "Selects the target shader family for material generation. Available presets are MMD Basic URP Toon and URP Lit. The value is an importer setting; it is summarized on the imported asset after Apply/Reimport. This UI is not a full Material Editor and does not mutate generated materials."));
+                            "MMD Basic Toon preserves the original MMD parity shading. MMD URP Toon adds URP lighting, fog, SSAO, reflection probes, and opt-in stylized controls. This is an importer setting and does not mutate generated materials until Apply/Reimport."),
+                        selectedPreset,
+                        ShaderPresetDisplayNames);
+                    if (updatedPreset != selectedPreset)
+                    {
+                        shaderPresetProperty.enumValueIndex = updatedPreset;
+                    }
+                }
+
+                if (materialProfileAssetProperty != null &&
+                    shaderPresetProperty != null &&
+                    shaderPresetProperty.enumValueIndex == (int)MmdPmxShaderPreset.CustomProfile)
+                {
+                    EditorGUILayout.PropertyField(
+                        materialProfileAssetProperty,
+                        new GUIContent(
+                            "Custom Material Profile",
+                            "Explicitly declares the profile shader, texture destinations, render-state targets, and unsupported features."));
                 }
             }
 
             DrawPendingImportSettingsWarning(HasModified());
+        }
+
+        private void DrawExtractMaterialsAction(MmdPmxAsset asset)
+        {
+            Material[] importedMaterials = asset.ImportedMaterials ?? System.Array.Empty<Material>();
+            if (importedMaterials.Length == 0 || materialRemapsProperty == null)
+            {
+                return;
+            }
+
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField(
+                "Embedded Materials",
+                "Copy importer-owned materials to independent project assets without extracting textures.");
+            using (new EditorGUI.DisabledScope(HasModified()))
+            {
+                if (!GUILayout.Button("Extract Materials..."))
+                {
+                    return;
+                }
+
+                string importerAssetPath = target is AssetImporter selectedImporter
+                    ? selectedImporter.assetPath
+                    : string.Empty;
+                Material[] existingRemaps = ReadMaterialRemaps(importedMaterials.Length);
+                MmdPmxMaterialExtractor.Result result = MmdPmxMaterialExtractor.TryExtractToSiblingMaterialsFolder(
+                    importerAssetPath,
+                    importedMaterials,
+                    existingRemaps,
+                    out Material[] updatedRemaps);
+                if (!result.Success)
+                {
+                    EditorUtility.DisplayDialog("Materials Not Extracted", result.Message, "OK");
+                    return;
+                }
+
+                try
+                {
+                    Undo.RecordObject(target, "Extract PMX Materials");
+                    materialRemapsProperty.arraySize = updatedRemaps.Length;
+                    for (int i = 0; i < updatedRemaps.Length; i++)
+                    {
+                        materialRemapsProperty.GetArrayElementAtIndex(i).objectReferenceValue = updatedRemaps[i];
+                    }
+
+                    serializedObject.ApplyModifiedProperties();
+                    if (target is AssetImporter importer)
+                    {
+                        importer.SaveAndReimport();
+                    }
+
+                    cachedAsset = null;
+                    EditorUtility.DisplayDialog("Materials Extracted", result.Message, "OK");
+                }
+                catch (System.Exception exception)
+                {
+                    // The extractor has already committed only the newly-created
+                    // assets. If importer persistence fails, remove those assets
+                    // and restore the prior slot remaps before surfacing the error.
+                    for (int i = result.CreatedAssetPaths.Count - 1; i >= 0; i--)
+                    {
+                        AssetDatabase.DeleteAsset(result.CreatedAssetPaths[i]);
+                    }
+
+                    cachedAsset = null;
+                    RestoreMaterialRemaps(importerAssetPath, existingRemaps);
+                    EditorUtility.DisplayDialog(
+                        "Materials Not Extracted",
+                        $"Material remap persistence failed: {exception.Message}",
+                        "OK");
+                }
+            }
+        }
+
+        private Material[] ReadMaterialRemaps(int materialCount)
+        {
+            Material[] remaps = new Material[materialCount];
+            if (materialRemapsProperty == null)
+            {
+                return remaps;
+            }
+
+            int copyCount = Mathf.Min(materialRemapsProperty.arraySize, materialCount);
+            for (int i = 0; i < copyCount; i++)
+            {
+                remaps[i] = materialRemapsProperty.GetArrayElementAtIndex(i).objectReferenceValue as Material;
+            }
+
+            return remaps;
+        }
+
+        private static void RestoreMaterialRemaps(string importerAssetPath, Material[] remaps)
+        {
+            if (string.IsNullOrWhiteSpace(importerAssetPath))
+            {
+                return;
+            }
+
+            // SaveAndReimport can invalidate the inspector target. Resolve the
+            // importer from its stable asset path and persist only the rollback
+            // setting; do not recursively invoke another reimport here.
+            AssetImporter? importer = AssetImporter.GetAtPath(importerAssetPath);
+            if (importer == null)
+            {
+                return;
+            }
+
+            SerializedObject rollbackObject = new SerializedObject(importer);
+            SerializedProperty? rollbackProperty = rollbackObject.FindProperty("materialRemaps");
+            if (rollbackProperty == null)
+            {
+                return;
+            }
+
+            rollbackProperty.arraySize = remaps.Length;
+            for (int i = 0; i < remaps.Length; i++)
+            {
+                rollbackProperty.GetArrayElementAtIndex(i).objectReferenceValue = remaps[i];
+            }
+
+            rollbackObject.ApplyModifiedPropertiesWithoutUndo();
+            AssetDatabase.WriteImportSettingsIfDirty(importerAssetPath);
         }
 
         private void DrawRigTab(MmdPmxAsset? asset)

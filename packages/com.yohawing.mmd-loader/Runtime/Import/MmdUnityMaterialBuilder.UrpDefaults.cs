@@ -8,6 +8,21 @@ namespace Mmd.UnityIntegration
 {
     internal static partial class MmdUnityMaterialBuilder
     {
+        private static void ApplyMapperShaderState(
+            Material material,
+            MmdMaterialRenderingTargets targets)
+        {
+            foreach (string keyword in targets.RequiredKeywords)
+            {
+                material.EnableKeyword(keyword);
+            }
+
+            foreach (string passName in targets.RequiredPasses)
+            {
+                material.SetShaderPassEnabled(passName, true);
+            }
+        }
+
         private static void ApplyUrpLitDefaults(Material[] materials)
         {
             foreach (Material material in materials)
@@ -39,51 +54,132 @@ namespace Mmd.UnityIntegration
             }
         }
 
-        private static void ApplyMaterialColors(Material material, MmdMaterialDescriptor source)
+        private static void ApplyMaterialColors(
+            Material material,
+            MmdMaterialDescriptor source,
+            MmdMaterialRenderingTargets targets)
         {
             Color diffuse = ToColor(source.diffuseColor, source.alpha, Color.white);
             Color ambient = ToColor(source.ambientColor, 1.0f, new Color(0.25f, 0.25f, 0.25f, 1.0f));
             float edgeAlpha = source.edgeColor != null && source.edgeColor.Length > 3 ? source.edgeColor[3] : 1.0f;
             Color edge = ToColor(source.edgeColor, edgeAlpha, Color.black);
-            if (material.HasProperty("_BaseColor"))
+            if (HasProperty(material, targets.BaseColorProperty))
             {
-                material.SetColor("_BaseColor", diffuse);
+                material.SetColor(targets.BaseColorProperty, diffuse);
             }
 
-            if (material.HasProperty("_Color"))
+            if (HasProperty(material, targets.ColorProperty))
             {
-                material.SetColor("_Color", Color.white);
+                material.SetColor(targets.ColorProperty, Color.white);
             }
 
-            if (material.HasProperty("_AmbientColor"))
+            if (HasProperty(material, targets.AmbientColorProperty))
             {
-                material.SetColor("_AmbientColor", ambient);
+                material.SetColor(targets.AmbientColorProperty, ambient);
             }
 
-            if (material.HasProperty("_OutlineColor"))
+            if (material.HasProperty(MmdMaterialPropertyNames.ToonBoundary))
             {
-                material.SetColor("_OutlineColor", edge);
+                material.SetFloat(MmdMaterialPropertyNames.ToonBoundary, source.toonBoundary);
             }
 
-            if (material.HasProperty("_OutlineWidth"))
+            if (material.HasProperty(MmdMaterialPropertyNames.ToonFeather))
             {
-                material.SetFloat("_OutlineWidth", source.drawEdgeFlag ? source.edgeSize : 0.0f);
+                material.SetFloat(MmdMaterialPropertyNames.ToonFeather, source.toonFeather);
             }
 
-            if (material.HasProperty("_OutlineVisible"))
+            if (material.HasProperty(MmdMaterialPropertyNames.ToonBandCount))
             {
-                material.SetFloat("_OutlineVisible", source.drawEdgeFlag ? 1.0f : 0.0f);
+                material.SetFloat(MmdMaterialPropertyNames.ToonBandCount, source.toonBandCount);
             }
 
-            if (material.HasProperty("_OutlineScreenSpaceWeight"))
+            if (material.HasProperty(MmdMaterialPropertyNames.StylizedSpecularColor))
             {
-                material.SetFloat("_OutlineScreenSpaceWeight", PmxOutlineScreenSpaceWeight);
+                material.SetColor(MmdMaterialPropertyNames.StylizedSpecularColor,
+                    ToColor(source.stylizedSpecularColor, 1.0f, Color.white));
             }
 
-            if (material.HasProperty("_OutlineZTest"))
+            if (material.HasProperty(MmdMaterialPropertyNames.StylizedSpecularBoundary))
             {
-                material.SetFloat("_OutlineZTest", OutlineZTest);
+                material.SetFloat(MmdMaterialPropertyNames.StylizedSpecularBoundary, source.stylizedSpecularBoundary);
             }
+
+            if (material.HasProperty(MmdMaterialPropertyNames.StylizedSpecularFeather))
+            {
+                material.SetFloat(MmdMaterialPropertyNames.StylizedSpecularFeather, source.stylizedSpecularFeather);
+            }
+
+            if (material.HasProperty(MmdMaterialPropertyNames.EmissionColor))
+            {
+                material.SetColor(MmdMaterialPropertyNames.EmissionColor,
+                    ToHdrColor(source.emissionColor, Color.white));
+            }
+
+            if (material.HasProperty(MmdMaterialPropertyNames.MmdEmissionIntensity))
+            {
+                material.SetFloat(MmdMaterialPropertyNames.MmdEmissionIntensity, source.emissionIntensity);
+            }
+
+            if (material.HasProperty(MmdMaterialPropertyNames.MmdEmissionMapBound))
+            {
+                material.SetFloat(MmdMaterialPropertyNames.MmdEmissionMapBound, source.usesEmissionMap ? 1.0f : 0.0f);
+            }
+
+            if (material.HasProperty(MmdMaterialPropertyNames.MmdEmissionMaskBound))
+            {
+                material.SetFloat(MmdMaterialPropertyNames.MmdEmissionMaskBound, source.usesEmissionMask ? 1.0f : 0.0f);
+            }
+
+            if (material.HasProperty(MmdMaterialPropertyNames.RimColor))
+            {
+                material.SetColor(MmdMaterialPropertyNames.RimColor,
+                    ToColor(source.rimColor, 1.0f, Color.white));
+            }
+
+            if (material.HasProperty(MmdMaterialPropertyNames.RimBoundary))
+            {
+                material.SetFloat(MmdMaterialPropertyNames.RimBoundary, source.rimBoundary);
+            }
+
+            if (material.HasProperty(MmdMaterialPropertyNames.RimFeather))
+            {
+                material.SetFloat(MmdMaterialPropertyNames.RimFeather, source.rimFeather);
+            }
+
+            if (material.HasProperty(MmdMaterialPropertyNames.RimLightFollow))
+            {
+                material.SetFloat(MmdMaterialPropertyNames.RimLightFollow, source.rimLightFollow);
+            }
+
+            if (HasProperty(material, targets.OutlineColorProperty))
+            {
+                material.SetColor(targets.OutlineColorProperty, edge);
+            }
+
+            if (HasProperty(material, targets.OutlineWidthProperty))
+            {
+                material.SetFloat(targets.OutlineWidthProperty, source.drawEdgeFlag ? source.edgeSize : 0.0f);
+            }
+
+            if (HasProperty(material, targets.OutlineVisibleProperty))
+            {
+                material.SetFloat(targets.OutlineVisibleProperty, source.drawEdgeFlag ? 1.0f : 0.0f);
+            }
+
+            if (HasProperty(material, targets.OutlineScreenSpaceWeightProperty))
+            {
+                material.SetFloat(targets.OutlineScreenSpaceWeightProperty, PmxOutlineScreenSpaceWeight);
+            }
+
+            if (HasProperty(material, targets.OutlineZTestProperty))
+            {
+                material.SetFloat(targets.OutlineZTestProperty, OutlineZTest);
+            }
+        }
+
+        private static bool HasProperty(Material material, string propertyName)
+        {
+            return !string.IsNullOrWhiteSpace(propertyName) && material.HasProperty(propertyName);
         }
 
         private static Color ToColor(float[]? values, float alpha, Color fallback)
@@ -100,9 +196,22 @@ namespace Mmd.UnityIntegration
             return new Color(r, g, b, a);
         }
 
+        private static Color ToHdrColor(float[]? values, Color fallback)
+        {
+            if (values == null)
+            {
+                return fallback;
+            }
+
+            float r = values.Length > 0 && IsFinite(values[0]) ? values[0] : fallback.r;
+            float g = values.Length > 1 && IsFinite(values[1]) ? values[1] : fallback.g;
+            float b = values.Length > 2 && IsFinite(values[2]) ? values[2] : fallback.b;
+            return new Color(r, g, b, fallback.a);
+        }
+
         private static void SetColorAlpha(Material material, string propertyName, float alpha)
         {
-            if (!material.HasProperty(propertyName))
+            if (!HasProperty(material, propertyName))
             {
                 return;
             }

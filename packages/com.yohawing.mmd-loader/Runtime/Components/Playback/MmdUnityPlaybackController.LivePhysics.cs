@@ -76,6 +76,7 @@ namespace Mmd.UnityIntegration
                     gameObject,
                     modelAsset,
                     "humanoid-physics");
+                humanoidPhysicsBinding.LivePhysicsBodyDiagnosticsSampleInterval = livePhysicsBodyDiagnosticsSampleInterval;
                 humanoidPhysicsBinding.SetPhysicsMode(MmdPhysicsMode.Live);
                 ResetLivePhysicsDriveSource();
                 ConfigurationRevision++;

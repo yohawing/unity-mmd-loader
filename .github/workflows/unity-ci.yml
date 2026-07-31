@@ -94,12 +94,6 @@ jobs:
       - name: Build mmd-anim FFI
         run: cargo build -p mmd-anim-ffi --release --manifest-path native/mmd-anim/Cargo.toml
 
-      - name: Configure Bullet physics plugin
-        run: cmake -S native/bullet -B build/bullet -G Ninja -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build Bullet physics plugin
-        run: cmake --build build/bullet --config Release --target mmd_bullet
-
       - name: Upload native artifacts
         uses: actions/upload-artifact@v4
         if: always()
@@ -109,9 +103,6 @@ jobs:
             native/mmd-anim/target/release/mmd_runtime_ffi.dll
             native/mmd-anim/target/release/libmmd_runtime_ffi.so
             native/mmd-anim/target/release/libmmd_runtime_ffi.dylib
-            packages/com.yohawing.mmd-loader/Runtime/Plugins/x86_64/mmd_bullet.dll
-            packages/com.yohawing.mmd-loader/Runtime/Plugins/x86_64/mmd_bullet.so
-            packages/com.yohawing.mmd-loader/Runtime/Plugins/x86_64/mmd_bullet.dylib
           if-no-files-found: warn
 
   # Checks whether UNITY_LICENSE is configured.

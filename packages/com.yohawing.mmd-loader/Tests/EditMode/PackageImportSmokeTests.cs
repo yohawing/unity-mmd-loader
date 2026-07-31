@@ -110,6 +110,44 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void UnityToonShaderAdapterSampleIsOptionalAndImportable()
+        {
+            string packageRoot = MmdTestFixtures.PackageRoot;
+            string sampleRoot = Path.Combine(packageRoot, "Samples~", "UnityToonShaderAdapter");
+            string sourcePath = Path.Combine(sampleRoot, "Assets", "UnityToonShaderAdapter.cs");
+            string profileSourcePath = Path.Combine(sampleRoot, "Assets", "UnityToonShaderMaterialProfile.cs");
+            string assemblyPath = Path.Combine(sampleRoot, "Assets", "Mmd.UnityToonShaderAdapter.asmdef");
+            string testsAssemblyPath = Path.Combine(sampleRoot, "Tests", "Mmd.UnityToonShaderAdapter.Tests.asmdef");
+            string readmePath = Path.Combine(sampleRoot, "README.md");
+            string packageJsonPath = Path.Combine(packageRoot, "package.json");
+
+            Assert.That(sourcePath, Does.Exist, "UTS adapter source must be bundled in the sample.");
+            Assert.That(profileSourcePath, Does.Exist, "UTS material profile factory must be bundled in the sample.");
+            Assert.That(assemblyPath, Does.Exist, "UTS adapter sample must define an importable assembly.");
+            Assert.That(testsAssemblyPath, Does.Exist, "UTS adapter conversion/schema tests must be bundled.");
+            Assert.That(readmePath, Does.Exist, "UTS adapter limitations must be documented.");
+
+            string source = File.ReadAllText(sourcePath);
+            string profileSource = File.ReadAllText(profileSourcePath);
+            string assembly = File.ReadAllText(assemblyPath);
+            string readme = File.ReadAllText(readmePath);
+            string packageJson = File.ReadAllText(packageJsonPath);
+            Assert.That(packageJson, Does.Contain("Samples~/UnityToonShaderAdapter"));
+            Assert.That(assembly, Does.Not.Contain("com.unity.toonshader"),
+                "the adapter assembly must not take a compile-time UTS dependency");
+            Assert.That(source, Does.Contain("Shader.Find(ExpectedShaderName)"),
+                "UTS must be resolved at runtime when no shader is injected");
+            Assert.That(source, Does.Contain("UTS_FALLBACK_MMD_TOON"),
+                "the all-slots fallback must be explicit");
+            Assert.That(profileSource, Does.Contain("MmdMaterialProfileAsset.CurrentSchemaVersion"),
+                "the UTS profile must pin the loader profile schema");
+            Assert.That(profileSource, Does.Contain("UTS_PROFILE_FALLBACK_MMD_TOON"),
+                "the profile factory must fail closed when UTS is unavailable");
+            Assert.That(readme, Does.Contain("Custom Material Profile"),
+                "the sample must document the importer profile connection");
+        }
+
+        [Test]
         public void ActualTraceDumperCreatesSchemaVersionOneJson()
         {
             MmdTrace trace = MmdActualTraceDumper.CreateTrace("minimal.pmx", "minimal.vmd");
@@ -217,6 +255,72 @@ namespace Mmd.Tests
 
             Assert.That(sample.Rotation[0], Is.EqualTo(-0.06206015f).Within(0.00001f));
             Assert.That(sample.Rotation[3], Is.EqualTo(0.99807227f).Within(0.00001f));
+        }
+
+        [Test]
+        public void VmdMotionSamplerProjectsRegisteredRotationsToTheModelFixedAxis()
+        {
+            var model = new MmdModelDefinition();
+            model.bones.Add(new MmdBoneDefinition
+            {
+                index = 0,
+                name = "fixed",
+                parentIndex = -1,
+                fixedAxis = true,
+                fixedAxisVector = new[] { 1.0f, 0.0f, 0.0f }
+            });
+            var motion = new MmdMotionDefinition();
+            motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
+            {
+                boneName = "fixed",
+                frame = 0,
+                rotation = new[] { 0.3f, 0.4f, 0.0f, 0.8660254f }
+            });
+
+            MmdBonePoseSample raw = VmdMotionSampler.Sample(motion, 0.0f).Bones["fixed"];
+            MmdBonePoseSample registered = VmdMotionSampler.Sample(motion, model, 0.0f).Bones["fixed"];
+
+            Assert.That(raw.Rotation[1], Is.EqualTo(0.4f).Within(0.00001f));
+            Assert.That(registered.Rotation[0], Is.EqualTo(0.5f).Within(0.00001f));
+            Assert.That(registered.Rotation[1], Is.EqualTo(0.0f).Within(0.00001f));
+            Assert.That(registered.Rotation[2], Is.EqualTo(0.0f).Within(0.00001f));
+            Assert.That(registered.Rotation[3], Is.EqualTo(0.8660254f).Within(0.00001f));
+        }
+
+        [Test]
+        public void VmdMotionSamplerUsesRegisteredInterpolationOnlyWhenPairedWithAModel()
+        {
+            var model = new MmdModelDefinition();
+            model.bones.Add(new MmdBoneDefinition { index = 0, name = "root", parentIndex = -1 });
+            var registeredBlock = new byte[64];
+            registeredBlock[48] = 20;
+            registeredBlock[52] = 20;
+            registeredBlock[56] = 107;
+            registeredBlock[60] = 107;
+            var motion = new MmdMotionDefinition();
+            motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
+            {
+                boneName = "root",
+                frame = 0,
+                rotation = new[] { 0.0f, 0.0f, 0.0f, 1.0f }
+            });
+            motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
+            {
+                boneName = "root",
+                frame = 9,
+                rotation = new[] { -0.38268337f, 0.0f, 0.0f, 0.92387956f },
+                interpolation = new MmdBoneInterpolationDefinition
+                {
+                    rotation = new byte[] { 0, 0, 85, 127 }
+                },
+                rawInterpolation = registeredBlock
+            });
+
+            MmdBonePoseSample raw = VmdMotionSampler.Sample(motion, 1.0f).Bones["root"];
+            MmdBonePoseSample registered = VmdMotionSampler.Sample(motion, model, 1.0f).Bones["root"];
+
+            Assert.That(raw.Rotation[0], Is.EqualTo(-0.06206015f).Within(0.00001f));
+            Assert.That(registered.Rotation[0], Is.EqualTo(-0.04361939f).Within(0.00001f));
         }
 
         [Test]

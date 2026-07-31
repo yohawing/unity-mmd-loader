@@ -413,32 +413,6 @@ namespace Mmd.Tests
             return new Quaternion(-rotation.x, rotation.y, -rotation.z, rotation.w);
         }
 
-        private static MmdMotionDefinition CreateRootTranslationMotion()
-        {
-            var motion = new MmdMotionDefinition
-            {
-                targetModelName = "minimal-static-triangle",
-                maxFrame = 10
-            };
-            motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
-            {
-                boneName = "root",
-                frame = 0,
-                translation = new[] { 0.0f, 0.0f, 0.0f },
-                rotation = new[] { 0.0f, 0.0f, 0.0f, 1.0f },
-                interpolation = LinearInterpolation()
-            });
-            motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
-            {
-                boneName = "root",
-                frame = 10,
-                translation = new[] { 2.0f, 0.0f, 0.0f },
-                rotation = new[] { 0.0f, 0.0f, 0.0f, 1.0f },
-                interpolation = LinearInterpolation()
-            });
-            return motion;
-        }
-
         private static (MmdModelDefinition Model, MmdMotionDefinition Motion) LoadPlaybackFixturePair()
         {
             var parser = new NativeMmdParser();
@@ -453,18 +427,6 @@ namespace Mmd.Tests
             MmdModelDefinition model = parser.LoadModel(MmdTestFixtures.ReadFixtureAssetBytes("test_vertex_morph.pmx"));
             MmdMotionDefinition motion = parser.LoadMotion(MmdTestFixtures.ReadFixtureAssetBytes("test_vertex_morph_motion.vmd"));
             return (model, motion);
-        }
-
-        private static MmdBoneInterpolationDefinition LinearInterpolation()
-        {
-            byte[] linear = { 20, 20, 107, 107 };
-            return new MmdBoneInterpolationDefinition
-            {
-                translationX = linear,
-                translationY = linear,
-                translationZ = linear,
-                rotation = linear
-            };
         }
 
         private static MmdEvaluatedBonePose CreateBonePose(int index, string name, float x, float y, float z)
@@ -517,21 +479,6 @@ namespace Mmd.Tests
             return model;
         }
 
-
-        private static void WritePng(string path, Color color)
-        {
-            var texture = new Texture2D(2, 2, TextureFormat.RGBA32, mipChain: false);
-            try
-            {
-                texture.SetPixels(new[] { color, color, color, color });
-                texture.Apply();
-                File.WriteAllBytes(path, texture.EncodeToPNG());
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(texture);
-            }
-        }
 
         private static void WriteCutoutPng(string path)
         {

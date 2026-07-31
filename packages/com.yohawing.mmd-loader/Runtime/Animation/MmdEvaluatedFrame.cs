@@ -50,9 +50,11 @@ namespace Mmd
             IMmdPhysicsBackend? physicsBackend = null,
             IMmdIkSolver? ikSolver = null)
         {
-            if (ikSolver != null)
+            if (!CanUseNativeEvaluation(model, motion, physicsBackend, ikSolver))
             {
-                return EvaluateManagedFrame(model, motion, frame, time, includeMaterials: true, physicsBackend, ikSolver);
+                return EvaluateManagedFrame(
+                    model, motion, frame, time, includeMaterials: true,
+                    physicsBackend, ikSolver ?? new MmdIkSolver());
             }
 
             return EvaluateNativeFrame(model, motion, frame, time, includeMaterials: true);
@@ -66,9 +68,11 @@ namespace Mmd
             IMmdPhysicsBackend? physicsBackend = null,
             IMmdIkSolver? ikSolver = null)
         {
-            if (ikSolver != null)
+            if (!CanUseNativeEvaluation(model, motion, physicsBackend, ikSolver))
             {
-                return EvaluateManagedFrame(model, motion, frame, time, includeMaterials: false, physicsBackend, ikSolver);
+                return EvaluateManagedFrame(
+                    model, motion, frame, time, includeMaterials: false,
+                    physicsBackend, ikSolver ?? new MmdIkSolver());
             }
 
             return EvaluateNativeFrame(model, motion, frame, time, includeMaterials: false);
@@ -84,11 +88,35 @@ namespace Mmd
         {
             ValidateFrame(frame);
             ValidateTime(time);
-            if (ikSolver != null)
+            if (!CanUseNativeEvaluation(model, motion, physicsBackend, ikSolver))
             {
-                return EvaluateManagedFrame(model, motion, frame, time, includeMaterials: false, physicsBackend, ikSolver);
+                return EvaluateManagedFrame(
+                    model, motion, frame, time, includeMaterials: false,
+                    physicsBackend, ikSolver ?? new MmdIkSolver());
             }
 
+            return EvaluateNativeFrame(model, motion, frame, time, includeMaterials: false);
+        }
+
+        internal static MmdEvaluatedFrame EvaluateValidatedPhaseOnePlaybackFrame(
+            MmdModelDefinition model,
+            MmdMotionDefinition motion,
+            int frame,
+            float time,
+            MmdTopologyPlan topologyPlan,
+            IMmdPhysicsBackend? physicsBackend = null,
+            IMmdIkSolver? ikSolver = null)
+        {
+            ValidateFrame(frame);
+            ValidateTime(time);
+            if (!CanUseNativeEvaluation(model, motion, physicsBackend, ikSolver))
+            {
+                return EvaluateManagedFrame(
+                    model, motion, frame, time, includeMaterials: false,
+                    physicsBackend, ikSolver ?? new MmdIkSolver(), topologyPlan);
+            }
+
+            topologyPlan.EnsureModel(model);
             return EvaluateNativeFrame(model, motion, frame, time, includeMaterials: false);
         }
 
@@ -100,16 +128,42 @@ namespace Mmd
             IMmdPhysicsBackend? physicsBackend = null,
             IMmdIkSolver? ikSolver = null)
         {
-            // Native evaluation produces the animation-only result (no physics).
-            // This is equivalent to the old "before physics" stage.
             ValidateFrame(frame);
             ValidateTime(time);
-            if (ikSolver != null)
+            if (!model.HasDeformAfterPhysicsBones &&
+                CanUseNativeEvaluation(model, motion, physicsBackend, ikSolver))
             {
-                return EvaluateManagedFrame(model, motion, frame, time, includeMaterials: false, physicsBackend, ikSolver);
+                return EvaluateNativeFrame(model, motion, frame, time, includeMaterials: false);
             }
 
-            return EvaluateNativeFrame(model, motion, frame, time, includeMaterials: false);
+            return EvaluateManagedFrame(
+                model, motion, frame, time, includeMaterials: false,
+                physicsBackend, ikSolver ?? new MmdIkSolver(),
+                stopBeforePhysics: true);
+        }
+
+        internal static MmdEvaluatedFrame EvaluateValidatedBeforePhysicsPlaybackFrame(
+            MmdModelDefinition model,
+            MmdMotionDefinition motion,
+            int frame,
+            float time,
+            MmdTopologyPlan topologyPlan,
+            IMmdPhysicsBackend? physicsBackend = null,
+            IMmdIkSolver? ikSolver = null)
+        {
+            ValidateFrame(frame);
+            ValidateTime(time);
+            if (!model.HasDeformAfterPhysicsBones &&
+                CanUseNativeEvaluation(model, motion, physicsBackend, ikSolver))
+            {
+                topologyPlan.EnsureModel(model);
+                return EvaluateNativeFrame(model, motion, frame, time, includeMaterials: false);
+            }
+
+            return EvaluateManagedFrame(
+                model, motion, frame, time, includeMaterials: false,
+                physicsBackend, ikSolver ?? new MmdIkSolver(), topologyPlan,
+                stopBeforePhysics: true);
         }
 
         public static IReadOnlyList<MmdEvaluatedFrame> EvaluatePhaseOneFrames(
@@ -127,9 +181,10 @@ namespace Mmd
                 throw new ArgumentException("At least one frame is required.", nameof(frames));
             MmdPlaybackTime.ValidateFrameRate(frameRate);
 
-            if (ikSolver != null)
+            if (!CanUseNativeEvaluation(model, motion, physicsBackend, ikSolver))
             {
                 physicsBackend ??= new NullMmdPhysicsBackend();
+                ikSolver ??= new MmdIkSolver();
                 physicsBackend.Reset();
 
                 var managedEvaluatedFrames = new List<MmdEvaluatedFrame>(frames.Count);
@@ -178,6 +233,18 @@ namespace Mmd
             return evaluatedFrames;
         }
 
+        private static bool CanUseNativeEvaluation(
+            MmdModelDefinition? model,
+            MmdMotionDefinition? motion,
+            IMmdPhysicsBackend? physicsBackend,
+            IMmdIkSolver? ikSolver)
+        {
+            return physicsBackend == null &&
+                   ikSolver == null &&
+                   model?.sourceBytes != null &&
+                   motion?.sourceBytes != null;
+        }
+
         private static MmdEvaluatedFrame EvaluateNativeFrame(
             MmdModelDefinition model,
             MmdMotionDefinition motion,
@@ -208,18 +275,27 @@ namespace Mmd
             float time,
             bool includeMaterials,
             IMmdPhysicsBackend? physicsBackend,
-            IMmdIkSolver ikSolver)
+            IMmdIkSolver ikSolver,
+            MmdTopologyPlan? topologyPlan = null,
+            bool stopBeforePhysics = false)
         {
             ValidateInputs(model, motion);
             ValidateFrame(frame);
             ValidateTime(time);
 
             physicsBackend ??= new NullMmdPhysicsBackend();
-            MmdRuntimeFrameEvaluation evaluation = MmdRuntimeFramePipeline.Evaluate(model, motion, frame, physicsBackend, ikSolver);
+            MmdRuntimeFrameEvaluation evaluation = MmdRuntimeFramePipeline.EvaluateWithOptions(
+                model,
+                motion,
+                frame,
+                physicsBackend,
+                ikSolver,
+                topologyPlan: topologyPlan,
+                stopBeforePhysics: stopBeforePhysics);
             return BuildFrameFromManagedEvaluation(model, frame, time, evaluation, includeMaterials);
         }
 
-        private static MmdEvaluatedFrame BuildFrameFromNative(
+        internal static MmdEvaluatedFrame BuildFrameFromNative(
             MmdModelDefinition model,
             int frame,
             float time,

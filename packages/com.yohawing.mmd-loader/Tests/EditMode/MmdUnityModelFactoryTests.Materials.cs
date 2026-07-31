@@ -214,6 +214,65 @@ namespace Mmd.Tests
             Assert.That(instance.Materials[0].shader, Is.Not.Null);
         }
         [Test]
+        public void CreateStaticModelResolvesLegacyAndUrpLitShadersPerMaterialSlot()
+        {
+            MmdModelDefinition model = CreateTwoTransparentTriangleModel();
+            MmdRenderingDescriptor descriptor = MmdRenderingDescriptorBuilder.Build(model);
+            descriptor.urpMaterialBindings[0].shaderName = MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName;
+            descriptor.urpMaterialBindings[1].shaderName = MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName;
+
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(descriptor, "mixed-shader-smoke"));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            Assert.That(instance.Materials, Has.Length.EqualTo(2));
+            Assert.That(instance.Materials[0].shader.name, Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName));
+            Assert.That(instance.Materials[1].shader.name, Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName));
+            Assert.That(instance.MaterialBindingDiagnostics[0].resolvedShaderName,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName));
+            Assert.That(instance.MaterialBindingDiagnostics[1].resolvedShaderName,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName));
+            Assert.That(instance.Materials[0].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
+            Assert.That(instance.Materials[1].renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent + 1));
+
+            // Model-level diagnostics remain the legacy scalar summary of the first requested shader.
+            Assert.That(instance.ShaderDiagnostics.requestedShaderName,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName));
+            Assert.That(instance.ShaderDiagnostics.resolvedShaderName,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName));
+            Assert.That(instance.ShaderDiagnostics.shaderFallbackUsed, Is.False);
+        }
+
+        [Test]
+        public void CreateStaticModelUrpLitPresetUsesPbrMapperTargets()
+        {
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.materials[0].sphereTexture = "sphere.spa";
+            model.materials[0].toonTexture = "toon.bmp";
+            model.materials[0].drawEdgeFlag = true;
+            model.materials[0].edgeSize = 1.0f;
+
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(
+                model,
+                sourcePath: null,
+                importScale: 1.0f,
+                preset: MmdMaterialPreset.UrpLit));
+            MmdUnityModelInstance instance = scope.Instance;
+            MmdMaterialRenderingTargets targets = instance.MaterialRenderingTargets[0];
+            MmdUnityMaterialBindingDiagnostic diagnostic = instance.MaterialBindingDiagnostics[0];
+
+            Assert.That(instance.Materials[0].shader.name,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName));
+            Assert.That(targets.BaseColorProperty, Is.EqualTo("_BaseColor"));
+            Assert.That(targets.AlphaClipThresholdProperty, Is.EqualTo("_Cutoff"));
+            Assert.That(targets.OutlineColorProperty, Is.Empty);
+            Assert.That(targets.UnsupportedFeatures,
+                Is.EqualTo(new[] { "ambient-color", "sphere-texture", "toon-texture", "outline" }));
+            Assert.That(diagnostic.unsupportedFeatures,
+                Is.EqualTo(new[] { "ambient-color", "sphere-texture", "toon-texture", "outline" }));
+            Assert.That(instance.SkippedSphereTextureReferenceCount, Is.EqualTo(1));
+            Assert.That(instance.SkippedToonTextureReferenceCount, Is.EqualTo(1));
+        }
+        [Test]
         public void CreateStaticModelPreservesRawSnapshotUvAndFlipsViewportUv()
         {
 

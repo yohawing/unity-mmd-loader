@@ -1,9 +1,9 @@
 {
   "name": "com.yohawing.mmd-loader",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "displayName": "MMD Loader",
   "description": "Unity package for importing, placing, and playing PMX/VMD assets through standard Unity workflows.",
-  "unity": "6000.4",
+  "unity": "6000.0",
   "author": {
     "name": "MMD Loader contributors"
   },
@@ -27,6 +27,11 @@
       "displayName": "Humanoid Playback",
       "description": "Ready-to-play Humanoid PMX/FBX retarget-playback sample with a valid imported Avatar, Timeline binding, and redistributable source assets.",
       "path": "Samples~/HumanoidPlayback"
+    },
+    {
+      "displayName": "Unity Toon Shader Adapter",
+      "description": "Optional, conservative PMX material conversion for Unity Toon Shader 0.14.1-preview with a self-contained side-by-side generated-material demo scene and fail-closed fallback. This sample is not an MMD parity renderer.",
+      "path": "Samples~/UnityToonShaderAdapter"
     }
   ]
 }

@@ -100,7 +100,7 @@ namespace Mmd.Tests
                 Assert.That(result.Diagnostics, Has.Some.Contains("persistent native evaluation"));
 #if UNITY_EDITOR_WIN
                 Assert.That(keyCounts.Max(), Is.LessThan(10), "native reducer output remains sparse");
-                Assert.That(result.Diagnostics, Has.Some.Contains("exclusively from mmd-runtime sparse curve descriptors and keys"));
+                Assert.That(result.Diagnostics, Has.Some.Contains("exclusively from mmd-runtime generic sparse track descriptors and keys"));
 #else
                 Assert.That(keyCounts, Does.Contain(10));
                 Assert.That(result.Diagnostics, Has.Some.Contains("compacted"));
@@ -146,7 +146,7 @@ namespace Mmd.Tests
 #if UNITY_EDITOR_WIN
                 Assert.That(curve.keys.Length, Is.LessThan(11));
                 Assert.That(curve.keys.All(key => float.IsFinite(key.inTangent) && float.IsFinite(key.outTangent)), Is.True);
-                Assert.That(result.Diagnostics, Has.Some.Contains("sparse curve descriptors and keys"));
+                Assert.That(result.Diagnostics, Has.Some.Contains("generic sparse track descriptors and keys"));
 #else
                 Assert.That(curve.keys, Has.Length.EqualTo(11));
 #endif
@@ -171,7 +171,7 @@ namespace Mmd.Tests
                     MmdGenericAnimationClipWriter.CreateInMemoryClip(pmx, vmd, 30.0f, 0, 10);
                 clip = result.Clip;
                 Assert.That(clip, Is.Not.Null, string.Join("\n", result.Diagnostics));
-                Assert.That(result.Diagnostics, Has.Some.Contains("sparse curve descriptors and keys"));
+                Assert.That(result.Diagnostics, Has.Some.Contains("generic sparse track descriptors and keys"));
 
                 binding = MmdUnityPlaybackBinding.CreateSkinned(pmx, vmd);
                 binding.SetPhysicsMode(MmdPhysicsMode.Off);
@@ -317,64 +317,41 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void NativeTranslationCurveAppliesDefaultHostScaleToValuesAndTangentsOnly()
+        public void GenericTranslationKeyConvertsFramesTangentsAndHostScale()
         {
-            var native = new MmdRuntimeFfiMethods.UnityCurveKey
-            {
-                timeSeconds = 2.0f,
-                value = 3.0f,
-                inTangent = 4.0f,
-                outTangent = -5.0f
-            };
-
-            Keyframe key = MmdGenericAnimationClipWriter.CreateUnityKeyframe(native, 0.1f);
+            Keyframe key = MmdGenericAnimationClipWriter.CreateGenericKeyframe(
+                frame: 60.0f,
+                value: 3.0f,
+                inTangentPerFrame: 4.0f,
+                outTangentPerFrame: -5.0f,
+                framesPerSecond: 30.0f,
+                valueScale: 0.1f,
+                tangentUnitScale: 1.0f);
 
             Assert.That(key.time, Is.EqualTo(2.0f));
             Assert.That(key.value, Is.EqualTo(0.3f).Within(1.0e-6f));
-            Assert.That(key.inTangent, Is.EqualTo(0.4f).Within(1.0e-6f));
-            Assert.That(key.outTangent, Is.EqualTo(-0.5f).Within(1.0e-6f));
+            Assert.That(key.inTangent, Is.EqualTo(12.0f).Within(1.0e-6f));
+            Assert.That(key.outTangent, Is.EqualTo(-15.0f).Within(1.0e-6f));
         }
 
         [Test]
-        public void NativeSparseCurvesApplyPackageXzCoordinateFlipToValuesAndTangents()
+        public void GenericRotationConversionFiltersEulerWraps()
         {
-            var native = new MmdRuntimeFfiMethods.UnityCurveKey
+            static MmdRuntimeFfiMethods.GenericCurveKey ZRotation(float degrees)
             {
-                timeSeconds = 2.0f,
-                value = 3.0f,
-                inTangent = 4.0f,
-                outTangent = -5.0f
-            };
-            var descriptor = new MmdRuntimeFfiMethods.UnityCurveDescriptor
-            {
-                semantic = MmdRuntimeFfiMethods.UnityCurveBoneLocalTranslation,
-                axis = 0
-            };
+                float radians = degrees * Mathf.Deg2Rad;
+                return new MmdRuntimeFfiMethods.GenericCurveKey
+                {
+                    rotationZ = Mathf.Sin(radians * 0.5f),
+                    rotationW = Mathf.Cos(radians * 0.5f)
+                };
+            }
 
-            float scale = MmdGenericAnimationClipWriter.GetSparseCurveValueScale(descriptor, 0.1f);
-            Keyframe key = MmdGenericAnimationClipWriter.CreateUnityKeyframe(native, scale);
+            Vector3[] euler = MmdGenericAnimationClipWriter.ConvertGenericRotationKeysToEulerDegrees(
+                new[] { ZRotation(179.0f), ZRotation(-179.0f) });
 
-            Assert.That(scale, Is.EqualTo(-0.1f));
-            Assert.That(key.value, Is.EqualTo(-0.3f).Within(1.0e-6f));
-            Assert.That(key.inTangent, Is.EqualTo(-0.4f).Within(1.0e-6f));
-            Assert.That(key.outTangent, Is.EqualTo(0.5f).Within(1.0e-6f));
-
-            descriptor.axis = 1;
-            Assert.That(
-                MmdGenericAnimationClipWriter.GetSparseCurveValueScale(descriptor, 0.1f),
-                Is.EqualTo(0.1f));
-            descriptor.axis = 2;
-            Assert.That(
-                MmdGenericAnimationClipWriter.GetSparseCurveValueScale(descriptor, 0.1f),
-                Is.EqualTo(-0.1f));
-
-            descriptor.semantic = MmdRuntimeFfiMethods.UnityCurveBoneLocalEuler;
-            descriptor.axis = 0;
-            Assert.That(MmdGenericAnimationClipWriter.GetSparseCurveValueScale(descriptor, 0.1f), Is.EqualTo(-1.0f));
-            descriptor.axis = 1;
-            Assert.That(MmdGenericAnimationClipWriter.GetSparseCurveValueScale(descriptor, 0.1f), Is.EqualTo(1.0f));
-            descriptor.axis = 2;
-            Assert.That(MmdGenericAnimationClipWriter.GetSparseCurveValueScale(descriptor, 0.1f), Is.EqualTo(-1.0f));
+            Assert.That(euler[0].z, Is.EqualTo(179.0f).Within(1.0e-4f));
+            Assert.That(euler[1].z, Is.EqualTo(181.0f).Within(1.0e-4f));
         }
 
         [Test]
@@ -453,7 +430,7 @@ namespace Mmd.Tests
                 MmdGenericAnimationClipWriterResult result =
                     MmdGenericAnimationClipWriter.CreateInMemoryClip(pmx, vmd, 30.0f, 0, 9);
                 Assert.That(result.Clip, Is.Not.Null, string.Join("\n", result.Diagnostics));
-                Assert.That(result.Diagnostics, Has.Some.Contains("exclusively from mmd-runtime sparse curve descriptors and keys"));
+                Assert.That(result.Diagnostics, Has.Some.Contains("exclusively from mmd-runtime generic sparse track descriptors and keys"));
                 EditorCurveBinding[] translations = AnimationUtility.GetCurveBindings(result.Clip!)
                     .Where(binding => binding.propertyName.StartsWith("m_LocalPosition.", StringComparison.Ordinal))
                     .ToArray();
@@ -492,7 +469,7 @@ namespace Mmd.Tests
                 clip = result.Clip;
                 Assert.That(clip, Is.Not.Null, string.Join("\n", result.Diagnostics));
                 Assert.That(result.Diagnostics, Has.Some.Contains(
-                    "exclusively from mmd-runtime sparse curve descriptors and keys"));
+                    "exclusively from mmd-runtime generic sparse track descriptors and keys"));
                 Assert.That(pmx.ImportScale, Is.EqualTo(ImportScale));
 
                 binding = MmdUnityPlaybackBinding.CreateSkinned(pmx, vmd);

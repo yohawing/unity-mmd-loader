@@ -22,6 +22,7 @@ namespace Mmd.Tests
     {
         private const string TempDirectory = "Assets/__MmdAssetImporterTests";
         private const string TempPmxPath = TempDirectory + "/test_1bone_cube.pmx";
+        private const string TempMmePmxPath = TempDirectory + "/mme_test_1bone_cube.pmx";
         private const string TempHumanoidPmxPath = TempDirectory + "/test_semi_basic_bone.pmx";
         private const string TempVmdPath = TempDirectory + "/test_1bone_cube_motion.vmd";
         private const string TempConfigPath = TempDirectory + "/test_playback_config.asset";
@@ -29,19 +30,25 @@ namespace Mmd.Tests
         private const string TempScenePath = TempDirectory + "/test_1bone_cube_scene.unity";
         private const string TempRemapMaterialPath = TempDirectory + "/remapped_body.mat";
         private const string TempMaterialOverridePath = TempDirectory + "/material_override.asset";
+        private const string TempMaterialProfilePath = TempDirectory + "/material_profile.asset";
+        private const string TempMmeMaterialOverridePath = TempDirectory + "/mme_material_override.asset";
         private const string TempNormalMapPath = TempDirectory + "/normal_map.png";
         private const int TestOneBoneCubeVertexCount = 14;
+        private string? previousShaderRenderPipeline;
 
         [SetUp]
         public void SetUp()
         {
+            previousShaderRenderPipeline = Shader.globalRenderPipeline;
             DeleteTempDirectory();
+            Shader.globalRenderPipeline = "UniversalPipeline";
         }
 
         [TearDown]
         public void TearDown()
         {
             DeleteTempDirectory();
+            Shader.globalRenderPipeline = previousShaderRenderPipeline ?? string.Empty;
         }
 
         private static void DeleteTempDirectory()
@@ -242,8 +249,6 @@ namespace Mmd.Tests
 
         private static string ProjectRoot => Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
 
-        private static string RepositoryRoot => Path.GetFullPath(Path.Combine(ProjectRoot, ".."));
-
         private static int CountMaterials(MmdModelDefinition model, Func<MmdMaterialDefinition, bool> predicate)
         {
             int count = 0;
@@ -342,13 +347,6 @@ namespace Mmd.Tests
                 vertexCount = 3
             });
             return model;
-        }
-
-        private static string CreateTempDirectory()
-        {
-            string tempRoot = Path.Combine(Path.GetTempPath(), "yohawing-mmd-unity-importer-tests", Path.GetRandomFileName());
-            Directory.CreateDirectory(tempRoot);
-            return tempRoot;
         }
 
         private static void WritePng(string path, Color color)

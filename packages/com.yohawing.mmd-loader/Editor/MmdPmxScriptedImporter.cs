@@ -39,10 +39,12 @@ namespace Mmd.Editor
     public enum MmdPmxShaderPreset
     {
         MmdBasicUrpToon = 0,
-        UrpLit = 1
+        UrpLit = 1,
+        MmdToonLit = 2,
+        CustomProfile = 3
     }
 
-    [ScriptedImporter(26, "pmx")]
+    [ScriptedImporter(29, "pmx")]
     public sealed class MmdPmxScriptedImporter : ScriptedImporter
     {
         [SerializeField] private float importScale = MmdPmxAsset.DefaultImportScale;
@@ -55,6 +57,7 @@ namespace Mmd.Editor
 #pragma warning restore CS0414
         [SerializeField] private MmdPmxAnimationType animationType = MmdPmxAnimationType.Generic;
         [SerializeField] private MmdPmxShaderPreset shaderPreset = MmdPmxShaderPreset.MmdBasicUrpToon;
+        [SerializeField] private MmdMaterialProfileAsset? materialProfileAsset;
         [SerializeField] private MmdMaterialOverrideAsset? materialOverrideAsset;
         [SerializeField] private Material[] materialRemaps = System.Array.Empty<Material>();
         [SerializeField] private MmdHumanoidBoneMappingOverride[] humanoidBoneMappingOverrides =
@@ -81,6 +84,8 @@ namespace Mmd.Editor
         public MmdPmxAnimationType AnimationType => animationType;
 
         public MmdPmxShaderPreset ShaderPreset => shaderPreset;
+
+        public MmdMaterialProfileAsset? MaterialProfileAsset => materialProfileAsset;
 
         public Material[] MaterialRemaps => materialRemaps;
 
@@ -111,11 +116,17 @@ namespace Mmd.Editor
                 model,
                 ImportScale,
                 MmdPmxModelPresetAutoDetector.IsCharacter(effectiveModelPreset),
-                MapMaterialPreset(shaderPreset),
-                materialOverrideAsset);
+                ResolveMaterialPresetForImport(ctx, out MmdMaterialMapperSet? materialMappers),
+                materialOverride: null,
+                materialMappers: materialMappers);
+            if (shaderPreset == MmdPmxShaderPreset.CustomProfile && materialMappers != null)
+            {
+                LogCustomProfileDiagnostics(ctx, generatedAssets);
+            }
+            Material[] generatedMaterials = generatedAssets.Materials;
             transaction.Track(generatedAssets.Root, hierarchyRoot: true);
             transaction.Track(generatedAssets.Mesh);
-            foreach (Material material in generatedAssets.Materials)
+            foreach (Material material in generatedMaterials)
             {
                 transaction.Track(material);
             }
@@ -126,7 +137,7 @@ namespace Mmd.Editor
             MmdPmxImportFaultInjection.ThrowIfRequested(ctx.assetPath, MmdPmxImportStage.AssetCacheCreated);
 
             Mesh importedMesh = generatedAssets.Mesh;
-            Material[] importedMaterials = generatedAssets.Materials;
+            Material[] importedMaterials = generatedMaterials;
 
             MmdPmxProjectTextureBindingSummary textureBindingSummary =
                 MmdPmxProjectTextureBinder.BindProjectTextureAssetsToMaterials(
@@ -134,7 +145,8 @@ namespace Mmd.Editor
                     ctx.assetPath,
                     importedMaterials,
                     generatedAssets.RenderingDescriptor,
-                    ctx);
+                    ctx,
+                    materialMappers);
             foreach (MmdPmxOwnedTextureSubAsset ownedTexture in textureBindingSummary.OwnedSubAssets)
             {
                 transaction.Track(ownedTexture.Texture);
@@ -150,7 +162,23 @@ namespace Mmd.Editor
                     importedMaterials);
             }
 
-            ApplyMaterialOverrideAsset(ctx, importedMaterials);
+            MmdMmeFxMaterialOverrideBuilder.ApplyScannedMaterialOverrides(
+                ctx,
+                resolvedSourcePath,
+                generatedAssets.RenderingDescriptor,
+                importedMaterials);
+
+            ApplyMaterialOverrideAsset(ctx, generatedAssets.RenderingDescriptor, importedMaterials);
+
+            generatedAssets = MmdUnityModelFactory.ApplyMaterialRemaps(generatedAssets, materialRemaps);
+            importedMaterials = generatedAssets.Materials;
+            for (int i = 0; i < generatedMaterials.Length; i++)
+            {
+                if (HasMaterialRemap(materialRemaps, i))
+                {
+                    transaction.Discard(generatedMaterials[i]);
+                }
+            }
 
             MmdPmxAsset asset = MmdPmxImportedAssetBuilder.CreateAndInitializeImportedAsset(
                 bytes,
@@ -158,7 +186,7 @@ namespace Mmd.Editor
                 resolvedSourcePath,
                 ImportScale,
                 effectiveModelPreset.ToString(),
-                shaderPreset.ToString(),
+                GetShaderPresetDisplayName(shaderPreset),
                 parseSummary,
                 generatedAssets,
                 materialRemaps,
@@ -251,7 +279,10 @@ namespace Mmd.Editor
             transaction.TransferToContext(ctx, "Mesh", importedMesh);
             for (int i = 0; i < importedMaterials.Length; i++)
             {
-                transaction.TransferToContext(ctx, "Material_" + i, importedMaterials[i]);
+                if (!HasMaterialRemap(materialRemaps, i))
+                {
+                    transaction.TransferToContext(ctx, "Material_" + i, importedMaterials[i]);
+                }
             }
             for (int i = 0; i < textureBindingSummary.OwnedSubAssets.Count; i++)
             {
@@ -280,6 +311,11 @@ namespace Mmd.Editor
             transaction.Complete();
         }
 
+        private static bool HasMaterialRemap(Material[]? remaps, int slot)
+        {
+            return remaps != null && slot >= 0 && slot < remaps.Length && remaps[slot] != null;
+        }
+
         private static float NormalizeImportScale(float value)
         {
             return float.IsFinite(value) && value > 0.0f ? value : MmdPmxAsset.DefaultImportScale;
@@ -291,11 +327,82 @@ namespace Mmd.Editor
             {
                 MmdPmxShaderPreset.MmdBasicUrpToon => MmdMaterialPreset.MmdToon,
                 MmdPmxShaderPreset.UrpLit => MmdMaterialPreset.UrpLit,
+                MmdPmxShaderPreset.MmdToonLit => MmdMaterialPreset.MmdToonLit,
                 _ => MmdMaterialPreset.MmdToon
             };
         }
 
-        private void ApplyMaterialOverrideAsset(AssetImportContext ctx, Material[] importedMaterials)
+        private static string GetShaderPresetDisplayName(MmdPmxShaderPreset value)
+        {
+            return value switch
+            {
+                MmdPmxShaderPreset.MmdBasicUrpToon => "MMD Basic Toon",
+                MmdPmxShaderPreset.MmdToonLit => "MMD URP Toon",
+                MmdPmxShaderPreset.CustomProfile => "Custom Profile",
+                _ => "URP Lit",
+            };
+        }
+
+        private MmdMaterialPreset ResolveMaterialPresetForImport(
+            AssetImportContext ctx,
+            out MmdMaterialMapperSet? materialMappers)
+        {
+            materialMappers = null;
+            if (shaderPreset != MmdPmxShaderPreset.CustomProfile)
+            {
+                return MapMaterialPreset(shaderPreset);
+            }
+
+            if (materialProfileAsset == null)
+            {
+                ctx.LogImportWarning(
+                    "Custom Profile is selected but no MMD Material Profile asset is assigned. Falling back to MMD Basic Toon.");
+                return MmdMaterialPreset.MmdToon;
+            }
+
+            string profilePath = AssetDatabase.GetAssetPath(materialProfileAsset);
+            if (!string.IsNullOrWhiteSpace(profilePath))
+            {
+                ctx.DependsOnSourceAsset(profilePath);
+            }
+
+            if (!materialProfileAsset.TryCreateMapperSet(out materialMappers, out string reason))
+            {
+                ctx.LogImportWarning(
+                    $"MMD Material Profile '{materialProfileAsset.name}' is invalid ({reason}). Falling back to MMD Basic Toon.");
+                materialMappers = null;
+                return MmdMaterialPreset.MmdToon;
+            }
+
+            return MmdMaterialPreset.MmdToon;
+        }
+
+        private static void LogCustomProfileDiagnostics(
+            AssetImportContext ctx,
+            MmdUnityModelInstance generatedAssets)
+        {
+            foreach (MmdUnityMaterialBindingDiagnostic diagnostic in generatedAssets.MaterialBindingDiagnostics)
+            {
+                if (diagnostic.unsupportedFeatures.Length > 0)
+                {
+                    ctx.LogImportWarning(
+                        $"PMX material {diagnostic.materialIndex} custom profile unsupported features: " +
+                        string.Join(", ", diagnostic.unsupportedFeatures));
+                }
+
+                foreach (MmdUnityMaterialMissingPropertyDiagnostic missingProperty in diagnostic.missingProperties)
+                {
+                    ctx.LogImportWarning(
+                        $"PMX material {diagnostic.materialIndex} custom profile missing property " +
+                        $"'{missingProperty.property}' for {missingProperty.feature}.");
+                }
+            }
+        }
+
+        private void ApplyMaterialOverrideAsset(
+            AssetImportContext ctx,
+            MmdRenderingDescriptor renderingDescriptor,
+            Material[] importedMaterials)
         {
             if (materialOverrideAsset == null)
             {
@@ -303,12 +410,12 @@ namespace Mmd.Editor
             }
 
             string overrideAssetPath = AssetDatabase.GetAssetPath(materialOverrideAsset);
-            if (string.IsNullOrEmpty(overrideAssetPath))
+            if (!string.IsNullOrEmpty(overrideAssetPath))
             {
-                return;
+                ctx.DependsOnSourceAsset(overrideAssetPath);
             }
 
-            ctx.DependsOnSourceAsset(overrideAssetPath);
+            MmdMaterialOverrideApplier.ApplyToRenderingDescriptor(materialOverrideAsset, renderingDescriptor);
             MmdMaterialOverrideApplier.Apply(materialOverrideAsset, importedMaterials);
         }
 

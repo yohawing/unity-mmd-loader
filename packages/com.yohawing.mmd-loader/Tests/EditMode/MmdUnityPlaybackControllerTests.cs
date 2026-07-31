@@ -104,7 +104,7 @@ namespace Mmd.Tests
         [Test]
         public void PlaybackSourceConfigureKeepsControllerLivePhysicsMode()
         {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
@@ -617,7 +617,7 @@ namespace Mmd.Tests
         [Test]
         public void LivePhysicsReportsPinnedRigidbodySyncToAnimatedBone()
         {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
@@ -663,6 +663,11 @@ namespace Mmd.Tests
                 Assert.That(diagnostics.pinnedBodies.maxPinnedBodySyncDistance, Is.LessThan(0.0001f));
                 Assert.That(diagnostics.stepPhysicsMs, Is.GreaterThanOrEqualTo(0.0));
                 Assert.That(diagnostics.totalMs, Is.GreaterThanOrEqualTo(diagnostics.stepPhysicsMs));
+                Assert.That(diagnostics.bodyDiagnosticsFrame, Is.EqualTo(-1),
+                    "Detailed body diagnostics must be disabled by default.");
+                Assert.That(diagnostics.bodyDiagnostics, Is.Empty);
+                Assert.That(diagnostics.readbackShapeTypeCount, Is.EqualTo(0),
+                    "Disabled detailed diagnostics must not query native shape metadata.");
                 Assert.That(binding.Instance.PhysicsBodies, Has.Length.EqualTo(1));
                 Assert.That(
                     Vector3.Distance(binding.Instance.PhysicsBodies[0].transform.position, binding.Instance.BoneTransforms[rootBoneIndex].position),
@@ -677,7 +682,7 @@ namespace Mmd.Tests
         [Test]
         public void LivePhysicsReportsBodyDiagnosticsWithImportScaleOne()
         {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
@@ -732,12 +737,15 @@ namespace Mmd.Tests
                 binding = CreatePhysicsPlaybackBinding(model, "body-diagnostics.vmd");
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f);
+                controller.LivePhysicsBodyDiagnosticsSampleInterval = 1;
                 controller.SetPhysicsMode(MmdPhysicsMode.Live);
 
                 controller.ApplyFrame(0);
                 MmdLivePhysicsFrameDiagnostics? seedDiagnostics = binding.LastLivePhysicsDiagnostics;
                 Assert.That(seedDiagnostics, Is.Not.Null);
                 Assert.That(seedDiagnostics!.frame, Is.EqualTo(0));
+                Assert.That(seedDiagnostics.bodyDiagnosticsFrame, Is.EqualTo(0));
+                Assert.That(seedDiagnostics.readbackShapeTypeCount, Is.EqualTo(2));
                 Assert.That(seedDiagnostics.pinnedBodies.pinnedBodyCount, Is.EqualTo(2));
                 Assert.That(seedDiagnostics.pinnedBodies.staticPinnedBodyCount, Is.EqualTo(1));
                 Assert.That(seedDiagnostics.pinnedBodies.dynamicOrientationPinnedBodyCount, Is.EqualTo(1),
@@ -748,6 +756,10 @@ namespace Mmd.Tests
                 MmdLivePhysicsFrameDiagnostics? diagnostics = binding.LastLivePhysicsDiagnostics;
                 Assert.That(diagnostics, Is.Not.Null);
                 Assert.That(diagnostics!.frame, Is.EqualTo(LivePhysicsPlaybackFrame));
+                Assert.That(diagnostics.readbackTransformCount, Is.EqualTo(2),
+                    "The host-pose path performs one shared native readback per body.");
+                Assert.That(diagnostics.readbackShapeTypeCount, Is.Zero,
+                    "Shape metadata must be cached after the backend's first frame.");
                 Assert.That(diagnostics.comparisonSpace, Is.EqualTo("runtime-forward-playback-diagnostics"));
                 Assert.That(diagnostics.importScale, Is.EqualTo(1.0f).Within(0.0001f));
                 Assert.That(diagnostics.pinnedBodies.pinnedBodyCount, Is.EqualTo(1));
@@ -756,6 +768,7 @@ namespace Mmd.Tests
                     "Mode-2 dynamic-orientation bodies must not be re-pinned on normal forward frames");
                 Assert.That(diagnostics.bodyDiagnostics, Is.Not.Null);
                 Assert.That(diagnostics.bodyDiagnostics.Length, Is.EqualTo(2));
+                Assert.That(diagnostics.bodyDiagnosticsFrame, Is.EqualTo(LivePhysicsPlaybackFrame));
 
                 // --- body 0: static ---
                 MmdLivePhysicsBodyDiagnostics body0 = diagnostics.bodyDiagnostics[0];
@@ -765,6 +778,9 @@ namespace Mmd.Tests
                 Assert.That(body0.boneName, Is.EqualTo(rootBoneName));
                 Assert.That(body0.physicsKind, Is.EqualTo("static"));
                 Assert.That(body0.shapeType, Is.EqualTo("sphere"));
+                Assert.That(body0.nativeShapeType, Is.EqualTo(body0.shapeType));
+                Assert.That(body0.debugColliderType, Is.EqualTo(body0.shapeType));
+                Assert.That(body0.debugColliderSize, Is.EqualTo(new Vector3(0.25f, 0.25f, 0.25f)));
                 Assert.That(body0.mass, Is.EqualTo(0.0f));
                 Assert.That(body0.descriptorPosition, Is.EqualTo(Vector3.zero));
                 Assert.That(body0.descriptorRotation, Is.EqualTo(Vector3.zero));
@@ -781,6 +797,9 @@ namespace Mmd.Tests
                 Assert.That(body1.boneName, Is.EqualTo(rootBoneName));
                 Assert.That(body1.physicsKind, Is.EqualTo("dynamic-orientation"));
                 Assert.That(body1.shapeType, Is.EqualTo("box"));
+                Assert.That(body1.nativeShapeType, Is.EqualTo(body1.shapeType));
+                Assert.That(body1.debugColliderType, Is.EqualTo(body1.shapeType));
+                Assert.That(body1.debugColliderSize, Is.EqualTo(new Vector3(1.0f, 1.0f, 1.0f)));
                 Assert.That(body1.mass, Is.EqualTo(1.0f));
                 // Descriptor position is offset from root
                 Assert.That(body1.descriptorPosition.x, Is.EqualTo(0.5f).Within(0.0001f));
@@ -800,6 +819,29 @@ namespace Mmd.Tests
 
                 // Instance must report importScale=1
                 Assert.That(binding.Instance.ImportScale, Is.EqualTo(1.0f).Within(0.0001f));
+
+                MmdLivePhysicsBodyDiagnostics[] latestSample = diagnostics.bodyDiagnostics;
+                controller.LivePhysicsBodyDiagnosticsSampleInterval = 2;
+                controller.ApplyFrame(LivePhysicsPlaybackFrame + 1);
+                diagnostics = binding.LastLivePhysicsDiagnostics;
+                Assert.That(diagnostics, Is.Not.Null);
+                Assert.That(diagnostics!.frame, Is.EqualTo(LivePhysicsPlaybackFrame + 1));
+                Assert.That(diagnostics.bodyDiagnosticsFrame, Is.EqualTo(LivePhysicsPlaybackFrame));
+                Assert.That(diagnostics.bodyDiagnostics, Is.SameAs(latestSample),
+                    "Non-sampled frames must retain the latest detailed diagnostics rather than rebuilding them.");
+                Assert.That(diagnostics.readbackShapeTypeCount, Is.EqualTo(0),
+                    "Cached detailed metadata must not re-query native shapes on a later sample interval frame.");
+
+                var serializedController = new SerializedObject(controller);
+                SerializedProperty sampleInterval = serializedController.FindProperty("livePhysicsBodyDiagnosticsSampleInterval");
+                sampleInterval.intValue = -2;
+                serializedController.ApplyModifiedPropertiesWithoutUndo();
+                typeof(MmdUnityPlaybackController)
+                    .GetMethod("OnValidate", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                    .Invoke(controller, null);
+                Assert.That(controller.LivePhysicsBodyDiagnosticsSampleInterval, Is.Zero);
+                Assert.That(binding.LivePhysicsBodyDiagnosticsSampleInterval, Is.Zero,
+                    "Serialized interval changes must be clamped and synchronized to the active binding.");
             }
             finally
             {
@@ -810,7 +852,7 @@ namespace Mmd.Tests
         [Test]
         public void SerializedPhysicsModeChangeAppliesToLoadedBindingAndRestartsLiveFromFrameZero()
         {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
@@ -853,7 +895,7 @@ namespace Mmd.Tests
         [Test]
         public void ControllerExposesLastLivePhysicsDiagnosticsAfterApplyFrame()
         {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
@@ -1094,6 +1136,33 @@ namespace Mmd.Tests
 
                 Assert.That(enabled, Is.False);
                 Assert.That(reason, Does.Contain("source"));
+            }
+            finally
+            {
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
+            }
+        }
+
+        [Test]
+        public void TryEnableFastRuntimeAcceptsModelsWithDeformAfterPhysicsBones()
+        {
+            MmdUnityPlaybackBinding? binding = null;
+            try
+            {
+                byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes(PlaybackPmxId);
+                byte[] vmdBytes = MmdTestFixtures.ReadFixtureAssetBytes(PlaybackVmdId);
+                var parser = new NativeMmdParser();
+                MmdModelDefinition model = parser.LoadModel(pmxBytes);
+                model.bones[0].deformAfterPhysics = true;
+                MmdMotionDefinition motion = parser.LoadMotion(vmdBytes);
+                binding = MmdUnityPlaybackBinding.CreateSkinned(model, motion, PlaybackPmxId, PlaybackVmdId);
+
+                bool enabled = binding.TryEnableFastRuntime(pmxBytes, vmdBytes, out string reason);
+
+                Assert.That(model.HasDeformAfterPhysicsBones, Is.True);
+                Assert.That(enabled, Is.True, reason);
+                Assert.That(reason, Is.Empty);
+                Assert.DoesNotThrow(() => binding.ApplyFrame(10, 30.0f));
             }
             finally
             {

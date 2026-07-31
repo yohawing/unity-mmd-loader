@@ -50,6 +50,34 @@ namespace Mmd.Editor
             transferred.Remove(instanceId);
         }
 
+        internal void Discard(Object? value)
+        {
+            if (value == null)
+            {
+                return;
+            }
+
+            int instanceId = value.GetInstanceID();
+            if (!pending.TryGetValue(instanceId, out Object trackedValue))
+            {
+                throw new InvalidOperationException(
+                    $"Object '{value.name}' must be tracked before it can be discarded.");
+            }
+            if (transferred.Contains(instanceId))
+            {
+                throw new InvalidOperationException(
+                    $"Object '{value.name}' cannot be discarded after it was transferred to an import context.");
+            }
+
+            pending.Remove(instanceId);
+            hierarchyRoots.Remove(instanceId);
+            transferred.Remove(instanceId);
+            if (trackedValue != null)
+            {
+                Object.DestroyImmediate(trackedValue);
+            }
+        }
+
         internal void TransferToContext(AssetImportContext context, string identifier, Object value)
         {
             if (context == null)

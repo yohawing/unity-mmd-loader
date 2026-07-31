@@ -34,6 +34,12 @@ Shader "MMD Basic URP Toon"
         _MmdNormalMapBound ("Normal Map Bound", Float) = 0
         _AlphaClipThreshold ("Alpha Clip Threshold", Range(0, 1)) = 0
         _ShadowAlphaClipThreshold ("Shadow Alpha Clip Threshold", Range(0, 1)) = 0
+        [HideInInspector] _MmdAlphaClipThresholdBackup ("MMD Alpha Clip Threshold Backup", Float) = 0.01
+        [HideInInspector] _MmdShadowAlphaClipThresholdBackup ("MMD Shadow Alpha Clip Threshold Backup", Float) = 0.01
+        [HideInInspector] _MmdSphereModeBackup ("MMD Sphere Mode Backup", Float) = 1
+        [HideInInspector] _MmdStylizedSpecularBoundaryBackup ("MMD Stylized Specular Boundary Backup", Float) = 0.5
+        [HideInInspector] _MmdRimBoundaryBackup ("MMD Rim Boundary Backup", Float) = 0.5
+        [HideInInspector] _MmdEmissionIntensityBackup ("MMD Emission Intensity Backup", Float) = 1
         _Cull ("Cull", Float) = 2
         _ZWrite ("ZWrite", Float) = 1
         _ZTest ("ZTest", Float) = 4
@@ -120,7 +126,7 @@ Shader "MMD Basic URP Toon"
                 Varyings output;
                 float3 normalOS = normalize(input.normalOS);
                 half edgeScale = input.uv1.y > 0.5h ? input.uv1.x : 1.0h;
-                float scaledWidth = _OutlineWidth * edgeScale * 2.0; // HighDPI fix 2.0
+                float scaledWidth = _OutlineWidth * edgeScale;
                 float4 meshNormalPositionCS = TransformObjectToHClip(input.positionOS.xyz + normalOS * scaledWidth);
                 float4 basePositionCS = TransformObjectToHClip(input.positionOS.xyz);
                 float3 normalWS = TransformObjectToWorldNormal(normalOS);
@@ -576,4 +582,6 @@ Shader "MMD Basic URP Toon"
     }
 
     Fallback "Universal Render Pipeline/Lit"
+
+    CustomEditor "Mmd.Editor.MmdToonLitShaderGUI"
 }

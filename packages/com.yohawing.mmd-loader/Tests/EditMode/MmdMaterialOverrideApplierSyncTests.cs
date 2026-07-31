@@ -17,7 +17,6 @@ namespace Mmd.EditModeTests
         {
             "hasAlphaClipThreshold",
             "hasColor",
-            "hasEmissionColor",
             "hasMetallic",
             "hasMetallicMap",
             "hasNormalMap",
@@ -32,7 +31,6 @@ namespace Mmd.EditModeTests
         private static readonly string[] UrpBindingExcludedFlags =
         {
             "hasColor",
-            "hasEmissionColor",
             "hasMetallic",
             "hasMetallicMap",
             "hasNormalMap",
@@ -54,6 +52,9 @@ namespace Mmd.EditModeTests
                 "hasBaseColor",
                 "hasColor",
                 "hasEmissionColor",
+                "hasEmissionIntensity",
+                "hasEmissionMap",
+                "hasEmissionMask",
                 "hasMetallic",
                 "hasMetallicMap",
                 "hasNormalMap",
@@ -62,9 +63,19 @@ namespace Mmd.EditModeTests
                 "hasOcclusionStrength",
                 "hasOutlineColor",
                 "hasOutlineWidth",
+                "hasRimBoundary",
+                "hasRimColor",
+                "hasRimFeather",
+                "hasRimLightFollow",
                 "hasRoughnessMap",
                 "hasSmoothness",
-                "hasSurfaceMode"
+                "hasStylizedSpecularBoundary",
+                "hasStylizedSpecularColor",
+                "hasStylizedSpecularFeather",
+                "hasSurfaceMode",
+                "hasToonBandCount",
+                "hasToonBoundary",
+                "hasToonFeather"
             };
             string[] actual = typeof(MmdMaterialOverrideEntry)
                 .GetFields(BindingFlags.Public | BindingFlags.Instance)
@@ -83,8 +94,8 @@ namespace Mmd.EditModeTests
         [Test]
         public void AllFlagsApplyToMaterialSink()
         {
-            Shader shader = Shader.Find("MMD Basic URP Toon")
-                ?? throw new InvalidOperationException("MMD Basic URP Toon shader was not found.");
+            Shader shader = Shader.Find(MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName)
+                ?? throw new InvalidOperationException("MMD Toon Lit shader was not found.");
             Shader urpLitShader = Shader.Find("Universal Render Pipeline/Lit")
                 ?? throw new InvalidOperationException("Universal Render Pipeline/Lit shader was not found.");
             Material? toonMaterial = null;
@@ -94,6 +105,8 @@ namespace Mmd.EditModeTests
             Texture2D? metallicMap = null;
             Texture2D? roughnessMap = null;
             Texture2D? occlusionMap = null;
+            Texture2D? emissionMap = null;
+            Texture2D? emissionMask = null;
             try
             {
                 toonMaterial = new Material(shader) { name = "sync-material-toon" };
@@ -102,7 +115,10 @@ namespace Mmd.EditModeTests
                 metallicMap = NewTexture(new Color(0.7f, 0.1f, 0.2f));
                 roughnessMap = NewTexture(new Color(0.4f, 0.5f, 0.6f));
                 occlusionMap = NewTexture(new Color(0.3f, 0.8f, 0.1f));
-                MmdMaterialOverrideEntry entry = CreateAllFlagsEntry(normalMap, metallicMap, roughnessMap, occlusionMap);
+                emissionMap = NewTexture(new Color(0.8f, 0.7f, 0.6f));
+                emissionMask = NewTexture(new Color(0.9f, 0.5f, 0.2f));
+                MmdMaterialOverrideEntry entry = CreateAllFlagsEntry(
+                    normalMap, metallicMap, roughnessMap, occlusionMap, emissionMap, emissionMask);
                 asset = CreateAsset(entry);
 
                 MmdMaterialOverrideApplier.Apply(asset, new[] { toonMaterial });
@@ -110,7 +126,19 @@ namespace Mmd.EditModeTests
 
                 AssertHasProperties(toonMaterial,
                     MmdMaterialPropertyNames.BaseColor, MmdMaterialPropertyNames.Color, MmdMaterialPropertyNames.Alpha,
-                    MmdMaterialPropertyNames.AmbientColor, MmdMaterialPropertyNames.OutlineColor,
+                    MmdMaterialPropertyNames.AmbientColor, MmdMaterialPropertyNames.ToonBandCount,
+                    MmdMaterialPropertyNames.ToonBoundary, MmdMaterialPropertyNames.ToonFeather,
+                    MmdMaterialPropertyNames.StylizedSpecularColor,
+                    MmdMaterialPropertyNames.StylizedSpecularBoundary,
+                    MmdMaterialPropertyNames.StylizedSpecularFeather,
+                    MmdMaterialPropertyNames.EmissionColor, MmdMaterialPropertyNames.EmissionMap,
+                    MmdMaterialPropertyNames.MmdEmissionIntensity, MmdMaterialPropertyNames.MmdEmissionMapBound,
+                    MmdMaterialPropertyNames.MmdEmissionMask, MmdMaterialPropertyNames.MmdEmissionMaskBound,
+                    MmdMaterialPropertyNames.RimColor,
+                    MmdMaterialPropertyNames.RimBoundary,
+                    MmdMaterialPropertyNames.RimFeather,
+                    MmdMaterialPropertyNames.RimLightFollow,
+                    MmdMaterialPropertyNames.OutlineColor,
                     MmdMaterialPropertyNames.OutlineWidth, MmdMaterialPropertyNames.OutlineVisible,
                     MmdMaterialPropertyNames.MmdNormalMap, MmdMaterialPropertyNames.MmdNormalMapBound,
                     MmdMaterialPropertyNames.AlphaClipThreshold, MmdMaterialPropertyNames.ShadowAlphaClipThreshold,
@@ -119,6 +147,16 @@ namespace Mmd.EditModeTests
                 AssertColor(toonMaterial.GetColor(MmdMaterialPropertyNames.Color), new Color(0.44f, 0.55f, 0.66f, 0.42f));
                 Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.Alpha), Is.EqualTo(0.42f).Within(0.00001f));
                 AssertColor(toonMaterial.GetColor(MmdMaterialPropertyNames.AmbientColor), new Color(0.13f, 0.24f, 0.35f, 1.0f));
+                Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.ToonBandCount), Is.EqualTo(3.0f).Within(0.00001f));
+                Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.ToonBoundary), Is.EqualTo(0.42f).Within(0.00001f));
+                Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.ToonFeather), Is.EqualTo(0.12f).Within(0.00001f));
+                AssertColor(toonMaterial.GetColor(MmdMaterialPropertyNames.StylizedSpecularColor), new Color(0.91f, 0.81f, 0.71f, 0.61f));
+                Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.StylizedSpecularBoundary), Is.EqualTo(0.90f).Within(0.00001f));
+                Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.StylizedSpecularFeather), Is.EqualTo(0.03f).Within(0.00001f));
+                AssertColor(toonMaterial.GetColor(MmdMaterialPropertyNames.RimColor), new Color(0.19f, 0.29f, 0.39f, 0.49f));
+                Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.RimBoundary), Is.EqualTo(0.72f).Within(0.00001f));
+                Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.RimFeather), Is.EqualTo(0.08f).Within(0.00001f));
+                Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.RimLightFollow), Is.EqualTo(0.65f).Within(0.00001f));
                 AssertColor(toonMaterial.GetColor(MmdMaterialPropertyNames.OutlineColor), new Color(0.72f, 0.61f, 0.5f, 0.39f));
                 Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.OutlineWidth), Is.EqualTo(1.75f).Within(0.00001f));
                 Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.OutlineVisible), Is.EqualTo(1.0f));
@@ -135,7 +173,7 @@ namespace Mmd.EditModeTests
                 Assert.That(urpLitMaterial.GetFloat(MmdMaterialPropertyNames.Metallic), Is.EqualTo(0.73f).Within(0.00001f));
                 Assert.That(urpLitMaterial.GetFloat(MmdMaterialPropertyNames.Smoothness), Is.EqualTo(0.64f).Within(0.00001f));
                 Assert.That(urpLitMaterial.GetFloat(MmdMaterialPropertyNames.OcclusionStrength), Is.EqualTo(0.58f).Within(0.00001f));
-                AssertColor(urpLitMaterial.GetColor(MmdMaterialPropertyNames.EmissionColor), new Color(0.31f, 0.21f, 0.11f, 1.0f));
+                AssertColor(urpLitMaterial.GetColor(MmdMaterialPropertyNames.EmissionColor), new Color(2.1f, 1.2f, 0.4f, 1.0f));
                 Assert.That(urpLitMaterial.GetFloat(MmdMaterialPropertyNames.BumpScale), Is.EqualTo(0.87f).Within(0.00001f));
                 Assert.That(urpLitMaterial.GetTexture(MmdMaterialPropertyNames.BumpMap), Is.SameAs(normalMap));
                 Assert.That(urpLitMaterial.GetTexture(MmdMaterialPropertyNames.MetallicGlossMap), Is.SameAs(metallicMap));
@@ -159,6 +197,13 @@ namespace Mmd.EditModeTests
                 Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.AlphaClipThreshold), Is.EqualTo(0.0f).Within(0.00001f));
                 Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.ShadowAlphaClipThreshold), Is.EqualTo(0.27f).Within(0.00001f));
                 Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.TextureAlphaOutputWeight), Is.EqualTo(1.0f).Within(0.00001f));
+                Assert.That(toonMaterial.GetColor(MmdMaterialPropertyNames.EmissionColor), Is.EqualTo(new Color(2.1f, 1.2f, 0.4f, 1.0f)));
+                Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.MmdEmissionIntensity), Is.EqualTo(2.5f).Within(0.00001f));
+                Assert.That(toonMaterial.GetTexture(MmdMaterialPropertyNames.EmissionMap), Is.SameAs(emissionMap));
+                Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.MmdEmissionMapBound), Is.EqualTo(1.0f).Within(0.00001f));
+                Assert.That(toonMaterial.GetTexture(MmdMaterialPropertyNames.MmdEmissionMask), Is.SameAs(emissionMask));
+                Assert.That(toonMaterial.GetFloat(MmdMaterialPropertyNames.MmdEmissionMaskBound), Is.EqualTo(1.0f).Within(0.00001f));
+                AssertKeywordUndeclaredAndDisabled(toonMaterial, "_EMISSION");
                 Assert.That(toonMaterial.renderQueue, Is.EqualTo((int)RenderQueue.Transparent));
                 Assert.That(urpLitMaterial.IsKeywordEnabled("_SURFACE_TYPE_TRANSPARENT"), Is.True);
                 AssertKeywordUndeclaredAndDisabled(urpLitMaterial, "_ALPHABLEND_ON");
@@ -166,7 +211,7 @@ namespace Mmd.EditModeTests
             }
             finally
             {
-                Destroy(asset, toonMaterial, urpLitMaterial, normalMap, metallicMap, roughnessMap, occlusionMap);
+                Destroy(asset, toonMaterial, urpLitMaterial, normalMap, metallicMap, roughnessMap, occlusionMap, emissionMap, emissionMask);
             }
         }
 
@@ -187,6 +232,20 @@ namespace Mmd.EditModeTests
                 Assert.That(material.diffuseColor, Is.EqualTo(new[] { 0.11f, 0.22f, 0.33f }));
                 Assert.That(material.alpha, Is.EqualTo(0.42f).Within(0.00001f));
                 Assert.That(material.ambientColor, Is.EqualTo(new[] { 0.13f, 0.24f, 0.35f }));
+                Assert.That(material.emissionColor, Is.EqualTo(new[] { 2.1f, 1.2f, 0.4f }));
+                Assert.That(material.emissionIntensity, Is.EqualTo(2.5f).Within(0.00001f));
+                Assert.That(material.usesEmissionMap, Is.False);
+                Assert.That(material.usesEmissionMask, Is.False);
+                Assert.That(material.toonBandCount, Is.EqualTo(3.0f).Within(0.00001f));
+                Assert.That(material.toonBoundary, Is.EqualTo(0.42f).Within(0.00001f));
+                Assert.That(material.toonFeather, Is.EqualTo(0.12f).Within(0.00001f));
+                Assert.That(material.stylizedSpecularColor, Is.EqualTo(new[] { 0.91f, 0.81f, 0.71f }));
+                Assert.That(material.stylizedSpecularBoundary, Is.EqualTo(0.90f).Within(0.00001f));
+                Assert.That(material.stylizedSpecularFeather, Is.EqualTo(0.03f).Within(0.00001f));
+                Assert.That(material.rimColor, Is.EqualTo(new[] { 0.19f, 0.29f, 0.39f }));
+                Assert.That(material.rimBoundary, Is.EqualTo(0.72f).Within(0.00001f));
+                Assert.That(material.rimFeather, Is.EqualTo(0.08f).Within(0.00001f));
+                Assert.That(material.rimLightFollow, Is.EqualTo(0.65f).Within(0.00001f));
                 Assert.That(material.edgeColor, Is.EqualTo(new[] { 0.72f, 0.61f, 0.5f, 0.39f }));
                 Assert.That(material.edgeSize, Is.EqualTo(1.75f).Within(0.00001f));
                 Assert.That(material.drawEdgeFlag, Is.True);
@@ -214,6 +273,20 @@ namespace Mmd.EditModeTests
                 Assert.That(binding.diffuseColor, Is.EqualTo(new[] { 0.11f, 0.22f, 0.33f }));
                 Assert.That(binding.alpha, Is.EqualTo(0.42f).Within(0.00001f));
                 Assert.That(binding.ambientColor, Is.EqualTo(new[] { 0.13f, 0.24f, 0.35f }));
+                Assert.That(binding.emissionColor, Is.EqualTo(new[] { 2.1f, 1.2f, 0.4f }));
+                Assert.That(binding.emissionIntensity, Is.EqualTo(2.5f).Within(0.00001f));
+                Assert.That(binding.usesEmissionMap, Is.False);
+                Assert.That(binding.usesEmissionMask, Is.False);
+                Assert.That(binding.toonBandCount, Is.EqualTo(3.0f).Within(0.00001f));
+                Assert.That(binding.toonBoundary, Is.EqualTo(0.42f).Within(0.00001f));
+                Assert.That(binding.toonFeather, Is.EqualTo(0.12f).Within(0.00001f));
+                Assert.That(binding.stylizedSpecularColor, Is.EqualTo(new[] { 0.91f, 0.81f, 0.71f }));
+                Assert.That(binding.stylizedSpecularBoundary, Is.EqualTo(0.90f).Within(0.00001f));
+                Assert.That(binding.stylizedSpecularFeather, Is.EqualTo(0.03f).Within(0.00001f));
+                Assert.That(binding.rimColor, Is.EqualTo(new[] { 0.19f, 0.29f, 0.39f }));
+                Assert.That(binding.rimBoundary, Is.EqualTo(0.72f).Within(0.00001f));
+                Assert.That(binding.rimFeather, Is.EqualTo(0.08f).Within(0.00001f));
+                Assert.That(binding.rimLightFollow, Is.EqualTo(0.65f).Within(0.00001f));
                 Assert.That(binding.edgeColor, Is.EqualTo(new[] { 0.72f, 0.61f, 0.5f, 0.39f }));
                 Assert.That(binding.edgeSize, Is.EqualTo(1.75f).Within(0.00001f));
                 Assert.That(binding.drawEdgeFlag, Is.True);
@@ -227,11 +300,53 @@ namespace Mmd.EditModeTests
             }
         }
 
+        [Test]
+        public void NullEmissionTexturesClearMaterialBindings()
+        {
+            Shader shader = Shader.Find(MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName)
+                ?? throw new InvalidOperationException("MMD Toon Lit shader was not found.");
+            Material? material = null;
+            MmdMaterialOverrideAsset? asset = null;
+            Texture2D? map = null;
+            Texture2D? mask = null;
+            try
+            {
+                material = new Material(shader);
+                map = NewTexture(Color.white);
+                mask = NewTexture(Color.white);
+                material.SetTexture(MmdMaterialPropertyNames.EmissionMap, map);
+                material.SetTexture(MmdMaterialPropertyNames.MmdEmissionMask, mask);
+                material.SetFloat(MmdMaterialPropertyNames.MmdEmissionMapBound, 1.0f);
+                material.SetFloat(MmdMaterialPropertyNames.MmdEmissionMaskBound, 1.0f);
+                asset = CreateAsset(new MmdMaterialOverrideEntry
+                {
+                    materialIndex = 0,
+                    hasEmissionMap = true,
+                    emissionMap = null,
+                    hasEmissionMask = true,
+                    emissionMask = null
+                });
+
+                MmdMaterialOverrideApplier.Apply(asset, new[] { material });
+
+                Assert.That(material.GetTexture(MmdMaterialPropertyNames.EmissionMap), Is.Null);
+                Assert.That(material.GetTexture(MmdMaterialPropertyNames.MmdEmissionMask), Is.Null);
+                Assert.That(material.GetFloat(MmdMaterialPropertyNames.MmdEmissionMapBound), Is.EqualTo(0.0f));
+                Assert.That(material.GetFloat(MmdMaterialPropertyNames.MmdEmissionMaskBound), Is.EqualTo(0.0f));
+            }
+            finally
+            {
+                Destroy(asset, material, map, mask);
+            }
+        }
+
         private static MmdMaterialOverrideEntry CreateAllFlagsEntry(
             Texture2D? normalMap,
             Texture2D? metallicMap,
             Texture2D? roughnessMap,
-            Texture2D? occlusionMap)
+            Texture2D? occlusionMap,
+            Texture2D? emissionMap = null,
+            Texture2D? emissionMask = null)
             => new()
             {
                 materialIndex = 0,
@@ -243,6 +358,26 @@ namespace Mmd.EditModeTests
                 alpha = 0.42f,
                 hasAmbientColor = true,
                 ambientColor = new Color(0.13f, 0.24f, 0.35f, 1.0f),
+                hasToonBandCount = true,
+                toonBandCount = 3.0f,
+                hasToonBoundary = true,
+                toonBoundary = 0.42f,
+                hasToonFeather = true,
+                toonFeather = 0.12f,
+                hasStylizedSpecularColor = true,
+                stylizedSpecularColor = new Color(0.91f, 0.81f, 0.71f, 0.61f),
+                hasStylizedSpecularBoundary = true,
+                stylizedSpecularBoundary = 0.90f,
+                hasStylizedSpecularFeather = true,
+                stylizedSpecularFeather = 0.03f,
+                hasRimColor = true,
+                rimColor = new Color(0.19f, 0.29f, 0.39f, 0.49f),
+                hasRimBoundary = true,
+                rimBoundary = 0.72f,
+                hasRimFeather = true,
+                rimFeather = 0.08f,
+                hasRimLightFollow = true,
+                rimLightFollow = 0.65f,
                 hasOutlineColor = true,
                 outlineColor = new Color(0.72f, 0.61f, 0.5f, 0.39f),
                 hasOutlineWidth = true,
@@ -256,7 +391,13 @@ namespace Mmd.EditModeTests
                 hasOcclusionStrength = true,
                 occlusionStrength = 0.58f,
                 hasEmissionColor = true,
-                emissionColor = new Color(0.31f, 0.21f, 0.11f, 1.0f),
+                emissionColor = new Color(2.1f, 1.2f, 0.4f, 1.0f),
+                hasEmissionIntensity = true,
+                emissionIntensity = 2.5f,
+                hasEmissionMap = true,
+                emissionMap = emissionMap,
+                hasEmissionMask = true,
+                emissionMask = emissionMask,
                 hasNormalScale = true,
                 normalScale = 0.87f,
                 hasMetallicMap = true,

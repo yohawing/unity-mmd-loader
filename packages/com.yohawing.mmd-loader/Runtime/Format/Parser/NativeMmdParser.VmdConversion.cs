@@ -35,7 +35,8 @@ namespace Mmd.Parser
                         translationZ = CopyInterpolation(frame?.TranslationZInterpolation),
                         rotation = CopyInterpolation(frame?.RotationInterpolation)
                     },
-                    physicsEnabled = false
+                    physicsEnabled = false,
+                    rawInterpolation = CopyByteArray(frame?.RawInterpolation)
                 });
             }
 
@@ -147,7 +148,8 @@ namespace Mmd.Parser
                     TranslationXInterpolation = VmdJsonBoneInterpolation(frame.interpolation, 0),
                     TranslationYInterpolation = VmdJsonBoneInterpolation(frame.interpolation, 1),
                     TranslationZInterpolation = VmdJsonBoneInterpolation(frame.interpolation, 2),
-                    RotationInterpolation = VmdJsonBoneInterpolation(frame.interpolation, 3)
+                    RotationInterpolation = VmdJsonBoneInterpolation(frame.interpolation, 3),
+                    RawInterpolation = CopyByteArray(frame.interpolation)
                 };
             }
 
@@ -235,6 +237,11 @@ namespace Mmd.Parser
                 JsonByteAt(values, component + 8),
                 JsonByteAt(values, component + 12)
             };
+        }
+
+        private static byte[] CopyByteArray(byte[]? values)
+        {
+            return values == null || values.Length == 0 ? Array.Empty<byte>() : (byte[])values.Clone();
         }
 
         private static byte JsonByteAt(int[]? values, int index)

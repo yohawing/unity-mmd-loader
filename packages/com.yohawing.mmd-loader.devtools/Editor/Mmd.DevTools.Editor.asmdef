@@ -1,0 +1,29 @@
+{
+  "name": "Mmd.DevTools.Editor",
+  "rootNamespace": "Mmd.DevTools.Editor",
+  "references": [
+    "Mmd.Runtime",
+    "Mmd.Editor",
+    "Mmd.Editor.Timeline",
+    "Mmd.Timeline",
+    "Unity.Timeline",
+    "Unity.Timeline.Editor"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [
+    {
+      "name": "com.unity.timeline",
+      "expression": "1.0.0",
+      "define": "ENABLE_TIMELINE"
+    }
+  ],
+  "noEngineReferences": false
+}
