@@ -2,6 +2,7 @@
 param(
     [string] $EditorVersion = "6000.0.80f1",
     [string] $Unity = "C:\Program Files\Unity\Hub\Editor\6000.0.80f1\Editor\Unity.exe",
+    [string] $VisualUnity = "C:\Program Files\Unity\Hub\Editor\6000.4.8f1\Editor\Unity.exe",
     [string] $UnityCli = (Join-Path $env:LOCALAPPDATA "Unity\bin\unity.exe"),
     [string] $ProjectPath = "",
     [string] $Filter = "Mmd.Tests.MmdSelfShadowTargetTests;Mmd.Tests.MmdHumanoidProxyRigFactoryTests;Mmd.Tests.MmdAssetImporterTests"
@@ -139,3 +140,6 @@ finally {
 
 Write-Host ("Unity LTS compatibility gate passed. editor={0}; result={1}; passed={2}; skipped={3}; total={4}; project={5}; results={6}" -f `
     $EditorVersion, $testSummary.Result, $testSummary.Passed, $testSummary.Skipped, $testSummary.Total, $ProjectPath, $testResults)
+
+Write-Host "Running visual shading release gate..."
+& (Join-Path $PSScriptRoot "run-visual-shading-tier.ps1") -Unity $VisualUnity
