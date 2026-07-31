@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Mmd;
 using Mmd.Rendering;
 using NUnit.Framework;
 using UnityEditor;
@@ -57,6 +58,7 @@ namespace Mmd.Samples.UnityToonShader.Tests
             Assert.That(source, Does.Contain("ambientStateCaptured"));
             Assert.That(usage, Does.Contain("UnityToonShaderAdapterDemo.unity"));
             Assert.That(usage, Does.Contain("UTS_FALLBACK_MMD_TOON"));
+            Assert.That(usage, Does.Contain("Material Inspector"));
         }
 
         [Test]
@@ -95,6 +97,62 @@ namespace Mmd.Samples.UnityToonShader.Tests
             finally
             {
                 Object.DestroyImmediate(original);
+            }
+        }
+
+        [Test]
+        public void ValidatedUtsShaderConfiguresImporterProfileContract()
+        {
+            Shader shader = RequireInstalledUtsShader();
+            var profile = ScriptableObject.CreateInstance<MmdMaterialProfileAsset>();
+            var diagnostics = new List<UnityToonShaderDiagnostic>();
+            try
+            {
+                Assert.That(UnityToonShaderMaterialProfile.TryConfigure(profile, shader, diagnostics), Is.True,
+                    string.Join("\n", diagnostics));
+                Assert.That(diagnostics.Select(item => item.Code), Does.Contain("UTS_PROFILE_CONFIGURED"));
+
+                Assert.That(profile.TryCreateMapperSet(out Mmd.UnityIntegration.MmdMaterialMapperSet? mapperSet,
+                    out string reason), Is.True, reason);
+                Assert.That(mapperSet, Is.Not.Null);
+                Assert.That(mapperSet!.DefaultTextureTargets.DiffuseTextureProperties,
+                    Is.EqualTo(new[] { "_BaseMap", "_MainTex" }));
+                Assert.That(mapperSet.DefaultTextureTargets.SphereTextureProperty,
+                    Is.EqualTo("_MatCap_Sampler"));
+                Assert.That(mapperSet.DefaultRenderingTargets.RequiredKeywords,
+                    Does.Contain("_OUTLINE_NML"));
+                Assert.That(mapperSet.DefaultRenderingTargets.RequiredPasses,
+                    Does.Contain("SRPDefaultUnlit"));
+                Assert.That(mapperSet.DefaultRenderingTargets.UnsupportedFeatures,
+                    Does.Contain("material-morph"));
+                Assert.That(mapperSet.DefaultRenderingTargets.SupportsMaterialMorphs, Is.False);
+            }
+            finally
+            {
+                Object.DestroyImmediate(profile);
+            }
+        }
+
+        [Test]
+        public void MissingUtsShaderLeavesProfileUnchangedAndReportsFallback()
+        {
+            var profile = ScriptableObject.CreateInstance<MmdMaterialProfileAsset>();
+            profile.schemaVersion = 37;
+            profile.shader = Shader.Find("MMD Basic Toon");
+            int originalSchema = profile.schemaVersion;
+            Shader? originalShader = profile.shader;
+            var diagnostics = new List<UnityToonShaderDiagnostic>();
+            try
+            {
+                Assert.That(UnityToonShaderMaterialProfile.TryConfigure(profile, null, diagnostics), Is.False);
+                Assert.That(profile.schemaVersion, Is.EqualTo(originalSchema));
+                Assert.That(profile.shader, Is.SameAs(originalShader));
+                Assert.That(diagnostics.Select(item => item.Code), Does.Contain("UTS_SHADER_ABSENT"));
+                Assert.That(diagnostics.Select(item => item.Code), Does.Contain("UTS_PROFILE_FALLBACK_MMD_TOON"));
+            }
+            finally
+            {
+                Object.DestroyImmediate(profile);
             }
         }
 
@@ -381,7 +439,11 @@ namespace Mmd.Samples.UnityToonShader.Tests
                 Object.DestroyImmediate(baseTexture);
                 Object.DestroyImmediate(sphereTexture);
                 Object.DestroyImmediate(readback);
-                cameraObject.GetComponent<Camera>().targetTexture = null;
+                Camera camera = cameraObject.GetComponent<Camera>();
+                if (camera != null)
+                {
+                    camera.targetTexture = null;
+                }
                 renderTexture.Release();
                 Object.DestroyImmediate(renderTexture);
                 Object.DestroyImmediate(geometry);

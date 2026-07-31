@@ -19,7 +19,7 @@ unity-mmd-loader は、PMX / VMD を Unity に取り込むためのプラグイ�
 
 | 項目 | 現在の対応 |
 | --- | --- |
-| 対象環境 | Unity 6000.4 / Windows x86_64 / URP |
+| 対象環境 | Unity 6000.0 LTS 以降 / Windows x86_64 / URP |
 | モデル | PMXのインポートとシーンへの配置に対応(PMD非対応) |
 | VMD | インポートとTimelineクリップに対応。モーション再生は [mmd-anim](https://github.com/yohawing/mmd-anim) によるランタイム評価。カメラモーション対応済み |
 | モーフ | 頂点（ブレンドシェイプ）／ UV ／材質／ボーン／グループの各モーフに対応 |

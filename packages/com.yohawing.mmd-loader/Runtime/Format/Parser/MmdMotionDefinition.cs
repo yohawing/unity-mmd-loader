@@ -70,6 +70,8 @@ namespace Mmd.Parser
         public float[] rotation = Array.Empty<float>();
         public MmdBoneInterpolationDefinition interpolation = new();
         public bool physicsEnabled;
+
+        [NonSerialized] internal byte[] rawInterpolation = Array.Empty<byte>();
     }
 
     [Serializable]

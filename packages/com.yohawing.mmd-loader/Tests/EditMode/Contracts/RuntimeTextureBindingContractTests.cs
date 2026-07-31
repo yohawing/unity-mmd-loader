@@ -56,6 +56,80 @@ namespace Mmd.Tests
             }
         }
 
+        [Test]
+        public void RepeatedDiffusePathSharesDecodeAndOwnedTexture()
+        {
+            MmdUnityModelInstance? instance = null;
+            string tempRoot = CreateTempDirectory();
+            try
+            {
+                string pmxPath = Path.Combine(tempRoot, "model.pmx");
+                File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
+                WritePng(Path.Combine(tempRoot, "shared.png"), Color.red);
+
+                MmdModelDefinition model = CreateMinimalTriangleModel();
+                model.indices.AddRange(new[] { 0, 1, 2 });
+                model.materials[0].texture = "shared.png";
+                model.materials.Add(new MmdMaterialDefinition
+                {
+                    index = 1,
+                    name = "shared-texture-material",
+                    texture = "shared.png",
+                    vertexCount = 3
+                });
+
+                instance = MmdUnityModelFactory.CreateStaticModel(model, pmxPath);
+
+                Assert.That(instance.LoadedDiffuseTextureCount, Is.EqualTo(2));
+                Assert.That(instance.TextureDiagnostics.TextureReferences, Has.Count.EqualTo(2));
+                Assert.That(instance.OwnedTextures, Has.Length.EqualTo(1));
+                Assert.That(ReadBoundDiffuseTexture(instance.Materials[0]), Is.SameAs(instance.OwnedTextures[0]));
+                Assert.That(ReadBoundDiffuseTexture(instance.Materials[1]), Is.SameAs(instance.OwnedTextures[0]));
+            }
+            finally
+            {
+                DestroyInstance(instance);
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+
+        [Test]
+        public void SamePathWithDifferentUsageKeepsSeparateTextures()
+        {
+            string tempRoot = CreateTempDirectory();
+            MmdRuntimeTextureResolution? resolution = null;
+            try
+            {
+                string pmxPath = Path.Combine(tempRoot, "model.pmx");
+                File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
+                WritePng(Path.Combine(tempRoot, "shared.png"), Color.blue);
+                MmdModelDefinition model = CreateMinimalTriangleModel();
+                model.materials[0].texture = "shared.png";
+                model.materials[0].sphereTexture = "shared.png";
+
+                resolution = MmdRuntimeTextureResolver.ResolveDiffuseTextures(
+                    MmdRenderingDescriptorBuilder.Build(model),
+                    MmdUnityModelSourceContext.FromOptionalPath(pmxPath));
+
+                Assert.That(resolution.DiffuseTextures, Has.Count.EqualTo(1));
+                Assert.That(resolution.SphereTextures, Has.Count.EqualTo(1));
+                Assert.That(resolution.DiffuseTextures[0].Texture,
+                    Is.Not.SameAs(resolution.SphereTextures[0].Texture));
+            }
+            finally
+            {
+                if (resolution != null)
+                {
+                    foreach (Texture2D texture in resolution.DiffuseTextures.Select(item => item.Texture)
+                                 .Concat(resolution.SphereTextures.Select(item => item.Texture)).Distinct())
+                    {
+                        Object.DestroyImmediate(texture);
+                    }
+                }
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+
         [TestCase(@"..\outside.png")]
         [TestCase("../outside.png")]
         [TestCase(@"textures/sub/..\..\..\outside.png")]

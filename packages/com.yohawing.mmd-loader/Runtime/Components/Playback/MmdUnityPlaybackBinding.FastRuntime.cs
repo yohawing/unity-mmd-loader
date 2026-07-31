@@ -32,12 +32,6 @@ namespace Mmd.UnityIntegration
             }
 
             DisposeFastRuntime();
-            if (model.HasDeformAfterPhysicsBones)
-            {
-                reason = "mmd-runtime fast playback does not support PMX deformAfterPhysics two-pass bone evaluation; managed playback remains active.";
-                return false;
-            }
-
             try
             {
                 MmdRuntimeFfiPlaybackSession candidate = MmdRuntimeFfiPlaybackSession.Create(pmxBytes, vmdBytes);
@@ -177,6 +171,17 @@ namespace Mmd.UnityIntegration
         private MmdPlaybackSnapshot ApplyFastFrame(int frame, float frameRate)
         {
             float time = MmdPlaybackTime.ToTime(frame, frameRate);
+            return ApplyFastCore(frame, time);
+        }
+
+        private MmdPlaybackSnapshot ApplyFastTime(float time, float frameRate)
+        {
+            int frame = MmdPlaybackTime.ToFrame(time, frameRate);
+            return ApplyFastCore(frame, time);
+        }
+
+        private MmdPlaybackSnapshot ApplyFastCore(int frame, float time)
+        {
             fastSession!.EvaluateAndCopy(frame, fastWorldMatrices!, fastMorphWeights!, fastIkEnabled!);
             MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(playbackInstance, fastWorldMatrices!);
             ApplyFastMorphWeights();
@@ -186,24 +191,6 @@ namespace Mmd.UnityIntegration
             // morphs reflects the last-applied fast weights (mutated on subsequent calls).
             // rendering is the active playback descriptor reference.
             // See runtime-session contract "fast-runtime binding snapshot mode".
-            fastMorphFrame!.frame = frame;
-            fastMorphFrame.time = time;
-            fastSnapshot ??= new MmdPlaybackSnapshot
-            {
-                model = modelId,
-                motion = motionId,
-                frame = fastMorphFrame,
-                rendering = playbackInstance.RenderingDescriptor
-            };
-            return fastSnapshot;
-        }
-
-        private MmdPlaybackSnapshot ApplyFastTime(float time, float frameRate)
-        {
-            int frame = MmdPlaybackTime.ToFrame(time, frameRate);
-            fastSession!.EvaluateAndCopy(frame, fastWorldMatrices!, fastMorphWeights!, fastIkEnabled!);
-            MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(playbackInstance, fastWorldMatrices!);
-            ApplyFastMorphWeights();
             fastMorphFrame!.frame = frame;
             fastMorphFrame.time = time;
             fastSnapshot ??= new MmdPlaybackSnapshot

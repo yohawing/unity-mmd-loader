@@ -126,7 +126,7 @@ Shader "MMD Basic URP Toon"
                 Varyings output;
                 float3 normalOS = normalize(input.normalOS);
                 half edgeScale = input.uv1.y > 0.5h ? input.uv1.x : 1.0h;
-                float scaledWidth = _OutlineWidth * edgeScale * 2.0; // HighDPI fix 2.0
+                float scaledWidth = _OutlineWidth * edgeScale;
                 float4 meshNormalPositionCS = TransformObjectToHClip(input.positionOS.xyz + normalOS * scaledWidth);
                 float4 basePositionCS = TransformObjectToHClip(input.positionOS.xyz);
                 float3 normalWS = TransformObjectToWorldNormal(normalOS);

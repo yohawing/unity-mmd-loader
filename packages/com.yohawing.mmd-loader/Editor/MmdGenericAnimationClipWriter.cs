@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 using UnityEditor;
 using UnityEngine;
 using Mmd.Native;
@@ -123,7 +124,7 @@ namespace Mmd.Editor
                     out string nativeSparseReason);
                 if (usedNativeSparse)
                 {
-                    diagnostics.Add("writer: built AnimationClip exclusively from mmd-runtime sparse curve descriptors and keys.");
+                    diagnostics.Add("writer: built AnimationClip exclusively from mmd-runtime generic sparse track descriptors and keys.");
                 }
                 else if (!options.ReduceKeys)
                 {
@@ -234,8 +235,9 @@ namespace Mmd.Editor
 
         public static string GetDefaultOutputPath(MmdPmxAsset? pmxAsset, MmdVmdAsset? vmdAsset)
         {
-            return "Assets/" + GetSourceStem(pmxAsset?.SourceId, "PMX") + "_"
-                   + GetSourceStem(vmdAsset?.SourceId, "VMD") + ".anim";
+            return MmdAssetPathUtility.GetDefaultAnimationOutputPath(
+                pmxAsset?.SourceId,
+                vmdAsset?.SourceId);
         }
 
         private static AnimationClip BakeDenseClip(
@@ -254,8 +256,8 @@ namespace Mmd.Editor
             int frameCount = endFrame - startFrame + 1;
             var clip = new AnimationClip
             {
-                name = "MmdGenericClip_" + NormalizeIdentifier(pmxAsset.SourceId) + "_"
-                       + NormalizeIdentifier(vmdAsset.SourceId) + "_" + startFrame + "_" + endFrame,
+                name = "MmdGenericClip_" + MmdAssetPathUtility.NormalizeIdentifier(pmxAsset.SourceId) + "_"
+                       + MmdAssetPathUtility.NormalizeIdentifier(vmdAsset.SourceId) + "_" + startFrame + "_" + endFrame,
                 frameRate = frameRate
             };
 
@@ -453,13 +455,20 @@ namespace Mmd.Editor
 
                 using (reducedPose)
                 {
-                    // Request native MMD-space curves. This package maps MMD to Unity with a
-                    // 180-degree Y rotation (X/Z sign change), which is not the native FBX
-                    // exporter's Z-reflection option. Apply the package convention below once.
-                    const bool NativeFlipZ = false;
-                    int descriptorCount = reducedPose.GetUnityCurveCount(frameRate, NativeFlipZ);
-                    var bindings = new List<EditorCurveBinding>(descriptorCount);
-                    var curves = new List<AnimationCurve>(descriptorCount);
+                    MmdRuntimeFfiMethods.GenericCurveInfo info = reducedPose.GetGenericCurveInfo();
+                    ValidateGenericCurveInfo(info, bonePaths.Length);
+                    int trackCount = reducedPose.GetGenericCurveCount();
+                    int boneTrackCount = MmdFfiMarshal.CheckedIntPtrToInt(
+                        info.boneCount, "generic reduced pose bone count");
+                    int morphTrackCount = MmdFfiMarshal.CheckedIntPtrToInt(
+                        info.morphCount, "generic reduced pose morph count");
+                    if (trackCount != checked(boneTrackCount + morphTrackCount))
+                    {
+                        throw new InvalidOperationException("native generic reduced pose track count is inconsistent with its metadata.");
+                    }
+
+                    var bindings = new List<EditorCurveBinding>(checked(boneTrackCount * 6 + morphTrackCount));
+                    var curves = new List<AnimationCurve>(bindings.Capacity);
                     var morphBindings = new Dictionary<int, MmdUnityVertexMorphBlendShapeBinding>();
                     foreach (MmdUnityVertexMorphBlendShapeBinding morph in morphs)
                     {
@@ -475,66 +484,129 @@ namespace Mmd.Editor
                         : AnimationUtility.CalculateTransformPath(
                             instance.SkinnedMeshRenderer.transform, instance.Root.transform);
                     string[] axes = { "x", "y", "z" };
-                    for (int curveIndex = 0; curveIndex < descriptorCount; curveIndex++)
+                    for (int trackIndex = 0; trackIndex < trackCount; trackIndex++)
                     {
-                        MmdRuntimeFfiMethods.UnityCurveDescriptor descriptor =
-                            reducedPose.GetUnityCurveDescriptor(frameRate, NativeFlipZ, curveIndex);
+                        MmdRuntimeFfiMethods.GenericCurveDescriptor descriptor =
+                            reducedPose.GetGenericCurveDescriptor(trackIndex);
+                        ValidateGenericCurveDescriptor(descriptor);
                         int targetIndex = checked((int)descriptor.targetIndex);
-                        EditorCurveBinding curveBinding;
-                        if (descriptor.semantic == MmdRuntimeFfiMethods.UnityCurveBoneLocalTranslation ||
-                            descriptor.semantic == MmdRuntimeFfiMethods.UnityCurveBoneLocalEuler)
+                        MmdRuntimeFfiMethods.GenericCurveKey[] nativeKeys =
+                            reducedPose.GetGenericCurveKeys(trackIndex);
+                        int declaredKeyCount = MmdFfiMarshal.CheckedIntPtrToInt(
+                            descriptor.keyCount, "generic reduced pose descriptor key count");
+                        if (nativeKeys.Length != declaredKeyCount)
                         {
-                            if (targetIndex < 0 || targetIndex >= bonePaths.Length || descriptor.axis >= 3)
+                            throw new InvalidOperationException("native generic reduced pose descriptor/key count mismatch.");
+                        }
+
+                        if (descriptor.kind == MmdRuntimeFfiMethods.GenericCurveBoneLocal)
+                        {
+                            if (targetIndex < 0 || targetIndex >= bonePaths.Length ||
+                                descriptor.valueFlags != (MmdRuntimeFfiMethods.GenericValueTranslation |
+                                                          MmdRuntimeFfiMethods.GenericValueQuaternion) ||
+                                descriptor.rotationBasis != MmdRuntimeFfiMethods.GenericRotationBasisRuntimeQuaternion)
                             {
-                                throw new InvalidOperationException("native reduced pose returned an invalid bone curve descriptor.");
+                                throw new InvalidOperationException("native generic reduced pose returned an invalid bone track descriptor.");
                             }
 
-                            string property = descriptor.semantic == MmdRuntimeFfiMethods.UnityCurveBoneLocalTranslation
-                                ? "m_LocalPosition." + axes[descriptor.axis]
-                                : "localEulerAnglesRaw." + axes[descriptor.axis];
-                            curveBinding = EditorCurveBinding.FloatCurve(
-                                bonePaths[targetIndex], typeof(Transform), property);
+                            Vector3[] eulerDegrees = ConvertGenericRotationKeysToEulerDegrees(nativeKeys);
+                            for (int axis = 0; axis < 3; axis++)
+                            {
+                                float valueScale = axis == 1 ? instance.ImportScale : -instance.ImportScale;
+                                var unityKeys = new Keyframe[nativeKeys.Length];
+                                for (int keyIndex = 0; keyIndex < nativeKeys.Length; keyIndex++)
+                                {
+                                    float inTangent = keyIndex == 0
+                                        ? 0.0f
+                                        : GetTranslationInTangent(nativeKeys[keyIndex], axis);
+                                    float outTangent = keyIndex + 1 == nativeKeys.Length
+                                        ? 0.0f
+                                        : GetTranslationOutTangent(nativeKeys[keyIndex + 1], axis);
+                                    unityKeys[keyIndex] = CreateGenericKeyframe(
+                                        nativeKeys[keyIndex].frame,
+                                        GetTranslation(nativeKeys[keyIndex], axis),
+                                        inTangent,
+                                        outTangent,
+                                        frameRate,
+                                        valueScale,
+                                        1.0f);
+                                }
+
+                                bindings.Add(EditorCurveBinding.FloatCurve(
+                                    bonePaths[targetIndex], typeof(Transform), "m_LocalPosition." + axes[axis]));
+                                curves.Add(new AnimationCurve(unityKeys));
+                            }
+
+                            for (int axis = 0; axis < 3; axis++)
+                            {
+                                float valueScale = axis == 1 ? 1.0f : -1.0f;
+                                var unityKeys = new Keyframe[nativeKeys.Length];
+                                for (int keyIndex = 0; keyIndex < nativeKeys.Length; keyIndex++)
+                                {
+                                    float inTangent = keyIndex == 0
+                                        ? 0.0f
+                                        : GetRotationInTangent(nativeKeys[keyIndex], axis);
+                                    float outTangent = keyIndex + 1 == nativeKeys.Length
+                                        ? 0.0f
+                                        : GetRotationOutTangent(nativeKeys[keyIndex + 1], axis);
+                                    unityKeys[keyIndex] = CreateGenericKeyframe(
+                                        nativeKeys[keyIndex].frame,
+                                        eulerDegrees[keyIndex][axis],
+                                        inTangent,
+                                        outTangent,
+                                        frameRate,
+                                        valueScale,
+                                        Mathf.Rad2Deg);
+                                }
+
+                                bindings.Add(EditorCurveBinding.FloatCurve(
+                                    bonePaths[targetIndex], typeof(Transform), "localEulerAnglesRaw." + axes[axis]));
+                                curves.Add(new AnimationCurve(unityKeys));
+                            }
                         }
-                        else if (descriptor.semantic == MmdRuntimeFfiMethods.UnityCurveMorphWeight)
+                        else if (descriptor.kind == MmdRuntimeFfiMethods.GenericCurveMorphWeight)
                         {
-                            if (descriptor.axis != MmdRuntimeFfiMethods.UnityCurveAxisNone ||
-                                instance.SkinnedMeshRenderer == null ||
+                            if (descriptor.valueFlags != MmdRuntimeFfiMethods.GenericValueScalar ||
+                                descriptor.rotationBasis != MmdRuntimeFfiMethods.GenericRotationBasisNone)
+                            {
+                                throw new InvalidOperationException("native generic reduced pose returned an invalid morph track descriptor.");
+                            }
+
+                            if (instance.SkinnedMeshRenderer == null ||
                                 !morphBindings.TryGetValue(targetIndex, out MmdUnityVertexMorphBlendShapeBinding morph))
                             {
                                 continue;
                             }
 
-                            curveBinding = EditorCurveBinding.FloatCurve(
+                            var unityKeys = new Keyframe[nativeKeys.Length];
+                            for (int keyIndex = 0; keyIndex < nativeKeys.Length; keyIndex++)
+                            {
+                                float inTangent = keyIndex == 0
+                                    ? 0.0f
+                                    : nativeKeys[keyIndex].segmentCurrentInScalar;
+                                float outTangent = keyIndex + 1 == nativeKeys.Length
+                                    ? 0.0f
+                                    : nativeKeys[keyIndex + 1].segmentPrevOutScalar;
+                                unityKeys[keyIndex] = CreateGenericKeyframe(
+                                    nativeKeys[keyIndex].frame,
+                                    nativeKeys[keyIndex].scalar,
+                                    inTangent,
+                                    outTangent,
+                                    frameRate,
+                                    100.0f,
+                                    1.0f);
+                            }
+
+                            bindings.Add(EditorCurveBinding.FloatCurve(
                                 rendererPath,
                                 typeof(SkinnedMeshRenderer),
-                                "blendShape." + morph.BlendShapeName);
+                                "blendShape." + morph.BlendShapeName));
+                            curves.Add(new AnimationCurve(unityKeys));
                         }
                         else
                         {
-                            throw new InvalidOperationException("native reduced pose returned an unknown curve semantic.");
+                            throw new InvalidOperationException("native generic reduced pose returned an unknown track kind.");
                         }
-
-                        MmdRuntimeFfiMethods.UnityCurveKey[] nativeKeys =
-                            reducedPose.GetUnityCurveKeys(frameRate, NativeFlipZ, curveIndex);
-                        int declaredKeyCount = MmdFfiMarshal.CheckedIntPtrToInt(
-                            descriptor.keyCount, "reduced pose descriptor key count");
-                        if (nativeKeys.Length != declaredKeyCount)
-                        {
-                            throw new InvalidOperationException("native reduced pose descriptor/key count mismatch.");
-                        }
-
-                        var unityKeys = new Keyframe[nativeKeys.Length];
-                        // Rust owns Euler filtering/degree conversion and per-second tangents.
-                        // The host applies its coordinate convention and PMX unit scale to both
-                        // value and dv/dt so the native Hermite curve remains intact.
-                        float valueScale = GetSparseCurveValueScale(descriptor, instance.ImportScale);
-                        for (int keyIndex = 0; keyIndex < nativeKeys.Length; keyIndex++)
-                        {
-                            unityKeys[keyIndex] = CreateUnityKeyframe(nativeKeys[keyIndex], valueScale);
-                        }
-
-                        bindings.Add(curveBinding);
-                        curves.Add(new AnimationCurve(unityKeys));
                     }
 
                     AnimationUtility.SetEditorCurves(clip, bindings.ToArray(), curves.ToArray());
@@ -558,43 +630,158 @@ namespace Mmd.Editor
                 MmdRuntimeUnsupportedException;
         }
 
-        internal static Keyframe CreateUnityKeyframe(
-            MmdRuntimeFfiMethods.UnityCurveKey key,
-            float valueScale)
+        internal static Keyframe CreateGenericKeyframe(
+            float frame,
+            float value,
+            float inTangentPerFrame,
+            float outTangentPerFrame,
+            float framesPerSecond,
+            float valueScale,
+            float tangentUnitScale)
         {
-            if (!float.IsFinite(valueScale) || valueScale == 0.0f)
+            if (!float.IsFinite(frame) || !float.IsFinite(value) ||
+                !float.IsFinite(inTangentPerFrame) || !float.IsFinite(outTangentPerFrame) ||
+                !float.IsFinite(framesPerSecond) || framesPerSecond <= 0.0f ||
+                !float.IsFinite(valueScale) || valueScale == 0.0f ||
+                !float.IsFinite(tangentUnitScale) || tangentUnitScale <= 0.0f)
             {
-                throw new ArgumentOutOfRangeException(nameof(valueScale));
+                throw new ArgumentOutOfRangeException(nameof(framesPerSecond));
             }
 
             return new Keyframe(
-                key.timeSeconds,
-                key.value * valueScale,
-                key.inTangent * valueScale,
-                key.outTangent * valueScale);
+                frame / framesPerSecond,
+                value * valueScale,
+                inTangentPerFrame * framesPerSecond * tangentUnitScale * valueScale,
+                outTangentPerFrame * framesPerSecond * tangentUnitScale * valueScale);
         }
 
-        internal static float GetSparseCurveValueScale(
-            MmdRuntimeFfiMethods.UnityCurveDescriptor descriptor,
-            float importScale)
+        internal static Vector3[] ConvertGenericRotationKeysToEulerDegrees(
+            MmdRuntimeFfiMethods.GenericCurveKey[] keys)
         {
-            if (!float.IsFinite(importScale) || importScale <= 0.0f)
+            var result = new Vector3[keys.Length];
+            double[]? previous = null;
+            const double RadiansToDegrees = 180.0 / Math.PI;
+            for (int index = 0; index < keys.Length; index++)
             {
-                throw new ArgumentOutOfRangeException(nameof(importScale));
+                MmdRuntimeFfiMethods.GenericCurveKey key = keys[index];
+                double x = key.rotationX;
+                double y = key.rotationY;
+                double z = key.rotationZ;
+                double w = key.rotationW;
+                double sinBeta = Math.Max(-1.0, Math.Min(1.0, 2.0 * (w * y - x * z)));
+                double beta = Math.Asin(sinBeta);
+                double alpha;
+                double gamma;
+                if (Math.Abs(Math.Cos(beta)) < 1.0e-6)
+                {
+                    alpha = Math.Atan2(2.0 * (x * y + w * z), 1.0 - 2.0 * (y * y + z * z));
+                    gamma = 0.0;
+                }
+                else
+                {
+                    alpha = Math.Atan2(2.0 * (y * z + w * x), 1.0 - 2.0 * (x * x + y * y));
+                    gamma = Math.Atan2(2.0 * (x * y + w * z), 1.0 - 2.0 * (y * y + z * z));
+                }
+
+                var current = new[]
+                {
+                    alpha * RadiansToDegrees,
+                    beta * RadiansToDegrees,
+                    gamma * RadiansToDegrees
+                };
+                if (previous != null)
+                {
+                    for (int axis = 0; axis < 3; axis++)
+                    {
+                        while (current[axis] - previous[axis] > 180.0)
+                        {
+                            current[axis] -= 360.0;
+                        }
+
+                        while (current[axis] - previous[axis] < -180.0)
+                        {
+                            current[axis] += 360.0;
+                        }
+                    }
+                }
+
+                result[index] = new Vector3((float)current[0], (float)current[1], (float)current[2]);
+                previous = current;
             }
 
-            bool flipAxis = descriptor.axis == 0 || descriptor.axis == 2;
-            if (descriptor.semantic == MmdRuntimeFfiMethods.UnityCurveBoneLocalTranslation)
-            {
-                return flipAxis ? -importScale : importScale;
-            }
+            return result;
+        }
 
-            if (descriptor.semantic == MmdRuntimeFfiMethods.UnityCurveBoneLocalEuler)
+        private static void ValidateGenericCurveInfo(
+            MmdRuntimeFfiMethods.GenericCurveInfo info,
+            int expectedBoneCount)
+        {
+            if (info.structSize != Marshal.SizeOf<MmdRuntimeFfiMethods.GenericCurveInfo>() ||
+                info.abiVersion != MmdRuntimeFfiMethods.GenericCurveAbiVersionV1 ||
+                info.reductionTarget != MmdRuntimeFfiMethods.ReductionTargetDccCubic ||
+                info.coordinateSystem != 0 || info.lengthUnit != 0 || info.angleUnit != 0 ||
+                info.timeUnit != 0 || info.tangentUnit != 0 ||
+                !float.IsFinite(info.startFrame) || !float.IsFinite(info.frameStep) || info.frameStep <= 0.0f ||
+                MmdFfiMarshal.CheckedIntPtrToInt(info.boneCount, "generic reduced pose bone count") != expectedBoneCount)
             {
-                return flipAxis ? -1.0f : 1.0f;
+                throw new InvalidOperationException("native generic reduced pose metadata does not match the Unity adapter contract.");
             }
+        }
 
-            return 1.0f;
+        private static void ValidateGenericCurveDescriptor(
+            MmdRuntimeFfiMethods.GenericCurveDescriptor descriptor)
+        {
+            if (descriptor.structSize != Marshal.SizeOf<MmdRuntimeFfiMethods.GenericCurveDescriptor>() ||
+                descriptor.abiVersion != MmdRuntimeFfiMethods.GenericCurveAbiVersionV1 ||
+                descriptor.interpolation != MmdRuntimeFfiMethods.ReductionTargetDccCubic)
+            {
+                throw new InvalidOperationException("native generic reduced pose descriptor does not match the Unity adapter contract.");
+            }
+        }
+
+        private static float GetTranslation(MmdRuntimeFfiMethods.GenericCurveKey key, int axis)
+        {
+            return axis switch { 0 => key.translationX, 1 => key.translationY, _ => key.translationZ };
+        }
+
+        private static float GetTranslationInTangent(MmdRuntimeFfiMethods.GenericCurveKey key, int axis)
+        {
+            return axis switch
+            {
+                0 => key.segmentCurrentInTranslationX,
+                1 => key.segmentCurrentInTranslationY,
+                _ => key.segmentCurrentInTranslationZ
+            };
+        }
+
+        private static float GetTranslationOutTangent(MmdRuntimeFfiMethods.GenericCurveKey key, int axis)
+        {
+            return axis switch
+            {
+                0 => key.segmentPrevOutTranslationX,
+                1 => key.segmentPrevOutTranslationY,
+                _ => key.segmentPrevOutTranslationZ
+            };
+        }
+
+        private static float GetRotationInTangent(MmdRuntimeFfiMethods.GenericCurveKey key, int axis)
+        {
+            return axis switch
+            {
+                0 => key.segmentCurrentInRotationX,
+                1 => key.segmentCurrentInRotationY,
+                _ => key.segmentCurrentInRotationZ
+            };
+        }
+
+        private static float GetRotationOutTangent(MmdRuntimeFfiMethods.GenericCurveKey key, int axis)
+        {
+            return axis switch
+            {
+                0 => key.segmentPrevOutRotationX,
+                1 => key.segmentPrevOutRotationY,
+                _ => key.segmentPrevOutRotationZ
+            };
         }
 
         internal static void SetSparseEulerRotationOrderToXyz(AnimationClip clip)
@@ -927,20 +1114,6 @@ namespace Mmd.Editor
                 if (texture != null && destroyedTextures.Add(texture)) UnityEngine.Object.DestroyImmediate(texture);
         }
 
-        private static string NormalizeIdentifier(string value)
-        {
-            return string.IsNullOrWhiteSpace(value)
-                ? "asset"
-                : value.Replace('/', '_').Replace('\\', '_').Replace(':', '_').Replace('.', '_');
-        }
-
-        private static string GetSourceStem(string? sourceId, string fallback)
-        {
-            string fileName = string.IsNullOrWhiteSpace(sourceId)
-                ? fallback
-                : Path.GetFileNameWithoutExtension(sourceId!.Replace('\\', '/')) ?? fallback;
-            return NormalizeIdentifier(fileName);
-        }
     }
 
     public sealed class MmdGenericAnimationClipWriterResult

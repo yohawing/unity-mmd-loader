@@ -1,7 +1,6 @@
 #nullable enable
 
 using System.Collections.Generic;
-using System.Diagnostics;
 using Mmd.Motion;
 using Mmd.Parser;
 using Mmd.Physics;
@@ -12,26 +11,13 @@ namespace Mmd
     internal sealed class MmdRuntimeFrameEvaluation
     {
         public MmdSampledMotion SampledMotion { get; init; } = new();
-        public Dictionary<int, float[]> SampledWorldMatrices { get; init; } = new();
+        public Dictionary<int, float[]>? SampledWorldMatrices { get; init; }
         public MmdSampledMotion AppendedMotion { get; init; } = new();
-        public Dictionary<int, float[]> AppendedWorldMatrices { get; init; } = new();
+        public Dictionary<int, float[]>? AppendedWorldMatrices { get; init; }
         public MmdSampledMotion IkMotion { get; init; } = new();
-        public Dictionary<int, float[]> IkWorldMatrices { get; init; } = new();
+        public Dictionary<int, float[]>? IkWorldMatrices { get; init; }
         public MmdSampledMotion FinalMotion { get; init; } = new();
         public Dictionary<int, float[]> WorldMatrices { get; init; } = new();
-        public MmdRuntimeFrameTiming? Timing { get; init; }
-    }
-
-    internal sealed class MmdRuntimeFrameTiming
-    {
-        public long MotionSamplingTicks { get; set; }
-        public long SampledWorldTicks { get; set; }
-        public long BoneMorphTicks { get; set; }
-        public long AppendTransformTicks { get; set; }
-        public long AppendedWorldTicks { get; set; }
-        public long IkSolveTicks { get; set; }
-        public long IkWorldTicks { get; set; }
-        public long PhysicsStepTicks { get; set; }
     }
 
     internal static class MmdRuntimeFramePipeline
@@ -41,68 +27,97 @@ namespace Mmd
             MmdMotionDefinition motion,
             int frame,
             IMmdPhysicsBackend physicsBackend,
-            IMmdIkSolver? ikSolver = null,
-            bool collectTiming = false)
+            IMmdIkSolver? ikSolver = null)
         {
+            return EvaluateWithOptions(
+                model,
+                motion,
+                frame,
+                physicsBackend,
+                ikSolver,
+                captureCheckpoints: true);
+        }
+
+        internal static MmdRuntimeFrameEvaluation EvaluateWithOptions(
+            MmdModelDefinition model,
+            MmdMotionDefinition motion,
+            int frame,
+            IMmdPhysicsBackend physicsBackend,
+            IMmdIkSolver? ikSolver = null,
+            bool captureCheckpoints = false,
+            MmdTopologyPlan? topologyPlan = null,
+            bool stopBeforePhysics = false)
+        {
+            topologyPlan?.EnsureModel(model);
             ikSolver ??= new MmdIkSolver();
-            MmdRuntimeFrameTiming? timing = collectTiming ? new MmdRuntimeFrameTiming() : null;
-            long started;
 
-            started = Stopwatch.GetTimestamp();
-            MmdSampledMotion sampledMotion = VmdMotionSampler.Sample(motion, frame);
-            RecordTiming(timing, started, ticks => timing!.MotionSamplingTicks = ticks);
+            MmdSampledMotion sampledMotion = VmdMotionSampler.Sample(motion, model, frame);
 
-            started = Stopwatch.GetTimestamp();
-            Dictionary<int, float[]> sampledWorldMatrices = MmdPoseEvaluator.EvaluateWorldMatrices(model, sampledMotion);
-            RecordTiming(timing, started, ticks => timing!.SampledWorldTicks = ticks);
+            Dictionary<int, float[]>? sampledWorldMatrices = captureCheckpoints
+                ? EvaluateWorldMatrices(model, topologyPlan, sampledMotion) : null;
 
-            started = Stopwatch.GetTimestamp();
             MmdSampledMotion boneMorphedMotion = MmdBoneMorphEvaluator.ApplyBoneMorphs(model, sampledMotion);
-            RecordTiming(timing, started, ticks => timing!.BoneMorphTicks = ticks);
 
-            started = Stopwatch.GetTimestamp();
             MmdSampledMotion appendedMotion = ApplyBeforePhysicsAppendTransforms(model, boneMorphedMotion, ikSolver);
-            RecordTiming(timing, started, ticks => timing!.AppendTransformTicks = ticks);
 
-            started = Stopwatch.GetTimestamp();
-            Dictionary<int, float[]> appendedWorldMatrices = MmdPoseEvaluator.EvaluateWorldMatrices(model, appendedMotion);
-            RecordTiming(timing, started, ticks => timing!.AppendedWorldTicks = ticks);
+            Dictionary<int, float[]>? appendedWorldMatrices = captureCheckpoints
+                ? EvaluateWorldMatrices(model, topologyPlan, appendedMotion) : null;
 
-            started = Stopwatch.GetTimestamp();
             MmdSampledMotion ikMotion = ikSolver is MmdIkSolver mmdIkSolver
-                ? mmdIkSolver.Solve(model, boneMorphedMotion, appendedMotion, MmdBoneEvaluationPass.BeforePhysics)
-                : ikSolver.Solve(model, appendedMotion);
-            RecordTiming(timing, started, ticks => timing!.IkSolveTicks = ticks);
+                ? topologyPlan != null
+                    ? mmdIkSolver.SolveWithValidatedTopology(
+                        model,
+                        boneMorphedMotion,
+                        appendedMotion,
+                        MmdBoneEvaluationPass.BeforePhysics,
+                        topologyPlan)
+                    : mmdIkSolver.Solve(model, boneMorphedMotion, appendedMotion, MmdBoneEvaluationPass.BeforePhysics)
+                    : ikSolver.Solve(model, appendedMotion);
 
-            started = Stopwatch.GetTimestamp();
-            Dictionary<int, float[]> ikWorldMatrices = MmdPoseEvaluator.EvaluateWorldMatrices(model, ikMotion);
-            RecordTiming(timing, started, ticks => timing!.IkWorldTicks = ticks);
+            Dictionary<int, float[]>? ikWorldMatrices = captureCheckpoints
+                ? EvaluateWorldMatrices(model, topologyPlan, ikMotion) : null;
 
-            started = Stopwatch.GetTimestamp();
+            if (stopBeforePhysics)
+            {
+                return new MmdRuntimeFrameEvaluation
+                {
+                    SampledMotion = sampledMotion,
+                    SampledWorldMatrices = sampledWorldMatrices,
+                    AppendedMotion = appendedMotion,
+                    AppendedWorldMatrices = appendedWorldMatrices,
+                    IkMotion = ikMotion,
+                    IkWorldMatrices = ikWorldMatrices,
+                    FinalMotion = ikMotion,
+                    WorldMatrices = ikWorldMatrices ?? EvaluateWorldMatrices(model, topologyPlan, ikMotion)
+                };
+            }
+
             physicsBackend.Step(frame, deltaTime: 0.0f);
-            RecordTiming(timing, started, ticks => timing!.PhysicsStepTicks = ticks);
 
             MmdSampledMotion finalMotion = ikMotion;
-            Dictionary<int, float[]> finalWorldMatrices = ikWorldMatrices;
+            Dictionary<int, float[]> finalWorldMatrices = captureCheckpoints
+                ? ikWorldMatrices!
+                : EvaluateWorldMatrices(model, topologyPlan, ikMotion);
             if (model.HasDeformAfterPhysicsBones)
             {
-                started = Stopwatch.GetTimestamp();
                 MmdSampledMotion afterAppendMotion = MmdAppendTransformEvaluator.ApplyAppendTransforms(
                     model,
                     ikMotion,
                     MmdBoneEvaluationPass.AfterPhysics);
-                RecordTiming(timing, started, ticks => timing!.AppendTransformTicks += ticks);
 
-                started = Stopwatch.GetTimestamp();
                 MmdSampledMotion afterIkMotion = ikSolver is MmdIkSolver afterPassIkSolver
-                    ? afterPassIkSolver.Solve(model, ikMotion, afterAppendMotion, MmdBoneEvaluationPass.AfterPhysics)
-                    : ikSolver.Solve(model, afterAppendMotion);
+                    ? topologyPlan != null
+                        ? afterPassIkSolver.SolveWithValidatedTopology(
+                            model,
+                            ikMotion,
+                            afterAppendMotion,
+                            MmdBoneEvaluationPass.AfterPhysics,
+                            topologyPlan)
+                        : afterPassIkSolver.Solve(model, ikMotion, afterAppendMotion, MmdBoneEvaluationPass.AfterPhysics)
+                        : ikSolver.Solve(model, afterAppendMotion);
                 finalMotion = MergeAfterPhysicsMotion(model, ikMotion, afterIkMotion);
-                RecordTiming(timing, started, ticks => timing!.IkSolveTicks += ticks);
 
-                started = Stopwatch.GetTimestamp();
-                finalWorldMatrices = MmdPoseEvaluator.EvaluateWorldMatrices(model, finalMotion);
-                RecordTiming(timing, started, ticks => timing!.IkWorldTicks += ticks);
+                finalWorldMatrices = EvaluateWorldMatrices(model, topologyPlan, finalMotion);
             }
 
             return new MmdRuntimeFrameEvaluation
@@ -114,9 +129,18 @@ namespace Mmd
                 IkMotion = ikMotion,
                 IkWorldMatrices = ikWorldMatrices,
                 FinalMotion = finalMotion,
-                WorldMatrices = finalWorldMatrices,
-                Timing = timing
+                WorldMatrices = finalWorldMatrices
             };
+        }
+
+        private static Dictionary<int, float[]> EvaluateWorldMatrices(
+            MmdModelDefinition model,
+            MmdTopologyPlan? topologyPlan,
+            MmdSampledMotion motion)
+        {
+            return topologyPlan != null
+                ? MmdPoseEvaluator.EvaluateWorldMatrices(topologyPlan, motion)
+                : MmdPoseEvaluator.EvaluateWorldMatrices(model, motion);
         }
 
         private static MmdSampledMotion ApplyBeforePhysicsAppendTransforms(
@@ -185,16 +209,6 @@ namespace Mmd
             }
 
             return result;
-        }
-
-        private static void RecordTiming(MmdRuntimeFrameTiming? timing, long started, System.Action<long> assign)
-        {
-            if (timing == null)
-            {
-                return;
-            }
-
-            assign(Stopwatch.GetTimestamp() - started);
         }
     }
 }

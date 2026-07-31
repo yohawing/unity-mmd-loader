@@ -119,7 +119,7 @@ namespace Mmd.Tests
             Assert.That(toonLitSource, Does.Not.Contain("LinearToSRGB(_BaseColor.rgb) * (mainLightSrgb + ambientShSrgb + reflectionSrgb)"));
             Assert.That(toonLitSource, Does.Contain("#pragma multi_compile_fog"));
             Assert.That(toonLitSource, Does.Contain("output.fogFactor = ComputeFogFactor(output.positionCS.z);"));
-            Assert.That(toonLitSource, Does.Contain("half3 foggedLinear = MixFog(SRGBToLinear(litSrgb), input.fogFactor);"));
+            Assert.That(toonLitSource, Does.Contain("half3 foggedLinear = MixFog(SRGBToLinear(litSrgb) + emissionLinear, input.fogFactor);"));
             Assert.That(toonLitSource, Does.Contain("_GammaTarget > 0.5h ? LinearToSRGB(foggedLinear) : foggedLinear"));
 
             Shader toonLitShader = Shader.Find(MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName);
@@ -190,7 +190,8 @@ namespace Mmd.Tests
             Assert.That(toonLitSource, Does.Contain("half3 shadeColorToonLight = ApplyMmdShadeColors(shadeVisibility);"));
             Assert.That(toonLitSource, Does.Contain("if (_ToonAuthoringMode > 0.5h)"));
             Assert.That(toonLitSource, Does.Contain("half3 mmdToonLight = lerp(selfShadowToon, half3(1.0h, 1.0h, 1.0h), toonRampVisibility);"));
-            Assert.That(toonLitSource, Does.Contain("half3 selfShadowMmdToonLight = lerp(selfShadowToon, half3(1.0h, 1.0h, 1.0h), toonVisibility);"));
+            Assert.That(toonLitSource, Does.Contain("half3 selfShadowMmdToonLight = lerp("));
+            Assert.That(toonLitSource, Does.Contain("half3 selfShadowToonLight = lerp(ndotl.xxx, selfShadowMmdToonLight, _ToonStrength);"));
             Assert.That(toonLitSource, Does.Contain("_StylizedSpecularColor (\"Stylized Specular Color\", Color) = (1, 1, 1, 1)"));
             Assert.That(toonLitSource, Does.Contain("_StylizedSpecularBoundary (\"Stylized Specular Boundary\", Range(-1, 1)) = -1"));
             Assert.That(toonLitSource, Does.Contain("_StylizedSpecularFeather (\"Stylized Specular Feather\", Range(-1, 1)) = -1"));

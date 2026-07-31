@@ -8,6 +8,21 @@ namespace Mmd.UnityIntegration
 {
     internal static partial class MmdUnityMaterialBuilder
     {
+        private static void ApplyMapperShaderState(
+            Material material,
+            MmdMaterialRenderingTargets targets)
+        {
+            foreach (string keyword in targets.RequiredKeywords)
+            {
+                material.EnableKeyword(keyword);
+            }
+
+            foreach (string passName in targets.RequiredPasses)
+            {
+                material.SetShaderPassEnabled(passName, true);
+            }
+        }
+
         private static void ApplyUrpLitDefaults(Material[] materials)
         {
             foreach (Material material in materials)
@@ -39,25 +54,28 @@ namespace Mmd.UnityIntegration
             }
         }
 
-        private static void ApplyMaterialColors(Material material, MmdMaterialDescriptor source)
+        private static void ApplyMaterialColors(
+            Material material,
+            MmdMaterialDescriptor source,
+            MmdMaterialRenderingTargets targets)
         {
             Color diffuse = ToColor(source.diffuseColor, source.alpha, Color.white);
             Color ambient = ToColor(source.ambientColor, 1.0f, new Color(0.25f, 0.25f, 0.25f, 1.0f));
             float edgeAlpha = source.edgeColor != null && source.edgeColor.Length > 3 ? source.edgeColor[3] : 1.0f;
             Color edge = ToColor(source.edgeColor, edgeAlpha, Color.black);
-            if (material.HasProperty("_BaseColor"))
+            if (HasProperty(material, targets.BaseColorProperty))
             {
-                material.SetColor("_BaseColor", diffuse);
+                material.SetColor(targets.BaseColorProperty, diffuse);
             }
 
-            if (material.HasProperty("_Color"))
+            if (HasProperty(material, targets.ColorProperty))
             {
-                material.SetColor("_Color", Color.white);
+                material.SetColor(targets.ColorProperty, Color.white);
             }
 
-            if (material.HasProperty("_AmbientColor"))
+            if (HasProperty(material, targets.AmbientColorProperty))
             {
-                material.SetColor("_AmbientColor", ambient);
+                material.SetColor(targets.AmbientColorProperty, ambient);
             }
 
             if (material.HasProperty(MmdMaterialPropertyNames.ToonBoundary))
@@ -133,30 +151,35 @@ namespace Mmd.UnityIntegration
                 material.SetFloat(MmdMaterialPropertyNames.RimLightFollow, source.rimLightFollow);
             }
 
-            if (material.HasProperty("_OutlineColor"))
+            if (HasProperty(material, targets.OutlineColorProperty))
             {
-                material.SetColor("_OutlineColor", edge);
+                material.SetColor(targets.OutlineColorProperty, edge);
             }
 
-            if (material.HasProperty("_OutlineWidth"))
+            if (HasProperty(material, targets.OutlineWidthProperty))
             {
-                material.SetFloat("_OutlineWidth", source.drawEdgeFlag ? source.edgeSize : 0.0f);
+                material.SetFloat(targets.OutlineWidthProperty, source.drawEdgeFlag ? source.edgeSize : 0.0f);
             }
 
-            if (material.HasProperty("_OutlineVisible"))
+            if (HasProperty(material, targets.OutlineVisibleProperty))
             {
-                material.SetFloat("_OutlineVisible", source.drawEdgeFlag ? 1.0f : 0.0f);
+                material.SetFloat(targets.OutlineVisibleProperty, source.drawEdgeFlag ? 1.0f : 0.0f);
             }
 
-            if (material.HasProperty("_OutlineScreenSpaceWeight"))
+            if (HasProperty(material, targets.OutlineScreenSpaceWeightProperty))
             {
-                material.SetFloat("_OutlineScreenSpaceWeight", PmxOutlineScreenSpaceWeight);
+                material.SetFloat(targets.OutlineScreenSpaceWeightProperty, PmxOutlineScreenSpaceWeight);
             }
 
-            if (material.HasProperty("_OutlineZTest"))
+            if (HasProperty(material, targets.OutlineZTestProperty))
             {
-                material.SetFloat("_OutlineZTest", OutlineZTest);
+                material.SetFloat(targets.OutlineZTestProperty, OutlineZTest);
             }
+        }
+
+        private static bool HasProperty(Material material, string propertyName)
+        {
+            return !string.IsNullOrWhiteSpace(propertyName) && material.HasProperty(propertyName);
         }
 
         private static Color ToColor(float[]? values, float alpha, Color fallback)
@@ -188,7 +211,7 @@ namespace Mmd.UnityIntegration
 
         private static void SetColorAlpha(Material material, string propertyName, float alpha)
         {
-            if (!material.HasProperty(propertyName))
+            if (!HasProperty(material, propertyName))
             {
                 return;
             }

@@ -34,6 +34,7 @@ namespace Mmd.UnityIntegration
         [SerializeField] private int initialFrame;
         [SerializeField] private float frameRate = 30.0f;
         [SerializeField] private MmdPhysicsMode physicsMode = MmdPhysicsMode.Live;
+        [SerializeField] private int livePhysicsBodyDiagnosticsSampleInterval;
         [SerializeField] private MmdPmxAsset? modelAsset;
         [SerializeField] private MmdVmdAsset? motionAsset;
         [SerializeField] private string lastFastRuntimeReason = string.Empty;
@@ -86,6 +87,29 @@ namespace Mmd.UnityIntegration
 
         public MmdLivePhysicsFrameDiagnostics? LastLivePhysicsDiagnostics =>
             binding?.LastLivePhysicsDiagnostics ?? humanoidPhysicsBinding?.LastLivePhysicsDiagnostics;
+
+        public int LivePhysicsBodyDiagnosticsSampleInterval
+        {
+            get => livePhysicsBodyDiagnosticsSampleInterval;
+            set
+            {
+                if (value < 0)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(value), "Live physics body diagnostics sample interval must be non-negative.");
+                }
+
+                livePhysicsBodyDiagnosticsSampleInterval = value;
+                if (binding != null)
+                {
+                    binding.LivePhysicsBodyDiagnosticsSampleInterval = value;
+                }
+
+                if (humanoidPhysicsBinding != null)
+                {
+                    humanoidPhysicsBinding.LivePhysicsBodyDiagnosticsSampleInterval = value;
+                }
+            }
+        }
 
         internal bool HasHumanoidPhysicsBinding => humanoidPhysicsBinding != null;
 
@@ -145,6 +169,7 @@ namespace Mmd.UnityIntegration
             LastSnapshot = null;
             IsPlaying = false;
             this.playOnStart = playOnStart;
+            binding.LivePhysicsBodyDiagnosticsSampleInterval = livePhysicsBodyDiagnosticsSampleInterval;
             binding.SetPhysicsMode(physicsMode);
             ResetLivePhysicsDriveSource();
             ConfigurationRevision++;
@@ -370,6 +395,17 @@ namespace Mmd.UnityIntegration
 
         private void OnValidate()
         {
+            livePhysicsBodyDiagnosticsSampleInterval = Math.Max(0, livePhysicsBodyDiagnosticsSampleInterval);
+            if (binding != null)
+            {
+                binding.LivePhysicsBodyDiagnosticsSampleInterval = livePhysicsBodyDiagnosticsSampleInterval;
+            }
+
+            if (humanoidPhysicsBinding != null)
+            {
+                humanoidPhysicsBinding.LivePhysicsBodyDiagnosticsSampleInterval = livePhysicsBodyDiagnosticsSampleInterval;
+            }
+
             if (binding == null)
             {
                 ValidatePhysicsModeForSerialization();

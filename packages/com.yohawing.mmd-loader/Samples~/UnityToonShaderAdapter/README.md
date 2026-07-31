@@ -12,6 +12,11 @@ Import this sample through Package Manager, open `Scenes/UnityToonShaderAdapterD
 
 UTS is optional. When `Toon/Toon` is missing or fails schema validation, the right side intentionally retains the original MMD Toon materials and the overlay reports `UTS_FALLBACK_MMD_TOON`; the scene remains playable and does not throw. No external or licensed MMD asset is required.
 
+While the scene is playing, expand `Legacy MMD Toon` or `UTS converted` in the Hierarchy and
+select a generated child. The `Mesh Renderer > Materials` field opens the corresponding Legacy or
+UTS material in the Material Inspector for side-by-side property/pass inspection. Generated
+objects and materials are transient and are destroyed when the demo component is disabled.
+
 ```csharp
 var diagnostics = new List<UnityToonShaderDiagnostic>();
 if (UnityToonShaderAdapter.TryConvertMaterials(
@@ -33,10 +38,31 @@ else
 
 The caller owns successful replacement materials and must destroy them when they are no longer used. Do not destroy the loader-owned original materials.
 
+### Connecting the importer through a Custom Material Profile
+
+Create an `MMD/Material Profile` asset, then configure it from a validated UTS shader before assigning it to the PMX Scripted Importer:
+
+```csharp
+var profile = ScriptableObject.CreateInstance<MmdMaterialProfileAsset>();
+var diagnostics = new List<UnityToonShaderDiagnostic>();
+if (UnityToonShaderMaterialProfile.TryConfigure(
+        profile,
+        Shader.Find(UnityToonShaderAdapter.ExpectedShaderName),
+        diagnostics))
+{
+    AssetDatabase.CreateAsset(profile, "Assets/Mmd UTS Profile.asset");
+    AssetDatabase.SaveAssets();
+}
+```
+
+Select `Custom Profile` and this asset in the PMX Importer. The profile declares UTS texture, render-state, keyword, pass, and unsupported-feature targets; if UTS is absent or its schema changes, keep the importer on MMD Basic Toon and retain the diagnostics.
+
 ## Mapping and non-parity scope
 
 - PMX diffuse color and base texture map to UTS Base Color/Base Map.
-- PMX alpha classification, culling, render queue and Z-write are preserved conservatively.
+- PMX alpha classification, culling, render queue and Z-write are preserved conservatively. The
+  profile also maps UTS base-map alpha clipping (`_IsBaseMapAlphaAsClippingMask` and
+  `_ClippingMode`) so the alpha-cutout fixture exercises the actual UTS clipping branch.
 - `.spa`/additive sphere maps and `.sph`/multiply sphere maps map to UTS MatCap. UTS has no exact MMD multiply-sphere equation, so `.sph` is an approximation.
 - Opaque PMX edge color/size map to UTS outline color/width. PMX screen-pixel width and UTS outline width use different spaces, so width is an approximation. UTS Inspector normalization disables color writes for transparent outlines; the adapter reports this instead of promising a visible transparent edge.
 - MMD toon ramps are not transferred. UTS shade colors use a conservative diffuse-derived approximation.

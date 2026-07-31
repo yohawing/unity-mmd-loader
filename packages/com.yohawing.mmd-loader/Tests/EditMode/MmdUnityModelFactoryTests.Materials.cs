@@ -241,6 +241,37 @@ namespace Mmd.Tests
                 Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName));
             Assert.That(instance.ShaderDiagnostics.shaderFallbackUsed, Is.False);
         }
+
+        [Test]
+        public void CreateStaticModelUrpLitPresetUsesPbrMapperTargets()
+        {
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.materials[0].sphereTexture = "sphere.spa";
+            model.materials[0].toonTexture = "toon.bmp";
+            model.materials[0].drawEdgeFlag = true;
+            model.materials[0].edgeSize = 1.0f;
+
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(
+                model,
+                sourcePath: null,
+                importScale: 1.0f,
+                preset: MmdMaterialPreset.UrpLit));
+            MmdUnityModelInstance instance = scope.Instance;
+            MmdMaterialRenderingTargets targets = instance.MaterialRenderingTargets[0];
+            MmdUnityMaterialBindingDiagnostic diagnostic = instance.MaterialBindingDiagnostics[0];
+
+            Assert.That(instance.Materials[0].shader.name,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName));
+            Assert.That(targets.BaseColorProperty, Is.EqualTo("_BaseColor"));
+            Assert.That(targets.AlphaClipThresholdProperty, Is.EqualTo("_Cutoff"));
+            Assert.That(targets.OutlineColorProperty, Is.Empty);
+            Assert.That(targets.UnsupportedFeatures,
+                Is.EqualTo(new[] { "ambient-color", "sphere-texture", "toon-texture", "outline" }));
+            Assert.That(diagnostic.unsupportedFeatures,
+                Is.EqualTo(new[] { "ambient-color", "sphere-texture", "toon-texture", "outline" }));
+            Assert.That(instance.SkippedSphereTextureReferenceCount, Is.EqualTo(1));
+            Assert.That(instance.SkippedToonTextureReferenceCount, Is.EqualTo(1));
+        }
         [Test]
         public void CreateStaticModelPreservesRawSnapshotUvAndFlipsViewportUv()
         {

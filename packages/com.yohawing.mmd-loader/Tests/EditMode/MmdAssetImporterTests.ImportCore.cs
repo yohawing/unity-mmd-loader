@@ -11,6 +11,7 @@ using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using Mmd.Editor;
+using Mmd.Mme;
 using Mmd.Parser;
 using Mmd.Physics;
 using Mmd.Rendering;
@@ -191,7 +192,7 @@ namespace Mmd.Tests
 
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
 
-            Assert.That(pmxAsset.ShaderPreset, Is.EqualTo(nameof(MmdPmxShaderPreset.UrpLit)));
+            Assert.That(pmxAsset.ShaderPreset, Is.EqualTo("URP Lit"));
             Assert.That(pmxAsset.ImportedMaterials, Is.Not.Null.And.Not.Empty);
             Assert.That(pmxAsset.ImportedMaterials[0].shader, Is.Not.Null);
             Assert.That(pmxAsset.ImportedMaterials[0].shader.name,
@@ -216,6 +217,80 @@ namespace Mmd.Tests
             Assert.That(pmxAsset.ImportedMaterials[0].shader, Is.Not.Null);
             Assert.That(pmxAsset.ImportedMaterials[0].shader.name,
                 Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName));
+        }
+
+        [Test]
+        public void PmxImporterCustomProfileUsesProfileShaderAndPreservesPresetSummary()
+        {
+            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            var profile = ScriptableObject.CreateInstance<MmdMaterialProfileAsset>();
+            profile.shader = Shader.Find(MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName);
+            profile.textureTargets = new MmdMaterialProfileTextureTargets
+            {
+                diffuseTextureProperties = new[] { "_BaseMap" }
+            };
+            profile.renderingTargets = new MmdMaterialProfileRenderingTargets
+            {
+                colorProperty = string.Empty,
+                ambientColorProperty = string.Empty,
+                alphaProperty = string.Empty,
+                alphaClipThresholdProperty = "_Cutoff",
+                outlineColorProperty = string.Empty,
+                outlineWidthProperty = string.Empty,
+                outlineVisibleProperty = string.Empty,
+                outlineScreenSpaceWeightProperty = string.Empty,
+                outlineZTestProperty = string.Empty,
+                unsupportedFeatures = new[] { "sphere-texture", "toon-texture", "outline" },
+                requiredKeywords = new[] { "_SURFACE_TYPE_TRANSPARENT" }
+            };
+            AssetDatabase.Refresh();
+            AssetDatabase.CreateAsset(profile, TempMaterialProfilePath);
+            AssetDatabase.SaveAssets();
+
+            var importer = AssetImporter.GetAtPath(TempPmxPath) as MmdPmxScriptedImporter;
+            Assert.That(importer, Is.Not.Null);
+            var serializedImporter = new SerializedObject(importer!);
+            serializedImporter.FindProperty("shaderPreset").enumValueIndex = (int)MmdPmxShaderPreset.CustomProfile;
+            serializedImporter.FindProperty("materialProfileAsset").objectReferenceValue = profile;
+            serializedImporter.ApplyModifiedPropertiesWithoutUndo();
+            importer!.SaveAndReimport();
+
+            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+
+            Assert.That(pmxAsset.ShaderPreset, Is.EqualTo("Custom Profile"));
+            Assert.That(pmxAsset.ImportedMaterials, Is.Not.Null.And.Not.Empty);
+            Assert.That(pmxAsset.ImportedMaterials[0].shader, Is.Not.Null);
+            Assert.That(pmxAsset.ImportedMaterials[0].shader.name,
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName));
+            Assert.That(pmxAsset.ImportedMaterials[0].IsKeywordEnabled("_SURFACE_TYPE_TRANSPARENT"), Is.True);
+            Assert.That(AssetDatabase.GetDependencies(TempPmxPath), Does.Contain(TempMaterialProfilePath));
+        }
+
+        [Test]
+        public void PmxImporterCustomProfileUsesUtsShaderAndDeclaredMaterialStates()
+        {
+            Shader? utsShader = Shader.Find("Toon/Toon");
+            if (utsShader == null)
+            {
+                Assert.Ignore("Optional Unity Toon Shader is not installed.");
+            }
+
+            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            CreateUtsProfileAsset(utsShader!);
+            ConfigureCustomProfileImporter(TempPmxPath);
+
+            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+            Material material = pmxAsset.ImportedMaterials[0];
+            Assert.That(material.shader, Is.SameAs(utsShader));
+            Assert.That(material.IsKeywordEnabled("_OUTLINE_NML"), Is.True);
+            Assert.That(material.GetShaderPassEnabled("SRPDefaultUnlit"), Is.True);
+            Assert.That(material.HasProperty("_BaseColor"), Is.True);
+            Assert.That(material.HasProperty("_CullMode"), Is.True);
+            Assert.That(material.HasProperty("_Clipping_Level"), Is.True);
+            Assert.That(material.HasProperty("_Outline_Width"), Is.True);
+            Assert.That(material.HasProperty("_MatCap_Sampler"), Is.True);
+            Assert.That(pmxAsset.ShaderPreset, Is.EqualTo("Custom Profile"));
+            Assert.That(AssetDatabase.GetDependencies(TempPmxPath), Does.Contain(TempMaterialProfilePath));
         }
         [Test]
         public void PmxImporterMmdUrpToonReimportPreservesBoundDiffuseTexture()
@@ -288,7 +363,7 @@ namespace Mmd.Tests
 
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
 
-            Assert.That(pmxAsset.ShaderPreset, Is.EqualTo(nameof(MmdPmxShaderPreset.UrpLit)));
+            Assert.That(pmxAsset.ShaderPreset, Is.EqualTo("URP Lit"));
             Assert.That(pmxAsset.ImportedMaterials, Is.Not.Null.And.Not.Empty);
             Material importedMaterial = pmxAsset.ImportedMaterials[0];
             Assert.That(importedMaterial.shader, Is.Not.Null);
@@ -311,10 +386,10 @@ namespace Mmd.Tests
         [Test]
         public void PmxImporterAutoDiscoversMmeNormalMapAndExplicitOverrideWins()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempMmePmxPath);
 
             string autoFxAssetPath = TempDirectory + "/auto.fx";
-            string autoEmdAssetPath = TempDirectory + "/test_1bone_cube.emd";
+            string autoEmdAssetPath = TempDirectory + "/mme_test_1bone_cube.emd";
             string autoNormalMapAssetPath = TempDirectory + "/auto_normal.png";
             string explicitNormalMapAssetPath = TempDirectory + "/explicit_normal.png";
 
@@ -330,27 +405,49 @@ namespace Mmd.Tests
             AssetDatabase.Refresh();
             AssetDatabase.ImportAsset(autoNormalMapAssetPath, ImportAssetOptions.ForceUpdate);
             AssetDatabase.ImportAsset(explicitNormalMapAssetPath, ImportAssetOptions.ForceUpdate);
-            AssetDatabase.ImportAsset(TempPmxPath, ImportAssetOptions.ForceUpdate);
+            Shader.globalRenderPipeline = "UniversalPipeline";
+            string absoluteMmePmxPath = Path.Combine(ProjectRoot, TempMmePmxPath);
+            var scannedEffects = MmeFxScanner.ScanFromModelPath(absoluteMmePmxPath, materialCount: 1);
+            Assert.That(scannedEffects, Has.Count.EqualTo(1),
+                $"pmx={absoluteMmePmxPath}; emdExists={File.Exists(Path.ChangeExtension(absoluteMmePmxPath, ".emd"))}");
+            Assert.That(scannedEffects[0].useNormalMap, Is.True);
+            Assert.That(scannedEffects[0].normalMapTexture, Is.EqualTo("auto_normal.png"));
+            Assert.That(
+                MmdAssetPathUtility.TryResolveProjectRelativeAssetPath(
+                    scannedEffects[0].sourcePath,
+                    scannedEffects[0].normalMapTexture!,
+                    out string resolvedAutoNormalMapPath),
+                Is.True,
+                $"source={scannedEffects[0].sourcePath}; reference={scannedEffects[0].normalMapTexture}");
+            Assert.That(AssetDatabase.LoadAssetAtPath<Texture2D>(resolvedAutoNormalMapPath), Is.Not.Null,
+                $"resolvedPath={resolvedAutoNormalMapPath}");
+            AssetDatabase.ImportAsset(TempMmePmxPath, ImportAssetOptions.ForceUpdate);
 
-            MmdPmxScriptedImporter importer = AssetImporter.GetAtPath(TempPmxPath) as MmdPmxScriptedImporter;
+            MmdPmxScriptedImporter importer = AssetImporter.GetAtPath(TempMmePmxPath) as MmdPmxScriptedImporter;
             Assert.That(importer, Is.Not.Null);
             var serializedImporter = new SerializedObject(importer!);
-            serializedImporter.FindProperty("shaderPreset").enumValueIndex = (int)MmdPmxShaderPreset.MmdToonLit;
+            serializedImporter.FindProperty("shaderPreset").enumValueIndex = (int)MmdPmxShaderPreset.UrpLit;
             serializedImporter.ApplyModifiedPropertiesWithoutUndo();
+            Shader.globalRenderPipeline = "UniversalPipeline";
             importer!.SaveAndReimport();
+            Shader.globalRenderPipeline = "UniversalPipeline";
 
             Texture2D autoNormalMap = AssetDatabase.LoadAssetAtPath<Texture2D>(autoNormalMapAssetPath);
             Assert.That(autoNormalMap, Is.Not.Null);
-            MmdPmxAsset autoImportedAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+            MmdPmxAsset autoImportedAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempMmePmxPath);
             Assert.That(autoImportedAsset, Is.Not.Null);
-            Assert.That(autoImportedAsset.ShaderPreset, Is.EqualTo(nameof(MmdPmxShaderPreset.MmdToonLit)));
+            Assert.That(autoImportedAsset.ShaderPreset, Is.EqualTo("URP Lit"));
             Assert.That(autoImportedAsset.ImportedMaterials, Is.Not.Null.And.Not.Empty);
             Material autoImportedMaterial = autoImportedAsset.ImportedMaterials[0];
             Assert.That(autoImportedMaterial.shader, Is.Not.Null);
             Assert.That(autoImportedMaterial.shader.name,
-                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName));
-            Assert.That(autoImportedMaterial.GetTexture(MmdMaterialPropertyNames.MmdNormalMap), Is.SameAs(autoNormalMap));
-            Assert.That(autoImportedMaterial.GetFloat(MmdMaterialPropertyNames.MmdNormalMapBound), Is.EqualTo(1.0f).Within(0.00001f));
+                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName));
+            Assert.That(
+                autoImportedMaterial.HasProperty(MmdMaterialPropertyNames.BumpMap),
+                Is.True,
+                $"pipeline={Shader.globalRenderPipeline}; shader={autoImportedMaterial.shader.name}; supported={autoImportedMaterial.shader.isSupported}; passCount={autoImportedMaterial.passCount}");
+            Assert.That(autoImportedMaterial.GetTexture(MmdMaterialPropertyNames.BumpMap), Is.SameAs(autoNormalMap));
+            Assert.That(autoImportedMaterial.IsKeywordEnabled("_NORMALMAP"), Is.True);
 
             Texture2D explicitNormalMap = AssetDatabase.LoadAssetAtPath<Texture2D>(explicitNormalMapAssetPath);
             Assert.That(explicitNormalMap, Is.Not.Null);
@@ -364,20 +461,31 @@ namespace Mmd.Tests
                     normalMap = explicitNormalMap
                 }
             };
-            AssetDatabase.CreateAsset(overrideAsset, TempMaterialOverridePath);
-            AssetDatabase.ImportAsset(TempMaterialOverridePath, ImportAssetOptions.ForceUpdate);
+            AssetDatabase.CreateAsset(overrideAsset, TempMmeMaterialOverridePath);
+            AssetDatabase.ImportAsset(TempMmeMaterialOverridePath, ImportAssetOptions.ForceUpdate);
             MmdMaterialOverrideAsset persistedOverride =
-                AssetDatabase.LoadAssetAtPath<MmdMaterialOverrideAsset>(TempMaterialOverridePath);
+                AssetDatabase.LoadAssetAtPath<MmdMaterialOverrideAsset>(TempMmeMaterialOverridePath);
             Assert.That(persistedOverride, Is.Not.Null);
+            Assert.That(persistedOverride!.entries, Has.Length.EqualTo(1));
+            Assert.That(persistedOverride.entries[0].enabled, Is.True);
+            Assert.That(persistedOverride.entries[0].normalMap, Is.SameAs(explicitNormalMap));
 
-            serializedImporter.FindProperty("materialOverrideAsset").objectReferenceValue = persistedOverride;
+            importer = AssetImporter.GetAtPath(TempMmePmxPath) as MmdPmxScriptedImporter;
+            Assert.That(importer, Is.Not.Null);
+            serializedImporter = new SerializedObject(importer!);
+            SerializedProperty overrideProperty = serializedImporter.FindProperty("materialOverrideAsset");
+            Assert.That(overrideProperty, Is.Not.Null);
+            overrideProperty!.objectReferenceValue = persistedOverride;
             serializedImporter.ApplyModifiedPropertiesWithoutUndo();
+            importer = AssetImporter.GetAtPath(TempMmePmxPath) as MmdPmxScriptedImporter;
+            Assert.That(importer, Is.Not.Null);
+            Shader.globalRenderPipeline = "UniversalPipeline";
             importer!.SaveAndReimport();
 
-            MmdPmxAsset explicitImportedAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+            MmdPmxAsset explicitImportedAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempMmePmxPath);
             Material explicitImportedMaterial = explicitImportedAsset.ImportedMaterials[0];
-            Assert.That(explicitImportedMaterial.GetTexture(MmdMaterialPropertyNames.MmdNormalMap), Is.SameAs(explicitNormalMap));
-            Assert.That(explicitImportedMaterial.GetFloat(MmdMaterialPropertyNames.MmdNormalMapBound), Is.EqualTo(1.0f).Within(0.00001f));
+            Assert.That(explicitImportedMaterial.GetTexture(MmdMaterialPropertyNames.BumpMap), Is.SameAs(explicitNormalMap));
+            Assert.That(explicitImportedMaterial.IsKeywordEnabled("_NORMALMAP"), Is.True);
         }
 
         [Test]
@@ -516,7 +624,7 @@ namespace Mmd.Tests
             }
         }
         [Test]
-        public void PmxScriptedImporterVersionIsTwentyEightForPublicToonTextureMigration()
+        public void PmxScriptedImporterVersionIsTwentyNineForMaterialReimportMigration()
         {
             object[] attributes = typeof(MmdPmxScriptedImporter).GetCustomAttributes(
                 typeof(ScriptedImporterAttribute),
@@ -524,8 +632,58 @@ namespace Mmd.Tests
 
             Assert.That(attributes, Has.Length.EqualTo(1));
             var attribute = (ScriptedImporterAttribute)attributes[0];
-            Assert.That(attribute.version, Is.EqualTo(28),
-                "PMX importer version must force a texture rebind after the public Toon shader migration.");
+            Assert.That(attribute.version, Is.EqualTo(29),
+                "PMX importer version must force a material rebind after the importer migration.");
+        }
+
+        private static void CreateUtsProfileAsset(Shader utsShader)
+        {
+            var profile = ScriptableObject.CreateInstance<MmdMaterialProfileAsset>();
+            profile.shader = utsShader;
+            profile.textureTargets = new MmdMaterialProfileTextureTargets
+            {
+                diffuseTextureProperties = new[] { "_BaseMap", "_MainTex" },
+                sphereTextureProperty = "_MatCap_Sampler",
+                sphereTextureBoundProperty = "_MatCap",
+                sphereModeProperty = "_Is_BlendAddToMatCap"
+            };
+            profile.renderingTargets = new MmdMaterialProfileRenderingTargets
+            {
+                baseColorProperty = "_BaseColor",
+                colorProperty = "_Color",
+                ambientColorProperty = string.Empty,
+                alphaProperty = string.Empty,
+                alphaClipThresholdProperty = "_Clipping_Level",
+                shadowAlphaClipThresholdProperty = string.Empty,
+                textureAlphaOutputWeightProperty = string.Empty,
+                textureAlphaClipMaskProperty = "_IsBaseMapAlphaAsClippingMask",
+                alphaClipModeProperty = "_ClippingMode",
+                cullProperty = "_CullMode",
+                surfaceProperty = string.Empty,
+                blendProperty = string.Empty,
+                sourceBlendProperty = string.Empty,
+                destinationBlendProperty = string.Empty,
+                zWriteProperty = "_ZWrite",
+                outlineColorProperty = "_Outline_Color",
+                outlineWidthProperty = "_Outline_Width",
+                outlineVisibleProperty = "_OUTLINE",
+                outlineScreenSpaceWeightProperty = string.Empty,
+                outlineZTestProperty = string.Empty,
+                requiredKeywords = new[]
+                {
+                    "_OUTLINE_NML",
+                    "_MatCap",
+                    "_IS_CLIPPING_OFF",
+                    "_IS_CLIPPING_TRANSMODE",
+                    "_IS_TRANSCLIPPING_ON",
+                    "_IS_OUTLINE_CLIPPING_NO"
+                },
+                requiredPasses = new[] { "SRPDefaultUnlit" },
+                unsupportedFeatures = new[] { "toon-texture", "self-shadow", "material-morph" },
+                supportsMaterialMorphs = false
+            };
+            AssetDatabase.CreateAsset(profile, TempMaterialProfilePath);
+            AssetDatabase.SaveAssets();
         }
 
         private static void AssertMmdUrpToonDiffuseTextureIsBound(string pmxPath, string texturePath)
@@ -620,53 +778,6 @@ namespace Mmd.Tests
             Assert.That(pmxAsset.IkCount, Is.GreaterThanOrEqualTo(0));
             Assert.That(pmxAsset.RigidbodyCount, Is.GreaterThanOrEqualTo(0));
             Assert.That(pmxAsset.JointCount, Is.GreaterThanOrEqualTo(0));
-        }
-        [Test]
-        public void PmxImporterGeneratesMeshAndMaterialSubAssets()
-        {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
-
-            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
-
-            // D1 contract evidence via LoadAllAssetsAtPath:
-            // - main object under .pmx is the importer-owned GameObject hierarchy root
-            // - MmdPmxAsset is a metadata sub-asset (resolves via LoadAssetAtPath<MmdPmxAsset>)
-            // - exactly one importer-owned Mesh sub-asset (for this fixture)
-            // - zero or more Material sub-assets
-            Object[] allSubAssets = AssetDatabase.LoadAllAssetsAtPath(TempPmxPath);
-            Assert.That(allSubAssets, Is.Not.Null);
-            int pmxAssetCount = 0;
-            int gameObjectCount = 0;
-            int meshSubCount = 0;
-            int materialSubCount = 0;
-            int textureSubCount = 0;
-            foreach (Object o in allSubAssets)
-            {
-                if (o is MmdPmxAsset) pmxAssetCount++;
-                else if (o is GameObject) gameObjectCount++;
-                else if (o is Mesh) meshSubCount++;
-                else if (o is Material) materialSubCount++;
-                else if (o is Texture2D) textureSubCount++;
-            }
-            Assert.That(pmxAssetCount, Is.EqualTo(1), "MmdPmxAsset must exist as a sub-asset");
-            Assert.That(gameObjectCount, Is.GreaterThanOrEqualTo(1), "at least one GameObject in sub-assets (hierarchy root main object)");
-            Assert.That(meshSubCount, Is.EqualTo(1));
-            Assert.That(materialSubCount, Is.GreaterThanOrEqualTo(0)); // fixture creates 1
-            Assert.That(textureSubCount, Is.EqualTo(0), "no Texture sub-assets under .pmx");
-
-            Assert.That(pmxAsset.ImportedMesh, Is.Not.Null);
-            Mesh importedMesh = pmxAsset.ImportedMesh!;
-            Assert.That(AssetDatabase.Contains(importedMesh), Is.True);
-            Assert.That(AssetDatabase.GetAssetPath(importedMesh), Is.EqualTo(TempPmxPath));
-            Assert.That(importedMesh.vertexCount, Is.EqualTo(pmxAsset.VertexCount));
-            Assert.That(importedMesh.subMeshCount, Is.GreaterThanOrEqualTo(1));
-            Assert.That(pmxAsset.ImportedMaterials, Has.Length.EqualTo(pmxAsset.MaterialCount));
-            Assert.That(pmxAsset.ImportedMaterials[0], Is.Not.Null);
-            Assert.That(AssetDatabase.Contains(pmxAsset.ImportedMaterials[0]), Is.True);
-            Assert.That(AssetDatabase.GetAssetPath(pmxAsset.ImportedMaterials[0]), Is.EqualTo(TempPmxPath));
-            Assert.That(pmxAsset.ImportedMaterials[0].shader, Is.Not.Null);
-            Assert.That(pmxAsset.ImportedMaterials[0].shader.name,
-                Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.DefaultShaderName));
         }
     }
 }

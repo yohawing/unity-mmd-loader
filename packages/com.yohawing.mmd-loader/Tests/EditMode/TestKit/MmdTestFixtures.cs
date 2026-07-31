@@ -19,8 +19,17 @@ namespace Mmd.Tests
         internal static string RepositoryRoot =>
             Path.GetFullPath(Path.Combine(ProjectRoot, ".."));
 
-        internal static string PackageRoot =>
-            Path.Combine(RepositoryRoot, "packages", "com.yohawing.mmd-loader");
+        internal static string PackageRoot
+        {
+            get
+            {
+                UnityEditor.PackageManager.PackageInfo? package =
+                    UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(MmdTestFixtures).Assembly);
+                return package != null && !string.IsNullOrWhiteSpace(package.resolvedPath)
+                    ? Path.GetFullPath(package.resolvedPath)
+                    : Path.Combine(RepositoryRoot, "packages", "com.yohawing.mmd-loader");
+            }
+        }
 
         internal static string FixturesRoot =>
             Path.Combine(PackageRoot, "Tests", "Fixtures");
@@ -118,6 +127,26 @@ namespace Mmd.Tests
             };
             var parser = new NativeMmdParser();
             return parser.LoadMotion(CreateVmdBytes(targetModelName, keyframes));
+        }
+
+        internal static byte[] BuildSceneTrackVmdBytes(string modelName)
+        {
+            using var stream = new MemoryStream();
+            using var writer = new BinaryWriter(stream);
+
+            WriteFixedSjis(writer, "Vocaloid Motion Data 0002", 30);
+            WriteFixedSjis(writer, modelName ?? string.Empty, 20);
+            writer.Write(0u); // bone frames
+            writer.Write(0u); // morph frames
+            writer.Write(0u); // camera frames
+            writer.Write(2u); // light frames
+            WriteSceneTrackLightFrame(writer, 10u, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f);
+            WriteSceneTrackLightFrame(writer, 30u, 1.0f, 0.5f, 0.0f, 0.0f, -1.0f, 0.0f);
+            writer.Write(2u); // self-shadow frames
+            WriteSceneTrackSelfShadowFrame(writer, 10u, 1, 0.2f);
+            WriteSceneTrackSelfShadowFrame(writer, 30u, 2, 0.4f);
+            writer.Write(0u); // property frames
+            return stream.ToArray();
         }
 
         internal static string MotionFixtureFileName(string baseName)
@@ -373,6 +402,32 @@ namespace Mmd.Tests
             byte[] encoded = Encoding.GetEncoding(932).GetBytes(value ?? string.Empty);
             Array.Copy(encoded, 0, buffer, 0, Math.Min(encoded.Length, buffer.Length));
             writer.Write(buffer);
+        }
+
+        private static void WriteSceneTrackLightFrame(
+            BinaryWriter writer,
+            uint frame,
+            float r,
+            float g,
+            float b,
+            float x,
+            float y,
+            float z)
+        {
+            writer.Write(frame);
+            writer.Write(r);
+            writer.Write(g);
+            writer.Write(b);
+            writer.Write(x);
+            writer.Write(y);
+            writer.Write(z);
+        }
+
+        private static void WriteSceneTrackSelfShadowFrame(BinaryWriter writer, uint frame, byte mode, float distance)
+        {
+            writer.Write(frame);
+            writer.Write(mode);
+            writer.Write(distance);
         }
 
         private static byte[] LinearVmdInterpolationBytes()

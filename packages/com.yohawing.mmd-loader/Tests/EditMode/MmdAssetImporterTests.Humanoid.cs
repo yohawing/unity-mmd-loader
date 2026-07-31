@@ -27,7 +27,7 @@ namespace Mmd.Tests
         {
             CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
             MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(TempVmdPath);
-            string pmxPath = Path.Combine(RepositoryRoot, "packages", "com.yohawing.mmd-loader", "Tests", "Fixtures", "Assets", "test_1bone_cube.pmx");
+            string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
 
             bool accepted = MmdSceneDragAndDrop.TryGetDraggedSources(
                 new Object[] { vmdAsset },
@@ -63,10 +63,14 @@ namespace Mmd.Tests
 #pragma warning disable CS0618 // Legacy InstanceID input remains supported by Hierarchy drop callbacks.
                 GameObject? resolved = MmdSceneDragAndDrop.GetHierarchyDropParent(parent.GetInstanceID());
 #pragma warning restore CS0618
+#if UNITY_6000_1_OR_NEWER
                 GameObject? resolvedByEntityId = MmdSceneDragAndDrop.GetHierarchyDropParent(parent.GetEntityId());
+#endif
 
                 Assert.That(resolved, Is.SameAs(parent));
+#if UNITY_6000_1_OR_NEWER
                 Assert.That(resolvedByEntityId, Is.SameAs(parent));
+#endif
             }
             finally
             {
@@ -100,6 +104,7 @@ namespace Mmd.Tests
                     HierarchyDropFlags.DropBetween,
                     forcedParent: null);
 #pragma warning restore CS0618
+#if UNITY_6000_1_OR_NEWER
                 GameObject? entityIdUponDrop = MmdSceneDragAndDrop.GetHierarchyDropParent(
                     parent.GetEntityId(),
                     HierarchyDropFlags.DropUpon,
@@ -108,13 +113,16 @@ namespace Mmd.Tests
                     sibling.GetEntityId(),
                     HierarchyDropFlags.DropBetween,
                     forcedParent: null);
+#endif
 
                 Assert.That(rootDrop, Is.Null);
                 Assert.That(forcedDrop, Is.SameAs(forcedParent));
                 Assert.That(uponDrop, Is.SameAs(parent));
                 Assert.That(betweenDrop, Is.SameAs(parent));
+#if UNITY_6000_1_OR_NEWER
                 Assert.That(entityIdUponDrop, Is.SameAs(parent));
                 Assert.That(entityIdBetweenDrop, Is.SameAs(parent));
+#endif
             }
             finally
             {
@@ -212,7 +220,7 @@ namespace Mmd.Tests
         [Test]
         public void SceneDragAndDropLoadsRawPmxPathUnderHierarchyParent()
         {
-            string pmxPath = Path.Combine(RepositoryRoot, "packages", "com.yohawing.mmd-loader", "Tests", "Fixtures", "Assets", "test_1bone_cube.pmx");
+            string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
             var parent = new GameObject("mmd-raw-pmx-drop-parent");
             MmdUnityModelInstance? instance = null;
 
@@ -249,7 +257,7 @@ namespace Mmd.Tests
         [Test]
         public void SceneDragAndDropLoadsRawPmxPathAtSceneDropPosition()
         {
-            string pmxPath = Path.Combine(RepositoryRoot, "packages", "com.yohawing.mmd-loader", "Tests", "Fixtures", "Assets", "test_1bone_cube.pmx");
+            string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
             MmdUnityModelInstance? instance = null;
 
             try
@@ -438,8 +446,8 @@ namespace Mmd.Tests
         [Test]
         public void SceneDragAndDropLoadsRawPmxAndRawVmdPlaybackUnderHierarchyParent()
         {
-            string pmxPath = Path.Combine(RepositoryRoot, "packages", "com.yohawing.mmd-loader", "Tests", "Fixtures", "Assets", "test_1bone_cube.pmx");
-            string vmdPath = Path.Combine(RepositoryRoot, "packages", "com.yohawing.mmd-loader", "Tests", "Fixtures", "Assets", "test_1bone_cube_motion.vmd");
+            string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
+            string vmdPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
             var parent = new GameObject("mmd-raw-playback-drop-parent");
             MmdEditorPlaybackSceneLoadResult? result = null;
 

@@ -91,7 +91,8 @@ namespace Mmd.UnityIntegration
                     Array.Empty<Texture2D>(),
                     sourceInstance.TextureDiagnostics,
                     sourceInstance.ShaderDiagnostics,
-                    sourceInstance.ImportScale);
+                    sourceInstance.ImportScale,
+                    sourceInstance.MaterialRenderingTargets.ToArray());
                 CopyBindPose(sourceInstance, candidate);
 
                 CaptureOriginalState(sourceRenderer, sourceMesh, bones);

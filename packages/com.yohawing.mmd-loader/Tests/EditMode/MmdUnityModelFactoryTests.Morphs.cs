@@ -375,6 +375,94 @@ namespace Mmd.Tests
             // edgeSize: base(1.0) + offset(2.0)*1.0 = 3.0 -> _OutlineWidth = raw edgeSize = 3.0
             Assert.That(morphedOutlineWidth, Is.EqualTo(3.0f).Within(0.00001f));
         }
+
+        [Test]
+        public void ApplyFrameWithMaterialMorphUsesMapperRenderingTargets()
+        {
+            MmdModelDefinition model = CreateMaterialMorphTriangleModel();
+            var renderingTargets = new MmdMaterialRenderingTargets(
+                baseColorProperty: "_Color",
+                colorProperty: null,
+                alphaProperty: "_BaseMapBound",
+                outlineColorProperty: "_AmbientColor",
+                outlineWidthProperty: "_OutlineScreenSpaceWeight",
+                outlineScreenSpaceWeightProperty: "_OutlineWidth");
+            var materialMappers = new MmdMaterialMapperSet(
+                (source, defaultShader) => new Material(defaultShader),
+                MmdMaterialTextureTargets.BuiltIn,
+                renderingTargets);
+
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(
+                model,
+                sourcePath: null,
+                importScale: 1.0f,
+                MmdMaterialPreset.MmdToon,
+                materialOverride: null,
+                materialMappers));
+            MmdUnityModelInstance instance = scope.Instance;
+
+            Assert.That(instance.MaterialRenderingTargets[0].BaseColorProperty, Is.EqualTo("_Color"));
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "color-change", weight = 1.0f });
+            MmdUnityFrameApplier.ApplyFrame(instance, frame);
+
+            Color morphedColor = ReadMaterialColor(instance.Materials[0], "_Color");
+            Color untouchedBaseColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
+            Color mappedOutline = ReadMaterialColor(instance.Materials[0], "_AmbientColor");
+            float mappedAlpha = ReadMaterialFloat(instance.Materials[0], "_BaseMapBound");
+            float mappedOutlineWidth = ReadMaterialFloat(instance.Materials[0], "_OutlineScreenSpaceWeight");
+            float untouchedOutlineWidth = ReadMaterialFloat(instance.Materials[0], "_OutlineWidth");
+
+            Assert.That(morphedColor.r, Is.EqualTo(0.8f).Within(0.00001f));
+            Assert.That(morphedColor.g, Is.EqualTo(0.7f).Within(0.00001f));
+            Assert.That(morphedColor.b, Is.EqualTo(0.6f).Within(0.00001f));
+            Assert.That(morphedColor.a, Is.EqualTo(0.7f).Within(0.00001f));
+            Assert.That(untouchedBaseColor.r, Is.EqualTo(1.0f).Within(0.00001f));
+            Assert.That(untouchedBaseColor.g, Is.EqualTo(1.0f).Within(0.00001f));
+            Assert.That(untouchedBaseColor.b, Is.EqualTo(1.0f).Within(0.00001f));
+            Assert.That(mappedOutline.r, Is.EqualTo(0.5f).Within(0.00001f));
+            Assert.That(mappedOutline.g, Is.EqualTo(0.0f).Within(0.00001f));
+            Assert.That(mappedOutline.b, Is.EqualTo(0.0f).Within(0.00001f));
+            Assert.That(mappedAlpha, Is.EqualTo(0.7f).Within(0.00001f));
+            Assert.That(mappedOutlineWidth, Is.EqualTo(3.0f).Within(0.00001f));
+            Assert.That(untouchedOutlineWidth, Is.EqualTo(1.0f).Within(0.00001f));
+        }
+
+        [Test]
+        public void ApplyFrameWithUnsupportedMaterialMorphTargetsLeavesMaterialUntouched()
+        {
+            MmdModelDefinition model = CreateMaterialMorphTriangleModel();
+            var renderingTargets = new MmdMaterialRenderingTargets(
+                supportsMaterialMorphs: false,
+                unsupportedFeatures: new[] { "material-morph" });
+            var materialMappers = new MmdMaterialMapperSet(
+                (source, defaultShader) => new Material(defaultShader),
+                MmdMaterialTextureTargets.BuiltIn,
+                renderingTargets);
+
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(
+                model,
+                sourcePath: null,
+                importScale: 1.0f,
+                MmdMaterialPreset.MmdToon,
+                materialOverride: null,
+                materialMappers));
+            MmdUnityModelInstance instance = scope.Instance;
+            Color baseColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "color-change", weight = 1.0f });
+
+            MmdUnityFrameApplier.ApplyFrame(instance, frame);
+
+            Color unchangedColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
+            Assert.That(instance.MaterialBindingDiagnostics[0].unsupportedFeatures,
+                Does.Contain("material-morph"));
+            Assert.That(unchangedColor.r, Is.EqualTo(baseColor.r).Within(0.00001f));
+            Assert.That(unchangedColor.g, Is.EqualTo(baseColor.g).Within(0.00001f));
+            Assert.That(unchangedColor.b, Is.EqualTo(baseColor.b).Within(0.00001f));
+            Assert.That(unchangedColor.a, Is.EqualTo(baseColor.a).Within(0.00001f));
+        }
+
         [Test]
         public void ApplyMaterialMorphTwiceDoesNotAccumulate()
         {

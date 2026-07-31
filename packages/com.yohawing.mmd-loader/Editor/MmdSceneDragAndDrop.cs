@@ -26,8 +26,13 @@ namespace Mmd.Editor
         {
             SceneView.duringSceneGui -= HandleSceneGui;
             SceneView.duringSceneGui += HandleSceneGui;
+#if UNITY_6000_1_OR_NEWER
             DragAndDrop.RemoveDropHandlerV2(HandleHierarchyDrop);
             DragAndDrop.AddDropHandlerV2(HandleHierarchyDrop);
+#else
+            DragAndDrop.RemoveDropHandler(HandleHierarchyDrop);
+            DragAndDrop.AddDropHandler(HandleHierarchyDrop);
+#endif
         }
 
         public static bool TryGetDraggedAssets(Object[] objectReferences, out MmdPmxAsset? pmxAsset, out MmdVmdAsset? vmdAsset)
@@ -299,10 +304,12 @@ namespace Mmd.Editor
             return InstanceIdToObjectMethod?.Invoke(null, new object[] { instanceId }) as GameObject;
         }
 
+#if UNITY_6000_1_OR_NEWER
         public static GameObject? GetHierarchyDropParent(EntityId entityId)
         {
             return EditorUtility.EntityIdToObject(entityId) as GameObject;
         }
+#endif
 
         public static bool TryAttachVmdSourceToExistingModel(
             GameObject? target,
@@ -358,6 +365,7 @@ namespace Mmd.Editor
             return target.transform.parent == null ? null : target.transform.parent.gameObject;
         }
 
+#if UNITY_6000_1_OR_NEWER
         public static GameObject? GetHierarchyDropParent(EntityId entityId, HierarchyDropFlags dropMode, Transform? forcedParent)
         {
             if (forcedParent != null)
@@ -378,6 +386,7 @@ namespace Mmd.Editor
 
             return target.transform.parent == null ? null : target.transform.parent.gameObject;
         }
+#endif
 
         private static void HandleSceneGui(SceneView sceneView)
         {
@@ -420,11 +429,23 @@ namespace Mmd.Editor
             }
         }
 
-        private static DragAndDropVisualMode HandleHierarchyDrop(EntityId dropTargetEntityId, HierarchyDropFlags dropMode, Transform parentForDraggedObjects, bool perform)
+        private static DragAndDropVisualMode HandleHierarchyDrop(
+#if UNITY_6000_1_OR_NEWER
+            EntityId dropTargetEntityId,
+#else
+            int dropTargetInstanceId,
+#endif
+            HierarchyDropFlags dropMode,
+            Transform parentForDraggedObjects,
+            bool perform)
         {
             if (TryGetDraggedVmdAssetForExistingModel(DragAndDrop.objectReferences, DragAndDrop.paths, out MmdVmdAsset? draggedVmdAsset))
             {
+#if UNITY_6000_1_OR_NEWER
                 GameObject? target = GetHierarchyVmdDropTarget(dropTargetEntityId, dropMode);
+#else
+                GameObject? target = GetHierarchyVmdDropTarget(dropTargetInstanceId, dropMode);
+#endif
                 if (!CanAttachVmdSourceToExistingModel(target))
                 {
                     return DragAndDropVisualMode.None;
@@ -461,7 +482,11 @@ namespace Mmd.Editor
                 return DragAndDropVisualMode.Copy;
             }
 
+#if UNITY_6000_1_OR_NEWER
             GameObject? parent = GetHierarchyDropParent(dropTargetEntityId, dropMode, parentForDraggedObjects);
+#else
+            GameObject? parent = GetHierarchyDropParent(dropTargetInstanceId, dropMode, parentForDraggedObjects);
+#endif
             Vector3 dropPosition = CalculateHierarchyDropPosition(parent);
             try
             {
@@ -490,14 +515,24 @@ namespace Mmd.Editor
             return controller != null && controller.ModelAssetSource != null;
         }
 
-        private static GameObject? GetHierarchyVmdDropTarget(EntityId dropTargetEntityId, HierarchyDropFlags dropMode)
+        private static GameObject? GetHierarchyVmdDropTarget(
+#if UNITY_6000_1_OR_NEWER
+            EntityId dropTargetEntityId,
+#else
+            int dropTargetInstanceId,
+#endif
+            HierarchyDropFlags dropMode)
         {
             if ((dropMode & HierarchyDropFlags.DropUpon) != HierarchyDropFlags.DropUpon)
             {
                 return null;
             }
 
+#if UNITY_6000_1_OR_NEWER
             return GetHierarchyDropParent(dropTargetEntityId);
+#else
+            return GetHierarchyDropParent(dropTargetInstanceId);
+#endif
         }
 
         public static MmdUnityModelInstance LoadPmxForDragAndDrop(MmdPmxAsset pmxAsset, Vector3 position, GameObject? parent)

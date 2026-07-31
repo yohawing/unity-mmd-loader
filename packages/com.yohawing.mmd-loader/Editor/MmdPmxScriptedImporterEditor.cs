@@ -13,6 +13,7 @@ namespace Mmd.Editor
         private SerializedProperty? importScaleProperty;
         private SerializedProperty? modelPresetProperty;
         private SerializedProperty? shaderPresetProperty;
+        private SerializedProperty? materialProfileAssetProperty;
         private SerializedProperty? materialOverrideAssetProperty;
         private SerializedProperty? materialRemapsProperty;
         private SerializedProperty? animationTypeProperty;
@@ -35,7 +36,7 @@ namespace Mmd.Editor
 
         private int selectedTab;
         private static readonly string[] TabNames = { "Model", "Rig", "Materials" };
-        private static readonly string[] ShaderPresetDisplayNames = { "MMD Basic Toon", "URP Lit", "MMD URP Toon" };
+        private static readonly string[] ShaderPresetDisplayNames = { "MMD Basic Toon", "URP Lit", "MMD URP Toon", "Custom Profile" };
 
         public override void OnEnable()
         {
@@ -43,6 +44,7 @@ namespace Mmd.Editor
             importScaleProperty = serializedObject.FindProperty("importScale");
             modelPresetProperty = serializedObject.FindProperty("modelPreset");
             shaderPresetProperty = serializedObject.FindProperty("shaderPreset");
+            materialProfileAssetProperty = serializedObject.FindProperty("materialProfileAsset");
             materialOverrideAssetProperty = serializedObject.FindProperty("materialOverrideAsset");
             materialRemapsProperty = serializedObject.FindProperty("materialRemaps");
             animationTypeProperty = serializedObject.FindProperty("animationType");
@@ -204,6 +206,17 @@ namespace Mmd.Editor
                     {
                         shaderPresetProperty.enumValueIndex = updatedPreset;
                     }
+                }
+
+                if (materialProfileAssetProperty != null &&
+                    shaderPresetProperty != null &&
+                    shaderPresetProperty.enumValueIndex == (int)MmdPmxShaderPreset.CustomProfile)
+                {
+                    EditorGUILayout.PropertyField(
+                        materialProfileAssetProperty,
+                        new GUIContent(
+                            "Custom Material Profile",
+                            "Explicitly declares the profile shader, texture destinations, render-state targets, and unsupported features."));
                 }
             }
 

@@ -8,6 +8,9 @@ param(
 $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "unity-project-guard.ps1")
+. (Join-Path $PSScriptRoot "unity-process-environment.ps1")
+Initialize-UnityProcessEnvironment
+. (Join-Path $PSScriptRoot "read-nunit-test-result.ps1")
 
 function Resolve-FullPath {
     param([Parameter(Mandatory = $true)][string] $Path)
@@ -17,6 +20,118 @@ function Resolve-FullPath {
     }
 
     return [System.IO.Path]::GetFullPath((Join-Path (Get-Location) $Path))
+}
+
+function Get-GateContentManifest {
+    param(
+        [Parameter(Mandatory = $true)][string] $Path,
+        [Parameter(Mandatory = $true)][string] $SampleMetaPath,
+        [switch] $LegacyRootMetaHash
+    )
+
+    $entries = @()
+    if (Test-Path -LiteralPath $Path -PathType Container) {
+        $entries += @(
+            Get-ChildItem -LiteralPath $Path -Recurse -Directory |
+                ForEach-Object {
+                    $relativePath = [System.IO.Path]::GetRelativePath($Path, $_.FullName).Replace('\', '/')
+                    "D|$relativePath"
+                }
+        )
+        $entries += @(
+            Get-ChildItem -LiteralPath $Path -Recurse -File |
+                ForEach-Object {
+                    $relativePath = [System.IO.Path]::GetRelativePath($Path, $_.FullName).Replace('\', '/')
+                    $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+                    "F|{0}|{1}|{2}" -f $relativePath, $_.Length, $hash
+                }
+        )
+    }
+
+    if (Test-Path -LiteralPath $SampleMetaPath -PathType Leaf) {
+        if ($LegacyRootMetaHash) {
+            $meta = Get-Item -LiteralPath $SampleMetaPath
+            $metaHash = (Get-FileHash -LiteralPath $SampleMetaPath -Algorithm SHA256).Hash
+            $entries += "R|{0}|{1}" -f $meta.Length, $metaHash
+            return @($entries | Sort-Object)
+        }
+
+        $metaLines = @(Get-Content -LiteralPath $SampleMetaPath | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" })
+        $guidLine = @($metaLines | Where-Object { $_ -match '^guid: [0-9a-fA-F]{32}$' })
+        $defaultFolderMetaLines = @(
+            "fileFormatVersion: 2", "folderAsset: yes", "DefaultImporter:",
+            "externalObjects: {}", "userData:", "assetBundleName:", "assetBundleVariant:"
+        )
+        $nonGuidLines = @($metaLines | Where-Object { $_ -notmatch '^guid: [0-9a-fA-F]{32}$' })
+        $isInitialStub = $nonGuidLines.Count -eq 1 -and $nonGuidLines[0] -eq "fileFormatVersion: 2"
+        $isExpandedDefault = $nonGuidLines.Count -eq $defaultFolderMetaLines.Count -and
+            @(Compare-Object -ReferenceObject $defaultFolderMetaLines -DifferenceObject $nonGuidLines).Count -eq 0
+        if ($guidLine.Count -eq 1 -and ($isInitialStub -or $isExpandedDefault)) {
+            # Unity may expand the initial two-line folder .meta into its equivalent default
+            # importer form between compile and EditMode. Compare that representation by GUID,
+            # while any non-default importer/user setting still falls back to an exact hash.
+            $entries += "R|default-folder|{0}" -f $guidLine[0].Substring(6).ToLowerInvariant()
+        }
+        else {
+            $meta = Get-Item -LiteralPath $SampleMetaPath
+            $metaHash = (Get-FileHash -LiteralPath $SampleMetaPath -Algorithm SHA256).Hash
+            $entries += "R|exact|{0}|{1}" -f $meta.Length, $metaHash
+        }
+    }
+
+    return @($entries | Sort-Object)
+}
+
+function Write-GateOwnershipMarker {
+    param(
+        [Parameter(Mandatory = $true)][string] $SamplePath,
+        [Parameter(Mandatory = $true)][string] $SampleMetaPath,
+        [Parameter(Mandatory = $true)][string] $MarkerPath
+    )
+
+    $marker = [ordered]@{
+        schemaVersion = 3
+        entries = @(Get-GateContentManifest -Path $SamplePath -SampleMetaPath $SampleMetaPath)
+    }
+    [System.IO.File]::WriteAllText(
+        $MarkerPath,
+        ($marker | ConvertTo-Json -Depth 3),
+        [System.Text.UTF8Encoding]::new($false))
+}
+
+function Remove-GateOwnedSampleIfUnchanged {
+    param(
+        [Parameter(Mandatory = $true)][string] $SamplePath,
+        [Parameter(Mandatory = $true)][string] $SampleMetaPath,
+        [Parameter(Mandatory = $true)][string] $MarkerPath
+    )
+
+    if (-not (Test-Path -LiteralPath $MarkerPath -PathType Leaf)) {
+        throw "Gate ownership marker is missing; preserving the imported sample: $SamplePath"
+    }
+
+    try {
+        $marker = Get-Content -LiteralPath $MarkerPath -Raw | ConvertFrom-Json
+    }
+    catch {
+        throw "Gate ownership marker is invalid; preserving the imported sample: $MarkerPath"
+    }
+    $schemaVersion = [int] $marker.schemaVersion
+    if ($schemaVersion -ne 2 -and $schemaVersion -ne 3) {
+        throw "Gate ownership marker schema is unsupported; preserving the imported sample: $MarkerPath"
+    }
+
+    $expected = @($marker.entries | ForEach-Object { [string] $_ })
+    $actual = @(Get-GateContentManifest `
+        -Path $SamplePath `
+        -SampleMetaPath $SampleMetaPath `
+        -LegacyRootMetaHash:($schemaVersion -eq 2))
+    if (@(Compare-Object -ReferenceObject $expected -DifferenceObject $actual).Count -ne 0) {
+        throw "Gate-owned sample content changed; preserving it for manual recovery: $SamplePath"
+    }
+
+    Remove-Item -LiteralPath $SamplePath -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $SampleMetaPath, $MarkerPath, ($MarkerPath + ".meta") -Force -ErrorAction SilentlyContinue
 }
 
 function Remove-EmptyDirectoryCreatedByGate {
@@ -85,8 +200,10 @@ path=$sampleImportPath
 "@
     }
 
-    Remove-Item -LiteralPath $sampleImportPath -Recurse -Force -ErrorAction SilentlyContinue
-    Remove-Item -LiteralPath $sampleImportMetaPath, $sampleImportMarkerPath, ($sampleImportMarkerPath + ".meta") -Force -ErrorAction SilentlyContinue
+    Remove-GateOwnedSampleIfUnchanged `
+        -SamplePath $sampleImportPath `
+        -SampleMetaPath $sampleImportMetaPath `
+        -MarkerPath $sampleImportMarkerPath
 }
 
 $samplesPathExisted = Test-Path -LiteralPath $samplesPath -PathType Container
@@ -97,9 +214,14 @@ New-Item -ItemType Directory -Force -Path $versionSamplesPath, $ArtifactsPath | 
 Remove-Item -LiteralPath $compileLog, $testLog, $testResults, $visualCanaryPath -Force -ErrorAction SilentlyContinue
 Remove-Item -LiteralPath $generatedPmxVisualPath -Recurse -Force -ErrorAction SilentlyContinue
 
+$markerCreated = $false
 try {
-    [System.IO.File]::WriteAllText($sampleImportMarkerPath, "temporary import owned by verify-unity-toon-shader-sample.ps1")
     Copy-Item -LiteralPath $sampleSourcePath -Destination $sampleImportPath -Recurse
+    Write-GateOwnershipMarker `
+        -SamplePath $sampleImportPath `
+        -SampleMetaPath $sampleImportMetaPath `
+        -MarkerPath $sampleImportMarkerPath
+    $markerCreated = $true
 
     & pwsh -NoProfile -File $compileScript `
         -Unity $Unity `
@@ -108,37 +230,43 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "Unity Toon Shader adapter sample compile failed. exitCode=$LASTEXITCODE; log=$compileLog"
     }
+    Write-GateOwnershipMarker `
+        -SamplePath $sampleImportPath `
+        -SampleMetaPath $sampleImportMetaPath `
+        -MarkerPath $sampleImportMarkerPath
 
     Assert-NoRunningUnityProject -ProjectPath $ProjectPath -OperationName "Unity Toon Shader adapter sample tests"
 
-    & $Unity -batchmode -runTests `
-        -projectPath $ProjectPath `
-        -testPlatform EditMode `
-        -testFilter "Mmd.Samples.UnityToonShader.Tests" `
-        -testResults $testResults `
-        -logFile $testLog
-    $unityExitCode = if ($null -eq $LASTEXITCODE) { 0 } else { $LASTEXITCODE }
+    $testArguments = @(
+        "-batchmode",
+        "-runTests",
+        "-projectPath", $ProjectPath,
+        "-testPlatform", "EditMode",
+        "-testFilter", "Mmd.Samples.UnityToonShader.Tests",
+        "-testResults", $testResults,
+        "-logFile", $testLog
+    )
+    $testStartInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $testStartInfo.FileName = $Unity
+    $testStartInfo.UseShellExecute = $false
+    $testStartInfo.CreateNoWindow = $true
+    foreach ($argument in $testArguments) {
+        [void] $testStartInfo.ArgumentList.Add($argument)
+    }
+    $testProcess = [System.Diagnostics.Process]::Start($testStartInfo)
+    $testProcess.WaitForExit()
+    $unityExitCode = $testProcess.ExitCode
 
-    if (-not (Test-Path -LiteralPath $testResults -PathType Leaf)) {
-        throw "Unity Toon Shader adapter sample tests produced no results. exitCode=$unityExitCode; log=$testLog"
+    try {
+        $testSummary = Read-NUnitTestRunSummary -Path $testResults -Context "Unity Toon Shader adapter sample tests"
+    }
+    catch {
+        throw "Unity Toon Shader adapter sample tests failed. exitCode=$unityExitCode; results=$testResults; log=$testLog; $($_.Exception.Message)"
     }
 
-    [xml] $resultsXml = Get-Content -LiteralPath $testResults -Raw
-    $testRun = $resultsXml.SelectSingleNode("//test-run")
-    if ($null -eq $testRun) {
-        throw "Unity Toon Shader adapter sample results have no <test-run> root: $testResults"
-    }
-
-    $totalCount = 0
-    $failedCount = 0
-    $skippedCount = 0
-    [void][int]::TryParse([string] $testRun.GetAttribute("total"), [ref] $totalCount)
-    [void][int]::TryParse([string] $testRun.GetAttribute("failed"), [ref] $failedCount)
-    [void][int]::TryParse([string] $testRun.GetAttribute("skipped"), [ref] $skippedCount)
-    $runResult = [string] $testRun.GetAttribute("result")
-    if ($unityExitCode -ne 0 -or $totalCount -lt 6 -or $failedCount -gt 0 -or $skippedCount -gt 0 -or $runResult -eq "Failed") {
+    if ($unityExitCode -ne 0 -or $testSummary.Total -lt 6 -or $testSummary.Failed -gt 0 -or $testSummary.Skipped -gt 0 -or $testSummary.HasFailedResult) {
         throw ("Unity Toon Shader adapter sample tests failed. exitCode={0}; result={1}; total={2}; passed={3}; failed={4}; skipped={5}; results={6}; log={7}" -f `
-            $unityExitCode, $runResult, $totalCount, $testRun.GetAttribute("passed"), $failedCount, $testRun.GetAttribute("skipped"), $testResults, $testLog)
+            $unityExitCode, $testSummary.Result, $testSummary.Total, $testSummary.Passed, $testSummary.Failed, $testSummary.Skipped, $testResults, $testLog)
     }
     if (-not (Test-Path -LiteralPath $visualCanaryPath -PathType Leaf) -or (Get-Item -LiteralPath $visualCanaryPath).Length -eq 0) {
         throw "Unity Toon Shader adapter visual canary PNG was not generated: $visualCanaryPath"
@@ -156,12 +284,16 @@ try {
     }
 
     Write-Host ("Unity Toon Shader adapter sample gate passed. total={0}; passed={1}; skipped={2}; results={3}; png={4}; generatedPmx={5}; log={6}" -f `
-        $totalCount, $testRun.GetAttribute("passed"), $testRun.GetAttribute("skipped"), $testResults, $visualCanaryPath, $generatedPmxVisualPath, $testLog)
+        $testSummary.Total, $testSummary.Passed, $testSummary.Skipped, $testResults, $visualCanaryPath, $generatedPmxVisualPath, $testLog)
 }
 finally {
     Assert-NoRunningUnityProject -ProjectPath $ProjectPath -OperationName "Unity Toon Shader adapter sample cleanup"
-    Remove-Item -LiteralPath $sampleImportPath -Recurse -Force -ErrorAction SilentlyContinue
-    Remove-Item -LiteralPath $sampleImportMetaPath, $sampleImportMarkerPath, ($sampleImportMarkerPath + ".meta") -Force -ErrorAction SilentlyContinue
+    if ($markerCreated -and (Test-Path -LiteralPath $sampleImportMarkerPath -PathType Leaf)) {
+        Remove-GateOwnedSampleIfUnchanged `
+            -SamplePath $sampleImportPath `
+            -SampleMetaPath $sampleImportMetaPath `
+            -MarkerPath $sampleImportMarkerPath
+    }
     Remove-EmptyDirectoryCreatedByGate -Path $versionSamplesPath -ExistedBeforeGate $versionSamplesPathExisted
     Remove-EmptyDirectoryCreatedByGate -Path $packageSamplesPath -ExistedBeforeGate $packageSamplesPathExisted
     Remove-EmptyDirectoryCreatedByGate -Path $samplesPath -ExistedBeforeGate $samplesPathExisted

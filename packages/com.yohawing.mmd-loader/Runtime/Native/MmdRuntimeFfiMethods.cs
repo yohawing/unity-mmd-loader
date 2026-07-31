@@ -8,19 +8,23 @@ namespace Mmd.Native
     internal static class MmdRuntimeFfiMethods
     {
         internal const string LibraryName = "mmd_runtime_ffi";
-        internal const uint ExpectedAbiVersion = 2;
+        internal const uint ExpectedAbiVersion = 3;
         internal const uint FeatureSplitPhysicsEvaluation = 1u << 0;
         internal const uint FeaturePhysicsBulletNative = 1u << 1;
+        internal const uint FeatureReducedPoseGenericCurves = 1u << 4;
         internal const uint PhysicsModeLive = 2;
         internal const int StatusOk = 0;
         internal const int StatusUnsupported = 2;
         internal const int StatusBufferTooSmall = 3;
         internal const uint ReductionTargetDccCubic = 2;
-
-        internal const uint UnityCurveBoneLocalTranslation = 0;
-        internal const uint UnityCurveBoneLocalEuler = 1;
-        internal const uint UnityCurveMorphWeight = 2;
-        internal const uint UnityCurveAxisNone = 3;
+        internal const uint GenericCurveAbiVersionV1 = 1;
+        internal const uint GenericCurveBoneLocal = 0;
+        internal const uint GenericCurveMorphWeight = 1;
+        internal const uint GenericValueTranslation = 1u << 0;
+        internal const uint GenericValueQuaternion = 1u << 1;
+        internal const uint GenericValueScalar = 1u << 2;
+        internal const uint GenericRotationBasisNone = 0;
+        internal const uint GenericRotationBasisRuntimeQuaternion = 1;
 
         [StructLayout(LayoutKind.Sequential)]
         internal struct PhysicsStepStats
@@ -87,21 +91,71 @@ namespace Mmd.Native
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        internal struct UnityCurveDescriptor
+        internal struct GenericCurveInfo
         {
-            internal uint semantic;
+            internal uint structSize;
+            internal uint abiVersion;
+            internal uint reductionTarget;
+            internal uint coordinateSystem;
+            internal uint lengthUnit;
+            internal uint angleUnit;
+            internal uint timeUnit;
+            internal uint tangentUnit;
+            internal ulong modelIdentity;
+            internal float startFrame;
+            internal float frameStep;
+            internal IntPtr frameCount;
+            internal IntPtr boneCount;
+            internal IntPtr morphCount;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct GenericCurveDescriptor
+        {
+            internal uint structSize;
+            internal uint abiVersion;
+            internal uint kind;
             internal uint targetIndex;
-            internal uint axis;
+            internal int parentIndex;
+            internal uint valueFlags;
+            internal uint interpolation;
+            internal uint rotationBasis;
             internal IntPtr keyCount;
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        internal struct UnityCurveKey
+        internal struct GenericCurveKey
         {
-            internal float timeSeconds;
-            internal float value;
-            internal float inTangent;
-            internal float outTangent;
+            internal IntPtr sampleIndex;
+            internal float frame;
+            internal float translationX;
+            internal float translationY;
+            internal float translationZ;
+            internal float rotationX;
+            internal float rotationY;
+            internal float rotationZ;
+            internal float rotationW;
+            internal float scalar;
+            internal float segmentPrevOutTranslationX;
+            internal float segmentPrevOutTranslationY;
+            internal float segmentPrevOutTranslationZ;
+            internal float segmentCurrentInTranslationX;
+            internal float segmentCurrentInTranslationY;
+            internal float segmentCurrentInTranslationZ;
+            internal float segmentFromPreviousStartEulerX;
+            internal float segmentFromPreviousStartEulerY;
+            internal float segmentFromPreviousStartEulerZ;
+            internal float segmentFromPreviousEndEulerX;
+            internal float segmentFromPreviousEndEulerY;
+            internal float segmentFromPreviousEndEulerZ;
+            internal float segmentPrevOutRotationX;
+            internal float segmentPrevOutRotationY;
+            internal float segmentPrevOutRotationZ;
+            internal float segmentCurrentInRotationX;
+            internal float segmentCurrentInRotationY;
+            internal float segmentCurrentInRotationZ;
+            internal float segmentPrevOutScalar;
+            internal float segmentCurrentInScalar;
         }
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_abi_version", CallingConvention = CallingConvention.Cdecl)]
@@ -262,29 +316,29 @@ namespace Mmd.Native
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_reduced_pose_free", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void ReducedPoseFree(IntPtr reducedPose);
 
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_reduced_pose_unity_curve_count", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern int ReducedPoseUnityCurveCount(
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_reduced_pose_generic_curve_info", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ReducedPoseGenericCurveInfo(
             IntPtr reducedPose,
-            float framesPerSecond,
-            [MarshalAs(UnmanagedType.I1)] bool flipZ,
+            ref GenericCurveInfo info);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_reduced_pose_generic_curve_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ReducedPoseGenericCurveCount(
+            IntPtr reducedPose,
             out IntPtr curveCount);
 
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_reduced_pose_unity_curve_descriptor", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern int ReducedPoseUnityCurveDescriptor(
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_reduced_pose_generic_curve_descriptor", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ReducedPoseGenericCurveDescriptor(
             IntPtr reducedPose,
-            float framesPerSecond,
-            [MarshalAs(UnmanagedType.I1)] bool flipZ,
             IntPtr curveIndex,
-            out UnityCurveDescriptor descriptor);
+            ref GenericCurveDescriptor descriptor);
 
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_reduced_pose_unity_curve_keys", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern int ReducedPoseUnityCurveKeys(
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_reduced_pose_generic_curve_keys", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ReducedPoseGenericCurveKeys(
             IntPtr reducedPose,
-            float framesPerSecond,
-            [MarshalAs(UnmanagedType.I1)] bool flipZ,
             IntPtr curveIndex,
-            [Out] UnityCurveKey[]? keys,
+            [Out] GenericCurveKey[]? keys,
             IntPtr keyCapacity,
+            IntPtr keyStrideBytes,
             out IntPtr requiredCount);
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_ik_enabled_len", CallingConvention = CallingConvention.Cdecl)]
@@ -581,65 +635,71 @@ namespace Mmd.Native
                 : throw new ArgumentException("Reduced pose handle is required.", nameof(handle));
         }
 
-        internal int GetUnityCurveCount(float framesPerSecond, bool flipZ)
+        internal MmdRuntimeFfiMethods.GenericCurveInfo GetGenericCurveInfo()
         {
             ThrowIfDisposed();
-            int status = MmdRuntimeFfiMethods.ReducedPoseUnityCurveCount(
-                handle, framesPerSecond, flipZ, out IntPtr count);
-            ThrowForStatus(status, "curve count");
+            var info = new MmdRuntimeFfiMethods.GenericCurveInfo
+            {
+                structSize = checked((uint)Marshal.SizeOf<MmdRuntimeFfiMethods.GenericCurveInfo>())
+            };
+            int status = MmdRuntimeFfiMethods.ReducedPoseGenericCurveInfo(handle, ref info);
+            ThrowForStatus(status, "generic curve info");
+            return info;
+        }
+
+        internal int GetGenericCurveCount()
+        {
+            ThrowIfDisposed();
+            int status = MmdRuntimeFfiMethods.ReducedPoseGenericCurveCount(handle, out IntPtr count);
+            ThrowForStatus(status, "generic curve count");
             return MmdFfiMarshal.CheckedIntPtrToInt(count, "reduced pose curve count");
         }
 
-        internal MmdRuntimeFfiMethods.UnityCurveDescriptor GetUnityCurveDescriptor(
-            float framesPerSecond,
-            bool flipZ,
-            int curveIndex)
+        internal MmdRuntimeFfiMethods.GenericCurveDescriptor GetGenericCurveDescriptor(int curveIndex)
         {
             ThrowIfDisposed();
-            int status = MmdRuntimeFfiMethods.ReducedPoseUnityCurveDescriptor(
+            var descriptor = new MmdRuntimeFfiMethods.GenericCurveDescriptor
+            {
+                structSize = checked((uint)Marshal.SizeOf<MmdRuntimeFfiMethods.GenericCurveDescriptor>())
+            };
+            int status = MmdRuntimeFfiMethods.ReducedPoseGenericCurveDescriptor(
                 handle,
-                framesPerSecond,
-                flipZ,
                 new IntPtr(curveIndex),
-                out MmdRuntimeFfiMethods.UnityCurveDescriptor descriptor);
-            ThrowForStatus(status, "curve descriptor");
+                ref descriptor);
+            ThrowForStatus(status, "generic curve descriptor");
             return descriptor;
         }
 
-        internal MmdRuntimeFfiMethods.UnityCurveKey[] GetUnityCurveKeys(
-            float framesPerSecond,
-            bool flipZ,
-            int curveIndex)
+        internal MmdRuntimeFfiMethods.GenericCurveKey[] GetGenericCurveKeys(int curveIndex)
         {
             ThrowIfDisposed();
-            int status = MmdRuntimeFfiMethods.ReducedPoseUnityCurveKeys(
+            IntPtr keyStrideBytes = new IntPtr(Marshal.SizeOf<MmdRuntimeFfiMethods.GenericCurveKey>());
+            int status = MmdRuntimeFfiMethods.ReducedPoseGenericCurveKeys(
                 handle,
-                framesPerSecond,
-                flipZ,
                 new IntPtr(curveIndex),
                 null,
                 IntPtr.Zero,
+                keyStrideBytes,
                 out IntPtr requiredCount);
             if (status != MmdRuntimeFfiMethods.StatusBufferTooSmall)
             {
-                ThrowForStatus(status, "curve key count");
+                ThrowForStatus(status, "generic curve key count");
             }
 
-            MmdRuntimeFfiMethods.UnityCurveKey[] keys = AllocateUnityCurveKeyBuffer(requiredCount);
+            MmdRuntimeFfiMethods.GenericCurveKey[] keys = AllocateGenericCurveKeyBuffer(requiredCount);
             if (keys.Length == 0)
             {
                 return keys;
             }
 
-            status = MmdRuntimeFfiMethods.ReducedPoseUnityCurveKeys(
+            status = MmdRuntimeFfiMethods.ReducedPoseGenericCurveKeys(
                 handle,
-                framesPerSecond,
-                flipZ,
                 new IntPtr(curveIndex),
                 keys,
                 new IntPtr(keys.Length),
+                keyStrideBytes,
                 out IntPtr copiedCount);
-            ThrowForStatus(status, "curve keys");
+            ThrowForStatus(status, "generic curve keys");
             if (copiedCount != requiredCount)
             {
                 throw new InvalidOperationException("mmd-runtime reduced pose curve key count changed during enumeration.");
@@ -648,14 +708,14 @@ namespace Mmd.Native
             return keys;
         }
 
-        internal static MmdRuntimeFfiMethods.UnityCurveKey[] AllocateUnityCurveKeyBuffer(
+        internal static MmdRuntimeFfiMethods.GenericCurveKey[] AllocateGenericCurveKeyBuffer(
             IntPtr requiredCount)
         {
             int keyCount = MmdFfiMarshal.CheckedIntPtrToInt(
                 requiredCount, "reduced pose curve key count");
             return keyCount == 0
-                ? Array.Empty<MmdRuntimeFfiMethods.UnityCurveKey>()
-                : new MmdRuntimeFfiMethods.UnityCurveKey[keyCount];
+                ? Array.Empty<MmdRuntimeFfiMethods.GenericCurveKey>()
+                : new MmdRuntimeFfiMethods.GenericCurveKey[keyCount];
         }
 
         public void Dispose()

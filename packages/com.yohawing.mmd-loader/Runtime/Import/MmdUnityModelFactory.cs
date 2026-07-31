@@ -51,7 +51,7 @@ namespace Mmd.UnityIntegration
                 importScale,
                 preset,
                 materialOverride,
-                MmdMaterialMapperSet.BuiltIn);
+                MmdMaterialMapperSet.ForPreset(preset));
         }
 
         public static MmdUnityModelInstance CreateStaticModel(
@@ -120,7 +120,7 @@ namespace Mmd.UnityIntegration
                 scale,
                 includeSelfShadowTarget,
                 materialOverride,
-                materialMappers ?? MmdMaterialMapperSet.BuiltIn);
+                materialMappers ?? MmdMaterialMapperSet.ForPreset(preset));
         }
 
         public static MmdUnityModelInstance CreateStaticModel(MmdRenderingDescriptor descriptor, string modelName)
@@ -186,7 +186,7 @@ namespace Mmd.UnityIntegration
                 importScale,
                 preset,
                 materialOverride,
-                MmdMaterialMapperSet.BuiltIn);
+                MmdMaterialMapperSet.ForPreset(preset));
         }
 
         public static MmdUnityModelInstance CreateSkinnedModel(
@@ -260,7 +260,7 @@ namespace Mmd.UnityIntegration
                 scale,
                 includeSelfShadowTarget,
                 materialOverride,
-                materialMappers ?? MmdMaterialMapperSet.BuiltIn);
+                materialMappers ?? MmdMaterialMapperSet.ForPreset(preset));
         }
 
         public static MmdUnityModelInstance CreateExistingSkinnedModelInstance(
@@ -509,6 +509,7 @@ namespace Mmd.UnityIntegration
             var root = new GameObject(ResolveModelName(modelName));
             Mesh? mesh = null;
             Material[] materials = Array.Empty<Material>();
+            MmdMaterialRenderingTargets[] materialRenderingTargets = Array.Empty<MmdMaterialRenderingTargets>();
             MmdRuntimeTextureResolution? textureResolution = null;
             try
             {
@@ -519,7 +520,8 @@ namespace Mmd.UnityIntegration
                     descriptor,
                     textureResolution,
                     materialMappers ?? MmdMaterialMapperSet.BuiltIn,
-                    out MmdShaderBindingDiagnostics shaderDiagnostics);
+                    out MmdShaderBindingDiagnostics shaderDiagnostics,
+                    out materialRenderingTargets);
                 MmdMaterialOverrideApplier.Apply(materialOverride, materials);
                 Transform[] boneTransforms = BuildBoneTransforms(modelRoot, bones, importScale);
                 MmdUnityPhysicsBody[] physicsBodies = BuildPhysicsBodies(modelRoot, bones, boneTransforms, physics, importScale);
@@ -545,7 +547,8 @@ namespace Mmd.UnityIntegration
                     GetOwnedTextures(textureResolution),
                     textureResolution.Diagnostics,
                     shaderDiagnostics,
-                    importScale);
+                    importScale,
+                    materialRenderingTargets);
             }
             catch
             {
@@ -571,6 +574,7 @@ namespace Mmd.UnityIntegration
             var root = new GameObject(ResolveModelName(modelName));
             Mesh? mesh = null;
             Material[] materials = Array.Empty<Material>();
+            MmdMaterialRenderingTargets[] materialRenderingTargets = Array.Empty<MmdMaterialRenderingTargets>();
             MmdRuntimeTextureResolution? textureResolution = null;
             try
             {
@@ -585,7 +589,8 @@ namespace Mmd.UnityIntegration
                     descriptor,
                     textureResolution,
                     materialMappers ?? MmdMaterialMapperSet.BuiltIn,
-                    out MmdShaderBindingDiagnostics shaderDiagnostics);
+                    out MmdShaderBindingDiagnostics shaderDiagnostics,
+                    out materialRenderingTargets);
                 MmdMaterialOverrideApplier.Apply(materialOverride, materials);
 
                 var renderer = modelRoot.gameObject.AddComponent<SkinnedMeshRenderer>();
@@ -609,7 +614,8 @@ namespace Mmd.UnityIntegration
                     GetOwnedTextures(textureResolution),
                     textureResolution.Diagnostics,
                     shaderDiagnostics,
-                    importScale);
+                    importScale,
+                    materialRenderingTargets);
             }
             catch
             {
@@ -733,27 +739,27 @@ namespace Mmd.UnityIntegration
 
         private static Texture2D[] GetOwnedTextures(MmdRuntimeTextureResolution textureResolution)
         {
-            var textures = new Texture2D[
-                textureResolution.DiffuseTextures.Count
-                + textureResolution.SphereTextures.Count
-                + textureResolution.ToonTextures.Count];
-            int index = 0;
+            var textures = new List<Texture2D>();
+            var seen = new HashSet<int>();
             for (int i = 0; i < textureResolution.DiffuseTextures.Count; i++)
             {
-                textures[index++] = textureResolution.DiffuseTextures[i].Texture;
+                Texture2D texture = textureResolution.DiffuseTextures[i].Texture;
+                if (seen.Add(texture.GetInstanceID())) textures.Add(texture);
             }
 
             for (int i = 0; i < textureResolution.SphereTextures.Count; i++)
             {
-                textures[index++] = textureResolution.SphereTextures[i].Texture;
+                Texture2D texture = textureResolution.SphereTextures[i].Texture;
+                if (seen.Add(texture.GetInstanceID())) textures.Add(texture);
             }
 
             for (int i = 0; i < textureResolution.ToonTextures.Count; i++)
             {
-                textures[index++] = textureResolution.ToonTextures[i].Texture;
+                Texture2D texture = textureResolution.ToonTextures[i].Texture;
+                if (seen.Add(texture.GetInstanceID())) textures.Add(texture);
             }
 
-            return textures;
+            return textures.ToArray();
         }
 
         private static string ResolveModelName(string modelName)

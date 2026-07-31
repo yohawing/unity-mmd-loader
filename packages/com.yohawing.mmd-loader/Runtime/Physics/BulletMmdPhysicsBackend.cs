@@ -179,23 +179,35 @@ namespace Mmd.Physics
 
         public MmdPhysicsBodyTransform GetRigidbodyTransform(int bodyIndex)
         {
+            var result = new MmdPhysicsBodyTransform
+            {
+                position = new float[3],
+                rotation = new float[4]
+            };
+            CopyRigidbodyTransform(bodyIndex, result.position, result.rotation);
+            return result;
+        }
+
+        internal void CopyRigidbodyTransform(int bodyIndex, float[] position, float[] rotation)
+        {
             ThrowIfUnavailable("GetRigidbodyTransform");
             EnsureWorld();
             if (bodyIndex < 0 || bodyIndex >= RigidbodyCount)
             {
                 throw new ArgumentOutOfRangeException(nameof(bodyIndex), "Rigidbody index is out of range.");
             }
+            if (position == null || position.Length != 3)
+            {
+                throw new ArgumentException("Rigidbody position destination must contain three values.", nameof(position));
+            }
+            if (rotation == null || rotation.Length != 4)
+            {
+                throw new ArgumentException("Rigidbody rotation destination must contain four values.", nameof(rotation));
+            }
 
-            float[] position = new float[3];
-            float[] rotation = new float[4];
             GuardStatus(MmdNativePhysicsMethods.WorldGetRigidbodyTransform(world, bodyIndex, position, rotation), "GetRigidbodyTransform");
             ValidateVector(position, 3, "native position");
             ValidateQuaternion(rotation, "native rotation");
-            return new MmdPhysicsBodyTransform
-            {
-                position = position,
-                rotation = rotation
-            };
         }
 
         public string GetRigidbodyShapeType(int bodyIndex)

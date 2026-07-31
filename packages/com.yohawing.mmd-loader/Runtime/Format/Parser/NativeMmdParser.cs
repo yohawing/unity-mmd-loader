@@ -44,9 +44,13 @@ namespace Mmd.Parser
                 throw new InvalidOperationException("mmd-runtime PMX non-geometry JSON parser returned empty JSON.");
             }
 
+            // Complete and release the native geometry handle before materializing the
+            // non-geometry JSON object graph. The handle owns a parsed PMX model, so keeping
+            // it alive beside the snapshot needlessly raises peak memory for large PMX.
+            PmxModelSourceGeometry geometry = createPmxGeometry(bytes);
             PmxModelSourceSnapshot snapshot = UnityEngine.JsonUtility.FromJson<PmxModelSourceSnapshot>(json)
                 ?? new PmxModelSourceSnapshot();
-            snapshot.geometry = createPmxGeometry(bytes);
+            snapshot.geometry = geometry;
             MmdModelDefinition model = BuildModelDefinition(snapshot);
             model.sourceBytes = bytes;
             return model;

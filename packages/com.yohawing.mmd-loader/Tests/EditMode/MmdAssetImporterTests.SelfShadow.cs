@@ -406,7 +406,7 @@ namespace Mmd.Tests
                 EditorSceneManager.OpenScene(TempScenePath, OpenSceneMode.Single);
 
                 MmdUnityPlaybackController[] controllers =
-                    Object.FindObjectsByType<MmdUnityPlaybackController>();
+                    Object.FindObjectsByType<MmdUnityPlaybackController>(FindObjectsSortMode.None);
                 Assert.That(controllers, Has.Length.EqualTo(1));
                 Assert.That(controllers[0].IsConfigured, Is.False);
                 Assert.That(controllers[0].HasModelSource, Is.True);
@@ -421,7 +421,7 @@ namespace Mmd.Tests
                 MmdPmxAsset reopenedPmxAsset = reloadedPmxAsset!;
 
                 SkinnedMeshRenderer[] renderers =
-                    Object.FindObjectsByType<SkinnedMeshRenderer>();
+                    Object.FindObjectsByType<SkinnedMeshRenderer>(FindObjectsSortMode.None);
                 Assert.That(renderers, Has.Length.GreaterThanOrEqualTo(1));
                 SkinnedMeshRenderer smr = renderers[0];
 

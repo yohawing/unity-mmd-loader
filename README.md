@@ -19,7 +19,7 @@ It provides a native-feel PMX importer, a Timeline-integrated VMD importer, and 
 
 | Item | Current support |
 | --- | --- |
-| Target environment | Unity 6000.4 / Windows x86_64 / URP |
+| Target environment | Unity 6000.0 LTS+ / Windows x86_64 / URP |
 | Models | PMX import and scene placement (PMD is not supported) |
 | VMD | Import and Timeline clips. Motion playback is runtime evaluation by [mmd-anim](https://github.com/yohawing/mmd-anim). Camera motion supported |
 | Morphs | Vertex (BlendShape), UV, material, bone, and group morphs |

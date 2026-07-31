@@ -28,11 +28,13 @@ namespace Mmd.UnityIntegration
             MmdRuntimeTextureResolution textureResolution,
             out MmdShaderBindingDiagnostics shaderDiagnostics)
         {
+            MmdMaterialRenderingTargets[] renderingTargets;
             return BuildMaterials(
                 descriptor,
                 textureResolution,
                 MmdMaterialMapperSet.BuiltIn,
-                out shaderDiagnostics);
+                out shaderDiagnostics,
+                out renderingTargets);
         }
 
         internal static Material[] BuildMaterials(
@@ -40,6 +42,22 @@ namespace Mmd.UnityIntegration
             MmdRuntimeTextureResolution textureResolution,
             MmdMaterialMapperSet materialMappers,
             out MmdShaderBindingDiagnostics shaderDiagnostics)
+        {
+            MmdMaterialRenderingTargets[] renderingTargets;
+            return BuildMaterials(
+                descriptor,
+                textureResolution,
+                materialMappers,
+                out shaderDiagnostics,
+                out renderingTargets);
+        }
+
+        internal static Material[] BuildMaterials(
+            MmdRenderingDescriptor descriptor,
+            MmdRuntimeTextureResolution textureResolution,
+            MmdMaterialMapperSet materialMappers,
+            out MmdShaderBindingDiagnostics shaderDiagnostics,
+            out MmdMaterialRenderingTargets[] renderingTargets)
         {
             if (materialMappers == null)
             {
@@ -51,6 +69,7 @@ namespace Mmd.UnityIntegration
             ResolveShader(ResolveRequestedShaderName(descriptor), out shaderDiagnostics);
             var materials = new Material[descriptor.materials.Count];
             var textureTargets = new MmdMaterialTextureTargets[descriptor.materials.Count];
+            renderingTargets = new MmdMaterialRenderingTargets[descriptor.materials.Count];
             try
             {
                 for (int i = 0; i < descriptor.materials.Count; i++)
@@ -68,18 +87,26 @@ namespace Mmd.UnityIntegration
                     }
 
                     textureTargets[i] = mapper.TextureTargets;
+                    renderingTargets[i] = mapper.RenderingTargets;
                     material.hideFlags = RuntimeGeneratedAssetHideFlags;
                     material.name = string.IsNullOrWhiteSpace(source.name)
                         ? $"MMD Material {source.materialIndex}"
                         : source.name;
                     materials[i] = material;
-                    ApplyMaterialColors(material, source);
+                    ApplyMaterialColors(material, source, mapper.RenderingTargets);
                     MmdMaterialTransparencyMode transparencyMode = ResolveMaterialTransparencyMode(descriptor, source, textureResolution);
-                    ApplyMaterialRenderingPolicy(material, source.alpha, transparencyMode, source.cullingPolicy, i);
+                    ApplyMaterialRenderingPolicy(
+                        material,
+                        source.alpha,
+                        transparencyMode,
+                        source.cullingPolicy,
+                        i,
+                        mapper.RenderingTargets);
                     if (IsUrpLitShader(material.shader))
                     {
                         ApplyUrpLitDefaults(new[] { material });
                     }
+                    ApplyMapperShaderState(material, mapper.RenderingTargets);
                 }
 
                 BindDiffuseTextures(descriptor, materials, textureTargets, textureResolution);

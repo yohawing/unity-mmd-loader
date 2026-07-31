@@ -6,6 +6,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using NUnit.Framework;
+using UnityEngine;
 using Mmd.Native;
 using Mmd.Parser;
 
@@ -14,18 +15,6 @@ namespace Mmd.Tests
     [TestFixture]
     public sealed class NativeInteropContractTests
     {
-        [Test]
-        public void ParserFfiPinsActiveJsonEntrypoints()
-        {
-            Assert.That(MmdParserFfiMethods.LibraryName, Is.EqualTo("mmd_runtime_ffi"));
-            Assert.That(MmdParserFfiMethods.ByteBufferFreeEntryPoint, Is.EqualTo("mmd_runtime_byte_buffer_free"));
-            Assert.That(MmdParserFfiMethods.ParseVmdJsonEntryPoint, Is.EqualTo("mmd_runtime_parse_vmd_json"));
-            Assert.That(MmdParserFfiMethods.ParsePmxNonGeometryJsonEntryPoint, Is.EqualTo("mmd_runtime_parse_pmx_non_geometry_json"));
-
-            AssertPrivateFfiSignatureReturnName("ParseVmdJsonBuffer", "ByteBuffer", typeof(byte[]), typeof(IntPtr));
-            AssertPrivateFfiSignatureReturnName("ParsePmxNonGeometryJsonBuffer", "ByteBuffer", typeof(byte[]), typeof(IntPtr));
-        }
-
         [Test]
         public void ParserFfiParsesPmxNonGeometryJsonFromPackageFixture()
         {
@@ -38,89 +27,196 @@ namespace Mmd.Tests
             Assert.That(json, Does.Not.Contain("\"geometry\""));
         }
 
-        [Test]
-        public void ParserFfiPinsPmxGeometryBufferEntrypoints()
+        [TestCase("test_1bone_cube.pmx", 1, false)]
+        [TestCase("GeneratedPmx/mixed-deform-types.pmx", 3, true)]
+        public void ParseOnceHandleAndLegacyFallbackBuildEquivalentModel(
+            string fixtureName,
+            int minimumDistinctSkinningModes,
+            bool requireMultiBoneWeighting)
         {
-            // Static contract checks only; no native functions are invoked.
-            // These must pass even against the current locked package DLL.
-            Assert.That(MmdParserFfiMethods.ParsePmxPositionsBufferEntryPoint, Is.EqualTo("mmd_runtime_parse_pmx_positions_buffer"));
-            Assert.That(MmdParserFfiMethods.ParsePmxNormalsBufferEntryPoint, Is.EqualTo("mmd_runtime_parse_pmx_normals_buffer"));
-            Assert.That(MmdParserFfiMethods.ParsePmxUvsBufferEntryPoint, Is.EqualTo("mmd_runtime_parse_pmx_uvs_buffer"));
-            Assert.That(MmdParserFfiMethods.ParsePmxIndicesBufferEntryPoint, Is.EqualTo("mmd_runtime_parse_pmx_indices_buffer"));
-            Assert.That(MmdParserFfiMethods.ParsePmxSkinIndicesBufferEntryPoint, Is.EqualTo("mmd_runtime_parse_pmx_skin_indices_buffer"));
-            Assert.That(MmdParserFfiMethods.ParsePmxSkinWeightsBufferEntryPoint, Is.EqualTo("mmd_runtime_parse_pmx_skin_weights_buffer"));
-            Assert.That(MmdParserFfiMethods.ParsePmxSdefEnabledBufferEntryPoint, Is.EqualTo("mmd_runtime_parse_pmx_sdef_enabled_buffer"));
-            Assert.That(MmdParserFfiMethods.ParsePmxSdefCBufferEntryPoint, Is.EqualTo("mmd_runtime_parse_pmx_sdef_c_buffer"));
-            Assert.That(MmdParserFfiMethods.ParsePmxSdefR0BufferEntryPoint, Is.EqualTo("mmd_runtime_parse_pmx_sdef_r0_buffer"));
-            Assert.That(MmdParserFfiMethods.ParsePmxSdefR1BufferEntryPoint, Is.EqualTo("mmd_runtime_parse_pmx_sdef_r1_buffer"));
-            Assert.That(MmdParserFfiMethods.ParsePmxSkinningModesJsonEntryPoint, Is.EqualTo("mmd_runtime_parse_pmx_skinning_modes_json"));
+            byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes(fixtureName);
+            MmdModelDefinition handleModel = new NativeMmdParser().LoadModel(pmxBytes);
 
-            // Private DllImport signature checks (reflection-based, no invocation).
-            AssertPrivateFfiSignatureReturnName("ParsePmxPositionsBuffer", "ByteBuffer", typeof(byte[]), typeof(IntPtr));
-            AssertPrivateFfiSignatureReturnName("ParsePmxNormalsBuffer", "ByteBuffer", typeof(byte[]), typeof(IntPtr));
-            AssertPrivateFfiSignatureReturnName("ParsePmxUvsBuffer", "ByteBuffer", typeof(byte[]), typeof(IntPtr));
-            AssertPrivateFfiSignatureReturnName("ParsePmxIndicesBuffer", "ByteBuffer", typeof(byte[]), typeof(IntPtr));
-            AssertPrivateFfiSignatureReturnName("ParsePmxSkinIndicesBuffer", "ByteBuffer", typeof(byte[]), typeof(IntPtr));
-            AssertPrivateFfiSignatureReturnName("ParsePmxSkinWeightsBuffer", "ByteBuffer", typeof(byte[]), typeof(IntPtr));
-            AssertPrivateFfiSignatureReturnName("ParsePmxSdefEnabledBuffer", "ByteBuffer", typeof(byte[]), typeof(IntPtr));
-            AssertPrivateFfiSignatureReturnName("ParsePmxSdefCBuffer", "ByteBuffer", typeof(byte[]), typeof(IntPtr));
-            AssertPrivateFfiSignatureReturnName("ParsePmxSdefR0Buffer", "ByteBuffer", typeof(byte[]), typeof(IntPtr));
-            AssertPrivateFfiSignatureReturnName("ParsePmxSdefR1Buffer", "ByteBuffer", typeof(byte[]), typeof(IntPtr));
-            AssertPrivateFfiSignatureReturnName("ParsePmxSkinningModesJsonBuffer", "ByteBuffer", typeof(byte[]), typeof(IntPtr));
+            string nonGeometryJson = MmdParserFfiMethods.ParsePmxNonGeometryJson(pmxBytes);
+            NativeMmdParser.PmxModelSourceSnapshot legacySnapshot =
+                JsonUtility.FromJson<NativeMmdParser.PmxModelSourceSnapshot>(nonGeometryJson)
+                ?? new NativeMmdParser.PmxModelSourceSnapshot();
+            legacySnapshot.geometry = NativeMmdParser.CreatePmxGeometryFromLegacyBuffers(pmxBytes);
+            MmdModelDefinition legacyModel = NativeMmdParser.BuildModelDefinition(legacySnapshot);
+
+            AssertModelGeometryAndSkinningParity(handleModel, legacyModel, fixtureName);
+
+            Assert.That(handleModel.vertices.Select(vertex => vertex.skinningMode).Distinct().Count(),
+                Is.GreaterThanOrEqualTo(minimumDistinctSkinningModes),
+                fixtureName + " must retain the expected number of skinning modes.");
+            Assert.That(handleModel.vertices.Any(vertex => vertex.boneIndices.Length > 1 &&
+                vertex.boneWeights.Skip(1).Any(weight => weight > 0.0f)),
+                Is.EqualTo(requireMultiBoneWeighting),
+                fixtureName + " multi-bone weighting expectation.");
         }
 
         [Test]
-        public void ParserFfiParsesAllPmxGeometryBuffersFromPackageFixture()
+        public void NativeParserUsesOneGeometryHandleAndFreesItAfterAllAccessors()
+        {
+            var reader = new CountingPmxGeometryReader();
+
+            var geometry = NativeMmdParser.CreatePmxGeometryFromNativeHandle(new byte[] { 1 }, reader);
+
+            Assert.That(reader.CreateCount, Is.EqualTo(1));
+            Assert.That(reader.ReadAllCount, Is.EqualTo(1));
+            Assert.That(reader.FreeCount, Is.EqualTo(1));
+
+            CollectionAssert.AreEqual(new[] { 1.0f, 2.0f, 3.0f }, geometry.positions);
+            CollectionAssert.AreEqual(new uint[] { 0, 0, 0 }, geometry.indices);
+            CollectionAssert.AreEqual(new[] { "bdef1" }, geometry.skinningModes);
+        }
+
+        [Test]
+        public void NativeParserFreesGeometryHandleWhenReadAllFails()
+        {
+            var reader = new CountingPmxGeometryReader { ThrowOnReadAll = true };
+
+            Assert.Throws<InvalidOperationException>(() =>
+                NativeMmdParser.CreatePmxGeometryFromNativeHandle(new byte[] { 1 }, reader));
+
+            Assert.That(reader.CreateCount, Is.EqualTo(1));
+            Assert.That(reader.ReadAllCount, Is.EqualTo(1));
+            Assert.That(reader.FreeCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void NativeParserRejectsNullGeometryHandleWithoutFreeingIt()
+        {
+            var reader = new CountingPmxGeometryReader { CreatedHandle = IntPtr.Zero };
+
+            InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+                NativeMmdParser.CreatePmxGeometryFromNativeHandle(new byte[] { 1 }, reader))!;
+
+            Assert.That(exception.Message, Does.Contain("returned null"));
+            Assert.That(reader.CreateCount, Is.EqualTo(1));
+            Assert.That(reader.FreeCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ParserFfiParsesPmxGeometryHandleFromPackageFixture()
         {
             byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube.pmx");
+            IntPtr geometry = MmdParserFfiMethods.CreatePmxGeometry(pmxBytes);
+            Assert.That(geometry, Is.Not.EqualTo(IntPtr.Zero), "parse-once PMX geometry handle");
 
-            float[] positions = MmdParserFfiMethods.ParsePmxPositions(pmxBytes);
-            float[] normals = MmdParserFfiMethods.ParsePmxNormals(pmxBytes);
-            float[] uvs = MmdParserFfiMethods.ParsePmxUvs(pmxBytes);
-            uint[] indices = MmdParserFfiMethods.ParsePmxIndices(pmxBytes);
-            uint[] skinIndices = MmdParserFfiMethods.ParsePmxSkinIndices(pmxBytes);
-            float[] skinWeights = MmdParserFfiMethods.ParsePmxSkinWeights(pmxBytes);
-            bool[] sdefEnabled = MmdParserFfiMethods.ParsePmxSdefEnabled(pmxBytes);
-            float[] sdefC = MmdParserFfiMethods.ParsePmxSdefC(pmxBytes);
-            float[] sdefR0 = MmdParserFfiMethods.ParsePmxSdefR0(pmxBytes);
-            float[] sdefR1 = MmdParserFfiMethods.ParsePmxSdefR1(pmxBytes);
-            string modesJson = MmdParserFfiMethods.ParsePmxSkinningModesJson(pmxBytes);
+            try
+            {
+                float[] positions = MmdParserFfiMethods.ParsePmxGeometryPositions(geometry);
+                float[] normals = MmdParserFfiMethods.ParsePmxGeometryNormals(geometry);
+                float[] uvs = MmdParserFfiMethods.ParsePmxGeometryUvs(geometry);
+                float[] edgeScale = MmdParserFfiMethods.ParsePmxGeometryEdgeScale(geometry);
+                uint[] indices = MmdParserFfiMethods.ParsePmxGeometryIndices(geometry);
+                uint[] skinIndices = MmdParserFfiMethods.ParsePmxGeometrySkinIndices(geometry);
+                float[] skinWeights = MmdParserFfiMethods.ParsePmxGeometrySkinWeights(geometry);
+                bool[] sdefEnabled = MmdParserFfiMethods.ParsePmxGeometrySdefEnabled(geometry);
+                float[] sdefC = MmdParserFfiMethods.ParsePmxGeometrySdefC(geometry);
+                float[] sdefR0 = MmdParserFfiMethods.ParsePmxGeometrySdefR0(geometry);
+                float[] sdefR1 = MmdParserFfiMethods.ParsePmxGeometrySdefR1(geometry);
+                string modesJson = MmdParserFfiMethods.ParsePmxGeometrySkinningModesJson(geometry);
 
-            // positions: flat xyz, non-zero multiple of 3
-            Assert.That(positions.Length % 3, Is.EqualTo(0), "positions.Length % 3");
-            Assert.That(positions.Length, Is.GreaterThan(0), "positions vertex count");
-            int vertexCount = positions.Length / 3;
+                // positions: flat xyz, non-zero multiple of 3
+                Assert.That(positions.Length % 3, Is.EqualTo(0), "positions.Length % 3");
+                Assert.That(positions.Length, Is.GreaterThan(0), "positions vertex count");
+                int vertexCount = positions.Length / 3;
 
-            // normals: same flat xyz layout as positions
-            Assert.That(normals.Length, Is.EqualTo(positions.Length), "normals.Length == positions.Length");
+                // normals: same flat xyz layout as positions
+                Assert.That(normals.Length, Is.EqualTo(positions.Length), "normals.Length == positions.Length");
 
-            // uvs: flat uv pairs
-            Assert.That(uvs.Length, Is.EqualTo(vertexCount * 2), "uvs.Length == vertexCount*2");
+                // uvs: flat uv pairs
+                Assert.That(uvs.Length, Is.EqualTo(vertexCount * 2), "uvs.Length == vertexCount*2");
+                Assert.That(edgeScale.Length, Is.EqualTo(vertexCount), "edgeScale.Length == vertexCount");
 
-            // indices: triangles, non-zero multiple of 3
-            Assert.That(indices.Length % 3, Is.EqualTo(0), "indices.Length % 3");
-            Assert.That(indices.Length, Is.GreaterThan(0), "indices non-empty");
+                // indices: triangles, non-zero multiple of 3
+                Assert.That(indices.Length % 3, Is.EqualTo(0), "indices.Length % 3");
+                Assert.That(indices.Length, Is.GreaterThan(0), "indices non-empty");
 
-            // skinning: 4 values per vertex
-            Assert.That(skinIndices.Length, Is.EqualTo(vertexCount * 4), "skinIndices.Length == vertexCount*4");
-            Assert.That(skinWeights.Length, Is.EqualTo(vertexCount * 4), "skinWeights.Length == vertexCount*4");
+                // skinning: 4 values per vertex
+                Assert.That(skinIndices.Length, Is.EqualTo(vertexCount * 4), "skinIndices.Length == vertexCount*4");
+                Assert.That(skinWeights.Length, Is.EqualTo(vertexCount * 4), "skinWeights.Length == vertexCount*4");
 
-            // SDEF: one bool per vertex, xyz triples for C/R0/R1
-            Assert.That(sdefEnabled.Length, Is.EqualTo(vertexCount), "sdefEnabled.Length == vertexCount");
-            Assert.That(sdefC.Length, Is.EqualTo(vertexCount * 3), "sdefC.Length == vertexCount*3");
-            Assert.That(sdefR0.Length, Is.EqualTo(vertexCount * 3), "sdefR0.Length == vertexCount*3");
-            Assert.That(sdefR1.Length, Is.EqualTo(vertexCount * 3), "sdefR1.Length == vertexCount*3");
+                // SDEF: one bool per vertex, xyz triples for C/R0/R1
+                Assert.That(sdefEnabled.Length, Is.EqualTo(vertexCount), "sdefEnabled.Length == vertexCount");
+                Assert.That(sdefC.Length, Is.EqualTo(vertexCount * 3), "sdefC.Length == vertexCount*3");
+                Assert.That(sdefR0.Length, Is.EqualTo(vertexCount * 3), "sdefR0.Length == vertexCount*3");
+                Assert.That(sdefR1.Length, Is.EqualTo(vertexCount * 3), "sdefR1.Length == vertexCount*3");
 
-            // skinning modes JSON must be a non-empty JSON payload
-            Assert.That(modesJson, Is.Not.Null.And.Not.Empty, "skinningModesJson non-empty");
+                // skinning modes JSON must be a non-empty JSON payload
+                Assert.That(modesJson, Is.Not.Null.And.Not.Empty, "skinningModesJson non-empty");
+            }
+            finally
+            {
+                MmdParserFfiMethods.FreePmxGeometry(geometry);
+            }
+        }
+
+        private static void AssertModelGeometryAndSkinningParity(
+            MmdModelDefinition expected,
+            MmdModelDefinition actual,
+            string fixtureName)
+        {
+            Assert.That(actual.vertices.Count, Is.EqualTo(expected.vertices.Count), fixtureName + " vertex count");
+            Assert.That(actual.indices, Is.EqualTo(expected.indices), fixtureName + " indices");
+            for (int i = 0; i < expected.vertices.Count; i++)
+            {
+                MmdVertexDefinition expectedVertex = expected.vertices[i];
+                MmdVertexDefinition actualVertex = actual.vertices[i];
+                AssertFloatArraysEqual(expectedVertex.position, actualVertex.position, fixtureName + " position[" + i + "]");
+                AssertFloatArraysEqual(expectedVertex.normal, actualVertex.normal, fixtureName + " normal[" + i + "]");
+                AssertFloatArraysEqual(expectedVertex.uv, actualVertex.uv, fixtureName + " uv[" + i + "]");
+                AssertFloatEqualNaNAware(expectedVertex.edgeScale, actualVertex.edgeScale, fixtureName + " edgeScale[" + i + "]");
+                Assert.That(actualVertex.skinningMode, Is.EqualTo(expectedVertex.skinningMode), fixtureName + " skinningMode[" + i + "]");
+                Assert.That(actualVertex.boneIndices, Is.EqualTo(expectedVertex.boneIndices), fixtureName + " boneIndices[" + i + "]");
+                AssertFloatArraysEqual(expectedVertex.boneWeights, actualVertex.boneWeights, fixtureName + " boneWeights[" + i + "]");
+                Assert.That(actualVertex.hasSdefParameters, Is.EqualTo(expectedVertex.hasSdefParameters), fixtureName + " hasSdef[" + i + "]");
+                AssertFloatArraysEqual(expectedVertex.sdefC, actualVertex.sdefC, fixtureName + " sdefC[" + i + "]");
+                AssertFloatArraysEqual(expectedVertex.sdefR0, actualVertex.sdefR0, fixtureName + " sdefR0[" + i + "]");
+                AssertFloatArraysEqual(expectedVertex.sdefR1, actualVertex.sdefR1, fixtureName + " sdefR1[" + i + "]");
+            }
+        }
+
+        private static void AssertFloatArraysEqual(float[] expected, float[] actual, string label)
+        {
+            Assert.That(actual.Length, Is.EqualTo(expected.Length), label + " length");
+            for (int i = 0; i < expected.Length; i++)
+            {
+                if (float.IsNaN(expected[i]))
+                {
+                    Assert.That(actual[i], Is.NaN, label + "[" + i + "]");
+                }
+                else
+                {
+                    Assert.That(actual[i], Is.EqualTo(expected[i]).Within(0.000001f), label + "[" + i + "]");
+                }
+            }
+        }
+
+        private static void AssertFloatEqualNaNAware(float expected, float actual, string label)
+        {
+            if (float.IsNaN(expected))
+            {
+                Assert.That(actual, Is.NaN, label);
+            }
+            else if (float.IsInfinity(expected))
+            {
+                Assert.That(actual, Is.EqualTo(expected), label);
+            }
+            else
+            {
+                Assert.That(actual, Is.EqualTo(expected).Within(0.000001f), label);
+            }
         }
 
         [Test]
         public void FastRuntimeAndPhysicsWrapperNamesAreSeparate()
         {
             Assert.That(MmdRuntimeFfiMethods.LibraryName, Is.EqualTo("mmd_runtime_ffi"));
-            Assert.That(MmdRuntimeFfiMethods.ExpectedAbiVersion, Is.EqualTo(2));
-            Assert.That(MmdRuntimeFfiMethods.ValidateAbiVersion(), Is.EqualTo(2));
+            Assert.That(MmdRuntimeFfiMethods.ExpectedAbiVersion, Is.EqualTo(3));
+            Assert.That(MmdRuntimeFfiMethods.ValidateAbiVersion(), Is.EqualTo(3));
             Assert.That(MmdNativePhysicsMethods.LibraryName, Is.EqualTo("mmd_bullet"));
         }
 
@@ -189,28 +285,28 @@ namespace Mmd.Tests
                 typeof(IntPtr).MakeByRefType());
             AssertRuntimeFfiSignature("ReducedPoseFree", typeof(void), typeof(IntPtr));
             AssertRuntimeFfiSignature(
-                "ReducedPoseUnityCurveCount",
+                "ReducedPoseGenericCurveInfo",
                 typeof(int),
                 typeof(IntPtr),
-                typeof(float),
-                typeof(bool),
+                typeof(MmdRuntimeFfiMethods.GenericCurveInfo).MakeByRefType());
+            AssertRuntimeFfiSignature(
+                "ReducedPoseGenericCurveCount",
+                typeof(int),
+                typeof(IntPtr),
                 typeof(IntPtr).MakeByRefType());
             AssertRuntimeFfiSignature(
-                "ReducedPoseUnityCurveDescriptor",
+                "ReducedPoseGenericCurveDescriptor",
                 typeof(int),
                 typeof(IntPtr),
-                typeof(float),
-                typeof(bool),
                 typeof(IntPtr),
-                typeof(MmdRuntimeFfiMethods.UnityCurveDescriptor).MakeByRefType());
+                typeof(MmdRuntimeFfiMethods.GenericCurveDescriptor).MakeByRefType());
             AssertRuntimeFfiSignature(
-                "ReducedPoseUnityCurveKeys",
+                "ReducedPoseGenericCurveKeys",
                 typeof(int),
                 typeof(IntPtr),
-                typeof(float),
-                typeof(bool),
                 typeof(IntPtr),
-                typeof(MmdRuntimeFfiMethods.UnityCurveKey[]),
+                typeof(MmdRuntimeFfiMethods.GenericCurveKey[]),
+                typeof(IntPtr),
                 typeof(IntPtr),
                 typeof(IntPtr).MakeByRefType());
             Assert.That(
@@ -218,32 +314,42 @@ namespace Mmd.Tests
                     "ReducedPoseSample", BindingFlags.NonPublic | BindingFlags.Static),
                 Is.Null,
                 "the transitional dense reduced-pose sampler must not have a managed binding");
-            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.ReductionTolerances>(), Is.EqualTo(20));
-            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.UnityCurveKey>(), Is.EqualTo(16));
             Assert.That(
-                Marshal.SizeOf<MmdRuntimeFfiMethods.UnityCurveDescriptor>(),
-                Is.EqualTo(IntPtr.Size == 8 ? 24 : 16));
+                typeof(MmdRuntimeFfiMethods).GetMethod(
+                    "ReducedPoseUnityCurveCount", BindingFlags.NonPublic | BindingFlags.Static),
+                Is.Null,
+                "the deprecated Unity-specific curve ABI must not remain bound");
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.ReductionTolerances>(), Is.EqualTo(20));
+            Assert.That(
+                Marshal.SizeOf<MmdRuntimeFfiMethods.GenericCurveInfo>(),
+                Is.EqualTo(IntPtr.Size == 8 ? 72 : 64));
+            Assert.That(
+                Marshal.SizeOf<MmdRuntimeFfiMethods.GenericCurveDescriptor>(),
+                Is.EqualTo(IntPtr.Size == 8 ? 40 : 36));
+            Assert.That(
+                Marshal.SizeOf<MmdRuntimeFfiMethods.GenericCurveKey>(),
+                Is.EqualTo(IntPtr.Size == 8 ? 128 : 120));
             Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.ReductionTolerances>("localPosition").ToInt32(), Is.EqualTo(0));
             Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.ReductionTolerances>("localRotationRadians").ToInt32(), Is.EqualTo(4));
             Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.ReductionTolerances>("worldPosition").ToInt32(), Is.EqualTo(8));
             Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.ReductionTolerances>("worldRotationRadians").ToInt32(), Is.EqualTo(12));
             Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.ReductionTolerances>("morphWeight").ToInt32(), Is.EqualTo(16));
-            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.UnityCurveDescriptor>("semantic").ToInt32(), Is.EqualTo(0));
-            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.UnityCurveDescriptor>("targetIndex").ToInt32(), Is.EqualTo(4));
-            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.UnityCurveDescriptor>("axis").ToInt32(), Is.EqualTo(8));
-            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.UnityCurveDescriptor>("keyCount").ToInt32(), Is.EqualTo(IntPtr.Size == 8 ? 16 : 12));
-            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.UnityCurveKey>("timeSeconds").ToInt32(), Is.EqualTo(0));
-            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.UnityCurveKey>("value").ToInt32(), Is.EqualTo(4));
-            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.UnityCurveKey>("inTangent").ToInt32(), Is.EqualTo(8));
-            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.UnityCurveKey>("outTangent").ToInt32(), Is.EqualTo(12));
+            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.GenericCurveInfo>("modelIdentity").ToInt32(), Is.EqualTo(32));
+            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.GenericCurveInfo>("frameCount").ToInt32(), Is.EqualTo(48));
+            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.GenericCurveDescriptor>("targetIndex").ToInt32(), Is.EqualTo(12));
+            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.GenericCurveDescriptor>("keyCount").ToInt32(), Is.EqualTo(32));
+            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.GenericCurveKey>("frame").ToInt32(), Is.EqualTo(IntPtr.Size));
+            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.GenericCurveKey>("rotationX").ToInt32(), Is.EqualTo(IntPtr.Size == 8 ? 24 : 20));
+            Assert.That(Marshal.OffsetOf<MmdRuntimeFfiMethods.GenericCurveKey>("segmentCurrentInScalar").ToInt32(), Is.EqualTo(IntPtr.Size == 8 ? 120 : 116));
 
             foreach (string methodName in new[]
                      {
                          "ReducedPoseCreateFromDense",
                          "ReducedPoseFree",
-                         "ReducedPoseUnityCurveCount",
-                         "ReducedPoseUnityCurveDescriptor",
-                         "ReducedPoseUnityCurveKeys"
+                         "ReducedPoseGenericCurveInfo",
+                         "ReducedPoseGenericCurveCount",
+                         "ReducedPoseGenericCurveDescriptor",
+                         "ReducedPoseGenericCurveKeys"
                      })
             {
                 DllImportAttribute import = GetRuntimeFfiMethod(methodName).GetCustomAttribute<DllImportAttribute>()!;
@@ -251,26 +357,14 @@ namespace Mmd.Tests
                 Assert.That(import.CallingConvention, Is.EqualTo(CallingConvention.Cdecl), methodName);
             }
 
-            foreach (string methodName in new[]
-                     {
-                         "ReducedPoseUnityCurveCount",
-                         "ReducedPoseUnityCurveDescriptor",
-                         "ReducedPoseUnityCurveKeys"
-                     })
-            {
-                ParameterInfo flipZ = GetRuntimeFfiMethod(methodName).GetParameters()[2];
-                MarshalAsAttribute marshalAs = flipZ.GetCustomAttribute<MarshalAsAttribute>()!;
-                Assert.That(marshalAs, Is.Not.Null, methodName + " flipZ");
-                Assert.That(marshalAs.Value, Is.EqualTo(UnmanagedType.I1), methodName + " flipZ");
-            }
         }
 
         [Test]
         public void ReducedPoseZeroKeyBufferUsesSharedEmptyArray()
         {
-            MmdRuntimeFfiMethods.UnityCurveKey[] keys =
-                MmdRuntimeReducedPose.AllocateUnityCurveKeyBuffer(IntPtr.Zero);
-            Assert.That(keys, Is.SameAs(Array.Empty<MmdRuntimeFfiMethods.UnityCurveKey>()));
+            MmdRuntimeFfiMethods.GenericCurveKey[] keys =
+                MmdRuntimeReducedPose.AllocateGenericCurveKeyBuffer(IntPtr.Zero);
+            Assert.That(keys, Is.SameAs(Array.Empty<MmdRuntimeFfiMethods.GenericCurveKey>()));
         }
 
         [Test]
@@ -372,21 +466,24 @@ namespace Mmd.Tests
 
             try
             {
-                int curveCount = reducedPose.GetUnityCurveCount(30.0f, true);
-                Assert.That(curveCount, Is.EqualTo(6), "one bone exposes translation XYZ and Euler XYZ");
-                for (int curveIndex = 0; curveIndex < curveCount; curveIndex++)
+                MmdRuntimeFfiMethods.GenericCurveInfo info = reducedPose.GetGenericCurveInfo();
+                Assert.That(info.abiVersion, Is.EqualTo(MmdRuntimeFfiMethods.GenericCurveAbiVersionV1));
+                Assert.That(info.boneCount.ToInt64(), Is.EqualTo(1));
+                int trackCount = reducedPose.GetGenericCurveCount();
+                Assert.That(trackCount, Is.EqualTo(1), "one bone exposes one generic transform track");
+                for (int trackIndex = 0; trackIndex < trackCount; trackIndex++)
                 {
-                    MmdRuntimeFfiMethods.UnityCurveDescriptor descriptor =
-                        reducedPose.GetUnityCurveDescriptor(30.0f, true, curveIndex);
-                    MmdRuntimeFfiMethods.UnityCurveKey[] keys =
-                        reducedPose.GetUnityCurveKeys(30.0f, true, curveIndex);
+                    MmdRuntimeFfiMethods.GenericCurveDescriptor descriptor =
+                        reducedPose.GetGenericCurveDescriptor(trackIndex);
+                    MmdRuntimeFfiMethods.GenericCurveKey[] keys =
+                        reducedPose.GetGenericCurveKeys(trackIndex);
                     Assert.That(keys.Length, Is.EqualTo(descriptor.keyCount.ToInt64()));
                     Assert.That(keys, Is.Not.Empty);
                     Assert.That(keys.All(key =>
-                        float.IsFinite(key.timeSeconds) &&
-                        float.IsFinite(key.value) &&
-                        float.IsFinite(key.inTangent) &&
-                        float.IsFinite(key.outTangent)), Is.True);
+                        float.IsFinite(key.frame) &&
+                        float.IsFinite(key.translationX) &&
+                        float.IsFinite(key.rotationW) &&
+                        float.IsFinite(key.segmentCurrentInRotationZ)), Is.True);
                 }
             }
             finally
@@ -439,7 +536,7 @@ namespace Mmd.Tests
         [Test]
         public void RuntimeFfiSamplesVmdLightIntoCallerOwnedBuffer()
         {
-            byte[] vmdBytes = BuildSceneTrackVmdBytes();
+            byte[] vmdBytes = MmdTestFixtures.BuildSceneTrackVmdBytes("light_shadow");
             float[] values = new float[6];
 
             IntPtr track = MmdRuntimeFfiMethods.VmdLightTrackCreateFromVmdBytes(vmdBytes, new IntPtr(vmdBytes.Length));
@@ -469,7 +566,7 @@ namespace Mmd.Tests
         [Test]
         public void RuntimeFfiSamplesVmdSelfShadowIntoCallerOwnedBuffer()
         {
-            byte[] vmdBytes = BuildSceneTrackVmdBytes();
+            byte[] vmdBytes = MmdTestFixtures.BuildSceneTrackVmdBytes("light_shadow");
             float[] values = new float[2];
 
             IntPtr track = MmdRuntimeFfiMethods.VmdSelfShadowTrackCreateFromVmdBytes(vmdBytes, new IntPtr(vmdBytes.Length));
@@ -517,27 +614,6 @@ namespace Mmd.Tests
             Assert.That(Path.Combine(pluginRoot, "yohawing_mmd_unity_native.dll.meta"), Does.Not.Exist);
         }
 
-        private static void AssertPrivateFfiSignature(string methodName, Type returnType, params Type[] parameterTypes)
-        {
-            MethodInfo method = GetPrivateFfiMethod(methodName);
-            Assert.That(method.ReturnType, Is.EqualTo(returnType), methodName);
-            CollectionAssert.AreEqual(parameterTypes, method.GetParameters().Select(parameter => parameter.ParameterType).ToArray(), methodName);
-        }
-
-        private static void AssertPrivateFfiSignatureReturnName(string methodName, string returnTypeName, params Type[] parameterTypes)
-        {
-            MethodInfo method = GetPrivateFfiMethod(methodName);
-            Assert.That(method.ReturnType.Name, Is.EqualTo(returnTypeName), methodName);
-            CollectionAssert.AreEqual(parameterTypes, method.GetParameters().Select(parameter => parameter.ParameterType).ToArray(), methodName);
-        }
-
-        private static MethodInfo GetPrivateFfiMethod(string methodName)
-        {
-            MethodInfo method = typeof(MmdParserFfiMethods).GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Static);
-            Assert.That(method, Is.Not.Null, methodName);
-            return method;
-        }
-
         private static void AssertRuntimeFfiSignature(string methodName, Type returnType, params Type[] parameterTypes)
         {
             MethodInfo method = GetRuntimeFfiMethod(methodName);
@@ -579,58 +655,50 @@ namespace Mmd.Tests
             Assert.That(values[5], Is.EqualTo(0.0f).Within(0.0001f), "direction.z");
         }
 
-        private static byte[] BuildSceneTrackVmdBytes()
+        private sealed class CountingPmxGeometryReader : IPmxGeometryReader
         {
-            using var stream = new MemoryStream();
-            using var writer = new BinaryWriter(stream);
+            internal int CreateCount { get; private set; }
+            internal int ReadAllCount { get; private set; }
+            internal int FreeCount { get; private set; }
+            internal bool ThrowOnReadAll { get; set; }
+            internal IntPtr CreatedHandle { get; set; } = new IntPtr(1);
 
-            WriteFixedAscii(writer, "Vocaloid Motion Data 0002", 30);
-            WriteFixedAscii(writer, "light_shadow", 20);
-            writer.Write(0u); // bone frames
-            writer.Write(0u); // morph frames
-            writer.Write(0u); // camera frames
-            writer.Write(2u); // light frames
-            WriteLightFrame(writer, 10u, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f);
-            WriteLightFrame(writer, 30u, 1.0f, 0.5f, 0.0f, 0.0f, -1.0f, 0.0f);
-            writer.Write(2u); // self-shadow frames
-            WriteSelfShadowFrame(writer, 10u, 1, 0.2f);
-            WriteSelfShadowFrame(writer, 30u, 2, 0.4f);
-            writer.Write(0u); // property frames
-            return stream.ToArray();
+            public IntPtr Create(byte[] data)
+            {
+                CreateCount++;
+                return CreatedHandle;
+            }
+
+            public PmxGeometryData ReadAll(IntPtr geometry)
+            {
+                ReadAllCount++;
+                if (ThrowOnReadAll)
+                {
+                    throw new InvalidOperationException("simulated geometry read failure");
+                }
+
+                return new PmxGeometryData
+                {
+                    skinningModesJson = "{\"skinningModes\":[\"bdef1\"]}",
+                    positions = new[] { 1.0f, 2.0f, 3.0f },
+                    normals = new[] { 0.0f, 1.0f, 0.0f },
+                    uvs = new[] { 0.0f, 1.0f },
+                    edgeScale = new[] { 1.0f },
+                    indices = new uint[] { 0, 0, 0 },
+                    skinIndices = new uint[] { 0, 0, 0, 0 },
+                    skinWeights = new[] { 1.0f, 0.0f, 0.0f, 0.0f },
+                    hasSdefParameters = new[] { false },
+                    sdefC = new[] { 0.0f, 0.0f, 0.0f },
+                    sdefR0 = new[] { 0.0f, 0.0f, 0.0f },
+                    sdefR1 = new[] { 0.0f, 0.0f, 0.0f },
+                };
+            }
+
+            public void Free(IntPtr geometry)
+            {
+                FreeCount++;
+            }
         }
 
-        private static void WriteLightFrame(
-            BinaryWriter writer,
-            uint frame,
-            float r,
-            float g,
-            float b,
-            float x,
-            float y,
-            float z)
-        {
-            writer.Write(frame);
-            writer.Write(r);
-            writer.Write(g);
-            writer.Write(b);
-            writer.Write(x);
-            writer.Write(y);
-            writer.Write(z);
-        }
-
-        private static void WriteSelfShadowFrame(BinaryWriter writer, uint frame, byte mode, float distance)
-        {
-            writer.Write(frame);
-            writer.Write(mode);
-            writer.Write(distance);
-        }
-
-        private static void WriteFixedAscii(BinaryWriter writer, string text, int byteLength)
-        {
-            byte[] bytes = new byte[byteLength];
-            byte[] source = System.Text.Encoding.ASCII.GetBytes(text);
-            Array.Copy(source, bytes, Math.Min(source.Length, bytes.Length));
-            writer.Write(bytes);
-        }
     }
 }
