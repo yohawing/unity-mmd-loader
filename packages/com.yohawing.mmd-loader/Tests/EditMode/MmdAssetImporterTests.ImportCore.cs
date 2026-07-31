@@ -624,7 +624,7 @@ namespace Mmd.Tests
             }
         }
         [Test]
-        public void PmxScriptedImporterVersionIsTwentyEightForPublicToonTextureMigration()
+        public void PmxScriptedImporterVersionIsTwentyNineForMaterialReimportMigration()
         {
             object[] attributes = typeof(MmdPmxScriptedImporter).GetCustomAttributes(
                 typeof(ScriptedImporterAttribute),
@@ -632,8 +632,8 @@ namespace Mmd.Tests
 
             Assert.That(attributes, Has.Length.EqualTo(1));
             var attribute = (ScriptedImporterAttribute)attributes[0];
-            Assert.That(attribute.version, Is.EqualTo(28),
-                "PMX importer version must force a texture rebind after the public Toon shader migration.");
+            Assert.That(attribute.version, Is.EqualTo(29),
+                "PMX importer version must force a material rebind after the importer migration.");
         }
 
         private static void CreateUtsProfileAsset(Shader utsShader)

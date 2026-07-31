@@ -44,7 +44,7 @@ namespace Mmd.Editor
         CustomProfile = 3
     }
 
-    [ScriptedImporter(28, "pmx")]
+    [ScriptedImporter(29, "pmx")]
     public sealed class MmdPmxScriptedImporter : ScriptedImporter
     {
         [SerializeField] private float importScale = MmdPmxAsset.DefaultImportScale;
