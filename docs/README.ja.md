@@ -1,13 +1,15 @@
 # unity-mmd-loader
 
-![unity-mmd-loader](./assets/main-image.png)
+[English](../README.md)
 
-> クレジット — モデル: [Sour](https://bowlroll.net/file/146103) ／ モーション: [mobiusP](https://www.nicovideo.jp/watch/sm42576784) ／ カメラモーション: [koko](https://bowlroll.net/file/305434) ／ 背景: [とじる](https://seiga.nicovideo.jp/seiga/im11796453)
 
 unity-mmd-loader は、PMX / VMD を Unity に取り込むためのプラグインです。
 自然なPMXインポーターとTimeline統合されたVMDインポーターと、URPをカスタムしたMMDシェーダーを提供します。
 
-[English](../README.md) / [詳しい使い方（英語）](./HOW_TO_USE.md)
+![unity-mmd-loader](./assets/main-image.png)
+
+> クレジット — モデル: [Sour](https://bowlroll.net/file/146103) ／ モーション: [mobiusP](https://www.nicovideo.jp/watch/sm42576784) ／ カメラモーション: [koko](https://bowlroll.net/file/305434) ／ 背景: [とじる](https://seiga.nicovideo.jp/seiga/im11796453)
+
 
 ## 特徴
 
@@ -23,8 +25,8 @@ unity-mmd-loader は、PMX / VMD を Unity に取り込むためのプラグイ�
 | モデル | PMXのインポートとシーンへの配置に対応(PMD非対応) |
 | VMD | インポートとTimelineクリップに対応。モーション再生は [mmd-anim](https://github.com/yohawing/mmd-anim) によるランタイム評価。カメラモーション対応済み |
 | モーフ | 頂点（ブレンドシェイプ）／ UV ／材質／ボーン／グループの各モーフに対応 |
-| 物理 | Play Mode の通常再生中はリアルタイム物理に対応 |
-| レンダリング | URP ベースのトゥーン、アウトライン、半透明マテリアルの描画順、セルフシャドウに対応 |
+| 物理 |再生中のみリアルタイム物理に対応 |
+| レンダリング | URPベースのトゥーン、アウトライン、半透明マテリアルの描画順、セルフシャドウに対応 |
 | Humanoid | インポート時に Animator とプロキシリグを自動セットアップ。 既存のモーションアセットをリターゲットできます。 |
 
 ## インストール
@@ -34,3 +36,7 @@ Unity Package Managerの **Add package from git URL** に以下を指定しま�
 ```text
 https://github.com/yohawing/unity-mmd-loader.git?path=packages/com.yohawing.mmd-loader
 ```
+
+詳しい使い方はこちら
+
+ [詳しい使い方](./HOW_TO_USE.ja.md)
