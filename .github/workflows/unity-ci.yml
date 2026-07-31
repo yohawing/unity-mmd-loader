@@ -2,7 +2,8 @@ name: Unity CI
 
 # Triggers:
 #   - workflow_dispatch: safe manual trigger at any time.
-#   - push/pull_request on package/native/workflow changes.
+#   - pull_request: validate changes before they are merged into main.
+#   - develop -> main pull requests additionally run release-only checks.
 #
 # Required repository secrets (Settings → Secrets and variables → Actions):
 #   UNITY_LICENSE   — base64-encoded Unity .ulf activation file
@@ -19,18 +20,8 @@ on:
         required: false
         type: boolean
         default: false
-  push:
-    branches: [main]
-    paths:
-      - "packages/**"
-      - "native/**"
-      - ".github/workflows/unity-ci.yml"
   pull_request:
     branches: [main]
-    paths:
-      - "packages/**"
-      - "native/**"
-      - ".github/workflows/unity-ci.yml"
 
 permissions:
   contents: read
@@ -38,7 +29,9 @@ permissions:
 
 jobs:
   release-submodule-latest:
-    if: github.event_name == 'workflow_dispatch' && inputs.release_gate
+    if: >-
+      (github.event_name == 'pull_request' && github.head_ref == 'develop') ||
+      (github.event_name == 'workflow_dispatch' && inputs.release_gate)
     name: Release Submodule Remote Main Check
     runs-on: ubuntu-latest
     steps:
