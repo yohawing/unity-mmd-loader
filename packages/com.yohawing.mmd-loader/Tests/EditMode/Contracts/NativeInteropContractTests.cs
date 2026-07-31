@@ -212,12 +212,11 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void FastRuntimeAndPhysicsWrapperNamesAreSeparate()
+        public void FastRuntimeNameAndAbiArePinned()
         {
             Assert.That(MmdRuntimeFfiMethods.LibraryName, Is.EqualTo("mmd_runtime_ffi"));
             Assert.That(MmdRuntimeFfiMethods.ExpectedAbiVersion, Is.EqualTo(3));
             Assert.That(MmdRuntimeFfiMethods.ValidateAbiVersion(), Is.EqualTo(3));
-            Assert.That(MmdNativePhysicsMethods.LibraryName, Is.EqualTo("mmd_bullet"));
         }
 
         [Test]
@@ -595,7 +594,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void WindowsPluginLayoutContainsRuntimeAndPhysicsButNoLegacyParserDll()
+        public void WindowsPluginLayoutContainsOnlyRuntimeFfi()
         {
             string pluginRoot = Path.Combine(MmdTestFixtures.PackageRoot, "Runtime", "Plugins", "x86_64");
             string[] dllNames = Directory.GetFiles(pluginRoot, "*.dll")
@@ -605,10 +604,10 @@ namespace Mmd.Tests
 
             Assert.That(Path.Combine(pluginRoot, "mmd_runtime_ffi.dll"), Does.Exist);
             Assert.That(Path.Combine(pluginRoot, "mmd_runtime_ffi.dll.meta"), Does.Exist);
-            Assert.That(Path.Combine(pluginRoot, "mmd_bullet.dll"), Does.Exist);
-            Assert.That(Path.Combine(pluginRoot, "mmd_bullet.dll.meta"), Does.Exist);
+            Assert.That(Path.Combine(pluginRoot, "mmd_bullet.dll"), Does.Not.Exist);
+            Assert.That(Path.Combine(pluginRoot, "mmd_bullet.dll.meta"), Does.Not.Exist);
             CollectionAssert.AreEqual(
-                new[] { "mmd_bullet.dll", "mmd_runtime_ffi.dll" },
+                new[] { "mmd_runtime_ffi.dll" },
                 dllNames);
             Assert.That(Path.Combine(pluginRoot, "yohawing_mmd_unity_native.dll"), Does.Not.Exist);
             Assert.That(Path.Combine(pluginRoot, "yohawing_mmd_unity_native.dll.meta"), Does.Not.Exist);

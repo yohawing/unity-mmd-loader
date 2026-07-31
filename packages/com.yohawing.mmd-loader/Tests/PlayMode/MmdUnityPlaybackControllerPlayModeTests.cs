@@ -408,7 +408,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator HairPhysicsFixtureWithPureWorldAnchorJointsIsRejectedByLivePhysics()
         {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
@@ -456,7 +456,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator HairPhysicsFixtureLiveForwardPlaybackProducesDiagnostics()
         {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
@@ -643,7 +643,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator HairPhysicsFixtureImportScaleZeroDotOneKeepsNativeReadbackInMmdSpaceAndScalesUnityObjects()
         {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
@@ -669,7 +669,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator HumanoidRetargetLateUpdateStepsLivePhysicsFromCurrentPose()
         {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
@@ -860,7 +860,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator HumanoidRetargetLateUpdateCreatesModelOnlyPhysicsBindingFromModelAsset()
         {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
@@ -1019,7 +1019,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator HumanoidAnimationTrackSingleTrackMuscleClipDrivesProxyAndRetargetsAndStepsPhysics()
         {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
@@ -1560,7 +1560,7 @@ namespace Mmd.Tests
             // director.Evaluate(), so they cannot be distinguished — the Play Mode boundary is the contract
             // (scrubbing is an Editor/non-playing operation). Editor-side suppression (Application.isPlaying
             // == false) is covered by the EditMode timeline behaviour tests.
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
@@ -1628,7 +1628,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator ApplyLivePhysicsForwardFrameSeedsAtArbitraryStartFrame()
         {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
@@ -1742,7 +1742,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator TimelineForwardPlaybackEvaluationStepsLivePhysics()
         {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
@@ -1792,7 +1792,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator TimelineScrubSuspendsLivePhysicsAndResumeReseeds()
         {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
@@ -1847,7 +1847,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator TimelineForwardPlaybackPropagatesHairPhysicsToBones()
         {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);

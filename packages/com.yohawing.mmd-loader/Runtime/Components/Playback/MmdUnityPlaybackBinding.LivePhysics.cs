@@ -78,7 +78,7 @@ namespace Mmd.UnityIntegration
 
             var totalWatch = Stopwatch.StartNew();
             var stageWatch = Stopwatch.StartNew();
-            IMmdLivePhysicsBackend backend = EnsureLivePhysicsBackend(preferNativeAnimationClip: false);
+            IMmdLivePhysicsBackend backend = EnsureLivePhysicsBackend();
             double ensureBackendMs = stageWatch.Elapsed.TotalMilliseconds;
             stageWatch.Restart();
             MmdLivePhysicsFrameDiagnostics diagnostics = StepLivePhysicsCore(
@@ -143,7 +143,7 @@ namespace Mmd.UnityIntegration
 
             var totalWatch = Stopwatch.StartNew();
             var stageWatch = Stopwatch.StartNew();
-            IMmdLivePhysicsBackend backend = EnsureLivePhysicsBackend(preferNativeAnimationClip: true);
+            IMmdLivePhysicsBackend backend = EnsureLivePhysicsBackend();
             double ensureBackendMs = stageWatch.Elapsed.TotalMilliseconds;
             stageWatch.Restart();
             float time = MmdPlaybackTime.ToTime(frame, frameRate);
@@ -204,26 +204,40 @@ namespace Mmd.UnityIntegration
             livePhysicsReadbackTransformCount = 0;
             livePhysicsReadbackShapeTypeCount = 0;
             var stageWatch = Stopwatch.StartNew();
-            backend.SetAnimationFrame(sequenceFrame);
-            MmdLivePhysicsPinnedBodyDiagnostics pinnedBodyDiagnostics;
-            double syncBoneDrivenBodiesMs;
-            double stepPhysicsMs;
+            CaptureHostPoseFromUnityTransforms(
+                out float[] localPositionOffsets,
+                out float[] localRotations,
+                out float[] localScales,
+                out float[] morphWeights,
+                out byte[] ikEnabled);
+            MmdLivePhysicsPinnedBodyDiagnostics pinnedBodyDiagnostics =
+                BuildHostPosePinnedBodyDiagnostics(resetSeed);
+            double syncBoneDrivenBodiesMs = stageWatch.Elapsed.TotalMilliseconds;
+            stageWatch.Restart();
+            if (backend is not MmdAnimPhysicsBackend nativeBackend)
+            {
+                throw new MmdPhysicsBackendException(
+                    "StepFromHostPose",
+                    backend.Name,
+                    "host-pose-unsupported",
+                    "Live physics requires the mmd-anim host-pose backend.",
+                    modelId,
+                    motionId);
+            }
+
+            nativeBackend.StepFromHostPose(
+                sequenceFrame,
+                localPositionOffsets,
+                localRotations,
+                localScales,
+                morphWeights,
+                ikEnabled,
+                resetSeed,
+                resetSeed ? 0.0f : deltaTime);
+            double stepPhysicsMs = stageWatch.Elapsed.TotalMilliseconds;
             if (resetSeed)
             {
-                // saba PMXModel::ResetPhysics-style seed. The bones are already at the CURRENT driving pose
-                // (VMD animation or Humanoid retarget), so seed from those Unity transforms without replaying VMD.
-                pinnedBodyDiagnostics = SeedLivePhysics(backend, sequenceFrame);
-                syncBoneDrivenBodiesMs = stageWatch.Elapsed.TotalMilliseconds;
-                stepPhysicsMs = 0.0;
                 deltaTime = 0.0f;
-            }
-            else
-            {
-                pinnedBodyDiagnostics = SyncBoneDrivenPhysicsBodies(backend, includeDynamicBodies: false);
-                syncBoneDrivenBodiesMs = stageWatch.Elapsed.TotalMilliseconds;
-                stageWatch.Restart();
-                backend.Step(sequenceFrame, deltaTime);
-                stepPhysicsMs = stageWatch.Elapsed.TotalMilliseconds;
             }
 
             stageWatch.Restart();
@@ -316,6 +330,116 @@ namespace Mmd.UnityIntegration
             return motion;
         }
 
+        private void CaptureHostPoseFromUnityTransforms(
+            out float[] localPositionOffsets,
+            out float[] localRotations,
+            out float[] localScales,
+            out float[] morphWeights,
+            out byte[] ikEnabled)
+        {
+            int boneCount = model.bones.Count;
+            localPositionOffsets = new float[checked(boneCount * 3)];
+            localRotations = new float[checked(boneCount * 4)];
+            localScales = new float[checked(boneCount * 3)];
+            for (int i = 0; i < boneCount; i++)
+            {
+                localRotations[i * 4 + 3] = 1.0f;
+                localScales[i * 3] = 1.0f;
+                localScales[i * 3 + 1] = 1.0f;
+                localScales[i * 3 + 2] = 1.0f;
+            }
+
+            float importScale = NormalizeImportScale(playbackInstance.ImportScale);
+            for (int i = 0; i < model.bones.Count; i++)
+            {
+                MmdBoneDefinition bone = model.bones[i];
+                int index = bone.index;
+                if (index < 0 || index >= playbackInstance.BoneTransforms.Length || index >= boneCount)
+                {
+                    continue;
+                }
+
+                Transform boneTransform = playbackInstance.BoneTransforms[index];
+                Vector3 localDelta = boneTransform.localPosition - playbackInstance.BindLocalPositions[index];
+                Quaternion localRotation = Quaternion.Inverse(playbackInstance.BindLocalRotations[index]) *
+                    boneTransform.localRotation;
+                Vector3 modelPosition = ToMmdModelPosition(localDelta, importScale);
+                Quaternion modelRotation = ToMmdModelRotation(localRotation);
+                int positionOffset = index * 3;
+                localPositionOffsets[positionOffset] = modelPosition.x;
+                localPositionOffsets[positionOffset + 1] = modelPosition.y;
+                localPositionOffsets[positionOffset + 2] = modelPosition.z;
+                int rotationOffset = index * 4;
+                localRotations[rotationOffset] = modelRotation.x;
+                localRotations[rotationOffset + 1] = modelRotation.y;
+                localRotations[rotationOffset + 2] = modelRotation.z;
+                localRotations[rotationOffset + 3] = modelRotation.w;
+                int scaleOffset = index * 3;
+                Vector3 scale = boneTransform.localScale;
+                localScales[scaleOffset] = scale.x;
+                localScales[scaleOffset + 1] = scale.y;
+                localScales[scaleOffset + 2] = scale.z;
+            }
+
+            morphWeights = new float[model.morphs.Count];
+            SkinnedMeshRenderer? renderer = playbackInstance.SkinnedMeshRenderer;
+            if (renderer != null)
+            {
+                for (int i = 0; i < model.morphs.Count; i++)
+                {
+                    MmdMorphDefinition morph = model.morphs[i];
+                    if (morph.index < 0 || morph.index >= morphWeights.Length ||
+                        !playbackInstance.BlendShapeIndexMap.TryGetValue(morph.name, out int blendShapeIndex))
+                    {
+                        continue;
+                    }
+
+                    morphWeights[morph.index] = renderer.GetBlendShapeWeight(blendShapeIndex) / 100.0f;
+                }
+            }
+
+            // The Unity pose is already after the host's animation/retargeting pass. Keep native IK
+            // disabled here so evaluate_host_frame does not solve a second, unrelated IK pass.
+            ikEnabled = new byte[model.ik.Count];
+        }
+
+        private MmdLivePhysicsPinnedBodyDiagnostics BuildHostPosePinnedBodyDiagnostics(bool resetSeed)
+        {
+            var diagnostics = new MmdLivePhysicsPinnedBodyDiagnostics();
+            for (int i = 0; i < model.physics.rigidbodies.Count; i++)
+            {
+                MmdRigidbodyDefinition body = model.physics.rigidbodies[i];
+                bool isStatic = IsStaticPhysicsKind(body.physicsKind);
+                bool isDynamicOrientation = IsDynamicWithBonePhysicsKind(body.physicsKind);
+                bool isDynamic = IsDynamicPhysicsKind(body.physicsKind);
+                if (!resetSeed && !isStatic)
+                {
+                    continue;
+                }
+
+                if (!isStatic && !isDynamicOrientation && !isDynamic)
+                {
+                    continue;
+                }
+
+                diagnostics.pinnedBodyCount++;
+                if (isStatic)
+                {
+                    diagnostics.staticPinnedBodyCount++;
+                }
+                else if (isDynamicOrientation)
+                {
+                    diagnostics.dynamicOrientationPinnedBodyCount++;
+                }
+                else if (isDynamic)
+                {
+                    diagnostics.dynamicInitialPinnedBodyCount++;
+                }
+            }
+
+            return diagnostics;
+        }
+
         private void ApplyBoneTransformsOnly(MmdSampledMotion motion, Func<MmdBoneDefinition, bool> predicate)
         {
             for (int i = 0; i < model.bones.Count; i++)
@@ -343,194 +467,41 @@ namespace Mmd.UnityIntegration
             }
         }
 
-        private IMmdLivePhysicsBackend EnsureLivePhysicsBackend(bool preferNativeAnimationClip)
+        private IMmdLivePhysicsBackend EnsureLivePhysicsBackend()
         {
-            bool hasNativeAnimationBackend = livePhysicsBackend is MmdAnimPhysicsBackend;
-            if (livePhysicsBackend != null && (preferNativeAnimationClip || !hasNativeAnimationBackend))
+            if (livePhysicsBackend != null)
             {
                 return livePhysicsBackend;
             }
 
-            if (livePhysicsBackend != null)
-            {
-                livePhysicsBackend.Dispose();
-                livePhysicsBackend = null;
-                lastLiveFrame = -1;
-                lastLiveSnapshot = null;
-                lastLivePhysicsDiagnostics = null;
-                ClearLivePhysicsBodyDiagnostics();
-            }
-
-            if (preferNativeAnimationClip &&
-                MmdAnimPhysicsBackend.TryCreate(
+            if (!MmdAnimPhysicsBackend.TryCreate(
                     model.sourceBytes,
-                    session.MotionSourceBytes,
                     modelId,
                     motionId,
                     out MmdAnimPhysicsBackend? nativeBackend,
-                    out _))
+                    out string reason))
             {
-                try
-                {
-                    nativeBackend!.InitializeWorld(model);
-                    nativeBackend.Reset();
-                    livePhysicsBackend = nativeBackend;
-                    return nativeBackend;
-                }
-                catch (MmdPhysicsBackendException)
-                {
-                    nativeBackend?.Dispose();
-                }
-                catch (DllNotFoundException)
-                {
-                    nativeBackend?.Dispose();
-                }
-                catch (EntryPointNotFoundException)
-                {
-                    nativeBackend?.Dispose();
-                }
-                catch (BadImageFormatException)
-                {
-                    nativeBackend?.Dispose();
-                }
+                throw new MmdPhysicsBackendException(
+                    "EnsureLivePhysicsBackend",
+                    "mmd-anim-bullet-native",
+                    "backend-unavailable",
+                    reason,
+                    modelId,
+                    motionId);
             }
 
-            var fallback = new MmdLegacyBulletPhysicsBackendAdapter(modelId, motionId);
-            fallback.InitializeWorld(model);
-            fallback.Reset();
-            livePhysicsBackend = fallback;
-            return fallback;
-        }
-
-        // saba PMXModel::ResetPhysics settles the bodies at the current pose over a SINGLE short fixed step
-        // (physics->Update(1/60)), not a long ease-in. A multi-step settle injects oscillation energy and is
-        // not saba-faithful, so the seed uses exactly one short step.
-        private const float LivePhysicsSeedSettleSeconds = 1.0f / 60.0f;
-
-        /// <summary>
-        /// Seeds the live simulation at (or after) a reset, mirroring saba PMXModel::ResetPhysics. The native
-        /// Reset() returned every body to its origin-space descriptor (bind) transform; saba's ResetPhysics
-        /// instead re-syncs each body to its CURRENT node global transform (MMDRigidBody::ResetTransform ->
-        /// DynamicMotionState::Reset), runs a single short physics Update, then cleans contact pairs and zeroes
-        /// velocity (MMDRigidBody::Reset). We replicate that here for BOTH the fast (native FFI) and managed
-        /// evaluation paths — the bones are ALREADY at the current motion pose before this runs:
-        ///   1. Place EVERY body (INCLUDING pure-dynamic mode-1) at the CURRENT bone-derived pose
-        ///      (SyncBoneDrivenPhysicsBodies -> SetRigidbodyTransform sets world + motion-state transform).
-        ///   2. Re-align the native interpolation transform with the just-placed world transform and zero all
-        ///      velocities (backend.SyncInterpolationAndZeroVelocity). Without this, native Reset() left the
-        ///      interpolation transform at the ORIGIN-bind, so the first forward Step would compute a kinematic
-        ///      velocity of (currentPose - originBind)/dt and fling the jointed dynamic chain apart.
-        ///   3. ONE short settle step at the current pose so the joints relax (saba physics->Update(1/60)).
-        ///   4. Re-pin static kinematic bodies at the current pose. Mode-2 dynamic-orientation bodies remain
-        ///      active dynamic bodies after the reset seed.
-        /// This is a settle, not a sweep from bind, so a pure-dynamic body never snaps toward the origin-space
-        /// bind while the model is animated far away (the reported "揺れ骨が BindPose の場所に戻る" bug).
-        /// </summary>
-        private MmdLivePhysicsPinnedBodyDiagnostics SeedLivePhysics(
-            IMmdLivePhysicsBackend backend, int frame)
-        {
-            // 1. saba MMDRigidBody::ResetTransform: place EVERY body (including pure-dynamic mode-1) at its
-            //    current bone-derived model-space pose, overriding the origin-bind that native Reset() set.
-            MmdLivePhysicsPinnedBodyDiagnostics seedDiagnostics =
-                SyncBoneDrivenPhysicsBodies(backend, includeDynamicBodies: true);
-
-            // 2. Re-align the native interpolation transform with the just-placed world transform and zero
-            //    velocity so the upcoming step (and the first forward Step) computes no spurious kinematic
-            //    velocity from the stale origin-bind interpolation transform left by native Reset().
-            backend.SyncInterpolationAndZeroVelocity();
-
-            // 3. saba ResetPhysics' physics->Update settle: a SINGLE short step relaxes the joints at the
-            //    current pose. The rig stays at the current pose, so the bone-driven bodies stay pinned and
-            //    the dynamics settle in place instead of being dragged toward the origin.
-            backend.Step(frame, LivePhysicsSeedSettleSeconds);
-
-            // 4. Re-pin only static bodies at the current pose. Return the seed diagnostics so reset-frame
-            //    reports still show that mode-1 and mode-2 dynamic bodies were initialized and zeroed.
-            SyncBoneDrivenPhysicsBodies(backend, includeDynamicBodies: false);
-            return seedDiagnostics;
-        }
-
-        private MmdLivePhysicsPinnedBodyDiagnostics SyncBoneDrivenPhysicsBodies(
-            IMmdLivePhysicsBackend backend,
-            bool includeDynamicBodies)
-        {
-            Transform root = playbackInstance.Root.transform;
-            float importScale = NormalizeImportScale(playbackInstance.ImportScale);
-            var diagnostics = new MmdLivePhysicsPinnedBodyDiagnostics();
-            for (int i = 0; i < model.physics.rigidbodies.Count; i++)
+            try
             {
-                MmdRigidbodyDefinition body = model.physics.rigidbodies[i];
-                bool isStatic = IsStaticPhysicsKind(body.physicsKind);
-                bool isDynamicOrientation = IsDynamicWithBonePhysicsKind(body.physicsKind);
-                bool isDynamic = IsDynamicPhysicsKind(body.physicsKind);
-                bool shouldSyncBody = isStatic || (includeDynamicBodies && (isDynamicOrientation || isDynamic));
-                if (!shouldSyncBody)
-                {
-                    continue;
-                }
-
-                if (body.boneIndex < 0 || body.boneIndex >= playbackInstance.BoneTransforms.Length)
-                {
-                    continue;
-                }
-
-                diagnostics.pinnedBodyCount++;
-                if (isStatic)
-                {
-                    diagnostics.staticPinnedBodyCount++;
-                }
-                else if (isDynamicOrientation)
-                {
-                    diagnostics.dynamicOrientationPinnedBodyCount++;
-                }
-                else if (isDynamic)
-                {
-                    diagnostics.dynamicInitialPinnedBodyCount++;
-                }
-
-                Transform bone = playbackInstance.BoneTransforms[body.boneIndex];
-                Vector3 boneModelPosition = ToMmdModelPosition(root.InverseTransformPoint(bone.position), importScale);
-                Vector3 bodyOffset = ToMmdVector3(body.position) - GetBoneOrigin(body.boneIndex);
-                Quaternion boneModelRotation = ToMmdModelRotation(Quaternion.Inverse(root.rotation) * bone.rotation);
-                Quaternion bodyLocalRotation = ToMmdEulerRotation(body.rotation);
-                Quaternion bodyModelRotation = boneModelRotation * bodyLocalRotation;
-
-                Vector3 rotatedBodyOffset = boneModelRotation * bodyOffset;
-                backend.SetRigidbodyTransform(
-                    i,
-                    ToArray(boneModelPosition + rotatedBodyOffset),
-                    ToArray(bodyModelRotation));
-                MmdPhysicsBodyTransform syncedTransform = backend.GetRigidbodyTransform(i);
-                livePhysicsReadbackTransformCount++;
-                Vector3 expectedPosition = boneModelPosition + rotatedBodyOffset;
-                Vector3 actualPosition = ToMmdVector3(syncedTransform.position);
-                float distance = Vector3.Distance(expectedPosition, actualPosition);
-                Quaternion actualRotation = ToMmdQuaternion(syncedTransform.rotation);
-                float rotationAngle = Quaternion.Angle(bodyModelRotation, actualRotation);
-                diagnostics.maxPinnedBodySyncDistance = Math.Max(diagnostics.maxPinnedBodySyncDistance, distance);
-                diagnostics.maxPinnedBodyRotationAngle = Math.Max(diagnostics.maxPinnedBodyRotationAngle, rotationAngle);
-                if (distance > diagnostics.worstPinnedBodySyncDistance || diagnostics.worstPinnedBodyIndex < 0)
-                {
-                    diagnostics.worstPinnedBodySyncDistance = distance;
-                    diagnostics.worstPinnedBodyIndex = i;
-                    diagnostics.worstPinnedBodyName = body.name;
-                    diagnostics.worstPinnedBodyBoneIndex = body.boneIndex;
-                    diagnostics.worstPinnedBodyBoneName = body.boneName;
-                    diagnostics.worstPinnedBodyPhysicsKind = body.physicsKind;
-                }
-
-                if (rotationAngle > diagnostics.worstPinnedBodyRotationAngle || diagnostics.worstPinnedBodyRotationIndex < 0)
-                {
-                    diagnostics.worstPinnedBodyRotationAngle = rotationAngle;
-                    diagnostics.worstPinnedBodyRotationIndex = i;
-                    diagnostics.worstPinnedBodyRotationName = body.name;
-                    diagnostics.worstPinnedBodyRotationBoneIndex = body.boneIndex;
-                    diagnostics.worstPinnedBodyRotationBoneName = body.boneName;
-                    diagnostics.worstPinnedBodyRotationPhysicsKind = body.physicsKind;
-                }
+                nativeBackend!.InitializeWorld(model);
+                nativeBackend.Reset();
+                livePhysicsBackend = nativeBackend;
+                return nativeBackend;
             }
-
-            return diagnostics;
+            catch
+            {
+                nativeBackend?.Dispose();
+                throw;
+            }
         }
 
         private void CaptureLivePhysicsReadback(IMmdLivePhysicsBackend backend)

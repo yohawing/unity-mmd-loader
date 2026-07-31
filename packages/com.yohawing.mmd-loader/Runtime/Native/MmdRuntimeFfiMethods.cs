@@ -11,8 +11,18 @@ namespace Mmd.Native
         internal const uint ExpectedAbiVersion = 3;
         internal const uint FeatureSplitPhysicsEvaluation = 1u << 0;
         internal const uint FeaturePhysicsBulletNative = 1u << 1;
+        internal const uint FeatureHostPoseNativeMorphs = 1u << 3;
         internal const uint FeatureReducedPoseGenericCurves = 1u << 4;
         internal const uint PhysicsModeLive = 2;
+        internal const uint PhysicsFrameActionSeed = 0;
+        internal const uint PhysicsFrameActionStep = 1;
+        internal const uint PhysicsShapeSphere = 0;
+        internal const uint PhysicsShapeBox = 1;
+        internal const uint PhysicsShapeCapsule = 2;
+        internal const uint PhysicsBodyModeStatic = 0;
+        internal const uint PhysicsBodyModeDynamic = 1;
+        internal const uint PhysicsBodyModeDynamicBone = 2;
+        internal const uint PhysicsJointKindGeneric6DofSpring = 0;
         internal const int StatusOk = 0;
         internal const int StatusUnsupported = 2;
         internal const int StatusBufferTooSmall = 3;
@@ -107,6 +117,89 @@ namespace Mmd.Native
             internal IntPtr frameCount;
             internal IntPtr boneCount;
             internal IntPtr morphCount;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct PhysicsHostPoseView
+        {
+            internal IntPtr localPositionOffsetsXyz;
+            internal IntPtr localRotationXyzw;
+            internal IntPtr localScalesXyz;
+            internal IntPtr boneCount;
+            internal IntPtr morphWeights;
+            internal IntPtr morphCount;
+            internal IntPtr ikEnabled;
+            internal IntPtr ikCount;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct PhysicsRigidbodyDescriptor
+        {
+            internal uint shape;
+            internal float shapeSizeX;
+            internal float shapeSizeY;
+            internal float shapeSizeZ;
+            internal float positionX;
+            internal float positionY;
+            internal float positionZ;
+            internal float rotationX;
+            internal float rotationY;
+            internal float rotationZ;
+            internal float mass;
+            internal float linearDamping;
+            internal float angularDamping;
+            internal float friction;
+            internal float restitution;
+            internal ushort collisionGroup;
+            internal ushort collisionMask;
+            internal int boneIndex;
+            internal uint mode;
+            internal float bodyFromBonePositionX;
+            internal float bodyFromBonePositionY;
+            internal float bodyFromBonePositionZ;
+            internal float bodyFromBoneRotationX;
+            internal float bodyFromBoneRotationY;
+            internal float bodyFromBoneRotationZ;
+            internal float bodyFromBoneRotationW;
+            internal float boneFromBodyPositionX;
+            internal float boneFromBodyPositionY;
+            internal float boneFromBodyPositionZ;
+            internal float boneFromBodyRotationX;
+            internal float boneFromBodyRotationY;
+            internal float boneFromBodyRotationZ;
+            internal float boneFromBodyRotationW;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct PhysicsJointDescriptor
+        {
+            internal uint kind;
+            internal IntPtr rigidbodyA;
+            internal IntPtr rigidbodyB;
+            internal float positionX;
+            internal float positionY;
+            internal float positionZ;
+            internal float rotationX;
+            internal float rotationY;
+            internal float rotationZ;
+            internal float translationLowerX;
+            internal float translationLowerY;
+            internal float translationLowerZ;
+            internal float translationUpperX;
+            internal float translationUpperY;
+            internal float translationUpperZ;
+            internal float rotationLowerX;
+            internal float rotationLowerY;
+            internal float rotationLowerZ;
+            internal float rotationUpperX;
+            internal float rotationUpperY;
+            internal float rotationUpperZ;
+            internal float springTranslationX;
+            internal float springTranslationY;
+            internal float springTranslationZ;
+            internal float springRotationX;
+            internal float springRotationY;
+            internal float springRotationZ;
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -239,6 +332,14 @@ namespace Mmd.Native
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_physics_world_create_from_pmx_bytes", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int PhysicsWorldCreateFromPmxBytes(byte[] data, IntPtr len, out IntPtr world);
 
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_physics_world_create", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int PhysicsWorldCreate(
+            [In] PhysicsRigidbodyDescriptor[] rigidbodies,
+            IntPtr rigidbodyCount,
+            [In] PhysicsJointDescriptor[] joints,
+            IntPtr jointCount,
+            out IntPtr world);
+
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_physics_world_free", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void PhysicsWorldFree(IntPtr world);
 
@@ -253,6 +354,17 @@ namespace Mmd.Native
             IntPtr world,
             IntPtr instance,
             float deltaTime,
+            out PhysicsWorldStepReport outReport);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_evaluate_host_frame", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int EvaluateHostFrame(
+            IntPtr instance,
+            IntPtr world,
+            ref PhysicsHostPoseView pose,
+            uint action,
+            float deltaTime,
+            float ikTolerance,
+            uint ikMaxIterationsCap,
             out PhysicsWorldStepReport outReport);
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_physics_world_rigidbody_count", CallingConvention = CallingConvention.Cdecl)]

@@ -104,7 +104,7 @@ namespace Mmd.Tests
         [Test]
         public void PlaybackSourceConfigureKeepsControllerLivePhysicsMode()
         {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
@@ -617,7 +617,7 @@ namespace Mmd.Tests
         [Test]
         public void LivePhysicsReportsPinnedRigidbodySyncToAnimatedBone()
         {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
@@ -682,7 +682,7 @@ namespace Mmd.Tests
         [Test]
         public void LivePhysicsReportsBodyDiagnosticsWithImportScaleOne()
         {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
@@ -756,8 +756,8 @@ namespace Mmd.Tests
                 MmdLivePhysicsFrameDiagnostics? diagnostics = binding.LastLivePhysicsDiagnostics;
                 Assert.That(diagnostics, Is.Not.Null);
                 Assert.That(diagnostics!.frame, Is.EqualTo(LivePhysicsPlaybackFrame));
-                Assert.That(diagnostics.readbackTransformCount, Is.EqualTo(3),
-                    "One pinned-body sync plus one shared post-step readback per body is expected.");
+                Assert.That(diagnostics.readbackTransformCount, Is.EqualTo(2),
+                    "The host-pose path performs one shared native readback per body.");
                 Assert.That(diagnostics.readbackShapeTypeCount, Is.Zero,
                     "Shape metadata must be cached after the backend's first frame.");
                 Assert.That(diagnostics.comparisonSpace, Is.EqualTo("runtime-forward-playback-diagnostics"));
@@ -852,7 +852,7 @@ namespace Mmd.Tests
         [Test]
         public void SerializedPhysicsModeChangeAppliesToLoadedBindingAndRestartsLiveFromFrameZero()
         {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
@@ -895,7 +895,7 @@ namespace Mmd.Tests
         [Test]
         public void ControllerExposesLastLivePhysicsDiagnosticsAfterApplyFrame()
         {
-            MmdPhysicsBackendAvailability availability = BulletMmdPhysicsBackend.ProbeAvailability();
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
                 Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
