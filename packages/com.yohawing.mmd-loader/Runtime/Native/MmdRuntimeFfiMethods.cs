@@ -524,19 +524,22 @@ namespace Mmd.Native
                 model = MmdRuntimeFfiMethods.ModelCreateFromPmxBytes(pmxBytes, new IntPtr(pmxBytes.Length));
                 if (model == IntPtr.Zero)
                 {
-                    throw new InvalidOperationException("mmd-runtime PMX import returned a null model.");
+                    throw new InvalidOperationException(
+                        "mmd-runtime PMX import returned a null model: " + MmdRuntimeFfiMarshal.LastErrorMessage());
                 }
 
                 clip = MmdRuntimeFfiMethods.ClipCreateFromVmdBytesForModel(model, vmdBytes, new IntPtr(vmdBytes.Length));
                 if (clip == IntPtr.Zero)
                 {
-                    throw new InvalidOperationException("mmd-runtime VMD import returned a null clip.");
+                    throw new InvalidOperationException(
+                        "mmd-runtime VMD import returned a null clip: " + MmdRuntimeFfiMarshal.LastErrorMessage());
                 }
 
                 instance = MmdRuntimeFfiMethods.InstanceCreateForModel(model);
                 if (instance == IntPtr.Zero)
                 {
-                    throw new InvalidOperationException("mmd-runtime instance creation returned null.");
+                    throw new InvalidOperationException(
+                        "mmd-runtime instance creation returned null: " + MmdRuntimeFfiMarshal.LastErrorMessage());
                 }
 
                 MmdRuntimeFfiPlaybackSession session = new MmdRuntimeFfiPlaybackSession(model, clip, instance);
