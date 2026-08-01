@@ -25,26 +25,6 @@ namespace Mmd.Tests
     {
         private const string SyntheticPlayModeModelName = MmdPlayModeTestFixtures.MinimalTriangleModelName;
 
-        private static PlaybackSmokeReport? s_smokeReport;
-        private static bool s_playOnStartForwardPlayback;
-        private static bool s_stopReturnedToBindFrame;
-        private static bool s_invalidTickRejected;
-
-        [OneTimeSetUp]
-        public void ResetSmokeState()
-        {
-            s_smokeReport = null;
-            s_playOnStartForwardPlayback = false;
-            s_stopReturnedToBindFrame = false;
-            s_invalidTickRejected = false;
-        }
-
-        [OneTimeTearDown]
-        public void WriteSmokeArtifact()
-        {
-            WriteSmokeArtifactIfRequested();
-        }
-
         [UnityTest]
         public IEnumerator PlayOnStartBeginsForwardPlaybackInPlayMode()
         {
@@ -69,8 +49,6 @@ namespace Mmd.Tests
                 Assert.That(controller.LastSnapshot, Is.Not.Null);
                 Assert.That(controller.LastSnapshot!.frame.frame, Is.EqualTo(10));
                 Assert.That(binding.Instance.BoneTransforms[0].localPosition, Is.EqualTo(new Vector3(-2.0f, 0.0f, 0.0f)));
-                s_playOnStartForwardPlayback = true;
-                s_smokeReport = CreateSmokeReport(controller, binding.Instance.BoneTransforms[0].localPosition);
             }
             finally
             {
@@ -102,7 +80,6 @@ namespace Mmd.Tests
                 Assert.That(controller.LastSnapshot, Is.Not.Null);
                 Assert.That(controller.LastSnapshot!.frame.frame, Is.EqualTo(0));
                 Assert.That(binding.Instance.BoneTransforms[0].localPosition, Is.EqualTo(Vector3.zero));
-                s_stopReturnedToBindFrame = true;
             }
             finally
             {
@@ -136,7 +113,6 @@ namespace Mmd.Tests
                 Assert.That(
                     () => controller.Tick(float.PositiveInfinity),
                     Throws.TypeOf<ArgumentOutOfRangeException>().With.Property("ParamName").EqualTo("deltaTime"));
-                s_invalidTickRejected = true;
             }
             finally
             {
@@ -209,15 +185,12 @@ namespace Mmd.Tests
             controller.SetPhysicsMode(MmdPhysicsMode.Off);
             MmdPlaybackSnapshot frameZero = controller.ApplyFrame(0);
             int frameZeroNumber = frameZero.frame.frame;
-            Vector3 frameZeroApplied = ReadAppliedFirstBonePosition(controller, frameZero);
             MmdPlaybackSnapshot frameTen = controller.ApplyFrame(10);
             int frameTenNumber = frameTen.frame.frame;
-            Vector3 frameTenApplied = ReadAppliedFirstBonePosition(controller, frameTen);
 
             Assert.That(frameZeroNumber, Is.EqualTo(0));
             Assert.That(frameTenNumber, Is.EqualTo(10));
             Assert.That(controller.CurrentFrame, Is.EqualTo(10));
-            WriteNativeSceneSmokeArtifactIfRequested(frameTen, frameTenApplied);
         }
 
         private static void AddPinnedRootRigidbody(MmdModelDefinition model)
@@ -243,92 +216,6 @@ namespace Mmd.Tests
             });
         }
 
-        private static PlaybackSmokeReport CreateSmokeReport(MmdUnityPlaybackController controller, Vector3 firstBonePosition)
-        {
-            return new PlaybackSmokeReport
-            {
-                caseName = "phase10-playmode-synthetic-1bone",
-                modelSourceId = "synthetic:phase10-playmode-minimal-triangle",
-                motionSourceId = "synthetic:phase10-playmode-root-translation",
-                frameRate = controller.FrameRate,
-                startFrame = 0,
-                currentFrame = controller.CurrentFrame,
-                snapshotFrame = controller.LastSnapshot!.frame.frame,
-                snapshotTime = controller.LastSnapshot.frame.time,
-                isPlaying = controller.IsPlaying,
-                playOnStart = controller.PlayOnStart,
-                firstBoneLocalPosition = PlaybackVector3.From(firstBonePosition)
-            };
-        }
-
-        private static void WriteSmokeArtifactIfRequested()
-        {
-            string? outputPath = Environment.GetEnvironmentVariable("YMU_PHASE10_PLAYMODE_SMOKE_OUT");
-            if (string.IsNullOrWhiteSpace(outputPath))
-            {
-                return;
-            }
-
-            string? directory = Path.GetDirectoryName(outputPath);
-            if (!string.IsNullOrWhiteSpace(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            var report = s_smokeReport ?? new PlaybackSmokeReport
-            {
-                caseName = "phase10-playmode-synthetic-1bone"
-            };
-            report.playOnStartForwardPlayback = s_playOnStartForwardPlayback;
-            report.stopReturnedToBindFrame = s_stopReturnedToBindFrame;
-            report.invalidTickRejected = s_invalidTickRejected;
-            File.WriteAllText(outputPath, JsonUtility.ToJson(report, prettyPrint: true));
-        }
-
-        private static void WriteNativeSceneSmokeArtifactIfRequested(MmdPlaybackSnapshot snapshot, Vector3 appliedPosition)
-        {
-            string? outputPath = Environment.GetEnvironmentVariable("YMU_PHASE10_NATIVE_SCENE_SMOKE_OUT");
-            if (string.IsNullOrWhiteSpace(outputPath))
-            {
-                return;
-            }
-
-            string? directory = Path.GetDirectoryName(outputPath);
-            if (!string.IsNullOrWhiteSpace(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            Vector3 evaluatedPosition = snapshot.frame.bones.Count > 0
-                ? ToVector3(snapshot.frame.bones[0].localPosition)
-                : appliedPosition;
-            var report = new NativeSceneSmokeReport
-            {
-                caseName = "phase10-native-playback-scene-1bone",
-                scenePath = "Assets/Scenes/PackagePlaybackSmoke.unity",
-                modelSourceId = "packages/com.yohawing.mmd-loader/Tests/Fixtures/Assets/test_1bone_cube.pmx",
-                motionSourceId = "packages/com.yohawing.mmd-loader/Tests/Fixtures/Assets/test_1bone_cube_motion.vmd",
-                physicsMode = "off",
-                frameRate = 30.0f,
-                framesChecked = new[] { 0, 10 },
-                firstBoneAppliedLocalPosition = PlaybackVector3.From(appliedPosition),
-                firstBoneEvaluatedLocalPosition = PlaybackVector3.From(evaluatedPosition)
-            };
-            File.WriteAllText(outputPath, JsonUtility.ToJson(report, prettyPrint: true));
-        }
-
-        private static Vector3 ReadAppliedFirstBonePosition(MmdUnityPlaybackController controller, MmdPlaybackSnapshot snapshot)
-        {
-            string firstBoneName = snapshot.frame.bones.Count > 0
-                ? snapshot.frame.bones[0].name
-                : controller.ModelAssetSource!.LoadModel().bones[0].name;
-            GameObject root = controller.ConfiguredInstanceRoot ?? GameObject.Find("Native Playback Runtime");
-            Assert.That(root, Is.Not.Null);
-            Transform firstBone = root.GetComponentsInChildren<Transform>()
-                .First(transform => string.Equals(transform.name, firstBoneName, StringComparison.Ordinal));
-            return firstBone.localPosition;
-        }
-
         private static void AssertLivePhysicsShapesMatchDescriptors(MmdLivePhysicsFrameDiagnostics diagnostics)
         {
             Assert.That(diagnostics.bodyDiagnostics, Is.Not.Null.And.Not.Empty);
@@ -344,64 +231,6 @@ namespace Mmd.Tests
                     Assert.That(body.debugColliderSize.y, Is.GreaterThan(body.debugColliderSize.x * 2.0f), context + " capsule height must include a non-zero cylinder section");
                     Assert.That(body.debugColliderSize.z, Is.EqualTo(1.0f), context + " capsule direction must be Y-axis");
                 }
-            }
-        }
-
-        private static Vector3 ToVector3(float[] values)
-        {
-            Assert.That(values, Is.Not.Null);
-            Assert.That(values, Has.Length.EqualTo(3));
-            return new Vector3(values[0], values[1], values[2]);
-        }
-
-        [Serializable]
-        private sealed class PlaybackSmokeReport
-        {
-            public string caseName = string.Empty;
-            public string modelSourceId = string.Empty;
-            public string motionSourceId = string.Empty;
-            public float frameRate;
-            public int startFrame;
-            public int currentFrame;
-            public int snapshotFrame;
-            public float snapshotTime;
-            public bool isPlaying;
-            public bool playOnStart;
-            public bool playOnStartForwardPlayback;
-            public bool stopReturnedToBindFrame;
-            public bool invalidTickRejected;
-            public PlaybackVector3 firstBoneLocalPosition = new();
-        }
-
-        [Serializable]
-        private sealed class NativeSceneSmokeReport
-        {
-            public string caseName = string.Empty;
-            public string scenePath = string.Empty;
-            public string modelSourceId = string.Empty;
-            public string motionSourceId = string.Empty;
-            public string physicsMode = string.Empty;
-            public float frameRate;
-            public int[] framesChecked = Array.Empty<int>();
-            public PlaybackVector3 firstBoneAppliedLocalPosition = new();
-            public PlaybackVector3 firstBoneEvaluatedLocalPosition = new();
-        }
-
-        [Serializable]
-        private sealed class PlaybackVector3
-        {
-            public float x;
-            public float y;
-            public float z;
-
-            public static PlaybackVector3 From(Vector3 value)
-            {
-                return new PlaybackVector3
-                {
-                    x = value.x,
-                    y = value.y,
-                    z = value.z
-                };
             }
         }
 
