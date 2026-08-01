@@ -1,15 +1,7 @@
 #nullable enable
 
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using UnityEditor;
-using UnityEngine;
-using UnityEngine.Rendering;
-using UnityEngine.Rendering.Universal;
-using Mmd.Parser;
-using Mmd.Rendering.Universal;
-using Mmd.UnityIntegration;
 
 namespace Mmd.Editor
 {
