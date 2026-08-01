@@ -129,12 +129,17 @@ namespace Mmd.Tests.Contracts
             cases.Add(BuildSelfShadowCase(20.0f));
             report.cases = cases.ToArray();
 
+            var summaryCases = BuildVmdSummaryCases().ToList();
+            report.summaryCases = summaryCases.ToArray();
+
             int failed = cases.Count(c => !string.Equals(c.status, "passed", StringComparison.Ordinal));
+            int summaryFailed = summaryCases.Count(c => !string.Equals(c.status, "passed", StringComparison.Ordinal));
+            int total = cases.Count + summaryCases.Count;
             report.summary = new MmdAnimCliParitySummary
             {
-                total = cases.Count,
-                passed = cases.Count - failed,
-                failed = failed
+                total = total,
+                passed = total - failed - summaryFailed,
+                failed = failed + summaryFailed
             };
 
             string reportDir = Path.Combine(MmdTestFixtures.RepositoryRoot, "artifacts", "parity");
@@ -143,7 +148,7 @@ namespace Mmd.Tests.Contracts
             File.WriteAllText(reportPath, JsonUtility.ToJson(report, prettyPrint: true));
             UnityEngine.Debug.Log("mmd-anim CLI parity report: " + reportPath);
 
-            Assert.That(failed, Is.EqualTo(0), "mmd-anim CLI parity report has failed cases: " + reportPath);
+            Assert.That(report.summary.failed, Is.EqualTo(0), "mmd-anim CLI parity report has failed cases: " + reportPath);
         }
 
         private static void RunNativeConsistencyCheck(
@@ -372,6 +377,145 @@ namespace Mmd.Tests.Contracts
             return cases;
         }
 
+        private static IEnumerable<MmdAnimCliParitySummaryCase> BuildVmdSummaryCases()
+        {
+            yield return BuildVmdSummaryCase(
+                MmdTestFixtures.FixtureAssetPath("test_append_bone.vmd"),
+                "test_append_bone.vmd");
+            yield return BuildVmdSummaryCase(
+                MmdTestFixtures.FixtureAssetPath("test_vertex_morph_motion.vmd"),
+                "test_vertex_morph_motion.vmd");
+            yield return BuildVmdSummaryCase(
+                Path.Combine(MmdAnimRoot, "crates", "mmd-anim-format", "fixtures", "vmd", "simple_camera.vmd"),
+                "simple_camera.vmd");
+            string sceneTrackPath = WriteSceneTrackFixtureForCli();
+            yield return BuildVmdSummaryCase(sceneTrackPath, Path.GetFileName(sceneTrackPath));
+            string propertyTrackPath = WritePropertyTrackFixtureForCli();
+            yield return BuildVmdSummaryCase(propertyTrackPath, Path.GetFileName(propertyTrackPath));
+        }
+
+        private static MmdAnimCliParitySummaryCase BuildVmdSummaryCase(string vmdPath, string fixtureMotion)
+        {
+            byte[] bytes = File.ReadAllBytes(vmdPath);
+            MmdVmdParseSummary managed = MmdVmdBinarySummaryReader.Read(bytes);
+
+            string json = RunMmdAnimCli("inspect " + Quote(vmdPath) + " --json");
+            CliVmdInspectReport cli = ParseCliVmdInspectReport(json, vmdPath);
+            CliVmdInspectMetadata metadata = cli.metadata!;
+            CliVmdInspectCounts counts = metadata.counts!;
+            CliVmdInspectPropertyFrame[] propertyFrames = cli.propertyFrames!;
+            int cliConstraintStateCount = propertyFrames.Sum(frame => frame.ikStates!.Length);
+
+            bool passed = string.Equals(
+                    managed.TargetModelName,
+                    metadata.modelName,
+                    StringComparison.Ordinal) &&
+                managed.MaxFrame == metadata.maxFrame &&
+                managed.BoneKeyframeCount == counts.bones &&
+                managed.MorphKeyframeCount == counts.morphs &&
+                managed.ModelKeyframeCount == counts.properties &&
+                managed.ConstraintStateCount == cliConstraintStateCount &&
+                managed.CameraKeyframeCount == counts.cameras &&
+                managed.LightKeyframeCount == counts.lights &&
+                managed.SelfShadowKeyframeCount == counts.selfShadows;
+
+            return new MmdAnimCliParitySummaryCase
+            {
+                id = "summary-" + Path.GetFileNameWithoutExtension(fixtureMotion),
+                channel = "summary",
+                status = passed ? "passed" : "failed",
+                fixtureMotion = fixtureMotion,
+                managedTargetModelName = managed.TargetModelName,
+                cliTargetModelName = metadata.modelName,
+                managedMaxFrame = managed.MaxFrame,
+                cliMaxFrame = metadata.maxFrame,
+                managedBoneKeyframeCount = managed.BoneKeyframeCount,
+                cliBoneCount = counts.bones,
+                managedMorphKeyframeCount = managed.MorphKeyframeCount,
+                cliMorphCount = counts.morphs,
+                managedModelKeyframeCount = managed.ModelKeyframeCount,
+                managedConstraintStateCount = managed.ConstraintStateCount,
+                cliPropertyCount = counts.properties,
+                cliConstraintStateCount = cliConstraintStateCount,
+                managedCameraKeyframeCount = managed.CameraKeyframeCount,
+                cliCameraCount = counts.cameras,
+                managedLightKeyframeCount = managed.LightKeyframeCount,
+                cliLightCount = counts.lights,
+                managedSelfShadowKeyframeCount = managed.SelfShadowKeyframeCount,
+                cliSelfShadowCount = counts.selfShadows
+            };
+        }
+
+        private static CliVmdInspectReport ParseCliVmdInspectReport(string json, string vmdPath)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                throw new InvalidOperationException("mmd-anim inspect returned empty JSON for " + vmdPath);
+            }
+
+            RequireJsonKeys(
+                json,
+                vmdPath,
+                "metadata",
+                "modelName",
+                "maxFrame",
+                "counts",
+                "bones",
+                "morphs",
+                "cameras",
+                "lights",
+                "selfShadows",
+                "properties",
+                "propertyFrames");
+
+            CliVmdInspectReport? report;
+            try
+            {
+                report = JsonUtility.FromJson<CliVmdInspectReport>(json);
+            }
+            catch (Exception exception)
+            {
+                throw new InvalidOperationException(
+                    "Failed to parse mmd-anim inspect JSON for " + vmdPath,
+                    exception);
+            }
+
+            if (report == null || report.metadata == null || report.metadata.counts == null)
+            {
+                throw new InvalidOperationException(
+                    "mmd-anim inspect JSON is missing metadata/counts for " + vmdPath);
+            }
+
+            if (report.propertyFrames == null)
+            {
+                throw new InvalidOperationException(
+                    "mmd-anim inspect JSON is missing propertyFrames for " + vmdPath);
+            }
+
+            for (int i = 0; i < report.propertyFrames.Length; i++)
+            {
+                if (report.propertyFrames[i] == null || report.propertyFrames[i].ikStates == null)
+                {
+                    throw new InvalidOperationException(
+                        "mmd-anim inspect JSON is missing propertyFrames[" + i + "].ikStates for " + vmdPath);
+                }
+            }
+
+            return report;
+        }
+
+        private static void RequireJsonKeys(string json, string vmdPath, params string[] keys)
+        {
+            foreach (string key in keys)
+            {
+                if (json.IndexOf('"' + key + '"', StringComparison.Ordinal) < 0)
+                {
+                    throw new InvalidOperationException(
+                        "mmd-anim inspect JSON is missing key '" + key + "' for " + vmdPath);
+                }
+            }
+        }
+
         private static MmdAnimCliParityCase BuildCameraCase(float frame)
         {
             string vmdPath = Path.Combine(MmdAnimRoot, "crates", "mmd-anim-format", "fixtures", "vmd", "simple_camera.vmd");
@@ -465,6 +609,41 @@ namespace Mmd.Tests.Contracts
             string path = Path.Combine(dir, "scene-track-light-self-shadow.vmd");
             File.WriteAllBytes(path, MmdTestFixtures.BuildSceneTrackVmdBytes("cli_parity"));
             return path;
+        }
+
+        private static string WritePropertyTrackFixtureForCli()
+        {
+            string dir = Path.Combine(MmdTestFixtures.RepositoryRoot, "artifacts", "parity");
+            Directory.CreateDirectory(dir);
+            string path = Path.Combine(dir, "property-track-ik.vmd");
+
+            using var stream = new MemoryStream();
+            using var writer = new BinaryWriter(stream);
+            WriteFixedAscii(writer, "Vocaloid Motion Data 0002", 30);
+            WriteFixedAscii(writer, "cli_property", 20);
+            writer.Write(0u); // bone frames
+            writer.Write(0u); // morph frames
+            writer.Write(0u); // camera frames
+            writer.Write(0u); // light frames
+            writer.Write(0u); // self-shadow frames
+            writer.Write(1u); // property frames
+            writer.Write(14u);
+            writer.Write((byte)0);
+            writer.Write(2u); // IK states
+            WriteFixedAscii(writer, "cli_leg_ik", 20);
+            writer.Write((byte)0);
+            WriteFixedAscii(writer, "cli_arm_ik", 20);
+            writer.Write((byte)1);
+            File.WriteAllBytes(path, stream.ToArray());
+            return path;
+        }
+
+        private static void WriteFixedAscii(BinaryWriter writer, string value, int byteCount)
+        {
+            byte[] buffer = new byte[byteCount];
+            byte[] encoded = Encoding.ASCII.GetBytes(value ?? string.Empty);
+            Buffer.BlockCopy(encoded, 0, buffer, 0, Math.Min(encoded.Length, buffer.Length));
+            writer.Write(buffer);
         }
 
         private static string RunMmdAnimCli(string arguments)
@@ -595,6 +774,45 @@ namespace Mmd.Tests.Contracts
         }
 
         [Serializable]
+        private sealed class CliVmdInspectReport
+        {
+            public CliVmdInspectMetadata? metadata;
+            public CliVmdInspectPropertyFrame[]? propertyFrames;
+        }
+
+        [Serializable]
+        private sealed class CliVmdInspectMetadata
+        {
+            public string modelName = string.Empty;
+            public int maxFrame;
+            public CliVmdInspectCounts? counts;
+        }
+
+        [Serializable]
+        private sealed class CliVmdInspectCounts
+        {
+            public int bones;
+            public int morphs;
+            public int cameras;
+            public int lights;
+            public int selfShadows;
+            public int properties;
+        }
+
+        [Serializable]
+        private sealed class CliVmdInspectPropertyFrame
+        {
+            public CliVmdInspectIkState[]? ikStates;
+        }
+
+        [Serializable]
+        private sealed class CliVmdInspectIkState
+        {
+            public string boneName = string.Empty;
+            public bool enabled;
+        }
+
+        [Serializable]
         private sealed class CliCameraState
         {
             public float distance;
@@ -628,6 +846,7 @@ namespace Mmd.Tests.Contracts
             public MmdAnimCliParityMmdAnimReport mmdAnim = new();
             public MmdAnimCliParitySummary summary = new();
             public MmdAnimCliParityCase[] cases = Array.Empty<MmdAnimCliParityCase>();
+            public MmdAnimCliParitySummaryCase[] summaryCases = Array.Empty<MmdAnimCliParitySummaryCase>();
         }
 
         [Serializable]
@@ -673,6 +892,33 @@ namespace Mmd.Tests.Contracts
             public int packagedCount;
             public float maxAbsError;
             public float tolerance;
+        }
+
+        [Serializable]
+        private sealed class MmdAnimCliParitySummaryCase
+        {
+            public string id = string.Empty;
+            public string channel = string.Empty;
+            public string status = string.Empty;
+            public string fixtureMotion = string.Empty;
+            public string managedTargetModelName = string.Empty;
+            public string cliTargetModelName = string.Empty;
+            public int managedMaxFrame;
+            public int cliMaxFrame;
+            public int managedBoneKeyframeCount;
+            public int cliBoneCount;
+            public int managedMorphKeyframeCount;
+            public int cliMorphCount;
+            public int managedModelKeyframeCount;
+            public int managedConstraintStateCount;
+            public int cliPropertyCount;
+            public int cliConstraintStateCount;
+            public int managedCameraKeyframeCount;
+            public int cliCameraCount;
+            public int managedLightKeyframeCount;
+            public int cliLightCount;
+            public int managedSelfShadowKeyframeCount;
+            public int cliSelfShadowCount;
         }
     }
 }
