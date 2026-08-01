@@ -424,7 +424,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void ProviderMotionConfigurationRestoresManagedPlaybackWhenNativeUnavailable()
+        public void ProviderMotionConfigurationFailsClosedWhenNativeUnavailable()
         {
             MmdPmxAsset pmxAsset = null!;
             MmdVmdAsset vmdAsset = null!;
@@ -434,8 +434,6 @@ namespace Mmd.Tests
             {
                 string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
                 string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
-                byte[] vmdBytes = File.ReadAllBytes(vmdPath);
-                MmdVmdParseSummary parsedSummary = MmdVmdBinarySummaryReader.Read(vmdBytes);
                 MmdUnityPlaybackController controller = CreateProviderController(
                     pmxPath,
                     vmdPath,
@@ -443,24 +441,20 @@ namespace Mmd.Tests
                     out vmdAsset,
                     out instance);
 
-                controller.ConfigureMotionFromProviderModelSource(
-                    vmdAsset,
-                    playbackFrameRate: 30.0f,
-                    startFrame: 0,
-                    playOnStart: false);
+                InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+                    controller.ConfigureMotionFromProviderModelSource(
+                        vmdAsset,
+                        playbackFrameRate: 30.0f,
+                        startFrame: 0,
+                        playOnStart: false))!;
 
-                Assert.That(controller.IsConfigured, Is.True);
-                Assert.That(controller.IsFastRuntimeEnabled, Is.False);
+                Assert.That(exception.Message, Does.Contain("Normal playback requires mmd-anim native clip playback"));
+                Assert.That(exception.Message, Does.Contain("native runtime unavailable (forced by test)."));
                 Assert.That(controller.LastFastRuntimeReason, Does.Contain("forced by test"));
-                Assert.That(controller.MotionMaxFrame, Is.EqualTo(parsedSummary.MaxFrame));
-                Assert.That(controller.LastSnapshot, Is.Not.Null);
-                Assert.That(controller.LastSnapshot!.frame.bones, Is.Not.Empty,
-                    "managed fallback playback must preserve VMD bone keyframes.");
-                SkinnedMeshRenderer renderer = instance.SkinnedMeshRenderer!;
-                Assert.That(renderer.sharedMesh, Is.Not.Null,
-                    "managed fallback must keep the scene renderer bound after native candidate disposal.");
-                Assert.That(renderer.sharedMaterials, Is.Not.Empty,
-                    "managed fallback must keep scene materials bound after native candidate disposal.");
+                Assert.That(controller.IsConfigured, Is.False);
+                Assert.That(controller.LastSnapshot, Is.Null);
+                Assert.That(instance.SkinnedMeshRenderer!.sharedMesh, Is.Not.Null);
+                Assert.That(instance.SkinnedMeshRenderer.sharedMaterials, Is.Not.Empty);
             }
             finally
             {
@@ -472,12 +466,11 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void ProviderMotionReconfigurationKeepsManagedSceneBoundWhenNativeUnavailable()
+        public void ProviderMotionReconfigurationFailsClosedWhenNativeUnavailable()
         {
             MmdPmxAsset pmxAsset = null!;
             MmdVmdAsset vmdAsset = null!;
             MmdUnityModelInstance instance = null!;
-            MmdUnityPlaybackController.NativeRuntimeAvailabilityOverrideForTests = (_, _) => false;
             try
             {
                 string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
@@ -494,16 +487,25 @@ namespace Mmd.Tests
                     playbackFrameRate: 30.0f,
                     startFrame: 0,
                     playOnStart: false);
-                controller.ConfigureMotionFromProviderModelSource(
-                    vmdAsset,
-                    playbackFrameRate: 30.0f,
-                    startFrame: 1,
-                    playOnStart: false);
-
                 Assert.That(controller.IsConfigured, Is.True);
-                Assert.That(controller.IsFastRuntimeEnabled, Is.False);
-                Assert.That(controller.LastSnapshot, Is.Not.Null);
-                Assert.That(controller.LastSnapshot!.frame.bones, Is.Not.Empty);
+                Assert.That(controller.IsFastRuntimeEnabled, Is.True);
+                Mesh activePlaybackMesh = instance.SkinnedMeshRenderer!.sharedMesh!;
+
+                MmdUnityPlaybackController.NativeRuntimeAvailabilityOverrideForTests = (_, _) => false;
+                InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+                    controller.ConfigureMotionFromProviderModelSource(
+                        vmdAsset,
+                        playbackFrameRate: 30.0f,
+                        startFrame: 1,
+                        playOnStart: false))!;
+
+                Assert.That(exception.Message, Does.Contain("Normal playback requires mmd-anim native clip playback"));
+                Assert.That(exception.Message, Does.Contain("native runtime unavailable (forced by test)."));
+                Assert.That(controller.LastFastRuntimeReason, Does.Contain("forced by test"));
+                Assert.That(controller.IsConfigured, Is.False);
+                Assert.That(controller.LastSnapshot, Is.Null);
+                Assert.That(activePlaybackMesh == null, Is.True,
+                    "failed native reconfiguration must dispose the previous playback clone");
                 Assert.That(instance.SkinnedMeshRenderer!.sharedMesh, Is.Not.Null);
                 Assert.That(instance.SkinnedMeshRenderer.sharedMaterials, Is.Not.Empty);
             }
