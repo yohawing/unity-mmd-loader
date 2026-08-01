@@ -114,7 +114,12 @@ namespace Mmd.Editor
             RunStage(PmxValidationStage, () => MmdModelValidator.ThrowIfInvalid(model));
 
             byte[] vmdBytes = RunStage(VmdReadStage, () => File.ReadAllBytes(fullVmdPath));
-            MmdMotionDefinition motion = RunStage(VmdParseStage, () => parser.LoadMotion(vmdBytes));
+            MmdVmdParseSummary summary = RunStage(
+                VmdParseStage,
+                () => MmdVmdBinarySummaryReader.Read(vmdBytes));
+            MmdMotionDefinition motion = RunStage(
+                VmdParseStage,
+                () => MmdVmdAsset.CreateNativeClipMotionHeader(vmdBytes, summary));
             RunStage(VmdValidationStage, () => MmdMotionValidator.ThrowIfInvalid(motion));
 
             MmdUnityPlaybackBinding? binding = null;
