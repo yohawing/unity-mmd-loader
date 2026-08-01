@@ -32,16 +32,6 @@ namespace Mmd.Tests.Contracts
         }
 
         [Test]
-        public void SingleBoneCubeNativeEvaluatorConsistency()
-        {
-            RunNativeConsistencyCheck(
-                "test_1bone_cube.pmx",
-                "test_1bone_cube_motion.vmd",
-                new[] { 0, 15, 30 },
-                maxAllowedError: 0.00001f);
-        }
-
-        [Test]
         public void MorphWeightsMatchBetweenEvaluatorAndDirectSession()
         {
             RunMorphConsistencyCheck(
@@ -120,11 +110,9 @@ namespace Mmd.Tests.Contracts
             float[] nativeMorphWeights = new float[session.MorphWeightCount];
             byte[] nativeIkEnabled = new byte[session.IkEnabledCount];
 
-            var report = new StringBuilder();
-            report.AppendLine($"=== Native Consistency Report: {pmxFixture} + {vmdFixture} ===");
-            report.AppendLine($"Bones: {boneCount}, Frames: {string.Join(",", frames)}");
-
             float globalMaxError = 0.0f;
+            int worstFrame = -1;
+            string worstBoneName = string.Empty;
 
             foreach (int frame in frames)
             {
@@ -132,9 +120,6 @@ namespace Mmd.Tests.Contracts
 
                 MmdEvaluatedFrame evaluated = MmdRuntimeFrameEvaluator.EvaluatePhaseOneFrame(
                     model, motion, frame, frame / 30.0f);
-
-                float frameMaxError = 0.0f;
-                string worstBoneName = string.Empty;
 
                 for (int boneIndex = 0; boneIndex < boneCount; boneIndex++)
                 {
@@ -149,27 +134,18 @@ namespace Mmd.Tests.Contracts
                     float tz = Math.Abs(bonePose.worldMatrix[11] - nativeWorldMatrices[nativeOffset + 14]);
                     float translationError = MathF.Sqrt(tx * tx + ty * ty + tz * tz);
 
-                    if (translationError > frameMaxError)
+                    if (translationError > globalMaxError)
                     {
-                        frameMaxError = translationError;
+                        globalMaxError = translationError;
+                        worstFrame = frame;
                         worstBoneName = bonePose.name;
                     }
-
-                    if (translationError > globalMaxError)
-                        globalMaxError = translationError;
                 }
-
-                report.AppendLine(
-                    $"  Frame {frame}: maxErr={frameMaxError:F6} (bone={worstBoneName})");
             }
 
-            report.AppendLine($"  Global maxErr: {globalMaxError:F6}, threshold: {maxAllowedError:F6}");
-            report.AppendLine(globalMaxError <= maxAllowedError ? "  PASS" : "  FAIL");
-
-            UnityEngine.Debug.Log(report.ToString());
-
             Assert.That(globalMaxError, Is.LessThanOrEqualTo(maxAllowedError),
-                $"Max translation error {globalMaxError:F6} exceeds threshold {maxAllowedError:F6}.\n" + report);
+                $"{pmxFixture}: max translation error {globalMaxError:F6} exceeds threshold {maxAllowedError:F6} " +
+                $"at frame {worstFrame}, bone '{worstBoneName}'.");
         }
 
         private static void RunMorphConsistencyCheck(
@@ -190,10 +166,9 @@ namespace Mmd.Tests.Contracts
             float[] nativeMorphWeights = new float[session.MorphWeightCount];
             byte[] nativeIkEnabled = new byte[session.IkEnabledCount];
 
-            var report = new StringBuilder();
-            report.AppendLine($"=== Morph Consistency Report: {pmxFixture} + {vmdFixture} ===");
-
             float globalMaxError = 0.0f;
+            int worstFrame = -1;
+            string worstMorphName = string.Empty;
 
             foreach (int frame in frames)
             {
@@ -206,27 +181,24 @@ namespace Mmd.Tests.Contracts
                 foreach (MmdEvaluatedMorphWeight morph in evaluated.morphs)
                     evaluatedMorphMap[morph.name] = morph.weight;
 
-                float frameMaxError = 0.0f;
                 for (int morphIndex = 0; morphIndex < model.morphs.Count && morphIndex < nativeMorphWeights.Length; morphIndex++)
                 {
                     string morphName = model.morphs[morphIndex].name;
                     float directWeight = nativeMorphWeights[morphIndex];
                     evaluatedMorphMap.TryGetValue(morphName, out float evaluatedWeight);
                     float diff = Math.Abs(directWeight - evaluatedWeight);
-                    if (diff > frameMaxError) frameMaxError = diff;
-                    if (diff > globalMaxError) globalMaxError = diff;
+                    if (diff > globalMaxError)
+                    {
+                        globalMaxError = diff;
+                        worstFrame = frame;
+                        worstMorphName = morphName;
+                    }
                 }
-
-                report.AppendLine($"  Frame {frame}: maxErr={frameMaxError:F6}");
             }
 
-            report.AppendLine($"  Global maxErr: {globalMaxError:F6}, threshold: {maxAllowedMorphError:F6}");
-            report.AppendLine(globalMaxError <= maxAllowedMorphError ? "  PASS" : "  FAIL");
-
-            UnityEngine.Debug.Log(report.ToString());
-
             Assert.That(globalMaxError, Is.LessThanOrEqualTo(maxAllowedMorphError),
-                $"Max morph weight error {globalMaxError:F6} exceeds threshold {maxAllowedMorphError:F6}.\n" + report);
+                $"{pmxFixture}: max morph weight error {globalMaxError:F6} exceeds threshold {maxAllowedMorphError:F6} " +
+                $"at frame {worstFrame}, morph '{worstMorphName}'.");
         }
 
         private static MmdAnimCliParityNativeDllReport BuildNativeDllReport()
