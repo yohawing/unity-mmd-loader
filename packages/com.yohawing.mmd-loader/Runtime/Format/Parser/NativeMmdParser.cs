@@ -71,16 +71,6 @@ namespace Mmd.Parser
             return motion;
         }
 
-        private static int CountToArrayLength(int value, string label)
-        {
-            if (value < 0)
-            {
-                throw new InvalidOperationException(label + " is out of range: " + value);
-            }
-
-            return value;
-        }
-
         private static int CheckedUIntToInt(uint value, string label)
         {
             if (value > int.MaxValue)

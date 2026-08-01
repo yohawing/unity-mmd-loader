@@ -314,9 +314,6 @@ namespace Mmd.Native
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_camera_track_free", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void VmdCameraTrackFree(IntPtr track);
 
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_frame_range", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern byte ClipFrameRange(IntPtr clip, out uint firstFrame, out uint lastFrame);
-
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_free", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void ClipFree(IntPtr clip);
 
@@ -345,16 +342,6 @@ namespace Mmd.Native
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_physics_world_reset", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int PhysicsWorldReset(IntPtr world, IntPtr instance, out IntPtr seededRigidbodyCount);
-
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_evaluate_clip_frame_before_physics", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern int InstanceEvaluateClipFrameBeforePhysics(IntPtr instance, IntPtr clip, float frame);
-
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_physics_world_step_runtime", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern int PhysicsWorldStepRuntime(
-            IntPtr world,
-            IntPtr instance,
-            float deltaTime,
-            out PhysicsWorldStepReport outReport);
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_evaluate_host_frame", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int EvaluateHostFrame(

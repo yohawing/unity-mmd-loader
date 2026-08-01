@@ -15,24 +15,6 @@ namespace Mmd.Editor
 {
     internal static partial class MmdAssetInspectorUtility
     {
-        internal static MmdHumanoidClipConversionPlan ComputeHumanoidClipReadinessForVmd(
-            MmdVmdAsset vmdAsset,
-            MmdPmxAsset? pmxAsset)
-        {
-            // Delegates to planner. Planner AnalyzePrerequisites uses VMD import cache only (no LoadMotion).
-            if (vmdAsset == null)
-            {
-                // Planner handles null vmd; return its not-ready plan for consistency.
-                return MmdHumanoidClipConversionPlanner.AnalyzePrerequisites(pmxAsset, null);
-            }
-            return MmdHumanoidClipConversionPlanner.AnalyzePrerequisites(pmxAsset, vmdAsset);
-        }
-
-        internal static string FormatCompactVmdHumanoidIssues(MmdHumanoidClipConversionPlan plan)
-        {
-            return FormatCompactHumanoidClipConversionIssues(plan);
-        }
-
         internal static string FormatCompactHumanoidClipConversionIssues(MmdHumanoidClipConversionPlan plan)
         {
             if (plan == null || plan.PrerequisitesReady)
