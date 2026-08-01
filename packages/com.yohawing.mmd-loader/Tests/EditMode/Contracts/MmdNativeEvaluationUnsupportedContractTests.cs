@@ -12,53 +12,19 @@ namespace Mmd.Tests.Contracts
     public sealed class MmdNativeEvaluationUnsupportedContractTests
     {
         [Test]
-        public void SourceBackedPhaseOneFrameRejectsSuppliedPhysicsBackend()
-        {
-            (MmdModelDefinition model, MmdMotionDefinition motion) = LoadCubeFixturePair();
-
-            NotSupportedException exception = Assert.Throws<NotSupportedException>(
-                () => MmdRuntimeFrameEvaluator.EvaluatePhaseOneFrame(
-                    model,
-                    motion,
-                    frame: 0,
-                    time: 0.0f,
-                    physicsBackend: new NullMmdPhysicsBackend()))!;
-
-            Assert.That(exception.Message, Does.Contain("source-backed PMX/VMD"));
-            Assert.That(exception.Message, Does.Contain("custom physics backend or IK solver"));
-            Assert.That(exception.Message, Does.Contain("native evaluation is required"));
-        }
-
-        [Test]
-        public void SourceBackedPhaseOneFrameRejectsSuppliedIkSolver()
-        {
-            (MmdModelDefinition model, MmdMotionDefinition motion) = LoadCubeFixturePair();
-
-            NotSupportedException exception = Assert.Throws<NotSupportedException>(
-                () => MmdRuntimeFrameEvaluator.EvaluatePhaseOneFrame(
-                    model,
-                    motion,
-                    frame: 0,
-                    time: 0.0f,
-                    ikSolver: new PassthroughIkSolver()))!;
-
-            Assert.That(exception.Message, Does.Contain("source-backed PMX/VMD"));
-            Assert.That(exception.Message, Does.Contain("custom physics backend or IK solver"));
-            Assert.That(exception.Message, Does.Contain("native evaluation is required"));
-        }
-
-        [TestCase(true)]
         [TestCase(false)]
-        public void MixedSourcePhaseOneFrameRejectsManagedFallback(bool modelRetainsSourceBytes)
+        [TestCase(true)]
+        public void NonSourceLessPhaseOneFrameRejectsManagedFallback(bool mixedSource)
         {
             (MmdModelDefinition model, MmdMotionDefinition motion) = LoadCubeFixturePair();
-            if (modelRetainsSourceBytes)
+            IMmdPhysicsBackend? physicsBackend = null;
+            if (mixedSource)
             {
                 motion.sourceBytes = null;
             }
             else
             {
-                model.sourceBytes = null;
+                physicsBackend = new NullMmdPhysicsBackend();
             }
 
             NotSupportedException exception = Assert.Throws<NotSupportedException>(
@@ -66,33 +32,12 @@ namespace Mmd.Tests.Contracts
                     model,
                     motion,
                     frame: 0,
-                    time: 0.0f))!;
+                    time: 0.0f,
+                    physicsBackend: physicsBackend))!;
 
-            Assert.That(exception.Message, Does.Contain("source-less-only"));
-            Assert.That(exception.Message, Does.Contain("mixed-source"));
+            Assert.That(exception.Message, Does.Contain("Managed fallback evaluation"));
             Assert.That(exception.Message, Does.Contain("native evaluation is required"));
-        }
-
-        [Test]
-        public void SourceBackedBeforePhysicsRejectsDeformAfterPhysicsManagedFallback()
-        {
-            (MmdModelDefinition model, MmdMotionDefinition motion) = LoadCubeFixturePair();
-            model.bones[0].deformAfterPhysics = true;
-
-            Assert.That(model.HasDeformAfterPhysicsBones, Is.True,
-                "the source-backed model must exercise the deform-after-physics contract.");
-
-            NotSupportedException exception = Assert.Throws<NotSupportedException>(
-                () => MmdRuntimeFrameEvaluator.EvaluateValidatedBeforePhysicsPlaybackFrame(
-                    model,
-                    motion,
-                    frame: 0,
-                    time: 0.0f))!;
-
-            Assert.That(exception.Message, Does.Contain("source-backed PMX/VMD"));
-            Assert.That(exception.Message, Does.Contain("before-physics"));
-            Assert.That(exception.Message, Does.Contain("deform-after-physics bones"));
-            Assert.That(exception.Message, Does.Contain("native evaluation is required"));
+            Assert.That(exception.Message, Does.Contain("source-backed or mixed-source PMX/VMD"));
         }
 
         private static (MmdModelDefinition Model, MmdMotionDefinition Motion) LoadCubeFixturePair()
@@ -105,14 +50,5 @@ namespace Mmd.Tests.Contracts
             return (model, motion);
         }
 
-        private sealed class PassthroughIkSolver : IMmdIkSolver
-        {
-            public string Name => nameof(PassthroughIkSolver);
-
-            public MmdSampledMotion Solve(MmdModelDefinition model, MmdSampledMotion? sampledMotion)
-            {
-                return sampledMotion ?? new MmdSampledMotion();
-            }
-        }
     }
 }

@@ -484,8 +484,8 @@ namespace Mmd.Tests
                     time: 0.0f,
                     ikSolver: new TestOffsetIkSolver(targetBoneName, 2.0f)))!;
 
-            Assert.That(exception.Message, Does.Contain("source-backed PMX/VMD"));
-            Assert.That(exception.Message, Does.Contain("custom physics backend or IK solver"));
+            Assert.That(exception.Message, Does.Contain("Managed fallback evaluation"));
+            Assert.That(exception.Message, Does.Contain("source-backed or mixed-source PMX/VMD"));
             Assert.That(exception.Message, Does.Contain("native evaluation is required"));
         }
 

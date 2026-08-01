@@ -54,8 +54,7 @@ namespace Mmd
             {
                 return EvaluateManagedFrame(
                     model, motion, frame, time, includeMaterials: true,
-                    physicsBackend, ikSolver,
-                    nativeFallbackHasSuppliedPhysicsOrIk: physicsBackend != null || ikSolver != null);
+                    physicsBackend, ikSolver);
             }
 
             return EvaluateNativeFrame(model, motion, frame, time, includeMaterials: true);
@@ -73,8 +72,7 @@ namespace Mmd
             {
                 return EvaluateManagedFrame(
                     model, motion, frame, time, includeMaterials: false,
-                    physicsBackend, ikSolver,
-                    nativeFallbackHasSuppliedPhysicsOrIk: physicsBackend != null || ikSolver != null);
+                    physicsBackend, ikSolver);
             }
 
             return EvaluateNativeFrame(model, motion, frame, time, includeMaterials: false);
@@ -95,8 +93,7 @@ namespace Mmd
             {
                 return EvaluateManagedFrame(
                     model, motion, frame, time, includeMaterials: false,
-                    physicsBackend, ikSolver, topologyPlan,
-                    nativeFallbackHasSuppliedPhysicsOrIk: physicsBackend != null || ikSolver != null);
+                    physicsBackend, ikSolver, topologyPlan);
             }
 
             topologyPlan?.EnsureModel(model);
@@ -124,8 +121,7 @@ namespace Mmd
             return EvaluateManagedFrame(
                 model, motion, frame, time, includeMaterials: false,
                 physicsBackend, ikSolver, topologyPlan,
-                stopBeforePhysics: true,
-                nativeFallbackHasSuppliedPhysicsOrIk: physicsBackend != null || ikSolver != null);
+                stopBeforePhysics: true);
         }
 
         public static IReadOnlyList<MmdEvaluatedFrame> EvaluatePhaseOneFrames(
@@ -145,7 +141,6 @@ namespace Mmd
 
             if (!CanUseNativeEvaluation(model, motion, physicsBackend, ikSolver))
             {
-                bool nativeFallbackHasSuppliedPhysicsOrIk = physicsBackend != null || ikSolver != null;
                 physicsBackend ??= new NullMmdPhysicsBackend();
                 ikSolver ??= new MmdIkSolver();
                 physicsBackend.Reset();
@@ -165,8 +160,7 @@ namespace Mmd
                         MmdPlaybackTime.ToTime(frame, frameRate),
                         includeMaterials: true,
                         physicsBackend,
-                        ikSolver,
-                        nativeFallbackHasSuppliedPhysicsOrIk: nativeFallbackHasSuppliedPhysicsOrIk));
+                        ikSolver));
                 }
 
                 return managedEvaluatedFrames;
@@ -241,18 +235,13 @@ namespace Mmd
             IMmdPhysicsBackend? physicsBackend,
             IMmdIkSolver? ikSolver,
             MmdTopologyPlan? topologyPlan = null,
-            bool stopBeforePhysics = false,
-            bool nativeFallbackHasSuppliedPhysicsOrIk = false)
+            bool stopBeforePhysics = false)
         {
             ValidateInputs(model, motion);
             ValidateFrame(frame);
             ValidateTime(time);
 
-            ThrowIfNativeBackedManagedFallbackUnsupported(
-                model,
-                motion,
-                nativeFallbackHasSuppliedPhysicsOrIk,
-                stopBeforePhysics);
+            ThrowIfManagedEvaluationUnsupported(model, motion);
 
             physicsBackend ??= new NullMmdPhysicsBackend();
             ikSolver ??= new MmdIkSolver();
@@ -267,38 +256,13 @@ namespace Mmd
             return BuildFrameFromManagedEvaluation(model, frame, time, evaluation, includeMaterials);
         }
 
-        private static void ThrowIfNativeBackedManagedFallbackUnsupported(
+        private static void ThrowIfManagedEvaluationUnsupported(
             MmdModelDefinition model,
-            MmdMotionDefinition motion,
-            bool nativeFallbackHasSuppliedPhysicsOrIk,
-            bool stopBeforePhysics)
+            MmdMotionDefinition motion)
         {
             if (MmdRuntimeFramePipeline.IsSourceLess(model, motion))
             {
                 return;
-            }
-
-            bool sourceBackedPair = model.sourceBytes != null && motion.sourceBytes != null;
-            if (sourceBackedPair && nativeFallbackHasSuppliedPhysicsOrIk && stopBeforePhysics && model.HasDeformAfterPhysicsBones)
-            {
-                throw new NotSupportedException(
-                    "Managed fallback evaluation is unsupported for source-backed PMX/VMD when a custom " +
-                    "physics backend or IK solver is supplied during before-physics evaluation of a model " +
-                    "with deform-after-physics bones; native evaluation is required.");
-            }
-
-            if (sourceBackedPair && nativeFallbackHasSuppliedPhysicsOrIk)
-            {
-                throw new NotSupportedException(
-                    "Managed fallback evaluation is unsupported for source-backed PMX/VMD when a custom " +
-                    "physics backend or IK solver is supplied; native evaluation is required.");
-            }
-
-            if (sourceBackedPair && stopBeforePhysics && model.HasDeformAfterPhysicsBones)
-            {
-                throw new NotSupportedException(
-                    "Managed fallback evaluation is unsupported for source-backed PMX/VMD during before-physics " +
-                    "evaluation of a model with deform-after-physics bones; native evaluation is required.");
             }
 
             throw new NotSupportedException(
