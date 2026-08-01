@@ -117,6 +117,22 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void RejectsMorphAndPropertyIkCountsOutsideManagedSummaryRange()
+        {
+            byte[] morphBytes = CreateVmd(boneCount: 0, morphCount: 0, includeOptionalTail: false);
+            WriteUInt32(morphBytes, HeaderSize + sizeof(uint), uint.MaxValue);
+            InvalidDataException morphException = AssertInvalid(morphBytes, "morph", "count");
+            Assert.That(morphException.Message, Does.Contain("offset=54"));
+            Assert.That(morphException.Message, Does.Contain("out of range"));
+
+            byte[] propertyBytes = CreateVmd(boneCount: 0, morphCount: 0, includeOptionalTail: true);
+            WriteUInt32(propertyBytes, 79, uint.MaxValue);
+            InvalidDataException propertyException = AssertInvalid(propertyBytes, "property IK", "0");
+            Assert.That(propertyException.Message, Does.Contain("offset=79"));
+            Assert.That(propertyException.Message, Does.Contain("out of range"));
+        }
+
+        [Test]
         public void RejectsFrameOutsideManagedSummaryRange()
         {
             byte[] bytes = CreateVmd(morphCount: 0, includeOptionalTail: false);
@@ -231,6 +247,69 @@ namespace Mmd.Tests
 
             Assert.That(exception.Message, Does.Contain("distance"));
             Assert.That(exception.Message, Does.Contain("finite"));
+        }
+
+        [Test]
+        public void RejectsNonFiniteLightAndSelfShadowValues()
+        {
+            byte[] lightBytes = CreateVmd(morphCount: 0, includeOptionalTail: false);
+            using (var stream = new MemoryStream())
+            {
+                stream.Write(lightBytes, 0, lightBytes.Length);
+                using (var writer = new BinaryWriter(stream, Encoding.UTF8, true))
+                {
+                    writer.Write(0u); // camera count
+                    writer.Write(1u); // light count
+                    writer.Write(0u); // frame
+                    writer.Write(float.PositiveInfinity); // color.r
+                    for (int i = 0; i < 5; i++)
+                    {
+                        writer.Write(0.0f);
+                    }
+                }
+
+                lightBytes = stream.ToArray();
+            }
+
+            InvalidDataException lightException = AssertInvalid(lightBytes, "light", "0");
+            Assert.That(lightException.Message, Does.Contain("color.r"));
+            Assert.That(lightException.Message, Does.Contain("finite"));
+
+            byte[] selfShadowBytes = CreateVmd(morphCount: 0, includeOptionalTail: false);
+            using (var stream = new MemoryStream())
+            {
+                stream.Write(selfShadowBytes, 0, selfShadowBytes.Length);
+                using (var writer = new BinaryWriter(stream, Encoding.UTF8, true))
+                {
+                    writer.Write(0u); // camera count
+                    writer.Write(0u); // light count
+                    writer.Write(1u); // self-shadow count
+                    writer.Write(0u); // frame
+                    writer.Write((byte)0); // mode
+                    writer.Write(float.NegativeInfinity); // distance
+                }
+
+                selfShadowBytes = stream.ToArray();
+            }
+
+            InvalidDataException selfShadowException = AssertInvalid(selfShadowBytes, "self-shadow", "0");
+            Assert.That(selfShadowException.Message, Does.Contain("distance"));
+            Assert.That(selfShadowException.Message, Does.Contain("finite"));
+        }
+
+        [Test]
+        public void RejectsPartialOptionalCountInsteadOfSilentlyTreatingItAsAbsent()
+        {
+            byte[] bytes = CreateVmd(boneCount: 0, morphCount: 0, includeOptionalTail: false);
+            Array.Resize(ref bytes, bytes.Length + 3);
+            bytes[^3] = 1;
+            bytes[^2] = 2;
+            bytes[^1] = 3;
+
+            InvalidDataException exception = AssertInvalid(bytes, "camera", "count");
+
+            Assert.That(exception.Message, Does.Contain("offset=58"));
+            Assert.That(exception.Message, Does.Contain("truncated"));
         }
 
         private static InvalidDataException AssertInvalid(byte[] bytes, string section, string index)

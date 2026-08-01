@@ -24,6 +24,7 @@ namespace Mmd
         private const int BoneInterpolationOffset = 47;
         private const int BoneInterpolationSize = 64;
         private const string MagicPrefix = "Vocaloid Motion Data 0002\0";
+        private static readonly Encoding? Cp932Encoding = TryGetCp932Encoding();
 
         public static MmdVmdParseSummary Read(byte[] data)
         {
@@ -219,13 +220,19 @@ namespace Mmd
                 end++;
             }
 
+            Encoding encoding = Cp932Encoding ?? Encoding.UTF8;
+            return encoding.GetString(data, offset, end - offset).TrimEnd(' ', '\0');
+        }
+
+        private static Encoding? TryGetCp932Encoding()
+        {
             try
             {
-                return Encoding.GetEncoding(932).GetString(data, offset, end - offset).TrimEnd(' ', '\0');
+                return Encoding.GetEncoding(932);
             }
             catch (ArgumentException)
             {
-                return Encoding.UTF8.GetString(data, offset, end - offset).TrimEnd(' ', '\0');
+                return null;
             }
         }
 
@@ -383,11 +390,90 @@ namespace Mmd
                 string field)
             {
                 RequireAt(relativeOffset, byteCount, section, index, field);
-                string value = DecodeFixedString(data, checked(offset + relativeOffset), byteCount);
-                if (string.IsNullOrWhiteSpace(value))
+                if (!HasNonWhitespaceFixedString(checked(offset + relativeOffset), byteCount))
                 {
                     throw Invalid(section, index, checked(offset + relativeOffset), field + " is required");
                 }
+            }
+
+            private bool HasNonWhitespaceFixedString(int start, int byteCount)
+            {
+                int end = checked(start + byteCount);
+                for (int i = start; i < end; i++)
+                {
+                    byte value = data[i];
+                    if (value == 0)
+                    {
+                        break;
+                    }
+
+                    if (value == 0x09 || value == 0x0A || value == 0x0B ||
+                        value == 0x0C || value == 0x0D || value == 0x20)
+                    {
+                        continue;
+                    }
+
+                    // CP932 encodes U+3000 (IDEOGRAPHIC SPACE) as 0x81 0x40.
+                    // Keep the CP932 fast path separate from the UTF-8 fallback: the same raw
+                    // bytes can have different meanings in the two encodings.
+                    if (Cp932Encoding != null && value == 0x81 && i + 1 < end && data[i + 1] == 0x40)
+                    {
+                        i++;
+                        continue;
+                    }
+
+                    if (Cp932Encoding == null && TrySkipUtf8Whitespace(ref i, end))
+                    {
+                        continue;
+                    }
+
+                    return true;
+                }
+
+                return false;
+            }
+
+            private bool TrySkipUtf8Whitespace(ref int index, int end)
+            {
+                byte first = data[index];
+                if (first == 0xC2 && index + 1 < end &&
+                    (data[index + 1] == 0x85 || data[index + 1] == 0xA0))
+                {
+                    index++;
+                    return true;
+                }
+
+                if (first == 0xE1 && index + 2 < end &&
+                    data[index + 1] == 0x9A && data[index + 2] == 0x80)
+                {
+                    index += 2;
+                    return true;
+                }
+
+                if (first == 0xE2 && index + 2 < end && data[index + 1] == 0x80 &&
+                    ((data[index + 2] >= 0x80 && data[index + 2] <= 0x8A) ||
+                     data[index + 2] == 0xA8 || data[index + 2] == 0xA9 ||
+                     data[index + 2] == 0xAF))
+                {
+                    index += 2;
+                    return true;
+                }
+
+                if (first == 0xE2 && index + 2 < end &&
+                    data[index + 1] == 0x81 && data[index + 2] == 0x9F)
+                {
+                    index += 2;
+                    return true;
+                }
+
+                if (first == 0xE3 && index + 2 < end &&
+                    data[index + 1] == 0x80 && data[index + 2] == 0x80)
+                {
+                    index += 2;
+                    return true;
+                }
+
+                return false;
             }
 
             public void RequireAt(int relativeOffset, int count, string section, int index, string field)
