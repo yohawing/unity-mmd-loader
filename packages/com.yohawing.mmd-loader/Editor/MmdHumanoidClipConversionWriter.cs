@@ -215,7 +215,6 @@ namespace Mmd.Editor
             try
             {
                 var usedHumanBones = new HashSet<HumanBodyBones>();
-                var boneKeyframesByName = BuildBoneKeyframesByName(motion.boneKeyframes);
 
                 var importedStateDiagnostics = new List<string>();
                 if (!MmdHumanoidClipConversionPlanner.TryResolveImportedHumanoidState(
@@ -303,30 +302,35 @@ namespace Mmd.Editor
                     }
                     else
                     {
-                        diagnostics.Add("writer: native batch evaluation unavailable; using managed IK sampling: "
-                                        + fastRuntimeReason);
+                        diagnostics.Add(
+                            "unsupported: native batch evaluation is unavailable; managed VMD sampling is disabled: "
+                            + fastRuntimeReason);
+                        return new MmdHumanoidClipConversionWriterResult(null, plan, diagnostics);
                     }
                 }
                 catch (Exception ex)
                 {
-                    diagnostics.Add("writer: evaluated MMD pose unavailable; using direct VMD bone fallback: " + ex.Message);
-                    evaluatedBinding = null;
+                    diagnostics.Add(
+                        "unsupported: native batch evaluation could not be initialized; "
+                        + "managed VMD sampling is disabled: " + ex.Message);
+                    return new MmdHumanoidClipConversionWriterResult(null, plan, diagnostics);
                 }
 
-                AddMuscleCurvesToClip(
+                if (!AddMuscleCurvesToClip(
                     clip,
                     proxyRoot,
                     proxyAvatar,
                     mappedBones,
                     evaluatedBinding,
-                    boneKeyframesByName,
                     startFrame,
-                    effectiveEndFrame,
                     frameCount,
                     sampleFrameToTimeFactor,
                     diagnostics,
                     out Vector3[] bodyPositions,
-                    out Quaternion[] bodyRotations);
+                    out Quaternion[] bodyRotations))
+                {
+                    return new MmdHumanoidClipConversionWriterResult(null, plan, diagnostics);
+                }
 
                 float humanScale = ResolveHumanScale(proxyAvatar);
 
@@ -370,55 +374,13 @@ namespace Mmd.Editor
             }
         }
 
-        private static Dictionary<string, List<MmdBoneKeyframeDefinition>> BuildBoneKeyframesByName(
-            IReadOnlyList<MmdBoneKeyframeDefinition>? boneKeyframes)
-        {
-            var grouped = new Dictionary<string, List<MmdBoneKeyframeDefinition>>(StringComparer.Ordinal);
-            if (boneKeyframes == null)
-            {
-                return grouped;
-            }
-
-            foreach (MmdBoneKeyframeDefinition keyframe in boneKeyframes)
-            {
-                if (keyframe == null || string.IsNullOrWhiteSpace(keyframe.boneName))
-                {
-                    continue;
-                }
-
-                if (!grouped.TryGetValue(keyframe.boneName, out List<MmdBoneKeyframeDefinition>? list))
-                {
-                    list = new List<MmdBoneKeyframeDefinition>();
-                    grouped.Add(keyframe.boneName, list);
-                }
-                list.Add(keyframe);
-            }
-
-            foreach (List<MmdBoneKeyframeDefinition> list in grouped.Values)
-            {
-                list.Sort((left, right) => left.frame.CompareTo(right.frame));
-            }
-            return grouped;
-        }
-
-        private static IReadOnlyList<MmdBoneKeyframeDefinition> SelectBoneKeyframes(
-            Dictionary<string, List<MmdBoneKeyframeDefinition>> grouped,
-            string sourceBoneName)
-        {
-            return grouped.TryGetValue(sourceBoneName, out List<MmdBoneKeyframeDefinition>? keyframes)
-                ? keyframes
-                : Array.Empty<MmdBoneKeyframeDefinition>();
-        }
-
-        private static void AddMuscleCurvesToClip(
+        private static bool AddMuscleCurvesToClip(
             AnimationClip clip,
             GameObject proxyRoot,
             Avatar proxyAvatar,
             IReadOnlyList<(HumanBodyBones HumanBone, Transform ProxyTransform, string SourceBoneName, MmdHumanoidRetargetBinding Binding)> mappedBones,
             MmdUnityPlaybackBinding? evaluatedBinding,
-            Dictionary<string, List<MmdBoneKeyframeDefinition>> boneKeyframesByName,
             int startFrame,
-            int endFrame,
             int frameCount,
             float sampleFrameToTimeFactor,
             List<string> diagnostics,
@@ -433,78 +395,49 @@ namespace Mmd.Editor
             }
             bodyPositions = new Vector3[frameCount];
             bodyRotations = new Quaternion[frameCount];
-            var baseRotations = new Quaternion[mappedBones.Count];
+            var proxyBaseLocalRotations = new Quaternion[mappedBones.Count];
             for (int boneIndex = 0; boneIndex < mappedBones.Count; boneIndex++)
             {
-                baseRotations[boneIndex] = mappedBones[boneIndex].ProxyTransform.localRotation;
+                proxyBaseLocalRotations[boneIndex] = mappedBones[boneIndex].ProxyTransform.localRotation;
             }
 
             using (var poseHandler = new HumanPoseHandler(proxyAvatar, proxyRoot.transform))
             {
                 var pose = new HumanPose { muscles = new float[muscleCount] };
-                bool usedNativeBatch = evaluatedBinding != null &&
-                    TryFillMuscleKeysFromNativeBatch(
-                        evaluatedBinding,
-                        mappedBones,
-                        poseHandler,
-                        ref pose,
-                        startFrame,
-                        frameCount,
-                        sampleFrameToTimeFactor,
-                        muscleKeys,
-                        bodyPositions,
-                        bodyRotations);
-                if (usedNativeBatch)
+                bool usedNativeBatch;
+                try
                 {
-                    diagnostics.Add("writer: sampled evaluated MMD IK pose through native batch output.");
+                    usedNativeBatch = evaluatedBinding != null &&
+                        TryFillMuscleKeysFromNativeBatch(
+                            evaluatedBinding,
+                            mappedBones,
+                            poseHandler,
+                            ref pose,
+                            startFrame,
+                            frameCount,
+                            sampleFrameToTimeFactor,
+                            muscleKeys,
+                            bodyPositions,
+                            bodyRotations,
+                            proxyBaseLocalRotations);
                 }
-                else
+                catch (Exception ex)
                 {
-                    int sampleIndex = 0;
-                    for (int frame = startFrame; frame <= endFrame; frame++)
-                    {
-                        float time = (frame - startFrame) * sampleFrameToTimeFactor;
-                        evaluatedBinding?.ApplyFrame(frame, 1.0f / sampleFrameToTimeFactor);
-                        for (int boneIndex = 0; boneIndex < mappedBones.Count; boneIndex++)
-                        {
-                            (_, Transform proxyTransform, string sourceBoneName, MmdHumanoidRetargetBinding binding) = mappedBones[boneIndex];
-                            if (evaluatedBinding != null)
-                            {
-                                Transform evaluatedNative = evaluatedBinding.Instance.BoneTransforms[binding.MmdBoneIndex];
-                                ApplyEvaluatedLocalPoseToProxy(
-                                    proxyTransform,
-                                    binding,
-                                    evaluatedNative.localRotation);
-                            }
-                            else
-                            {
-                                IReadOnlyList<MmdBoneKeyframeDefinition> keyframes = SelectBoneKeyframes(
-                                    boneKeyframesByName,
-                                    sourceBoneName);
-                                float[] rotated = VmdBoneSampler.SampleSortedPose(
-                                    keyframes,
-                                    sourceBoneName,
-                                    frame).Rotation;
-                                var rotationDelta = new Quaternion(
-                                    -rotated[0],
-                                    rotated[1],
-                                    -rotated[2],
-                                    rotated[3]);
-                                proxyTransform.localRotation = baseRotations[boneIndex] * rotationDelta;
-                            }
-                        }
+                    diagnostics.Add(
+                        "unsupported: native batch evaluation failed; managed VMD sampling is disabled: "
+                        + ex.Message);
+                    return false;
+                }
 
-                        poseHandler.GetHumanPose(ref pose);
-                        bodyPositions[sampleIndex] = pose.bodyPosition;
-                        bodyRotations[sampleIndex] = pose.bodyRotation;
-                        for (int muscleIndex = 0; muscleIndex < muscleCount; muscleIndex++)
-                        {
-                            muscleKeys[muscleIndex][sampleIndex] =
-                                new Keyframe(time, pose.muscles[muscleIndex]);
-                        }
-                        sampleIndex++;
-                    }
+                if (!usedNativeBatch)
+                {
+                    diagnostics.Add(
+                        "unsupported: native batch evaluation eligibility failed; "
+                        + "managed VMD sampling is disabled.");
+                    return false;
                 }
+
+                diagnostics.Add("writer: sampled evaluated MMD IK pose through native batch output.");
             }
 
             for (int muscleIndex = 0; muscleIndex < muscleCount; muscleIndex++)
@@ -515,6 +448,7 @@ namespace Mmd.Editor
             }
 
             diagnostics.Add("writer: wrote " + muscleCount + " Humanoid muscle curves.");
+            return true;
         }
 
         private static bool TryFillMuscleKeysFromNativeBatch(
@@ -527,7 +461,8 @@ namespace Mmd.Editor
             float sampleFrameToTimeFactor,
             Keyframe[][] muscleKeys,
             Vector3[] bodyPositions,
-            Quaternion[] bodyRotations)
+            Quaternion[] bodyRotations,
+            Quaternion[] proxyBaseLocalRotations)
         {
             MmdUnityModelInstance instance = binding.Instance;
             if (!MmdGenericAnimationClipWriter.CanUseNativeBatch(
@@ -585,7 +520,8 @@ namespace Mmd.Editor
                         ApplyEvaluatedLocalPoseToProxy(
                             proxyTransform,
                             retargetBinding,
-                            localRotation);
+                            localRotation,
+                            proxyBaseLocalRotations[boneIndex]);
                     }
 
                     poseHandler.GetHumanPose(ref pose);
@@ -641,10 +577,11 @@ namespace Mmd.Editor
         private static void ApplyEvaluatedLocalPoseToProxy(
             Transform proxyTransform,
             MmdHumanoidRetargetBinding binding,
-            Quaternion evaluatedLocalRotation)
+            Quaternion evaluatedLocalRotation,
+            Quaternion proxyBaseLocalRotation)
         {
             proxyTransform.localRotation =
-                binding.ProxyBindLocalRotation *
+                proxyBaseLocalRotation *
                 Quaternion.Inverse(binding.NativeBindLocalRotation) *
                 evaluatedLocalRotation;
         }

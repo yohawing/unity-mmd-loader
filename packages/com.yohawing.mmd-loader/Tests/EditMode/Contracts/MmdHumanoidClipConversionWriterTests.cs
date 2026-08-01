@@ -23,26 +23,6 @@ namespace Mmd.Tests
         private const string FixtureVmdPath =
             "Packages/com.yohawing.mmd-loader/Tests/Fixtures/Assets/test_1bone_cube_motion.vmd";
 
-        private static readonly string[] RequiredBoneNames =
-        {
-            "下半身",
-            "上半身",
-            "首",
-            "頭",
-            "左足",
-            "左ひざ",
-            "左足首",
-            "右足",
-            "右ひざ",
-            "右足首",
-            "左腕",
-            "左ひじ",
-            "左手首",
-            "右腕",
-            "右ひじ",
-            "右手首",
-        };
-
         [Test]
         public void CreateInMemoryClipUsesImportedHumanoidAvatarAndBindings()
         {
@@ -70,6 +50,9 @@ namespace Mmd.Tests
                 Assert.That(
                     string.Join("\n", result.Diagnostics),
                     Does.Contain(MmdHumanoidClipConversionPlanner.ImportedPmxHumanoidMappingSource));
+                Assert.That(
+                    string.Join("\n", result.Diagnostics),
+                    Does.Contain("native batch evaluation"));
                 AssertHumanoidClipHasMuscleBindings(result.Clip!);
                 AssertRootMotionBindings(result.Clip!);
             }
@@ -505,91 +488,25 @@ namespace Mmd.Tests
             out MmdPmxAsset pmxAsset,
             List<UnityEngine.Object> ownedObjects)
         {
-            var hierarchyRoot = new GameObject("H6WriterReadyPmxRoot");
-            var modelObject = new GameObject("ReadyModel");
-            modelObject.transform.SetParent(hierarchyRoot.transform, worldPositionStays: false);
-
-            SkinnedMeshRenderer smr = modelObject.AddComponent<SkinnedMeshRenderer>();
-            Mesh mesh = new Mesh
-            {
-                name = "H6WriterReadyPmxMesh",
-            };
-            mesh.vertices = new Vector3[]
-            {
-                new Vector3(-0.5f, 0f, -0.5f),
-                new Vector3(0.5f, 0f, -0.5f),
-                new Vector3(0f, 1f, 0.5f),
-            };
-            mesh.triangles = new int[] { 0, 1, 2 };
-            mesh.bindposes = new Matrix4x4[RequiredBoneNames.Length];
-            smr.sharedMesh = mesh;
-
-            Transform[] bones = new Transform[RequiredBoneNames.Length];
-            for (int i = 0; i < RequiredBoneNames.Length; i++)
-            {
-                GameObject boneObject = new GameObject(RequiredBoneNames[i]);
-                boneObject.transform.SetParent(modelObject.transform, worldPositionStays: false);
-                boneObject.transform.localPosition = GetHumanoidFixtureBonePosition(RequiredBoneNames[i]);
-                bones[i] = boneObject.transform;
-            }
-            smr.bones = bones;
+            byte[] modelBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_basic_bone.pmx");
+            MmdModelDefinition model = new NativeMmdParser().LoadModel(modelBytes);
+            MmdUnityModelInstance generatedAssets = MmdUnityModelFactory.CreateSkinnedModel(model);
 
             pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
             pmxAsset.Initialize(
-                new byte[] { 0x10, 0x20, 0x30 },
+                modelBytes,
                 "ready-h6-writer-slice1.pmx",
                 System.IO.Path.Combine("Assets", "ready-h6-writer-slice1.pmx"),
-                importedMeshAsset: mesh,
-                importedRootAsset: hierarchyRoot,
+                importedMeshAsset: generatedAssets.Mesh,
+                importedMaterialAssets: generatedAssets.Materials,
+                importedRootAsset: generatedAssets.Root,
                 hierarchyReadinessValue: MmdImportReadiness.Ready,
                 rendererReadinessValue: MmdImportReadiness.Ready,
                 boneBindingReadinessValue: MmdImportReadiness.Ready,
-                parseSummary: new MmdPmxParseSummary(
-                    "ready-h6-writer",
-                    vertexCount: 3,
-                    indexCount: 3,
-                    boneCount: RequiredBoneNames.Length,
-                    morphCount: 0,
-                    materialCount: 1,
-                    diffuseTextureReferenceCount: 0,
-                    sphereTextureReferenceCount: 0,
-                    toonTextureReferenceCount: 0,
-                    transparentMaterialCount: 0,
-                    edgeMaterialCount: 0,
-                    ikCount: 0,
-                    rigidbodyCount: 0,
-                    jointCount: 0,
-                    boundsMin: new Vector3(-0.5f, 0f, -0.5f),
-                    boundsMax: new Vector3(0.5f, 1f, 0.5f),
-                    materialSummaries: Array.Empty<MmdPmxMaterialSummary>()));
+                parseSummary: MmdPmxParseSummary.FromModel(model));
 
             ownedObjects.Add(pmxAsset);
-            ownedObjects.Add(hierarchyRoot);
-            ownedObjects.Add(mesh);
-        }
-
-        private static Vector3 GetHumanoidFixtureBonePosition(string boneName)
-        {
-            return boneName switch
-            {
-                "下半身" => new Vector3(0.0f, 1.0f, 0.0f),
-                "上半身" => new Vector3(0.0f, 1.25f, 0.0f),
-                "首" => new Vector3(0.0f, 1.65f, 0.0f),
-                "頭" => new Vector3(0.0f, 1.85f, 0.0f),
-                "左足" => new Vector3(-0.18f, 0.9f, 0.0f),
-                "左ひざ" => new Vector3(-0.18f, 0.5f, 0.0f),
-                "左足首" => new Vector3(-0.18f, 0.1f, 0.0f),
-                "右足" => new Vector3(0.18f, 0.9f, 0.0f),
-                "右ひざ" => new Vector3(0.18f, 0.5f, 0.0f),
-                "右足首" => new Vector3(0.18f, 0.1f, 0.0f),
-                "左腕" => new Vector3(-0.35f, 1.5f, 0.0f),
-                "左ひじ" => new Vector3(-0.65f, 1.5f, 0.0f),
-                "左手首" => new Vector3(-0.9f, 1.5f, 0.0f),
-                "右腕" => new Vector3(0.35f, 1.5f, 0.0f),
-                "右ひじ" => new Vector3(0.65f, 1.5f, 0.0f),
-                "右手首" => new Vector3(0.9f, 1.5f, 0.0f),
-                _ => Vector3.zero,
-            };
+            ownedObjects.Add(generatedAssets.Root);
         }
 
         private static void ConfigureImportedHumanoidState(
