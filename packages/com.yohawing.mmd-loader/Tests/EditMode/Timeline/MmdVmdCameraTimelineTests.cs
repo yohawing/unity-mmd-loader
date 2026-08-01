@@ -389,6 +389,39 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void EvaluateAtLocalTimeAppliesNativeSelfShadowFromMotionBytes()
+        {
+            var bindingGo = new GameObject("binding");
+            MmdVmdCameraBehaviour behaviour = new MmdVmdCameraBehaviour
+            {
+                CameraKeyframes = Array.Empty<MmdCameraKeyframeDefinition>(),
+                LightKeyframes = Array.Empty<MmdLightKeyframeDefinition>(),
+                SelfShadowKeyframes = Array.Empty<MmdSelfShadowKeyframeDefinition>(),
+                MotionBytes = MmdTestFixtures.BuildSceneTrackVmdBytes("native_self_shadow"),
+                FrameRate = 30f
+            };
+
+            try
+            {
+                MmdSceneEnvironmentBinding binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
+
+                // The fixture has self-shadow records at frames 10 and 30. Frame 20 exercises
+                // native step-mode selection and linear distance interpolation without managed keys.
+                MmdSceneCameraApplyStatus status = behaviour.EvaluateAtLocalTime(binding, 20.0 / 30.0);
+
+                Assert.That(status, Is.EqualTo(MmdSceneCameraApplyStatus.NotApplied));
+                Assert.That(binding.LastSelfShadowApplyStatus, Is.EqualTo(MmdSceneSelfShadowApplyStatus.Recorded));
+                Assert.That(binding.LastSelfShadowState.Mode, Is.EqualTo(1));
+                Assert.That(binding.LastSelfShadowState.Distance, Is.EqualTo(0.3f).Within(0.001f));
+            }
+            finally
+            {
+                behaviour.OnPlayableDestroy(Playable.Null);
+                UnityEngine.Object.DestroyImmediate(bindingGo);
+            }
+        }
+
+        [Test]
         public void EvaluateAtLocalTimeKeepsEnabledDefaultSelfShadowWithoutSelfShadowKeyframes()
         {
             var bindingGo = new GameObject("binding");

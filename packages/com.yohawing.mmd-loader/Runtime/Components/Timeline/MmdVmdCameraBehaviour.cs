@@ -52,6 +52,10 @@ namespace Mmd.Timeline
         private NativeVmdLightTrackSampler? nativeLightSampler;
         private byte[]? nativeLightSamplerSource;
         private bool nativeLightSamplerUnavailable;
+        private NativeVmdSelfShadowTrackSampler? nativeSelfShadowSampler;
+        private byte[]? nativeSelfShadowSamplerSource;
+        private bool nativeSelfShadowSamplerUnavailable;
+        private bool managedSelfShadowFallbackLoaded;
 
         public override void ProcessFrame(Playable playable, FrameData info, object playerData)
         {
@@ -73,6 +77,7 @@ namespace Mmd.Timeline
         {
             DisposeNativeCameraSampler();
             DisposeNativeLightSampler();
+            DisposeNativeSelfShadowSampler();
         }
 
         /// <summary>
@@ -116,7 +121,15 @@ namespace Mmd.Timeline
                 target.ApplyLightState(lightState);
             }
 
-            target.TryEvaluateSelfShadowAtFrame(SelfShadowKeyframes, frame, out _);
+            if (TrySampleNativeSelfShadow(frame, out MmdSelfShadowState selfShadowState))
+            {
+                target.ApplySelfShadowState(selfShadowState);
+            }
+            else
+            {
+                EnsureManagedSelfShadowFallback();
+                target.TryEvaluateSelfShadowAtFrame(SelfShadowKeyframes, frame, out _);
+            }
 
             return LastApplyStatus;
         }
@@ -201,6 +214,65 @@ namespace Mmd.Timeline
             return nativeLightSampler != null && nativeLightSampler.TrySample(frame, out state);
         }
 
+        private bool TrySampleNativeSelfShadow(float frame, out MmdSelfShadowState state)
+        {
+            state = MmdSelfShadowState.Default;
+            byte[]? motionBytes = MotionBytes;
+            if (motionBytes == null || motionBytes.Length == 0)
+            {
+                return false;
+            }
+
+            if (!ReferenceEquals(nativeSelfShadowSamplerSource, motionBytes))
+            {
+                DisposeNativeSelfShadowSampler();
+                nativeSelfShadowSamplerSource = motionBytes;
+                nativeSelfShadowSamplerUnavailable = false;
+                if (!NativeVmdSelfShadowTrackSampler.TryCreate(motionBytes, out nativeSelfShadowSampler))
+                {
+                    nativeSelfShadowSamplerUnavailable = true;
+                    return false;
+                }
+            }
+
+            if (nativeSelfShadowSamplerUnavailable)
+            {
+                return false;
+            }
+
+            return nativeSelfShadowSampler != null && nativeSelfShadowSampler.TrySample(frame, out state);
+        }
+
+        private void EnsureManagedSelfShadowFallback()
+        {
+            if (managedSelfShadowFallbackLoaded || !nativeSelfShadowSamplerUnavailable)
+            {
+                return;
+            }
+
+            managedSelfShadowFallbackLoaded = true;
+            if (SelfShadowKeyframes != null && SelfShadowKeyframes.Count > 0)
+            {
+                return;
+            }
+
+            byte[]? motionBytes = MotionBytes;
+            if (motionBytes == null || motionBytes.Length == 0)
+            {
+                return;
+            }
+
+            try
+            {
+                MmdMotionDefinition motion = new NativeMmdParser().LoadMotion(motionBytes);
+                SelfShadowKeyframes = motion.selfShadowKeyframes ?? new List<MmdSelfShadowKeyframeDefinition>();
+            }
+            catch (Exception)
+            {
+                SelfShadowKeyframes = Array.Empty<MmdSelfShadowKeyframeDefinition>();
+            }
+        }
+
         private void DisposeNativeCameraSampler()
         {
             nativeCameraSampler?.Dispose();
@@ -215,6 +287,15 @@ namespace Mmd.Timeline
             nativeLightSampler = null;
             nativeLightSamplerSource = null;
             nativeLightSamplerUnavailable = false;
+        }
+
+        private void DisposeNativeSelfShadowSampler()
+        {
+            nativeSelfShadowSampler?.Dispose();
+            nativeSelfShadowSampler = null;
+            nativeSelfShadowSamplerSource = null;
+            nativeSelfShadowSamplerUnavailable = false;
+            managedSelfShadowFallbackLoaded = false;
         }
     }
 }
