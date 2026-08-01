@@ -396,6 +396,43 @@ namespace Mmd.Tests
             return stream.ToArray();
         }
 
+        internal static byte[] CreateDenseVmdBytes(
+            string modelName,
+            string boneName,
+            int boneKeyframeCount,
+            int frameSpan)
+        {
+            Assert.That(boneKeyframeCount, Is.GreaterThan(0));
+            Assert.That(frameSpan, Is.GreaterThan(0));
+
+            using var stream = new MemoryStream(checked(54 + boneKeyframeCount * 111 + 16));
+            using var writer = new BinaryWriter(stream);
+            WriteFixedSjis(writer, "Vocaloid Motion Data 0002", 30);
+            WriteFixedSjis(writer, modelName ?? string.Empty, 20);
+            writer.Write((uint)boneKeyframeCount);
+            byte[] interpolation = LinearVmdInterpolationBytes();
+            for (int i = 0; i < boneKeyframeCount; i++)
+            {
+                WriteFixedSjis(writer, boneName ?? string.Empty, 15);
+                writer.Write((uint)(i % frameSpan));
+                writer.Write((float)(i % 97) * 0.001f);
+                writer.Write((float)(i % 53) * -0.001f);
+                writer.Write((float)(i % 31) * 0.002f);
+                writer.Write(0.0f);
+                writer.Write(0.0f);
+                writer.Write(0.0f);
+                writer.Write(1.0f);
+                writer.Write(interpolation);
+            }
+
+            writer.Write(0u); // morph count
+            writer.Write(0u); // camera count
+            writer.Write(0u); // light count
+            writer.Write(0u); // self-shadow count
+            writer.Write(0u); // show/IK count
+            return stream.ToArray();
+        }
+
         private static void WriteFixedSjis(BinaryWriter writer, string value, int byteCount)
         {
             byte[] buffer = new byte[byteCount];
