@@ -201,6 +201,38 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void SourceBackedUnavailableNativeSelfShadowIsDiagnosticOnly()
+        {
+            var bindingGo = new GameObject("binding");
+            try
+            {
+                MmdSceneEnvironmentBinding binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
+                MmdSceneSelfShadowApplyStatus statusBefore = binding.LastSelfShadowApplyStatus;
+                MmdSelfShadowState stateBefore = binding.LastSelfShadowState;
+
+                var behaviour = new MmdVmdCameraBehaviour
+                {
+                    MotionBytes = new byte[] { 0, 1, 2, 3 },
+                    SelfShadowKeyframes = SelfShadowKeyframes(),
+                    FrameRate = 30f
+                };
+
+                behaviour.EvaluateAtLocalTime(binding, 0.5);
+
+                Assert.That(
+                    behaviour.NativeSelfShadowTrackDiagnostic,
+                    Does.StartWith("VMD native self-shadow track unavailable: "));
+                Assert.That(binding.LastSelfShadowApplyStatus, Is.EqualTo(statusBefore));
+                Assert.That(binding.LastSelfShadowState.Mode, Is.EqualTo(stateBefore.Mode));
+                Assert.That(binding.LastSelfShadowState.Distance, Is.EqualTo(stateBefore.Distance).Within(0.001f));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(bindingGo);
+            }
+        }
+
+        [Test]
         public void EvaluateAtLocalTimeAppliesLightToBoundProxy()
         {
             var bindingGo = new GameObject("binding");

@@ -78,7 +78,6 @@ namespace Mmd.Timeline
         private byte[]? nativeSelfShadowSamplerSource;
         private bool nativeSelfShadowSamplerUnavailable;
         private bool nativeSelfShadowTrackAbsent;
-        private bool managedSelfShadowFallbackLoaded;
 
         public override void ProcessFrame(Playable playable, FrameData info, object playerData)
         {
@@ -148,9 +147,8 @@ namespace Mmd.Timeline
             {
                 target.ApplySelfShadowState(selfShadowState);
             }
-            else
+            else if (MotionBytes == null || MotionBytes.Length == 0)
             {
-                EnsureManagedSelfShadowFallback();
                 target.TryEvaluateSelfShadowAtFrame(SelfShadowKeyframes, frame, out _);
             }
 
@@ -335,38 +333,6 @@ namespace Mmd.Timeline
                 string.Equals(failureReason, "native track creation returned null", StringComparison.Ordinal);
         }
 
-        private void EnsureManagedSelfShadowFallback()
-        {
-            if (managedSelfShadowFallbackLoaded ||
-                !nativeSelfShadowSamplerUnavailable ||
-                nativeSelfShadowTrackAbsent)
-            {
-                return;
-            }
-
-            managedSelfShadowFallbackLoaded = true;
-            if (SelfShadowKeyframes != null && SelfShadowKeyframes.Count > 0)
-            {
-                return;
-            }
-
-            byte[]? motionBytes = MotionBytes;
-            if (motionBytes == null || motionBytes.Length == 0)
-            {
-                return;
-            }
-
-            try
-            {
-                MmdMotionDefinition motion = new NativeMmdParser().LoadMotion(motionBytes);
-                SelfShadowKeyframes = motion.selfShadowKeyframes ?? new List<MmdSelfShadowKeyframeDefinition>();
-            }
-            catch (Exception)
-            {
-                SelfShadowKeyframes = Array.Empty<MmdSelfShadowKeyframeDefinition>();
-            }
-        }
-
         private void DisposeNativeCameraSampler()
         {
             nativeCameraSampler?.Dispose();
@@ -392,7 +358,6 @@ namespace Mmd.Timeline
             nativeSelfShadowSamplerSource = null;
             nativeSelfShadowSamplerUnavailable = false;
             nativeSelfShadowTrackAbsent = false;
-            managedSelfShadowFallbackLoaded = false;
             NativeSelfShadowTrackDiagnostic = string.Empty;
         }
     }
