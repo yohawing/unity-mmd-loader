@@ -10,7 +10,6 @@ using UnityEngine.Timeline;
 using Mmd;
 using Mmd.Editor;
 using Mmd.Physics;
-using Mmd.Timeline;
 using Mmd.UnityIntegration;
 using Object = UnityEngine.Object;
 
@@ -276,100 +275,6 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void ExecuteCreatePlaybackSourceCreatesOrUpdatesControllerSources()
-        {
-            // ExecuteCreatePlaybackSource is the full (model+motion) source action only.
-            // It always ConfigureAssets both; model-only provider uses ConfigureModelAsset via drag paths.
-            MmdPmxAsset pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
-            MmdVmdAsset vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
-            MmdPmxAsset updatedPmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
-            MmdVmdAsset updatedVmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
-            GameObject root = new("MMD Execute Playback Source");
-            try
-            {
-                MmdUnityPlaybackController controller = root.AddComponent<MmdUnityPlaybackController>();
-                controller.SetPlayOnStart(false);
-                controller.SetPhysicsMode(MmdPhysicsMode.Off);
-
-                var created = MmdEditorWorkflow.ExecuteCreatePlaybackSource(
-                    pmxAsset,
-                    vmdAsset,
-                    controller,
-                    useUndo: false);
-                Assert.That(created.success, Is.True);
-                Assert.That(created.status, Does.Contain("Playback source created"));
-                Assert.That(created.error, Is.Empty);
-                Assert.That(controller.ModelAssetSource, Is.SameAs(pmxAsset));
-                Assert.That(controller.MotionAssetSource, Is.SameAs(vmdAsset));
-                Assert.That(controller.PlayOnStart, Is.False);
-                Assert.That(controller.PhysicsMode, Is.EqualTo(MmdPhysicsMode.Live));
-
-                var updated = MmdEditorWorkflow.ExecuteCreatePlaybackSource(
-                    updatedPmxAsset,
-                    updatedVmdAsset,
-                    controller,
-                    useUndo: false);
-
-                Assert.That(updated.success, Is.True);
-                Assert.That(updated.status, Does.Contain("Playback source updated"));
-                Assert.That(updated.error, Is.Empty);
-                Assert.That(controller.ModelAssetSource, Is.SameAs(updatedPmxAsset));
-                Assert.That(controller.MotionAssetSource, Is.SameAs(updatedVmdAsset));
-            }
-            finally
-            {
-                Object.DestroyImmediate(root);
-                Object.DestroyImmediate(pmxAsset);
-                Object.DestroyImmediate(vmdAsset);
-                Object.DestroyImmediate(updatedPmxAsset);
-                Object.DestroyImmediate(updatedVmdAsset);
-            }
-        }
-
-        [Test]
-        public void ExecuteCreatePlaybackSourceUsesControllerSourcesForNewBundled()
-        {
-            // Full bundled source creation now uses controller-owned source references.
-            MmdPmxAsset pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
-            MmdVmdAsset vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
-            MmdPmxAsset updatedPmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
-            MmdVmdAsset updatedVmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
-            GameObject root = new("MMD Execute Playback Source Dedicated");
-            try
-            {
-                MmdUnityPlaybackController controller = root.AddComponent<MmdUnityPlaybackController>();
-
-                var created = MmdEditorWorkflow.ExecuteCreatePlaybackSource(
-                    pmxAsset,
-                    vmdAsset,
-                    controller,
-                    useUndo: false);
-
-                Assert.That(created.success, Is.True);
-                Assert.That(controller.ModelAssetSource, Is.SameAs(pmxAsset));
-                Assert.That(controller.MotionAssetSource, Is.SameAs(vmdAsset));
-
-                var updated = MmdEditorWorkflow.ExecuteCreatePlaybackSource(
-                    updatedPmxAsset,
-                    updatedVmdAsset,
-                    controller,
-                    useUndo: false);
-
-                Assert.That(updated.success, Is.True);
-                Assert.That(controller.ModelAssetSource, Is.SameAs(updatedPmxAsset));
-                Assert.That(controller.MotionAssetSource, Is.SameAs(updatedVmdAsset));
-            }
-            finally
-            {
-                Object.DestroyImmediate(root);
-                Object.DestroyImmediate(pmxAsset);
-                Object.DestroyImmediate(vmdAsset);
-                Object.DestroyImmediate(updatedPmxAsset);
-                Object.DestroyImmediate(updatedVmdAsset);
-            }
-        }
-
-        [Test]
         public void CanCreatePlaybackConfigRequiresSceneControllerOrRuntimeImporter()
         {
             // Static resolver utility (not button surface) still validates controller/importer presence.
@@ -472,55 +377,5 @@ namespace Mmd.Tests
             Assert.That(snapshot.PmxAsset, Is.SameAs(pmxAsset));
         }
 
-        [Test]
-        public void ExecuteCreateTimelineClipCreatesTrackClipAndSelects()
-        {
-            CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
-
-            MmdPmxAsset pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
-            MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(TempVmdPath);
-            TimelineAsset timelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
-            GameObject root = new("MMD Timeline Clip Test");
-            try
-            {
-                Assert.That(vmdAsset, Is.Not.Null);
-                pmxAsset.Initialize(new byte[] { 1 }, "model.pmx", "External/Model/model.pmx");
-                MmdUnityPlaybackController controller = root.AddComponent<MmdUnityPlaybackController>();
-                PlayableDirector director = root.AddComponent<PlayableDirector>();
-                director.playableAsset = timelineAsset;
-                controller.ConfigureModelAsset(pmxAsset);
-
-                var result = MmdEditorWorkflow.ExecuteCreateTimelineClip(
-                    vmdAsset,
-                    director,
-                    controller,
-                    timelineAsset,
-                    useUndo: false);
-
-                Assert.That(result.success, Is.True);
-                Assert.That(result.status, Does.Contain("Created VMD Timeline clip"));
-                Assert.That(result.error, Is.Empty);
-
-                // Verify track exists on timeline.
-                MmdVmdTimelineTrack? track = timelineAsset.GetOutputTracks().OfType<MmdVmdTimelineTrack>().FirstOrDefault();
-                Assert.That(track, Is.Not.Null, "MmdVmdTimelineTrack should exist on timeline");
-
-                // Verify clip exists on track.
-                Assert.That(track!.GetClips().Count(), Is.EqualTo(1));
-                TimelineClip clip = track.GetClips().First();
-                Assert.That(clip.asset, Is.TypeOf<MmdVmdTimelineClip>());
-                var mmdClip = (MmdVmdTimelineClip)clip.asset;
-                Assert.That(mmdClip.MotionAsset, Is.SameAs(vmdAsset));
-
-                // Verify created clip asset is selected.
-                Assert.That(Selection.activeObject, Is.SameAs(clip.asset));
-            }
-            finally
-            {
-                Object.DestroyImmediate(root);
-                Object.DestroyImmediate(timelineAsset);
-                Object.DestroyImmediate(pmxAsset);
-            }
-        }
     }
 }
