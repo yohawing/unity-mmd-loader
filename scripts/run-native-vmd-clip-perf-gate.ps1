@@ -30,6 +30,43 @@ $previousGate = $env:MMD_VMD_PERF_GATE
 $env:MMD_VMD_PERF_GATE = "1"
 $exitCode = 0
 
+function ConvertTo-WindowsCommandLineArgument {
+    param([Parameter(Mandatory = $true)][string] $Value)
+
+    $builder = [System.Text.StringBuilder]::new()
+    [void]$builder.Append('"')
+    $backslashCount = 0
+    foreach ($character in $Value.ToCharArray()) {
+        if ($character -eq '\') {
+            $backslashCount++
+            continue
+        }
+
+        if ($character -eq '"') {
+            if ($backslashCount -gt 0) {
+                [void]$builder.Append((('\' * (2 * $backslashCount)) -join ''))
+                $backslashCount = 0
+            }
+            [void]$builder.Append('\')
+            [void]$builder.Append('"')
+            continue
+        }
+
+        if ($backslashCount -gt 0) {
+            [void]$builder.Append((('\' * $backslashCount) -join ''))
+            $backslashCount = 0
+        }
+        [void]$builder.Append($character)
+    }
+
+    if ($backslashCount -gt 0) {
+        [void]$builder.Append((('\' * (2 * $backslashCount)) -join ''))
+    }
+
+    [void]$builder.Append('"')
+    return $builder.ToString()
+}
+
 try {
     $arguments = @(
         "-batchmode",
@@ -44,10 +81,9 @@ try {
     $startInfo.FileName = $Unity
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
-    foreach ($argument in $arguments) {
-        [void]$startInfo.ArgumentList.Add([string]$argument)
-    }
-
+    $startInfo.Arguments = ($arguments | ForEach-Object {
+        ConvertTo-WindowsCommandLineArgument ([string]$_)
+    }) -join ' '
     $unityProcess = [System.Diagnostics.Process]::new()
     $unityProcess.StartInfo = $startInfo
     [void]$unityProcess.Start()
