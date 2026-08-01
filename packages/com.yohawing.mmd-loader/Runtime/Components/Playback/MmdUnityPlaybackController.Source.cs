@@ -125,22 +125,20 @@ namespace Mmd.UnityIntegration
             }
 
             MmdUnityModelFactory.ValidateExistingSkinnedModelCompatibility(gameObject, model);
-            ReleaseCurrentBindingBeforeSceneRebind();
-            MmdUnityPlaybackBinding runtimeImporterBinding =
-                MmdUnityPlaybackBinding.CreateSkinnedFromExistingSceneModel(
+            TryConfigureNativeFirst(
+                motion,
+                pmxBytes,
+                vmdBytes,
+                nativeMotion => MmdUnityPlaybackBinding.CreateSkinnedFromExistingSceneModel(
                     gameObject,
                     model,
-                    motion,
+                    nativeMotion,
                     resolvedPmxPath,
                     resolvedVmdPath,
-                    resolvedPmxPath);
-
-            Configure(runtimeImporterBinding, config);
-            TryEnableFastRuntimeFromBytesForDefaultPlayback(pmxBytes, vmdBytes);
-            if (requireNativeClip)
-            {
-                ThrowIfTimelineNativeClipUnavailable();
-            }
+                    resolvedPmxPath),
+                () => CreateManagedFallbackMotion(parser.LoadMotion(vmdBytes), motion.maxFrame),
+                candidate => Configure(candidate, config),
+                requireNativeClip);
         }
 
         public void ConfigureMotionFromProviderModelSource(MmdVmdAsset vmdAsset, MmdPlaybackConfig config)
@@ -199,9 +197,10 @@ namespace Mmd.UnityIntegration
             }
 
             ConfigureMotionAsset(vmdAsset);
-            MmdMotionDefinition motion = requireNativeClip
-                ? vmdAsset.CreateNativeClipMotionHeader()
-                : vmdAsset.LoadMotion();
+            // Imported VMD playback stages source-backed native evaluation first. Normal playback
+            // restores the managed DTO path only when native setup is unavailable; Timeline is
+            // fail-closed in that case.
+            MmdMotionDefinition motion = vmdAsset.CreateNativeClipMotionHeader();
             MmdMotionValidator.ThrowIfInvalid(motion);
 
             // Model source from controller asset source or RuntimeImporterComponent raw path.
@@ -252,24 +251,21 @@ namespace Mmd.UnityIntegration
             }
 
             MmdUnityModelFactory.ValidateExistingSkinnedModelCompatibility(gameObject, model);
-            ReleaseCurrentBindingBeforeSceneRebind();
-            MmdUnityPlaybackBinding pathBinding =
-                MmdUnityPlaybackBinding.CreateSkinnedFromExistingSceneModel(
+            byte[] pathPmxBytes = File.ReadAllBytes(resolvedPmxPath);
+            TryConfigureNativeFirst(
+                motion,
+                pathPmxBytes,
+                vmdAsset.GetBytesCopy(),
+                nativeMotion => MmdUnityPlaybackBinding.CreateSkinnedFromExistingSceneModel(
                     gameObject,
                     model,
-                    motion,
+                    nativeMotion,
                     resolvedPmxPath,
                     string.IsNullOrWhiteSpace(vmdAsset.SourceId) ? vmdAsset.name : vmdAsset.SourceId,
-                    resolvedPmxPath);
-
-            Configure(pathBinding, playbackFrameRate, playOnStart);
-            TryEnableFastRuntimeFromBytesForDefaultPlayback(
-                File.ReadAllBytes(resolvedPmxPath),
-                vmdAsset.GetBytesCopy());
-            if (requireNativeClip)
-            {
-                ThrowIfTimelineNativeClipUnavailable();
-            }
+                    resolvedPmxPath),
+                () => CreateManagedFallbackMotion(vmdAsset.LoadMotion(), motion.maxFrame),
+                candidate => Configure(candidate, playbackFrameRate, playOnStart),
+                requireNativeClip);
 
             ApplyFrame(startFrame);
         }
@@ -367,30 +363,6 @@ namespace Mmd.UnityIntegration
             return false;
         }
 
-        private bool TryCreateExistingSceneBinding(
-            MmdPmxAsset pmxAsset,
-            MmdVmdAsset vmdAsset,
-            MmdMotionDefinition motion,
-            out MmdUnityPlaybackBinding binding)
-        {
-            if (!HasExistingSceneSkinnedMeshRenderer())
-            {
-                binding = null!;
-                return false;
-            }
-
-            var parser = new NativeMmdParser();
-            MmdModelDefinition model = pmxAsset.LoadModel(parser);
-            MmdUnityModelFactory.ValidateExistingSkinnedModelCompatibility(gameObject, model);
-            ReleaseCurrentBindingBeforeSceneRebind();
-            binding = MmdUnityPlaybackBinding.CreateSkinnedFromExistingSceneModel(
-                gameObject,
-                pmxAsset,
-                vmdAsset,
-                motion);
-            return true;
-        }
-
         private bool HasExistingSceneSkinnedMeshRenderer()
         {
             return GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true) != null;
@@ -419,17 +391,30 @@ namespace Mmd.UnityIntegration
             bool requireNativeClip,
             int? applyStartFrame)
         {
-            if (!TryCreateExistingSceneBinding(pmxAsset, vmdAsset, motion, out MmdUnityPlaybackBinding reboundBinding))
+            if (!HasExistingSceneSkinnedMeshRenderer())
             {
                 return false;
             }
 
-            configure(reboundBinding);
-            TryEnableFastRuntimeFromAssetBytesForDefaultPlayback(pmxAsset, vmdAsset);
-            if (requireNativeClip)
-            {
-                ThrowIfTimelineNativeClipUnavailable();
-            }
+            var parser = new NativeMmdParser();
+            MmdModelDefinition model = pmxAsset.LoadModel(parser);
+            MmdModelValidator.ThrowIfInvalid(model);
+            MmdUnityModelFactory.ValidateExistingSkinnedModelCompatibility(gameObject, model);
+            byte[] pmxBytes = pmxAsset.GetBytesCopy();
+            byte[] vmdBytes = vmdAsset.GetBytesCopy();
+            TryConfigureNativeFirst(
+                motion,
+                pmxBytes,
+                vmdBytes,
+                nativeMotion => MmdUnityPlaybackBinding.CreateSkinnedFromExistingSceneModel(
+                    gameObject,
+                    pmxAsset,
+                    model,
+                    vmdAsset,
+                    nativeMotion),
+                () => CreateManagedFallbackMotion(vmdAsset.LoadMotion(), motion.maxFrame),
+                configure,
+                requireNativeClip);
 
             if (applyStartFrame.HasValue)
             {
@@ -439,23 +424,109 @@ namespace Mmd.UnityIntegration
             return true;
         }
 
-        private void ThrowIfTimelineNativeClipUnavailable()
+        private void TryConfigureNativeFirst(
+            MmdMotionDefinition nativeMotion,
+            byte[] pmxBytes,
+            byte[] vmdBytes,
+            Func<MmdMotionDefinition, MmdUnityPlaybackBinding> createBinding,
+            Func<MmdMotionDefinition> loadManagedMotion,
+            Action<MmdUnityPlaybackBinding> configure,
+            bool requireNativeClip)
         {
-            if (IsFastRuntimeEnabled)
+            bool nativeAvailable = TryCheckNativeRuntimeAvailability(
+                pmxBytes,
+                vmdBytes,
+                out string nativeRuntimeFailure);
+            if (nativeAvailable)
+            {
+                ReleaseCurrentBindingBeforeSceneRebind();
+                MmdUnityPlaybackBinding? nativeBinding = null;
+                try
+                {
+                    nativeBinding = createBinding(nativeMotion);
+                    if (TryEnableNativeRuntime(
+                            nativeBinding,
+                            pmxBytes,
+                            vmdBytes,
+                            out nativeRuntimeFailure))
+                    {
+                        lastFastRuntimeReason = string.Empty;
+                        configure(nativeBinding);
+                        nativeBinding = null;
+                        return;
+                    }
+                }
+                finally
+                {
+                    if (nativeBinding != null)
+                    {
+                        ClearFailedBindingReference(nativeBinding);
+                    }
+                    nativeBinding?.Dispose();
+                }
+            }
+
+            lastFastRuntimeReason = nativeRuntimeFailure;
+            if (requireNativeClip)
+            {
+                ReleaseCurrentBindingBeforeSceneRebind();
+                throw CreateTimelineNativeClipUnavailableException(nativeRuntimeFailure);
+            }
+
+            Debug.LogWarning(
+                "MMD fast runtime unavailable; managed playback remains active: " + nativeRuntimeFailure,
+                this);
+            MmdMotionDefinition fallbackMotion = loadManagedMotion();
+            MmdMotionValidator.ThrowIfInvalid(fallbackMotion);
+            ReleaseCurrentBindingBeforeSceneRebind();
+            MmdUnityPlaybackBinding? fallbackBinding = null;
+            try
+            {
+                fallbackBinding = createBinding(fallbackMotion);
+                configure(fallbackBinding);
+                fallbackBinding = null;
+            }
+            finally
+            {
+                if (fallbackBinding != null)
+                {
+                    ClearFailedBindingReference(fallbackBinding);
+                }
+                fallbackBinding?.Dispose();
+            }
+        }
+
+        private void ClearFailedBindingReference(MmdUnityPlaybackBinding failedBinding)
+        {
+            if (!ReferenceEquals(binding, failedBinding))
             {
                 return;
             }
 
-            string reason = string.IsNullOrWhiteSpace(lastFastRuntimeReason)
-                ? "unknown fast runtime failure"
-                : lastFastRuntimeReason;
-            binding?.Dispose();
             binding = null;
             LastSnapshot = null;
             IsPlaying = false;
-            throw new InvalidOperationException(
+            ResetLivePhysicsDriveSource();
+        }
+
+        private static InvalidOperationException CreateTimelineNativeClipUnavailableException(string reason)
+        {
+            return new InvalidOperationException(
                 "Timeline evaluation requires mmd-anim native clip playback for VMD asset evaluation. " +
                 "Fast runtime unavailable: " + reason);
+        }
+
+        private static MmdMotionDefinition CreateManagedFallbackMotion(
+            MmdMotionDefinition managedMotion,
+            int importedMaxFrame)
+        {
+            if (managedMotion == null)
+            {
+                throw new InvalidOperationException("Managed VMD fallback returned no motion.");
+            }
+
+            managedMotion.maxFrame = importedMaxFrame;
+            return managedMotion;
         }
 
         private static InvalidOperationException CreateMissingSceneModelException(

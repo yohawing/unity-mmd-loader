@@ -19,7 +19,11 @@ namespace Mmd.UnityIntegration
         /// Returns false with a diagnostic message in <paramref name="reason"/> when the native library is absent,
         /// ABI-incompatible, or the bone/morph counts do not match the managed model.
         /// </summary>
-        public bool TryEnableFastRuntime(byte[] pmxBytes, byte[] vmdBytes, out string reason)
+        public bool TryEnableFastRuntime(
+            byte[] pmxBytes,
+            byte[] vmdBytes,
+            out string reason,
+            bool abiAlreadyValidated = false)
         {
             if (pmxBytes == null || pmxBytes.Length == 0)
             {
@@ -37,7 +41,10 @@ namespace Mmd.UnityIntegration
             reason = string.Empty;
             try
             {
-                MmdRuntimeFfiPlaybackSession created = MmdRuntimeFfiPlaybackSession.Create(pmxBytes, vmdBytes);
+                MmdRuntimeFfiPlaybackSession created = MmdRuntimeFfiPlaybackSession.Create(
+                    pmxBytes,
+                    vmdBytes,
+                    abiAlreadyValidated);
                 candidate = created;
                 int candidateBoneCount = created.BoneCount;
                 int candidateMorphCount = created.MorphCount;

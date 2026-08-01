@@ -503,7 +503,10 @@ namespace Mmd.Native
         public int MorphWeightCount { get; }
         public int IkEnabledCount { get; }
 
-        public static MmdRuntimeFfiPlaybackSession Create(byte[] pmxBytes, byte[] vmdBytes)
+        public static MmdRuntimeFfiPlaybackSession Create(
+            byte[] pmxBytes,
+            byte[] vmdBytes,
+            bool abiAlreadyValidated = false)
         {
             if (pmxBytes == null || pmxBytes.Length == 0)
             {
@@ -520,7 +523,10 @@ namespace Mmd.Native
             IntPtr instance = IntPtr.Zero;
             try
             {
-                MmdRuntimeFfiMethods.ValidateAbiVersion();
+                if (!abiAlreadyValidated)
+                {
+                    MmdRuntimeFfiMethods.ValidateAbiVersion();
+                }
                 model = MmdRuntimeFfiMethods.ModelCreateFromPmxBytes(pmxBytes, new IntPtr(pmxBytes.Length));
                 if (model == IntPtr.Zero)
                 {
