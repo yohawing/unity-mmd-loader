@@ -124,7 +124,7 @@ namespace Mmd.UnityIntegration
             var parser = new NativeMmdParser();
             MmdModelDefinition model = modelAsset.LoadModel(parser);
             MmdModelValidator.ThrowIfInvalid(model);
-            MmdMotionDefinition motion = motionAsset.LoadMotion(parser);
+            MmdMotionDefinition motion = motionAsset.CreateNativeClipMotionHeader();
             MmdMotionValidator.ThrowIfInvalid(motion);
             float importScale = modelAsset.ImportScale;
             return CreateSkinned(
@@ -147,8 +147,7 @@ namespace Mmd.UnityIntegration
                 throw new ArgumentNullException(nameof(motionAsset));
             }
 
-            var parser = new NativeMmdParser();
-            MmdMotionDefinition motion = motionAsset.LoadMotion(parser);
+            MmdMotionDefinition motion = motionAsset.CreateNativeClipMotionHeader();
             MmdMotionValidator.ThrowIfInvalid(motion);
             return CreateSkinned(instance, modelAsset, motionAsset, motion);
         }

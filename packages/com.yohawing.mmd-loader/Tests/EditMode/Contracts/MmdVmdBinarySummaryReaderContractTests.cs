@@ -172,6 +172,34 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void RejectsEmptyBoneName()
+        {
+            byte[] bytes = CreateVmd(morphCount: 0, includeOptionalTail: false);
+            Array.Clear(bytes, BoneRecordOffset, 15);
+
+            AssertInvalid(bytes, "bone", "0");
+        }
+
+        [Test]
+        public void RejectsEmptyMorphName()
+        {
+            byte[] bytes = CreateVmd(boneCount: 0, includeOptionalTail: false);
+            Array.Clear(bytes, HeaderSize + sizeof(uint) + sizeof(uint), 15);
+
+            AssertInvalid(bytes, "morph", "0");
+        }
+
+        [Test]
+        public void RejectsEmptyPropertyIkName()
+        {
+            byte[] bytes = CreateVmd(boneCount: 0, morphCount: 0, includeOptionalTail: true);
+            Array.Clear(bytes, 83, 20);
+
+            InvalidDataException exception = AssertInvalid(bytes, "property IK", "0[0]");
+            Assert.That(exception.Message, Does.Contain("boneName"));
+        }
+
+        [Test]
         public void RejectsNonFiniteCameraValue()
         {
             byte[] bytes = CreateVmd(morphCount: 0, includeOptionalTail: false);

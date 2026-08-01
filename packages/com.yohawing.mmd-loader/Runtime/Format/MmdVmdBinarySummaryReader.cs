@@ -41,6 +41,7 @@ namespace Mmd
             int maxFrame = 0;
             for (int i = 0; i < boneCount; i++)
             {
+                reader.ValidateNonEmptyFixedStringAtCurrent(0, 15, "bone", i, "name");
                 maxFrame = Math.Max(maxFrame, reader.ReadFrameAtCurrent(15, "bone", i, "frame"));
                 reader.ValidateFiniteSingleAtCurrent(19, "bone", i, "translation.x");
                 reader.ValidateFiniteSingleAtCurrent(23, "bone", i, "translation.y");
@@ -59,6 +60,7 @@ namespace Mmd
             int morphCount = reader.ReadOptionalCount("morph");
             for (int i = 0; i < morphCount; i++)
             {
+                reader.ValidateNonEmptyFixedStringAtCurrent(0, 15, "morph", i, "name");
                 maxFrame = Math.Max(maxFrame, reader.ReadFrameAtCurrent(15, "morph", i, "frame"));
                 reader.ValidateFiniteSingleAtCurrent(19, "morph", i, "weight");
                 reader.Skip(MorphRecordSize, "morph", i, "record");
@@ -160,6 +162,16 @@ namespace Mmd
                 }
 
                 constraintStateCount += ikCount;
+                reader.RequireRecords(ikCount, 21, "property IK", i, "records");
+                for (int stateIndex = 0; stateIndex < ikCount; stateIndex++)
+                {
+                    reader.ValidateNonEmptyFixedStringAtCurrent(
+                        checked(stateIndex * 21),
+                        20,
+                        "property IK",
+                        i + "[" + stateIndex + "]",
+                        "boneName");
+                }
                 reader.SkipRecords(ikCount, 21, "property IK", i, "records");
             }
 
@@ -348,6 +360,36 @@ namespace Mmd
                 }
             }
 
+            public void ValidateNonEmptyFixedStringAtCurrent(
+                int relativeOffset,
+                int byteCount,
+                string section,
+                int index,
+                string field)
+            {
+                ValidateNonEmptyFixedStringAtCurrent(
+                    relativeOffset,
+                    byteCount,
+                    section,
+                    index.ToString(CultureInfo.InvariantCulture),
+                    field);
+            }
+
+            public void ValidateNonEmptyFixedStringAtCurrent(
+                int relativeOffset,
+                int byteCount,
+                string section,
+                string index,
+                string field)
+            {
+                RequireAt(relativeOffset, byteCount, section, index, field);
+                string value = DecodeFixedString(data, checked(offset + relativeOffset), byteCount);
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    throw Invalid(section, index, checked(offset + relativeOffset), field + " is required");
+                }
+            }
+
             public void RequireAt(int relativeOffset, int count, string section, int index, string field)
             {
                 RequireAt(
@@ -385,6 +427,12 @@ namespace Mmd
 
             public void SkipRecords(int count, int recordSize, string section, int index, string field)
             {
+                RequireRecords(count, recordSize, section, index, field);
+                offset += checked(count * recordSize);
+            }
+
+            public void RequireRecords(int count, int recordSize, string section, int index, string field)
+            {
                 long bytes = (long)count * recordSize;
                 if (count < 0 || recordSize < 0 || bytes > int.MaxValue)
                 {
@@ -396,7 +444,6 @@ namespace Mmd
                 }
 
                 Require((int)bytes, section, index.ToString(CultureInfo.InvariantCulture), field);
-                offset += (int)bytes;
             }
 
             private uint ReadUInt32(string section, string index, string field)

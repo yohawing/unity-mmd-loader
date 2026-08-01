@@ -50,7 +50,7 @@ namespace Mmd.UnityIntegration
             config.Validate();
             ConfigureModelAsset(pmxAsset);
             ConfigureMotionAsset(vmdAsset);
-            MmdMotionDefinition motion = vmdAsset.LoadMotion();
+            MmdMotionDefinition motion = vmdAsset.CreateNativeClipMotionHeader();
             MmdMotionValidator.ThrowIfInvalid(motion);
             if (TryConfigureReboundAssetBinding(
                 pmxAsset,
@@ -116,7 +116,8 @@ namespace Mmd.UnityIntegration
             var parser = new NativeMmdParser();
             MmdModelDefinition model = parser.LoadModel(pmxBytes);
             MmdModelValidator.ThrowIfInvalid(model);
-            MmdMotionDefinition motion = parser.LoadMotion(vmdBytes);
+            MmdVmdParseSummary summary = MmdVmdBinarySummaryReader.Read(vmdBytes);
+            MmdMotionDefinition motion = MmdVmdAsset.CreateNativeClipMotionHeader(vmdBytes, summary);
             MmdMotionValidator.ThrowIfInvalid(motion);
             if (!HasExistingSceneSkinnedMeshRenderer())
             {
@@ -300,8 +301,7 @@ namespace Mmd.UnityIntegration
 
             ConfigureModelAsset(pmxAsset);
             ConfigureMotionAsset(vmdAsset);
-            var parser = new NativeMmdParser();
-            MmdMotionDefinition motion = vmdAsset.LoadMotion(parser);
+            MmdMotionDefinition motion = vmdAsset.CreateNativeClipMotionHeader();
             MmdMotionValidator.ThrowIfInvalid(motion);
 
             if (TryConfigureReboundAssetBinding(

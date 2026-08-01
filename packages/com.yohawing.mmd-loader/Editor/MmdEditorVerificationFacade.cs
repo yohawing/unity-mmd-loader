@@ -196,7 +196,7 @@ namespace Mmd.Editor
             var parser = new NativeMmdParser();
             MmdModelDefinition model = RunStage(PmxParseStage, () => pmxAsset.LoadModel(parser));
             RunStage(PmxValidationStage, () => MmdModelValidator.ThrowIfInvalid(model));
-            MmdMotionDefinition motion = RunStage(VmdParseStage, () => vmdAsset.LoadMotion(parser));
+            MmdMotionDefinition motion = RunStage(VmdParseStage, vmdAsset.CreateNativeClipMotionHeader);
             RunStage(VmdValidationStage, () => MmdMotionValidator.ThrowIfInvalid(motion));
 
             MmdUnityPlaybackBinding? binding = null;

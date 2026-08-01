@@ -4,7 +4,6 @@ using System;
 using System.IO;
 using UnityEditor.AssetImporters;
 using Mmd;
-using Mmd.Parser;
 
 namespace Mmd.Editor
 {
@@ -21,22 +20,7 @@ namespace Mmd.Editor
 
             try
             {
-                var parser = new NativeMmdParser();
-                MmdMotionDefinition motion = parser.LoadMotion(bytes);
-                diagnostics = MmdMotionValidator.ValidateStructuralMotion(motion);
-
-                int constraintStateCount = ComputeConstraintStateCount(motion);
-
-                summary = new MmdVmdParseSummary(
-                    motion.targetModelName,
-                    motion.maxFrame,
-                    motion.boneKeyframes?.Count ?? 0,
-                    motion.morphKeyframes?.Count ?? 0,
-                    motion.modelKeyframes?.Count ?? 0,
-                    constraintStateCount,
-                    motion.cameraKeyframeCount,
-                    motion.lightKeyframeCount,
-                    motion.selfShadowKeyframeCount);
+                summary = MmdVmdBinarySummaryReader.Read(bytes);
             }
             catch (Exception ex)
             {
@@ -50,23 +34,6 @@ namespace Mmd.Editor
             asset.Initialize(bytes, ctx.assetPath, resolvedSourcePath, summary, diagnostics);
             ctx.AddObjectToAsset("VMD", asset);
             ctx.SetMainObject(asset);
-        }
-
-        private static int ComputeConstraintStateCount(MmdMotionDefinition motion)
-        {
-            int count = 0;
-            if (motion?.modelKeyframes != null)
-            {
-                for (int i = 0; i < motion.modelKeyframes.Count; i++)
-                {
-                    var mk = motion.modelKeyframes[i];
-                    if (mk?.constraintStates != null)
-                    {
-                        count += mk.constraintStates.Count;
-                    }
-                }
-            }
-            return count;
         }
     }
 }
