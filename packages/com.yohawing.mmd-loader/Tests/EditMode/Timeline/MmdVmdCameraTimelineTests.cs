@@ -741,20 +741,7 @@ namespace Mmd.Tests
 
         private static byte[] BuildCameraVmdBytes()
         {
-            using var stream = new MemoryStream();
-            using var writer = new BinaryWriter(stream);
-
-            WriteFixedAscii(writer, "Vocaloid Motion Data 0002", 30);
-            WriteFixedAscii(writer, "camera_test", 20);
-            writer.Write(0u); // bone frames
-            writer.Write(0u); // morph frames
-            writer.Write(2u); // camera frames
-            WriteCameraFrame(writer, 0u, -40f, 0f, 10f, 0f, 0f, 0f, 0f, 20u, 0);
-            WriteCameraFrame(writer, 30u, -20f, 2f, 20f, -4f, 0.1f, 0.2f, 0.1f, 40u, 0);
-            writer.Write(0u); // light frames
-            writer.Write(0u); // self-shadow frames
-            writer.Write(0u); // property frames
-            return stream.ToArray();
+            return MmdTestFixtures.BuildCameraTrackVmdBytes("camera_test");
         }
 
         private static byte[] BuildCameraAndLightVmdBytes()
