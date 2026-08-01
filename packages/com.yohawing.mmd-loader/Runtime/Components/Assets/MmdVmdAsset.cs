@@ -141,13 +141,51 @@ namespace Mmd
                 throw new InvalidOperationException("VMD asset has no imported bytes.");
             }
 
+            if (structuralDiagnostics != null && structuralDiagnostics.Length > 0)
+            {
+                throw new InvalidOperationException(structuralDiagnostics[0]);
+            }
+
+            if (importSummaryStatus == MmdVmdImportSummaryStatus.Failed)
+            {
+                throw new InvalidOperationException("VMD import summary is marked as failed.");
+            }
+
+            MmdVmdParseSummary summary = importSummaryStatus == MmdVmdImportSummaryStatus.NotParsed
+                ? MmdVmdBinarySummaryReader.Read(data)
+                : new MmdVmdParseSummary(
+                    targetModelName,
+                    maxFrame,
+                    boneKeyframeCount,
+                    morphKeyframeCount,
+                    modelKeyframeCount,
+                    constraintStateCount,
+                    cameraKeyframeCount,
+                    lightKeyframeCount,
+                    selfShadowKeyframeCount);
+            return CreateNativeClipMotionHeader(data, summary);
+        }
+
+        public static MmdMotionDefinition CreateNativeClipMotionHeader(
+            byte[] vmdBytes,
+            MmdVmdParseSummary summary)
+        {
+            if (vmdBytes == null || vmdBytes.Length == 0)
+            {
+                throw new ArgumentException("VMD bytes are required.", nameof(vmdBytes));
+            }
+
             return new MmdMotionDefinition
             {
-                targetModelName = targetModelName ?? string.Empty,
-                maxFrame = Math.Max(0, maxFrame),
+                targetModelName = summary.TargetModelName,
+                maxFrame = summary.MaxFrame,
                 boneKeyframes = new List<MmdBoneKeyframeDefinition>(),
                 morphKeyframes = new List<MmdMorphKeyframeDefinition>(),
-                modelKeyframes = new List<MmdModelKeyframeDefinition>()
+                modelKeyframes = new List<MmdModelKeyframeDefinition>(),
+                cameraKeyframeCount = summary.CameraKeyframeCount,
+                lightKeyframeCount = summary.LightKeyframeCount,
+                selfShadowKeyframeCount = summary.SelfShadowKeyframeCount,
+                sourceBytes = (byte[])vmdBytes.Clone()
             };
         }
 
