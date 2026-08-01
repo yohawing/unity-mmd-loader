@@ -18,6 +18,14 @@ namespace Mmd.Motion
 
         public static bool TryCreate(byte[]? vmdBytes, out NativeVmdLightTrackSampler? sampler)
         {
+            return TryCreate(vmdBytes, out sampler, out _);
+        }
+
+        public static bool TryCreate(
+            byte[]? vmdBytes,
+            out NativeVmdLightTrackSampler? sampler,
+            out string failureReason)
+        {
             return TryCreateTrack(
                 vmdBytes,
                 MmdRuntimeFfiMethods.VmdLightTrackCreateFromVmdBytes,
@@ -25,7 +33,8 @@ namespace Mmd.Motion
                 MmdRuntimeFfiMethods.VmdLightTrackFree,
                 (track, frameCount) => new NativeVmdLightTrackSampler(track, frameCount),
                 "VMD light track frame count",
-                out sampler);
+                out sampler,
+                out failureReason);
         }
 
         protected override byte SampleTrack(IntPtr track, float frame, float[] values, IntPtr valueCount)

@@ -99,6 +99,13 @@ namespace Mmd.Timeline
             behaviour.MotionBytes = motionAsset != null && motionAsset.ByteLength > 0
                 ? motionAsset.GetBytesCopy()
                 : null;
+            if (motionAsset != null &&
+                motionAsset.ImportSummaryStatus == MmdVmdImportSummaryStatus.Passed)
+            {
+                behaviour.ExpectedCameraKeyframeCount = motionAsset.CameraKeyframeCount;
+                behaviour.ExpectedLightKeyframeCount = motionAsset.LightKeyframeCount;
+                behaviour.ExpectedSelfShadowKeyframeCount = motionAsset.SelfShadowKeyframeCount;
+            }
             return playable;
         }
 

@@ -94,7 +94,10 @@ namespace Mmd.Tests
                 {
                     MotionBytes = vmdBytes,
                     FrameRate = 30f,
-                    ImportScale = 1.0f
+                    ImportScale = 1.0f,
+                    ExpectedCameraKeyframeCount = 2,
+                    ExpectedLightKeyframeCount = 0,
+                    ExpectedSelfShadowKeyframeCount = 0
                 };
 
                 // localTime 0.5s at 30fps -> frame 15 (midway between keyframes 0 and 30).
@@ -107,6 +110,8 @@ namespace Mmd.Tests
                 Assert.That(Vector3.Distance(camera.transform.position, expectedPose.Position), Is.LessThan(0.001f));
                 Assert.That(Quaternion.Angle(camera.transform.rotation, expectedPose.Rotation), Is.LessThan(0.05f));
                 Assert.That(camera.fieldOfView, Is.EqualTo(expectedPose.FieldOfView).Within(0.001f));
+                Assert.That(behaviour.NativeLightTrackDiagnostic, Is.Empty);
+                Assert.That(behaviour.NativeSelfShadowTrackDiagnostic, Is.Empty);
             }
             finally
             {
@@ -178,6 +183,15 @@ namespace Mmd.Tests
 
                 Assert.That(status, Is.EqualTo(MmdSceneCameraApplyStatus.NotApplied));
                 Assert.That(camera.transform.position, Is.EqualTo(before));
+                Assert.That(
+                    behaviour.NativeCameraTrackDiagnostic,
+                    Does.StartWith("VMD native camera track unavailable: "));
+                Assert.That(
+                    behaviour.NativeLightTrackDiagnostic,
+                    Does.StartWith("VMD native light track unavailable: "));
+                Assert.That(
+                    behaviour.NativeSelfShadowTrackDiagnostic,
+                    Does.StartWith("VMD native self-shadow track unavailable: "));
             }
             finally
             {

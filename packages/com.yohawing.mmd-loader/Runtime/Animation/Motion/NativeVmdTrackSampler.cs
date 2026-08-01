@@ -22,6 +22,8 @@ namespace Mmd.Motion
 
         public int FrameCount { get; }
 
+        public string? LastFailureReason { get; private set; }
+
         protected abstract TState DefaultState { get; }
 
         protected static bool TryCreateTrack<TSampler>(
@@ -31,12 +33,15 @@ namespace Mmd.Motion
             Action<IntPtr> freeTrack,
             Func<IntPtr, int, TSampler> createSampler,
             string frameCountLabel,
-            out TSampler? sampler)
+            out TSampler? sampler,
+            out string failureReason)
             where TSampler : NativeVmdTrackSampler<TState>
         {
             sampler = null;
+            failureReason = string.Empty;
             if (vmdBytes == null || vmdBytes.Length == 0)
             {
+                failureReason = "source bytes are empty";
                 return false;
             }
 
@@ -59,18 +64,22 @@ namespace Mmd.Motion
             }
             catch (DllNotFoundException)
             {
+                failureReason = "native DLL is unavailable";
                 return false;
             }
             catch (EntryPointNotFoundException)
             {
+                failureReason = "native entry point is unavailable";
                 return false;
             }
             catch (BadImageFormatException)
             {
+                failureReason = "native DLL has an incompatible image format";
                 return false;
             }
-            catch (InvalidOperationException)
+            catch (InvalidOperationException exception)
             {
+                failureReason = "ABI validation or native track creation failed: " + exception.Message;
                 return false;
             }
             finally
@@ -78,6 +87,11 @@ namespace Mmd.Motion
                 if (track != IntPtr.Zero)
                 {
                     freeTrack(track);
+                }
+
+                if (sampler == null && string.IsNullOrEmpty(failureReason))
+                {
+                    failureReason = "native track creation returned null";
                 }
             }
         }
@@ -87,14 +101,19 @@ namespace Mmd.Motion
             state = DefaultState;
             if (disposed || track == IntPtr.Zero || !float.IsFinite(frame))
             {
+                LastFailureReason = disposed
+                    ? "sampler is disposed"
+                    : "sample frame is invalid or native track is unavailable";
                 return false;
             }
 
             if (SampleTrack(track, frame, sampleBuffer, new IntPtr(sampleBuffer.Length)) == 0)
             {
+                LastFailureReason = "native track sample returned false";
                 return false;
             }
 
+            LastFailureReason = null;
             state = ToState(sampleBuffer);
             return true;
         }
