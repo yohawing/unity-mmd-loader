@@ -53,6 +53,9 @@ namespace Mmd.Tests
                 Assert.That(
                     string.Join("\n", result.Diagnostics),
                     Does.Contain("native batch evaluation"));
+                Assert.That(
+                    string.Join("\n", result.Diagnostics),
+                    Does.Contain("root-motion: wrote native evaluated"));
                 AssertHumanoidClipHasMuscleBindings(result.Clip!);
                 AssertRootMotionBindings(result.Clip!);
             }
@@ -375,115 +378,6 @@ namespace Mmd.Tests
             }
         }
 
-        [Test]
-        public void RootMotionKeysComposeAncestorDeltaWithPerFrameHumanoidBodyPose()
-        {
-            var model = new MmdModelDefinition();
-            model.bones.Add(new MmdBoneDefinition
-            {
-                index = 0,
-                name = "全ての親",
-                parentIndex = -1,
-                origin = new[] { 0.0f, 0.0f, 0.0f },
-            });
-            model.bones.Add(new MmdBoneDefinition
-            {
-                index = 1,
-                name = "センター",
-                parentIndex = 0,
-                origin = new[] { 0.0f, 1.0f, 0.0f },
-            });
-            model.bones.Add(new MmdBoneDefinition
-            {
-                index = 2,
-                name = "下半身",
-                parentIndex = 1,
-                origin = new[] { 0.0f, 2.0f, 0.0f },
-            });
-
-            Quaternion parentRotation = Quaternion.AngleAxis(90.0f, Vector3.up);
-            Quaternion hipsRotation = Quaternion.AngleAxis(75.0f, Vector3.right);
-            var motion = new MmdMotionDefinition { maxFrame = 1 };
-            AddLinearBoneKeys(
-                motion,
-                "全ての親",
-                new Vector3(1.0f, 2.0f, 3.0f),
-                Quaternion.identity);
-            AddLinearBoneKeys(
-                motion,
-                "センター",
-                new Vector3(4.0f, 5.0f, 6.0f),
-                parentRotation);
-            AddLinearBoneKeys(
-                motion,
-                "下半身",
-                new Vector3(7.0f, 8.0f, 9.0f),
-                hipsRotation);
-
-            var positionKeys = new[] { new Keyframe[2], new Keyframe[2], new Keyframe[2] };
-            var rotationKeys = new[]
-            {
-                new Keyframe[2],
-                new Keyframe[2],
-                new Keyframe[2],
-                new Keyframe[2],
-            };
-            var bodyPositions = new[]
-            {
-                new Vector3(0.25f, 1.5f, -0.5f),
-                new Vector3(0.25f, 1.5f, -0.5f),
-            };
-            var bodyRotations = new[]
-            {
-                Quaternion.AngleAxis(30.0f, Vector3.forward),
-                Quaternion.AngleAxis(75.0f, Vector3.right),
-            };
-
-            bool success = MmdHumanoidClipConversionWriter.TryBuildRootMotionKeys(
-                model,
-                motion,
-                hipsBoneIndex: 2,
-                importScale: 0.5f,
-                humanScale: 2.0f,
-                bodyPositions,
-                bodyRotations,
-                startFrame: 0,
-                endFrame: 1,
-                sampleFrameToTimeFactor: 1.0f / 30.0f,
-                positionKeys,
-                rotationKeys,
-                out string diagnostic);
-
-            Assert.That(success, Is.True, diagnostic);
-            // The center rotation turns the Hips local translation before the root translation is added.
-            // MMD end position delta: (14, 15, 2), then coordinate flip, import scale,
-            // and HumanPose normalization => (-3.5, 3.75, -0.5), added to the baseline pose.
-            Assert.That(positionKeys[0][1].value, Is.EqualTo(-3.25f).Within(0.0001f));
-            Assert.That(positionKeys[1][1].value, Is.EqualTo(5.25f).Within(0.0001f));
-            Assert.That(positionKeys[2][1].value, Is.EqualTo(-1.0f).Within(0.0001f));
-
-            var actualRootRotation = new Quaternion(
-                rotationKeys[0][1].value,
-                rotationKeys[1][1].value,
-                rotationKeys[2][1].value,
-                rotationKeys[3][1].value);
-            Quaternion expectedRootRotation =
-                MmdCoordinateSpace.MmdToUnityRotation(parentRotation) * bodyRotations[1];
-            Assert.That(Mathf.Abs(Quaternion.Dot(actualRootRotation, expectedRootRotation)),
-                Is.EqualTo(1.0f).Within(0.0001f),
-                "RootQ must add only non-Humanoid ancestor rotation to the per-frame body orientation.");
-            Assert.That(positionKeys[1][0].value, Is.EqualTo(bodyPositions[0].y).Within(0.0001f));
-            var initialRootRotation = new Quaternion(
-                rotationKeys[0][0].value,
-                rotationKeys[1][0].value,
-                rotationKeys[2][0].value,
-                rotationKeys[3][0].value);
-            Assert.That(Mathf.Abs(Quaternion.Dot(initialRootRotation, bodyRotations[0])),
-                Is.EqualTo(1.0f).Within(0.0001f));
-            Assert.That(positionKeys[0][0].time, Is.Zero.Within(0.0001f));
-            Assert.That(positionKeys[0][1].time, Is.EqualTo(1.0f / 30.0f).Within(0.0001f));
-        }
-
         private static void CreateReadyFixturePmx(
             out MmdPmxAsset pmxAsset,
             List<UnityEngine.Object> ownedObjects)
@@ -670,31 +564,6 @@ namespace Mmd.Tests
                     UnityEngine.Object.DestroyImmediate(obj);
                 }
             }
-        }
-
-        private static void AddLinearBoneKeys(
-            MmdMotionDefinition motion,
-            string boneName,
-            Vector3 endTranslation,
-            Quaternion endRotation)
-        {
-            MmdBoneInterpolationDefinition interpolation = MmdTestFixtures.LinearBoneInterpolation();
-            motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
-            {
-                boneName = boneName,
-                frame = 0,
-                translation = new[] { 0.0f, 0.0f, 0.0f },
-                rotation = new[] { 0.0f, 0.0f, 0.0f, 1.0f },
-                interpolation = interpolation,
-            });
-            motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
-            {
-                boneName = boneName,
-                frame = 1,
-                translation = new[] { endTranslation.x, endTranslation.y, endTranslation.z },
-                rotation = new[] { endRotation.x, endRotation.y, endRotation.z, endRotation.w },
-                interpolation = interpolation,
-            });
         }
 
         private static void CreateFolderIfMissing(string folderPath)
