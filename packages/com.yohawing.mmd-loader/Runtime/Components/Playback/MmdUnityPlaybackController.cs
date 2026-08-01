@@ -110,8 +110,6 @@ namespace Mmd.UnityIntegration
             }
         }
 
-        internal bool HasHumanoidPhysicsBinding => humanoidPhysicsBinding != null;
-
         public Transform? HumanoidProxyRoot => proxyRoot;
 
         public IReadOnlyList<MmdHumanoidRetargetBinding> HumanoidRetargetEntries => humanoidRetargetEntries;

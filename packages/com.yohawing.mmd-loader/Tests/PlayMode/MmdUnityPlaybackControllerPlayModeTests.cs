@@ -584,8 +584,6 @@ namespace Mmd.Tests
                 Assert.That(controller.LastHumanoidRetargetGate, Is.EqualTo(MmdHumanoidRetargetGate.Ready));
                 Assert.That(controller.IsConfigured, Is.False,
                     "Self-tick humanoid Live physics must not configure the VMD playback binding.");
-                Assert.That(controller.HasHumanoidPhysicsBinding, Is.True,
-                    "Self-tick humanoid Live physics should lazily create a model-only physics binding from ModelAssetSource.");
                 Assert.That(controller.LastLivePhysicsDiagnostics, Is.Not.Null);
                 Assert.That(controller.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(0));
                 Assert.That(controller.LastLivePhysicsDiagnostics.deltaTime, Is.EqualTo(0.0f));
@@ -642,8 +640,9 @@ namespace Mmd.Tests
                 physicsModeField!.SetValue(controller, MmdPhysicsMode.Off);
                 controller.ConfigureFromAssets(pmxAsset, vmdAsset, 30.0f, startFrame: 0, playOnStart: false);
                 yield return null;
-                Assert.That(controller.HasHumanoidPhysicsBinding, Is.False);
                 Assert.That(controller.IsConfigured, Is.True);
+                Assert.That(controller.LastLivePhysicsDiagnostics, Is.Null,
+                    "VMD rebind with physics Off must release the previous Humanoid physics binding.");
                 Assert.That(humanoidPlaybackMesh == null, Is.True,
                     "VMD rebind must release the previous Humanoid physics Mesh clone before capturing Scene state");
                 Mesh vmdPlaybackMesh = renderer.sharedMesh;
@@ -771,8 +770,6 @@ namespace Mmd.Tests
                 Assert.That(controller.LastHumanoidRetargetGate, Is.EqualTo(MmdHumanoidRetargetGate.Ready));
                 Assert.That(controller.IsConfigured, Is.False,
                     "Model-only humanoid physics binding must stay separate from the VMD playback binding.");
-                Assert.That(controller.HasHumanoidPhysicsBinding, Is.True,
-                    "Humanoid Live physics should lazily create its own model-only binding from ModelAssetSource.");
                 Assert.That(controller.LastLivePhysicsDiagnostics, Is.Not.Null);
                 Assert.That(controller.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(0));
                 Assert.That(controller.LastSnapshot, Is.Null,
@@ -956,8 +953,6 @@ namespace Mmd.Tests
 
                 Assert.That(controller.IsConfigured, Is.False,
                     "The single humanoid track may only create a physics-only binding, never a VMD playback binding.");
-                Assert.That(controller.HasHumanoidPhysicsBinding, Is.False);
-
                 for (int i = 0; i <= 5; i++)
                 {
                     director.time = i / 30.0;
@@ -990,8 +985,6 @@ namespace Mmd.Tests
 
                 // (d) Live physics stepped from the single track, with no VMD playback binding
                 Assert.That(controller.IsConfigured, Is.False);
-                Assert.That(controller.HasHumanoidPhysicsBinding, Is.True,
-                    "the single humanoid track should lazily create a model-only physics binding from ModelAssetSource.");
                 Assert.That(controller.LastLivePhysicsDiagnostics, Is.Not.Null,
                     "the single humanoid track ProcessFrame must step Live physics in Play Mode.");
                 Assert.That(controller.LastLivePhysicsDiagnostics!.deltaTime, Is.GreaterThan(0.0f));
