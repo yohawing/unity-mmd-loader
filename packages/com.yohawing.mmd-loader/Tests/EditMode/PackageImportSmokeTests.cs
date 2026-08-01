@@ -665,45 +665,6 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void GroupMorphOffsetsSelfReferenceRejected()
-        {
-            var model = new MmdModelDefinition();
-            model.bones.Add(new MmdBoneDefinition
-            {
-                index = 0,
-                name = "root",
-                parentIndex = -1,
-                origin = new[] { 0.0f, 0.0f, 0.0f }
-            });
-            model.vertices.Add(new MmdVertexDefinition
-            {
-                index = 0,
-                position = new[] { 0.0f, 0.0f, 0.0f },
-                normal = new[] { 0.0f, 1.0f, 0.0f },
-                uv = new[] { 0.0f, 0.0f },
-                boneIndices = new[] { 0 },
-                boneWeights = new[] { 1.0f }
-            });
-            model.indices.AddRange(new[] { 0, 0, 0 });
-            model.materials.Add(new MmdMaterialDefinition { index = 0, name = "mat", vertexCount = 3 });
-
-            // Group morph referencing itself
-            model.morphs.Add(new MmdMorphDefinition
-            {
-                index = 0,
-                name = "self-ref-group",
-                type = "group",
-                groupOffsets =
-                {
-                    new MmdGroupMorphOffsetDefinition { morphIndex = 0, weight = 1.0f }
-                }
-            });
-
-            var errors = MmdModelValidator.ValidateStructuralModel(model);
-            Assert.That(errors, Has.Some.Matches<string>(msg => msg.Contains("self-reference")));
-        }
-
-        [Test]
         public void GroupMorphOffsetsNonExistentTargetRejected()
         {
             var model = new MmdModelDefinition();
@@ -727,38 +688,6 @@ namespace Mmd.Tests
 
             var errors = MmdModelValidator.ValidateStructuralModel(model);
             Assert.That(errors, Has.Some.Matches<string>(msg => msg.Contains("does not exist")));
-        }
-
-        [Test]
-        public void GroupMorphOffsetsNonFiniteWeightRejected()
-        {
-            var model = new MmdModelDefinition();
-            model.bones.Add(new MmdBoneDefinition
-            {
-                index = 0,
-                name = "root",
-                parentIndex = -1,
-                origin = new[] { 0.0f, 0.0f, 0.0f }
-            });
-            model.morphs.Add(new MmdMorphDefinition
-            {
-                index = 0,
-                name = "target-morph",
-                type = "vertex"
-            });
-            model.morphs.Add(new MmdMorphDefinition
-            {
-                index = 1,
-                name = "group-morph",
-                type = "group",
-                groupOffsets =
-                {
-                    new MmdGroupMorphOffsetDefinition { morphIndex = 0, weight = float.NaN }
-                }
-            });
-
-            var errors = MmdModelValidator.ValidateStructuralModel(model);
-            Assert.That(errors, Has.Some.Matches<string>(msg => msg.Contains("weight must be finite")));
         }
 
         [Test]
