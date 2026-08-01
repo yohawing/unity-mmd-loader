@@ -33,6 +33,7 @@ namespace Mmd
                 throw new ArgumentOutOfRangeException(nameof(time), "Time must be a non-negative finite value.");
             }
 
+            ThrowIfNativeBackedTraceUnsupported(model, motion);
             physicsBackend ??= new NullMmdPhysicsBackend();
             physicsBackend.Reset();
             MmdTrace trace = CreateTrace(modelId, motionId);
@@ -76,6 +77,7 @@ namespace Mmd
             }
 
             ValidateInputs(model, motion, modelId, motionId);
+            ThrowIfNativeBackedTraceUnsupported(model, motion);
             physicsBackend ??= new NullMmdPhysicsBackend();
             physicsBackend.Reset();
 
@@ -128,6 +130,21 @@ namespace Mmd
 
             MmdModelValidator.ThrowIfInvalid(model);
             MmdMotionValidator.ThrowIfInvalid(motion);
+        }
+
+        private static void ThrowIfNativeBackedTraceUnsupported(
+            MmdModelDefinition model,
+            MmdMotionDefinition motion)
+        {
+            if (model.sourceBytes == null || motion.sourceBytes == null)
+            {
+                return;
+            }
+
+            throw new NotSupportedException(
+                "Native-backed VMD trace checkpoints are unsupported: " +
+                "mmd-anim exposes final pose/batch evaluation but not the managed " +
+                "motion/append/IK/morph checkpoint sequence.");
         }
 
         private static MmdTrace CreateTrace(string modelId, string motionId)

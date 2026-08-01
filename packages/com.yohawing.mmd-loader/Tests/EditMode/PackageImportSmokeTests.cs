@@ -455,7 +455,12 @@ namespace Mmd.Tests
                 "test_1bone_cube.pmx",
                 "test_1bone_cube_motion.vmd");
 
-            Assert.That(session.EvaluateTrace(frame: 0, time: 0.0f).frames, Has.Count.EqualTo(5));
+            NotSupportedException traceException = Assert.Throws<NotSupportedException>(
+                () => session.EvaluateTrace(frame: 0, time: 0.0f))!;
+            Assert.That(traceException.Message, Does.Contain("Native-backed VMD trace checkpoints are unsupported"));
+            NotSupportedException traceFramesException = Assert.Throws<NotSupportedException>(
+                () => session.EvaluateTraceFrames(new[] { 0 }, frameRate: 30.0f))!;
+            Assert.That(traceFramesException.Message, Does.Contain("Native-backed VMD trace checkpoints are unsupported"));
             MmdPlaybackSnapshot snapshot = session.BuildSnapshot(frame: 0, time: 0.0f);
             Assert.That(snapshot.rendering.indices, Has.Count.GreaterThan(0));
             Assert.That(snapshot.frame.bones, Has.Count.GreaterThan(0));
