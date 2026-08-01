@@ -47,6 +47,32 @@ namespace Mmd.Tests.Contracts
             Assert.That(exception.Message, Does.Contain("native evaluation is required"));
         }
 
+        [TestCase(true)]
+        [TestCase(false)]
+        public void MixedSourcePhaseOneFrameRejectsManagedFallback(bool modelRetainsSourceBytes)
+        {
+            (MmdModelDefinition model, MmdMotionDefinition motion) = LoadCubeFixturePair();
+            if (modelRetainsSourceBytes)
+            {
+                motion.sourceBytes = null;
+            }
+            else
+            {
+                model.sourceBytes = null;
+            }
+
+            NotSupportedException exception = Assert.Throws<NotSupportedException>(
+                () => MmdRuntimeFrameEvaluator.EvaluatePhaseOneFrame(
+                    model,
+                    motion,
+                    frame: 0,
+                    time: 0.0f))!;
+
+            Assert.That(exception.Message, Does.Contain("source-less-only"));
+            Assert.That(exception.Message, Does.Contain("mixed-source"));
+            Assert.That(exception.Message, Does.Contain("native evaluation is required"));
+        }
+
         [Test]
         public void SourceBackedBeforePhysicsRejectsDeformAfterPhysicsManagedFallback()
         {

@@ -317,12 +317,13 @@ namespace Mmd
             bool nativeFallbackHasSuppliedPhysicsOrIk,
             bool stopBeforePhysics)
         {
-            if (model.sourceBytes == null || motion.sourceBytes == null)
+            if (MmdRuntimeFramePipeline.IsSourceLess(model, motion))
             {
                 return;
             }
 
-            if (nativeFallbackHasSuppliedPhysicsOrIk && stopBeforePhysics && model.HasDeformAfterPhysicsBones)
+            bool sourceBackedPair = model.sourceBytes != null && motion.sourceBytes != null;
+            if (sourceBackedPair && nativeFallbackHasSuppliedPhysicsOrIk && stopBeforePhysics && model.HasDeformAfterPhysicsBones)
             {
                 throw new NotSupportedException(
                     "Managed fallback evaluation is unsupported for source-backed PMX/VMD when a custom " +
@@ -330,19 +331,23 @@ namespace Mmd
                     "with deform-after-physics bones; native evaluation is required.");
             }
 
-            if (nativeFallbackHasSuppliedPhysicsOrIk)
+            if (sourceBackedPair && nativeFallbackHasSuppliedPhysicsOrIk)
             {
                 throw new NotSupportedException(
                     "Managed fallback evaluation is unsupported for source-backed PMX/VMD when a custom " +
                     "physics backend or IK solver is supplied; native evaluation is required.");
             }
 
-            if (stopBeforePhysics && model.HasDeformAfterPhysicsBones)
+            if (sourceBackedPair && stopBeforePhysics && model.HasDeformAfterPhysicsBones)
             {
                 throw new NotSupportedException(
                     "Managed fallback evaluation is unsupported for source-backed PMX/VMD during before-physics " +
                     "evaluation of a model with deform-after-physics bones; native evaluation is required.");
             }
+
+            throw new NotSupportedException(
+                "Managed fallback evaluation is source-less-only: source-backed or mixed-source PMX/VMD " +
+                "inputs are unsupported; native evaluation is required.");
         }
 
         internal static MmdEvaluatedFrame BuildFrameFromNative(

@@ -136,15 +136,16 @@ namespace Mmd
             MmdModelDefinition model,
             MmdMotionDefinition motion)
         {
-            if (model.sourceBytes == null || motion.sourceBytes == null)
+            if (MmdRuntimeFramePipeline.IsSourceLess(model, motion))
             {
                 return;
             }
 
             throw new NotSupportedException(
-                "Native-backed VMD trace checkpoints are unsupported: " +
+                "Native-backed VMD trace checkpoints are unsupported: source-backed or mixed-source " +
+                "model/motion inputs cannot use the managed checkpoint sequence. " +
                 "mmd-anim exposes final pose/batch evaluation but not the managed " +
-                "motion/append/IK/morph checkpoint sequence.");
+                "motion/append/IK/morph checkpoint sequence; source-less definitions are required.");
         }
 
         private static MmdTrace CreateTrace(string modelId, string motionId)

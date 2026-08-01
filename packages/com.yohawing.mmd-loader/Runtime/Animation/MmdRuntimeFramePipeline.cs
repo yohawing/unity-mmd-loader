@@ -1,5 +1,6 @@
 #nullable enable
 
+using System;
 using System.Collections.Generic;
 using Mmd.Motion;
 using Mmd.Parser;
@@ -22,6 +23,11 @@ namespace Mmd
 
     internal static class MmdRuntimeFramePipeline
     {
+        internal static bool IsSourceLess(MmdModelDefinition? model, MmdMotionDefinition? motion)
+        {
+            return model?.sourceBytes == null && motion?.sourceBytes == null;
+        }
+
         public static MmdRuntimeFrameEvaluation Evaluate(
             MmdModelDefinition model,
             MmdMotionDefinition motion,
@@ -48,6 +54,13 @@ namespace Mmd
             MmdTopologyPlan? topologyPlan = null,
             bool stopBeforePhysics = false)
         {
+            if (!IsSourceLess(model, motion))
+            {
+                throw new NotSupportedException(
+                    "Managed runtime frame pipeline is source-less-only: source-backed or mixed-source " +
+                    "PMX/VMD inputs are unsupported; native evaluation is required.");
+            }
+
             topologyPlan?.EnsureModel(model);
             ikSolver ??= new MmdIkSolver();
 

@@ -61,9 +61,15 @@ namespace Mmd.Tests
         private static (MmdModelDefinition Model, MmdMotionDefinition Motion) LoadFixture()
         {
             var parser = new NativeMmdParser();
+            MmdModelDefinition model = parser.LoadModel(
+                MmdTestFixtures.ReadFixtureAssetBytes("test_append_bone.pmx"));
+            MmdMotionDefinition motion = parser.LoadMotion(
+                MmdTestFixtures.ReadFixtureAssetBytes("test_append_bone.vmd"));
+            model.sourceBytes = null;
+            motion.sourceBytes = null;
             return (
-                parser.LoadModel(MmdTestFixtures.ReadFixtureAssetBytes("test_append_bone.pmx")),
-                parser.LoadMotion(MmdTestFixtures.ReadFixtureAssetBytes("test_append_bone.vmd")));
+                model,
+                motion);
         }
     }
 }
