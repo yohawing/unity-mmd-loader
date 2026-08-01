@@ -127,9 +127,9 @@ namespace Mmd
                 motion,
                 frame,
                 time,
-                TopologyPlan,
                 physicsBackend,
-                ikSolver);
+                ikSolver,
+                topologyPlan: TopologyPlan);
         }
 
         internal MmdEvaluatedFrame EvaluateBeforePhysicsFrame(int frame, float time, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
@@ -149,9 +149,9 @@ namespace Mmd
                 motion,
                 frame,
                 time,
-                TopologyPlan,
                 physicsBackend,
-                ikSolver);
+                ikSolver,
+                topologyPlan: TopologyPlan);
         }
 
         public MmdEvaluatedFrame EvaluateFrameAtTime(float time, float frameRate, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)

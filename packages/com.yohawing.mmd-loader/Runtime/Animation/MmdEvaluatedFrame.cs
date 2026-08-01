@@ -86,29 +86,8 @@ namespace Mmd
             int frame,
             float time,
             IMmdPhysicsBackend? physicsBackend = null,
-            IMmdIkSolver? ikSolver = null)
-        {
-            ValidateFrame(frame);
-            ValidateTime(time);
-            if (!CanUseNativeEvaluation(model, motion, physicsBackend, ikSolver))
-            {
-                return EvaluateManagedFrame(
-                    model, motion, frame, time, includeMaterials: false,
-                    physicsBackend, ikSolver,
-                    nativeFallbackHasSuppliedPhysicsOrIk: physicsBackend != null || ikSolver != null);
-            }
-
-            return EvaluateNativeFrame(model, motion, frame, time, includeMaterials: false);
-        }
-
-        internal static MmdEvaluatedFrame EvaluateValidatedPhaseOnePlaybackFrame(
-            MmdModelDefinition model,
-            MmdMotionDefinition motion,
-            int frame,
-            float time,
-            MmdTopologyPlan topologyPlan,
-            IMmdPhysicsBackend? physicsBackend = null,
-            IMmdIkSolver? ikSolver = null)
+            IMmdIkSolver? ikSolver = null,
+            MmdTopologyPlan? topologyPlan = null)
         {
             ValidateFrame(frame);
             ValidateTime(time);
@@ -120,7 +99,7 @@ namespace Mmd
                     nativeFallbackHasSuppliedPhysicsOrIk: physicsBackend != null || ikSolver != null);
             }
 
-            topologyPlan.EnsureModel(model);
+            topologyPlan?.EnsureModel(model);
             return EvaluateNativeFrame(model, motion, frame, time, includeMaterials: false);
         }
 
@@ -130,38 +109,15 @@ namespace Mmd
             int frame,
             float time,
             IMmdPhysicsBackend? physicsBackend = null,
-            IMmdIkSolver? ikSolver = null)
+            IMmdIkSolver? ikSolver = null,
+            MmdTopologyPlan? topologyPlan = null)
         {
             ValidateFrame(frame);
             ValidateTime(time);
             if (!model.HasDeformAfterPhysicsBones &&
                 CanUseNativeEvaluation(model, motion, physicsBackend, ikSolver))
             {
-                return EvaluateNativeFrame(model, motion, frame, time, includeMaterials: false);
-            }
-
-            return EvaluateManagedFrame(
-                model, motion, frame, time, includeMaterials: false,
-                physicsBackend, ikSolver,
-                stopBeforePhysics: true,
-                nativeFallbackHasSuppliedPhysicsOrIk: physicsBackend != null || ikSolver != null);
-        }
-
-        internal static MmdEvaluatedFrame EvaluateValidatedBeforePhysicsPlaybackFrame(
-            MmdModelDefinition model,
-            MmdMotionDefinition motion,
-            int frame,
-            float time,
-            MmdTopologyPlan topologyPlan,
-            IMmdPhysicsBackend? physicsBackend = null,
-            IMmdIkSolver? ikSolver = null)
-        {
-            ValidateFrame(frame);
-            ValidateTime(time);
-            if (!model.HasDeformAfterPhysicsBones &&
-                CanUseNativeEvaluation(model, motion, physicsBackend, ikSolver))
-            {
-                topologyPlan.EnsureModel(model);
+                topologyPlan?.EnsureModel(model);
                 return EvaluateNativeFrame(model, motion, frame, time, includeMaterials: false);
             }
 
