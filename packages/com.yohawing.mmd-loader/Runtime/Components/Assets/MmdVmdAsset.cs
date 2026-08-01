@@ -112,7 +112,36 @@ namespace Mmd
                 throw new ArgumentException("VMD asset bytes are required.", nameof(bytes));
             }
 
-            data = (byte[])bytes.Clone();
+            InitializeCore((byte[])bytes.Clone(), assetSourceId, assetSourcePath, vmdParseSummary, importDiagnostics);
+        }
+
+        /// <summary>
+        /// Initializes an imported asset with the importer-owned read buffer.
+        /// The importer must not mutate <paramref name="bytes"/> after this call.
+        /// </summary>
+        internal void InitializeImported(
+            byte[] bytes,
+            string assetSourceId,
+            string assetSourcePath,
+            MmdVmdParseSummary? vmdParseSummary = null,
+            IReadOnlyList<string>? importDiagnostics = null)
+        {
+            if (bytes == null || bytes.Length == 0)
+            {
+                throw new ArgumentException("VMD asset bytes are required.", nameof(bytes));
+            }
+
+            InitializeCore(bytes, assetSourceId, assetSourcePath, vmdParseSummary, importDiagnostics);
+        }
+
+        private void InitializeCore(
+            byte[] bytes,
+            string assetSourceId,
+            string assetSourcePath,
+            MmdVmdParseSummary? vmdParseSummary,
+            IReadOnlyList<string>? importDiagnostics)
+        {
+            data = bytes;
             sourceId = assetSourceId ?? string.Empty;
             sourcePath = assetSourcePath ?? string.Empty;
             ApplyVmdParseSummary(vmdParseSummary, importDiagnostics);
@@ -136,33 +165,9 @@ namespace Mmd
 
         public MmdMotionDefinition CreateNativeClipMotionHeader()
         {
-            if (data.Length == 0)
-            {
-                throw new InvalidOperationException("VMD asset has no imported bytes.");
-            }
+            ValidateNativeClipHeaderSource();
 
-            if (structuralDiagnostics != null && structuralDiagnostics.Length > 0)
-            {
-                throw new InvalidOperationException(structuralDiagnostics[0]);
-            }
-
-            if (importSummaryStatus == MmdVmdImportSummaryStatus.Failed)
-            {
-                throw new InvalidOperationException("VMD import summary is marked as failed.");
-            }
-
-            MmdVmdParseSummary summary = importSummaryStatus == MmdVmdImportSummaryStatus.NotParsed
-                ? MmdVmdBinarySummaryReader.Read(data)
-                : new MmdVmdParseSummary(
-                    targetModelName,
-                    maxFrame,
-                    boneKeyframeCount,
-                    morphKeyframeCount,
-                    modelKeyframeCount,
-                    constraintStateCount,
-                    cameraKeyframeCount,
-                    lightKeyframeCount,
-                    selfShadowKeyframeCount);
+            MmdVmdParseSummary summary = GetNativeClipSummary();
             return CreateNativeClipMotionHeader(data, summary);
         }
 
@@ -187,6 +192,40 @@ namespace Mmd
                 selfShadowKeyframeCount = summary.SelfShadowKeyframeCount,
                 sourceBytes = (byte[])vmdBytes.Clone()
             };
+        }
+
+        private MmdVmdParseSummary GetNativeClipSummary()
+        {
+            return importSummaryStatus == MmdVmdImportSummaryStatus.NotParsed
+                ? MmdVmdBinarySummaryReader.Read(data)
+                : new MmdVmdParseSummary(
+                    targetModelName,
+                    maxFrame,
+                    boneKeyframeCount,
+                    morphKeyframeCount,
+                    modelKeyframeCount,
+                    constraintStateCount,
+                    cameraKeyframeCount,
+                    lightKeyframeCount,
+                    selfShadowKeyframeCount);
+        }
+
+        private void ValidateNativeClipHeaderSource()
+        {
+            if (data.Length == 0)
+            {
+                throw new InvalidOperationException("VMD asset has no imported bytes.");
+            }
+
+            if (structuralDiagnostics != null && structuralDiagnostics.Length > 0)
+            {
+                throw new InvalidOperationException(structuralDiagnostics[0]);
+            }
+
+            if (importSummaryStatus == MmdVmdImportSummaryStatus.Failed)
+            {
+                throw new InvalidOperationException("VMD import summary is marked as failed.");
+            }
         }
 
         private void ApplyVmdParseSummary(MmdVmdParseSummary? parseSummary, IReadOnlyList<string>? diagnostics)

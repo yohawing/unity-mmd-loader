@@ -31,7 +31,7 @@ namespace Mmd.Editor
             }
 
             MmdVmdAsset asset = MmdVmdAsset.CreateInstance<MmdVmdAsset>();
-            asset.Initialize(bytes, ctx.assetPath, resolvedSourcePath, summary, diagnostics);
+            asset.InitializeImported(bytes, ctx.assetPath, resolvedSourcePath, summary, diagnostics);
             ctx.AddObjectToAsset("VMD", asset);
             ctx.SetMainObject(asset);
         }
