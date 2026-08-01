@@ -217,7 +217,6 @@ namespace Mmd.Tests.Contracts
             report.AppendLine(globalMaxError <= maxAllowedError ? "  PASS" : "  FAIL");
 
             UnityEngine.Debug.Log(report.ToString());
-            WriteParityReport(pmxFixture, "native_consistency", report.ToString());
 
             Assert.That(globalMaxError, Is.LessThanOrEqualTo(maxAllowedError),
                 $"Max translation error {globalMaxError:F6} exceeds threshold {maxAllowedError:F6}.\n" + report);
@@ -275,24 +274,9 @@ namespace Mmd.Tests.Contracts
             report.AppendLine(globalMaxError <= maxAllowedMorphError ? "  PASS" : "  FAIL");
 
             UnityEngine.Debug.Log(report.ToString());
-            WriteParityReport(pmxFixture, "morph_consistency", report.ToString());
 
             Assert.That(globalMaxError, Is.LessThanOrEqualTo(maxAllowedMorphError),
                 $"Max morph weight error {globalMaxError:F6} exceeds threshold {maxAllowedMorphError:F6}.\n" + report);
-        }
-
-        private static void WriteParityReport(string fixture, string channel, string report)
-        {
-            string repoRoot = MmdTestFixtures.RepositoryRoot;
-            string reportDir = Path.Combine(repoRoot, "artifacts", "parity");
-            if (!Directory.Exists(reportDir))
-            {
-                Directory.CreateDirectory(reportDir);
-            }
-
-            string safeName = Path.GetFileNameWithoutExtension(fixture);
-            string reportPath = Path.Combine(reportDir, $"{safeName}_{channel}_parity.txt");
-            File.WriteAllText(reportPath, report);
         }
 
         private static MmdAnimCliParityNativeDllReport BuildNativeDllReport()
