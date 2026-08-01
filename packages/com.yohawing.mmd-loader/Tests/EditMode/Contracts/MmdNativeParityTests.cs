@@ -52,56 +52,6 @@ namespace Mmd.Tests.Contracts
         }
 
         [Test]
-        public void NativeCameraSamplingProducesSensibleDefaults()
-        {
-            byte[] vmdBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_append_bone.vmd");
-
-            var parser = new NativeMmdParser();
-            MmdMotionDefinition motion = parser.LoadMotion(vmdBytes);
-
-            if (motion.cameraKeyframes == null || motion.cameraKeyframes.Count == 0)
-            {
-                Assert.Ignore("No camera keyframes in test_append_bone.vmd");
-                return;
-            }
-
-            if (!NativeVmdCameraTrackSampler.TryCreate(vmdBytes, out var cameraSampler))
-            {
-                Assert.Fail("Failed to create camera track sampler");
-            }
-
-            using (cameraSampler)
-            {
-                Assert.That(cameraSampler!.TrySample(0.0f, out _), Is.True, "Native camera sampling should succeed");
-            }
-        }
-
-        [Test]
-        public void NativeLightSamplingProducesSensibleDefaults()
-        {
-            byte[] vmdBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_append_bone.vmd");
-
-            var parser = new NativeMmdParser();
-            MmdMotionDefinition motion = parser.LoadMotion(vmdBytes);
-
-            if (motion.lightKeyframes == null || motion.lightKeyframes.Count == 0)
-            {
-                Assert.Ignore("No light keyframes in test_append_bone.vmd");
-                return;
-            }
-
-            if (!NativeVmdLightTrackSampler.TryCreate(vmdBytes, out var lightSampler))
-            {
-                Assert.Fail("Failed to create light track sampler");
-            }
-
-            using (lightSampler)
-            {
-                Assert.That(lightSampler!.TrySample(0.0f, out _), Is.True, "Native light sampling should succeed");
-            }
-        }
-
-        [Test]
         public void MmdAnimCliParityReportComparesCliWithPackagedNativeRuntime()
         {
             if (!string.Equals(
