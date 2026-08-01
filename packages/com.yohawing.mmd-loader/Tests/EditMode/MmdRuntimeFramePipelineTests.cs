@@ -31,20 +31,6 @@ namespace Mmd.Tests
             Assert.That(evaluation.WorldMatrices, Is.Not.Empty);
         }
 
-        [Test]
-        public void DiagnosticCompatibilityEntryPointKeepsAppendedCheckpoint()
-        {
-            (MmdModelDefinition model, MmdMotionDefinition motion) = LoadFixture();
-
-            MmdRuntimeFrameEvaluation evaluation = MmdRuntimeFramePipeline.Evaluate(
-                model,
-                motion,
-                frame: 0,
-                physicsBackend: new NullMmdPhysicsBackend());
-
-            Assert.That(evaluation.AppendedWorldMatrices, Is.Not.Empty);
-        }
-
         private static MmdRuntimeFrameEvaluation Evaluate(bool captureCheckpoints)
         {
             (MmdModelDefinition model, MmdMotionDefinition motion) = LoadFixture();

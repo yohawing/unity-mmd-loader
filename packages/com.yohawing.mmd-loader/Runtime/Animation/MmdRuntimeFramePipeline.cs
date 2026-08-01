@@ -28,22 +28,6 @@ namespace Mmd
             return model?.sourceBytes == null && motion?.sourceBytes == null;
         }
 
-        public static MmdRuntimeFrameEvaluation Evaluate(
-            MmdModelDefinition model,
-            MmdMotionDefinition motion,
-            int frame,
-            IMmdPhysicsBackend physicsBackend,
-            IMmdIkSolver? ikSolver = null)
-        {
-            return EvaluateWithOptions(
-                model,
-                motion,
-                frame,
-                physicsBackend,
-                ikSolver,
-                captureCheckpoints: true);
-        }
-
         internal static MmdRuntimeFrameEvaluation EvaluateWithOptions(
             MmdModelDefinition model,
             MmdMotionDefinition motion,
