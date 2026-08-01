@@ -24,7 +24,7 @@ namespace Mmd.Tests
     public sealed partial class MmdAssetImporterTests
     {
         [Test]
-        public void PmxAndVmdImportAsMmdAssetsAndParse()
+        public void PmxAndVmdImportAsMmdAssetsAndValidateNativeClipHeader()
         {
             CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
@@ -43,9 +43,32 @@ namespace Mmd.Tests
             Assert.That(vmdAsset.ByteLength, Is.GreaterThan(0));
 
             MmdModelDefinition model = pmxAsset.LoadModel();
-            MmdMotionDefinition motion = vmdAsset.LoadMotion();
+            Assert.That(vmdAsset.ImportSummaryStatus, Is.EqualTo(MmdVmdImportSummaryStatus.Passed));
+            Assert.That(vmdAsset.StructuralDiagnostics, Is.Empty);
+            Assert.That(vmdAsset.TargetModelName, Is.EqualTo("テスト用モデル_arm"));
+            Assert.That(vmdAsset.MaxFrame, Is.EqualTo(49));
+            Assert.That(vmdAsset.BoneKeyframeCount, Is.EqualTo(6));
+            Assert.That(vmdAsset.MorphKeyframeCount, Is.Zero);
+            Assert.That(vmdAsset.ModelKeyframeCount, Is.Zero);
+            Assert.That(vmdAsset.ConstraintStateCount, Is.Zero);
+            Assert.That(vmdAsset.CameraKeyframeCount, Is.Zero);
+            Assert.That(vmdAsset.LightKeyframeCount, Is.Zero);
+            Assert.That(vmdAsset.SelfShadowKeyframeCount, Is.Zero);
+
+            MmdMotionDefinition motion = vmdAsset.CreateNativeClipMotionHeader();
             Assert.That(model.bones, Has.Count.GreaterThan(0));
-            Assert.That(motion.boneKeyframes, Has.Count.GreaterThan(0));
+            Assert.That(motion.targetModelName, Is.EqualTo(vmdAsset.TargetModelName));
+            Assert.That(motion.maxFrame, Is.EqualTo(vmdAsset.MaxFrame));
+            Assert.That(motion.boneKeyframes, Is.Empty);
+            Assert.That(motion.morphKeyframes, Is.Empty);
+            Assert.That(motion.modelKeyframes, Is.Empty);
+            Assert.That(motion.cameraKeyframes, Is.Empty);
+            Assert.That(motion.lightKeyframes, Is.Empty);
+            Assert.That(motion.selfShadowKeyframes, Is.Empty);
+            Assert.That(motion.cameraKeyframeCount, Is.EqualTo(vmdAsset.CameraKeyframeCount));
+            Assert.That(motion.lightKeyframeCount, Is.EqualTo(vmdAsset.LightKeyframeCount));
+            Assert.That(motion.selfShadowKeyframeCount, Is.EqualTo(vmdAsset.SelfShadowKeyframeCount));
+            Assert.That(motion.sourceBytes, Is.EqualTo(vmdAsset.GetBytesCopy()));
         }
         [Test]
         public void ImportedPmxAssetCarriesImportScaleSummaryFromImporter()

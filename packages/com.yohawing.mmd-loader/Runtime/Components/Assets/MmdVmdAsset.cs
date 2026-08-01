@@ -152,6 +152,9 @@ namespace Mmd
             return (byte[])data.Clone();
         }
 
+        [Obsolete(
+            "Managed VMD parsing is a legacy compatibility path. Use CreateNativeClipMotionHeader() for native clip playback.",
+            error: false)]
         public MmdMotionDefinition LoadMotion(IMmdParser? parser = null)
         {
             if (data.Length == 0)
