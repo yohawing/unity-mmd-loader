@@ -36,7 +36,7 @@ namespace Mmd
             ThrowIfNativeBackedTraceUnsupported(model, motion);
             physicsBackend ??= new NullMmdPhysicsBackend();
             physicsBackend.Reset();
-            MmdTrace trace = CreateTrace(modelId, motionId);
+            MmdTrace trace = MmdActualTraceDumper.CreateTrace(modelId, motionId);
             AppendPhaseOneFrame(trace, model, motion, frame, time, physicsBackend, ikSolver);
             return trace;
         }
@@ -81,7 +81,7 @@ namespace Mmd
             physicsBackend ??= new NullMmdPhysicsBackend();
             physicsBackend.Reset();
 
-            MmdTrace trace = CreateTrace(modelId, motionId);
+            MmdTrace trace = MmdActualTraceDumper.CreateTrace(modelId, motionId);
             var seenFrames = new HashSet<int>(frames.Count);
 
             foreach (int frame in frames.OrderBy(value => value))
@@ -146,17 +146,6 @@ namespace Mmd
                 "model/motion inputs cannot use the managed checkpoint sequence. " +
                 "mmd-anim exposes final pose/batch evaluation but not the managed " +
                 "motion/append/IK/morph checkpoint sequence; source-less definitions are required.");
-        }
-
-        private static MmdTrace CreateTrace(string modelId, string motionId)
-        {
-            return new MmdTrace
-            {
-                schemaVersion = 1,
-                model = modelId,
-                motion = motionId,
-                space = "mmd"
-            };
         }
 
         private static void AppendPhaseOneFrame(
