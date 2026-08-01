@@ -3,6 +3,7 @@ unity-mmd/
 
 # Local development automation (not part of the distributed UPM package)
 scripts/*
+!scripts/run-vmd-import-timeline-perf-gate.ps1
 !scripts/unity-lts-compatibility-gate.ps1
 !scripts/unity-process-environment.ps1
 !scripts/run-visual-shading-tier.ps1
