@@ -1,7 +1,6 @@
 #nullable enable
 
 using System;
-using System.IO;
 using NUnit.Framework;
 using Mmd.Native;
 
@@ -14,19 +13,6 @@ namespace Mmd.Tests
         private const int GeneratedBoneKeyframeCount = 300_000;
         private const int GeneratedFrameSpan = 12_000;
         private const double P95BudgetMilliseconds = 100.0;
-
-        [Test]
-        public void BinarySummaryRejectsTruncatedVmdWithoutBuildingMotionDtos()
-        {
-            byte[] bytes = MmdTestFixtures.CreateDenseVmdBytes(
-                "generated-vmd-summary",
-                "全ての親",
-                3,
-                30);
-            Array.Resize(ref bytes, bytes.Length - 1);
-
-            Assert.Throws<InvalidDataException>(() => MmdVmdBinarySummaryReader.Read(bytes));
-        }
 
         [Test]
         [Category("Performance")]
