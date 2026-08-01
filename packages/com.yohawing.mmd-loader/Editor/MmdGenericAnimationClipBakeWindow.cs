@@ -63,11 +63,6 @@ namespace Mmd.Editor
             SetPmxAsset(asset);
         }
 
-        internal void SetVmdAssetForTests(MmdVmdAsset? asset)
-        {
-            SetVmdAsset(asset);
-        }
-
         internal void SetClipTypeForTests(ClipType type)
         {
             clipType = type;

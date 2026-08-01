@@ -167,10 +167,9 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void TimelineEvaluationPreservesSerializedLiveWithoutUserExplicit()
+        public void TimelineEvaluationPreservesSerializedLiveMode()
         {
-            // Verifies that serialized/Inspector Live stays Live after Timeline evaluation
-            // even when SetPhysicsMode(Live) was never called explicitly (non-user-explicit Live).
+            // Verifies that serialized/Inspector Live stays Live after Timeline evaluation.
             MmdUnityPlaybackBinding? binding = null;
             try
             {
@@ -178,7 +177,6 @@ namespace Mmd.Tests
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f);
                 // Do NOT call SetPhysicsMode(Live) explicitly — rely on the serialized default (Live).
-                // _userExplicitLive remains false, making this the "non-explicit Live" case.
                 var behaviour = new MmdVmdTimelineBehaviour
                 {
                     FrameRate = 30.0f
@@ -189,8 +187,6 @@ namespace Mmd.Tests
                 // Serialized physicsMode is preserved — still Live.
                 Assert.That(controller.PhysicsMode, Is.EqualTo(MmdPhysicsMode.Live));
                 Assert.That(snapshot.frame.frame, Is.EqualTo(10));
-                // IsUserExplicitLive is false (never explicitly set), but controller is still Live.
-                Assert.That(controller.PhysicsMode, Is.EqualTo(MmdPhysicsMode.Live));
             }
             finally
             {

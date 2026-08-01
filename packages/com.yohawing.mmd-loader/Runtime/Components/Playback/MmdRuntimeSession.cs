@@ -78,8 +78,6 @@ namespace Mmd
             Dispose(disposing: false);
         }
 
-        internal byte[]? MotionSourceBytes => motion.sourceBytes;
-
         internal MmdTopologyPlan TopologyPlan
         {
             get

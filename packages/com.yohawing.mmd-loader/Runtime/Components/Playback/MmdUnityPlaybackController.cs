@@ -45,7 +45,6 @@ namespace Mmd.UnityIntegration
         private bool isApplyingPlaybackPose;
         private bool pendingSeekReseed;
 
-        private bool _userExplicitLive;
 
         public bool IsConfigured => binding != null;
 
@@ -182,12 +181,10 @@ namespace Mmd.UnityIntegration
 
         public void SetPhysicsMode(MmdPhysicsMode mode)
         {
-            ApplyPhysicsMode(mode, markUserExplicit: true);
+            ApplyPhysicsMode(mode);
         }
 
-        internal bool IsUserExplicitLive => physicsMode == MmdPhysicsMode.Live && _userExplicitLive;
-
-        private void ApplyPhysicsMode(MmdPhysicsMode mode, bool markUserExplicit)
+        private void ApplyPhysicsMode(MmdPhysicsMode mode)
         {
             if (binding != null)
             {
@@ -199,15 +196,6 @@ namespace Mmd.UnityIntegration
             }
 
             physicsMode = mode;
-            if (mode == MmdPhysicsMode.Live)
-            {
-                _userExplicitLive = markUserExplicit;
-            }
-            else
-            {
-                _userExplicitLive = false;
-            }
-
             if (humanoidPhysicsBinding != null)
             {
                 if (mode == MmdPhysicsMode.Live)
