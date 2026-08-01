@@ -152,7 +152,7 @@ namespace Mmd.UnityIntegration
                 throw new ArgumentNullException(nameof(playbackBinding));
             }
 
-            ValidateFrameRate(playbackFrameRate);
+            MmdPlaybackTime.ValidateFrameRate(playbackFrameRate);
             if (binding != null && !ReferenceEquals(binding, playbackBinding))
             {
                 binding.Dispose();
@@ -466,11 +466,6 @@ namespace Mmd.UnityIntegration
             {
                 throw new InvalidOperationException("Playback controller must be configured before playback starts.");
             }
-        }
-
-        private static void ValidateFrameRate(float playbackFrameRate)
-        {
-            MmdPlaybackTime.ValidateFrameRate(playbackFrameRate);
         }
 
         private static void ValidatePhysicsMode(MmdPhysicsMode mode)
