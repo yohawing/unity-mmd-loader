@@ -53,7 +53,13 @@ namespace Mmd.UnityIntegration
             }
 
             VertexCount = mesh.vertexCount;
-            IndexCount = mesh.GetIndexCountAllSubmeshes();
+            int indexCount = 0;
+            for (int submeshIndex = 0; submeshIndex < mesh.subMeshCount; submeshIndex++)
+            {
+                indexCount += (int)mesh.GetIndexCount(submeshIndex);
+            }
+
+            IndexCount = indexCount;
             SubmeshCount = mesh.subMeshCount;
             LoadedDiffuseTextureCount = textureDiagnostics.LoadedDiffuseTextureCount;
             LoadedSphereTextureCount = textureDiagnostics.LoadedSphereTextureCount;
@@ -567,17 +573,4 @@ namespace Mmd.UnityIntegration
             Array.Empty<MmdUnityMaterialMissingPropertyDiagnostic>();
     }
 
-    internal static class MmdMeshIndexCountExtensions
-    {
-        public static int GetIndexCountAllSubmeshes(this Mesh mesh)
-        {
-            int count = 0;
-            for (int submeshIndex = 0; submeshIndex < mesh.subMeshCount; submeshIndex++)
-            {
-                count += (int)mesh.GetIndexCount(submeshIndex);
-            }
-
-            return count;
-        }
-    }
 }
