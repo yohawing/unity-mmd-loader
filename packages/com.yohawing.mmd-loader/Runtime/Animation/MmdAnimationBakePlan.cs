@@ -3,8 +3,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Mmd.Physics;
-
 namespace Mmd
 {
     [Serializable]
@@ -83,7 +81,7 @@ namespace Mmd
             }
 
             int[] frames = Enumerable.Range(startFrame, checked(endFrame - startFrame + 1)).ToArray();
-            IReadOnlyList<MmdPlaybackSnapshot> snapshots = session.BuildSnapshots(frames, frameRate, new NullMmdPhysicsBackend());
+            IReadOnlyList<MmdPlaybackSnapshot> snapshots = session.BuildSnapshots(frames, frameRate);
             MmdPlaybackSnapshot first = snapshots[0];
             var orderedBones = first.frame.bones
                 .OrderBy(bone => bone.index)

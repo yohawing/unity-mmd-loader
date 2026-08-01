@@ -188,6 +188,14 @@ namespace Mmd
         public IReadOnlyList<MmdPlaybackSnapshot> BuildSnapshots(IReadOnlyList<int> frames, float frameRate, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
         {
             ThrowIfDisposed();
+            if (physicsBackend == null &&
+                ikSolver == null &&
+                nativeModelSourceIdentity != null &&
+                nativeMotionSourceIdentity != null)
+            {
+                EnsureNativeSourcesUnchanged();
+            }
+
             return MmdPlaybackSnapshotBuilder.BuildPhaseOneSnapshots(model, motion, frames, frameRate, modelId, motionId, physicsBackend, ikSolver);
         }
 
@@ -300,6 +308,15 @@ namespace Mmd
                 || (motion.sourceBytes?.Length ?? 0) != nativeMotionSourceLength)
             {
                 throw new InvalidOperationException("Native runtime session source identity changed after construction.");
+            }
+
+            if (ComputeSourceFingerprint(model.sourceBytes) != nativeModelSourceFingerprint ||
+                ComputeSourceFingerprint(motion.sourceBytes) != nativeMotionSourceFingerprint)
+            {
+                throw new InvalidOperationException(
+                    nativePlaybackSession == null
+                        ? "Native runtime source bytes changed before session compilation."
+                        : "Native runtime source bytes changed after session compilation.");
             }
         }
 

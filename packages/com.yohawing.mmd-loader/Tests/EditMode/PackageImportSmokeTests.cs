@@ -512,6 +512,46 @@ namespace Mmd.Tests
             Assert.That(snapshots[1].frame.bones[0].localPosition[0], Is.EqualTo(2.0f).Within(0.00001f));
         }
 
+        [Test]
+        public void TransformBakeSummaryUsesNativeSourceBackedFramesWhenPhysicsIsOff()
+        {
+            (MmdModelDefinition model, MmdMotionDefinition motion) = LoadPlaybackFixturePair();
+            using var session = new MmdRuntimeSession(
+                model,
+                motion,
+                "test_1bone_cube.pmx",
+                "test_1bone_cube_motion.vmd");
+
+            MmdAnimationBakeSummary summary = session.BuildTransformBakeSummary(
+                startFrame: 0,
+                endFrame: 2,
+                frameRate: 30.0f);
+
+            Assert.That(summary.bakedFrameCount, Is.EqualTo(3));
+            Assert.That(summary.boneCurves, Is.Not.Empty);
+            Assert.That(summary.boneCurves[0].positionKeys, Has.Count.EqualTo(3));
+            Assert.That(summary.boneCurves[0].rotationKeys, Has.Count.EqualTo(3));
+            Assert.That(summary.frames, Is.EqualTo(new[] { 0, 1, 2 }));
+        }
+
+        [Test]
+        public void TransformBakeSummaryRejectsChangedNativeSourceBytes()
+        {
+            (MmdModelDefinition model, MmdMotionDefinition motion) = LoadPlaybackFixturePair();
+            using var session = new MmdRuntimeSession(
+                model,
+                motion,
+                "test_1bone_cube.pmx",
+                "test_1bone_cube_motion.vmd");
+
+            model.sourceBytes![0] ^= 0xff;
+
+            InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
+                () => session.BuildTransformBakeSummary(0, 2, 30.0f))!;
+
+            Assert.That(exception.Message, Does.Contain("source bytes changed before session compilation"));
+        }
+
         private static (MmdModelDefinition Model, MmdMotionDefinition Motion) LoadPlaybackFixturePair()
         {
             var parser = new NativeMmdParser();
