@@ -476,9 +476,9 @@ namespace Mmd.Native
     {
         internal const long MaxReductionInputBytes = 256L * 1024L * 1024L;
 
-        private readonly IntPtr model;
-        private readonly IntPtr clip;
-        private readonly IntPtr instance;
+        private IntPtr model;
+        private IntPtr clip;
+        private IntPtr instance;
         private bool disposed;
 
         private MmdRuntimeFfiPlaybackSession(IntPtr model, IntPtr clip, IntPtr instance)
@@ -732,10 +732,54 @@ namespace Mmd.Native
                 return;
             }
 
-            MmdRuntimeFfiMethods.InstanceFree(instance);
-            MmdRuntimeFfiMethods.ClipFree(clip);
-            MmdRuntimeFfiMethods.ModelFree(model);
             disposed = true;
+            Exception? firstCleanupException = null;
+            try
+            {
+                IntPtr handle = instance;
+                instance = IntPtr.Zero;
+                if (handle != IntPtr.Zero)
+                {
+                    MmdRuntimeFfiMethods.InstanceFree(handle);
+                }
+            }
+            catch (Exception exception)
+            {
+                firstCleanupException ??= exception;
+            }
+
+            try
+            {
+                IntPtr handle = clip;
+                clip = IntPtr.Zero;
+                if (handle != IntPtr.Zero)
+                {
+                    MmdRuntimeFfiMethods.ClipFree(handle);
+                }
+            }
+            catch (Exception exception)
+            {
+                firstCleanupException ??= exception;
+            }
+
+            try
+            {
+                IntPtr handle = model;
+                model = IntPtr.Zero;
+                if (handle != IntPtr.Zero)
+                {
+                    MmdRuntimeFfiMethods.ModelFree(handle);
+                }
+            }
+            catch (Exception exception)
+            {
+                firstCleanupException ??= exception;
+            }
+
+            if (firstCleanupException != null)
+            {
+                throw firstCleanupException;
+            }
         }
     }
 

@@ -31,82 +31,100 @@ namespace Mmd.UnityIntegration
                 throw new ArgumentException("VMD bytes are required.", nameof(vmdBytes));
             }
 
+            // A failed replacement must not leave the old session active for a new model/motion pair.
             DisposeFastRuntime();
+            MmdRuntimeFfiPlaybackSession? candidate = null;
+            reason = string.Empty;
             try
             {
-                MmdRuntimeFfiPlaybackSession candidate = MmdRuntimeFfiPlaybackSession.Create(pmxBytes, vmdBytes);
-                int candidateBoneCount = candidate.BoneCount;
-                int candidateMorphCount = candidate.MorphCount;
+                MmdRuntimeFfiPlaybackSession created = MmdRuntimeFfiPlaybackSession.Create(pmxBytes, vmdBytes);
+                candidate = created;
+                int candidateBoneCount = created.BoneCount;
+                int candidateMorphCount = created.MorphCount;
                 if (candidateBoneCount != model.bones.Count)
                 {
-                    candidate.Dispose();
                     reason = $"mmd-runtime bone count {candidateBoneCount} does not match managed model bone count {model.bones.Count}.";
                     return false;
                 }
 
                 if (candidateMorphCount != model.morphs.Count)
                 {
-                    candidate.Dispose();
                     reason = $"mmd-runtime morph count {candidateMorphCount} does not match managed model morph count {model.morphs.Count}.";
                     return false;
                 }
 
                 int expectedWorldMatrixFloatCount = model.bones.Count * 16;
-                if (candidate.WorldMatrixFloatCount < expectedWorldMatrixFloatCount)
+                if (created.WorldMatrixFloatCount < expectedWorldMatrixFloatCount)
                 {
-                    candidate.Dispose();
-                    reason = $"mmd-runtime world matrix float count {candidate.WorldMatrixFloatCount} is smaller than required {expectedWorldMatrixFloatCount}.";
+                    reason = $"mmd-runtime world matrix float count {created.WorldMatrixFloatCount} is smaller than required {expectedWorldMatrixFloatCount}.";
                     return false;
                 }
 
-                if (candidate.MorphWeightCount != model.morphs.Count)
+                if (created.MorphWeightCount != model.morphs.Count)
                 {
-                    candidate.Dispose();
-                    reason = $"mmd-runtime morph weight count {candidate.MorphWeightCount} does not match managed model morph count {model.morphs.Count}.";
+                    reason = $"mmd-runtime morph weight count {created.MorphWeightCount} does not match managed model morph count {model.morphs.Count}.";
                     return false;
                 }
 
-                if (candidate.IkEnabledCount != model.ik.Count)
+                if (created.IkEnabledCount != model.ik.Count)
                 {
-                    candidate.Dispose();
-                    reason = $"mmd-runtime IK enabled count {candidate.IkEnabledCount} does not match managed model IK count {model.ik.Count}.";
+                    reason = $"mmd-runtime IK enabled count {created.IkEnabledCount} does not match managed model IK count {model.ik.Count}.";
                     return false;
                 }
 
-                fastSession = candidate;
-                fastWorldMatrices = new float[fastSession.WorldMatrixFloatCount];
-                fastMorphWeights = new float[fastSession.MorphWeightCount];
-                fastIkEnabled = new byte[fastSession.IkEnabledCount];
-                fastLastAppliedMorphWeights = new float[fastSession.MorphWeightCount];
-                fastMorphFrame = BuildFastMorphFrame(fastMorphWeights);
+                float[] worldMatrices = new float[created.WorldMatrixFloatCount];
+                float[] morphWeights = new float[created.MorphWeightCount];
+                byte[] ikEnabled = new byte[created.IkEnabledCount];
+                float[] lastAppliedMorphWeights = new float[created.MorphWeightCount];
+                MmdEvaluatedFrame? morphFrame = BuildFastMorphFrame(morphWeights);
+
+                fastSession = created;
+                fastWorldMatrices = worldMatrices;
+                fastMorphWeights = morphWeights;
+                fastIkEnabled = ikEnabled;
+                fastLastAppliedMorphWeights = lastAppliedMorphWeights;
+                fastMorphFrame = morphFrame;
                 fastMorphApplied = false;
                 fastMorphCacheValid = false;
+                candidate = null;
                 reason = string.Empty;
                 return true;
             }
             catch (DllNotFoundException ex)
             {
-                DisposeFastRuntime();
                 reason = ex.GetType().Name + ": " + ex.Message;
                 return false;
             }
             catch (EntryPointNotFoundException ex)
             {
-                DisposeFastRuntime();
                 reason = ex.GetType().Name + ": " + ex.Message;
                 return false;
             }
             catch (BadImageFormatException ex)
             {
-                DisposeFastRuntime();
                 reason = ex.GetType().Name + ": " + ex.Message;
                 return false;
             }
             catch (InvalidOperationException ex)
             {
-                DisposeFastRuntime();
                 reason = ex.GetType().Name + ": " + ex.Message;
                 return false;
+            }
+            finally
+            {
+                if (candidate != null)
+                {
+                    try
+                    {
+                        candidate.Dispose();
+                    }
+                    catch (Exception)
+                    {
+                        reason = string.IsNullOrEmpty(reason)
+                            ? "native runtime cleanup failed while releasing a candidate session."
+                            : reason + " Native runtime cleanup also failed while releasing the candidate session.";
+                    }
+                }
             }
         }
 
