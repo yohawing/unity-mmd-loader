@@ -468,7 +468,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void RuntimeSessionBuildSnapshotAppliesCustomIkSolver()
+        public void RuntimeSessionBuildSnapshotRejectsCustomIkSolverForSourceBackedInput()
         {
             (MmdModelDefinition model, MmdMotionDefinition motion) = LoadPlaybackFixturePair();
             string targetBoneName = model.bones[0].name;
@@ -478,14 +478,15 @@ namespace Mmd.Tests
                 "test_1bone_cube.pmx",
                 "test_1bone_cube_motion.vmd");
 
-            MmdPlaybackSnapshot baseline = session.BuildSnapshot(frame: 0, time: 0.0f);
-            MmdPlaybackSnapshot adjusted = session.BuildSnapshot(
-                frame: 0,
-                time: 0.0f,
-                ikSolver: new TestOffsetIkSolver(targetBoneName, 2.0f));
+            NotSupportedException exception = Assert.Throws<NotSupportedException>(
+                () => session.BuildSnapshot(
+                    frame: 0,
+                    time: 0.0f,
+                    ikSolver: new TestOffsetIkSolver(targetBoneName, 2.0f)))!;
 
-            Assert.That(adjusted.frame.bones[0].localPosition[0], Is.EqualTo(baseline.frame.bones[0].localPosition[0] + 2.0f).Within(0.00001f));
-            Assert.That(adjusted.frame.bones[0].worldMatrix[3], Is.EqualTo(baseline.frame.bones[0].worldMatrix[3] + 2.0f).Within(0.00001f));
+            Assert.That(exception.Message, Does.Contain("source-backed PMX/VMD"));
+            Assert.That(exception.Message, Does.Contain("custom physics backend or IK solver"));
+            Assert.That(exception.Message, Does.Contain("native evaluation is required"));
         }
 
         [Test]

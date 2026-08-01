@@ -15,11 +15,8 @@ namespace Mmd.Tests
         [Test]
         public void RuntimeSessionReusesTopologyAndPreservesManagedWorldMatrices()
         {
-            var parser = new NativeMmdParser();
-            MmdModelDefinition model = parser.LoadModel(
-                MmdTestFixtures.ReadFixtureAssetBytes("test_append_bone.pmx"));
-            MmdMotionDefinition motion = parser.LoadMotion(
-                MmdTestFixtures.ReadFixtureAssetBytes("test_append_bone.vmd"));
+            MmdModelDefinition model = CreateIkTopologyModel();
+            var motion = new MmdMotionDefinition();
             using var session = new MmdRuntimeSession(model, motion, "model", "motion");
             var topologyPlan = session.TopologyPlan;
 
@@ -39,7 +36,12 @@ namespace Mmd.Tests
         [Test]
         public void RuntimeSessionManagedPipelineRejectsStaleTopologyBeforeEvaluation()
         {
-            using MmdRuntimeSession session = CreateSession(out MmdModelDefinition model);
+            MmdModelDefinition model = CreateIkTopologyModel();
+            using MmdRuntimeSession session = new(
+                model,
+                new MmdMotionDefinition(),
+                "synthetic.pmx",
+                "synthetic.vmd");
             _ = session.TopologyPlan;
             model.bones[0].origin[0] += 0.25f;
 
