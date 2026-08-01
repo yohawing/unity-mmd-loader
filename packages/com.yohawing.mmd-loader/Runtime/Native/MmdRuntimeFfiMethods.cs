@@ -12,7 +12,6 @@ namespace Mmd.Native
         internal const uint FeatureSplitPhysicsEvaluation = 1u << 0;
         internal const uint FeaturePhysicsBulletNative = 1u << 1;
         internal const uint FeatureHostPoseNativeMorphs = 1u << 3;
-        internal const uint FeatureReducedPoseGenericCurves = 1u << 4;
         internal const uint PhysicsModeLive = 2;
         internal const uint PhysicsFrameActionSeed = 0;
         internal const uint PhysicsFrameActionStep = 1;
@@ -363,9 +362,6 @@ namespace Mmd.Native
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_evaluate_clip_frame", CallingConvention = CallingConvention.Cdecl)]
         internal static extern byte InstanceEvaluateClipFrame(IntPtr instance, IntPtr clip, float frame);
 
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_evaluate_clip_frame_without_ik", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern byte InstanceEvaluateClipFrameWithoutIk(IntPtr instance, IntPtr clip, float frame);
-
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_world_matrix_f32_len", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr InstanceWorldMatrixF32Len(IntPtr instance);
 
@@ -568,16 +564,6 @@ namespace Mmd.Native
             }
 
             MmdRuntimeFfiSmoke.EvaluateAndCopy(instance, clip, frame, worldMatrices, morphWeights, ikEnabled);
-        }
-
-        public void EvaluateWithoutIkAndCopy(float frame, float[] worldMatrices, float[] morphWeights, byte[] ikEnabled)
-        {
-            if (disposed)
-            {
-                throw new ObjectDisposedException(nameof(MmdRuntimeFfiPlaybackSession));
-            }
-
-            MmdRuntimeFfiSmoke.EvaluateWithoutIkAndCopy(instance, clip, frame, worldMatrices, morphWeights, ikEnabled);
         }
 
         public void EvaluateBatch(
@@ -939,16 +925,7 @@ namespace Mmd.Native
             float[] worldMatrices,
             float[] morphWeights,
             byte[] ikEnabled)
-            => EvaluateAndCopyCore(instance, clip, frame, worldMatrices, morphWeights, ikEnabled, useIk: true);
-
-        internal static void EvaluateWithoutIkAndCopy(
-            IntPtr instance,
-            IntPtr clip,
-            float frame,
-            float[] worldMatrices,
-            float[] morphWeights,
-            byte[] ikEnabled)
-            => EvaluateAndCopyCore(instance, clip, frame, worldMatrices, morphWeights, ikEnabled, useIk: false);
+            => EvaluateAndCopyCore(instance, clip, frame, worldMatrices, morphWeights, ikEnabled);
 
         private static void EvaluateAndCopyCore(
             IntPtr instance,
@@ -956,17 +933,12 @@ namespace Mmd.Native
             float frame,
             float[] worldMatrices,
             float[] morphWeights,
-            byte[] ikEnabled,
-            bool useIk)
+            byte[] ikEnabled)
         {
-            byte evaluated = useIk
-                ? MmdRuntimeFfiMethods.InstanceEvaluateClipFrame(instance, clip, frame)
-                : MmdRuntimeFfiMethods.InstanceEvaluateClipFrameWithoutIk(instance, clip, frame);
+            byte evaluated = MmdRuntimeFfiMethods.InstanceEvaluateClipFrame(instance, clip, frame);
             if (evaluated == 0)
             {
-                throw new InvalidOperationException(useIk
-                    ? "mmd-runtime clip frame evaluation returned false."
-                    : "mmd-runtime clip frame without IK evaluation returned false.");
+                throw new InvalidOperationException("mmd-runtime clip frame evaluation returned false.");
             }
 
             if (worldMatrices.Length > 0 &&
