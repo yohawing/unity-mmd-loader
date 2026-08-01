@@ -563,7 +563,29 @@ namespace Mmd.Native
                 throw new ObjectDisposedException(nameof(MmdRuntimeFfiPlaybackSession));
             }
 
-            MmdRuntimeFfiSmoke.EvaluateAndCopy(instance, clip, frame, worldMatrices, morphWeights, ikEnabled);
+            byte evaluated = MmdRuntimeFfiMethods.InstanceEvaluateClipFrame(instance, clip, frame);
+            if (evaluated == 0)
+            {
+                throw new InvalidOperationException("mmd-runtime clip frame evaluation returned false.");
+            }
+
+            if (worldMatrices.Length > 0 &&
+                MmdRuntimeFfiMethods.InstanceCopyWorldMatrices(instance, worldMatrices, new IntPtr(worldMatrices.Length)) == 0)
+            {
+                throw new InvalidOperationException("mmd-runtime world matrix copy returned false.");
+            }
+
+            if (morphWeights.Length > 0 &&
+                MmdRuntimeFfiMethods.InstanceCopyMorphWeights(instance, morphWeights, new IntPtr(morphWeights.Length)) == 0)
+            {
+                throw new InvalidOperationException("mmd-runtime morph weight copy returned false.");
+            }
+
+            if (ikEnabled.Length > 0 &&
+                MmdRuntimeFfiMethods.InstanceCopyIkEnabled(instance, ikEnabled, new IntPtr(ikEnabled.Length)) == 0)
+            {
+                throw new InvalidOperationException("mmd-runtime IK enabled copy returned false.");
+            }
         }
 
         public void EvaluateBatch(
@@ -916,50 +938,5 @@ namespace Mmd.Native
         }
     }
 
-    internal static class MmdRuntimeFfiSmoke
-    {
-        internal static void EvaluateAndCopy(
-            IntPtr instance,
-            IntPtr clip,
-            float frame,
-            float[] worldMatrices,
-            float[] morphWeights,
-            byte[] ikEnabled)
-            => EvaluateAndCopyCore(instance, clip, frame, worldMatrices, morphWeights, ikEnabled);
-
-        private static void EvaluateAndCopyCore(
-            IntPtr instance,
-            IntPtr clip,
-            float frame,
-            float[] worldMatrices,
-            float[] morphWeights,
-            byte[] ikEnabled)
-        {
-            byte evaluated = MmdRuntimeFfiMethods.InstanceEvaluateClipFrame(instance, clip, frame);
-            if (evaluated == 0)
-            {
-                throw new InvalidOperationException("mmd-runtime clip frame evaluation returned false.");
-            }
-
-            if (worldMatrices.Length > 0 &&
-                MmdRuntimeFfiMethods.InstanceCopyWorldMatrices(instance, worldMatrices, new IntPtr(worldMatrices.Length)) == 0)
-            {
-                throw new InvalidOperationException("mmd-runtime world matrix copy returned false.");
-            }
-
-            if (morphWeights.Length > 0 &&
-                MmdRuntimeFfiMethods.InstanceCopyMorphWeights(instance, morphWeights, new IntPtr(morphWeights.Length)) == 0)
-            {
-                throw new InvalidOperationException("mmd-runtime morph weight copy returned false.");
-            }
-
-            if (ikEnabled.Length > 0 &&
-                MmdRuntimeFfiMethods.InstanceCopyIkEnabled(instance, ikEnabled, new IntPtr(ikEnabled.Length)) == 0)
-            {
-                throw new InvalidOperationException("mmd-runtime IK enabled copy returned false.");
-            }
-        }
-
-    }
 }
 
