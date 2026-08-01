@@ -258,7 +258,8 @@ namespace Mmd.UnityIntegration
     /// </summary>
     public sealed class MmdMaterialMapperSet
     {
-        private static readonly MmdMaterialMapper BuiltInMapper = CreateBuiltInMaterial;
+        private static readonly MmdMaterialMapper BuiltInMapper =
+            (_, resolvedDefaultShader) => new Material(resolvedDefaultShader);
         private readonly Dictionary<int, MmdMaterialMapperRegistration> _materialOverrides;
 
         public static MmdMaterialMapperSet BuiltIn { get; } = new MmdMaterialMapperSet(
@@ -388,12 +389,6 @@ namespace Mmd.UnityIntegration
                 : new MmdMaterialMapperRegistration(DefaultMapper, DefaultTextureTargets, DefaultRenderingTargets);
         }
 
-        private static Material CreateBuiltInMaterial(
-            MmdMaterialDescriptor descriptor,
-            Shader resolvedDefaultShader)
-        {
-            return new Material(resolvedDefaultShader);
-        }
     }
 
     internal readonly struct MmdMaterialMapperRegistration
