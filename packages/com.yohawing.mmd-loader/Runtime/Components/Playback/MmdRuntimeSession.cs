@@ -8,7 +8,6 @@ using Mmd.Parser;
 using Mmd.Physics;
 using Mmd.Pose;
 using Mmd.Rendering;
-using Mmd.Tracing;
 
 namespace Mmd
 {
@@ -85,18 +84,6 @@ namespace Mmd
                 ThrowIfDisposed();
                 return topologyPlan ??= MmdTopologyPlan.CreateFromValidatedModel(model);
             }
-        }
-
-        public MmdTrace EvaluateTrace(int frame, float time, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
-        {
-            ThrowIfDisposed();
-            return MmdRuntimeTraceEvaluator.EvaluatePhaseOneTrace(model, motion, frame, time, modelId, motionId, physicsBackend, ikSolver);
-        }
-
-        public MmdTrace EvaluateTraceFrames(IReadOnlyList<int> frames, float frameRate, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
-        {
-            ThrowIfDisposed();
-            return MmdRuntimeTraceEvaluator.EvaluatePhaseOneTraceFrames(model, motion, frames, frameRate, modelId, motionId, physicsBackend, ikSolver);
         }
 
         public MmdPlaybackSnapshot BuildSnapshot(int frame, float time, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
