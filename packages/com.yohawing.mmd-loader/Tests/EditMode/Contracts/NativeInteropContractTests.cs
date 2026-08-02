@@ -368,6 +368,87 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void RuntimeFfiPinsSharedVmdContextEntrypointsAndLayouts()
+        {
+            Assert.That(MmdRuntimeFfiMethods.FeatureVmdSharedContext, Is.EqualTo(1u << 9));
+            Assert.That(MmdRuntimeFfiMethods.FeatureVmdSharedContextBoneReadback, Is.EqualTo(1u << 10));
+            Assert.That(MmdRuntimeFfiMethods.VmdSharedContextAbiVersionV1, Is.EqualTo(1u));
+            Assert.That(MmdRuntimeFfiMethods.VmdSharedContextBoneReadbackAbiVersionV1, Is.EqualTo(1u));
+            Assert.That(
+                MmdRuntimeFfiMethods.ValidateVmdSharedContextCapability(),
+                Is.EqualTo(MmdRuntimeFfiMethods.VmdSharedContextAbiVersionV1));
+            Assert.That(
+                MmdRuntimeFfiMethods.ValidateVmdSharedContextBoneReadbackCapability(),
+                Is.EqualTo(MmdRuntimeFfiMethods.VmdSharedContextBoneReadbackAbiVersionV1));
+            AssertRuntimeFfiSignature(
+                "VmdContextCreateFromVmdBytes",
+                typeof(IntPtr),
+                typeof(byte[]),
+                typeof(IntPtr));
+            AssertRuntimeFfiSignature("VmdContextFree", typeof(void), typeof(IntPtr));
+            AssertRuntimeFfiSignature("VmdContextCameraFrameCount", typeof(IntPtr), typeof(IntPtr));
+            AssertRuntimeFfiSignature("VmdContextLightFrameCount", typeof(IntPtr), typeof(IntPtr));
+            AssertRuntimeFfiSignature("VmdContextSelfShadowFrameCount", typeof(IntPtr), typeof(IntPtr));
+            AssertRuntimeFfiSignature("VmdContextPropertyFrameCount", typeof(IntPtr), typeof(IntPtr));
+            AssertRuntimeFfiSignature("VmdContextPropertyIkEntryCount", typeof(IntPtr), typeof(IntPtr));
+            foreach (string methodName in new[]
+                     {
+                         "VmdContextCopyCameraKeyframes",
+                         "VmdContextCopyLightKeyframes",
+                         "VmdContextCopySelfShadowKeyframes",
+                         "VmdContextCopyPropertyKeyframes",
+                         "VmdContextCopyPropertyIkEntries"
+                     })
+            {
+                AssertRuntimeFfiSignature(
+                    methodName,
+                    typeof(int),
+                    typeof(IntPtr),
+                    typeof(IntPtr),
+                    typeof(IntPtr),
+                    typeof(IntPtr).MakeByRefType());
+            }
+
+            AssertRuntimeFfiSignature(
+                "ClipCreateFromVmdContextForModel",
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr));
+            AssertRuntimeFfiSignature(
+                "VmdContextBoneKeyframeCountForModel",
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr));
+            AssertRuntimeFfiSignature(
+                "VmdContextCopyBoneKeyframesForModel",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr).MakeByRefType(),
+                typeof(IntPtr).MakeByRefType());
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.VmdPropertyKeyframe>(), Is.EqualTo(24));
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.VmdPropertyIkEntry>(), Is.EqualTo(24));
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.VmdBoneKeyframe>(), Is.EqualTo(100));
+            Assert.That(
+                Marshal.OffsetOf<MmdRuntimeFfiMethods.VmdBoneKeyframe>("positionXyz").ToInt32(),
+                Is.EqualTo(8));
+            Assert.That(
+                Marshal.OffsetOf<MmdRuntimeFfiMethods.VmdBoneKeyframe>("rotationXyzw").ToInt32(),
+                Is.EqualTo(20));
+            Assert.That(
+                Marshal.OffsetOf<MmdRuntimeFfiMethods.VmdBoneKeyframe>("interpolation").ToInt32(),
+                Is.EqualTo(36));
+            Assert.That(
+                Marshal.OffsetOf<MmdRuntimeFfiMethods.VmdPropertyKeyframe>("ikEntryOffset").ToInt32(),
+                Is.EqualTo(8));
+            Assert.That(
+                Marshal.OffsetOf<MmdRuntimeFfiMethods.VmdPropertyIkEntry>("enabled").ToInt32(),
+                Is.EqualTo(20));
+        }
+
+        [Test]
         public void RuntimeFfiReadsCompiledAuthoredBoneAndMorphTracks()
         {
             byte[] bonePmx = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube.pmx");

@@ -16,6 +16,8 @@ namespace Mmd.Native
         internal const uint FeatureClipMorphTrackIntrospection = 1u << 6;
         internal const uint FeatureClipPropertyTrackIntrospection = 1u << 7;
         internal const uint FeatureVmdTrackKeyframeIntrospection = 1u << 8;
+        internal const uint FeatureVmdSharedContext = 1u << 9;
+        internal const uint FeatureVmdSharedContextBoneReadback = 1u << 10;
         internal const uint PhysicsModeLive = 2;
         internal const uint PhysicsFrameActionSeed = 0;
         internal const uint PhysicsFrameActionStep = 1;
@@ -27,8 +29,10 @@ namespace Mmd.Native
         internal const uint PhysicsBodyModeDynamicBone = 2;
         internal const uint PhysicsJointKindGeneric6DofSpring = 0;
         internal const int StatusOk = 0;
+        internal const int StatusInvalidInput = 1;
         internal const int StatusUnsupported = 2;
         internal const int StatusBufferTooSmall = 3;
+        internal const int StatusError = 4;
         internal const uint ReductionTargetDccCubic = 2;
         internal const uint GenericCurveAbiVersionV1 = 1;
         internal const uint GenericCurveBoneLocal = 0;
@@ -42,6 +46,8 @@ namespace Mmd.Native
         internal const uint ClipMorphTrackIntrospectionAbiVersionV1 = 1;
         internal const uint ClipPropertyTrackIntrospectionAbiVersionV1 = 1;
         internal const uint VmdTrackKeyframeIntrospectionAbiVersionV1 = 1;
+        internal const uint VmdSharedContextAbiVersionV1 = 1;
+        internal const uint VmdSharedContextBoneReadbackAbiVersionV1 = 1;
         internal const uint VmdCurveNone = 0;
         internal const uint VmdCurveCubicBezier = 1;
 
@@ -310,6 +316,40 @@ namespace Mmd.Native
         }
 
         [StructLayout(LayoutKind.Sequential)]
+        internal struct VmdBoneKeyframe
+        {
+            internal uint boneIndex;
+            internal uint frame;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3, ArraySubType = UnmanagedType.R4)]
+            internal float[] positionXyz;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4, ArraySubType = UnmanagedType.R4)]
+            internal float[] rotationXyzw;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 64, ArraySubType = UnmanagedType.U1)]
+            internal byte[] interpolation;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct VmdPropertyKeyframe
+        {
+            internal uint frame;
+            internal byte visible;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3, ArraySubType = UnmanagedType.U1)]
+            internal byte[] reserved;
+            internal IntPtr ikEntryOffset;
+            internal IntPtr ikEntryCount;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct VmdPropertyIkEntry
+        {
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 20, ArraySubType = UnmanagedType.U1)]
+            internal byte[] nameBytes;
+            internal byte enabled;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3, ArraySubType = UnmanagedType.U1)]
+            internal byte[] reserved;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
         internal struct BoneTrackCurve
         {
             internal uint kind;
@@ -397,6 +437,77 @@ namespace Mmd.Native
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_create_from_vmd_bytes_for_model", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr ClipCreateFromVmdBytesForModel(IntPtr model, byte[] data, IntPtr len);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_create_from_vmd_bytes", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr VmdContextCreateFromVmdBytes(byte[] data, IntPtr len);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_free", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void VmdContextFree(IntPtr context);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_camera_frame_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr VmdContextCameraFrameCount(IntPtr context);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_copy_camera_keyframes", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int VmdContextCopyCameraKeyframes(
+            IntPtr context,
+            IntPtr outKeys,
+            IntPtr outKeyCapacity,
+            out IntPtr outWritten);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_light_frame_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr VmdContextLightFrameCount(IntPtr context);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_copy_light_keyframes", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int VmdContextCopyLightKeyframes(
+            IntPtr context,
+            IntPtr outKeys,
+            IntPtr outKeyCapacity,
+            out IntPtr outWritten);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_self_shadow_frame_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr VmdContextSelfShadowFrameCount(IntPtr context);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_copy_self_shadow_keyframes", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int VmdContextCopySelfShadowKeyframes(
+            IntPtr context,
+            IntPtr outKeys,
+            IntPtr outKeyCapacity,
+            out IntPtr outWritten);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_property_frame_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr VmdContextPropertyFrameCount(IntPtr context);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_property_ik_entry_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr VmdContextPropertyIkEntryCount(IntPtr context);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_copy_property_keyframes", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int VmdContextCopyPropertyKeyframes(
+            IntPtr context,
+            IntPtr outKeys,
+            IntPtr outKeyCapacity,
+            out IntPtr outWritten);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_copy_property_ik_entries", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int VmdContextCopyPropertyIkEntries(
+            IntPtr context,
+            IntPtr outEntries,
+            IntPtr outEntryCapacity,
+            out IntPtr outWritten);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_create_from_vmd_context_for_model", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr ClipCreateFromVmdContextForModel(IntPtr model, IntPtr context);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_bone_keyframe_count_for_model", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr VmdContextBoneKeyframeCountForModel(IntPtr model, IntPtr context);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_copy_bone_keyframes_for_model", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int VmdContextCopyBoneKeyframesForModel(
+            IntPtr model,
+            IntPtr context,
+            IntPtr outKeys,
+            IntPtr outKeyCapacity,
+            out IntPtr outWritten,
+            out IntPtr outSkipped);
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_bone_track_count", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr ClipBoneTrackCount(IntPtr clip);
@@ -664,6 +775,41 @@ namespace Mmd.Native
             return abiVersion;
         }
 
+        internal static uint ValidateVmdSharedContextCapability()
+        {
+            uint abiVersion = AbiVersion();
+            if (abiVersion != ExpectedAbiVersion)
+            {
+                throw new MmdRuntimeUnsupportedException(
+                    $"mmd-runtime ABI version {abiVersion} is not supported for the shared VMD context. " +
+                    $"Expected {ExpectedAbiVersion}.");
+            }
+
+            uint featureFlags = FeatureFlags();
+            if ((featureFlags & FeatureVmdSharedContext) == 0)
+            {
+                throw new MmdRuntimeUnsupportedException(
+                    "mmd-runtime does not provide the shared VMD context feature " +
+                    $"(required feature bit 9, flags=0x{featureFlags:X8}).");
+            }
+
+            return VmdSharedContextAbiVersionV1;
+        }
+
+        internal static uint ValidateVmdSharedContextBoneReadbackCapability()
+        {
+            ValidateVmdSharedContextCapability();
+            uint featureFlags = FeatureFlags();
+            if ((featureFlags & FeatureVmdSharedContextBoneReadback) == 0)
+            {
+                throw new MmdRuntimeUnsupportedException(
+                    "mmd-runtime does not provide shared VMD raw bone readback " +
+                    $"(required feature bit 10, flags=0x{featureFlags:X8}).");
+            }
+
+            return VmdSharedContextBoneReadbackAbiVersionV1;
+        }
+
     }
     internal sealed partial class MmdRuntimeFfiPlaybackSession : IDisposable
     {
@@ -696,6 +842,12 @@ namespace Mmd.Native
         public int MorphWeightCount { get; }
         public int IkEnabledCount { get; }
 
+        internal IntPtr GetNativeModelHandle()
+        {
+            ThrowIfDisposed();
+            return model;
+        }
+
         public static MmdRuntimeFfiPlaybackSession Create(
             byte[] pmxBytes,
             byte[] vmdBytes,
@@ -711,27 +863,92 @@ namespace Mmd.Native
                 throw new ArgumentException("VMD bytes are required.", nameof(vmdBytes));
             }
 
+            if (!abiAlreadyValidated)
+            {
+                MmdRuntimeFfiMethods.ValidateAbiVersion();
+            }
+
+            return CreateFromModelClipFactory(
+                pmxBytes,
+                model => MmdRuntimeFfiMethods.ClipCreateFromVmdBytesForModel(
+                    model,
+                    vmdBytes,
+                    new IntPtr(vmdBytes.Length)),
+                "mmd-runtime VMD import returned a null clip",
+                unavailableOperation: null);
+        }
+
+        public static MmdRuntimeFfiPlaybackSession CreateFromVmdContext(
+            byte[] pmxBytes,
+            MmdRuntimeFfiVmdContext context,
+            bool abiAlreadyValidated = false)
+        {
+            if (pmxBytes == null || pmxBytes.Length == 0)
+            {
+                throw new ArgumentException("PMX bytes are required.", nameof(pmxBytes));
+            }
+
+            if (context == null)
+            {
+                throw new ArgumentNullException(nameof(context));
+            }
+
+            if (!abiAlreadyValidated)
+            {
+                try
+                {
+                    MmdRuntimeFfiMethods.ValidateVmdSharedContextCapability();
+                }
+                catch (DllNotFoundException exception)
+                {
+                    throw MmdRuntimeNativeBoundary.Unavailable(
+                        "shared VMD context-backed playback session", exception);
+                }
+                catch (EntryPointNotFoundException exception)
+                {
+                    throw MmdRuntimeNativeBoundary.Unavailable(
+                        "shared VMD context-backed playback session", exception);
+                }
+                catch (BadImageFormatException exception)
+                {
+                    throw MmdRuntimeNativeBoundary.Unavailable(
+                        "shared VMD context-backed playback session", exception);
+                }
+            }
+
+            IntPtr contextHandle = context.GetNativeHandle();
+            return CreateFromModelClipFactory(
+                pmxBytes,
+                model => MmdRuntimeFfiMethods.ClipCreateFromVmdContextForModel(model, contextHandle),
+                "mmd-runtime VMD context import returned a null clip",
+                "shared VMD context-backed playback session");
+        }
+
+        private static MmdRuntimeFfiPlaybackSession CreateFromModelClipFactory(
+            byte[] pmxBytes,
+            Func<IntPtr, IntPtr> createClip,
+            string clipFailureMessage,
+            string? unavailableOperation)
+        {
             IntPtr model = IntPtr.Zero;
             IntPtr clip = IntPtr.Zero;
             IntPtr instance = IntPtr.Zero;
             try
             {
-                if (!abiAlreadyValidated)
-                {
-                    MmdRuntimeFfiMethods.ValidateAbiVersion();
-                }
-                model = MmdRuntimeFfiMethods.ModelCreateFromPmxBytes(pmxBytes, new IntPtr(pmxBytes.Length));
+                model = MmdRuntimeFfiMethods.ModelCreateFromPmxBytes(
+                    pmxBytes,
+                    new IntPtr(pmxBytes.Length));
                 if (model == IntPtr.Zero)
                 {
                     throw new InvalidOperationException(
                         "mmd-runtime PMX import returned a null model: " + MmdRuntimeFfiMarshal.LastErrorMessage());
                 }
 
-                clip = MmdRuntimeFfiMethods.ClipCreateFromVmdBytesForModel(model, vmdBytes, new IntPtr(vmdBytes.Length));
+                clip = createClip(model);
                 if (clip == IntPtr.Zero)
                 {
-                    throw new InvalidOperationException(
-                        "mmd-runtime VMD import returned a null clip: " + MmdRuntimeFfiMarshal.LastErrorMessage());
+                    throw new InvalidOperationException(clipFailureMessage + ": " +
+                        MmdRuntimeFfiMarshal.LastErrorMessage());
                 }
 
                 instance = MmdRuntimeFfiMethods.InstanceCreateForModel(model);
@@ -746,6 +963,33 @@ namespace Mmd.Native
                 clip = IntPtr.Zero;
                 instance = IntPtr.Zero;
                 return session;
+            }
+            catch (DllNotFoundException exception)
+            {
+                if (unavailableOperation == null)
+                {
+                    throw;
+                }
+
+                throw MmdRuntimeNativeBoundary.Unavailable(unavailableOperation, exception);
+            }
+            catch (EntryPointNotFoundException exception)
+            {
+                if (unavailableOperation == null)
+                {
+                    throw;
+                }
+
+                throw MmdRuntimeNativeBoundary.Unavailable(unavailableOperation, exception);
+            }
+            catch (BadImageFormatException exception)
+            {
+                if (unavailableOperation == null)
+                {
+                    throw;
+                }
+
+                throw MmdRuntimeNativeBoundary.Unavailable(unavailableOperation, exception);
             }
             finally
             {

@@ -2,32 +2,29 @@
 
 using System;
 using System.Collections.Generic;
+using System.Text;
 using Mmd.Native;
 
 namespace Mmd.Parser
 {
     /// <summary>
-    /// Converts the intentionally name-less native authored-track readback into the
-    /// existing managed motion definition. This is an opt-in migration boundary; it
-    /// does not participate in the normal VMD parser path.
+    /// Converts model-resolved native authored-track readback into the existing managed
+    /// motion definition. This is an opt-in migration boundary; it does not participate
+    /// in the normal VMD parser path.
     /// </summary>
     internal static class MmdNativeMotionReadbackConverter
     {
-        private const byte DefaultCurveX1 = 20;
-        private const byte DefaultCurveY1 = 20;
-        private const byte DefaultCurveX2 = 107;
-        private const byte DefaultCurveY2 = 107;
-
         internal static MmdMotionDefinition Build(
             MmdModelDefinition model,
             MmdVmdParseSummary summary,
-            MmdRuntimeFfiMethods.BoneTrackDescriptor[] boneDescriptors,
-            MmdRuntimeFfiMethods.BoneTrackKey[][] boneKeys,
+            MmdRuntimeFfiMethods.VmdBoneKeyframe[] boneKeys,
             MmdRuntimeFfiMethods.MorphTrackDescriptor[] morphDescriptors,
             MmdRuntimeFfiMethods.MorphTrackKey[][] morphKeys,
             MmdRuntimeFfiMethods.VmdCameraKeyframe[] cameraKeys,
             MmdRuntimeFfiMethods.VmdLightKeyframe[] lightKeys,
             MmdRuntimeFfiMethods.VmdSelfShadowKeyframe[] selfShadowKeys,
+            MmdRuntimeFfiMethods.VmdPropertyKeyframe[] propertyKeys,
+            MmdRuntimeFfiMethods.VmdPropertyIkEntry[] propertyIkEntries,
             byte[] sourceBytes)
         {
             if (model == null)
@@ -35,9 +32,10 @@ namespace Mmd.Parser
                 throw new ArgumentNullException(nameof(model));
             }
 
-            if (boneDescriptors == null || boneKeys == null ||
+            if (boneKeys == null ||
                 morphDescriptors == null || morphKeys == null ||
-                cameraKeys == null || lightKeys == null || selfShadowKeys == null)
+                cameraKeys == null || lightKeys == null || selfShadowKeys == null ||
+                propertyKeys == null || propertyIkEntries == null)
             {
                 throw new ArgumentNullException("Native authored readback arrays are required.");
             }
@@ -47,11 +45,6 @@ namespace Mmd.Parser
                 throw new ArgumentException("VMD source bytes are required.", nameof(sourceBytes));
             }
 
-            if (boneDescriptors.Length != boneKeys.Length)
-            {
-                throw new InvalidOperationException(
-                    "Native authored bone descriptor/key track counts do not match.");
-            }
             if (morphDescriptors.Length != morphKeys.Length)
             {
                 throw new InvalidOperationException(
@@ -71,49 +64,39 @@ namespace Mmd.Parser
             };
 
             int bodyBoneKeyCount = 0;
-            for (int trackIndex = 0; trackIndex < boneDescriptors.Length; trackIndex++)
+            for (int keyIndex = 0; keyIndex < boneKeys.Length; keyIndex++)
             {
-                MmdRuntimeFfiMethods.BoneTrackDescriptor descriptor = boneDescriptors[trackIndex];
-                int boneIndex = CheckedUIntToInt(descriptor.boneIndex, "native bone track index");
-                string boneName = ResolveName(boneNames, boneIndex, "bone", trackIndex);
-                MmdRuntimeFfiMethods.BoneTrackKey[] keys = boneKeys[trackIndex] ??
-                    throw new InvalidOperationException("Native bone track keys are null: " + trackIndex + ".");
+                MmdRuntimeFfiMethods.VmdBoneKeyframe key = boneKeys[keyIndex];
+                int boneIndex = CheckedUIntToInt(key.boneIndex, "native bone key index");
+                string boneName = ResolveName(boneNames, boneIndex, "bone", keyIndex);
+                byte[] rawInterpolation = CopyRequiredBytes(
+                    key.interpolation,
+                    64,
+                    "native raw bone interpolation",
+                    0,
+                    keyIndex);
+                byte[] translationX = DecodeBoneInterpolation(rawInterpolation, 0);
+                byte[] translationY = DecodeBoneInterpolation(rawInterpolation, 1);
+                byte[] translationZ = DecodeBoneInterpolation(rawInterpolation, 2);
+                byte[] rotation = DecodeBoneInterpolation(rawInterpolation, 3);
 
-                bodyBoneKeyCount = checked(bodyBoneKeyCount + keys.Length);
-                for (int keyIndex = 0; keyIndex < keys.Length; keyIndex++)
+                bodyBoneKeyCount++;
+                motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
                 {
-                    MmdRuntimeFfiMethods.BoneTrackKey key = keys[keyIndex];
-                    int keyBoneIndex = CheckedUIntToInt(key.boneIndex, "native bone key index");
-                    if (keyBoneIndex != boneIndex)
+                    boneName = boneName,
+                    frame = CheckedFrame(key.frame, summary.MaxFrame, "native bone key", 0, keyIndex),
+                    translation = CopyRequired(key.positionXyz, 3, "native bone translation", 0, keyIndex),
+                    rotation = CopyRequired(key.rotationXyzw, 4, "native bone rotation", 0, keyIndex),
+                    interpolation = new MmdBoneInterpolationDefinition
                     {
-                        throw new InvalidOperationException(
-                            "Native bone key index does not match its track descriptor: track " +
-                            trackIndex + ", key " + keyIndex + ".");
-                    }
-
-                    byte[] translationX = CurveToInterpolation(key.translationX, "translationX", trackIndex, keyIndex);
-                    byte[] translationY = CurveToInterpolation(key.translationY, "translationY", trackIndex, keyIndex);
-                    byte[] translationZ = CurveToInterpolation(key.translationZ, "translationZ", trackIndex, keyIndex);
-                    byte[] rotation = CurveToInterpolation(key.rotation, "rotation", trackIndex, keyIndex);
-                    byte[] rawInterpolation = BuildRawInterpolation(translationX, translationY, translationZ, rotation);
-
-                    motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
-                    {
-                        boneName = boneName,
-                        frame = CheckedFrame(key.frame, summary.MaxFrame, "native bone key", trackIndex, keyIndex),
-                        translation = CopyRequired(key.positionXyz, 3, "native bone translation", trackIndex, keyIndex),
-                        rotation = CopyRequired(key.rotationXyzw, 4, "native bone rotation", trackIndex, keyIndex),
-                        interpolation = new MmdBoneInterpolationDefinition
-                        {
-                            translationX = translationX,
-                            translationY = translationY,
-                            translationZ = translationZ,
-                            rotation = rotation
-                        },
-                        physicsEnabled = false,
-                        rawInterpolation = rawInterpolation
-                    });
-                }
+                        translationX = translationX,
+                        translationY = translationY,
+                        translationZ = translationZ,
+                        rotation = rotation
+                    },
+                    physicsEnabled = false,
+                    rawInterpolation = rawInterpolation
+                });
             }
 
             if (bodyBoneKeyCount != summary.BoneKeyframeCount)
@@ -159,6 +142,81 @@ namespace Mmd.Parser
                     "Native authored morph readback count " + bodyMorphKeyCount +
                     " does not match the VMD summary count " + summary.MorphKeyframeCount + ".");
             }
+
+            if (propertyKeys.Length != summary.ModelKeyframeCount)
+            {
+                throw new InvalidOperationException(
+                    "Native authored property readback count " + propertyKeys.Length +
+                    " does not match the VMD summary count " + summary.ModelKeyframeCount + ".");
+            }
+
+            int propertyEntryCount = 0;
+            for (int keyIndex = 0; keyIndex < propertyKeys.Length; keyIndex++)
+            {
+                MmdRuntimeFfiMethods.VmdPropertyKeyframe key = propertyKeys[keyIndex];
+                if (key.visible > 1)
+                {
+                    throw new InvalidOperationException(
+                        "Native property visibility is not an ABI-safe boolean: key " + keyIndex + ".");
+                }
+
+                int entryOffset = CheckedIntPtrToInt(
+                    key.ikEntryOffset,
+                    "native property IK entry offset",
+                    keyIndex);
+                int entryCount = CheckedIntPtrToInt(
+                    key.ikEntryCount,
+                    "native property IK entry count",
+                    keyIndex);
+                if (entryOffset < 0 || entryCount < 0 || entryOffset > propertyIkEntries.Length - entryCount)
+                {
+                    throw new InvalidOperationException(
+                        "Native property IK entry range is outside the shared context buffer: key " +
+                        keyIndex + ".");
+                }
+
+                propertyEntryCount = checked(propertyEntryCount + entryCount);
+                var modelKey = new MmdModelKeyframeDefinition
+                {
+                    frame = CheckedFrame(key.frame, summary.MaxFrame, "native property key", 0, keyIndex),
+                    visible = key.visible != 0
+                };
+                for (int entryIndex = 0; entryIndex < entryCount; entryIndex++)
+                {
+                    MmdRuntimeFfiMethods.VmdPropertyIkEntry entry =
+                        propertyIkEntries[entryOffset + entryIndex];
+                    if (entry.enabled > 1)
+                    {
+                        throw new InvalidOperationException(
+                            "Native property IK enabled value is not an ABI-safe boolean: key " +
+                            keyIndex + ", entry " + entryIndex + ".");
+                    }
+
+                    modelKey.constraintStates.Add(new MmdModelConstraintStateDefinition
+                    {
+                        boneName = DecodePropertyIkName(entry.nameBytes, keyIndex, entryIndex),
+                        enabled = entry.enabled != 0
+                    });
+                }
+
+                motion.modelKeyframes.Add(modelKey);
+            }
+
+            if (propertyEntryCount != summary.ConstraintStateCount ||
+                propertyEntryCount != propertyIkEntries.Length)
+            {
+                throw new InvalidOperationException(
+                    "Native authored property IK entry count " + propertyEntryCount +
+                    " does not match the VMD summary/native counts " +
+                    summary.ConstraintStateCount + "/" + propertyIkEntries.Length + ".");
+            }
+
+            ValidateSceneTrackCount(cameraKeys.Length, summary.CameraKeyframeCount, "camera");
+            ValidateSceneTrackCount(lightKeys.Length, summary.LightKeyframeCount, "light");
+            ValidateSceneTrackCount(
+                selfShadowKeys.Length,
+                summary.SelfShadowKeyframeCount,
+                "self-shadow");
 
             AddCameraKeys(motion, cameraKeys, summary.MaxFrame);
             AddLightKeys(motion, lightKeys, summary.MaxFrame);
@@ -213,65 +271,15 @@ namespace Mmd.Parser
             return name;
         }
 
-        private static byte[] CurveToInterpolation(
-            MmdRuntimeFfiMethods.BoneTrackCurve curve,
-            string channel,
-            int trackIndex,
-            int keyIndex)
+        private static byte[] DecodeBoneInterpolation(byte[] rawInterpolation, int channel)
         {
-            if (curve.kind == MmdRuntimeFfiMethods.VmdCurveNone)
-            {
-                return new[] { DefaultCurveX1, DefaultCurveY1, DefaultCurveX2, DefaultCurveY2 };
-            }
-
-            if (curve.kind != MmdRuntimeFfiMethods.VmdCurveCubicBezier)
-            {
-                throw new InvalidOperationException(
-                    "Native bone interpolation kind is unsupported: " + channel + ", track " +
-                    trackIndex + ", key " + keyIndex + ".");
-            }
-
             return new[]
             {
-                CurvePointToByte(curve.x1, channel, trackIndex, keyIndex),
-                CurvePointToByte(curve.y1, channel, trackIndex, keyIndex),
-                CurvePointToByte(curve.x2, channel, trackIndex, keyIndex),
-                CurvePointToByte(curve.y2, channel, trackIndex, keyIndex)
+                rawInterpolation[channel],
+                rawInterpolation[4 + channel],
+                rawInterpolation[8 + channel],
+                rawInterpolation[12 + channel]
             };
-        }
-
-        private static byte CurvePointToByte(float point, string channel, int trackIndex, int keyIndex)
-        {
-            if (!float.IsFinite(point) || point < 0.0f || point > 1.0f)
-            {
-                throw new InvalidOperationException(
-                    "Native bone interpolation point is outside [0,1]: " + channel + ", track " +
-                    trackIndex + ", key " + keyIndex + ".");
-            }
-
-            return (byte)Math.Clamp((int)MathF.Round(point * 127.0f), 0, 127);
-        }
-
-        private static byte[] BuildRawInterpolation(
-            byte[] translationX,
-            byte[] translationY,
-            byte[] translationZ,
-            byte[] rotation)
-        {
-            var raw = new byte[64];
-            CopyInterpolationChannel(raw, 0, translationX);
-            CopyInterpolationChannel(raw, 1, translationY);
-            CopyInterpolationChannel(raw, 2, translationZ);
-            CopyInterpolationChannel(raw, 3, rotation);
-            return raw;
-        }
-
-        private static void CopyInterpolationChannel(byte[] destination, int channel, byte[] source)
-        {
-            for (int i = 0; i < 4; i++)
-            {
-                destination[channel + i * 4] = source[i];
-            }
         }
 
         private static void AddCameraKeys(
@@ -392,6 +400,65 @@ namespace Mmd.Parser
             }
 
             return (int)value;
+        }
+
+        private static int CheckedIntPtrToInt(IntPtr value, string label, int keyIndex)
+        {
+            long raw = value.ToInt64();
+            if (raw < 0 || raw > int.MaxValue)
+            {
+                throw new InvalidOperationException(
+                    label + " is out of range: key " + keyIndex + ", value " + raw + ".");
+            }
+
+            return (int)raw;
+        }
+
+        private static void ValidateSceneTrackCount(int actual, int expected, string label)
+        {
+            if (actual != expected)
+            {
+                throw new InvalidOperationException(
+                    "Native authored " + label + " readback count " + actual +
+                    " does not match the VMD summary count " + expected + ".");
+            }
+        }
+
+        private static string DecodePropertyIkName(byte[]? values, int keyIndex, int entryIndex)
+        {
+            if (values == null || values.Length != 20)
+            {
+                throw new InvalidOperationException(
+                    "Native property IK name must contain exactly 20 bytes: key " + keyIndex +
+                    ", entry " + entryIndex + ".");
+            }
+
+            int length = 0;
+            while (length < values.Length && values[length] != 0)
+            {
+                length++;
+            }
+
+            string name;
+            try
+            {
+                name = Encoding.GetEncoding(932).GetString(values, 0, length);
+            }
+            catch (ArgumentException exception)
+            {
+                throw new MmdRuntimeUnsupportedException(
+                    "CP932/Shift-JIS decoding is unavailable for native property IK names: " +
+                    exception.Message);
+            }
+
+            name = name.TrimEnd(' ', '\0');
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                throw new InvalidOperationException(
+                    "Native property IK name is empty: key " + keyIndex + ", entry " + entryIndex + ".");
+            }
+
+            return name;
         }
 
     }
