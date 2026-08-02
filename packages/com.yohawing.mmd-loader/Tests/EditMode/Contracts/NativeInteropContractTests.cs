@@ -367,6 +367,113 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void RuntimeFfiPinsCompiledAuthoredTrackReadbackEntrypointsAndLayouts()
+        {
+            AssertRuntimeFfiSignature("ClipBoneTrackCount", typeof(IntPtr), typeof(IntPtr));
+            AssertRuntimeFfiSignature(
+                "ClipBoneTrackDescriptor",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(MmdRuntimeFfiMethods.BoneTrackDescriptor).MakeByRefType());
+            AssertRuntimeFfiSignature("ClipBoneTrackKeyCount", typeof(IntPtr), typeof(IntPtr), typeof(IntPtr));
+            AssertRuntimeFfiSignature(
+                "ClipCopyBoneTrackKeys",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr).MakeByRefType());
+            AssertRuntimeFfiSignature("ClipMorphTrackCount", typeof(IntPtr), typeof(IntPtr));
+            AssertRuntimeFfiSignature(
+                "ClipMorphTrackDescriptor",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(MmdRuntimeFfiMethods.MorphTrackDescriptor).MakeByRefType());
+            AssertRuntimeFfiSignature("ClipMorphTrackKeyCount", typeof(IntPtr), typeof(IntPtr), typeof(IntPtr));
+            AssertRuntimeFfiSignature(
+                "ClipCopyMorphTrackKeys",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr).MakeByRefType());
+            AssertRuntimeFfiSignature("ClipPropertyTrackCount", typeof(IntPtr), typeof(IntPtr));
+            AssertRuntimeFfiSignature(
+                "ClipPropertyTrackDescriptor",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(MmdRuntimeFfiMethods.PropertyTrackDescriptor).MakeByRefType());
+            AssertRuntimeFfiSignature("ClipPropertyTrackKeyCount", typeof(IntPtr), typeof(IntPtr));
+            AssertRuntimeFfiSignature("ClipPropertyTrackIkEnabledCount", typeof(IntPtr), typeof(IntPtr));
+            AssertRuntimeFfiSignature(
+                "ClipCopyPropertyTrackKeys",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr).MakeByRefType());
+            AssertRuntimeFfiSignature(
+                "ClipCopyPropertyTrackIkEnabled",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr).MakeByRefType());
+
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.BoneTrackCurve>(), Is.EqualTo(20));
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.BoneTrackDescriptor>(), Is.EqualTo(16));
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.BoneTrackKey>(), Is.EqualTo(116));
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.MorphTrackDescriptor>(), Is.EqualTo(16));
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.MorphTrackKey>(), Is.EqualTo(12));
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.PropertyTrackDescriptor>(), Is.EqualTo(16));
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.PropertyTrackKey>(), Is.EqualTo(24));
+        }
+
+        [Test]
+        public void RuntimeFfiReadsCompiledAuthoredBoneAndMorphTracks()
+        {
+            byte[] bonePmx = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube.pmx");
+            byte[] boneVmd = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube_motion.vmd");
+            using (MmdRuntimeFfiPlaybackSession session = MmdRuntimeFfiPlaybackSession.Create(bonePmx, boneVmd))
+            {
+                int boneTrackCount = session.GetBoneTrackCount();
+                Assert.That(boneTrackCount, Is.GreaterThan(0));
+                MmdRuntimeFfiMethods.BoneTrackDescriptor descriptor = session.GetBoneTrackDescriptor(0);
+                int keyCount = MmdFfiMarshal.CheckedIntPtrToInt(descriptor.keyCount, "bone descriptor key count");
+                MmdRuntimeFfiMethods.BoneTrackKey[] keys = session.GetBoneTrackKeys(0);
+                Assert.That(keys, Has.Length.EqualTo(keyCount));
+                Assert.That(keys.All(key =>
+                    key.positionXyz != null && key.positionXyz.Length == 3 &&
+                    key.rotationXyzw != null && key.rotationXyzw.Length == 4 &&
+                    (key.translationX.kind == MmdRuntimeFfiMethods.VmdCurveNone ||
+                     key.translationX.kind == MmdRuntimeFfiMethods.VmdCurveCubicBezier)), Is.True);
+                Assert.That(keys.All(key => key.boneIndex == descriptor.boneIndex), Is.True);
+                AssertFramesAreSorted(keys.Select(key => (int)key.frame), "bone authored keys");
+            }
+
+            byte[] morphPmx = MmdTestFixtures.ReadFixtureAssetBytes("test_vertex_morph.pmx");
+            byte[] morphVmd = MmdTestFixtures.ReadFixtureAssetBytes("test_vertex_morph_motion.vmd");
+            using (MmdRuntimeFfiPlaybackSession session = MmdRuntimeFfiPlaybackSession.Create(morphPmx, morphVmd))
+            {
+                int morphTrackCount = session.GetMorphTrackCount();
+                Assert.That(morphTrackCount, Is.GreaterThan(0));
+                MmdRuntimeFfiMethods.MorphTrackDescriptor descriptor = session.GetMorphTrackDescriptor(0);
+                int keyCount = MmdFfiMarshal.CheckedIntPtrToInt(descriptor.keyCount, "morph descriptor key count");
+                MmdRuntimeFfiMethods.MorphTrackKey[] keys = session.GetMorphTrackKeys(0);
+                Assert.That(keys, Has.Length.EqualTo(keyCount));
+                Assert.That(keys.All(key => key.morphIndex == descriptor.morphIndex && float.IsFinite(key.weight)), Is.True);
+                AssertFramesAreSorted(keys.Select(key => (int)key.frame), "morph authored keys");
+                Assert.That(session.GetPropertyTrackCount(), Is.EqualTo(0));
+                Assert.That(session.GetPropertyTrackKeys(), Is.Empty);
+                Assert.That(session.GetPropertyTrackIkEnabled(), Is.Empty);
+            }
+        }
+
+        [Test]
         public void RuntimeFfiPinsClipFrameBatchEntrypoints()
         {
             AssertRuntimeFfiSignature(
