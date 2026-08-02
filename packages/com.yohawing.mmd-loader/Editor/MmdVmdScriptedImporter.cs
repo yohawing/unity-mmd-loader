@@ -20,6 +20,7 @@ namespace Mmd.Editor
                 int sourceByteLength,
                 DateTime sourceLastWriteTimeUtc,
                 byte[] sourceHash,
+                byte[] sourceBytes,
                 MmdVmdParseSummary? summary,
                 IReadOnlyList<string>? diagnostics)
             {
@@ -27,6 +28,7 @@ namespace Mmd.Editor
                 SourceByteLength = sourceByteLength;
                 SourceLastWriteTimeUtc = sourceLastWriteTimeUtc;
                 SourceHash = sourceHash;
+                SourceBytes = sourceBytes;
                 Summary = summary;
                 Diagnostics = diagnostics;
             }
@@ -38,6 +40,8 @@ namespace Mmd.Editor
             public DateTime SourceLastWriteTimeUtc { get; }
 
             public byte[] SourceHash { get; }
+
+            public byte[] SourceBytes { get; }
 
             public MmdVmdParseSummary? Summary { get; }
 
@@ -73,11 +77,9 @@ namespace Mmd.Editor
 
         public override void OnImportAsset(AssetImportContext ctx)
         {
-            byte[] bytes = File.ReadAllBytes(ctx.assetPath);
+            (byte[] bytes, MmdVmdParseSummary? summary, IReadOnlyList<string>? diagnostics, bool contentUnchanged) =
+                ReadSummaryWithCache(ctx.assetPath);
             string resolvedSourcePath = MmdAssetPathUtility.ResolveAssetSourcePath(ctx.assetPath);
-            (MmdVmdParseSummary? summary, IReadOnlyList<string>? diagnostics, bool contentUnchanged) = ReadSummaryWithCache(
-                ctx.assetPath,
-                bytes);
             TextAsset rawSource = FindReusableRawSource(ctx, contentUnchanged) ?? new TextAsset(bytes)
             {
                 name = "VMDSource"
@@ -90,23 +92,23 @@ namespace Mmd.Editor
             ctx.SetMainObject(asset);
         }
 
-        private static (MmdVmdParseSummary? Summary, IReadOnlyList<string>? Diagnostics, bool ContentUnchanged) ReadSummaryWithCache(
-            string assetPath,
-            byte[] bytes)
+        private static (byte[] Bytes, MmdVmdParseSummary? Summary, IReadOnlyList<string>? Diagnostics, bool ContentUnchanged) ReadSummaryWithCache(
+            string assetPath)
         {
-            int sourceByteLength = bytes.Length;
-            DateTime sourceLastWriteTimeUtc = File.GetLastWriteTimeUtc(assetPath);
+            FileInfo sourceInfo = new FileInfo(assetPath);
+            int sourceByteLength = checked((int)sourceInfo.Length);
+            DateTime sourceLastWriteTimeUtc = sourceInfo.LastWriteTimeUtc;
             CachedSummary? cached = cachedSummary;
-            byte[]? sourceHash = null;
             if (cached != null && cached.MatchesMetadata(assetPath, sourceByteLength, sourceLastWriteTimeUtc))
             {
-                sourceHash = ComputeSourceHash(bytes);
+                byte[] sourceHash = ComputeSourceHash(assetPath);
                 if (cached.MatchesContent(sourceHash))
                 {
-                    return (cached.Summary, cached.Diagnostics, true);
+                    return (cached.SourceBytes, cached.Summary, cached.Diagnostics, true);
                 }
             }
 
+            byte[] bytes = File.ReadAllBytes(assetPath);
             MmdVmdParseSummary? summary = null;
             IReadOnlyList<string>? diagnostics = null;
             try
@@ -123,12 +125,13 @@ namespace Mmd.Editor
 
             if (summary.HasValue && diagnostics == null)
             {
-                sourceHash ??= ComputeSourceHash(bytes);
+                byte[] sourceHash = ComputeSourceHash(bytes);
                 cachedSummary = new CachedSummary(
                     assetPath,
-                    sourceByteLength,
-                    sourceLastWriteTimeUtc,
+                    bytes.Length,
+                    File.GetLastWriteTimeUtc(assetPath),
                     sourceHash,
+                    bytes,
                     summary,
                     diagnostics);
             }
@@ -137,7 +140,7 @@ namespace Mmd.Editor
                 cachedSummary = null;
             }
 
-            return (summary, diagnostics, false);
+            return (bytes, summary, diagnostics, false);
         }
 
         private static TextAsset? FindReusableRawSource(AssetImportContext ctx, bool contentUnchanged)
@@ -164,6 +167,19 @@ namespace Mmd.Editor
         {
             using SHA256 sha256 = SHA256.Create();
             return sha256.ComputeHash(bytes);
+        }
+
+        private static byte[] ComputeSourceHash(string assetPath)
+        {
+            using FileStream stream = new FileStream(
+                assetPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                64 * 1024,
+                FileOptions.SequentialScan);
+            using SHA256 sha256 = SHA256.Create();
+            return sha256.ComputeHash(stream);
         }
     }
 }
