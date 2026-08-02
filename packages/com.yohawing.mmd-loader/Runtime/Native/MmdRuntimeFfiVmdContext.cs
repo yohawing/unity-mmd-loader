@@ -109,35 +109,6 @@ namespace Mmd.Native
                 });
         }
 
-        internal int GetCameraFrameCount()
-        {
-            return GetCount(MmdRuntimeFfiMethods.VmdContextCameraFrameCount, "camera frame count");
-        }
-
-        internal int GetLightFrameCount()
-        {
-            return GetCount(MmdRuntimeFfiMethods.VmdContextLightFrameCount, "light frame count");
-        }
-
-        internal int GetSelfShadowFrameCount()
-        {
-            return GetCount(
-                MmdRuntimeFfiMethods.VmdContextSelfShadowFrameCount,
-                "self-shadow frame count");
-        }
-
-        internal int GetPropertyFrameCount()
-        {
-            return GetCount(MmdRuntimeFfiMethods.VmdContextPropertyFrameCount, "property frame count");
-        }
-
-        internal int GetPropertyIkEntryCount()
-        {
-            return GetCount(
-                MmdRuntimeFfiMethods.VmdContextPropertyIkEntryCount,
-                "property IK entry count");
-        }
-
         internal MmdRuntimeFfiMethods.VmdCameraKeyframe[] GetCameraKeyframes()
         {
             return CopyStructArray<MmdRuntimeFfiMethods.VmdCameraKeyframe>(
@@ -278,27 +249,6 @@ namespace Mmd.Native
             catch (BadImageFormatException exception)
             {
                 throw MmdRuntimeNativeBoundary.Unavailable("shared VMD context cleanup", exception);
-            }
-        }
-
-        private int GetCount(Func<IntPtr, IntPtr> getCount, string label)
-        {
-            ThrowIfDisposed();
-            try
-            {
-                return MmdFfiMarshal.CheckedIntPtrToInt(getCount(handle), label);
-            }
-            catch (DllNotFoundException exception)
-            {
-                throw MmdRuntimeNativeBoundary.Unavailable("shared VMD context " + label, exception);
-            }
-            catch (EntryPointNotFoundException exception)
-            {
-                throw MmdRuntimeNativeBoundary.Unavailable("shared VMD context " + label, exception);
-            }
-            catch (BadImageFormatException exception)
-            {
-                throw MmdRuntimeNativeBoundary.Unavailable("shared VMD context " + label, exception);
             }
         }
 
