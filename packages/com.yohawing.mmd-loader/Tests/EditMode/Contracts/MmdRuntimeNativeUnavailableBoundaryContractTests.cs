@@ -13,9 +13,12 @@ namespace Mmd.Tests
     public sealed class MmdRuntimeNativeUnavailableBoundaryContractTests
     {
         private const string Operation = "standard VMD playback session";
-        private const string PhysicalUnavailableGateEnvironmentVariable =
-            "MMD_NATIVE_PHYSICAL_UNAVAILABLE_GATE";
+        private const string PhysicalGateModeEnvironmentVariable = "MMD_NATIVE_PHYSICAL_GATE_MODE";
+        private const string MissingDllMode = "MissingDll";
+        private const string MissingEntryPointMode = "MissingEntryPoint";
+        private const string AbiMismatchMode = "AbiMismatch";
         private const string PhysicalProbeOperation = "physical native runtime probe";
+        private const string PhysicalAbiMismatchOperation = "physical native ABI mismatch probe";
 
         [Test]
         public void MissingNativeDllIsClassifiedAsUnavailableWithStableOperation()
@@ -52,39 +55,12 @@ namespace Mmd.Tests
         [Test]
         public void PhysicalMissingNativeDllProbeClassifiesUnavailableRuntime()
         {
-            if (!string.Equals(
-                    Environment.GetEnvironmentVariable(PhysicalUnavailableGateEnvironmentVariable),
-                    "1",
-                    StringComparison.Ordinal))
-            {
-                Assert.Ignore(
-                    "Set " + PhysicalUnavailableGateEnvironmentVariable + "=1 to run the physical native unavailable gate.");
-            }
-
-#if !UNITY_EDITOR_WIN
-            Assert.Fail("The physical native unavailable gate is Windows Editor only.");
-#else
-            PackageInfo? package = PackageInfo.FindForAssembly(typeof(MmdRuntimeNativeUnavailableBoundaryContractTests).Assembly);
-            Assert.That(package, Is.Not.Null, "The loader package must be resolvable for the physical native unavailable gate.");
-            string projectRoot = Directory.GetParent(Application.dataPath)?.FullName ?? string.Empty;
-            Assert.That(projectRoot, Is.Not.Empty, "The Unity project root must be resolvable for the physical native unavailable gate.");
-            string packagePath = package!.assetPath;
-            if (!Path.IsPathRooted(packagePath))
-            {
-                packagePath = Path.Combine(projectRoot, packagePath);
-            }
-            string nativeDllPath = Path.GetFullPath(Path.Combine(
-                packagePath,
-                "Runtime",
-                "Plugins",
-                "x86_64",
-                "mmd_runtime_ffi.dll"));
+            string nativeDllPath = GetPhysicalNativeDllPath(MissingDllMode);
             Assert.That(
                 File.Exists(nativeDllPath),
                 Is.False,
                 "The physical missing-DLL gate requires the copied package DLL to be absent. " +
-                "Use scripts/run-native-unavailable-gate.ps1 before enabling " +
-                PhysicalUnavailableGateEnvironmentVariable + ". Path=" + nativeDllPath);
+                "Use scripts/run-native-unavailable-gate.ps1 before enabling the physical gate. Path=" + nativeDllPath);
 
             MmdRuntimeNativeUnavailableException unavailable = Assert.Throws<MmdRuntimeNativeUnavailableException>(
                 () => MmdRuntimeNativeBoundary.Invoke(
@@ -93,11 +69,80 @@ namespace Mmd.Tests
 
             Assert.That(unavailable.InnerException, Is.Not.Null);
             Assert.That(unavailable.InnerException!.Message, Is.Not.Null.And.Not.Empty);
-            Assert.That(
-                unavailable.InnerException,
-                    Is.TypeOf<DllNotFoundException>()
-                    .Or.TypeOf<EntryPointNotFoundException>()
-                    .Or.TypeOf<BadImageFormatException>());
+            Assert.That(unavailable.InnerException, Is.TypeOf<DllNotFoundException>());
+        }
+
+        [Test]
+        public void PhysicalMissingNativeEntryPointProbeClassifiesUnavailableRuntime()
+        {
+            string nativeDllPath = GetPhysicalNativeDllPath(MissingEntryPointMode);
+            Assert.That(File.Exists(nativeDllPath), Is.True, "The physical entry-point gate requires a replacement DLL.");
+
+            MmdRuntimeNativeUnavailableException unavailable = Assert.Throws<MmdRuntimeNativeUnavailableException>(
+                () => MmdRuntimeNativeBoundary.Invoke(
+                    PhysicalProbeOperation,
+                    MmdRuntimeFfiMethods.ValidateAbiVersion))!;
+
+            Assert.That(unavailable.InnerException, Is.TypeOf<EntryPointNotFoundException>());
+            Assert.That(unavailable.Message, Does.Contain(PhysicalProbeOperation));
+        }
+
+        [Test]
+        public void PhysicalAbiMismatchProbeClassifiesUnsupportedRuntime()
+        {
+            string nativeDllPath = GetPhysicalNativeDllPath(AbiMismatchMode);
+            Assert.That(File.Exists(nativeDllPath), Is.True, "The physical ABI gate requires a replacement DLL.");
+
+            uint observedAbiVersion = MmdRuntimeNativeBoundary.Invoke(
+                PhysicalAbiMismatchOperation,
+                MmdRuntimeFfiMethods.AbiVersion);
+            Assert.That(observedAbiVersion, Is.Not.EqualTo(MmdRuntimeFfiMethods.ExpectedAbiVersion));
+
+            MmdRuntimeUnsupportedException unsupported = Assert.Throws<MmdRuntimeUnsupportedException>(
+                () => MmdRuntimeNativeBoundary.Invoke(
+                    PhysicalAbiMismatchOperation,
+                    MmdRuntimeFfiMethods.ValidateVmdSharedContextCapability))!;
+            Assert.That(unsupported.Message, Does.Contain("ABI version"));
+            Assert.That(unsupported.Message, Does.Contain("Expected"));
+        }
+
+        private static string GetPhysicalNativeDllPath(string expectedMode)
+        {
+            if (!string.Equals(
+                    Environment.GetEnvironmentVariable(PhysicalGateModeEnvironmentVariable),
+                    expectedMode,
+                    StringComparison.Ordinal))
+            {
+                Assert.Ignore(
+                    "Set " + PhysicalGateModeEnvironmentVariable + "=" + expectedMode +
+                    " to run the physical native gate.");
+            }
+
+#if !UNITY_EDITOR_WIN
+            Assert.Fail("The physical native gate is Windows Editor only.");
+            return string.Empty;
+#else
+            PackageInfo? package = PackageInfo.FindForAssembly(typeof(MmdRuntimeNativeUnavailableBoundaryContractTests).Assembly);
+            Assert.That(package, Is.Not.Null, "The loader package must be resolvable for the physical native gate.");
+            string projectRoot = Directory.GetParent(Application.dataPath)?.FullName ?? string.Empty;
+            Assert.That(projectRoot, Is.Not.Empty, "The Unity project root must be resolvable for the physical native gate.");
+            string packagePath = package!.assetPath;
+            if (!Path.IsPathRooted(packagePath))
+            {
+                packagePath = Path.Combine(projectRoot, packagePath);
+            }
+            packagePath = Path.GetFullPath(packagePath);
+            Assert.That(Directory.Exists(packagePath), Is.True, "The resolved loader package directory must exist for the physical native gate.");
+            string nativePluginDirectory = Path.GetFullPath(Path.Combine(
+                packagePath,
+                "Runtime",
+                "Plugins",
+                "x86_64"));
+            Assert.That(nativePluginDirectory, Does.Exist, "The copied native plugin directory must exist for the physical native gate.");
+
+            return Path.GetFullPath(Path.Combine(
+                nativePluginDirectory,
+                "mmd_runtime_ffi.dll"));
 #endif
         }
 

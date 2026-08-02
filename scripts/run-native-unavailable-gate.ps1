@@ -3,7 +3,10 @@ param(
     [string] $ProjectPath = "F:\Develop\MMDDev\unity-mmd-loader\unity-mmd",
     [string] $PackageRoot = "F:\Develop\MMDDev\unity-mmd-loader\packages",
     [string] $ResultsFile = "F:\Develop\MMDDev\unity-mmd-loader\artifacts\native-unavailable-gate-results.xml",
-    [string] $LogFile = "F:\Develop\MMDDev\unity-mmd-loader\artifacts\native-unavailable-gate.log"
+    [string] $LogFile = "F:\Develop\MMDDev\unity-mmd-loader\artifacts\native-unavailable-gate.log",
+    [ValidateSet("MissingDll", "MissingEntryPoint", "AbiMismatch")]
+    [string] $Mode = "MissingDll",
+    [string] $ReplacementDll = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -57,11 +60,61 @@ function Copy-DirectoryWithRobocopy {
     }
 }
 
+function Remove-FileIfPresent {
+    param([Parameter(Mandatory = $true)][string] $Path)
+
+    if (Test-Path -LiteralPath $Path -PathType Leaf) {
+        Remove-Item -LiteralPath $Path -Force -ErrorAction Stop
+        if (Test-Path -LiteralPath $Path) {
+            throw "Native unavailable gate failed. Stale file could not be removed: $Path"
+        }
+    }
+}
+
+function Remove-DirectoryWithRetry {
+    param([Parameter(Mandatory = $true)][string] $Path)
+
+    for ($attempt = 1; $attempt -le 5; $attempt++) {
+        if (-not (Test-Path -LiteralPath $Path -PathType Container)) {
+            return
+        }
+
+        try {
+            [System.IO.Directory]::Delete($Path, $true)
+        }
+        catch {
+            if ($attempt -eq 5) {
+                throw "Native unavailable gate cleanup failed after $attempt attempts: $Path ($($_.Exception.Message))"
+            }
+            Start-Sleep -Seconds 1
+        }
+    }
+
+    if (Test-Path -LiteralPath $Path) {
+        throw "Native unavailable gate cleanup failed. Isolated project remains: $Path"
+    }
+}
+
 $Unity = Resolve-AbsolutePath $Unity
 $ProjectPath = Resolve-AbsolutePath $ProjectPath
 $PackageRoot = Resolve-AbsolutePath $PackageRoot
 $ResultsFile = Resolve-AbsolutePath $ResultsFile
 $LogFile = Resolve-AbsolutePath $LogFile
+$Mode = switch ($Mode.ToLowerInvariant()) {
+    "missingdll" { "MissingDll" }
+    "missingentrypoint" { "MissingEntryPoint" }
+    "abimismatch" { "AbiMismatch" }
+    default { throw "Native unavailable gate failed. Unsupported mode: $Mode" }
+}
+if ($Mode -ne "MissingDll") {
+    if ([string]::IsNullOrWhiteSpace($ReplacementDll)) {
+        throw "Native unavailable gate failed. -ReplacementDll is required for mode=$Mode"
+    }
+    $ReplacementDll = Resolve-AbsolutePath $ReplacementDll
+    if (-not (Test-Path -LiteralPath $ReplacementDll -PathType Leaf)) {
+        throw "Native unavailable gate failed. Replacement DLL was not found: $ReplacementDll"
+    }
+}
 
 if (-not (Test-Path -LiteralPath $Unity -PathType Leaf)) {
     throw "Native unavailable gate failed. Unity editor was not found: $Unity"
@@ -72,7 +125,7 @@ if (-not (Test-Path -LiteralPath $ProjectPath -PathType Container)) {
 if (-not (Test-Path -LiteralPath $PackageRoot -PathType Container)) {
     throw "Native unavailable gate failed. package root was not found: $PackageRoot"
 }
-Assert-NoRunningUnityProject -ProjectPath $ProjectPath -OperationName "native unavailable gate"
+Assert-NoRunningUnityProject -ProjectPath $ProjectPath -OperationName "native unavailable gate ($Mode)"
 
 $resultsDirectory = Split-Path -Parent $ResultsFile
 $logDirectory = Split-Path -Parent $LogFile
@@ -81,7 +134,14 @@ New-Item -ItemType Directory -Force -Path $resultsDirectory, $logDirectory | Out
 $gateRoot = Join-Path $resultsDirectory ("native-unavailable-gate-" + [Guid]::NewGuid().ToString("N"))
 $gateProject = Join-Path $gateRoot "unity-mmd"
 $gatePackages = Join-Path $gateRoot "packages"
-$previousGate = $env:MMD_NATIVE_PHYSICAL_UNAVAILABLE_GATE
+$previousGateMode = $env:MMD_NATIVE_PHYSICAL_GATE_MODE
+$replacementFingerprint = $null
+if ($Mode -ne "MissingDll") {
+    $replacementFile = Get-Item -LiteralPath $ReplacementDll
+    $replacementFingerprint = Get-FileHash -LiteralPath $ReplacementDll -Algorithm SHA256
+    Write-Host ("Native unavailable gate replacement DLL: mode={0}; path={1}; bytes={2}; sha256={3}" -f `
+        $Mode, $ReplacementDll, $replacementFile.Length, $replacementFingerprint.Hash)
+}
 
 try {
     New-Item -ItemType Directory -Force -Path `
@@ -111,16 +171,36 @@ try {
     }
 
     $gateDllPath = Join-Path $gatePackages "com.yohawing.mmd-loader\Runtime\Plugins\x86_64\mmd_runtime_ffi.dll"
-    if (Test-Path -LiteralPath $gateDllPath) {
-        throw "Native unavailable gate setup failed. The copied package still contains the native DLL: $gateDllPath"
+    if ($Mode -eq "MissingDll") {
+        if (Test-Path -LiteralPath $gateDllPath) {
+            throw "Native unavailable gate setup failed. The copied package still contains the native DLL: $gateDllPath"
+        }
+    }
+    else {
+        Copy-Item -LiteralPath $ReplacementDll -Destination $gateDllPath -Force
+        if (-not (Test-Path -LiteralPath $gateDllPath -PathType Leaf)) {
+            throw "Native unavailable gate setup failed. Replacement DLL was not copied: $gateDllPath"
+        }
     }
     if (-not (Test-Path -LiteralPath $gateProject -PathType Container) -or
         -not (Test-Path -LiteralPath (Join-Path $gateProject "ProjectSettings\ProjectVersion.txt") -PathType Leaf)) {
         throw "Native unavailable gate setup failed. The isolated Unity project is incomplete: $gateProject"
     }
 
-    Remove-Item -LiteralPath $ResultsFile, $LogFile -Force -ErrorAction SilentlyContinue
-    $env:MMD_NATIVE_PHYSICAL_UNAVAILABLE_GATE = "1"
+    Remove-FileIfPresent -Path $ResultsFile
+    Remove-FileIfPresent -Path $LogFile
+    $env:MMD_NATIVE_PHYSICAL_GATE_MODE = $Mode
+    $expectedTestName = switch ($Mode) {
+        "MissingDll" {
+            "Mmd.Tests.MmdRuntimeNativeUnavailableBoundaryContractTests.PhysicalMissingNativeDllProbeClassifiesUnavailableRuntime"
+        }
+        "MissingEntryPoint" {
+            "Mmd.Tests.MmdRuntimeNativeUnavailableBoundaryContractTests.PhysicalMissingNativeEntryPointProbeClassifiesUnavailableRuntime"
+        }
+        "AbiMismatch" {
+            "Mmd.Tests.MmdRuntimeNativeUnavailableBoundaryContractTests.PhysicalAbiMismatchProbeClassifiesUnsupportedRuntime"
+        }
+    }
     $gateProjectForUnity = Resolve-Path -LiteralPath $gateProject -Relative
     $unityArguments = @(
         "-batchmode",
@@ -129,9 +209,9 @@ try {
         "-testPlatform", "EditMode",
         "-testResults", $ResultsFile,
         "-logFile", $LogFile,
-        "-testFilter", "Mmd.Tests.MmdRuntimeNativeUnavailableBoundaryContractTests.PhysicalMissingNativeDllProbeClassifiesUnavailableRuntime"
+        "-testFilter", $expectedTestName
     )
-    Write-Host ("Native unavailable gate isolated project: {0}" -f $gateProject)
+    Write-Host ("Native unavailable gate mode={0}; isolated project: {1}" -f $Mode, $gateProject)
     $unityExitCode = 1
     for ($attempt = 1; $attempt -le 2; $attempt++) {
         if ($attempt -gt 1) {
@@ -171,7 +251,7 @@ try {
     }
 
     $physicalCase = $resultsXml.SelectSingleNode(
-        "//test-case[@fullname='Mmd.Tests.MmdRuntimeNativeUnavailableBoundaryContractTests.PhysicalMissingNativeDllProbeClassifiesUnavailableRuntime']")
+        "//test-case[@fullname='$expectedTestName']")
     $physicalCaseResult = if ($null -eq $physicalCase) { "<missing>" } else { [string] $physicalCase.GetAttribute("result") }
     if ($unityExitCode -ne 0 -or
         $summary.Result -ne "Passed" -or
@@ -181,24 +261,25 @@ try {
         $inconclusiveCount -ne 0 -or
         $summary.Skipped -ne 0 -or
         $physicalCaseResult -ne "Passed") {
-        throw (("Native unavailable gate failed. result={0}; total={1}; passed={2}; failed={3}; " +
-            "inconclusive={4}; skipped={5}; physicalCase={6}; unityExitCode={7}; results={8}; log={9}") -f `
+        throw (("Native unavailable gate failed. mode={0}; result={1}; total={2}; passed={3}; failed={4}; " +
+            "inconclusive={5}; skipped={6}; physicalCase={7}; unityExitCode={8}; results={9}; log={10}") -f `
+            $Mode,
             $summary.Result, $summary.Total, $summary.Passed, $summary.Failed, $inconclusiveCount, $summary.Skipped,
             $physicalCaseResult, $unityExitCode, $ResultsFile, $LogFile
         )
     }
 }
 finally {
-    if ($null -eq $previousGate) {
-        Remove-Item Env:MMD_NATIVE_PHYSICAL_UNAVAILABLE_GATE -ErrorAction SilentlyContinue
+    if ($null -eq $previousGateMode) {
+        Remove-Item Env:MMD_NATIVE_PHYSICAL_GATE_MODE -ErrorAction SilentlyContinue
     }
     else {
-        $env:MMD_NATIVE_PHYSICAL_UNAVAILABLE_GATE = $previousGate
+        $env:MMD_NATIVE_PHYSICAL_GATE_MODE = $previousGateMode
     }
 
     if (Test-Path -LiteralPath $gateRoot -PathType Container) {
-        [System.IO.Directory]::Delete($gateRoot, $true)
+        Remove-DirectoryWithRetry -Path $gateRoot
     }
 }
 
-Write-Host ("Native unavailable gate passed. results={0}; log={1}; isolatedCopy=cleaned" -f $ResultsFile, $LogFile)
+Write-Host ("Native unavailable gate passed. mode={0}; results={1}; log={2}; isolatedCopy=cleaned" -f $Mode, $ResultsFile, $LogFile)
