@@ -2,6 +2,9 @@
 
 using System;
 using System.IO;
+#if UNITY_EDITOR_WIN
+using System.Runtime.InteropServices;
+#endif
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -19,6 +22,8 @@ namespace Mmd.Tests
     public sealed class MmdVmdImportTimelinePerformanceTests
     {
         private const string GateEnvironmentVariable = "MMD_VMD_PERF_GATE";
+        private const string NativeHandleLifetimeStressGateEnvironmentVariable =
+            "MMD_NATIVE_HANDLE_LIFETIME_STRESS_GATE";
         private const string TempDirectory = "Assets/__MmdVmdImportTimelinePerformanceTests";
         private const string TempPmxPath = TempDirectory + "/test_1bone_cube.pmx";
         private const string TempVmdPath = TempDirectory + "/generated-vmd-timeline.vmd";
@@ -27,9 +32,19 @@ namespace Mmd.Tests
         private const int DefaultGeneratedBoneKeyframeCount = 300_000;
         private const int GeneratedFrameSpan = 12_000;
         private const double P95BudgetMilliseconds = 100.0;
+        private const int NativeHandleLifetimeStressIterationCount = 8;
+        private const int StressGeneratedBoneKeyframeCount = 16;
+        private const int StressGeneratedFrameSpan = 24;
+        private const int RetainedHandleAllowance = 4;
+        private const long RetainedManagedMemoryAllowanceBytes = 4L * 1024L * 1024L;
 
         [TearDown]
         public void TearDown()
+        {
+            CleanupTemporaryAssets();
+        }
+
+        private static void CleanupTemporaryAssets()
         {
             AssetDatabase.DeleteAsset(TempDirectory);
             AssetDatabase.Refresh();
@@ -211,6 +226,303 @@ namespace Mmd.Tests
                 Is.LessThanOrEqualTo(P95BudgetMilliseconds),
                 "Steady Timeline Evaluate exceeded the 100ms p95 budget.");
         }
+
+        [Test]
+        [Category("Stress")]
+        public void GeneratedVmdImportTimelineHandleLifetimeStressStaysWithinCleanupAllowance()
+        {
+            if (!string.Equals(
+                    Environment.GetEnvironmentVariable(NativeHandleLifetimeStressGateEnvironmentVariable),
+                    "1",
+                    StringComparison.Ordinal))
+            {
+                Assert.Ignore(
+                    "Set " + NativeHandleLifetimeStressGateEnvironmentVariable +
+                    "=1 to run the VMD import/Timeline native handle lifetime stress gate.");
+            }
+
+#if !UNITY_EDITOR_WIN
+            Assert.Fail("The VMD import/Timeline native handle lifetime stress gate is Windows Editor only.");
+#else
+            try
+            {
+                _ = MmdRuntimeNativeBoundary.Invoke(
+                    "VMD import/Timeline native handle lifetime stress",
+                    MmdRuntimeFfiMethods.ValidateAbiVersion);
+            }
+            catch (MmdRuntimeNativeUnavailableException exception)
+            {
+                Assert.Fail("Packaged native runtime is unavailable: " + exception.Message);
+            }
+            catch (MmdRuntimeUnsupportedException exception)
+            {
+                Assert.Fail("Packaged native runtime ABI is unsupported: " + exception.Message);
+            }
+            catch (InvalidOperationException exception)
+            {
+                Assert.Fail("Packaged native runtime ABI is unsupported: " + exception.Message);
+            }
+
+            byte[] vmdBytes = MmdTestFixtures.CreateDenseVmdBytes(
+                "generated-vmd-handle-lifetime-stress",
+                "全ての親",
+                StressGeneratedBoneKeyframeCount,
+                StressGeneratedFrameSpan);
+            MmdVmdParseSummary summary = MmdVmdBinarySummaryReader.Read(vmdBytes);
+            Assert.That(summary.BoneKeyframeCount, Is.EqualTo(StressGeneratedBoneKeyframeCount));
+
+            NativeHandleLifetimeStressReport report = RunNativeHandleLifetimeStress(vmdBytes);
+            TestContext.Progress.WriteLine(
+                "VMD import/Timeline native handle lifetime stress: iterations={0}, fixtureBytes={1}, " +
+                "fixtureBoneKeys={2}, fixtureMaxFrame={3}, retainedHandleAllowance={4}, " +
+                "retainedManagedMemoryAllowanceBytes={5} (machine-sensitive; kept conservative).",
+                NativeHandleLifetimeStressIterationCount,
+                vmdBytes.Length,
+                summary.BoneKeyframeCount,
+                summary.MaxFrame,
+                RetainedHandleAllowance,
+                RetainedManagedMemoryAllowanceBytes);
+            TestContext.Progress.WriteLine(FormatStressMetrics("baseline", report.Baseline));
+            TestContext.Progress.WriteLine(
+                "VMD import/Timeline native handle lifetime stress peak-after-cleanup: " +
+                "gcAllocatedBytesPerIteration={0}, gcRetainedBytes={1}, handleCount={2}",
+                FormatManagedGcAllocation(report.PeakManagedGcAllocatedBytesPerIteration),
+                report.PeakManagedRetainedBytes,
+                report.PeakHandleCount);
+            TestContext.Progress.WriteLine(FormatStressMetrics("final-after-teardown", report.Final));
+            UnityEngine.Debug.Log(
+                FormatStressMetrics("baseline", report.Baseline) + Environment.NewLine +
+                string.Format(
+                    "VMD import/Timeline native handle lifetime stress peak-after-cleanup: " +
+                    "gcAllocatedBytesPerIteration={0}, gcRetainedBytes={1}, handleCount={2}",
+                    FormatManagedGcAllocation(report.PeakManagedGcAllocatedBytesPerIteration),
+                    report.PeakManagedRetainedBytes,
+                    report.PeakHandleCount) + Environment.NewLine +
+                FormatStressMetrics("final-after-teardown", report.Final));
+
+            Assert.That(
+                report.Final.HandleCount,
+                Is.LessThanOrEqualTo(report.Baseline.HandleCount + RetainedHandleAllowance),
+                "Process.HandleCount retained beyond the conservative allowance after AssetDatabase and " +
+                "Timeline teardown. Baseline=" + report.Baseline.HandleCount +
+                ", final=" + report.Final.HandleCount + ". HandleCount is machine-sensitive; inspect the " +
+                "per-iteration peak before changing this gate.");
+            Assert.That(
+                report.Final.ManagedRetainedBytes,
+                Is.LessThanOrEqualTo(report.Baseline.ManagedRetainedBytes + RetainedManagedMemoryAllowanceBytes),
+                "Managed memory retained beyond the conservative allowance after full GC/finalizers. " +
+                "Baseline=" + report.Baseline.ManagedRetainedBytes +
+                ", final=" + report.Final.ManagedRetainedBytes +
+                ". Unity editor caches can be machine-sensitive; inspect the diagnostic metrics before " +
+                "changing this gate.");
+#endif
+        }
+
+#if UNITY_EDITOR_WIN
+        private readonly struct StressMetrics
+        {
+            public readonly long ManagedGcAllocatedBytes;
+            public readonly long ManagedRetainedBytes;
+            public readonly int HandleCount;
+
+            public StressMetrics(
+                long managedGcAllocatedBytes,
+                long managedRetainedBytes,
+                int handleCount)
+            {
+                ManagedGcAllocatedBytes = managedGcAllocatedBytes;
+                ManagedRetainedBytes = managedRetainedBytes;
+                HandleCount = handleCount;
+            }
+        }
+
+        private readonly struct NativeHandleLifetimeStressReport
+        {
+            public readonly StressMetrics Baseline;
+            public readonly StressMetrics Final;
+            public readonly long PeakManagedGcAllocatedBytesPerIteration;
+            public readonly long PeakManagedRetainedBytes;
+            public readonly int PeakHandleCount;
+
+            public NativeHandleLifetimeStressReport(
+                StressMetrics baseline,
+                StressMetrics final,
+                long peakManagedGcAllocatedBytesPerIteration,
+                long peakManagedRetainedBytes,
+                int peakHandleCount)
+            {
+                Baseline = baseline;
+                Final = final;
+                PeakManagedGcAllocatedBytesPerIteration = peakManagedGcAllocatedBytesPerIteration;
+                PeakManagedRetainedBytes = peakManagedRetainedBytes;
+                PeakHandleCount = peakHandleCount;
+            }
+        }
+
+        private NativeHandleLifetimeStressReport RunNativeHandleLifetimeStress(byte[] vmdBytes)
+        {
+            MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
+            StressMetrics baseline = default;
+            long peakManagedGcAllocatedBytesPerIteration = 0L;
+            long peakManagedRetainedBytes = 0L;
+            int peakHandleCount = 0;
+            try
+            {
+                PrepareTemporaryAssets(vmdBytes);
+                AssetDatabase.ImportAsset(TempVmdPath, ImportAssetOptions.ForceUpdate);
+                pmxAsset = LoadImportedPmxAsset();
+                vmdAsset = LoadImportedVmdAsset();
+                string assetGuid = AssetDatabase.AssetPathToGUID(TempVmdPath);
+                Assert.That(assetGuid, Is.Not.Null.And.Not.Empty);
+
+                using (TimelineEvaluationFixture warmup = CreateTimelineEvaluationFixture(pmxAsset, vmdAsset))
+                {
+                    warmup.Director.time = 0.0;
+                    warmup.Director.RebuildGraph();
+                    warmup.Director.Evaluate();
+                    Assert.That(warmup.Controller.IsConfigured, Is.True);
+                    Assert.That(warmup.Controller.LastSnapshot, Is.Not.Null);
+                }
+
+                ForceFullGarbageCollection();
+                baseline = CaptureStressMetrics();
+                peakManagedRetainedBytes = baseline.ManagedRetainedBytes;
+                peakHandleCount = baseline.HandleCount;
+
+                for (int iteration = 0; iteration < NativeHandleLifetimeStressIterationCount; iteration++)
+                {
+                    long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+                    AssetDatabase.ImportAsset(TempVmdPath, ImportAssetOptions.ForceUpdate);
+                    vmdAsset = LoadImportedVmdAsset();
+                    Assert.That(
+                        AssetDatabase.AssetPathToGUID(TempVmdPath),
+                        Is.EqualTo(assetGuid),
+                        "The temporary VMD AssetDatabase GUID changed during reimport iteration " + iteration + ".");
+
+                    using (TimelineEvaluationFixture evaluation =
+                           CreateTimelineEvaluationFixture(pmxAsset, vmdAsset))
+                    {
+                        evaluation.Director.time = 0.0;
+                        evaluation.Director.RebuildGraph();
+                        evaluation.Director.Evaluate();
+                        Assert.That(
+                            evaluation.Controller.IsConfigured,
+                            Is.True,
+                            "Timeline controller was not configured at iteration " + iteration + ".");
+                        Assert.That(
+                            evaluation.Controller.LastSnapshot,
+                            Is.Not.Null,
+                            "Timeline controller did not produce a snapshot at iteration " + iteration + ".");
+                    }
+
+                    ForceFullGarbageCollection();
+                    long allocatedAfter = GC.GetAllocatedBytesForCurrentThread();
+                    long iterationManagedGcAllocatedBytes = Math.Max(0L, allocatedAfter - allocatedBefore);
+                    StressMetrics current = CaptureStressMetrics();
+                    peakManagedGcAllocatedBytesPerIteration = Math.Max(
+                        peakManagedGcAllocatedBytesPerIteration,
+                        iterationManagedGcAllocatedBytes);
+                    peakManagedRetainedBytes = Math.Max(peakManagedRetainedBytes, current.ManagedRetainedBytes);
+                    peakHandleCount = Math.Max(peakHandleCount, current.HandleCount);
+
+                    TestContext.Progress.WriteLine(
+                        "VMD import/Timeline native handle lifetime stress iteration {0}: " +
+                        "gcAllocatedBytes={1}, gcRetainedBytes={2}, handleCount={3}",
+                        iteration,
+                        FormatManagedGcAllocation(iterationManagedGcAllocatedBytes),
+                        current.ManagedRetainedBytes,
+                        current.HandleCount);
+                }
+
+                pmxAsset = null;
+                vmdAsset = null;
+            }
+            finally
+            {
+                pmxAsset = null;
+                vmdAsset = null;
+                CleanupTemporaryAssets();
+            }
+
+            ForceFullGarbageCollection();
+            return new NativeHandleLifetimeStressReport(
+                baseline,
+                CaptureStressMetrics(),
+                peakManagedGcAllocatedBytesPerIteration,
+                peakManagedRetainedBytes,
+                peakHandleCount);
+        }
+
+        private static void ForceFullGarbageCollection()
+        {
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
+            GC.WaitForPendingFinalizers();
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
+        }
+
+        private static StressMetrics CaptureStressMetrics()
+        {
+            return new StressMetrics(
+                GC.GetAllocatedBytesForCurrentThread(),
+                GC.GetTotalMemory(forceFullCollection: true),
+                ReadProcessHandleCount());
+        }
+
+        [DllImport("kernel32.dll", ExactSpelling = true)]
+        private static extern IntPtr GetCurrentProcess();
+
+        [DllImport("kernel32.dll", ExactSpelling = true, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetProcessHandleCount(
+            IntPtr hProcess,
+            out uint pdwHandleCount);
+
+        private static int ReadProcessHandleCount()
+        {
+            IntPtr processHandle = GetCurrentProcess();
+            if (processHandle == IntPtr.Zero)
+            {
+                int error = Marshal.GetLastWin32Error();
+                Assert.Fail(
+                    "GetCurrentProcess returned NULL for the opt-in stress gate. Win32Error=" + error + ".");
+            }
+
+            if (!GetProcessHandleCount(processHandle, out uint handleCount))
+            {
+                int error = Marshal.GetLastWin32Error();
+                Assert.Fail(
+                    "GetProcessHandleCount failed for the current process. Win32Error=" + error + ".");
+            }
+
+            if (handleCount == 0)
+            {
+                Assert.Fail(
+                    "GetProcessHandleCount returned zero for the current Windows process; refusing to treat " +
+                    "zero as meaningful OS handle telemetry.");
+            }
+
+            return checked((int)handleCount);
+        }
+
+        private static string FormatManagedGcAllocation(long allocatedBytes)
+        {
+            return allocatedBytes == 0L
+                ? "0 (unavailable_or_zero_observed)"
+                : allocatedBytes.ToString();
+        }
+
+        private static string FormatStressMetrics(string label, StressMetrics metrics)
+        {
+            return string.Format(
+                "VMD import/Timeline native handle lifetime stress {0}: " +
+                "gcAllocatedBytes={1}, gcRetainedBytes={2}, handleCount={3}",
+                label,
+                FormatManagedGcAllocation(metrics.ManagedGcAllocatedBytes),
+                metrics.ManagedRetainedBytes,
+                metrics.HandleCount);
+        }
+#endif
 
         private static void PrepareTemporaryAssets(byte[] vmdBytes)
         {
