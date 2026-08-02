@@ -45,33 +45,23 @@ namespace Mmd.Native
                 throw new ArgumentException("VMD bytes are required.", nameof(vmdBytes));
             }
 
-            try
-            {
-                MmdRuntimeFfiMethods.ValidateVmdSharedContextCapability();
-                IntPtr nativeHandle = MmdRuntimeFfiMethods.VmdContextCreateFromVmdBytes(
-                    vmdBytes,
-                    new IntPtr(vmdBytes.Length));
-                if (nativeHandle == IntPtr.Zero)
+            return MmdRuntimeNativeBoundary.Invoke(
+                "shared VMD context",
+                () =>
                 {
-                    throw new InvalidOperationException(
-                        "mmd-runtime shared VMD context creation returned null: " +
-                        MmdRuntimeFfiMarshal.LastErrorMessage());
-                }
+                    MmdRuntimeFfiMethods.ValidateVmdSharedContextCapability();
+                    IntPtr nativeHandle = MmdRuntimeFfiMethods.VmdContextCreateFromVmdBytes(
+                        vmdBytes,
+                        new IntPtr(vmdBytes.Length));
+                    if (nativeHandle == IntPtr.Zero)
+                    {
+                        throw new InvalidOperationException(
+                            "mmd-runtime shared VMD context creation returned null: " +
+                            MmdRuntimeFfiMarshal.LastErrorMessage());
+                    }
 
-                return new MmdRuntimeFfiVmdContext(nativeHandle);
-            }
-            catch (DllNotFoundException exception)
-            {
-                throw MmdRuntimeNativeBoundary.Unavailable("shared VMD context", exception);
-            }
-            catch (EntryPointNotFoundException exception)
-            {
-                throw MmdRuntimeNativeBoundary.Unavailable("shared VMD context", exception);
-            }
-            catch (BadImageFormatException exception)
-            {
-                throw MmdRuntimeNativeBoundary.Unavailable("shared VMD context", exception);
-            }
+                    return new MmdRuntimeFfiVmdContext(nativeHandle);
+                });
         }
 
         internal IntPtr GetNativeHandle()
@@ -357,7 +347,10 @@ namespace Mmd.Native
         }
     }
 
-    internal sealed class MmdRuntimeNativeUnavailableException : Exception
+    /// <summary>
+    /// Indicates that the packaged native runtime cannot be loaded or does not expose a required entry point.
+    /// </summary>
+    public sealed class MmdRuntimeNativeUnavailableException : Exception
     {
         internal MmdRuntimeNativeUnavailableException(string message, Exception innerException)
             : base(message, innerException)
@@ -367,6 +360,26 @@ namespace Mmd.Native
 
     internal static class MmdRuntimeNativeBoundary
     {
+        internal static T Invoke<T>(string operation, Func<T> action)
+        {
+            try
+            {
+                return action();
+            }
+            catch (DllNotFoundException exception)
+            {
+                throw Unavailable(operation, exception);
+            }
+            catch (EntryPointNotFoundException exception)
+            {
+                throw Unavailable(operation, exception);
+            }
+            catch (BadImageFormatException exception)
+            {
+                throw Unavailable(operation, exception);
+            }
+        }
+
         internal static MmdRuntimeNativeUnavailableException Unavailable(
             string operation,
             Exception exception)

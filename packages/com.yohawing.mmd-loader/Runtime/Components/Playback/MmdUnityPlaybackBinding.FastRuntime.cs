@@ -149,6 +149,11 @@ namespace Mmd.UnityIntegration
                 reason = ex.GetType().Name + ": " + ex.Message;
                 return false;
             }
+            catch (MmdRuntimeNativeUnavailableException ex)
+            {
+                reason = ex.GetType().Name + ": " + ex.Message;
+                return false;
+            }
             catch (InvalidOperationException ex)
             {
                 reason = ex.GetType().Name + ": " + ex.Message;

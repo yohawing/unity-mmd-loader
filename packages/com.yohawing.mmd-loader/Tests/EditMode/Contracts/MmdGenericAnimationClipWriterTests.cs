@@ -409,6 +409,10 @@ namespace Mmd.Tests
             Assert.That(MmdGenericAnimationClipWriter.IsSparseNativeFallbackException(
                 new BadImageFormatException()), Is.True);
             Assert.That(MmdGenericAnimationClipWriter.IsSparseNativeFallbackException(
+                new MmdRuntimeNativeUnavailableException(
+                    "native runtime unavailable",
+                    new DllNotFoundException("missing native DLL"))), Is.True);
+            Assert.That(MmdGenericAnimationClipWriter.IsSparseNativeFallbackException(
                 new MmdRuntimeUnsupportedException("unsupported")), Is.True);
             Assert.That(MmdGenericAnimationClipWriter.IsSparseNativeFallbackException(
                 new MmdRuntimeReductionInputTooLargeException("safety limit")), Is.False);

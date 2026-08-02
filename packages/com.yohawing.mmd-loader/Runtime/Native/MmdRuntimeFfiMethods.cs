@@ -863,19 +863,24 @@ namespace Mmd.Native
                 throw new ArgumentException("VMD bytes are required.", nameof(vmdBytes));
             }
 
-            if (!abiAlreadyValidated)
-            {
-                MmdRuntimeFfiMethods.ValidateAbiVersion();
-            }
+            return MmdRuntimeNativeBoundary.Invoke(
+                "standard VMD playback session",
+                () =>
+                {
+                    if (!abiAlreadyValidated)
+                    {
+                        MmdRuntimeFfiMethods.ValidateAbiVersion();
+                    }
 
-            return CreateFromModelClipFactory(
-                pmxBytes,
-                model => MmdRuntimeFfiMethods.ClipCreateFromVmdBytesForModel(
-                    model,
-                    vmdBytes,
-                    new IntPtr(vmdBytes.Length)),
-                "mmd-runtime VMD import returned a null clip",
-                unavailableOperation: null);
+                    return CreateFromModelClipFactory(
+                        pmxBytes,
+                        model => MmdRuntimeFfiMethods.ClipCreateFromVmdBytesForModel(
+                            model,
+                            vmdBytes,
+                            new IntPtr(vmdBytes.Length)),
+                        "mmd-runtime VMD import returned a null clip",
+                        unavailableOperation: "standard VMD playback session");
+                });
         }
 
         public static MmdRuntimeFfiPlaybackSession CreateFromVmdContext(

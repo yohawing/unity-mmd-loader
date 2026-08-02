@@ -627,6 +627,7 @@ namespace Mmd.Editor
             return exception is DllNotFoundException or
                 EntryPointNotFoundException or
                 BadImageFormatException or
+                MmdRuntimeNativeUnavailableException or
                 MmdRuntimeUnsupportedException;
         }
 
