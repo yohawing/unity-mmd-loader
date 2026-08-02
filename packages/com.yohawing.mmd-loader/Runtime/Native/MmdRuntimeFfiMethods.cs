@@ -309,6 +309,68 @@ namespace Mmd.Native
             internal float distance;
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct BoneTrackCurve
+        {
+            internal uint kind;
+            internal float x1;
+            internal float y1;
+            internal float x2;
+            internal float y2;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct BoneTrackDescriptor
+        {
+            internal uint boneIndex;
+            internal IntPtr keyCount;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct BoneTrackKey
+        {
+            internal uint boneIndex;
+            internal uint frame;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3, ArraySubType = UnmanagedType.R4)]
+            internal float[] positionXyz;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4, ArraySubType = UnmanagedType.R4)]
+            internal float[] rotationXyzw;
+            internal BoneTrackCurve translationX;
+            internal BoneTrackCurve translationY;
+            internal BoneTrackCurve translationZ;
+            internal BoneTrackCurve rotation;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct MorphTrackDescriptor
+        {
+            internal uint morphIndex;
+            internal IntPtr keyCount;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct MorphTrackKey
+        {
+            internal uint morphIndex;
+            internal uint frame;
+            internal float weight;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct PropertyTrackDescriptor
+        {
+            internal IntPtr keyCount;
+            internal IntPtr ikEnabledCount;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct PropertyTrackKey
+        {
+            internal uint frame;
+            internal IntPtr ikEnabledOffset;
+            internal IntPtr ikEnabledCount;
+        }
+
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_abi_version", CallingConvention = CallingConvention.Cdecl)]
         internal static extern uint AbiVersion();
 
@@ -335,6 +397,74 @@ namespace Mmd.Native
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_create_from_vmd_bytes_for_model", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr ClipCreateFromVmdBytesForModel(IntPtr model, byte[] data, IntPtr len);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_bone_track_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr ClipBoneTrackCount(IntPtr clip);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_bone_track_descriptor", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ClipBoneTrackDescriptor(
+            IntPtr clip,
+            IntPtr trackIndex,
+            ref BoneTrackDescriptor outDescriptor);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_bone_track_key_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr ClipBoneTrackKeyCount(IntPtr clip, IntPtr trackIndex);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_copy_bone_track_keys", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ClipCopyBoneTrackKeys(
+            IntPtr clip,
+            IntPtr trackIndex,
+            IntPtr outKeys,
+            IntPtr outKeyCapacity,
+            out IntPtr outWritten);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_morph_track_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr ClipMorphTrackCount(IntPtr clip);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_morph_track_descriptor", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ClipMorphTrackDescriptor(
+            IntPtr clip,
+            IntPtr trackIndex,
+            ref MorphTrackDescriptor outDescriptor);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_morph_track_key_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr ClipMorphTrackKeyCount(IntPtr clip, IntPtr trackIndex);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_copy_morph_track_keys", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ClipCopyMorphTrackKeys(
+            IntPtr clip,
+            IntPtr trackIndex,
+            IntPtr outKeys,
+            IntPtr outKeyCapacity,
+            out IntPtr outWritten);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_property_track_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr ClipPropertyTrackCount(IntPtr clip);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_property_track_descriptor", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ClipPropertyTrackDescriptor(
+            IntPtr clip,
+            ref PropertyTrackDescriptor outDescriptor);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_property_track_key_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr ClipPropertyTrackKeyCount(IntPtr clip);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_property_track_ik_enabled_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr ClipPropertyTrackIkEnabledCount(IntPtr clip);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_copy_property_track_keys", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ClipCopyPropertyTrackKeys(
+            IntPtr clip,
+            IntPtr outKeys,
+            IntPtr outKeyCapacity,
+            out IntPtr outWritten);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_copy_property_track_ik_enabled", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ClipCopyPropertyTrackIkEnabled(
+            IntPtr clip,
+            IntPtr outStates,
+            IntPtr outStateCapacity,
+            out IntPtr outWritten);
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_camera_track_create_from_vmd_bytes", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr VmdCameraTrackCreateFromVmdBytes(byte[] data, IntPtr len);
