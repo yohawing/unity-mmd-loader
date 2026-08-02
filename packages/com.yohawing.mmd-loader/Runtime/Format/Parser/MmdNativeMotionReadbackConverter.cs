@@ -263,7 +263,7 @@ namespace Mmd.Parser
         {
             if (!names.TryGetValue(index, out string? name))
             {
-                throw new InvalidOperationException(
+                throw new MmdRuntimeUnsupportedException(
                     "Native " + label + " track index " + index + " is not present in MmdModelDefinition: track " +
                     trackIndex + ".");
             }

@@ -147,10 +147,6 @@ namespace Mmd.Timeline
             {
                 target.ApplySelfShadowState(selfShadowState);
             }
-            else if (MotionBytes == null || MotionBytes.Length == 0)
-            {
-                target.TryEvaluateSelfShadowAtFrame(SelfShadowKeyframes, frame, out _);
-            }
 
             return LastApplyStatus;
         }

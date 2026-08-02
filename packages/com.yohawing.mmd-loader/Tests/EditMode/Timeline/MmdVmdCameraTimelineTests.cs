@@ -392,7 +392,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void EvaluateAtLocalTimeRecordsSelfShadowByDefaultWithoutMutatingLight()
+        public void EvaluateAtLocalTimeDoesNotApplySourceLessSelfShadowKeyframes()
         {
             var bindingGo = new GameObject("binding");
             var lightGo = new GameObject("light");
@@ -406,6 +406,8 @@ namespace Mmd.Tests
 
                 MmdSceneEnvironmentBinding binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
                 binding.TargetLight = light;
+                MmdSceneSelfShadowApplyStatus statusBefore = binding.LastSelfShadowApplyStatus;
+                MmdSelfShadowState stateBefore = binding.LastSelfShadowState;
 
                 var behaviour = new MmdVmdCameraBehaviour
                 {
@@ -419,9 +421,11 @@ namespace Mmd.Tests
                 MmdSceneCameraApplyStatus status = behaviour.EvaluateAtLocalTime(binding, 0.5);
 
                 Assert.That(status, Is.EqualTo(MmdSceneCameraApplyStatus.NotApplied));
-                Assert.That(binding.LastSelfShadowApplyStatus, Is.EqualTo(MmdSceneSelfShadowApplyStatus.Recorded));
-                Assert.That(binding.LastSelfShadowState.Mode, Is.EqualTo(1));
-                Assert.That(binding.LastSelfShadowState.Distance, Is.EqualTo(0.4f).Within(0.001f));
+                Assert.That(behaviour.NativeSelfShadowTrackDiagnostic,
+                    Is.EqualTo("VMD native self-shadow track unavailable: source bytes are empty"));
+                Assert.That(binding.LastSelfShadowApplyStatus, Is.EqualTo(statusBefore));
+                Assert.That(binding.LastSelfShadowState.Mode, Is.EqualTo(stateBefore.Mode));
+                Assert.That(binding.LastSelfShadowState.Distance, Is.EqualTo(stateBefore.Distance).Within(0.001f));
                 Assert.That(light.shadows, Is.EqualTo(LightShadows.Hard));
                 Assert.That(light.shadowStrength, Is.EqualTo(0.3f).Within(0.001f));
                 Assert.That(QualitySettings.shadowDistance, Is.EqualTo(originalShadowDistance).Within(0.001f));
@@ -498,49 +502,8 @@ namespace Mmd.Tests
                 Assert.That(binding.LastSelfShadowState.Mode, Is.EqualTo(MmdSceneEnvironmentBinding.DefaultSelfShadowMode));
                 Assert.That(binding.LastSelfShadowState.Distance, Is.EqualTo(MmdSceneEnvironmentBinding.DefaultSelfShadowDistance));
                 Assert.That(binding.LastSelfShadowDiagnosticStatus, Is.EqualTo(MmdSceneSelfShadowDiagnosticStatus.Active));
-                Assert.That(light.shadows, Is.EqualTo(LightShadows.None));
-                Assert.That(light.shadowStrength, Is.EqualTo(0.25f).Within(0.001f));
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(lightGo);
-                UnityEngine.Object.DestroyImmediate(bindingGo);
-            }
-        }
-
-        [Test]
-        public void EvaluateAtLocalTimeRecordsSelfShadowWhenBindingExplicitlyEnabledWithoutMutatingLight()
-        {
-            var bindingGo = new GameObject("binding");
-            var lightGo = new GameObject("light");
-            try
-            {
-                Light light = lightGo.AddComponent<Light>();
-                light.type = LightType.Directional;
-                light.shadows = LightShadows.None;
-                light.shadowStrength = 0.25f;
-
-                MmdSceneEnvironmentBinding binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
-                binding.TargetLight = light;
-                binding.SelfShadowEnabled = true;
-
-                var behaviour = new MmdVmdCameraBehaviour
-                {
-                    CameraKeyframes = Array.Empty<MmdCameraKeyframeDefinition>(),
-                    LightKeyframes = Array.Empty<MmdLightKeyframeDefinition>(),
-                    SelfShadowKeyframes = SelfShadowKeyframes(),
-                    FrameRate = 30f,
-                    ImportScale = 1.0f
-                };
-
-                MmdSceneCameraApplyStatus status = behaviour.EvaluateAtLocalTime(binding, 0.5);
-
-                Assert.That(status, Is.EqualTo(MmdSceneCameraApplyStatus.NotApplied));
-                Assert.That(binding.LastSelfShadowApplyStatus, Is.EqualTo(MmdSceneSelfShadowApplyStatus.Recorded));
-                Assert.That(binding.LastSelfShadowState.Mode, Is.EqualTo(1));
-                Assert.That(binding.LastSelfShadowState.Distance, Is.EqualTo(0.4f).Within(0.001f));
-                Assert.That(binding.LastSelfShadowSettings.Mode, Is.EqualTo(1));
-                Assert.That(binding.LastSelfShadowSettings.RuntimeApplicationEnabled, Is.False);
+                Assert.That(behaviour.NativeSelfShadowTrackDiagnostic,
+                    Is.EqualTo("VMD native self-shadow track unavailable: source bytes are empty"));
                 Assert.That(light.shadows, Is.EqualTo(LightShadows.None));
                 Assert.That(light.shadowStrength, Is.EqualTo(0.25f).Within(0.001f));
             }

@@ -125,6 +125,58 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void ReadbackRejectsUnresolvedMorphNameWithUnsupportedException()
+        {
+            var model = new MmdModelDefinition();
+            model.morphs.Add(new MmdMorphDefinition
+            {
+                index = 0,
+                name = "known-morph"
+            });
+
+            var summary = new MmdVmdParseSummary(
+                "unresolved-morph",
+                maxFrame: 0,
+                boneKeyframeCount: 0,
+                morphKeyframeCount: 1,
+                modelKeyframeCount: 0,
+                constraintStateCount: 0);
+            var descriptor = new MmdRuntimeFfiMethods.MorphTrackDescriptor
+            {
+                morphIndex = 1
+            };
+            var morphKeys = new[]
+            {
+                new[]
+                {
+                    new MmdRuntimeFfiMethods.MorphTrackKey
+                    {
+                        morphIndex = 1,
+                        frame = 0,
+                        weight = 0.5f
+                    }
+                }
+            };
+
+            MmdRuntimeUnsupportedException exception = Assert.Throws<MmdRuntimeUnsupportedException>(() =>
+                MmdNativeMotionReadbackConverter.Build(
+                    model,
+                    summary,
+                    Array.Empty<MmdRuntimeFfiMethods.VmdBoneKeyframe>(),
+                    new[] { descriptor },
+                    morphKeys,
+                    Array.Empty<MmdRuntimeFfiMethods.VmdCameraKeyframe>(),
+                    Array.Empty<MmdRuntimeFfiMethods.VmdLightKeyframe>(),
+                    Array.Empty<MmdRuntimeFfiMethods.VmdSelfShadowKeyframe>(),
+                    Array.Empty<MmdRuntimeFfiMethods.VmdPropertyKeyframe>(),
+                    Array.Empty<MmdRuntimeFfiMethods.VmdPropertyIkEntry>(),
+                    new byte[] { 1 }))!;
+
+            Assert.That(exception.Message,
+                Is.EqualTo("Native morph track index 1 is not present in MmdModelDefinition: track 0."));
+        }
+
+        [Test]
         public void ReadbackCopiesRawCameraLightAndSelfShadowKeysAndSummaryCounts()
         {
             byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube.pmx");
