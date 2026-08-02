@@ -665,7 +665,7 @@ namespace Mmd.Native
         }
 
     }
-    internal sealed class MmdRuntimeFfiPlaybackSession : IDisposable
+    internal sealed partial class MmdRuntimeFfiPlaybackSession : IDisposable
     {
         internal const long MaxReductionInputBytes = 256L * 1024L * 1024L;
 
