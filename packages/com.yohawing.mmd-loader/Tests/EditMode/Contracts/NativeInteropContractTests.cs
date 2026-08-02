@@ -373,14 +373,19 @@ namespace Mmd.Tests
             Assert.That(MmdRuntimeFfiMethods.FeatureVmdSharedContext, Is.EqualTo(1u << 9));
             Assert.That(MmdRuntimeFfiMethods.FeatureVmdSharedContextBoneReadback, Is.EqualTo(1u << 10));
             Assert.That(MmdRuntimeFfiMethods.FeatureVmdSummaryBytes, Is.EqualTo(1u << 11));
+            Assert.That(MmdRuntimeFfiMethods.FeatureVmdSharedContextRawReadback, Is.EqualTo(1u << 12));
             Assert.That(MmdRuntimeFfiMethods.VmdSharedContextAbiVersionV1, Is.EqualTo(1u));
             Assert.That(MmdRuntimeFfiMethods.VmdSharedContextSummaryAbiVersionV1, Is.EqualTo(1u));
             Assert.That(MmdRuntimeFfiMethods.VmdContextSummarySizeV1, Is.EqualTo(84));
             Assert.That(MmdRuntimeFfiMethods.VmdSharedContextBoneReadbackAbiVersionV1, Is.EqualTo(1u));
+            Assert.That(MmdRuntimeFfiMethods.VmdSharedContextRawReadbackAbiVersionV1, Is.EqualTo(1u));
             Assert.That(MmdRuntimeFfiMethods.VmdSummaryBytesAbiVersionV1, Is.EqualTo(1u));
             Assert.That(
                 MmdRuntimeFfiMethods.ValidateVmdSharedContextCapability(),
                 Is.EqualTo(MmdRuntimeFfiMethods.VmdSharedContextAbiVersionV1));
+            Assert.That(
+                MmdRuntimeFfiMethods.ValidateVmdSharedContextRawReadbackCapability(),
+                Is.EqualTo(MmdRuntimeFfiMethods.VmdSharedContextRawReadbackAbiVersionV1));
             Assert.That(
                 MmdRuntimeFfiMethods.ValidateVmdSharedContextBoneReadbackCapability(),
                 Is.EqualTo(MmdRuntimeFfiMethods.VmdSharedContextBoneReadbackAbiVersionV1));
@@ -448,6 +453,24 @@ namespace Mmd.Tests
                 typeof(IntPtr),
                 typeof(IntPtr).MakeByRefType(),
                 typeof(IntPtr).MakeByRefType());
+            AssertRuntimeFfiSignature("VmdContextBoneKeyframeCount", typeof(IntPtr), typeof(IntPtr));
+            AssertRuntimeFfiSignature(
+                "VmdContextCopyBoneKeyframes",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr).MakeByRefType());
+            AssertRuntimeFfiSignature("VmdContextMorphKeyframeCount", typeof(IntPtr), typeof(IntPtr));
+            AssertRuntimeFfiSignature(
+                "VmdContextCopyMorphKeyframes",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr).MakeByRefType());
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.VmdRawBoneKeyframe>(), Is.EqualTo(112));
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.VmdRawMorphKeyframe>(), Is.EqualTo(24));
             Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.VmdPropertyKeyframe>(), Is.EqualTo(24));
             Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.VmdPropertyIkEntry>(), Is.EqualTo(24));
             Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.VmdBoneKeyframe>(), Is.EqualTo(100));

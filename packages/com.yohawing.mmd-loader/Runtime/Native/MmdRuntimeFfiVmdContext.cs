@@ -149,6 +149,34 @@ namespace Mmd.Native
                 "property IK entries");
         }
 
+        internal MmdRuntimeFfiMethods.VmdRawBoneKeyframe[] GetRawBoneKeyframes()
+        {
+            return MmdRuntimeNativeBoundary.Invoke(
+                "shared VMD model-less raw bone keyframes",
+                () =>
+                {
+                    MmdRuntimeFfiMethods.ValidateVmdSharedContextRawReadbackCapability();
+                    return CopyStructArray<MmdRuntimeFfiMethods.VmdRawBoneKeyframe>(
+                        MmdRuntimeFfiMethods.VmdContextBoneKeyframeCount,
+                        MmdRuntimeFfiMethods.VmdContextCopyBoneKeyframes,
+                        "model-less raw bone keyframes");
+                });
+        }
+
+        internal MmdRuntimeFfiMethods.VmdRawMorphKeyframe[] GetRawMorphKeyframes()
+        {
+            return MmdRuntimeNativeBoundary.Invoke(
+                "shared VMD model-less raw morph keyframes",
+                () =>
+                {
+                    MmdRuntimeFfiMethods.ValidateVmdSharedContextRawReadbackCapability();
+                    return CopyStructArray<MmdRuntimeFfiMethods.VmdRawMorphKeyframe>(
+                        MmdRuntimeFfiMethods.VmdContextMorphKeyframeCount,
+                        MmdRuntimeFfiMethods.VmdContextCopyMorphKeyframes,
+                        "model-less raw morph keyframes");
+                });
+        }
+
         internal MmdRuntimeFfiMethods.VmdBoneKeyframe[] GetBoneKeyframesForModel(
             IntPtr model,
             out int skipped)
