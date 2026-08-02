@@ -70,6 +70,105 @@ namespace Mmd.Tests
             Assert.That(motion.selfShadowKeyframeCount, Is.EqualTo(vmdAsset.SelfShadowKeyframeCount));
             Assert.That(motion.sourceBytes, Is.EqualTo(vmdAsset.GetBytesCopy()));
         }
+
+        [Test]
+        public void ImportedVmdUsesNativeRawSourceSubassetAndSurvivesReimport()
+        {
+            CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
+
+            byte[] sourceBytes = File.ReadAllBytes(Path.Combine(ProjectRoot, TempVmdPath));
+            MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(TempVmdPath);
+            Assert.That(vmdAsset, Is.Not.Null);
+
+            Object[] subAssets = AssetDatabase.LoadAllAssetsAtPath(TempVmdPath);
+            TextAsset? rawSource = null;
+            foreach (Object subAsset in subAssets)
+            {
+                if (subAsset is TextAsset textAsset && textAsset.name == "VMDSource")
+                {
+                    rawSource = textAsset;
+                    break;
+                }
+            }
+
+            Assert.That(rawSource, Is.Not.Null, "VMD import must create one named raw-source TextAsset subasset.");
+            Assert.That(rawSource!.dataSize, Is.EqualTo(sourceBytes.LongLength));
+            Assert.That(rawSource.bytes, Is.EqualTo(sourceBytes));
+
+            SerializedObject serializedAsset = new SerializedObject(vmdAsset);
+            Assert.That(serializedAsset.FindProperty("data")!.arraySize, Is.Zero,
+                "New imports must not serialize the raw VMD into the managed byte[] field.");
+            Assert.That(
+                serializedAsset.FindProperty("rawSource")!.objectReferenceValue,
+                Is.SameAs(rawSource),
+                "MmdVmdAsset must retain the importer-created raw-source subasset reference.");
+
+            Assert.That(vmdAsset.ByteLength, Is.EqualTo(sourceBytes.Length));
+            Assert.That(vmdAsset.GetBytesCopy(), Is.EqualTo(sourceBytes));
+            Assert.That(vmdAsset.CreateNativeClipMotionHeader().sourceBytes, Is.EqualTo(sourceBytes));
+
+            AssetDatabase.ImportAsset(TempVmdPath, ImportAssetOptions.ForceUpdate);
+            MmdVmdAsset reloaded = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(TempVmdPath);
+            Assert.That(reloaded, Is.Not.Null);
+            Assert.That(reloaded.SourceId, Is.EqualTo(TempVmdPath));
+            Assert.That(reloaded.ByteLength, Is.EqualTo(sourceBytes.Length));
+            Assert.That(reloaded.GetBytesCopy(), Is.EqualTo(sourceBytes));
+            Assert.That(reloaded.ImportSummaryStatus, Is.EqualTo(MmdVmdImportSummaryStatus.Passed));
+            Assert.That(reloaded.StructuralDiagnostics, Is.Empty);
+            Assert.That(reloaded.CreateNativeClipMotionHeader().sourceBytes, Is.EqualTo(sourceBytes));
+
+            Object[] reloadedSubAssets = AssetDatabase.LoadAllAssetsAtPath(TempVmdPath);
+            Assert.That(
+                Array.FindAll(reloadedSubAssets, value => value is TextAsset textAsset && textAsset.name == "VMDSource"),
+                Has.Length.EqualTo(1));
+        }
+
+        [Test]
+        public void ImportedInvalidVmdPreservesRawBytesAndRejectsNativeClipHeader()
+        {
+            byte[] invalidBytes = { 0x56, 0x4D, 0x44, 0x00 };
+            Directory.CreateDirectory(Path.Combine(ProjectRoot, TempDirectory));
+            File.WriteAllBytes(Path.Combine(ProjectRoot, TempVmdPath), invalidBytes);
+            AssetDatabase.ImportAsset(TempVmdPath, ImportAssetOptions.ForceUpdate);
+
+            MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(TempVmdPath);
+            Assert.That(vmdAsset, Is.Not.Null);
+            Assert.That(vmdAsset.ByteLength, Is.EqualTo(invalidBytes.Length));
+            Assert.That(vmdAsset.GetBytesCopy(), Is.EqualTo(invalidBytes));
+            Assert.That(vmdAsset.ImportSummaryStatus, Is.EqualTo(MmdVmdImportSummaryStatus.Failed));
+            Assert.That(vmdAsset.StructuralDiagnostics.Count, Is.EqualTo(1));
+            Assert.That(vmdAsset.StructuralDiagnostics[0], Does.Contain("Failed to parse VMD"));
+
+            InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
+                () => vmdAsset.CreateNativeClipMotionHeader())!;
+            Assert.That(exception.Message, Does.Contain("Failed to parse VMD"));
+
+            TextAsset? rawSource = null;
+            foreach (Object subAsset in AssetDatabase.LoadAllAssetsAtPath(TempVmdPath))
+            {
+                if (subAsset is TextAsset textAsset && textAsset.name == "VMDSource")
+                {
+                    rawSource = textAsset;
+                    break;
+                }
+            }
+
+            Assert.That(rawSource, Is.Not.Null);
+            Assert.That(rawSource!.bytes, Is.EqualTo(invalidBytes));
+        }
+
+        [Test]
+        public void VmdScriptedImporterVersionIsTwoForRawSourceMigration()
+        {
+            object[] attributes = typeof(MmdVmdScriptedImporter).GetCustomAttributes(
+                typeof(ScriptedImporterAttribute),
+                inherit: false);
+
+            Assert.That(attributes, Has.Length.EqualTo(1));
+            var attribute = (ScriptedImporterAttribute)attributes[0];
+            Assert.That(attribute.version, Is.EqualTo(2));
+        }
+
         [Test]
         public void ImportedPmxAssetCarriesImportScaleSummaryFromImporter()
         {

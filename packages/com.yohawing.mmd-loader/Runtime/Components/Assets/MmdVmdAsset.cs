@@ -62,7 +62,10 @@ namespace Mmd
 
     public sealed class MmdVmdAsset : ScriptableObject
     {
+        // Kept for serialized assets created before importer version 2. New imported assets
+        // store the raw source in the Unity-native TextAsset subasset below instead.
         [SerializeField] private byte[] data = Array.Empty<byte>();
+        [SerializeField] private TextAsset? rawSource;
         [SerializeField] private string sourceId = string.Empty;
         [SerializeField] private string sourcePath = string.Empty;
 
@@ -80,12 +83,16 @@ namespace Mmd
 
         [NonSerialized] private MmdRuntimeFfiVmdContext? nativeVmdContext;
         [NonSerialized] private byte[]? nativeVmdContextSource;
+        [NonSerialized] private TextAsset? sourceReadbackAsset;
+        [NonSerialized] private byte[]? sourceReadback;
 
         public string SourceId => sourceId;
 
         public string SourcePath => sourcePath;
 
-        public int ByteLength => data.Length;
+        public int ByteLength => rawSource != null
+            ? checked((int)rawSource.dataSize)
+            : data?.Length ?? 0;
 
         public MmdVmdImportSummaryStatus ImportSummaryStatus => importSummaryStatus;
 
@@ -116,7 +123,13 @@ namespace Mmd
                 throw new ArgumentException("VMD asset bytes are required.", nameof(bytes));
             }
 
-            InitializeCore((byte[])bytes.Clone(), assetSourceId, assetSourcePath, vmdParseSummary, importDiagnostics);
+            InitializeCore(
+                (byte[])bytes.Clone(),
+                assetSourceId,
+                assetSourcePath,
+                null,
+                vmdParseSummary,
+                importDiagnostics);
         }
 
         /// <summary>
@@ -135,18 +148,65 @@ namespace Mmd
                 throw new ArgumentException("VMD asset bytes are required.", nameof(bytes));
             }
 
-            InitializeCore(bytes, assetSourceId, assetSourcePath, vmdParseSummary, importDiagnostics);
+            InitializeCore(
+                bytes,
+                assetSourceId,
+                assetSourcePath,
+                null,
+                vmdParseSummary,
+                importDiagnostics);
+        }
+
+        /// <summary>
+        /// Initializes an imported asset backed by a Unity-native raw source subasset. The
+        /// importer-owned byte buffer is used only for validation and summary parsing; it is
+        /// intentionally not serialized into the MmdVmdAsset.
+        /// </summary>
+        internal void InitializeImported(
+            byte[] bytes,
+            string assetSourceId,
+            string assetSourcePath,
+            TextAsset importedRawSource,
+            MmdVmdParseSummary? vmdParseSummary = null,
+            IReadOnlyList<string>? importDiagnostics = null)
+        {
+            if (bytes == null || bytes.Length == 0)
+            {
+                throw new ArgumentException("VMD asset bytes are required.", nameof(bytes));
+            }
+
+            if (importedRawSource == null)
+            {
+                throw new ArgumentNullException(nameof(importedRawSource));
+            }
+
+            if (importedRawSource.dataSize != bytes.LongLength)
+            {
+                throw new ArgumentException("The imported VMD raw source does not match the source buffer.", nameof(importedRawSource));
+            }
+
+            InitializeCore(
+                Array.Empty<byte>(),
+                assetSourceId,
+                assetSourcePath,
+                importedRawSource,
+                vmdParseSummary,
+                importDiagnostics);
         }
 
         private void InitializeCore(
             byte[] bytes,
             string assetSourceId,
             string assetSourcePath,
+            TextAsset? importedRawSource,
             MmdVmdParseSummary? vmdParseSummary,
             IReadOnlyList<string>? importDiagnostics)
         {
             DisposeNativeVmdContext();
+            sourceReadbackAsset = null;
+            sourceReadback = null;
             data = bytes;
+            rawSource = importedRawSource;
             sourceId = assetSourceId ?? string.Empty;
             sourcePath = assetSourcePath ?? string.Empty;
             ApplyVmdParseSummary(vmdParseSummary, importDiagnostics);
@@ -154,18 +214,19 @@ namespace Mmd
 
         public byte[] GetBytesCopy()
         {
-            return (byte[])data.Clone();
+            return (byte[])ReadSourceBytes().Clone();
         }
 
         public MmdMotionDefinition LoadMotion(IMmdParser? parser = null)
         {
-            if (data.Length == 0)
+            byte[] sourceBytes = ReadSourceBytes();
+            if (sourceBytes.Length == 0)
             {
                 throw new InvalidOperationException("VMD asset has no imported bytes.");
             }
 
             parser ??= new NativeMmdParser();
-            return parser.LoadMotion(data);
+            return parser.LoadMotion(sourceBytes);
         }
 
         /// <summary>
@@ -177,8 +238,9 @@ namespace Mmd
             out string reason)
         {
             ValidateNativeClipHeaderSource();
+            byte[] sourceBytes = ReadSourceBytes();
             reason = string.Empty;
-            if (nativeVmdContext != null && ReferenceEquals(nativeVmdContextSource, data))
+            if (nativeVmdContext != null && ReferenceEquals(nativeVmdContextSource, sourceBytes))
             {
                 context = nativeVmdContext;
                 return true;
@@ -187,8 +249,8 @@ namespace Mmd
             DisposeNativeVmdContext();
             try
             {
-                nativeVmdContext = MmdRuntimeFfiVmdContext.Create(data);
-                nativeVmdContextSource = data;
+                nativeVmdContext = MmdRuntimeFfiVmdContext.Create(sourceBytes);
+                nativeVmdContextSource = sourceBytes;
                 context = nativeVmdContext;
                 return true;
             }
@@ -207,7 +269,7 @@ namespace Mmd
             ValidateNativeClipHeaderSource();
 
             MmdVmdParseSummary summary = GetNativeClipSummary();
-            return CreateNativeClipMotionHeader(data, summary);
+            return CreateNativeClipMotionHeader(ReadSourceBytes(), summary);
         }
 
         public static MmdMotionDefinition CreateNativeClipMotionHeader(
@@ -236,7 +298,7 @@ namespace Mmd
         private MmdVmdParseSummary GetNativeClipSummary()
         {
             return importSummaryStatus == MmdVmdImportSummaryStatus.NotParsed
-                ? MmdVmdBinarySummaryReader.Read(data)
+                ? MmdVmdBinarySummaryReader.Read(ReadSourceBytes())
                 : new MmdVmdParseSummary(
                     targetModelName,
                     maxFrame,
@@ -251,7 +313,7 @@ namespace Mmd
 
         private void ValidateNativeClipHeaderSource()
         {
-            if (data.Length == 0)
+            if (ByteLength == 0)
             {
                 throw new InvalidOperationException("VMD asset has no imported bytes.");
             }
@@ -265,6 +327,27 @@ namespace Mmd
             {
                 throw new InvalidOperationException("VMD import summary is marked as failed.");
             }
+        }
+
+        private byte[] ReadSourceBytes()
+        {
+            if (rawSource == null)
+            {
+                return data ?? Array.Empty<byte>();
+            }
+
+            if (!ReferenceEquals(sourceReadbackAsset, rawSource) || sourceReadback == null)
+            {
+                if (sourceReadbackAsset != null && !ReferenceEquals(sourceReadbackAsset, rawSource))
+                {
+                    DisposeNativeVmdContext();
+                }
+
+                sourceReadbackAsset = rawSource;
+                sourceReadback = rawSource.bytes;
+            }
+
+            return sourceReadback;
         }
 
         private void ApplyVmdParseSummary(MmdVmdParseSummary? parseSummary, IReadOnlyList<string>? diagnostics)

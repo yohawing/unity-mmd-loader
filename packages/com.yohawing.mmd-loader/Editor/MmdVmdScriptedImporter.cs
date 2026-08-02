@@ -3,17 +3,22 @@
 using System;
 using System.IO;
 using UnityEditor.AssetImporters;
+using UnityEngine;
 using Mmd;
 
 namespace Mmd.Editor
 {
-    [ScriptedImporter(1, "vmd")]
+    [ScriptedImporter(2, "vmd")]
     public sealed class MmdVmdScriptedImporter : ScriptedImporter
     {
         public override void OnImportAsset(AssetImportContext ctx)
         {
             byte[] bytes = File.ReadAllBytes(ctx.assetPath);
             string resolvedSourcePath = MmdAssetPathUtility.ResolveAssetSourcePath(ctx.assetPath);
+            TextAsset rawSource = new TextAsset(bytes)
+            {
+                name = "VMDSource"
+            };
 
             MmdVmdParseSummary? summary = null;
             System.Collections.Generic.IReadOnlyList<string>? diagnostics = null;
@@ -31,7 +36,8 @@ namespace Mmd.Editor
             }
 
             MmdVmdAsset asset = MmdVmdAsset.CreateInstance<MmdVmdAsset>();
-            asset.InitializeImported(bytes, ctx.assetPath, resolvedSourcePath, summary, diagnostics);
+            asset.InitializeImported(bytes, ctx.assetPath, resolvedSourcePath, rawSource, summary, diagnostics);
+            ctx.AddObjectToAsset("VMDSource", rawSource);
             ctx.AddObjectToAsset("VMD", asset);
             ctx.SetMainObject(asset);
         }
