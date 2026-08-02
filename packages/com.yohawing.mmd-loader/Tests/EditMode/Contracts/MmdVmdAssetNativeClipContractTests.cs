@@ -90,5 +90,37 @@ namespace Mmd.Tests
                 UnityEngine.Object.DestroyImmediate(asset);
             }
         }
+
+        [Test]
+        public void NativeVmdContextIsReusedForTheSameAssetSourceIdentity()
+        {
+            byte[] sourceBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube_motion.vmd");
+            MmdVmdAsset asset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+
+            try
+            {
+                asset.Initialize(
+                    sourceBytes,
+                    "test_1bone_cube_motion.vmd",
+                    "Assets/test_1bone_cube_motion.vmd",
+                    new MmdVmdParseSummary("test", 49, 6, 0, 0, 0));
+
+                if (!asset.TryGetOrCreateNativeVmdContext(out var first, out string firstReason))
+                {
+                    Assert.Ignore("Shared VMD context is unavailable: " + firstReason);
+                }
+
+                Assert.That(first, Is.Not.Null);
+                Assert.That(
+                    asset.TryGetOrCreateNativeVmdContext(out var second, out string secondReason),
+                    Is.True,
+                    secondReason);
+                Assert.That(second, Is.SameAs(first));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(asset);
+            }
+        }
     }
 }

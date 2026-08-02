@@ -3,6 +3,7 @@
 using System;
 using System.IO;
 using Mmd;
+using Mmd.Native;
 using Mmd.Parser;
 using UnityEngine;
 
@@ -398,7 +399,9 @@ namespace Mmd.UnityIntegration
             MmdModelValidator.ThrowIfInvalid(model);
             MmdUnityModelFactory.ValidateExistingSkinnedModelCompatibility(gameObject, model);
             byte[] pmxBytes = pmxAsset.GetBytesCopy();
-            byte[] vmdBytes = vmdAsset.GetBytesCopy();
+            byte[] vmdBytes = motion.sourceBytes
+                ?? throw new InvalidOperationException("Native VMD motion source bytes are required.");
+            vmdAsset.TryGetOrCreateNativeVmdContext(out MmdRuntimeFfiVmdContext? sharedVmdContext, out _);
             TryConfigureNativeFirst(
                 motion,
                 pmxBytes,
@@ -410,7 +413,8 @@ namespace Mmd.UnityIntegration
                     vmdAsset,
                     nativeMotion),
                 configure,
-                timelineEvaluation);
+                timelineEvaluation,
+                sharedVmdContext);
 
             if (applyStartFrame.HasValue)
             {
@@ -426,7 +430,8 @@ namespace Mmd.UnityIntegration
             byte[] vmdBytes,
             Func<MmdMotionDefinition, MmdUnityPlaybackBinding> createBinding,
             Action<MmdUnityPlaybackBinding> configure,
-            bool timelineEvaluation)
+            bool timelineEvaluation,
+            MmdRuntimeFfiVmdContext? sharedVmdContext = null)
         {
             bool nativeAvailable = TryCheckNativeRuntimeAvailability(
                 pmxBytes,
@@ -443,6 +448,7 @@ namespace Mmd.UnityIntegration
                             nativeBinding,
                             pmxBytes,
                             vmdBytes,
+                            sharedVmdContext,
                             out nativeRuntimeFailure))
                     {
                         lastFastRuntimeReason = string.Empty;

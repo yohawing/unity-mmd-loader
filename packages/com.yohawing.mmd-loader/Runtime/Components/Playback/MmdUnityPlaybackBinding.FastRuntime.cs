@@ -25,6 +25,41 @@ namespace Mmd.UnityIntegration
             out string reason,
             bool abiAlreadyValidated = false)
         {
+            return TryEnableFastRuntimeCore(
+                pmxBytes,
+                vmdBytes,
+                sharedVmdContext: null,
+                out reason,
+                abiAlreadyValidated);
+        }
+
+        internal bool TryEnableFastRuntimeWithSharedVmdContext(
+            byte[] pmxBytes,
+            byte[] vmdBytes,
+            MmdRuntimeFfiVmdContext sharedVmdContext,
+            out string reason,
+            bool abiAlreadyValidated = false)
+        {
+            if (sharedVmdContext == null)
+            {
+                throw new ArgumentNullException(nameof(sharedVmdContext));
+            }
+
+            return TryEnableFastRuntimeCore(
+                pmxBytes,
+                vmdBytes,
+                sharedVmdContext,
+                out reason,
+                abiAlreadyValidated);
+        }
+
+        private bool TryEnableFastRuntimeCore(
+            byte[] pmxBytes,
+            byte[] vmdBytes,
+            MmdRuntimeFfiVmdContext? sharedVmdContext,
+            out string reason,
+            bool abiAlreadyValidated)
+        {
             if (pmxBytes == null || pmxBytes.Length == 0)
             {
                 throw new ArgumentException("PMX bytes are required.", nameof(pmxBytes));
@@ -41,10 +76,12 @@ namespace Mmd.UnityIntegration
             reason = string.Empty;
             try
             {
-                MmdRuntimeFfiPlaybackSession created = MmdRuntimeFfiPlaybackSession.Create(
-                    pmxBytes,
-                    vmdBytes,
-                    abiAlreadyValidated);
+                MmdRuntimeFfiPlaybackSession created = sharedVmdContext == null
+                    ? MmdRuntimeFfiPlaybackSession.Create(pmxBytes, vmdBytes, abiAlreadyValidated)
+                    : MmdRuntimeFfiPlaybackSession.CreateFromVmdContext(
+                        pmxBytes,
+                        sharedVmdContext,
+                        abiAlreadyValidated);
                 candidate = created;
                 int candidateBoneCount = created.BoneCount;
                 int candidateMorphCount = created.MorphCount;

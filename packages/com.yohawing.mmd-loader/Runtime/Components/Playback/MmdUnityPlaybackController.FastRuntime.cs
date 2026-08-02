@@ -62,8 +62,19 @@ namespace Mmd.UnityIntegration
             MmdUnityPlaybackBinding candidate,
             byte[] pmxBytes,
             byte[] vmdBytes,
+            MmdRuntimeFfiVmdContext? sharedVmdContext,
             out string reason)
         {
+            if (sharedVmdContext != null)
+            {
+                return candidate.TryEnableFastRuntimeWithSharedVmdContext(
+                    pmxBytes,
+                    vmdBytes,
+                    sharedVmdContext,
+                    out reason,
+                    abiAlreadyValidated: true);
+            }
+
             return candidate.TryEnableFastRuntime(
                 pmxBytes,
                 vmdBytes,

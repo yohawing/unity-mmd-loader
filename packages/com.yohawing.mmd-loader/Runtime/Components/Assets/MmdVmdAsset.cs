@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using Mmd.Native;
 using Mmd.Parser;
 
 namespace Mmd
@@ -77,6 +78,9 @@ namespace Mmd
         [SerializeField] private int selfShadowKeyframeCount;
         [SerializeField] private string[] structuralDiagnostics = Array.Empty<string>();
 
+        [NonSerialized] private MmdRuntimeFfiVmdContext? nativeVmdContext;
+        [NonSerialized] private byte[]? nativeVmdContextSource;
+
         public string SourceId => sourceId;
 
         public string SourcePath => sourcePath;
@@ -141,6 +145,7 @@ namespace Mmd
             MmdVmdParseSummary? vmdParseSummary,
             IReadOnlyList<string>? importDiagnostics)
         {
+            DisposeNativeVmdContext();
             data = bytes;
             sourceId = assetSourceId ?? string.Empty;
             sourcePath = assetSourcePath ?? string.Empty;
@@ -161,6 +166,40 @@ namespace Mmd
 
             parser ??= new NativeMmdParser();
             return parser.LoadMotion(data);
+        }
+
+        /// <summary>
+        /// Gets one asset-owned native VMD parse for clips created from this source. Native clips
+        /// retain independent ownership, while parsed VMD records are shared across bindings.
+        /// </summary>
+        internal bool TryGetOrCreateNativeVmdContext(
+            out MmdRuntimeFfiVmdContext? context,
+            out string reason)
+        {
+            ValidateNativeClipHeaderSource();
+            reason = string.Empty;
+            if (nativeVmdContext != null && ReferenceEquals(nativeVmdContextSource, data))
+            {
+                context = nativeVmdContext;
+                return true;
+            }
+
+            DisposeNativeVmdContext();
+            try
+            {
+                nativeVmdContext = MmdRuntimeFfiVmdContext.Create(data);
+                nativeVmdContextSource = data;
+                context = nativeVmdContext;
+                return true;
+            }
+            catch (Exception exception) when (
+                exception is MmdRuntimeUnsupportedException ||
+                exception is MmdRuntimeNativeUnavailableException)
+            {
+                context = null;
+                reason = exception.Message;
+                return false;
+            }
         }
 
         public MmdMotionDefinition CreateNativeClipMotionHeader()
@@ -264,6 +303,27 @@ namespace Mmd
                  diagnostics[0].IndexOf("Failed to load", StringComparison.OrdinalIgnoreCase) >= 0);
 
             importSummaryStatus = isParseFailure ? MmdVmdImportSummaryStatus.Failed : MmdVmdImportSummaryStatus.Passed;
+        }
+
+        private void OnDisable()
+        {
+            DisposeNativeVmdContext();
+        }
+
+        private void DisposeNativeVmdContext()
+        {
+            if (nativeVmdContext == null)
+            {
+                nativeVmdContextSource = null;
+                return;
+            }
+
+            // MmdRuntimeFfiVmdContext deliberately retains its native handle when
+            // cleanup crosses an unavailable P/Invoke boundary. Keep the asset's
+            // reference too so a later lifecycle retry can release that handle.
+            nativeVmdContext.Dispose();
+            nativeVmdContext = null;
+            nativeVmdContextSource = null;
         }
     }
 }
