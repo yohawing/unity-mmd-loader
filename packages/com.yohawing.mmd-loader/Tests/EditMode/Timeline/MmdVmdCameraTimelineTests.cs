@@ -326,7 +326,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void EvaluateAtLocalTimeDoesNotApplySourceLessSelfShadowKeyframes()
+        public void EvaluateAtLocalTimeDoesNotApplyWithoutMotionBytes()
         {
             var bindingGo = new GameObject("binding");
             var lightGo = new GameObject("light");
@@ -400,7 +400,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void EvaluateAtLocalTimeKeepsEnabledDefaultSelfShadowWithoutSelfShadowKeyframes()
+        public void EvaluateAtLocalTimeKeepsEnabledDefaultSelfShadowWithoutMotionBytes()
         {
             var bindingGo = new GameObject("binding");
             var lightGo = new GameObject("light");

@@ -1,7 +1,6 @@
 #nullable enable
 
 using System;
-using System.Collections.Generic;
 using UnityEngine.Playables;
 using Mmd;
 using Mmd.Motion;
@@ -27,20 +26,6 @@ namespace Mmd.Timeline
             "VMD native self-shadow track unavailable: source bytes are empty";
 
         public MmdSceneEnvironmentBinding? Binding { get; set; }
-
-        // Retained only so 0.3.0 consumers keep compiling. Native source bytes are the only
-        // evaluation input; these managed lists are intentionally ignored.
-        [Obsolete("Managed VMD keyframe lists are ignored; provide native MotionBytes instead.")]
-        public IReadOnlyList<MmdCameraKeyframeDefinition>? CameraKeyframes { get; set; }
-            = Array.Empty<MmdCameraKeyframeDefinition>();
-
-        [Obsolete("Managed VMD keyframe lists are ignored; provide native MotionBytes instead.")]
-        public IReadOnlyList<MmdLightKeyframeDefinition>? LightKeyframes { get; set; }
-            = Array.Empty<MmdLightKeyframeDefinition>();
-
-        [Obsolete("Managed VMD keyframe lists are ignored; provide native MotionBytes instead.")]
-        public IReadOnlyList<MmdSelfShadowKeyframeDefinition>? SelfShadowKeyframes { get; set; }
-            = Array.Empty<MmdSelfShadowKeyframeDefinition>();
 
         public byte[]? MotionBytes { get; set; }
 
