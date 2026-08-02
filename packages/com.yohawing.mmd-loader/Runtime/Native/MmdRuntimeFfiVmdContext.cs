@@ -70,6 +70,44 @@ namespace Mmd.Native
             return handle;
         }
 
+        internal MmdRuntimeFfiMethods.VmdContextSummary ReadSummary()
+        {
+            ThrowIfDisposed();
+            return MmdRuntimeNativeBoundary.Invoke(
+                "shared VMD context summary",
+                () =>
+                {
+                    MmdRuntimeFfiMethods.ValidateVmdSharedContextCapability();
+                    int managedSize = Marshal.SizeOf<MmdRuntimeFfiMethods.VmdContextSummary>();
+                    if (managedSize != MmdRuntimeFfiMethods.VmdContextSummarySizeV1)
+                    {
+                        throw new InvalidOperationException(
+                            "mmd-runtime shared VMD context summary managed layout is " +
+                            managedSize + " bytes; expected " +
+                            MmdRuntimeFfiMethods.VmdContextSummarySizeV1 + ".");
+                    }
+
+                    IntPtr buffer = Marshal.AllocHGlobal(MmdRuntimeFfiMethods.VmdContextSummarySizeV1);
+                    try
+                    {
+                        int status = MmdRuntimeFfiMethods.VmdContextReadSummary(
+                            handle,
+                            buffer,
+                            new IntPtr(MmdRuntimeFfiMethods.VmdContextSummarySizeV1));
+                        ThrowForStatus(status, "summary");
+
+                        MmdRuntimeFfiMethods.VmdContextSummary summary =
+                            Marshal.PtrToStructure<MmdRuntimeFfiMethods.VmdContextSummary>(buffer);
+                        ValidateSummaryLayout(summary);
+                        return summary;
+                    }
+                    finally
+                    {
+                        Marshal.FreeHGlobal(buffer);
+                    }
+                });
+        }
+
         internal int GetCameraFrameCount()
         {
             return GetCount(MmdRuntimeFfiMethods.VmdContextCameraFrameCount, "camera frame count");
@@ -336,6 +374,31 @@ namespace Mmd.Native
             }
 
             throw new InvalidOperationException(message);
+        }
+
+        private static void ValidateSummaryLayout(MmdRuntimeFfiMethods.VmdContextSummary summary)
+        {
+            if (summary.structSize != (uint)MmdRuntimeFfiMethods.VmdContextSummarySizeV1)
+            {
+                throw new InvalidOperationException(
+                    "mmd-runtime shared VMD context summary reported " +
+                    summary.structSize + " bytes; expected " +
+                    MmdRuntimeFfiMethods.VmdContextSummarySizeV1 + ".");
+            }
+
+            if (summary.abiVersion != MmdRuntimeFfiMethods.VmdSharedContextSummaryAbiVersionV1)
+            {
+                throw new MmdRuntimeUnsupportedException(
+                    "mmd-runtime shared VMD context summary ABI version " +
+                    summary.abiVersion + " is not supported. Expected " +
+                    MmdRuntimeFfiMethods.VmdSharedContextSummaryAbiVersionV1 + ".");
+            }
+
+            if (summary.targetModelNameBytes == null || summary.targetModelNameBytes.Length != 20)
+            {
+                throw new InvalidOperationException(
+                    "mmd-runtime shared VMD context summary model-name layout is invalid.");
+            }
         }
 
         private void ThrowIfDisposed()

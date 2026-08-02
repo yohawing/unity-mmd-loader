@@ -47,6 +47,8 @@ namespace Mmd.Native
         internal const uint ClipPropertyTrackIntrospectionAbiVersionV1 = 1;
         internal const uint VmdTrackKeyframeIntrospectionAbiVersionV1 = 1;
         internal const uint VmdSharedContextAbiVersionV1 = 1;
+        internal const uint VmdSharedContextSummaryAbiVersionV1 = 1;
+        internal const int VmdContextSummarySizeV1 = 84;
         internal const uint VmdSharedContextBoneReadbackAbiVersionV1 = 1;
         internal const uint VmdCurveNone = 0;
         internal const uint VmdCurveCubicBezier = 1;
@@ -350,6 +352,30 @@ namespace Mmd.Native
         }
 
         [StructLayout(LayoutKind.Sequential)]
+        internal struct VmdTrackSummary
+        {
+            internal uint trackCount;
+            internal uint keyCount;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct VmdContextSummary
+        {
+            internal uint structSize;
+            internal uint abiVersion;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 20, ArraySubType = UnmanagedType.U1)]
+            internal byte[] targetModelNameBytes;
+            internal uint maxFrame;
+            internal VmdTrackSummary bones;
+            internal VmdTrackSummary morphs;
+            internal VmdTrackSummary cameras;
+            internal VmdTrackSummary lights;
+            internal VmdTrackSummary selfShadows;
+            internal VmdTrackSummary properties;
+            internal uint propertyIkEntryCount;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
         internal struct BoneTrackCurve
         {
             internal uint kind;
@@ -443,6 +469,12 @@ namespace Mmd.Native
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_free", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void VmdContextFree(IntPtr context);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_read_summary", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int VmdContextReadSummary(
+            IntPtr context,
+            IntPtr outSummary,
+            IntPtr outSummarySize);
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_camera_frame_count", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr VmdContextCameraFrameCount(IntPtr context);
