@@ -119,7 +119,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void RuntimeSessionNativePlaybackRejectsMutationBeforeCompileAndReplacementAfterCompile()
+        public void RuntimeSessionNativePlaybackRejectsMutationBeforeCompileButUsesCompiledStateAfterSourceReplacement()
         {
             using MmdRuntimeSession changedBeforeCompile = CreateSession(out MmdModelDefinition firstModel);
             firstModel.sourceBytes![0] ^= 0xff;
@@ -130,9 +130,15 @@ namespace Mmd.Tests
             using MmdRuntimeSession replacedAfterCompile = CreateSession(out _, out MmdMotionDefinition secondMotion);
             _ = replacedAfterCompile.EvaluateFrame(frame: 0, time: 0.0f);
             secondMotion.sourceBytes = (byte[])secondMotion.sourceBytes!.Clone();
-            InvalidOperationException? identityError = Assert.Throws<InvalidOperationException>(() =>
-                replacedAfterCompile.EvaluateFrame(frame: 0, time: 0.0f));
-            Assert.That(identityError!.Message, Does.Contain("source identity changed"));
+            secondMotion.sourceBytes[0] ^= 0xff;
+            Assert.DoesNotThrow(() =>
+            {
+                _ = replacedAfterCompile.EvaluateFrame(frame: 0, time: 0.0f);
+            });
+
+            InvalidOperationException? snapshotError = Assert.Throws<InvalidOperationException>(() =>
+                replacedAfterCompile.BuildSnapshots(new[] { 0 }, frameRate: 30.0f));
+            Assert.That(snapshotError!.Message, Does.Contain("changed after session compilation"));
         }
 
         [Test]

@@ -146,7 +146,7 @@ namespace Mmd
                     MmdModelValidator.ThrowIfInvalid(model);
                     MmdMotionValidator.ThrowIfInvalid(motion);
                     TopologyPlan.EnsureModel(model);
-                    EnsureNativeSourcesUnchanged();
+                    EnsureNativeSourcesUnchangedBeforeCompilation();
                     if (physicsBackend != null || ikSolver != null)
                     {
                         throw new NotSupportedException(
@@ -264,7 +264,6 @@ namespace Mmd
             ThrowIfDisposed();
             MmdPlaybackTime.ValidateFrame(frame);
             MmdPlaybackTime.ValidateTime(time);
-            EnsureNativeSourcesUnchanged();
             EnsureNativePlaybackSession();
 
             nativePlaybackSession!.EvaluateAndCopy(
@@ -292,11 +291,7 @@ namespace Mmd
                 ?? throw new InvalidOperationException("Model source bytes are required for native runtime evaluation.");
             byte[] motionSourceIdentity = nativeMotionSourceIdentity
                 ?? throw new InvalidOperationException("Motion source bytes are required for native runtime evaluation.");
-            if (ComputeSourceFingerprint(modelSourceIdentity) != nativeModelSourceFingerprint
-                || ComputeSourceFingerprint(motionSourceIdentity) != nativeMotionSourceFingerprint)
-            {
-                throw new InvalidOperationException("Native runtime source bytes changed before session compilation.");
-            }
+            EnsureNativeSourcesUnchangedBeforeCompilation();
 
             byte[] modelSource = (byte[])modelSourceIdentity.Clone();
             byte[] motionSource = (byte[])motionSourceIdentity.Clone();
@@ -318,23 +313,34 @@ namespace Mmd
             }
         }
 
+        private void EnsureNativeSourcesUnchangedBeforeCompilation()
+        {
+            if (nativePlaybackSession != null)
+            {
+                return;
+            }
+
+            EnsureNativeSourcesUnchanged();
+        }
+
         private void EnsureNativeSourcesUnchanged()
         {
+            string phase = nativePlaybackSession == null
+                ? "before session compilation"
+                : "after session compilation";
             if (!ReferenceEquals(model.sourceBytes, nativeModelSourceIdentity)
                 || !ReferenceEquals(motion.sourceBytes, nativeMotionSourceIdentity)
                 || (model.sourceBytes?.Length ?? 0) != nativeModelSourceLength
                 || (motion.sourceBytes?.Length ?? 0) != nativeMotionSourceLength)
             {
-                throw new InvalidOperationException("Native runtime session source identity changed after construction.");
+                throw new InvalidOperationException(
+                    "Native runtime session source identity changed " + phase + ".");
             }
 
             if (ComputeSourceFingerprint(model.sourceBytes) != nativeModelSourceFingerprint ||
                 ComputeSourceFingerprint(motion.sourceBytes) != nativeMotionSourceFingerprint)
             {
-                throw new InvalidOperationException(
-                    nativePlaybackSession == null
-                        ? "Native runtime source bytes changed before session compilation."
-                        : "Native runtime source bytes changed after session compilation.");
+                throw new InvalidOperationException("Native runtime source bytes changed " + phase + ".");
             }
         }
 
