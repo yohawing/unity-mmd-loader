@@ -11,7 +11,6 @@ using Mmd.Motion;
 using Mmd.Parser;
 using Mmd.Physics;
 using Mmd.Rendering;
-using Mmd.Tracing;
 
 namespace Mmd.Tests
 {
@@ -145,19 +144,6 @@ namespace Mmd.Tests
                 "the profile factory must fail closed when UTS is unavailable");
             Assert.That(readme, Does.Contain("Custom Material Profile"),
                 "the sample must document the importer profile connection");
-        }
-
-        [Test]
-        public void ActualTraceDumperCreatesSchemaVersionOneJson()
-        {
-            MmdTrace trace = MmdActualTraceDumper.CreateTrace("minimal.pmx", "minimal.vmd");
-
-            string json = MmdActualTraceDumper.ToJson(trace, prettyPrint: false);
-
-            Assert.That(json, Does.Contain("\"schemaVersion\":1"));
-            Assert.That(json, Does.Contain("\"model\":\"minimal.pmx\""));
-            Assert.That(json, Does.Contain("\"motion\":\"minimal.vmd\""));
-            Assert.That(json, Does.Contain("\"space\":\"mmd\""));
         }
 
         [Test]
@@ -367,17 +353,16 @@ namespace Mmd.Tests
                 }
             });
 
-            MmdTrace trace = MmdRuntimeTraceEvaluator.EvaluatePhaseOneTrace(
+            MmdRuntimeFrameEvaluation evaluation = MmdRuntimeFramePipeline.EvaluateWithOptions(
                 model,
                 new MmdMotionDefinition(),
                 frame: 0,
-                time: 0.0f,
-                modelId: "ik-model.pmx",
-                motionId: "empty.vmd");
+                physicsBackend: new NullMmdPhysicsBackend(),
+                captureCheckpoints: true);
 
-            MmdTraceBone appendLink = trace.frames.Single(frame => frame.checkpoint == MmdTraceCheckpoints.AfterAppendTransform).bones.Single(bone => bone.name == "link");
-            MmdTraceBone ikLink = trace.frames.Single(frame => frame.checkpoint == MmdTraceCheckpoints.AfterIk).bones.Single(bone => bone.name == "link");
-            Assert.That(ikLink.localRotation[2], Is.Not.EqualTo(appendLink.localRotation[2]).Within(0.00001f));
+            Assert.That(evaluation.AppendedWorldMatrices, Is.Not.Null);
+            Assert.That(evaluation.IkWorldMatrices, Is.Not.Null);
+            Assert.That(evaluation.IkWorldMatrices![1], Is.Not.EqualTo(evaluation.AppendedWorldMatrices![1]));
         }
 
         [Test]
