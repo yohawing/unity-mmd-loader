@@ -4,7 +4,7 @@ param(
     [string] $PackageRoot = "F:\Develop\MMDDev\unity-mmd-loader\packages",
     [string] $ResultsFile = "F:\Develop\MMDDev\unity-mmd-loader\artifacts\native-unavailable-gate-results.xml",
     [string] $LogFile = "F:\Develop\MMDDev\unity-mmd-loader\artifacts\native-unavailable-gate.log",
-    [ValidateSet("MissingDll", "MissingEntryPoint", "AbiMismatch")]
+    [ValidateSet("MissingDll", "MissingEntryPoint", "AbiMismatch", "InvalidBytes")]
     [string] $Mode = "MissingDll",
     [string] $ReplacementDll = ""
 )
@@ -104,9 +104,13 @@ $Mode = switch ($Mode.ToLowerInvariant()) {
     "missingdll" { "MissingDll" }
     "missingentrypoint" { "MissingEntryPoint" }
     "abimismatch" { "AbiMismatch" }
+    "invalidbytes" { "InvalidBytes" }
     default { throw "Native unavailable gate failed. Unsupported mode: $Mode" }
 }
-if ($Mode -ne "MissingDll") {
+if ($Mode -eq "InvalidBytes") {
+    $ReplacementDll = Join-Path $PackageRoot "com.yohawing.mmd-loader\Runtime\Plugins\x86_64\mmd_runtime_ffi.dll"
+}
+elseif ($Mode -ne "MissingDll") {
     if ([string]::IsNullOrWhiteSpace($ReplacementDll)) {
         throw "Native unavailable gate failed. -ReplacementDll is required for mode=$Mode"
     }
@@ -176,6 +180,12 @@ try {
             throw "Native unavailable gate setup failed. The copied package still contains the native DLL: $gateDllPath"
         }
     }
+    elseif ($Mode -eq "InvalidBytes") {
+        Copy-Item -LiteralPath $ReplacementDll -Destination $gateDllPath -Force
+        if (-not (Test-Path -LiteralPath $gateDllPath -PathType Leaf)) {
+            throw "Native unavailable gate setup failed. Packaged DLL was not copied for invalid-bytes mode: $gateDllPath"
+        }
+    }
     else {
         Copy-Item -LiteralPath $ReplacementDll -Destination $gateDllPath -Force
         if (-not (Test-Path -LiteralPath $gateDllPath -PathType Leaf)) {
@@ -199,6 +209,9 @@ try {
         }
         "AbiMismatch" {
             "Mmd.Tests.MmdRuntimeNativeUnavailableBoundaryContractTests.PhysicalAbiMismatchProbeClassifiesUnsupportedRuntime"
+        }
+        "InvalidBytes" {
+            "Mmd.Tests.MmdRuntimeNativeUnavailableBoundaryContractTests.PhysicalInvalidNativeBytesProbeReportsNativeLastError"
         }
     }
     $gateProjectForUnity = Resolve-Path -LiteralPath $gateProject -Relative

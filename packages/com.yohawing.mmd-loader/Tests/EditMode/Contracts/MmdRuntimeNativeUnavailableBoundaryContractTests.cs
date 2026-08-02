@@ -17,8 +17,10 @@ namespace Mmd.Tests
         private const string MissingDllMode = "MissingDll";
         private const string MissingEntryPointMode = "MissingEntryPoint";
         private const string AbiMismatchMode = "AbiMismatch";
+        private const string InvalidBytesMode = "InvalidBytes";
         private const string PhysicalProbeOperation = "physical native runtime probe";
         private const string PhysicalAbiMismatchOperation = "physical native ABI mismatch probe";
+        private const string PhysicalInvalidBytesOperation = "physical invalid VMD bytes probe";
 
         [Test]
         public void MissingNativeDllIsClassifiedAsUnavailableWithStableOperation()
@@ -104,6 +106,23 @@ namespace Mmd.Tests
                     MmdRuntimeFfiMethods.ValidateVmdSharedContextCapability))!;
             Assert.That(unsupported.Message, Does.Contain("ABI version"));
             Assert.That(unsupported.Message, Does.Contain("Expected"));
+        }
+
+        [Test]
+        public void PhysicalInvalidNativeBytesProbeReportsNativeLastError()
+        {
+            string nativeDllPath = GetPhysicalNativeDllPath(InvalidBytesMode);
+            Assert.That(File.Exists(nativeDllPath), Is.True, "The physical invalid-bytes gate requires the packaged DLL.");
+
+            const string prefix = "mmd-runtime shared VMD context creation returned null: ";
+            InvalidOperationException invalid = Assert.Throws<InvalidOperationException>(
+                () => MmdRuntimeNativeBoundary.Invoke(
+                    PhysicalInvalidBytesOperation,
+                    () => MmdRuntimeFfiVmdContext.Create(new byte[] { 0x6e, 0x6f, 0x74, 0x2d, 0x76, 0x6d, 0x64 })))!;
+            Assert.That(invalid.Message, Does.StartWith(prefix));
+            string nativeDiagnostic = invalid.Message.Substring(prefix.Length).Trim();
+            Assert.That(nativeDiagnostic, Is.Not.Empty);
+            Assert.That(nativeDiagnostic, Is.Not.EqualTo("no native diagnostic"));
         }
 
         private static string GetPhysicalNativeDllPath(string expectedMode)
