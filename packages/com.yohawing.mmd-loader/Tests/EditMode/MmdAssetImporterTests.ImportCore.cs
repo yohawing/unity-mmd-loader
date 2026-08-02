@@ -132,6 +132,33 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void ImportedVmdSummaryCacheInvalidatesWhenSourceBytesChange()
+        {
+            const string cachePath = TempDirectory + "/summary-cache.vmd";
+            byte[] firstBytes = MmdTestFixtures.CreateDenseVmdBytes("cache", "root", 2, 1);
+            byte[] secondBytes = MmdTestFixtures.CreateDenseVmdBytes("cache", "root", 2, 16);
+            Directory.CreateDirectory(Path.Combine(ProjectRoot, TempDirectory));
+            string absolutePath = Path.Combine(ProjectRoot, cachePath);
+
+            File.WriteAllBytes(absolutePath, firstBytes);
+            DateTime firstLastWriteTimeUtc = File.GetLastWriteTimeUtc(absolutePath);
+            AssetDatabase.ImportAsset(cachePath, ImportAssetOptions.ForceUpdate);
+            MmdVmdAsset firstAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(cachePath);
+            Assert.That(firstAsset, Is.Not.Null);
+            Assert.That(firstAsset.BoneKeyframeCount, Is.EqualTo(2));
+            Assert.That(firstAsset.MaxFrame, Is.Zero);
+
+            File.WriteAllBytes(absolutePath, secondBytes);
+            File.SetLastWriteTimeUtc(absolutePath, firstLastWriteTimeUtc);
+            AssetDatabase.ImportAsset(cachePath, ImportAssetOptions.ForceUpdate);
+            MmdVmdAsset secondAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(cachePath);
+            Assert.That(secondAsset, Is.Not.Null);
+            Assert.That(secondAsset.BoneKeyframeCount, Is.EqualTo(2));
+            Assert.That(secondAsset.MaxFrame, Is.EqualTo(1));
+            Assert.That(secondAsset.GetBytesCopy(), Is.EqualTo(secondBytes));
+        }
+
+        [Test]
         public void ImportedInvalidVmdPreservesRawBytesAndRejectsNativeClipHeader()
         {
             byte[] invalidBytes = { 0x56, 0x4D, 0x44, 0x00 };
