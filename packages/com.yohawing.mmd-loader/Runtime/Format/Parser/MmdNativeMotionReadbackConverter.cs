@@ -8,12 +8,14 @@ using Mmd.Native;
 namespace Mmd.Parser
 {
     /// <summary>
-    /// Converts model-resolved native authored-track readback into the existing managed
-    /// motion definition. This is an opt-in migration boundary; it does not participate
-    /// in the normal VMD parser path.
+    /// Converts native authored-track readback into the existing managed motion definition.
+    /// The raw model-less path is the normal VMD parser boundary; the model-resolved overload
+    /// remains an opt-in diagnostic bridge.
     /// </summary>
     internal static class MmdNativeMotionReadbackConverter
     {
+        private static readonly Encoding? Cp932Encoding = TryGetCp932Encoding();
+
         internal static MmdMotionDefinition Build(
             MmdModelDefinition model,
             MmdVmdParseSummary summary,
@@ -53,15 +55,7 @@ namespace Mmd.Parser
 
             Dictionary<int, string> boneNames = BuildNameMap(model.bones, bone => bone.index, bone => bone.name, "bone");
             Dictionary<int, string> morphNames = BuildNameMap(model.morphs, morph => morph.index, morph => morph.name, "morph");
-            var motion = new MmdMotionDefinition
-            {
-                targetModelName = summary.TargetModelName ?? string.Empty,
-                maxFrame = summary.MaxFrame,
-                cameraKeyframeCount = summary.CameraKeyframeCount,
-                lightKeyframeCount = summary.LightKeyframeCount,
-                selfShadowKeyframeCount = summary.SelfShadowKeyframeCount,
-                sourceBytes = (byte[])sourceBytes.Clone()
-            };
+            MmdMotionDefinition motion = CreateMotion(summary, sourceBytes);
 
             int bodyBoneKeyCount = 0;
             for (int keyIndex = 0; keyIndex < boneKeys.Length; keyIndex++)
@@ -143,6 +137,101 @@ namespace Mmd.Parser
                     " does not match the VMD summary count " + summary.MorphKeyframeCount + ".");
             }
 
+            AddPropertyKeys(motion, summary, propertyKeys, propertyIkEntries);
+            AddSceneKeys(motion, summary, cameraKeys, lightKeys, selfShadowKeys);
+            MmdMotionValidator.ThrowIfInvalid(motion);
+            return motion;
+        }
+
+        internal static MmdMotionDefinition BuildRaw(
+            MmdVmdParseSummary summary,
+            MmdRuntimeFfiMethods.VmdRawBoneKeyframe[] boneKeys,
+            MmdRuntimeFfiMethods.VmdRawMorphKeyframe[] morphKeys,
+            MmdRuntimeFfiMethods.VmdCameraKeyframe[] cameraKeys,
+            MmdRuntimeFfiMethods.VmdLightKeyframe[] lightKeys,
+            MmdRuntimeFfiMethods.VmdSelfShadowKeyframe[] selfShadowKeys,
+            MmdRuntimeFfiMethods.VmdPropertyKeyframe[] propertyKeys,
+            MmdRuntimeFfiMethods.VmdPropertyIkEntry[] propertyIkEntries,
+            byte[] sourceBytes)
+        {
+            if (boneKeys == null || morphKeys == null || cameraKeys == null ||
+                lightKeys == null || selfShadowKeys == null || propertyKeys == null ||
+                propertyIkEntries == null)
+            {
+                throw new ArgumentNullException("Native raw VMD readback arrays are required.");
+            }
+
+            MmdMotionDefinition motion = CreateMotion(summary, sourceBytes);
+            for (int keyIndex = 0; keyIndex < boneKeys.Length; keyIndex++)
+            {
+                MmdRuntimeFfiMethods.VmdRawBoneKeyframe key = boneKeys[keyIndex];
+                byte[] rawInterpolation = CopyRequiredBytes(
+                    key.interpolation,
+                    64,
+                    "native raw bone interpolation",
+                    0,
+                    keyIndex);
+                motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
+                {
+                    boneName = DecodeRawVmdName(key.boneNameBytes, "bone", keyIndex),
+                    frame = CheckedFrame(key.frame, summary.MaxFrame, "native raw bone key", 0, keyIndex),
+                    translation = CopyRequired(key.positionXyz, 3, "native raw bone translation", 0, keyIndex),
+                    rotation = CopyRequired(key.rotationXyzw, 4, "native raw bone rotation", 0, keyIndex),
+                    interpolation = new MmdBoneInterpolationDefinition
+                    {
+                        translationX = DecodeBoneInterpolation(rawInterpolation, 0),
+                        translationY = DecodeBoneInterpolation(rawInterpolation, 1),
+                        translationZ = DecodeBoneInterpolation(rawInterpolation, 2),
+                        rotation = DecodeBoneInterpolation(rawInterpolation, 3)
+                    },
+                    physicsEnabled = false,
+                    rawInterpolation = rawInterpolation
+                });
+            }
+
+            for (int keyIndex = 0; keyIndex < morphKeys.Length; keyIndex++)
+            {
+                MmdRuntimeFfiMethods.VmdRawMorphKeyframe key = morphKeys[keyIndex];
+                motion.morphKeyframes.Add(new MmdMorphKeyframeDefinition
+                {
+                    morphName = DecodeRawVmdName(key.morphNameBytes, "morph", keyIndex),
+                    frame = CheckedFrame(key.frame, summary.MaxFrame, "native raw morph key", 0, keyIndex),
+                    weight = RequireFinite(key.weight, "native raw morph weight", 0, keyIndex)
+                });
+            }
+
+            AddPropertyKeys(motion, summary, propertyKeys, propertyIkEntries);
+            AddSceneKeys(motion, summary, cameraKeys, lightKeys, selfShadowKeys);
+            MmdMotionValidator.ThrowIfInvalid(motion);
+            return motion;
+        }
+
+        private static MmdMotionDefinition CreateMotion(
+            MmdVmdParseSummary summary,
+            byte[] sourceBytes)
+        {
+            if (sourceBytes == null || sourceBytes.Length == 0)
+            {
+                throw new ArgumentException("VMD source bytes are required.", nameof(sourceBytes));
+            }
+
+            return new MmdMotionDefinition
+            {
+                targetModelName = summary.TargetModelName ?? string.Empty,
+                maxFrame = summary.MaxFrame,
+                cameraKeyframeCount = summary.CameraKeyframeCount,
+                lightKeyframeCount = summary.LightKeyframeCount,
+                selfShadowKeyframeCount = summary.SelfShadowKeyframeCount,
+                sourceBytes = (byte[])sourceBytes.Clone()
+            };
+        }
+
+        private static void AddPropertyKeys(
+            MmdMotionDefinition motion,
+            MmdVmdParseSummary summary,
+            MmdRuntimeFfiMethods.VmdPropertyKeyframe[] propertyKeys,
+            MmdRuntimeFfiMethods.VmdPropertyIkEntry[] propertyIkEntries)
+        {
             if (propertyKeys.Length != summary.ModelKeyframeCount)
             {
                 throw new InvalidOperationException(
@@ -210,7 +299,15 @@ namespace Mmd.Parser
                     " does not match the VMD summary/native counts " +
                     summary.ConstraintStateCount + "/" + propertyIkEntries.Length + ".");
             }
+        }
 
+        private static void AddSceneKeys(
+            MmdMotionDefinition motion,
+            MmdVmdParseSummary summary,
+            MmdRuntimeFfiMethods.VmdCameraKeyframe[] cameraKeys,
+            MmdRuntimeFfiMethods.VmdLightKeyframe[] lightKeys,
+            MmdRuntimeFfiMethods.VmdSelfShadowKeyframe[] selfShadowKeys)
+        {
             ValidateSceneTrackCount(cameraKeys.Length, summary.CameraKeyframeCount, "camera");
             ValidateSceneTrackCount(lightKeys.Length, summary.LightKeyframeCount, "light");
             ValidateSceneTrackCount(
@@ -221,8 +318,36 @@ namespace Mmd.Parser
             AddCameraKeys(motion, cameraKeys, summary.MaxFrame);
             AddLightKeys(motion, lightKeys, summary.MaxFrame);
             AddSelfShadowKeys(motion, selfShadowKeys, summary.MaxFrame);
-            MmdMotionValidator.ThrowIfInvalid(motion);
-            return motion;
+        }
+
+        private static string DecodeRawVmdName(byte[]? values, string channel, int keyIndex)
+        {
+            if (values == null || values.Length != 15)
+            {
+                throw new InvalidOperationException(
+                    "Native raw VMD " + channel + " name must contain exactly 15 bytes: key " +
+                    keyIndex + ".");
+            }
+
+            int length = 0;
+            while (length < values.Length && values[length] != 0)
+            {
+                length++;
+            }
+
+            Encoding encoding = Cp932Encoding ?? throw new MmdRuntimeUnsupportedException(
+                "CP932/Shift-JIS decoding is unavailable for native raw VMD " + channel +
+                " names.");
+            string name = encoding.GetString(values, 0, length);
+
+            name = name.TrimEnd(' ', '\0');
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                throw new InvalidOperationException(
+                    "Native raw VMD " + channel + " name is empty: key " + keyIndex + ".");
+            }
+
+            return name;
         }
 
         private static Dictionary<int, string> BuildNameMap<T>(
@@ -439,17 +564,9 @@ namespace Mmd.Parser
                 length++;
             }
 
-            string name;
-            try
-            {
-                name = Encoding.GetEncoding(932).GetString(values, 0, length);
-            }
-            catch (ArgumentException exception)
-            {
-                throw new MmdRuntimeUnsupportedException(
-                    "CP932/Shift-JIS decoding is unavailable for native property IK names: " +
-                    exception.Message);
-            }
+            Encoding encoding = Cp932Encoding ?? throw new MmdRuntimeUnsupportedException(
+                "CP932/Shift-JIS decoding is unavailable for native property IK names.");
+            string name = encoding.GetString(values, 0, length);
 
             name = name.TrimEnd(' ', '\0');
             if (string.IsNullOrWhiteSpace(name))
@@ -459,6 +576,18 @@ namespace Mmd.Parser
             }
 
             return name;
+        }
+
+        private static Encoding? TryGetCp932Encoding()
+        {
+            try
+            {
+                return Encoding.GetEncoding(932);
+            }
+            catch (ArgumentException)
+            {
+                return null;
+            }
         }
 
     }

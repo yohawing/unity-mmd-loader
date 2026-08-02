@@ -2,34 +2,25 @@
 #pragma warning disable CS0649
 
 using System;
+using Mmd;
+using Mmd.Native;
 
 namespace Mmd.Parser
 {
     public sealed partial class NativeMmdParser : IMmdParser
     {
-        private readonly Func<byte[], string> parseVmdJson;
         private readonly Func<byte[], string> parsePmxNonGeometryJson;
         private readonly Func<byte[], PmxModelSourceGeometry> createPmxGeometry;
 
         public NativeMmdParser()
-            : this(MmdParserFfiMethods.ParseVmdJson,
-                   MmdParserFfiMethods.ParsePmxNonGeometryJson, CreatePmxGeometryFromNativeBuffers)
+            : this(MmdParserFfiMethods.ParsePmxNonGeometryJson, CreatePmxGeometryFromNativeBuffers)
         {
         }
 
         internal NativeMmdParser(
-            Func<byte[], string> parseVmdJson)
-            : this(parseVmdJson,
-                   MmdParserFfiMethods.ParsePmxNonGeometryJson, CreatePmxGeometryFromNativeBuffers)
-        {
-        }
-
-        internal NativeMmdParser(
-            Func<byte[], string> parseVmdJson,
             Func<byte[], string> parsePmxNonGeometryJson,
             Func<byte[], PmxModelSourceGeometry> createPmxGeometry)
         {
-            this.parseVmdJson = parseVmdJson ?? throw new ArgumentNullException(nameof(parseVmdJson));
             this.parsePmxNonGeometryJson = parsePmxNonGeometryJson ?? throw new ArgumentNullException(nameof(parsePmxNonGeometryJson));
             this.createPmxGeometry = createPmxGeometry ?? throw new ArgumentNullException(nameof(createPmxGeometry));
         }
@@ -59,16 +50,19 @@ namespace Mmd.Parser
         public MmdMotionDefinition LoadMotion(ReadOnlySpan<byte> data)
         {
             MmdParserInput.RequireNonEmpty(data, nameof(data));
-            string json = parseVmdJson(data.ToArray());
-            if (string.IsNullOrWhiteSpace(json))
-            {
-                throw new InvalidOperationException("mmd-runtime VMD JSON parser returned empty JSON.");
-            }
-
-            VmdParsedAnimationJson? parsed = UnityEngine.JsonUtility.FromJson<VmdParsedAnimationJson>(json);
-            MmdMotionDefinition motion = BuildMotionDefinition(CreateMotionSnapshot(parsed));
-            motion.sourceBytes = data.ToArray();
-            return motion;
+            byte[] bytes = data.ToArray();
+            using var context = MmdRuntimeFfiVmdContext.Create(bytes);
+            MmdVmdParseSummary summary = MmdVmdNativeSummaryAdapter.Read(context);
+            return MmdNativeMotionReadbackConverter.BuildRaw(
+                summary,
+                context.GetRawBoneKeyframes(),
+                context.GetRawMorphKeyframes(),
+                context.GetCameraKeyframes(),
+                context.GetLightKeyframes(),
+                context.GetSelfShadowKeyframes(),
+                context.GetPropertyKeyframes(),
+                context.GetPropertyIkEntries(),
+                bytes);
         }
 
         private static int CheckedUIntToInt(uint value, string label)

@@ -21,9 +21,6 @@ namespace Mmd.Parser
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_byte_buffer_free", CallingConvention = CallingConvention.Cdecl)]
         private static extern void ByteBufferFree(ByteBuffer buffer);
 
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_parse_vmd_json", CallingConvention = CallingConvention.Cdecl)]
-        private static extern ByteBuffer ParseVmdJsonBuffer(byte[] data, IntPtr len);
-
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_parse_pmx_non_geometry_json", CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer ParsePmxNonGeometryJsonBuffer(byte[] data, IntPtr len);
 
@@ -104,16 +101,6 @@ namespace Mmd.Parser
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_pmx_geometry_skinning_modes_json", CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer PmxGeometrySkinningModesJsonBuffer(IntPtr geometry);
-
-        internal static string ParseVmdJson(byte[] data)
-        {
-            if (data == null || data.Length == 0)
-            {
-                throw new ArgumentException("VMD bytes are required.", nameof(data));
-            }
-
-            return ReadString(ParseVmdJsonBuffer(data, new IntPtr(data.Length)), "VMD parser JSON");
-        }
 
         internal static string ParsePmxNonGeometryJson(byte[] data)
         {

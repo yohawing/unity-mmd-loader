@@ -312,7 +312,6 @@ namespace Mmd.Tests
             byte[]? observedGeometryBytes = null;
 
             var parser = new NativeMmdParser(
-                _ => throw new AssertionException("VMD JSON parser must not be used when loading PMX."),
                 bytes =>
                 {
                     observedJsonBytes = bytes;
@@ -338,7 +337,6 @@ namespace Mmd.Tests
         public void LoadModelRejectsInvalidNonGeometryJsonBeforeGeometryFallback()
         {
             var parser = new NativeMmdParser(
-                _ => throw new AssertionException("VMD JSON parser must not be used when loading PMX."),
                 _ => string.Empty,
                 _ => throw new AssertionException("Invalid PMX must be rejected before geometry fallback."));
 
