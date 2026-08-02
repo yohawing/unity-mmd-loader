@@ -135,12 +135,32 @@ namespace Mmd
         internal MmdEvaluatedFrame EvaluateBeforePhysicsFrame(int frame, float time, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
         {
             ThrowIfDisposed();
-            if (!model.HasDeformAfterPhysicsBones &&
-                physicsBackend == null &&
-                ikSolver == null &&
-                nativeModelSourceIdentity != null &&
-                nativeMotionSourceIdentity != null)
+            if (nativeModelSourceIdentity != null && nativeMotionSourceIdentity != null)
             {
+                if (physicsBackend != null || ikSolver != null || model.HasDeformAfterPhysicsBones)
+                {
+                    // Preserve the public before-physics input precedence before reporting
+                    // the native-only unsupported boundary, including mutable topology state.
+                    MmdPlaybackTime.ValidateFrame(frame);
+                    MmdPlaybackTime.ValidateTime(time);
+                    MmdModelValidator.ThrowIfInvalid(model);
+                    MmdMotionValidator.ThrowIfInvalid(motion);
+                    TopologyPlan.EnsureModel(model);
+                    EnsureNativeSourcesUnchanged();
+                    if (physicsBackend != null || ikSolver != null)
+                    {
+                        throw new NotSupportedException(
+                            "Managed fallback evaluation is unsupported for source-backed PMX/VMD when a custom " +
+                            "physics backend or IK solver is supplied during before-physics evaluation; " +
+                            "native evaluation is required.");
+                    }
+
+                    throw new NotSupportedException(
+                        "Managed fallback evaluation is unsupported for source-backed PMX/VMD during " +
+                        "before-physics evaluation of a model with deform-after-physics bones; " +
+                        "native evaluation is required.");
+                }
+
                 return EvaluateNativeFrame(frame, time);
             }
 
