@@ -369,7 +369,7 @@ namespace Mmd.Tests
                 string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
                 string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
                 byte[] vmdBytes = File.ReadAllBytes(vmdPath);
-                MmdVmdParseSummary parsedSummary = MmdVmdBinarySummaryReader.Read(vmdBytes);
+                MmdVmdParseSummary parsedSummary = MmdVmdNativeSummaryAdapter.Read(vmdBytes);
                 const int cachedMaxFrameOffset = 17;
                 int cachedMaxFrame = parsedSummary.MaxFrame + cachedMaxFrameOffset;
                 var cachedSummary = new MmdVmdParseSummary(

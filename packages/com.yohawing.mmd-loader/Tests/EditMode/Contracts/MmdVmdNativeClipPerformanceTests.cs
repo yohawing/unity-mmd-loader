@@ -36,7 +36,7 @@ namespace Mmd.Tests
                 GeneratedBoneKeyframeCount,
                 GeneratedFrameSpan);
 
-            MmdVmdParseSummary summary = MmdVmdBinarySummaryReader.Read(vmdBytes);
+            MmdVmdParseSummary summary = MmdVmdNativeSummaryAdapter.Read(vmdBytes);
             Assert.That(summary.BoneKeyframeCount,
                 Is.EqualTo(GeneratedBoneKeyframeCount));
 

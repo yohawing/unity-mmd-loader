@@ -303,7 +303,7 @@ namespace Mmd.Tests.Contracts
         private static MmdAnimCliParitySummaryCase BuildVmdSummaryCase(string vmdPath, string fixtureMotion)
         {
             byte[] bytes = File.ReadAllBytes(vmdPath);
-            MmdVmdParseSummary managed = MmdVmdBinarySummaryReader.Read(bytes);
+            MmdVmdParseSummary managed = MmdVmdNativeSummaryAdapter.Read(bytes);
 
             string json = RunMmdAnimCli("inspect " + Quote(vmdPath) + " --json");
             CliVmdInspectReport cli = ParseCliVmdInspectReport(json, vmdPath);

@@ -11,6 +11,38 @@ namespace Mmd.Tests
     public sealed class MmdVmdAssetNativeClipContractTests
     {
         [Test]
+        public void NativeSummaryMapsKeyCountsIntoTheExistingPublicDto()
+        {
+            byte[] sourceBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube_motion.vmd");
+            MmdVmdParseSummary summary = MmdVmdNativeSummaryAdapter.Read(sourceBytes);
+            MmdMotionDefinition parsed = new NativeMmdParser().LoadMotion(sourceBytes);
+            int constraintStateCount = 0;
+            foreach (MmdModelKeyframeDefinition keyframe in parsed.modelKeyframes)
+            {
+                constraintStateCount += keyframe.constraintStates.Count;
+            }
+
+            Assert.That(summary.TargetModelName, Is.EqualTo(parsed.targetModelName));
+            Assert.That(summary.MaxFrame, Is.EqualTo(parsed.maxFrame));
+            Assert.That(summary.BoneKeyframeCount, Is.EqualTo(parsed.boneKeyframes.Count));
+            Assert.That(summary.MorphKeyframeCount, Is.EqualTo(parsed.morphKeyframes.Count));
+            Assert.That(summary.ModelKeyframeCount, Is.EqualTo(parsed.modelKeyframes.Count));
+            Assert.That(summary.ConstraintStateCount, Is.EqualTo(constraintStateCount));
+            Assert.That(summary.CameraKeyframeCount, Is.EqualTo(parsed.cameraKeyframes.Count));
+            Assert.That(summary.LightKeyframeCount, Is.EqualTo(parsed.lightKeyframes.Count));
+            Assert.That(summary.SelfShadowKeyframeCount, Is.EqualTo(parsed.selfShadowKeyframes.Count));
+        }
+
+        [Test]
+        public void NativeSummaryDecodesCp932ModelNameWithNulPadding()
+        {
+            MmdVmdParseSummary summary = MmdVmdNativeSummaryAdapter.Read(
+                MmdTestFixtures.BuildSceneTrackVmdBytes("モデル名"));
+
+            Assert.That(summary.TargetModelName, Is.EqualTo("モデル名"));
+        }
+
+        [Test]
         public void FailedImportSummaryPreservesBytesButRejectsNativeClipHeader()
         {
             MmdVmdAsset asset = ScriptableObject.CreateInstance<MmdVmdAsset>();
@@ -42,7 +74,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void UnparsedAssetBuildsNativeClipHeaderFromSummaryReader()
+        public void UnparsedAssetBuildsNativeClipHeaderFromNativeSummary()
         {
             byte[] sourceBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube_motion.vmd");
             MmdVmdAsset asset = ScriptableObject.CreateInstance<MmdVmdAsset>();

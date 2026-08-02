@@ -183,7 +183,7 @@ namespace Mmd.Tests
             var parser = new NativeMmdParser();
 
             byte[] cameraBytes = MmdTestFixtures.BuildCameraTrackVmdBytes("native-camera");
-            MmdVmdParseSummary cameraSummary = MmdVmdBinarySummaryReader.Read(cameraBytes);
+            MmdVmdParseSummary cameraSummary = MmdVmdNativeSummaryAdapter.Read(cameraBytes);
             MmdMotionDefinition camera = MmdNativeAuthoredMotionReadbackAdapter.Read(
                 parser.LoadModel(pmxBytes),
                 pmxBytes,
@@ -197,7 +197,7 @@ namespace Mmd.Tests
             Assert.That(camera.cameraKeyframes[1].perspective, Is.False);
 
             byte[] sceneBytes = MmdTestFixtures.BuildSceneTrackVmdBytes("native-scene");
-            MmdVmdParseSummary sceneSummary = MmdVmdBinarySummaryReader.Read(sceneBytes);
+            MmdVmdParseSummary sceneSummary = MmdVmdNativeSummaryAdapter.Read(sceneBytes);
             MmdMotionDefinition scene = MmdNativeAuthoredMotionReadbackAdapter.Read(
                 parser.LoadModel(pmxBytes),
                 pmxBytes,

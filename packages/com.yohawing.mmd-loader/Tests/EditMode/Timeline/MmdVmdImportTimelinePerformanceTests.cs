@@ -82,7 +82,7 @@ namespace Mmd.Tests
                 "全ての親",
                 generatedKeyframeCount,
                 GeneratedFrameSpan);
-            MmdVmdParseSummary summary = MmdVmdBinarySummaryReader.Read(vmdBytes);
+            MmdVmdParseSummary summary = MmdVmdNativeSummaryAdapter.Read(vmdBytes);
             Assert.That(summary.BoneKeyframeCount, Is.EqualTo(generatedKeyframeCount));
 
             PrepareTemporaryAssets(vmdBytes);
@@ -268,7 +268,7 @@ namespace Mmd.Tests
                 "全ての親",
                 StressGeneratedBoneKeyframeCount,
                 StressGeneratedFrameSpan);
-            MmdVmdParseSummary summary = MmdVmdBinarySummaryReader.Read(vmdBytes);
+            MmdVmdParseSummary summary = MmdVmdNativeSummaryAdapter.Read(vmdBytes);
             Assert.That(summary.BoneKeyframeCount, Is.EqualTo(StressGeneratedBoneKeyframeCount));
 
             NativeHandleLifetimeStressReport report = RunNativeHandleLifetimeStress(vmdBytes);
