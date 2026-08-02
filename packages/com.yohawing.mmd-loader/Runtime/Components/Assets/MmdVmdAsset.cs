@@ -269,7 +269,8 @@ namespace Mmd
             ValidateNativeClipHeaderSource();
 
             MmdVmdParseSummary summary = GetNativeClipSummary();
-            return CreateNativeClipMotionHeader(ReadSourceBytes(), summary);
+            byte[] sourceBytes = ReadSourceBytes();
+            return CreateNativeClipMotionHeaderCore(sourceBytes, summary, rawSource != null);
         }
 
         public static MmdMotionDefinition CreateNativeClipMotionHeader(
@@ -281,6 +282,14 @@ namespace Mmd
                 throw new ArgumentException("VMD bytes are required.", nameof(vmdBytes));
             }
 
+            return CreateNativeClipMotionHeaderCore(vmdBytes, summary, shareSourceBytes: false);
+        }
+
+        private static MmdMotionDefinition CreateNativeClipMotionHeaderCore(
+            byte[] vmdBytes,
+            MmdVmdParseSummary summary,
+            bool shareSourceBytes)
+        {
             return new MmdMotionDefinition
             {
                 targetModelName = summary.TargetModelName,
@@ -291,7 +300,9 @@ namespace Mmd
                 cameraKeyframeCount = summary.CameraKeyframeCount,
                 lightKeyframeCount = summary.LightKeyframeCount,
                 selfShadowKeyframeCount = summary.SelfShadowKeyframeCount,
-                sourceBytes = (byte[])vmdBytes.Clone()
+                // Imported raw-source headers share the cached asset-owned buffer to avoid
+                // cloning the full VMD during the first Timeline evaluation.
+                sourceBytes = shareSourceBytes ? vmdBytes : (byte[])vmdBytes.Clone()
             };
         }
 

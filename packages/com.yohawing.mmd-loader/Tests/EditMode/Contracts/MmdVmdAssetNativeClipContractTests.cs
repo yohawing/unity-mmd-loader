@@ -59,11 +59,25 @@ namespace Mmd.Tests
                 Assert.That(header.boneKeyframes, Is.Empty);
                 Assert.That(header.morphKeyframes, Is.Empty);
                 Assert.That(header.sourceBytes, Is.EqualTo(sourceBytes));
+                Assert.That(header.sourceBytes, Is.Not.SameAs(sourceBytes));
+                Assert.That(asset.GetBytesCopy(), Is.Not.SameAs(header.sourceBytes));
             }
             finally
             {
                 UnityEngine.Object.DestroyImmediate(asset);
             }
+        }
+
+        [Test]
+        public void StaticNativeClipHeaderClonesLegacySourceBytes()
+        {
+            byte[] sourceBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube_motion.vmd");
+            MmdMotionDefinition header = MmdVmdAsset.CreateNativeClipMotionHeader(
+                sourceBytes,
+                new MmdVmdParseSummary("test", 49, 6, 0, 0, 0));
+
+            Assert.That(header.sourceBytes, Is.Not.SameAs(sourceBytes));
+            Assert.That(header.sourceBytes, Is.EqualTo(sourceBytes));
         }
 
         [Test]

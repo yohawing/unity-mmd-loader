@@ -69,6 +69,14 @@ namespace Mmd.Tests
             Assert.That(motion.lightKeyframeCount, Is.EqualTo(vmdAsset.LightKeyframeCount));
             Assert.That(motion.selfShadowKeyframeCount, Is.EqualTo(vmdAsset.SelfShadowKeyframeCount));
             Assert.That(motion.sourceBytes, Is.EqualTo(vmdAsset.GetBytesCopy()));
+
+            System.Reflection.FieldInfo? sourceReadbackField = typeof(MmdVmdAsset).GetField(
+                "sourceReadback",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            Assert.That(sourceReadbackField, Is.Not.Null);
+            byte[] cachedSourceBytes = (byte[])sourceReadbackField!.GetValue(vmdAsset)!;
+            Assert.That(motion.sourceBytes, Is.SameAs(cachedSourceBytes));
+            Assert.That(vmdAsset.GetBytesCopy(), Is.Not.SameAs(cachedSourceBytes));
         }
 
         [Test]
