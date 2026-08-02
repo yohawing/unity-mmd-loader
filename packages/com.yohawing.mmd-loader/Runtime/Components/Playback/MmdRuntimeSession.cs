@@ -2,10 +2,8 @@
 
 using System;
 using System.Collections.Generic;
-using Mmd.Motion;
 using Mmd.Native;
 using Mmd.Parser;
-using Mmd.Physics;
 using Mmd.Pose;
 using Mmd.Rendering;
 
@@ -86,66 +84,40 @@ namespace Mmd
             }
         }
 
-        public MmdPlaybackSnapshot BuildSnapshot(int frame, float time, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
+        public MmdPlaybackSnapshot BuildSnapshot(int frame, float time)
         {
             ThrowIfDisposed();
-            return MmdPlaybackSnapshotBuilder.BuildPhaseOneSnapshot(model, motion, frame, time, modelId, motionId, physicsBackend, ikSolver);
+            return MmdPlaybackSnapshotBuilder.BuildPhaseOneSnapshot(model, motion, frame, time, modelId, motionId);
         }
 
-        public MmdPlaybackSnapshot BuildSnapshotAtTime(float time, float frameRate, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
+        public MmdPlaybackSnapshot BuildSnapshotAtTime(float time, float frameRate)
         {
             MmdPlaybackTimeMapping mapping = DescribePlaybackTime(time, frameRate);
-            return BuildSnapshot(mapping.frame, time, physicsBackend, ikSolver);
+            return BuildSnapshot(mapping.frame, time);
         }
 
-        public MmdEvaluatedFrame EvaluateFrame(int frame, float time, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
+        public MmdEvaluatedFrame EvaluateFrame(int frame, float time)
         {
             ThrowIfDisposed();
-            if (physicsBackend == null &&
-                ikSolver == null &&
-                nativeModelSourceIdentity != null &&
-                nativeMotionSourceIdentity != null)
-            {
-                return EvaluateNativeFrame(frame, time);
-            }
-
-            return MmdRuntimeFrameEvaluator.EvaluateValidatedPhaseOnePlaybackFrame(
-                model,
-                motion,
-                frame,
-                time,
-                physicsBackend,
-                ikSolver,
-                topologyPlan: TopologyPlan);
+            return EvaluateNativeFrame(frame, time);
         }
 
-        internal MmdEvaluatedFrame EvaluateBeforePhysicsFrame(int frame, float time, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
+        internal MmdEvaluatedFrame EvaluateBeforePhysicsFrame(int frame, float time)
         {
             ThrowIfDisposed();
             if (nativeModelSourceIdentity != null && nativeMotionSourceIdentity != null)
             {
-                if (physicsBackend != null || ikSolver != null || model.HasDeformAfterPhysicsBones)
+                if (model.HasDeformAfterPhysicsBones)
                 {
-                    // Preserve the public before-physics input precedence before reporting
-                    // the native-only unsupported boundary, including mutable topology state.
                     MmdPlaybackTime.ValidateFrame(frame);
                     MmdPlaybackTime.ValidateTime(time);
                     MmdModelValidator.ThrowIfInvalid(model);
                     MmdMotionValidator.ThrowIfInvalid(motion);
                     TopologyPlan.EnsureModel(model);
                     EnsureNativeSourcesUnchangedBeforeCompilation();
-                    if (physicsBackend != null || ikSolver != null)
-                    {
-                        throw new NotSupportedException(
-                            "Managed fallback evaluation is unsupported for source-backed PMX/VMD when a custom " +
-                            "physics backend or IK solver is supplied during before-physics evaluation; " +
-                            "native evaluation is required.");
-                    }
-
                     throw new NotSupportedException(
-                        "Managed fallback evaluation is unsupported for source-backed PMX/VMD during " +
-                        "before-physics evaluation of a model with deform-after-physics bones; " +
-                        "native evaluation is required.");
+                        "Native before-physics evaluation is unsupported for source-backed PMX/VMD " +
+                        "when the model has deform-after-physics bones.");
                 }
 
                 return EvaluateNativeFrame(frame, time);
@@ -156,15 +128,13 @@ namespace Mmd
                 motion,
                 frame,
                 time,
-                physicsBackend,
-                ikSolver,
                 topologyPlan: TopologyPlan);
         }
 
-        public MmdEvaluatedFrame EvaluateFrameAtTime(float time, float frameRate, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
+        public MmdEvaluatedFrame EvaluateFrameAtTime(float time, float frameRate)
         {
             MmdPlaybackTimeMapping mapping = DescribePlaybackTime(time, frameRate);
-            return EvaluateFrame(mapping.frame, time, physicsBackend, ikSolver);
+            return EvaluateFrame(mapping.frame, time);
         }
 
         public MmdPlaybackSnapshot BuildSnapshotFromEvaluatedFrame(MmdEvaluatedFrame frame, MmdRenderingDescriptor rendering)
@@ -185,28 +155,22 @@ namespace Mmd
             return MmdPlaybackTime.Map(time, frameRate, motion.maxFrame);
         }
 
-        public MmdPlaybackSnapshotSummary BuildSnapshotSummary(int frame, float time, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
+        public MmdPlaybackSnapshotSummary BuildSnapshotSummary(int frame, float time)
         {
-            return MmdPlaybackSnapshotDiagnostics.Summarize(BuildSnapshot(frame, time, physicsBackend, ikSolver));
+            return MmdPlaybackSnapshotDiagnostics.Summarize(BuildSnapshot(frame, time));
         }
 
-        public IReadOnlyList<MmdPlaybackSnapshot> BuildSnapshots(IReadOnlyList<int> frames, float frameRate, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
+        public IReadOnlyList<MmdPlaybackSnapshot> BuildSnapshots(IReadOnlyList<int> frames, float frameRate)
         {
             ThrowIfDisposed();
-            if (physicsBackend == null &&
-                ikSolver == null &&
-                nativeModelSourceIdentity != null &&
-                nativeMotionSourceIdentity != null)
-            {
-                EnsureNativeSourcesUnchanged();
-            }
+            EnsureNativeSourcesUnchanged();
 
-            return MmdPlaybackSnapshotBuilder.BuildPhaseOneSnapshots(model, motion, frames, frameRate, modelId, motionId, physicsBackend, ikSolver);
+            return MmdPlaybackSnapshotBuilder.BuildPhaseOneSnapshots(model, motion, frames, frameRate, modelId, motionId);
         }
 
-        public MmdPlaybackSnapshotSequenceSummary BuildSnapshotSequenceSummary(IReadOnlyList<int> frames, float frameRate, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
+        public MmdPlaybackSnapshotSequenceSummary BuildSnapshotSequenceSummary(IReadOnlyList<int> frames, float frameRate)
         {
-            return MmdPlaybackSnapshotDiagnostics.SummarizeSequence(BuildSnapshots(frames, frameRate, physicsBackend, ikSolver));
+            return MmdPlaybackSnapshotDiagnostics.SummarizeSequence(BuildSnapshots(frames, frameRate));
         }
 
         public MmdAnimationBakeSummary BuildTransformBakeSummary(

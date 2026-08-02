@@ -3,9 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Mmd.Motion;
 using Mmd.Parser;
-using Mmd.Physics;
 using Mmd.Rendering;
 
 namespace Mmd
@@ -25,11 +23,9 @@ namespace Mmd
             MmdModelDefinition model,
             MmdMotionDefinition motion,
             int frame,
-            float time,
-            IMmdPhysicsBackend? physicsBackend = null,
-            IMmdIkSolver? ikSolver = null)
+            float time)
         {
-            return BuildPhaseOneSnapshot(model, motion, frame, time, string.Empty, string.Empty, physicsBackend, ikSolver);
+            return BuildPhaseOneSnapshot(model, motion, frame, time, string.Empty, string.Empty);
         }
 
         public static MmdPlaybackSnapshot BuildPhaseOneSnapshot(
@@ -38,15 +34,13 @@ namespace Mmd
             int frame,
             float time,
             string modelId,
-            string motionId,
-            IMmdPhysicsBackend? physicsBackend = null,
-            IMmdIkSolver? ikSolver = null)
+            string motionId)
         {
             return new MmdPlaybackSnapshot
             {
                 model = modelId ?? throw new ArgumentNullException(nameof(modelId)),
                 motion = motionId ?? throw new ArgumentNullException(nameof(motionId)),
-                frame = MmdRuntimeFrameEvaluator.EvaluatePhaseOneFrame(model, motion, frame, time, physicsBackend, ikSolver),
+                frame = MmdRuntimeFrameEvaluator.EvaluatePhaseOneFrame(model, motion, frame, time),
                 rendering = MmdRenderingDescriptorBuilder.Build(model)
             };
         }
@@ -55,11 +49,9 @@ namespace Mmd
             MmdModelDefinition model,
             MmdMotionDefinition motion,
             IReadOnlyList<int> frames,
-            float frameRate,
-            IMmdPhysicsBackend? physicsBackend = null,
-            IMmdIkSolver? ikSolver = null)
+            float frameRate)
         {
-            return BuildPhaseOneSnapshots(model, motion, frames, frameRate, string.Empty, string.Empty, physicsBackend, ikSolver);
+            return BuildPhaseOneSnapshots(model, motion, frames, frameRate, string.Empty, string.Empty);
         }
 
         public static IReadOnlyList<MmdPlaybackSnapshot> BuildPhaseOneSnapshots(
@@ -68,9 +60,7 @@ namespace Mmd
             IReadOnlyList<int> frames,
             float frameRate,
             string modelId,
-            string motionId,
-            IMmdPhysicsBackend? physicsBackend = null,
-            IMmdIkSolver? ikSolver = null)
+            string motionId)
         {
             if (model == null)
             {
@@ -96,9 +86,7 @@ namespace Mmd
                 model,
                 motion,
                 frames,
-                frameRate,
-                physicsBackend,
-                ikSolver);
+                frameRate);
 
             return evaluatedFrames
                 .Select(evaluatedFrame => new MmdPlaybackSnapshot

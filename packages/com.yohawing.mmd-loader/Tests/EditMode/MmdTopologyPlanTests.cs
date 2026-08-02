@@ -2,9 +2,7 @@
 
 using System;
 using System.Reflection;
-using Mmd.Motion;
 using Mmd.Parser;
-using Mmd.Physics;
 using Mmd.Pose;
 using NUnit.Framework;
 
@@ -12,63 +10,6 @@ namespace Mmd.Tests
 {
     public sealed class MmdTopologyPlanTests
     {
-        [Test]
-        public void RuntimeSessionReusesTopologyAndPreservesManagedWorldMatrices()
-        {
-            MmdModelDefinition model = CreateIkTopologyModel();
-            var motion = new MmdMotionDefinition();
-            using var session = new MmdRuntimeSession(model, motion, "model", "motion");
-            var topologyPlan = session.TopologyPlan;
-
-            MmdEvaluatedFrame expected = MmdRuntimeFrameEvaluator.EvaluatePhaseOnePlaybackFrame(
-                model, motion, frame: 0, time: 0.0f, ikSolver: new MmdIkSolver());
-            MmdEvaluatedFrame actual = session.EvaluateFrame(
-                frame: 0, time: 0.0f, ikSolver: new MmdIkSolver());
-
-            Assert.That(session.TopologyPlan, Is.SameAs(topologyPlan));
-            Assert.That(actual.bones.Count, Is.EqualTo(expected.bones.Count));
-            for (int bone = 0; bone < expected.bones.Count; bone++)
-            {
-                Assert.That(actual.bones[bone].worldMatrix, Is.EqualTo(expected.bones[bone].worldMatrix));
-            }
-        }
-
-        [Test]
-        public void RuntimeSessionManagedPipelineRejectsStaleTopologyBeforeEvaluation()
-        {
-            MmdModelDefinition model = CreateIkTopologyModel();
-            using MmdRuntimeSession session = new(
-                model,
-                new MmdMotionDefinition(),
-                "synthetic.pmx",
-                "synthetic.vmd");
-            _ = session.TopologyPlan;
-            model.bones[0].origin[0] += 0.25f;
-
-            InvalidOperationException? error = Assert.Throws<InvalidOperationException>(() =>
-                session.EvaluateFrame(frame: 0, time: 0.0f, ikSolver: new MmdIkSolver()));
-
-            Assert.That(error!.Message, Does.Contain("topology changed"));
-        }
-
-        [Test]
-        public void RuntimeSessionPublicEvaluationSupportsSyntheticIrAndUsesRequestedPhysicsBackend()
-        {
-            MmdModelDefinition model = CreateIkTopologyModel();
-            var motion = new MmdMotionDefinition();
-            using var session = new MmdRuntimeSession(model, motion, "synthetic.pmx", "synthetic.vmd");
-            var physics = new RecordingPhysicsBackend();
-
-            MmdEvaluatedFrame frame = session.EvaluateFrame(
-                frame: 0,
-                time: 0.0f,
-                physicsBackend: physics);
-
-            Assert.That(frame.bones, Has.Count.EqualTo(model.bones.Count));
-            Assert.That(physics.StepCount, Is.EqualTo(1));
-            Assert.That(RequirePrivateField("nativePlaybackSession").GetValue(session), Is.Null);
-        }
-
         [Test]
         public void RuntimeSessionNativePlaybackIsLazyAndReusesStateWithoutManagedTopology()
         {
@@ -324,22 +265,5 @@ namespace Mmd.Tests
             }
         }
 
-        private sealed class RecordingPhysicsBackend : IMmdPhysicsBackend
-        {
-            public string Name => "recording";
-
-            public bool IsDeterministic => true;
-
-            public int StepCount { get; private set; }
-
-            public void Reset()
-            {
-            }
-
-            public void Step(int frame, float deltaTime)
-            {
-                StepCount++;
-            }
-        }
     }
 }

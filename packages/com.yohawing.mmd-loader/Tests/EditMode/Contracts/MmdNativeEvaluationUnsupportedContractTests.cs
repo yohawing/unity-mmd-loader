@@ -2,9 +2,7 @@
 
 using System;
 using NUnit.Framework;
-using Mmd.Motion;
 using Mmd.Parser;
-using Mmd.Physics;
 
 namespace Mmd.Tests.Contracts
 {
@@ -12,32 +10,20 @@ namespace Mmd.Tests.Contracts
     public sealed class MmdNativeEvaluationUnsupportedContractTests
     {
         [Test]
-        [TestCase(false)]
-        [TestCase(true)]
-        public void NonSourceLessPhaseOneFrameRejectsManagedFallback(bool mixedSource)
+        public void SourceLessPhaseOneFrameRequiresNativeSourceBytes()
         {
             (MmdModelDefinition model, MmdMotionDefinition motion) = LoadCubeFixturePair();
-            IMmdPhysicsBackend? physicsBackend = null;
-            if (mixedSource)
-            {
-                motion.sourceBytes = null;
-            }
-            else
-            {
-                physicsBackend = new NullMmdPhysicsBackend();
-            }
+            model.sourceBytes = null;
+            motion.sourceBytes = null;
 
-            NotSupportedException exception = Assert.Throws<NotSupportedException>(
+            InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
                 () => MmdRuntimeFrameEvaluator.EvaluatePhaseOneFrame(
                     model,
                     motion,
                     frame: 0,
-                    time: 0.0f,
-                    physicsBackend: physicsBackend))!;
+                    time: 0.0f))!;
 
-            Assert.That(exception.Message, Does.Contain("Managed fallback evaluation"));
-            Assert.That(exception.Message, Does.Contain("native evaluation is required"));
-            Assert.That(exception.Message, Does.Contain("source-backed or mixed-source PMX/VMD"));
+            Assert.That(exception.Message, Does.Contain("Model sourceBytes are required for native evaluation"));
         }
 
         [Test]
@@ -56,7 +42,7 @@ namespace Mmd.Tests.Contracts
         }
 
         [Test]
-        public void SourceBackedRuntimeSessionRejectsDeformAfterPhysicsBeforePhysicsFallback()
+        public void SourceBackedRuntimeSessionRejectsDeformAfterPhysicsBeforePhysicsNativeBoundary()
         {
             (MmdModelDefinition model, MmdMotionDefinition motion) = LoadCubeFixturePair();
             model.bones[0].deformAfterPhysics = true;
@@ -72,29 +58,6 @@ namespace Mmd.Tests.Contracts
             Assert.That(exception.Message, Does.Contain("source-backed PMX/VMD"));
             Assert.That(exception.Message, Does.Contain("before-physics"));
             Assert.That(exception.Message, Does.Contain("deform-after-physics bones"));
-            Assert.That(exception.Message, Does.Contain("native evaluation is required"));
-        }
-
-        [TestCase(true, false)]
-        [TestCase(false, true)]
-        public void SourceBackedRuntimeSessionRejectsBeforePhysicsCustomBackendOrIk(bool usePhysicsBackend, bool useIkSolver)
-        {
-            (MmdModelDefinition model, MmdMotionDefinition motion) = LoadCubeFixturePair();
-            using var session = new MmdRuntimeSession(
-                model,
-                motion,
-                "test_1bone_cube.pmx",
-                "test_1bone_cube_motion.vmd");
-
-            IMmdPhysicsBackend? physicsBackend = usePhysicsBackend ? new NullMmdPhysicsBackend() : null;
-            IMmdIkSolver? ikSolver = useIkSolver ? new MmdIkSolver() : null;
-            NotSupportedException exception = Assert.Throws<NotSupportedException>(
-                () => session.EvaluateBeforePhysicsFrame(0, 0.0f, physicsBackend, ikSolver))!;
-
-            Assert.That(exception.Message, Does.Contain("source-backed PMX/VMD"));
-            Assert.That(exception.Message, Does.Contain("custom physics backend or IK solver"));
-            Assert.That(exception.Message, Does.Contain("before-physics"));
-            Assert.That(exception.Message, Does.Contain("native evaluation is required"));
         }
 
         [Test]

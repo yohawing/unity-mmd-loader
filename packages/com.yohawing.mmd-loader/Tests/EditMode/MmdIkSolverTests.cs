@@ -3,7 +3,6 @@
 using System;
 using Mmd.Motion;
 using Mmd.Parser;
-using Mmd.Physics;
 using Mmd.Pose;
 using NUnit.Framework;
 
@@ -52,24 +51,6 @@ namespace Mmd.Tests
                 Assert.That(planned.Bones[boneName].Translation, Is.EqualTo(legacy.Bones[boneName].Translation));
                 Assert.That(planned.Bones[boneName].Rotation, Is.EqualTo(legacy.Bones[boneName].Rotation));
             }
-        }
-
-        [Test]
-        public void ValidatedTopologyRejectsSourceMutationInsteadOfUsingStaleParents()
-        {
-            MmdModelDefinition model = CreateSparseIkModel();
-            MmdTopologyPlan topology = MmdTopologyPlan.CreateFromValidatedModel(model);
-            model.bones[1].parentIndex = 7;
-
-            InvalidOperationException? error = Assert.Throws<InvalidOperationException>(() =>
-                MmdRuntimeFramePipeline.EvaluateWithOptions(
-                    model,
-                    new MmdMotionDefinition(),
-                    frame: 0,
-                    physicsBackend: new NullMmdPhysicsBackend(),
-                    topologyPlan: topology));
-
-            Assert.That(error!.Message, Does.Contain("topology changed"));
         }
 
         private static MmdModelDefinition CreateModelWithInvalidGeometry()
