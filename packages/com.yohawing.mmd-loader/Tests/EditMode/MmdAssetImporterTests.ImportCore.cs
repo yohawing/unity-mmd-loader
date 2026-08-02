@@ -159,6 +159,43 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void ImportedVmdReusesRawSourceOnUnchangedReimportAndReplacesItWhenContentChanges()
+        {
+            const string rawSourcePath = TempDirectory + "/raw-source-identity.vmd";
+            byte[] firstBytes = MmdTestFixtures.CreateDenseVmdBytes("raw-source", "root", 2, 1);
+            byte[] secondBytes = MmdTestFixtures.CreateDenseVmdBytes("raw-source", "root", 2, 16);
+            Assert.That(secondBytes.Length, Is.EqualTo(firstBytes.Length),
+                "The replacement fixture must preserve byte length to cover the mtime/length cache candidate.");
+
+            Directory.CreateDirectory(Path.Combine(ProjectRoot, TempDirectory));
+            string absolutePath = Path.Combine(ProjectRoot, rawSourcePath);
+            File.WriteAllBytes(absolutePath, firstBytes);
+            DateTime firstLastWriteTimeUtc = File.GetLastWriteTimeUtc(absolutePath);
+            AssetDatabase.ImportAsset(rawSourcePath, ImportAssetOptions.ForceUpdate);
+
+            TextAsset firstRawSource = FindImportedVmdRawSource(rawSourcePath);
+            Assert.That(firstRawSource.bytes, Is.EqualTo(firstBytes));
+            int firstRawSourceInstanceId = firstRawSource.GetInstanceID();
+
+            AssetDatabase.ImportAsset(rawSourcePath, ImportAssetOptions.ForceUpdate);
+            TextAsset unchangedRawSource = FindImportedVmdRawSource(rawSourcePath);
+            Assert.That(unchangedRawSource.GetInstanceID(), Is.EqualTo(firstRawSourceInstanceId),
+                "An unchanged reimport must reuse the existing VMDSource object.");
+
+            File.WriteAllBytes(absolutePath, secondBytes);
+            File.SetLastWriteTimeUtc(absolutePath, firstLastWriteTimeUtc);
+            AssetDatabase.ImportAsset(rawSourcePath, ImportAssetOptions.ForceUpdate);
+
+            TextAsset changedRawSource = FindImportedVmdRawSource(rawSourcePath);
+            Assert.That(changedRawSource.bytes, Is.EqualTo(secondBytes));
+
+            MmdVmdAsset changedAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(rawSourcePath);
+            Assert.That(changedAsset, Is.Not.Null);
+            Assert.That(changedAsset.MaxFrame, Is.EqualTo(1));
+            Assert.That(changedAsset.GetBytesCopy(), Is.EqualTo(secondBytes));
+        }
+
+        [Test]
         public void ImportedInvalidVmdPreservesRawBytesAndRejectsNativeClipHeader()
         {
             byte[] invalidBytes = { 0x56, 0x4D, 0x44, 0x00 };
@@ -202,6 +239,20 @@ namespace Mmd.Tests
             Assert.That(attributes, Has.Length.EqualTo(1));
             var attribute = (ScriptedImporterAttribute)attributes[0];
             Assert.That(attribute.version, Is.EqualTo(2));
+        }
+
+        private static TextAsset FindImportedVmdRawSource(string assetPath)
+        {
+            foreach (Object subAsset in AssetDatabase.LoadAllAssetsAtPath(assetPath))
+            {
+                if (subAsset is TextAsset textAsset && textAsset.name == "VMDSource")
+                {
+                    return textAsset;
+                }
+            }
+
+            Assert.Fail("VMD import must create a named raw-source TextAsset subasset.");
+            return null!;
         }
 
         [Test]

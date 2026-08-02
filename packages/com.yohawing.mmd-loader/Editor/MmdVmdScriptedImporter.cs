@@ -75,14 +75,13 @@ namespace Mmd.Editor
         {
             byte[] bytes = File.ReadAllBytes(ctx.assetPath);
             string resolvedSourcePath = MmdAssetPathUtility.ResolveAssetSourcePath(ctx.assetPath);
-            TextAsset rawSource = new TextAsset(bytes)
+            (MmdVmdParseSummary? summary, IReadOnlyList<string>? diagnostics, bool contentUnchanged) = ReadSummaryWithCache(
+                ctx.assetPath,
+                bytes);
+            TextAsset rawSource = FindReusableRawSource(ctx, contentUnchanged) ?? new TextAsset(bytes)
             {
                 name = "VMDSource"
             };
-
-            (MmdVmdParseSummary? summary, IReadOnlyList<string>? diagnostics) = ReadSummaryWithCache(
-                ctx.assetPath,
-                bytes);
 
             MmdVmdAsset asset = MmdVmdAsset.CreateInstance<MmdVmdAsset>();
             asset.InitializeImported(bytes, ctx.assetPath, resolvedSourcePath, rawSource, summary, diagnostics);
@@ -91,7 +90,7 @@ namespace Mmd.Editor
             ctx.SetMainObject(asset);
         }
 
-        private static (MmdVmdParseSummary? Summary, IReadOnlyList<string>? Diagnostics) ReadSummaryWithCache(
+        private static (MmdVmdParseSummary? Summary, IReadOnlyList<string>? Diagnostics, bool ContentUnchanged) ReadSummaryWithCache(
             string assetPath,
             byte[] bytes)
         {
@@ -104,7 +103,7 @@ namespace Mmd.Editor
                 sourceHash = ComputeSourceHash(bytes);
                 if (cached.MatchesContent(sourceHash))
                 {
-                    return (cached.Summary, cached.Diagnostics);
+                    return (cached.Summary, cached.Diagnostics, true);
                 }
             }
 
@@ -138,7 +137,27 @@ namespace Mmd.Editor
                 cachedSummary = null;
             }
 
-            return (summary, diagnostics);
+            return (summary, diagnostics, false);
+        }
+
+        private static TextAsset? FindReusableRawSource(AssetImportContext ctx, bool contentUnchanged)
+        {
+            if (!contentUnchanged)
+            {
+                return null;
+            }
+
+            var importedObjects = new List<UnityEngine.Object>();
+            ctx.GetObjects(importedObjects);
+            foreach (UnityEngine.Object importedObject in importedObjects)
+            {
+                if (importedObject is TextAsset textAsset && textAsset.name == "VMDSource")
+                {
+                    return textAsset;
+                }
+            }
+
+            return null;
         }
 
         private static byte[] ComputeSourceHash(byte[] bytes)
