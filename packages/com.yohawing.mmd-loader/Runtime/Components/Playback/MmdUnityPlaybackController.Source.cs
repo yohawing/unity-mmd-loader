@@ -401,7 +401,9 @@ namespace Mmd.UnityIntegration
             byte[] pmxBytes = pmxAsset.GetBytesCopy();
             byte[] vmdBytes = motion.sourceBytes
                 ?? throw new InvalidOperationException("Native VMD motion source bytes are required.");
-            vmdAsset.TryGetOrCreateNativeVmdContext(out MmdRuntimeFfiVmdContext? sharedVmdContext, out _);
+            vmdAsset.TryGetOrCreateNativeVmdContext(
+                out MmdRuntimeFfiVmdContext? sharedVmdContext,
+                out string sharedVmdContextFailure);
             TryConfigureNativeFirst(
                 motion,
                 pmxBytes,
@@ -414,7 +416,8 @@ namespace Mmd.UnityIntegration
                     nativeMotion),
                 configure,
                 timelineEvaluation,
-                sharedVmdContext);
+                sharedVmdContext,
+                sharedVmdContextFailure);
 
             if (applyStartFrame.HasValue)
             {
@@ -431,7 +434,8 @@ namespace Mmd.UnityIntegration
             Func<MmdMotionDefinition, MmdUnityPlaybackBinding> createBinding,
             Action<MmdUnityPlaybackBinding> configure,
             bool timelineEvaluation,
-            MmdRuntimeFfiVmdContext? sharedVmdContext = null)
+            MmdRuntimeFfiVmdContext? sharedVmdContext = null,
+            string? sharedVmdContextFailure = null)
         {
             bool nativeAvailable = TryCheckNativeRuntimeAvailability(
                 pmxBytes,
@@ -467,9 +471,25 @@ namespace Mmd.UnityIntegration
                 }
             }
 
-            lastFastRuntimeReason = nativeRuntimeFailure;
+            string finalNativeRuntimeFailure = ComposeNativeRuntimeFailure(
+                sharedVmdContextFailure,
+                nativeRuntimeFailure);
+            lastFastRuntimeReason = finalNativeRuntimeFailure;
             ReleaseCurrentBindingBeforeSceneRebind();
-            throw CreateNativeClipPlaybackUnavailableException(nativeRuntimeFailure, timelineEvaluation);
+            throw CreateNativeClipPlaybackUnavailableException(finalNativeRuntimeFailure, timelineEvaluation);
+        }
+
+        private static string ComposeNativeRuntimeFailure(
+            string? sharedVmdContextFailure,
+            string nativeRuntimeFailure)
+        {
+            if (string.IsNullOrWhiteSpace(sharedVmdContextFailure))
+            {
+                return nativeRuntimeFailure;
+            }
+
+            return "Shared VMD context setup failed: " + sharedVmdContextFailure +
+                   "; standalone native setup failed: " + nativeRuntimeFailure;
         }
 
         private void ClearFailedBindingReference(MmdUnityPlaybackBinding failedBinding)

@@ -86,6 +86,10 @@ namespace Mmd
         [NonSerialized] private TextAsset? sourceReadbackAsset;
         [NonSerialized] private byte[]? sourceReadback;
 
+        // Test-only seam for deterministic shared-context failure propagation coverage. Production
+        // code leaves this null and uses the real native context creation below.
+        internal static Func<byte[], string>? NativeVmdContextFailureReasonOverrideForTests { get; set; }
+
         public string SourceId => sourceId;
 
         public string SourcePath => sourcePath;
@@ -247,6 +251,14 @@ namespace Mmd
             }
 
             DisposeNativeVmdContext();
+            Func<byte[], string>? failureOverrideForTests = NativeVmdContextFailureReasonOverrideForTests;
+            if (failureOverrideForTests != null)
+            {
+                context = null;
+                reason = failureOverrideForTests(sourceBytes);
+                return false;
+            }
+
             try
             {
                 nativeVmdContext = MmdRuntimeFfiVmdContext.Create(sourceBytes);

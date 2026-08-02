@@ -1252,6 +1252,57 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void ConfigureFromAssetsPropagatesSharedVmdContextFailureToFinalNativeCaller()
+        {
+            MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
+            MmdUnityModelInstance? previewInstance = null;
+            const string sharedContextFailure = "shared VMD context unavailable (forced by test).";
+            const string nativeSetupFailure = "native runtime unavailable (forced by test).";
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                byte[] pmxBytes = File.ReadAllBytes(pmxPath);
+                var parser = new NativeMmdParser();
+                previewInstance = MmdUnityModelFactory.CreateSkinnedModel(parser.LoadModel(pmxBytes), pmxPath);
+                pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                pmxAsset.Initialize(pmxBytes, "test_1bone_cube.pmx", pmxPath, assetImportScale: 1.0f);
+                vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
+                MmdUnityPlaybackController controller = previewInstance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+
+                MmdVmdAsset.NativeVmdContextFailureReasonOverrideForTests = _ => sharedContextFailure;
+
+                controller.ConfigureFromAssets(pmxAsset, vmdAsset, 30.0f, startFrame: 0, playOnStart: false);
+
+                Assert.That(controller.IsConfigured, Is.True);
+                Assert.That(controller.IsFastRuntimeEnabled, Is.True);
+                Assert.That(controller.LastFastRuntimeReason, Is.Empty);
+
+                MmdUnityPlaybackController.NativeRuntimeAvailabilityOverrideForTests = (_, _) => false;
+
+                InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+                    controller.ConfigureFromAssets(pmxAsset, vmdAsset, 30.0f, startFrame: 0, playOnStart: false))!;
+
+                string expectedFailure =
+                    "Shared VMD context setup failed: " + sharedContextFailure +
+                    "; standalone native setup failed: " + nativeSetupFailure;
+                Assert.That(exception.Message, Does.Contain(expectedFailure));
+                Assert.That(controller.LastFastRuntimeReason, Is.EqualTo(expectedFailure));
+            }
+            finally
+            {
+                MmdVmdAsset.NativeVmdContextFailureReasonOverrideForTests = null;
+                MmdUnityPlaybackController.NativeRuntimeAvailabilityOverrideForTests = null;
+                MmdTestInstanceScope.DestroyInstance(previewInstance);
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+            }
+        }
+
+        [Test]
         public void ConfigureFromPlaybackSourceUsesPlaybackConfigInitialFrame()
         {
             MmdPmxAsset? pmxAsset = null;
