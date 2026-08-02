@@ -28,16 +28,21 @@ namespace Mmd.Timeline
 
         public MmdSceneEnvironmentBinding? Binding { get; set; }
 
+        // Retained only so 0.3.0 consumers keep compiling. Native source bytes are the only
+        // evaluation input; these managed lists are intentionally ignored.
+        [Obsolete("Managed VMD keyframe lists are ignored; provide native MotionBytes instead.")]
         public IReadOnlyList<MmdCameraKeyframeDefinition>? CameraKeyframes { get; set; }
             = Array.Empty<MmdCameraKeyframeDefinition>();
 
-        public byte[]? MotionBytes { get; set; }
-
+        [Obsolete("Managed VMD keyframe lists are ignored; provide native MotionBytes instead.")]
         public IReadOnlyList<MmdLightKeyframeDefinition>? LightKeyframes { get; set; }
             = Array.Empty<MmdLightKeyframeDefinition>();
 
+        [Obsolete("Managed VMD keyframe lists are ignored; provide native MotionBytes instead.")]
         public IReadOnlyList<MmdSelfShadowKeyframeDefinition>? SelfShadowKeyframes { get; set; }
             = Array.Empty<MmdSelfShadowKeyframeDefinition>();
+
+        public byte[]? MotionBytes { get; set; }
 
         public string MotionSourceId { get; set; } = string.Empty;
 
