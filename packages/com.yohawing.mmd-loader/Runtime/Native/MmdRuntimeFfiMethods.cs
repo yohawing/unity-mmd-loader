@@ -17,7 +17,6 @@ namespace Mmd.Native
         internal const uint FeatureClipPropertyTrackIntrospection = 1u << 7;
         internal const uint FeatureVmdTrackKeyframeIntrospection = 1u << 8;
         internal const uint FeatureVmdSharedContext = 1u << 9;
-        internal const uint FeatureVmdSharedContextBoneReadback = 1u << 10;
         internal const uint FeatureVmdSummaryBytes = 1u << 11;
         internal const uint FeatureVmdSharedContextRawReadback = 1u << 12;
         internal const uint PhysicsModeLive = 2;
@@ -51,7 +50,6 @@ namespace Mmd.Native
         internal const uint VmdSharedContextAbiVersionV1 = 1;
         internal const uint VmdSharedContextSummaryAbiVersionV1 = 1;
         internal const int VmdContextSummarySizeV1 = 84;
-        internal const uint VmdSharedContextBoneReadbackAbiVersionV1 = 1;
         internal const uint VmdSharedContextRawReadbackAbiVersionV1 = 1;
         internal const uint VmdSummaryBytesAbiVersionV1 = 1;
         internal const uint VmdCurveNone = 0;
@@ -322,19 +320,6 @@ namespace Mmd.Native
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        internal struct VmdBoneKeyframe
-        {
-            internal uint boneIndex;
-            internal uint frame;
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3, ArraySubType = UnmanagedType.R4)]
-            internal float[] positionXyz;
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4, ArraySubType = UnmanagedType.R4)]
-            internal float[] rotationXyzw;
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 64, ArraySubType = UnmanagedType.U1)]
-            internal byte[] interpolation;
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
         internal struct VmdRawBoneKeyframe
         {
             [MarshalAs(UnmanagedType.ByValArray, SizeConst = 15, ArraySubType = UnmanagedType.U1)]
@@ -562,18 +547,6 @@ namespace Mmd.Native
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_create_from_vmd_context_for_model", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr ClipCreateFromVmdContextForModel(IntPtr model, IntPtr context);
-
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_bone_keyframe_count_for_model", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr VmdContextBoneKeyframeCountForModel(IntPtr model, IntPtr context);
-
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_copy_bone_keyframes_for_model", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern int VmdContextCopyBoneKeyframesForModel(
-            IntPtr model,
-            IntPtr context,
-            IntPtr outKeys,
-            IntPtr outKeyCapacity,
-            out IntPtr outWritten,
-            out IntPtr outSkipped);
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_bone_keyframe_count", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr VmdContextBoneKeyframeCount(IntPtr context);
@@ -880,20 +853,6 @@ namespace Mmd.Native
             }
 
             return VmdSharedContextAbiVersionV1;
-        }
-
-        internal static uint ValidateVmdSharedContextBoneReadbackCapability()
-        {
-            ValidateVmdSharedContextCapability();
-            uint featureFlags = FeatureFlags();
-            if ((featureFlags & FeatureVmdSharedContextBoneReadback) == 0)
-            {
-                throw new MmdRuntimeUnsupportedException(
-                    "mmd-runtime does not provide shared VMD raw bone readback " +
-                    $"(required feature bit 10, flags=0x{featureFlags:X8}).");
-            }
-
-            return VmdSharedContextBoneReadbackAbiVersionV1;
         }
 
         internal static uint ValidateVmdSummaryBytesCapability()

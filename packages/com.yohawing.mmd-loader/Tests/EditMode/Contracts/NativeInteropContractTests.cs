@@ -371,13 +371,11 @@ namespace Mmd.Tests
         public void RuntimeFfiPinsSharedVmdContextEntrypointsAndLayouts()
         {
             Assert.That(MmdRuntimeFfiMethods.FeatureVmdSharedContext, Is.EqualTo(1u << 9));
-            Assert.That(MmdRuntimeFfiMethods.FeatureVmdSharedContextBoneReadback, Is.EqualTo(1u << 10));
             Assert.That(MmdRuntimeFfiMethods.FeatureVmdSummaryBytes, Is.EqualTo(1u << 11));
             Assert.That(MmdRuntimeFfiMethods.FeatureVmdSharedContextRawReadback, Is.EqualTo(1u << 12));
             Assert.That(MmdRuntimeFfiMethods.VmdSharedContextAbiVersionV1, Is.EqualTo(1u));
             Assert.That(MmdRuntimeFfiMethods.VmdSharedContextSummaryAbiVersionV1, Is.EqualTo(1u));
             Assert.That(MmdRuntimeFfiMethods.VmdContextSummarySizeV1, Is.EqualTo(84));
-            Assert.That(MmdRuntimeFfiMethods.VmdSharedContextBoneReadbackAbiVersionV1, Is.EqualTo(1u));
             Assert.That(MmdRuntimeFfiMethods.VmdSharedContextRawReadbackAbiVersionV1, Is.EqualTo(1u));
             Assert.That(MmdRuntimeFfiMethods.VmdSummaryBytesAbiVersionV1, Is.EqualTo(1u));
             Assert.That(
@@ -386,9 +384,6 @@ namespace Mmd.Tests
             Assert.That(
                 MmdRuntimeFfiMethods.ValidateVmdSharedContextRawReadbackCapability(),
                 Is.EqualTo(MmdRuntimeFfiMethods.VmdSharedContextRawReadbackAbiVersionV1));
-            Assert.That(
-                MmdRuntimeFfiMethods.ValidateVmdSharedContextBoneReadbackCapability(),
-                Is.EqualTo(MmdRuntimeFfiMethods.VmdSharedContextBoneReadbackAbiVersionV1));
             Assert.That(
                 MmdRuntimeFfiMethods.ValidateVmdSummaryBytesCapability(),
                 Is.EqualTo(MmdRuntimeFfiMethods.VmdSummaryBytesAbiVersionV1));
@@ -439,20 +434,6 @@ namespace Mmd.Tests
                 typeof(IntPtr),
                 typeof(IntPtr),
                 typeof(IntPtr));
-            AssertRuntimeFfiSignature(
-                "VmdContextBoneKeyframeCountForModel",
-                typeof(IntPtr),
-                typeof(IntPtr),
-                typeof(IntPtr));
-            AssertRuntimeFfiSignature(
-                "VmdContextCopyBoneKeyframesForModel",
-                typeof(int),
-                typeof(IntPtr),
-                typeof(IntPtr),
-                typeof(IntPtr),
-                typeof(IntPtr),
-                typeof(IntPtr).MakeByRefType(),
-                typeof(IntPtr).MakeByRefType());
             AssertRuntimeFfiSignature("VmdContextBoneKeyframeCount", typeof(IntPtr), typeof(IntPtr));
             AssertRuntimeFfiSignature(
                 "VmdContextCopyBoneKeyframes",
@@ -473,7 +454,6 @@ namespace Mmd.Tests
             Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.VmdRawMorphKeyframe>(), Is.EqualTo(24));
             Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.VmdPropertyKeyframe>(), Is.EqualTo(24));
             Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.VmdPropertyIkEntry>(), Is.EqualTo(24));
-            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.VmdBoneKeyframe>(), Is.EqualTo(100));
             Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.VmdTrackSummary>(), Is.EqualTo(8));
             Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.VmdContextSummary>(), Is.EqualTo(84));
             Assert.That(
@@ -485,15 +465,6 @@ namespace Mmd.Tests
             Assert.That(
                 Marshal.OffsetOf<MmdRuntimeFfiMethods.VmdContextSummary>("propertyIkEntryCount").ToInt32(),
                 Is.EqualTo(80));
-            Assert.That(
-                Marshal.OffsetOf<MmdRuntimeFfiMethods.VmdBoneKeyframe>("positionXyz").ToInt32(),
-                Is.EqualTo(8));
-            Assert.That(
-                Marshal.OffsetOf<MmdRuntimeFfiMethods.VmdBoneKeyframe>("rotationXyzw").ToInt32(),
-                Is.EqualTo(20));
-            Assert.That(
-                Marshal.OffsetOf<MmdRuntimeFfiMethods.VmdBoneKeyframe>("interpolation").ToInt32(),
-                Is.EqualTo(36));
             Assert.That(
                 Marshal.OffsetOf<MmdRuntimeFfiMethods.VmdPropertyKeyframe>("ikEntryOffset").ToInt32(),
                 Is.EqualTo(8));
