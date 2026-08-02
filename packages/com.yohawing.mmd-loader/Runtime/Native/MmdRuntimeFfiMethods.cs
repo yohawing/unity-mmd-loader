@@ -18,6 +18,7 @@ namespace Mmd.Native
         internal const uint FeatureVmdTrackKeyframeIntrospection = 1u << 8;
         internal const uint FeatureVmdSharedContext = 1u << 9;
         internal const uint FeatureVmdSharedContextBoneReadback = 1u << 10;
+        internal const uint FeatureVmdSummaryBytes = 1u << 11;
         internal const uint PhysicsModeLive = 2;
         internal const uint PhysicsFrameActionSeed = 0;
         internal const uint PhysicsFrameActionStep = 1;
@@ -50,6 +51,7 @@ namespace Mmd.Native
         internal const uint VmdSharedContextSummaryAbiVersionV1 = 1;
         internal const int VmdContextSummarySizeV1 = 84;
         internal const uint VmdSharedContextBoneReadbackAbiVersionV1 = 1;
+        internal const uint VmdSummaryBytesAbiVersionV1 = 1;
         internal const uint VmdCurveNone = 0;
         internal const uint VmdCurveCubicBezier = 1;
 
@@ -476,6 +478,13 @@ namespace Mmd.Native
             IntPtr outSummary,
             IntPtr outSummarySize);
 
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_summary_read_from_vmd_bytes", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int VmdSummaryReadFromVmdBytes(
+            byte[] data,
+            IntPtr len,
+            IntPtr outSummary,
+            IntPtr outSummarySize);
+
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_camera_frame_count", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr VmdContextCameraFrameCount(IntPtr context);
 
@@ -840,6 +849,27 @@ namespace Mmd.Native
             }
 
             return VmdSharedContextBoneReadbackAbiVersionV1;
+        }
+
+        internal static uint ValidateVmdSummaryBytesCapability()
+        {
+            uint abiVersion = AbiVersion();
+            if (abiVersion != ExpectedAbiVersion)
+            {
+                throw new MmdRuntimeUnsupportedException(
+                    $"mmd-runtime ABI version {abiVersion} is not supported for VMD byte summaries. " +
+                    $"Expected {ExpectedAbiVersion}.");
+            }
+
+            uint featureFlags = FeatureFlags();
+            if ((featureFlags & FeatureVmdSummaryBytes) == 0)
+            {
+                throw new MmdRuntimeUnsupportedException(
+                    "mmd-runtime does not provide VMD byte summary parsing " +
+                    $"(required feature bit 11, flags=0x{featureFlags:X8}).");
+            }
+
+            return VmdSummaryBytesAbiVersionV1;
         }
 
     }

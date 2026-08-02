@@ -78,33 +78,34 @@ namespace Mmd.Native
                 () =>
                 {
                     MmdRuntimeFfiMethods.ValidateVmdSharedContextCapability();
-                    int managedSize = Marshal.SizeOf<MmdRuntimeFfiMethods.VmdContextSummary>();
-                    if (managedSize != MmdRuntimeFfiMethods.VmdContextSummarySizeV1)
-                    {
-                        throw new InvalidOperationException(
-                            "mmd-runtime shared VMD context summary managed layout is " +
-                            managedSize + " bytes; expected " +
-                            MmdRuntimeFfiMethods.VmdContextSummarySizeV1 + ".");
-                    }
-
-                    IntPtr buffer = Marshal.AllocHGlobal(MmdRuntimeFfiMethods.VmdContextSummarySizeV1);
-                    try
-                    {
-                        int status = MmdRuntimeFfiMethods.VmdContextReadSummary(
+                    return ReadSummaryBuffer(
+                        buffer => MmdRuntimeFfiMethods.VmdContextReadSummary(
                             handle,
                             buffer,
-                            new IntPtr(MmdRuntimeFfiMethods.VmdContextSummarySizeV1));
-                        ThrowForStatus(status, "summary");
+                            new IntPtr(MmdRuntimeFfiMethods.VmdContextSummarySizeV1)),
+                        "summary");
+                });
+        }
 
-                        MmdRuntimeFfiMethods.VmdContextSummary summary =
-                            Marshal.PtrToStructure<MmdRuntimeFfiMethods.VmdContextSummary>(buffer);
-                        ValidateSummaryLayout(summary);
-                        return summary;
-                    }
-                    finally
-                    {
-                        Marshal.FreeHGlobal(buffer);
-                    }
+        internal static MmdRuntimeFfiMethods.VmdContextSummary ReadSummaryFromVmdBytes(byte[] vmdBytes)
+        {
+            if (vmdBytes == null || vmdBytes.Length == 0)
+            {
+                throw new ArgumentException("VMD bytes are required.", nameof(vmdBytes));
+            }
+
+            return MmdRuntimeNativeBoundary.Invoke(
+                "VMD summary-only parse",
+                () =>
+                {
+                    MmdRuntimeFfiMethods.ValidateVmdSummaryBytesCapability();
+                    return ReadSummaryBuffer(
+                        buffer => MmdRuntimeFfiMethods.VmdSummaryReadFromVmdBytes(
+                            vmdBytes,
+                            new IntPtr(vmdBytes.Length),
+                            buffer,
+                            new IntPtr(MmdRuntimeFfiMethods.VmdContextSummarySizeV1)),
+                        "summary-only parse");
                 });
         }
 
@@ -374,6 +375,34 @@ namespace Mmd.Native
             }
 
             throw new InvalidOperationException(message);
+        }
+
+        private static MmdRuntimeFfiMethods.VmdContextSummary ReadSummaryBuffer(
+            Func<IntPtr, int> read,
+            string operation)
+        {
+            int managedSize = Marshal.SizeOf<MmdRuntimeFfiMethods.VmdContextSummary>();
+            if (managedSize != MmdRuntimeFfiMethods.VmdContextSummarySizeV1)
+            {
+                throw new InvalidOperationException(
+                    "mmd-runtime shared VMD context summary managed layout is " +
+                    managedSize + " bytes; expected " +
+                    MmdRuntimeFfiMethods.VmdContextSummarySizeV1 + ".");
+            }
+
+            IntPtr buffer = Marshal.AllocHGlobal(MmdRuntimeFfiMethods.VmdContextSummarySizeV1);
+            try
+            {
+                ThrowForStatus(read(buffer), operation);
+                MmdRuntimeFfiMethods.VmdContextSummary summary =
+                    Marshal.PtrToStructure<MmdRuntimeFfiMethods.VmdContextSummary>(buffer);
+                ValidateSummaryLayout(summary);
+                return summary;
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
         }
 
         private static void ValidateSummaryLayout(MmdRuntimeFfiMethods.VmdContextSummary summary)

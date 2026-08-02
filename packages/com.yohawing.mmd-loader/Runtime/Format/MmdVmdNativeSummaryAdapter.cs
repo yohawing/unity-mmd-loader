@@ -20,8 +20,7 @@ namespace Mmd
                 throw new ArgumentException("VMD bytes are required.", nameof(vmdBytes));
             }
 
-            using var context = MmdRuntimeFfiVmdContext.Create(vmdBytes);
-            return Read(context);
+            return FromNativeSummary(MmdRuntimeFfiVmdContext.ReadSummaryFromVmdBytes(vmdBytes));
         }
 
         internal static MmdVmdParseSummary Read(MmdRuntimeFfiVmdContext context)
