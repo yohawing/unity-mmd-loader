@@ -12,6 +12,10 @@ namespace Mmd.Native
         internal const uint FeatureSplitPhysicsEvaluation = 1u << 0;
         internal const uint FeaturePhysicsBulletNative = 1u << 1;
         internal const uint FeatureHostPoseNativeMorphs = 1u << 3;
+        internal const uint FeatureClipBoneTrackIntrospection = 1u << 5;
+        internal const uint FeatureClipMorphTrackIntrospection = 1u << 6;
+        internal const uint FeatureClipPropertyTrackIntrospection = 1u << 7;
+        internal const uint FeatureVmdTrackKeyframeIntrospection = 1u << 8;
         internal const uint PhysicsModeLive = 2;
         internal const uint PhysicsFrameActionSeed = 0;
         internal const uint PhysicsFrameActionStep = 1;
@@ -34,6 +38,12 @@ namespace Mmd.Native
         internal const uint GenericValueScalar = 1u << 2;
         internal const uint GenericRotationBasisNone = 0;
         internal const uint GenericRotationBasisRuntimeQuaternion = 1;
+        internal const uint ClipBoneTrackIntrospectionAbiVersionV1 = 1;
+        internal const uint ClipMorphTrackIntrospectionAbiVersionV1 = 1;
+        internal const uint ClipPropertyTrackIntrospectionAbiVersionV1 = 1;
+        internal const uint VmdTrackKeyframeIntrospectionAbiVersionV1 = 1;
+        internal const uint VmdCurveNone = 0;
+        internal const uint VmdCurveCubicBezier = 1;
 
         [StructLayout(LayoutKind.Sequential)]
         internal struct PhysicsStepStats
@@ -250,6 +260,55 @@ namespace Mmd.Native
             internal float segmentCurrentInScalar;
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct VmdCurve
+        {
+            internal uint kind;
+            internal float x1;
+            internal float y1;
+            internal float x2;
+            internal float y2;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct VmdCameraKeyframe
+        {
+            internal uint frame;
+            internal float distance;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3, ArraySubType = UnmanagedType.R4)]
+            internal float[] positionXyz;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3, ArraySubType = UnmanagedType.R4)]
+            internal float[] rotationXyz;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 24, ArraySubType = UnmanagedType.U1)]
+            internal byte[] interpolation;
+            internal uint fov;
+            internal byte perspective;
+            internal VmdCurve positionX;
+            internal VmdCurve positionY;
+            internal VmdCurve positionZ;
+            internal VmdCurve rotation;
+            internal VmdCurve distanceCurve;
+            internal VmdCurve fovCurve;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct VmdLightKeyframe
+        {
+            internal uint frame;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3, ArraySubType = UnmanagedType.R4)]
+            internal float[] color;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3, ArraySubType = UnmanagedType.R4)]
+            internal float[] direction;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct VmdSelfShadowKeyframe
+        {
+            internal uint frame;
+            internal byte mode;
+            internal float distance;
+        }
+
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_abi_version", CallingConvention = CallingConvention.Cdecl)]
         internal static extern uint AbiVersion();
 
@@ -283,6 +342,13 @@ namespace Mmd.Native
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_camera_track_frame_count", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr VmdCameraTrackFrameCount(IntPtr track);
 
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_camera_track_copy_keyframes", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int VmdCameraTrackCopyKeyframes(
+            IntPtr track,
+            IntPtr outKeys,
+            IntPtr outKeyCapacity,
+            out IntPtr outWritten);
+
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_camera_track_sample", CallingConvention = CallingConvention.Cdecl)]
         internal static extern byte VmdCameraTrackSample(IntPtr track, float frame, [Out] float[] outF32, IntPtr outF32Len);
 
@@ -295,6 +361,13 @@ namespace Mmd.Native
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_light_track_frame_count", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr VmdLightTrackFrameCount(IntPtr track);
 
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_light_track_copy_keyframes", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int VmdLightTrackCopyKeyframes(
+            IntPtr track,
+            IntPtr outKeys,
+            IntPtr outKeyCapacity,
+            out IntPtr outWritten);
+
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_light_track_free", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void VmdLightTrackFree(IntPtr track);
 
@@ -306,6 +379,13 @@ namespace Mmd.Native
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_self_shadow_track_frame_count", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr VmdSelfShadowTrackFrameCount(IntPtr track);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_self_shadow_track_copy_keyframes", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int VmdSelfShadowTrackCopyKeyframes(
+            IntPtr track,
+            IntPtr outKeys,
+            IntPtr outKeyCapacity,
+            out IntPtr outWritten);
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_self_shadow_track_free", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void VmdSelfShadowTrackFree(IntPtr track);

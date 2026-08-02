@@ -237,6 +237,136 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void RuntimeFfiPinsAuthoredVmdTrackReadbackEntrypointsAndLayouts()
+        {
+            AssertRuntimeFfiSignature(
+                "VmdCameraTrackCopyKeyframes",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr).MakeByRefType());
+            AssertRuntimeFfiSignature(
+                "VmdLightTrackCopyKeyframes",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr).MakeByRefType());
+            AssertRuntimeFfiSignature(
+                "VmdSelfShadowTrackCopyKeyframes",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr).MakeByRefType());
+
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.VmdCurve>(), Is.EqualTo(20));
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.VmdCameraKeyframe>(), Is.EqualTo(184));
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.VmdLightKeyframe>(), Is.EqualTo(28));
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.VmdSelfShadowKeyframe>(), Is.EqualTo(12));
+        }
+
+        [Test]
+        public void RuntimeFfiReadsAuthoredSceneTrackKeyframesInBulk()
+        {
+            string cameraFixturePath = Path.Combine(
+                MmdTestFixtures.RepositoryRoot,
+                "native",
+                "mmd-anim",
+                "crates",
+                "mmd-anim-format",
+                "fixtures",
+                "vmd",
+                "simple_camera.vmd");
+            byte[] cameraBytes = File.ReadAllBytes(cameraFixturePath);
+            IntPtr cameraTrack = MmdRuntimeFfiMethods.VmdCameraTrackCreateFromVmdBytes(
+                cameraBytes,
+                new IntPtr(cameraBytes.Length));
+            Assert.That(cameraTrack, Is.Not.EqualTo(IntPtr.Zero));
+
+            try
+            {
+                MmdRuntimeFfiMethods.VmdCameraKeyframe[] cameraKeys =
+                    MmdRuntimeFfiTrackReadback.CopyVmdCameraTrackKeyframes(cameraTrack);
+                Assert.That(cameraKeys.Length, Is.GreaterThan(0));
+                Assert.That(cameraKeys.All(key =>
+                    key.positionXyz != null && key.positionXyz.Length == 3 &&
+                    key.rotationXyz != null && key.rotationXyz.Length == 3 &&
+                    key.interpolation != null && key.interpolation.Length == 24), Is.True);
+                AssertFramesAreSorted(cameraKeys.Select(key => (int)key.frame), "camera authored keys");
+            }
+            finally
+            {
+                MmdRuntimeFfiMethods.VmdCameraTrackFree(cameraTrack);
+            }
+
+            byte[] sceneBytes = MmdTestFixtures.BuildSceneTrackVmdBytes("light_shadow");
+            IntPtr lightTrack = MmdRuntimeFfiMethods.VmdLightTrackCreateFromVmdBytes(
+                sceneBytes,
+                new IntPtr(sceneBytes.Length));
+            IntPtr selfShadowTrack = MmdRuntimeFfiMethods.VmdSelfShadowTrackCreateFromVmdBytes(
+                sceneBytes,
+                new IntPtr(sceneBytes.Length));
+            Assert.That(lightTrack, Is.Not.EqualTo(IntPtr.Zero));
+            Assert.That(selfShadowTrack, Is.Not.EqualTo(IntPtr.Zero));
+
+            try
+            {
+                MmdRuntimeFfiMethods.VmdLightKeyframe[] lightKeys =
+                    MmdRuntimeFfiTrackReadback.CopyVmdLightTrackKeyframes(lightTrack);
+                MmdRuntimeFfiMethods.VmdSelfShadowKeyframe[] selfShadowKeys =
+                    MmdRuntimeFfiTrackReadback.CopyVmdSelfShadowTrackKeyframes(selfShadowTrack);
+                Assert.That(lightKeys, Has.Length.EqualTo(2));
+                Assert.That(selfShadowKeys, Has.Length.EqualTo(2));
+                Assert.That(lightKeys.All(key =>
+                    key.color != null && key.color.Length == 3 &&
+                    key.direction != null && key.direction.Length == 3), Is.True);
+                AssertFramesAreSorted(lightKeys.Select(key => (int)key.frame), "light authored keys");
+                AssertFramesAreSorted(selfShadowKeys.Select(key => (int)key.frame), "self-shadow authored keys");
+            }
+            finally
+            {
+                MmdRuntimeFfiMethods.VmdSelfShadowTrackFree(selfShadowTrack);
+                MmdRuntimeFfiMethods.VmdLightTrackFree(lightTrack);
+            }
+        }
+
+        [Test]
+        public void RuntimeFfiAuthoredTrackReadbackRejectsShortBuffersWithoutPartialWrites()
+        {
+            byte[] sceneBytes = MmdTestFixtures.BuildSceneTrackVmdBytes("light_shadow");
+            IntPtr track = MmdRuntimeFfiMethods.VmdLightTrackCreateFromVmdBytes(
+                sceneBytes,
+                new IntPtr(sceneBytes.Length));
+            Assert.That(track, Is.Not.EqualTo(IntPtr.Zero));
+
+            int stride = Marshal.SizeOf<MmdRuntimeFfiMethods.VmdLightKeyframe>();
+            IntPtr shortBuffer = Marshal.AllocHGlobal(stride);
+            try
+            {
+                byte[] sentinel = Enumerable.Repeat((byte)0xA5, stride).ToArray();
+                Marshal.Copy(sentinel, 0, shortBuffer, sentinel.Length);
+                int status = MmdRuntimeFfiMethods.VmdLightTrackCopyKeyframes(
+                    track,
+                    shortBuffer,
+                    new IntPtr(1),
+                    out IntPtr written);
+
+                Assert.That(status, Is.EqualTo(MmdRuntimeFfiMethods.StatusBufferTooSmall));
+                Assert.That(written, Is.EqualTo(IntPtr.Zero));
+                byte[] after = new byte[stride];
+                Marshal.Copy(shortBuffer, after, 0, after.Length);
+                Assert.That(after, Is.EqualTo(sentinel));
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(shortBuffer);
+                MmdRuntimeFfiMethods.VmdLightTrackFree(track);
+            }
+        }
+
+        [Test]
         public void RuntimeFfiPinsClipFrameBatchEntrypoints()
         {
             AssertRuntimeFfiSignature(
@@ -641,6 +771,12 @@ namespace Mmd.Tests
             Assert.That(values[6], Is.EqualTo(0.75f).Within(0.0001f), "rotation.z");
             Assert.That(values[7], Is.EqualTo(47.5f).Within(0.0001f), "fov");
             Assert.That(values[8], Is.EqualTo(1.0f).Within(0.0001f), "perspective");
+        }
+
+        private static void AssertFramesAreSorted(System.Collections.Generic.IEnumerable<int> frames, string label)
+        {
+            int[] actual = frames.ToArray();
+            Assert.That(actual, Is.EqualTo(actual.OrderBy(frame => frame).ToArray()), label);
         }
 
         private static void AssertLightSample(float[] values)
