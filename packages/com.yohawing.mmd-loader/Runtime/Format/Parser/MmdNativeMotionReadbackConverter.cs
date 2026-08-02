@@ -1,7 +1,6 @@
 #nullable enable
 
 using System;
-using System.Collections.Generic;
 using System.Text;
 using Mmd.Native;
 
@@ -9,139 +8,11 @@ namespace Mmd.Parser
 {
     /// <summary>
     /// Converts native authored-track readback into the existing managed motion definition.
-    /// The raw model-less path is the normal VMD parser boundary; the model-resolved overload
-    /// remains an opt-in diagnostic bridge.
+    /// The raw model-less path is the normal VMD parser boundary.
     /// </summary>
     internal static class MmdNativeMotionReadbackConverter
     {
         private static readonly Encoding? Cp932Encoding = TryGetCp932Encoding();
-
-        internal static MmdMotionDefinition Build(
-            MmdModelDefinition model,
-            MmdVmdParseSummary summary,
-            MmdRuntimeFfiMethods.VmdBoneKeyframe[] boneKeys,
-            MmdRuntimeFfiMethods.MorphTrackDescriptor[] morphDescriptors,
-            MmdRuntimeFfiMethods.MorphTrackKey[][] morphKeys,
-            MmdRuntimeFfiMethods.VmdCameraKeyframe[] cameraKeys,
-            MmdRuntimeFfiMethods.VmdLightKeyframe[] lightKeys,
-            MmdRuntimeFfiMethods.VmdSelfShadowKeyframe[] selfShadowKeys,
-            MmdRuntimeFfiMethods.VmdPropertyKeyframe[] propertyKeys,
-            MmdRuntimeFfiMethods.VmdPropertyIkEntry[] propertyIkEntries,
-            byte[] sourceBytes)
-        {
-            if (model == null)
-            {
-                throw new ArgumentNullException(nameof(model));
-            }
-
-            if (boneKeys == null ||
-                morphDescriptors == null || morphKeys == null ||
-                cameraKeys == null || lightKeys == null || selfShadowKeys == null ||
-                propertyKeys == null || propertyIkEntries == null)
-            {
-                throw new ArgumentNullException("Native authored readback arrays are required.");
-            }
-
-            if (sourceBytes == null || sourceBytes.Length == 0)
-            {
-                throw new ArgumentException("VMD source bytes are required.", nameof(sourceBytes));
-            }
-
-            if (morphDescriptors.Length != morphKeys.Length)
-            {
-                throw new InvalidOperationException(
-                    "Native authored morph descriptor/key track counts do not match.");
-            }
-
-            Dictionary<int, string> boneNames = BuildNameMap(model.bones, bone => bone.index, bone => bone.name, "bone");
-            Dictionary<int, string> morphNames = BuildNameMap(model.morphs, morph => morph.index, morph => morph.name, "morph");
-            MmdMotionDefinition motion = CreateMotion(summary, sourceBytes);
-
-            int bodyBoneKeyCount = 0;
-            for (int keyIndex = 0; keyIndex < boneKeys.Length; keyIndex++)
-            {
-                MmdRuntimeFfiMethods.VmdBoneKeyframe key = boneKeys[keyIndex];
-                int boneIndex = CheckedUIntToInt(key.boneIndex, "native bone key index");
-                string boneName = ResolveName(boneNames, boneIndex, "bone", keyIndex);
-                byte[] rawInterpolation = CopyRequiredBytes(
-                    key.interpolation,
-                    64,
-                    "native raw bone interpolation",
-                    0,
-                    keyIndex);
-                byte[] translationX = DecodeBoneInterpolation(rawInterpolation, 0);
-                byte[] translationY = DecodeBoneInterpolation(rawInterpolation, 1);
-                byte[] translationZ = DecodeBoneInterpolation(rawInterpolation, 2);
-                byte[] rotation = DecodeBoneInterpolation(rawInterpolation, 3);
-
-                bodyBoneKeyCount++;
-                motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
-                {
-                    boneName = boneName,
-                    frame = CheckedFrame(key.frame, summary.MaxFrame, "native bone key", 0, keyIndex),
-                    translation = CopyRequired(key.positionXyz, 3, "native bone translation", 0, keyIndex),
-                    rotation = CopyRequired(key.rotationXyzw, 4, "native bone rotation", 0, keyIndex),
-                    interpolation = new MmdBoneInterpolationDefinition
-                    {
-                        translationX = translationX,
-                        translationY = translationY,
-                        translationZ = translationZ,
-                        rotation = rotation
-                    },
-                    physicsEnabled = false,
-                    rawInterpolation = rawInterpolation
-                });
-            }
-
-            if (bodyBoneKeyCount != summary.BoneKeyframeCount)
-            {
-                throw new InvalidOperationException(
-                    "Native authored bone readback count " + bodyBoneKeyCount +
-                    " does not match the VMD summary count " + summary.BoneKeyframeCount + ".");
-            }
-            int bodyMorphKeyCount = 0;
-            for (int trackIndex = 0; trackIndex < morphDescriptors.Length; trackIndex++)
-            {
-                MmdRuntimeFfiMethods.MorphTrackDescriptor descriptor = morphDescriptors[trackIndex];
-                int morphIndex = CheckedUIntToInt(descriptor.morphIndex, "native morph track index");
-                string morphName = ResolveName(morphNames, morphIndex, "morph", trackIndex);
-                MmdRuntimeFfiMethods.MorphTrackKey[] keys = morphKeys[trackIndex] ??
-                    throw new InvalidOperationException("Native morph track keys are null: " + trackIndex + ".");
-
-                bodyMorphKeyCount = checked(bodyMorphKeyCount + keys.Length);
-                for (int keyIndex = 0; keyIndex < keys.Length; keyIndex++)
-                {
-                    MmdRuntimeFfiMethods.MorphTrackKey key = keys[keyIndex];
-                    int keyMorphIndex = CheckedUIntToInt(key.morphIndex, "native morph key index");
-                    if (keyMorphIndex != morphIndex)
-                    {
-                        throw new InvalidOperationException(
-                            "Native morph key index does not match its track descriptor: track " +
-                            trackIndex + ", key " + keyIndex + ".");
-                    }
-
-                    RequireFinite(key.weight, "native morph weight", trackIndex, keyIndex);
-                    motion.morphKeyframes.Add(new MmdMorphKeyframeDefinition
-                    {
-                        morphName = morphName,
-                        frame = CheckedFrame(key.frame, summary.MaxFrame, "native morph key", trackIndex, keyIndex),
-                        weight = key.weight
-                    });
-                }
-            }
-
-            if (bodyMorphKeyCount != summary.MorphKeyframeCount)
-            {
-                throw new InvalidOperationException(
-                    "Native authored morph readback count " + bodyMorphKeyCount +
-                    " does not match the VMD summary count " + summary.MorphKeyframeCount + ".");
-            }
-
-            AddPropertyKeys(motion, summary, propertyKeys, propertyIkEntries);
-            AddSceneKeys(motion, summary, cameraKeys, lightKeys, selfShadowKeys);
-            MmdMotionValidator.ThrowIfInvalid(motion);
-            return motion;
-        }
 
         internal static MmdMotionDefinition BuildRaw(
             MmdVmdParseSummary summary,
@@ -345,52 +216,6 @@ namespace Mmd.Parser
             {
                 throw new InvalidOperationException(
                     "Native raw VMD " + channel + " name is empty: key " + keyIndex + ".");
-            }
-
-            return name;
-        }
-
-        private static Dictionary<int, string> BuildNameMap<T>(
-            IReadOnlyList<T> definitions,
-            Func<T, int> getIndex,
-            Func<T, string> getName,
-            string label)
-            where T : class
-        {
-            if (definitions == null)
-            {
-                throw new InvalidOperationException("MmdModelDefinition " + label + " list is null.");
-            }
-
-            var names = new Dictionary<int, string>();
-            for (int i = 0; i < definitions.Count; i++)
-            {
-                T definition = definitions[i];
-                if (definition == null)
-                {
-                    throw new InvalidOperationException("MmdModelDefinition " + label + " is null: " + i + ".");
-                }
-
-                int index = getIndex(definition);
-                string name = getName(definition);
-
-                if (index < 0 || string.IsNullOrWhiteSpace(name) || !names.TryAdd(index, name))
-                {
-                    throw new InvalidOperationException(
-                        "MmdModelDefinition " + label + " index/name map is invalid: " + i + ".");
-                }
-            }
-
-            return names;
-        }
-
-        private static string ResolveName(Dictionary<int, string> names, int index, string label, int trackIndex)
-        {
-            if (!names.TryGetValue(index, out string? name))
-            {
-                throw new MmdRuntimeUnsupportedException(
-                    "Native " + label + " track index " + index + " is not present in MmdModelDefinition: track " +
-                    trackIndex + ".");
             }
 
             return name;

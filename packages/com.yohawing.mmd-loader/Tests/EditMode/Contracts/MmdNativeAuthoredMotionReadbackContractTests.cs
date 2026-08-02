@@ -13,44 +13,16 @@ namespace Mmd.Tests
     public sealed class MmdNativeAuthoredMotionReadbackContractTests
     {
         [Test]
-        public void ReadbackMapsCompiledBoneTrackIndicesToModelNames()
+        public void LoadMotionPreservesRawCp932BoneNames()
         {
-            byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube.pmx");
             byte[] vmdBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube_motion.vmd");
-            var parser = new NativeMmdParser();
-            MmdModelDefinition model = parser.LoadModel(pmxBytes);
-            MmdMotionDefinition expected = parser.LoadMotion(vmdBytes);
+            MmdMotionDefinition actual = new NativeMmdParser().LoadMotion(vmdBytes);
 
-            MmdMotionDefinition actual = MmdNativeAuthoredMotionReadbackAdapter.Read(
-                model,
-                pmxBytes,
-                vmdBytes);
-
-            Assert.That(actual.targetModelName, Is.EqualTo(expected.targetModelName));
-            Assert.That(actual.maxFrame, Is.EqualTo(expected.maxFrame));
-            Assert.That(actual.modelKeyframes, Is.Empty);
-            Assert.That(actual.boneKeyframes, Has.Count.EqualTo(expected.boneKeyframes.Count));
-            for (int i = 0; i < expected.boneKeyframes.Count; i++)
+            Assert.That(actual.boneKeyframes, Has.Count.EqualTo(6));
+            for (int i = 0; i < actual.boneKeyframes.Count; i++)
             {
-                MmdBoneKeyframeDefinition expectedKey = expected.boneKeyframes[i];
                 MmdBoneKeyframeDefinition actualKey = actual.boneKeyframes[i];
-                Assert.That(actualKey.boneName, Is.EqualTo(expectedKey.boneName));
-                Assert.That(actualKey.frame, Is.EqualTo(expectedKey.frame));
-                CollectionAssert.AreEqual(expectedKey.translation, actualKey.translation);
-                CollectionAssert.AreEqual(expectedKey.rotation, actualKey.rotation);
-                CollectionAssert.AreEqual(
-                    expectedKey.interpolation.translationX,
-                    actualKey.interpolation.translationX);
-                CollectionAssert.AreEqual(
-                    expectedKey.interpolation.translationY,
-                    actualKey.interpolation.translationY);
-                CollectionAssert.AreEqual(
-                    expectedKey.interpolation.translationZ,
-                    actualKey.interpolation.translationZ);
-                CollectionAssert.AreEqual(
-                    expectedKey.interpolation.rotation,
-                    actualKey.interpolation.rotation);
-                CollectionAssert.AreEqual(expectedKey.rawInterpolation, actualKey.rawInterpolation);
+                Assert.That(actualKey.boneName, Is.EqualTo("全ての親"));
             }
 
             MmdMotionValidator.ThrowIfInvalid(actual);
@@ -59,135 +31,102 @@ namespace Mmd.Tests
         [Test]
         public void ReadbackPreservesNonUniformRawBoneInterpolationAndManagedChannelParity()
         {
-            byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube.pmx");
             byte[] vmdBytes = BuildNonUniformBoneInterpolationVmdBytes();
-            var parser = new NativeMmdParser();
-            MmdModelDefinition model = parser.LoadModel(pmxBytes);
-            MmdMotionDefinition expected = parser.LoadMotion(vmdBytes);
+            MmdMotionDefinition actual = new NativeMmdParser().LoadMotion(vmdBytes);
 
-            MmdMotionDefinition actual = MmdNativeAuthoredMotionReadbackAdapter.Read(
-                model,
-                pmxBytes,
-                vmdBytes);
-
-            Assert.That(actual.boneKeyframes, Has.Count.EqualTo(expected.boneKeyframes.Count));
-            for (int i = 0; i < expected.boneKeyframes.Count; i++)
+            Assert.That(actual.boneKeyframes, Has.Count.EqualTo(6));
+            int[] expectedFrames = { 0, 9, 19, 29, 39, 49 };
+            float[][] expectedRotations =
             {
-                MmdBoneKeyframeDefinition expectedKey = expected.boneKeyframes[i];
+                new[] { 0.0f, 0.0f, 0.0f, 1.0f },
+                new[] { -0.3826834f, 0.0f, 0.0f, 0.9238796f },
+                new[] { 0.0f, 0.0f, -0.3826834f, 0.9238796f },
+                new[] { 0.0f, 0.0f, 0.3826834f, 0.9238796f },
+                new[] { 0.3826834f, 0.0f, 0.0f, 0.9238796f },
+                new[] { 0.0f, 0.0f, 0.0f, 1.0f }
+            };
+            for (int i = 0; i < actual.boneKeyframes.Count; i++)
+            {
                 MmdBoneKeyframeDefinition actualKey = actual.boneKeyframes[i];
-                CollectionAssert.AreEqual(expectedKey.rawInterpolation, actualKey.rawInterpolation, "raw " + i);
+                Assert.That(actualKey.frame, Is.EqualTo(expectedFrames[i]));
+                CollectionAssert.AreEqual(new[] { 0.0f, 0.0f, 0.0f }, actualKey.translation);
+                for (int component = 0; component < expectedRotations[i].Length; component++)
+                {
+                    Assert.That(actualKey.rotation[component], Is.EqualTo(expectedRotations[i][component]).Within(1e-5f));
+                }
+                Assert.That(actualKey.rawInterpolation, Has.Length.EqualTo(64));
                 CollectionAssert.AreEqual(
-                    expectedKey.interpolation.translationX,
-                    actualKey.interpolation.translationX,
-                    "translation X " + i);
+                    new[]
+                    {
+                        actualKey.rawInterpolation[0],
+                        actualKey.rawInterpolation[4],
+                        actualKey.rawInterpolation[8],
+                        actualKey.rawInterpolation[12]
+                    },
+                    actualKey.interpolation.translationX);
                 CollectionAssert.AreEqual(
-                    expectedKey.interpolation.translationY,
-                    actualKey.interpolation.translationY,
-                    "translation Y " + i);
+                    new[]
+                    {
+                        actualKey.rawInterpolation[1],
+                        actualKey.rawInterpolation[5],
+                        actualKey.rawInterpolation[9],
+                        actualKey.rawInterpolation[13]
+                    },
+                    actualKey.interpolation.translationY);
                 CollectionAssert.AreEqual(
-                    expectedKey.interpolation.translationZ,
-                    actualKey.interpolation.translationZ,
-                    "translation Z " + i);
+                    new[]
+                    {
+                        actualKey.rawInterpolation[2],
+                        actualKey.rawInterpolation[6],
+                        actualKey.rawInterpolation[10],
+                        actualKey.rawInterpolation[14]
+                    },
+                    actualKey.interpolation.translationZ);
                 CollectionAssert.AreEqual(
-                    expectedKey.interpolation.rotation,
-                    actualKey.interpolation.rotation,
-                    "rotation " + i);
+                    new[]
+                    {
+                        actualKey.rawInterpolation[3],
+                        actualKey.rawInterpolation[7],
+                        actualKey.rawInterpolation[11],
+                        actualKey.rawInterpolation[15]
+                    },
+                    actualKey.interpolation.rotation);
+                for (int byteIndex = 0; byteIndex < actualKey.rawInterpolation.Length; byteIndex++)
+                {
+                    Assert.That(
+                        actualKey.rawInterpolation[byteIndex],
+                        Is.EqualTo((byte)((i * 17 + byteIndex) % 127)),
+                        "raw " + i + ", byte " + byteIndex);
+                }
             }
         }
 
         [Test]
-        public void ReadbackMapsCompiledMorphTrackIndicesToModelNames()
+        public void LoadMotionPreservesRawCp932MorphNames()
         {
-            byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_vertex_morph.pmx");
-            byte[] vmdBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_vertex_morph_motion.vmd");
-            var parser = new NativeMmdParser();
-            MmdModelDefinition model = parser.LoadModel(pmxBytes);
-            MmdMotionDefinition expected = parser.LoadMotion(vmdBytes);
-
-            MmdMotionDefinition actual = MmdNativeAuthoredMotionReadbackAdapter.Read(
-                model,
-                pmxBytes,
-                vmdBytes);
+            byte[] vmdBytes = BuildVmdWithCp932MorphName();
+            MmdMotionDefinition actual = new NativeMmdParser().LoadMotion(vmdBytes);
 
             Assert.That(actual.boneKeyframes, Is.Empty);
             Assert.That(actual.modelKeyframes, Is.Empty);
-            Assert.That(actual.morphKeyframes, Has.Count.EqualTo(expected.morphKeyframes.Count));
-            for (int i = 0; i < expected.morphKeyframes.Count; i++)
+            Assert.That(actual.morphKeyframes, Has.Count.EqualTo(2));
+            for (int i = 0; i < actual.morphKeyframes.Count; i++)
             {
-                MmdMorphKeyframeDefinition expectedKey = expected.morphKeyframes[i];
                 MmdMorphKeyframeDefinition actualKey = actual.morphKeyframes[i];
-                Assert.That(actualKey.morphName, Is.EqualTo(expectedKey.morphName));
-                Assert.That(actualKey.frame, Is.EqualTo(expectedKey.frame));
-                Assert.That(actualKey.weight, Is.EqualTo(expectedKey.weight));
+                Assert.That(actualKey.morphName, Is.EqualTo(i == 0 ? "笑顔" : "blink"));
             }
 
             MmdMotionValidator.ThrowIfInvalid(actual);
         }
 
         [Test]
-        public void ReadbackRejectsUnresolvedMorphNameWithUnsupportedException()
-        {
-            var model = new MmdModelDefinition();
-            model.morphs.Add(new MmdMorphDefinition
-            {
-                index = 0,
-                name = "known-morph"
-            });
-
-            var summary = new MmdVmdParseSummary(
-                "unresolved-morph",
-                maxFrame: 0,
-                boneKeyframeCount: 0,
-                morphKeyframeCount: 1,
-                modelKeyframeCount: 0,
-                constraintStateCount: 0);
-            var descriptor = new MmdRuntimeFfiMethods.MorphTrackDescriptor
-            {
-                morphIndex = 1
-            };
-            var morphKeys = new[]
-            {
-                new[]
-                {
-                    new MmdRuntimeFfiMethods.MorphTrackKey
-                    {
-                        morphIndex = 1,
-                        frame = 0,
-                        weight = 0.5f
-                    }
-                }
-            };
-
-            MmdRuntimeUnsupportedException exception = Assert.Throws<MmdRuntimeUnsupportedException>(() =>
-                MmdNativeMotionReadbackConverter.Build(
-                    model,
-                    summary,
-                    Array.Empty<MmdRuntimeFfiMethods.VmdBoneKeyframe>(),
-                    new[] { descriptor },
-                    morphKeys,
-                    Array.Empty<MmdRuntimeFfiMethods.VmdCameraKeyframe>(),
-                    Array.Empty<MmdRuntimeFfiMethods.VmdLightKeyframe>(),
-                    Array.Empty<MmdRuntimeFfiMethods.VmdSelfShadowKeyframe>(),
-                    Array.Empty<MmdRuntimeFfiMethods.VmdPropertyKeyframe>(),
-                    Array.Empty<MmdRuntimeFfiMethods.VmdPropertyIkEntry>(),
-                    new byte[] { 1 }))!;
-
-            Assert.That(exception.Message,
-                Is.EqualTo("Native morph track index 1 is not present in MmdModelDefinition: track 0."));
-        }
-
-        [Test]
         public void ReadbackCopiesRawCameraLightAndSelfShadowKeysAndSummaryCounts()
         {
-            byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube.pmx");
             var parser = new NativeMmdParser();
 
             byte[] cameraBytes = MmdTestFixtures.BuildCameraTrackVmdBytes("native-camera");
             MmdVmdParseSummary cameraSummary = MmdVmdNativeSummaryAdapter.Read(cameraBytes);
-            MmdMotionDefinition camera = MmdNativeAuthoredMotionReadbackAdapter.Read(
-                parser.LoadModel(pmxBytes),
-                pmxBytes,
-                cameraBytes);
+            MmdMotionDefinition camera = parser.LoadMotion(cameraBytes);
             Assert.That(camera.cameraKeyframeCount, Is.EqualTo(cameraSummary.CameraKeyframeCount));
             Assert.That(camera.cameraKeyframes, Has.Count.EqualTo(cameraSummary.CameraKeyframeCount));
             Assert.That(camera.cameraKeyframes[0].frame, Is.EqualTo(0));
@@ -198,10 +137,7 @@ namespace Mmd.Tests
 
             byte[] sceneBytes = MmdTestFixtures.BuildSceneTrackVmdBytes("native-scene");
             MmdVmdParseSummary sceneSummary = MmdVmdNativeSummaryAdapter.Read(sceneBytes);
-            MmdMotionDefinition scene = MmdNativeAuthoredMotionReadbackAdapter.Read(
-                parser.LoadModel(pmxBytes),
-                pmxBytes,
-                sceneBytes);
+            MmdMotionDefinition scene = parser.LoadMotion(sceneBytes);
             Assert.That(scene.lightKeyframeCount, Is.EqualTo(sceneSummary.LightKeyframeCount));
             Assert.That(scene.selfShadowKeyframeCount, Is.EqualTo(sceneSummary.SelfShadowKeyframeCount));
             Assert.That(scene.lightKeyframes, Has.Count.EqualTo(sceneSummary.LightKeyframeCount));
@@ -216,11 +152,8 @@ namespace Mmd.Tests
         [Test]
         public void ReadbackCopiesPropertyVisibilityAndCp932IkNames()
         {
-            byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube.pmx");
             byte[] vmdBytes = BuildPropertyVmdBytes();
-            MmdModelDefinition model = new NativeMmdParser().LoadModel(pmxBytes);
-
-            MmdMotionDefinition actual = MmdNativeAuthoredMotionReadbackAdapter.Read(model, pmxBytes, vmdBytes);
+            MmdMotionDefinition actual = new NativeMmdParser().LoadMotion(vmdBytes);
 
             Assert.That(actual.modelKeyframes, Has.Count.EqualTo(1));
             Assert.That(actual.modelKeyframes[0].visible, Is.False);
@@ -324,20 +257,6 @@ namespace Mmd.Tests
                 Is.Not.TypeOf<MmdRuntimeNativeUnavailableException>());
         }
 
-        [Test]
-        public void ReadbackFailsClosedWhenContextReportsUnresolvedModelBoneNames()
-        {
-            byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube.pmx");
-            byte[] vmdBytes = BuildVmdWithOneUnresolvedBoneName();
-            MmdModelDefinition model = new NativeMmdParser().LoadModel(pmxBytes);
-
-            MmdRuntimeUnsupportedException exception = Assert.Throws<MmdRuntimeUnsupportedException>(
-                () => MmdNativeAuthoredMotionReadbackAdapter.Read(model, pmxBytes, vmdBytes))!;
-
-            Assert.That(exception.Message, Does.Contain("skipped 1"));
-            Assert.That(exception.Message, Does.Contain("unresolved"));
-        }
-
         private static byte[] BuildPropertyVmdBytes()
         {
             using var stream = new MemoryStream();
@@ -374,10 +293,10 @@ namespace Mmd.Tests
             return bytes;
         }
 
-        private static byte[] BuildVmdWithOneUnresolvedBoneName()
+        private static byte[] BuildVmdWithCp932MorphName()
         {
-            byte[] bytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube_motion.vmd");
-            WriteFixedSjisAt(bytes, 54, "missing-native-bone", 15);
+            byte[] bytes = MmdTestFixtures.ReadFixtureAssetBytes("test_vertex_morph_motion.vmd");
+            WriteFixedSjisAt(bytes, 58, "笑顔", 15);
             return bytes;
         }
 
