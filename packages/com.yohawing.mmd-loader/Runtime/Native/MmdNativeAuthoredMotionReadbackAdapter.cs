@@ -32,7 +32,7 @@ namespace Mmd.Native
             }
 
             using var context = MmdRuntimeFfiVmdContext.Create(vmdBytes);
-            MmdVmdParseSummary summary = MmdVmdBinarySummaryReader.Read(vmdBytes);
+            MmdVmdParseSummary summary = MmdVmdNativeSummaryAdapter.Read(context);
             using var session = MmdRuntimeFfiPlaybackSession.CreateFromVmdContext(
                 pmxBytes,
                 context,

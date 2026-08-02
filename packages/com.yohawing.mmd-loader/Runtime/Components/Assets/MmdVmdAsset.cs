@@ -321,7 +321,7 @@ namespace Mmd
         private MmdVmdParseSummary GetNativeClipSummary()
         {
             return importSummaryStatus == MmdVmdImportSummaryStatus.NotParsed
-                ? MmdVmdBinarySummaryReader.Read(ReadSourceBytes())
+                ? MmdVmdNativeSummaryAdapter.Read(ReadSourceBytes())
                 : new MmdVmdParseSummary(
                     targetModelName,
                     maxFrame,

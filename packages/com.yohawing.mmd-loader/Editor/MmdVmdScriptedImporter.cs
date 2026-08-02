@@ -113,7 +113,7 @@ namespace Mmd.Editor
             IReadOnlyList<string>? diagnostics = null;
             try
             {
-                summary = MmdVmdBinarySummaryReader.Read(bytes);
+                summary = MmdVmdNativeSummaryAdapter.Read(bytes);
             }
             catch (Exception ex)
             {

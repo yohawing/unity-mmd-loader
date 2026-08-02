@@ -116,7 +116,7 @@ namespace Mmd.Editor
             byte[] vmdBytes = RunStage(VmdReadStage, () => File.ReadAllBytes(fullVmdPath));
             MmdVmdParseSummary summary = RunStage(
                 VmdParseStage,
-                () => MmdVmdBinarySummaryReader.Read(vmdBytes));
+                () => MmdVmdNativeSummaryAdapter.Read(vmdBytes));
             MmdMotionDefinition motion = RunStage(
                 VmdParseStage,
                 () => MmdVmdAsset.CreateNativeClipMotionHeader(vmdBytes, summary));

@@ -117,7 +117,7 @@ namespace Mmd.UnityIntegration
             var parser = new NativeMmdParser();
             MmdModelDefinition model = parser.LoadModel(pmxBytes);
             MmdModelValidator.ThrowIfInvalid(model);
-            MmdVmdParseSummary summary = MmdVmdBinarySummaryReader.Read(vmdBytes);
+            MmdVmdParseSummary summary = MmdVmdNativeSummaryAdapter.Read(vmdBytes);
             MmdMotionDefinition motion = MmdVmdAsset.CreateNativeClipMotionHeader(vmdBytes, summary);
             MmdMotionValidator.ThrowIfInvalid(motion);
             if (!HasExistingSceneSkinnedMeshRenderer())
