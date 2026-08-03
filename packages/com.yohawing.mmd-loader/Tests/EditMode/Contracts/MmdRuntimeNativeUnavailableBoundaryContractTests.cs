@@ -62,7 +62,7 @@ namespace Mmd.Tests
                 File.Exists(nativeDllPath),
                 Is.False,
                 "The physical missing-DLL gate requires the copied package DLL to be absent. " +
-                "Use scripts/run-native-unavailable-gate.ps1 before enabling the physical gate. Path=" + nativeDllPath);
+                "Run the physical native-unavailable gate in an isolated package copy before enabling this test. Path=" + nativeDllPath);
 
             MmdRuntimeNativeUnavailableException unavailable = Assert.Throws<MmdRuntimeNativeUnavailableException>(
                 () => MmdRuntimeNativeBoundary.Invoke(
