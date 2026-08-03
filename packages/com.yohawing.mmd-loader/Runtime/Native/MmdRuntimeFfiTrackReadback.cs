@@ -34,7 +34,7 @@ namespace Mmd.Native
             int count = MmdFfiMarshal.CheckedIntPtrToInt(
                 MmdRuntimeFfiMethods.VmdCameraTrackFrameCount(track),
                 "VMD camera track keyframe count");
-            return CopyStructArray<MmdRuntimeFfiMethods.VmdCameraKeyframe>(
+            return CopyTrackStructArray<MmdRuntimeFfiMethods.VmdCameraKeyframe>(
                 track,
                 count,
                 MmdRuntimeFfiMethods.VmdCameraTrackCopyKeyframes,
@@ -49,7 +49,7 @@ namespace Mmd.Native
             int count = MmdFfiMarshal.CheckedIntPtrToInt(
                 MmdRuntimeFfiMethods.VmdLightTrackFrameCount(track),
                 "VMD light track keyframe count");
-            return CopyStructArray<MmdRuntimeFfiMethods.VmdLightKeyframe>(
+            return CopyTrackStructArray<MmdRuntimeFfiMethods.VmdLightKeyframe>(
                 track,
                 count,
                 MmdRuntimeFfiMethods.VmdLightTrackCopyKeyframes,
@@ -64,7 +64,7 @@ namespace Mmd.Native
             int count = MmdFfiMarshal.CheckedIntPtrToInt(
                 MmdRuntimeFfiMethods.VmdSelfShadowTrackFrameCount(track),
                 "VMD self-shadow track keyframe count");
-            return CopyStructArray<MmdRuntimeFfiMethods.VmdSelfShadowKeyframe>(
+            return CopyTrackStructArray<MmdRuntimeFfiMethods.VmdSelfShadowKeyframe>(
                 track,
                 count,
                 MmdRuntimeFfiMethods.VmdSelfShadowTrackCopyKeyframes,
@@ -238,7 +238,7 @@ namespace Mmd.Native
             }
         }
 
-        private static T[] CopyStructArray<T>(
+        private static T[] CopyTrackStructArray<T>(
             IntPtr track,
             int count,
             CopyKeyframesDelegate copyKeyframes,
@@ -250,47 +250,9 @@ namespace Mmd.Native
                 throw new ArgumentException("Native track handle is required.", nameof(track));
             }
 
-            if (count == 0)
-            {
-                return Array.Empty<T>();
-            }
-
-            int stride = Marshal.SizeOf<T>();
-            IntPtr buffer = Marshal.AllocHGlobal(checked(stride * count));
-            try
-            {
-                int status = copyKeyframes(
-                    track,
-                    buffer,
-                    new IntPtr(count),
-                    out IntPtr written);
-                if (status != MmdRuntimeFfiMethods.StatusOk)
-                {
-                    throw new InvalidOperationException(
-                        "mmd-runtime " + label + " copy failed with status " + status + ": "
-                        + MmdRuntimeFfiMarshal.LastErrorMessage());
-                }
-
-                int copied = MmdFfiMarshal.CheckedIntPtrToInt(written, label + " copied count");
-                if (copied != count)
-                {
-                    throw new InvalidOperationException(
-                        "mmd-runtime " + label + " count changed during readback: expected "
-                        + count + ", copied " + copied + ".");
-                }
-
-                var result = new T[count];
-                for (int i = 0; i < result.Length; i++)
-                {
-                    result[i] = Marshal.PtrToStructure<T>(IntPtr.Add(buffer, checked(i * stride)));
-                }
-
-                return result;
-            }
-            finally
-            {
-                Marshal.FreeHGlobal(buffer);
-            }
+            NativeStructCopyDelegate copy = (IntPtr buffer, IntPtr capacity, out IntPtr written) =>
+                copyKeyframes(track, buffer, capacity, out written);
+            return MmdFfiMarshal.CopyStructArray<T>(count, label, copy, ThrowForCopyStatus);
         }
 
         private static T[] CopyClipStructArray<T>(
@@ -311,28 +273,9 @@ namespace Mmd.Native
                 throw new ArgumentOutOfRangeException(nameof(trackIndex));
             }
 
-            if (count == 0)
-            {
-                return Array.Empty<T>();
-            }
-
-            int stride = Marshal.SizeOf<T>();
-            IntPtr buffer = Marshal.AllocHGlobal(checked(stride * count));
-            try
-            {
-                int status = copyKeyframes(
-                    clip,
-                    new IntPtr(trackIndex),
-                    buffer,
-                    new IntPtr(count),
-                    out IntPtr written);
-                ThrowForStatus(status, label);
-                return ReadCopiedStructArray<T>(buffer, count, written, stride, label);
-            }
-            finally
-            {
-                Marshal.FreeHGlobal(buffer);
-            }
+            NativeStructCopyDelegate copy = (IntPtr buffer, IntPtr capacity, out IntPtr written) =>
+                copyKeyframes(clip, new IntPtr(trackIndex), buffer, capacity, out written);
+            return MmdFfiMarshal.CopyStructArray<T>(count, label, copy, ThrowForStatus);
         }
 
         private static T[] CopyPropertyStructArray<T>(
@@ -347,52 +290,9 @@ namespace Mmd.Native
                 throw new ArgumentException("Native clip handle is required.", nameof(clip));
             }
 
-            if (count == 0)
-            {
-                return Array.Empty<T>();
-            }
-
-            int stride = Marshal.SizeOf<T>();
-            IntPtr buffer = Marshal.AllocHGlobal(checked(stride * count));
-            try
-            {
-                int status = copyKeyframes(
-                    clip,
-                    buffer,
-                    new IntPtr(count),
-                    out IntPtr written);
-                ThrowForStatus(status, label);
-                return ReadCopiedStructArray<T>(buffer, count, written, stride, label);
-            }
-            finally
-            {
-                Marshal.FreeHGlobal(buffer);
-            }
-        }
-
-        private static T[] ReadCopiedStructArray<T>(
-            IntPtr buffer,
-            int expectedCount,
-            IntPtr written,
-            int stride,
-            string label)
-            where T : struct
-        {
-            int copied = MmdFfiMarshal.CheckedIntPtrToInt(written, label + " copied count");
-            if (copied != expectedCount)
-            {
-                throw new InvalidOperationException(
-                    "mmd-runtime " + label + " count changed during readback: expected "
-                    + expectedCount + ", copied " + copied + ".");
-            }
-
-            var result = new T[expectedCount];
-            for (int i = 0; i < result.Length; i++)
-            {
-                result[i] = Marshal.PtrToStructure<T>(IntPtr.Add(buffer, checked(i * stride)));
-            }
-
-            return result;
+            NativeStructCopyDelegate copy = (IntPtr buffer, IntPtr capacity, out IntPtr written) =>
+                copyKeyframes(clip, buffer, capacity, out written);
+            return MmdFfiMarshal.CopyStructArray<T>(count, label, copy, ThrowForStatus);
         }
 
         private static void RequireFeature(uint feature, string label)
@@ -419,6 +319,18 @@ namespace Mmd.Native
             }
 
             throw new InvalidOperationException(message);
+        }
+
+        private static void ThrowForCopyStatus(int status, string operation)
+        {
+            if (status == MmdRuntimeFfiMethods.StatusOk)
+            {
+                return;
+            }
+
+            throw new InvalidOperationException(
+                "mmd-runtime " + operation + " copy failed with status " + status + ": "
+                + MmdRuntimeFfiMarshal.LastErrorMessage());
         }
     }
 }

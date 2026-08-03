@@ -216,38 +216,10 @@ namespace Mmd.Native
             try
             {
                 int count = MmdFfiMarshal.CheckedIntPtrToInt(getCount(handle), label + " count");
-                if (count == 0)
-                {
-                    return Array.Empty<T>();
-                }
-
-                int stride = Marshal.SizeOf<T>();
-                int byteCount = checked(stride * count);
-                IntPtr buffer = Marshal.AllocHGlobal(byteCount);
-                try
-                {
-                    int status = copy(handle, buffer, new IntPtr(count), out IntPtr written);
-                    ThrowForStatus(status, label);
-                    int copied = MmdFfiMarshal.CheckedIntPtrToInt(written, label + " copied count");
-                    if (copied != count)
-                    {
-                        throw new InvalidOperationException(
-                            "mmd-runtime " + label + " count changed during readback: expected " +
-                            count + ", copied " + copied + ".");
-                    }
-
-                    var result = new T[count];
-                    for (int i = 0; i < result.Length; i++)
-                    {
-                        result[i] = Marshal.PtrToStructure<T>(IntPtr.Add(buffer, checked(i * stride)));
-                    }
-
-                    return result;
-                }
-                finally
-                {
-                    Marshal.FreeHGlobal(buffer);
-                }
+                NativeStructCopyDelegate copyDelegate =
+                    (IntPtr buffer, IntPtr capacity, out IntPtr written) =>
+                        copy(handle, buffer, capacity, out written);
+                return MmdFfiMarshal.CopyStructArray<T>(count, label, copyDelegate, ThrowForStatus);
             }
             catch (DllNotFoundException exception)
             {
