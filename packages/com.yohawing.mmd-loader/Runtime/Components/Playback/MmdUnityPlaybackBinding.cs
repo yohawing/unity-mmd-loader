@@ -44,9 +44,18 @@ namespace Mmd.UnityIntegration
         private byte[]? fastIkEnabled;
         private MmdEvaluatedFrame? fastMorphFrame;
         private float[]? fastLastAppliedMorphWeights;
+        private MmdEvaluatedFrame? fastLivePhysicsFrame;
         private bool fastMorphApplied;
         private bool fastMorphCacheValid;
         private MmdPlaybackSnapshot? fastSnapshot;
+        private readonly int[] fastPoseBoneIndices;
+        private readonly int[] fastMorphIndices;
+        private readonly int[] fastAfterPhysicsBoneIndices;
+        private float[]? livePhysicsLocalPositionOffsets;
+        private float[]? livePhysicsLocalRotations;
+        private float[]? livePhysicsLocalScales;
+        private float[]? livePhysicsMorphWeights;
+        private byte[]? livePhysicsIkEnabled;
         private readonly MmdUnityModelInstanceOwnership instanceOwnership;
         private readonly MmdBorrowedSceneMutationLease? borrowedMutationLease;
         private readonly IDisposable? borrowedSourceMutation;
@@ -69,6 +78,9 @@ namespace Mmd.UnityIntegration
             this.model = model;
             this.modelId = modelId;
             this.motionId = motionId;
+            fastPoseBoneIndices = MmdUnityPlaybackWorkset.BuildBoneIndices(model, instance);
+            fastMorphIndices = MmdUnityPlaybackWorkset.BuildMorphIndices(model, instance.RenderingDescriptor);
+            fastAfterPhysicsBoneIndices = MmdUnityPlaybackWorkset.BuildAfterPhysicsBoneIndices(model);
             this.instanceOwnership = instanceOwnership;
             this.borrowedMutationLease = borrowedMutationLease;
             this.borrowedSourceMutation = borrowedSourceMutation;
@@ -103,6 +115,14 @@ namespace Mmd.UnityIntegration
         }
 
         public bool IsFastRuntimeEnabled => fastSession != null;
+
+        internal int FastRuntimePoseBoneCount => fastPoseBoneIndices.Length;
+
+        internal int FastRuntimeMorphCount => fastMorphIndices.Length;
+
+        internal int FastRuntimeAfterPhysicsBoneCount => fastAfterPhysicsBoneIndices.Length;
+
+        internal MmdEvaluatedFrame? FastLivePhysicsFrameForTests => fastLivePhysicsFrame;
 
         public int MotionMaxFrame => session.MotionMaxFrame;
 

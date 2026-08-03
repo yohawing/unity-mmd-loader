@@ -118,7 +118,7 @@ namespace Mmd.UnityIntegration
                 float[] worldMatrices = new float[created.WorldMatrixFloatCount];
                 float[] morphWeights = new float[created.MorphWeightCount];
                 byte[] ikEnabled = new byte[created.IkEnabledCount];
-                float[] lastAppliedMorphWeights = new float[created.MorphWeightCount];
+                float[] lastAppliedMorphWeights = new float[fastMorphIndices.Length];
                 MmdEvaluatedFrame? morphFrame = BuildFastMorphFrame(morphWeights);
 
                 fastSession = created;
@@ -218,6 +218,7 @@ namespace Mmd.UnityIntegration
             fastIkEnabled = null;
             fastMorphFrame = null;
             fastLastAppliedMorphWeights = null;
+            fastLivePhysicsFrame = null;
             fastMorphApplied = false;
             fastMorphCacheValid = false;
             fastSnapshot = null;
@@ -249,7 +250,10 @@ namespace Mmd.UnityIntegration
         private MmdPlaybackSnapshot ApplyFastCore(int frame, float time)
         {
             fastSession!.EvaluateAndCopy(frame, fastWorldMatrices!, fastMorphWeights!, fastIkEnabled!);
-            MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(playbackInstance, fastWorldMatrices!);
+            MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(
+                playbackInstance,
+                fastWorldMatrices!,
+                fastPoseBoneIndices);
             ApplyFastMorphWeights();
             // Lightweight snapshot: no managed session.EvaluateFrame call.
             // fastMorphFrame is reused in-place; frame/time are updated each call.
@@ -289,7 +293,10 @@ namespace Mmd.UnityIntegration
             // time and over-drive (roughly double) the member blend shapes. Flip morphs are NOT expanded by
             // the native runtime, so the applier still resolves those.
             MmdUnityFrameApplier.ApplyMorphs(playbackInstance, fastMorphFrame!, groupMorphsResolvedExternally: true);
-            Array.Copy(fastMorphWeights!, fastLastAppliedMorphWeights!, fastMorphWeights!.Length);
+            for (int i = 0; i < fastMorphIndices.Length; i++)
+            {
+                fastLastAppliedMorphWeights![i] = fastMorphWeights![fastMorphIndices[i]];
+            }
             fastMorphApplied = hasNonZero;
             fastMorphCacheValid = true;
         }
@@ -299,21 +306,23 @@ namespace Mmd.UnityIntegration
             List<MmdEvaluatedMorphWeight> morphList = fastMorphFrame!.morphs;
             for (int i = 0; i < morphList.Count; i++)
             {
-                morphList[i].weight = i < weights.Length ? weights[i] : 0.0f;
+                int morphIndex = fastMorphIndices[i];
+                morphList[i].weight = morphIndex < weights.Length ? weights[morphIndex] : 0.0f;
             }
         }
 
         private MmdEvaluatedFrame BuildFastMorphFrame(float[] weights)
         {
-            var morphList = new List<MmdEvaluatedMorphWeight>(model.morphs.Count);
-            for (int i = 0; i < model.morphs.Count; i++)
+            var morphList = new List<MmdEvaluatedMorphWeight>(fastMorphIndices.Length);
+            for (int i = 0; i < fastMorphIndices.Length; i++)
             {
+                int morphIndex = fastMorphIndices[i];
                 morphList.Add(new MmdEvaluatedMorphWeight
                 {
-                    name = string.IsNullOrWhiteSpace(model.morphs[i].name)
-                        ? model.morphs[i].index.ToString(System.Globalization.CultureInfo.InvariantCulture)
-                        : model.morphs[i].name,
-                    weight = i < weights.Length ? weights[i] : 0.0f
+                    name = string.IsNullOrWhiteSpace(model.morphs[morphIndex].name)
+                        ? model.morphs[morphIndex].index.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                        : model.morphs[morphIndex].name,
+                    weight = morphIndex < weights.Length ? weights[morphIndex] : 0.0f
                 });
             }
 
@@ -322,42 +331,48 @@ namespace Mmd.UnityIntegration
 
         private MmdEvaluatedFrame BuildFastLivePhysicsFrame(int frame, float time)
         {
-            var bones = new List<MmdEvaluatedBonePose>(model.bones.Count);
-            foreach (MmdBoneDefinition bone in model.bones)
+            if (fastLivePhysicsFrame == null)
             {
-                bones.Add(new MmdEvaluatedBonePose
+                var bones = new List<MmdEvaluatedBonePose>(model.bones.Count);
+                foreach (MmdBoneDefinition bone in model.bones)
                 {
-                    index = bone.index,
-                    name = string.IsNullOrWhiteSpace(bone.name)
-                        ? bone.index.ToString(System.Globalization.CultureInfo.InvariantCulture)
-                        : bone.name,
-                    localPosition = new[] { 0.0f, 0.0f, 0.0f },
-                    localRotation = new[] { 0.0f, 0.0f, 0.0f, 1.0f },
-                    localScale = new[] { 1.0f, 1.0f, 1.0f },
-                    worldMatrix = new[]
+                    bones.Add(new MmdEvaluatedBonePose
                     {
-                        1.0f, 0.0f, 0.0f, 0.0f,
-                        0.0f, 1.0f, 0.0f, 0.0f,
-                        0.0f, 0.0f, 1.0f, 0.0f,
-                        0.0f, 0.0f, 0.0f, 1.0f
-                    }
-                });
+                        index = bone.index,
+                        name = string.IsNullOrWhiteSpace(bone.name)
+                            ? bone.index.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                            : bone.name,
+                        localPosition = new[] { 0.0f, 0.0f, 0.0f },
+                        localRotation = new[] { 0.0f, 0.0f, 0.0f, 1.0f },
+                        localScale = new[] { 1.0f, 1.0f, 1.0f },
+                        worldMatrix = new[]
+                        {
+                            1.0f, 0.0f, 0.0f, 0.0f,
+                            0.0f, 1.0f, 0.0f, 0.0f,
+                            0.0f, 0.0f, 1.0f, 0.0f,
+                            0.0f, 0.0f, 0.0f, 1.0f
+                        }
+                    });
+                }
+
+                fastLivePhysicsFrame = new MmdEvaluatedFrame
+                {
+                    bones = bones,
+                    morphs = fastMorphFrame!.morphs
+                };
             }
 
-            return new MmdEvaluatedFrame
-            {
-                frame = frame,
-                time = time,
-                bones = bones,
-                morphs = BuildFastMorphFrame(fastMorphWeights!).morphs
-            };
+            fastLivePhysicsFrame.frame = frame;
+            fastLivePhysicsFrame.time = time;
+            return fastLivePhysicsFrame;
         }
 
-        private static bool HasAnyNonZeroMorphWeight(float[] weights)
+        private bool HasAnyNonZeroMorphWeight(float[] weights)
         {
-            for (int i = 0; i < weights.Length; i++)
+            for (int i = 0; i < fastMorphIndices.Length; i++)
             {
-                if (weights[i] != 0.0f)
+                int morphIndex = fastMorphIndices[i];
+                if (morphIndex < weights.Length && weights[morphIndex] != 0.0f)
                 {
                     return true;
                 }
@@ -366,16 +381,17 @@ namespace Mmd.UnityIntegration
             return false;
         }
 
-        private static bool MorphWeightsEqual(float[] a, float[] b)
+        private bool MorphWeightsEqual(float[] weights, float[] lastAppliedWeights)
         {
-            if (a.Length != b.Length)
+            if (lastAppliedWeights.Length != fastMorphIndices.Length)
             {
                 return false;
             }
 
-            for (int i = 0; i < a.Length; i++)
+            for (int i = 0; i < fastMorphIndices.Length; i++)
             {
-                if (a[i] != b[i])
+                int morphIndex = fastMorphIndices[i];
+                if (morphIndex >= weights.Length || weights[morphIndex] != lastAppliedWeights[i])
                 {
                     return false;
                 }

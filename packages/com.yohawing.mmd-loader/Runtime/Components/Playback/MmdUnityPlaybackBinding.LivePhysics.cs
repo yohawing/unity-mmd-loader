@@ -182,7 +182,7 @@ namespace Mmd.UnityIntegration
                 evaluatedFrame,
                 out double refreshSnapshotFrameMs);
             lastLiveFrame = frame;
-            lastLiveSnapshot = session.BuildSnapshotFromEvaluatedFrame(evaluatedFrame!, playbackInstance.RenderingDescriptor);
+            lastLiveSnapshot = BuildOrUpdateLiveSnapshot(evaluatedFrame!);
             totalWatch.Stop();
             diagnostics.refreshSnapshotFrameMs = refreshSnapshotFrameMs;
             diagnostics.totalMs = totalWatch.Elapsed.TotalMilliseconds;
@@ -246,7 +246,7 @@ namespace Mmd.UnityIntegration
             ApplyPhysicsBodyTransforms();
             double applyPhysicsBodiesMs = stageWatch.Elapsed.TotalMilliseconds;
             stageWatch.Restart();
-            ApplyAfterPhysicsBoneEvaluationFromNative(nativeBackend, evaluatedFrame, sequenceFrame);
+            ApplyAfterPhysicsBoneEvaluationFromNative(nativeBackend);
             if (ShouldSampleLivePhysicsBodyDiagnostics(sequenceFrame))
             {
                 ApplyPhysicsBodyDebugTransforms(backend);
@@ -278,16 +278,27 @@ namespace Mmd.UnityIntegration
                 unsupportedWorldAnchorJointCount = backend.SkippedWorldAnchorJointCount,
                 comparisonSpace = "runtime-forward-playback-diagnostics",
                 importScale = playbackInstance.ImportScale,
+                modelBoneCount = model.bones.Count,
+                appliedBoneCount = fastSession != null ? fastPoseBoneIndices.Length : evaluatedFrame?.bones.Count ?? model.bones.Count,
+                modelMorphCount = model.morphs.Count,
+                appliedMorphCount = fastSession != null ? fastMorphIndices.Length : evaluatedFrame?.morphs.Count ?? model.morphs.Count,
                 bodyDiagnosticsFrame = lastLivePhysicsBodyDiagnosticsFrame,
                 bodyDiagnostics = lastLivePhysicsBodyDiagnostics
             };
             return lastLivePhysicsDiagnostics;
         }
 
-        private void ApplyAfterPhysicsBoneEvaluationFromNative(
-            MmdAnimPhysicsBackend nativeBackend,
-            MmdEvaluatedFrame? evaluatedFrame,
-            int sequenceFrame)
+        private MmdPlaybackSnapshot BuildOrUpdateLiveSnapshot(MmdEvaluatedFrame frame)
+        {
+            lastLiveSnapshot ??= new MmdPlaybackSnapshot();
+            lastLiveSnapshot.model = modelId;
+            lastLiveSnapshot.motion = motionId;
+            lastLiveSnapshot.frame = frame;
+            lastLiveSnapshot.rendering = playbackInstance.RenderingDescriptor;
+            return lastLiveSnapshot;
+        }
+
+        private void ApplyAfterPhysicsBoneEvaluationFromNative(MmdAnimPhysicsBackend nativeBackend)
         {
             if (!model.HasDeformAfterPhysicsBones)
             {
@@ -301,17 +312,10 @@ namespace Mmd.UnityIntegration
             }
 
             nativeBackend.CopyAfterPhysicsWorldMatrices(livePhysicsAfterPhysicsWorldMatrices);
-            MmdEvaluatedFrame afterPhysicsFrame = MmdRuntimeFrameEvaluator.BuildFrameFromNative(
-                model,
-                evaluatedFrame?.frame ?? sequenceFrame,
-                evaluatedFrame?.time ?? 0.0f,
-                livePhysicsAfterPhysicsWorldMatrices,
-                Array.Empty<float>(),
-                includeMaterials: false);
-            MmdUnityFrameApplier.ApplyBonePoses(
+            MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(
                 playbackInstance,
-                afterPhysicsFrame.bones,
-                bonePose => IsDeformAfterPhysicsBone(bonePose.index));
+                livePhysicsAfterPhysicsWorldMatrices,
+                fastAfterPhysicsBoneIndices);
         }
 
         private void CaptureHostPoseFromUnityTransforms(
@@ -322,9 +326,18 @@ namespace Mmd.UnityIntegration
             out byte[] ikEnabled)
         {
             int boneCount = model.bones.Count;
-            localPositionOffsets = new float[checked(boneCount * 3)];
-            localRotations = new float[checked(boneCount * 4)];
-            localScales = new float[checked(boneCount * 3)];
+            localPositionOffsets = EnsureLivePhysicsBuffer(
+                ref livePhysicsLocalPositionOffsets,
+                checked(boneCount * 3));
+            localRotations = EnsureLivePhysicsBuffer(
+                ref livePhysicsLocalRotations,
+                checked(boneCount * 4));
+            localScales = EnsureLivePhysicsBuffer(
+                ref livePhysicsLocalScales,
+                checked(boneCount * 3));
+            Array.Clear(localPositionOffsets, 0, localPositionOffsets.Length);
+            Array.Clear(localRotations, 0, localRotations.Length);
+            Array.Clear(localScales, 0, localScales.Length);
             for (int i = 0; i < boneCount; i++)
             {
                 localRotations[i * 4 + 3] = 1.0f;
@@ -365,7 +378,10 @@ namespace Mmd.UnityIntegration
                 localScales[scaleOffset + 2] = scale.z;
             }
 
-            morphWeights = new float[model.morphs.Count];
+            morphWeights = EnsureLivePhysicsBuffer(
+                ref livePhysicsMorphWeights,
+                model.morphs.Count);
+            Array.Clear(morphWeights, 0, morphWeights.Length);
             SkinnedMeshRenderer? renderer = playbackInstance.SkinnedMeshRenderer;
             if (renderer != null)
             {
@@ -384,7 +400,28 @@ namespace Mmd.UnityIntegration
 
             // The Unity pose is already after the host's animation/retargeting pass. Keep native IK
             // disabled here so evaluate_host_frame does not solve a second, unrelated IK pass.
-            ikEnabled = new byte[model.ik.Count];
+            ikEnabled = EnsureLivePhysicsBuffer(ref livePhysicsIkEnabled, model.ik.Count);
+            Array.Clear(ikEnabled, 0, ikEnabled.Length);
+        }
+
+        private static float[] EnsureLivePhysicsBuffer(ref float[]? buffer, int length)
+        {
+            if (buffer == null || buffer.Length != length)
+            {
+                buffer = new float[length];
+            }
+
+            return buffer;
+        }
+
+        private static byte[] EnsureLivePhysicsBuffer(ref byte[]? buffer, int length)
+        {
+            if (buffer == null || buffer.Length != length)
+            {
+                buffer = new byte[length];
+            }
+
+            return buffer;
         }
 
         private MmdLivePhysicsPinnedBodyDiagnostics BuildHostPosePinnedBodyDiagnostics(bool resetSeed)
@@ -422,19 +459,6 @@ namespace Mmd.UnityIntegration
             }
 
             return diagnostics;
-        }
-
-        private bool IsDeformAfterPhysicsBone(int boneIndex)
-        {
-            for (int i = 0; i < model.bones.Count; i++)
-            {
-                if (model.bones[i].index == boneIndex)
-                {
-                    return model.bones[i].deformAfterPhysics;
-                }
-            }
-
-            return false;
         }
 
         private IMmdLivePhysicsBackend EnsureLivePhysicsBackend()

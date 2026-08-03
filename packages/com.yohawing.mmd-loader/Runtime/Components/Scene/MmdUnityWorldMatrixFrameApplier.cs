@@ -1,13 +1,17 @@
 #nullable enable
 
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Mmd.UnityIntegration
 {
     internal static class MmdUnityWorldMatrixFrameApplier
     {
-        public static void ApplyColumnMajorWorldMatrices(MmdUnityModelInstance instance, float[] worldMatrices)
+        public static void ApplyColumnMajorWorldMatrices(
+            MmdUnityModelInstance instance,
+            float[] worldMatrices,
+            IReadOnlyList<int>? boneIndices = null)
         {
             if (instance == null)
             {
@@ -28,17 +32,49 @@ namespace Mmd.UnityIntegration
 
             Transform root = instance.Root.transform;
             float importScale = NormalizeImportScale(instance.ImportScale);
-            for (int boneIndex = 0; boneIndex < boneCount; boneIndex++)
+            if (boneIndices == null)
             {
-                Transform bone = instance.BoneTransforms[boneIndex];
-                int offset = boneIndex * 16;
-                Vector3 mmdPosition = new Vector3(
-                    worldMatrices[offset + 12],
-                    worldMatrices[offset + 13],
-                    worldMatrices[offset + 14]);
-                Quaternion mmdRotation = ExtractColumnMajorRotation(worldMatrices, offset);
-                bone.position = root.TransformPoint(ToUnityModelPosition(mmdPosition) * importScale);
-                bone.rotation = root.rotation * ToUnityModelRotation(mmdRotation);
+                for (int boneIndex = 0; boneIndex < boneCount; boneIndex++)
+                {
+                    ApplyBoneWorldMatrix(instance, root, importScale, worldMatrices, boneIndex);
+                }
+
+                return;
+            }
+
+            for (int i = 0; i < boneIndices.Count; i++)
+            {
+                int boneIndex = boneIndices[i];
+                if (boneIndex < 0 || boneIndex >= boneCount)
+                {
+                    throw new ArgumentException(
+                        $"World matrix bone index {boneIndex} is outside the Unity bone array.",
+                        nameof(boneIndices));
+                }
+
+                ApplyBoneWorldMatrix(instance, root, importScale, worldMatrices, boneIndex);
+            }
+        }
+
+        private static void ApplyBoneWorldMatrix(
+            MmdUnityModelInstance instance,
+            Transform root,
+            float importScale,
+            float[] worldMatrices,
+            int boneIndex)
+        {
+            Transform bone = instance.BoneTransforms[boneIndex];
+            int offset = boneIndex * 16;
+            Vector3 mmdPosition = new Vector3(
+                worldMatrices[offset + 12],
+                worldMatrices[offset + 13],
+                worldMatrices[offset + 14]);
+            Quaternion mmdRotation = ExtractColumnMajorRotation(worldMatrices, offset);
+            Vector3 worldPosition = root.TransformPoint(ToUnityModelPosition(mmdPosition) * importScale);
+            Quaternion worldRotation = root.rotation * ToUnityModelRotation(mmdRotation);
+            bone.SetPositionAndRotation(worldPosition, worldRotation);
+            if (bone.localScale != Vector3.one)
+            {
                 bone.localScale = Vector3.one;
             }
         }
