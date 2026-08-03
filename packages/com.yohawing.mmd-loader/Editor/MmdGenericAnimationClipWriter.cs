@@ -107,8 +107,9 @@ namespace Mmd.Editor
                 }
                 else
                 {
-                    diagnostics.Add("writer: persistent native evaluation unavailable; using managed fallback: "
-                                    + fastRuntimeReason);
+                    throw new InvalidOperationException(
+                        "native Generic AnimationClip evaluation unavailable; managed transform fallback is not supported: "
+                        + fastRuntimeReason);
                 }
 
                 AnimationClip clip = BakeDenseClip(
@@ -120,8 +121,7 @@ namespace Mmd.Editor
                     effectiveEndFrame,
                     options,
                     out int compactedCurveCount,
-                    out bool usedNativeSparse,
-                    out string nativeSparseReason);
+                    out bool usedNativeSparse);
                 if (usedNativeSparse)
                 {
                     diagnostics.Add("writer: built AnimationClip exclusively from mmd-runtime generic sparse track descriptors and keys.");
@@ -130,14 +130,9 @@ namespace Mmd.Editor
                 {
                     diagnostics.Add("writer: key reduction disabled; baked dense curves for every sampled frame.");
                 }
-                else if (!string.IsNullOrEmpty(nativeSparseReason))
-                {
-                    diagnostics.Add("writer: native sparse reduction unavailable; using dense managed fallback: "
-                                    + nativeSparseReason);
-                }
                 if (!usedNativeSparse)
                 {
-                    diagnostics.Add("writer: baked Generic transform and vertex morph curves with physics off; compacted "
+                    diagnostics.Add("writer: baked Generic transform and vertex morph curves from native batch evaluation with physics off; compacted "
                                     + compactedCurveCount + " constant curves to endpoint keys.");
                 }
                 return new MmdGenericAnimationClipWriterResult(clip, diagnostics, binding.PhysicsMode);
@@ -249,8 +244,7 @@ namespace Mmd.Editor
             int endFrame,
             MmdGenericAnimationClipBakeOptions options,
             out int compactedCurveCount,
-            out bool usedNativeSparse,
-            out string nativeSparseReason)
+            out bool usedNativeSparse)
         {
             MmdUnityModelInstance instance = binding.Instance;
             int frameCount = endFrame - startFrame + 1;
@@ -265,10 +259,11 @@ namespace Mmd.Editor
             {
             compactedCurveCount = 0;
             usedNativeSparse = false;
-            nativeSparseReason = string.Empty;
             string[] bonePaths = CalculateUniqueBonePaths(instance.BoneTransforms, instance.Root.transform);
             IReadOnlyList<MmdUnityVertexMorphBlendShapeBinding> morphs = instance.VertexMorphBlendShapes;
-            if (options.ReduceKeys && TryBakeSparseNativeCurves(
+            if (options.ReduceKeys)
+            {
+                compactedCurveCount = BakeSparseNativeCurves(
                     binding,
                     instance,
                     pmxAsset,
@@ -279,18 +274,13 @@ namespace Mmd.Editor
                     bonePaths,
                     morphs,
                     clip,
-                    options.HighPrecision,
-                    out int sparseCurveCount,
-                    out nativeSparseReason))
-            {
-                compactedCurveCount = sparseCurveCount;
+                    options.HighPrecision);
                 usedNativeSparse = true;
                 return clip;
             }
 
-            // Native sparse reduction owns a separate byte budget and may return a
-            // small clip for ranges that would be unsafe to materialize as managed
-            // Keyframe arrays. Apply this budget only at the dense fallback boundary.
+            // Native batch evaluation is used for dense curves only when key
+            // reduction was explicitly disabled.
             if (!MmdAnimationClipBakeBudget.TryValidateGeneric(
                     frameCount,
                     instance.BoneTransforms.Length,
@@ -312,55 +302,38 @@ namespace Mmd.Editor
             var morphKeys = new Keyframe[morphs.Count][];
             for (int morph = 0; morph < morphs.Count; morph++) morphKeys[morph] = new Keyframe[frameCount];
 
-            if (CanUseNativeBatch(
+            if (!CanUseNativeBatch(
                     binding,
                     instance,
                     out int[] parentBoneIndices,
                     out Vector3[] staticParentPositions,
                     out Quaternion[] staticParentRotations))
             {
-                try
-                {
-                    FillDenseKeysFromNativeBatch(
-                        binding,
-                        instance,
-                        parentBoneIndices,
-                        staticParentPositions,
-                        staticParentRotations,
-                        morphs,
-                        frameRate,
-                        startFrame,
-                        frameCount,
-                        positionKeys,
-                        rotationKeys,
-                        morphKeys);
-                }
-                catch (EntryPointNotFoundException)
-                {
-                    FillDenseKeysThroughUnityTransforms(
-                        binding,
-                        instance,
-                        morphs,
-                        frameRate,
-                        startFrame,
-                        endFrame,
-                        positionKeys,
-                        rotationKeys,
-                        morphKeys);
-                }
+                throw new InvalidOperationException(
+                    "native Generic AnimationClip batch evaluation is unavailable or the Unity hierarchy is unsupported.");
             }
-            else
+
+            try
             {
-                FillDenseKeysThroughUnityTransforms(
+                FillDenseKeysFromNativeBatch(
                     binding,
                     instance,
+                    parentBoneIndices,
+                    staticParentPositions,
+                    staticParentRotations,
                     morphs,
                     frameRate,
                     startFrame,
-                    endFrame,
+                    frameCount,
                     positionKeys,
                     rotationKeys,
                     morphKeys);
+            }
+            catch (EntryPointNotFoundException ex)
+            {
+                throw new InvalidOperationException(
+                    "native Generic AnimationClip batch evaluation failed because the required native entry point is unavailable.",
+                    ex);
             }
 
             string[] positionProperties = { "m_LocalPosition.x", "m_LocalPosition.y", "m_LocalPosition.z" };
@@ -409,7 +382,7 @@ namespace Mmd.Editor
             }
         }
 
-        private static bool TryBakeSparseNativeCurves(
+        private static int BakeSparseNativeCurves(
             MmdUnityPlaybackBinding binding,
             MmdUnityModelInstance instance,
             MmdPmxAsset pmxAsset,
@@ -420,16 +393,12 @@ namespace Mmd.Editor
             string[] bonePaths,
             IReadOnlyList<MmdUnityVertexMorphBlendShapeBinding> morphs,
             AnimationClip clip,
-            bool highPrecision,
-            out int sparseCurveCount,
-            out string reason)
+            bool highPrecision)
         {
-            sparseCurveCount = 0;
-            reason = string.Empty;
             if (!CanUseNativeBatch(binding, instance, out _, out _, out _))
             {
-                reason = "native batch input is unavailable or the Unity hierarchy is unsupported.";
-                return false;
+                throw new InvalidOperationException(
+                    "native Generic AnimationClip sparse reduction is unavailable because native batch evaluation is unavailable or the Unity hierarchy is unsupported.");
             }
 
             try
@@ -611,24 +580,15 @@ namespace Mmd.Editor
 
                     AnimationUtility.SetEditorCurves(clip, bindings.ToArray(), curves.ToArray());
                     SetSparseEulerRotationOrderToXyz(clip);
-                    sparseCurveCount = curves.Count;
-                    return true;
+                    return curves.Count;
                 }
             }
-            catch (Exception ex) when (IsSparseNativeFallbackException(ex))
+            catch (EntryPointNotFoundException ex)
             {
-                reason = ex.GetType().Name + ": " + ex.Message;
-                return false;
+                throw new InvalidOperationException(
+                    "native Generic AnimationClip sparse evaluation failed because the required native entry point is unavailable.",
+                    ex);
             }
-        }
-
-        internal static bool IsSparseNativeFallbackException(Exception exception)
-        {
-            return exception is DllNotFoundException or
-                EntryPointNotFoundException or
-                BadImageFormatException or
-                MmdRuntimeNativeUnavailableException or
-                MmdRuntimeUnsupportedException;
         }
 
         internal static Keyframe CreateGenericKeyframe(
@@ -1014,45 +974,6 @@ namespace Mmd.Editor
                 ? Quaternion.LookRotation(forward.normalized, up.normalized)
                 : Quaternion.identity;
             rotation = MmdCoordinateSpace.MmdToUnityRotation(mmdRotation);
-        }
-
-        private static void FillDenseKeysThroughUnityTransforms(
-            MmdUnityPlaybackBinding binding,
-            MmdUnityModelInstance instance,
-            IReadOnlyList<MmdUnityVertexMorphBlendShapeBinding> morphs,
-            float frameRate,
-            int startFrame,
-            int endFrame,
-            Keyframe[,][] positionKeys,
-            Keyframe[,][] rotationKeys,
-            Keyframe[][] morphKeys)
-        {
-            for (int frame = startFrame, sample = 0; frame <= endFrame; frame++, sample++)
-            {
-                binding.ApplyFrame(frame, frameRate);
-                float time = (frame - startFrame) / frameRate;
-                for (int bone = 0; bone < instance.BoneTransforms.Length; bone++)
-                {
-                    Vector3 p = instance.BoneTransforms[bone].localPosition;
-                    Quaternion q = instance.BoneTransforms[bone].localRotation;
-                    positionKeys[bone, 0][sample] = new Keyframe(time, p.x);
-                    positionKeys[bone, 1][sample] = new Keyframe(time, p.y);
-                    positionKeys[bone, 2][sample] = new Keyframe(time, p.z);
-                    rotationKeys[bone, 0][sample] = new Keyframe(time, q.x);
-                    rotationKeys[bone, 1][sample] = new Keyframe(time, q.y);
-                    rotationKeys[bone, 2][sample] = new Keyframe(time, q.z);
-                    rotationKeys[bone, 3][sample] = new Keyframe(time, q.w);
-                }
-
-                if (instance.SkinnedMeshRenderer != null)
-                {
-                    for (int morph = 0; morph < morphs.Count; morph++)
-                    {
-                        float weight = instance.SkinnedMeshRenderer.GetBlendShapeWeight(morphs[morph].BlendShapeIndex);
-                        morphKeys[morph][sample] = new Keyframe(time, weight);
-                    }
-                }
-            }
         }
 
         private static AnimationCurve CreateBakedCurve(

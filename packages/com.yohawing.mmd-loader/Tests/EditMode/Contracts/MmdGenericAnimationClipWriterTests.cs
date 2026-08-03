@@ -74,6 +74,9 @@ namespace Mmd.Tests
         [Test]
         public void BakeUsesNativeSparseTranslationAndEulerCurvesWithPhysicsOff()
         {
+#if !UNITY_EDITOR_WIN
+            Assert.Ignore("mmd-runtime native generic bake is only distributed for the Windows Editor.");
+#endif
             CreateAssets(CubePmx, CubeVmd, out MmdPmxAsset pmx, out MmdVmdAsset vmd);
             try
             {
@@ -115,6 +118,9 @@ namespace Mmd.Tests
         [Test]
         public void DenseBakeIsRepeatableForSameInputs()
         {
+#if !UNITY_EDITOR_WIN
+            Assert.Ignore("mmd-runtime native generic bake is only distributed for the Windows Editor.");
+#endif
             CreateAssets(CubePmx, CubeVmd, out MmdPmxAsset pmx, out MmdVmdAsset vmd);
             try
             {
@@ -135,6 +141,9 @@ namespace Mmd.Tests
         [Test]
         public void VertexMorphBakeWritesBlendShapeCurveInPercentUnits()
         {
+#if !UNITY_EDITOR_WIN
+            Assert.Ignore("mmd-runtime native generic bake is only distributed for the Windows Editor.");
+#endif
             CreateAssets(MorphPmx, MorphVmd, out MmdPmxAsset pmx, out MmdVmdAsset vmd);
             try
             {
@@ -226,6 +235,9 @@ namespace Mmd.Tests
         [Test]
         public void ExplicitAssetPersistenceUsesValidatedAnimPathAndCanBeCleanedUp()
         {
+#if !UNITY_EDITOR_WIN
+            Assert.Ignore("mmd-runtime native generic bake is only distributed for the Windows Editor.");
+#endif
             string directory = "Assets/MmdGenericAnimationClipWriterTests_" + Guid.NewGuid().ToString("N");
             string path = directory + "/clip.anim";
             CreateAssets(CubePmx, CubeVmd, out MmdPmxAsset pmx, out MmdVmdAsset vmd);
@@ -270,6 +282,9 @@ namespace Mmd.Tests
         [Test]
         public void DisablingKeyReductionRetainsEverySampledFrame()
         {
+#if !UNITY_EDITOR_WIN
+            Assert.Ignore("mmd-runtime native generic bake is only distributed for the Windows Editor.");
+#endif
             CreateAssets(CubePmx, CubeVmd, out MmdPmxAsset pmx, out MmdVmdAsset vmd);
             try
             {
@@ -400,26 +415,43 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void SparseFallbackAllowlistDoesNotHideContractOrOverflowFailures()
+        public void NativeUnavailableFailsClosedWithoutManagedTransformFallback()
         {
-            Assert.That(MmdGenericAnimationClipWriter.IsSparseNativeFallbackException(
-                new DllNotFoundException()), Is.True);
-            Assert.That(MmdGenericAnimationClipWriter.IsSparseNativeFallbackException(
-                new EntryPointNotFoundException()), Is.True);
-            Assert.That(MmdGenericAnimationClipWriter.IsSparseNativeFallbackException(
-                new BadImageFormatException()), Is.True);
-            Assert.That(MmdGenericAnimationClipWriter.IsSparseNativeFallbackException(
-                new MmdRuntimeNativeUnavailableException(
-                    "native runtime unavailable",
-                    new DllNotFoundException("missing native DLL"))), Is.True);
-            Assert.That(MmdGenericAnimationClipWriter.IsSparseNativeFallbackException(
-                new MmdRuntimeUnsupportedException("unsupported")), Is.True);
-            Assert.That(MmdGenericAnimationClipWriter.IsSparseNativeFallbackException(
-                new MmdRuntimeReductionInputTooLargeException("safety limit")), Is.False);
-            Assert.That(MmdGenericAnimationClipWriter.IsSparseNativeFallbackException(
-                new InvalidOperationException("descriptor mismatch")), Is.False);
-            Assert.That(MmdGenericAnimationClipWriter.IsSparseNativeFallbackException(
-                new OverflowException("count overflow")), Is.False);
+#if UNITY_EDITOR_WIN
+            Assert.Ignore("mmd-runtime native generic bake is available in the Windows Editor.");
+#endif
+            CreateAssets(CubePmx, CubeVmd, out MmdPmxAsset pmx, out MmdVmdAsset vmd);
+            try
+            {
+                MmdGenericAnimationClipWriterResult result =
+                    MmdGenericAnimationClipWriter.CreateInMemoryClip(pmx, vmd, 30.0f, 0, 9);
+
+                Assert.That(result.Clip, Is.Null);
+                Assert.That(result.Diagnostics, Has.Some.Contains("native Generic AnimationClip evaluation unavailable"));
+                Assert.That(result.Diagnostics, Has.None.Contains("using managed fallback"));
+            }
+            finally
+            {
+                DestroyAssets(pmx, vmd);
+            }
+        }
+
+        [Test]
+        public void GenericBakeHasNoManagedTransformEvaluationRoute()
+        {
+            string writerPath = Path.GetFullPath(Path.Combine(
+                Application.dataPath,
+                "..",
+                "Packages",
+                "com.yohawing.mmd-loader",
+                "Editor",
+                "MmdGenericAnimationClipWriter.cs"));
+            string source = File.ReadAllText(writerPath);
+
+            Assert.That(source, Does.Contain("BakeSparseNativeCurves"));
+            Assert.That(source, Does.Contain("FillDenseKeysFromNativeBatch"));
+            Assert.That(source, Does.Not.Contain("FillDenseKeysThroughUnityTransforms"));
+            Assert.That(source, Does.Not.Contain("binding.ApplyFrame("));
         }
 
         [Test]
