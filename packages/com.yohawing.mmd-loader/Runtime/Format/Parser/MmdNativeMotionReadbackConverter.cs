@@ -114,12 +114,6 @@ namespace Mmd.Parser
             for (int keyIndex = 0; keyIndex < propertyKeys.Length; keyIndex++)
             {
                 MmdRuntimeFfiMethods.VmdPropertyKeyframe key = propertyKeys[keyIndex];
-                if (key.visible > 1)
-                {
-                    throw new InvalidOperationException(
-                        "Native property visibility is not an ABI-safe boolean: key " + keyIndex + ".");
-                }
-
                 int entryOffset = CheckedIntPtrToInt(
                     key.ikEntryOffset,
                     "native property IK entry offset",
@@ -145,13 +139,6 @@ namespace Mmd.Parser
                 {
                     MmdRuntimeFfiMethods.VmdPropertyIkEntry entry =
                         propertyIkEntries[entryOffset + entryIndex];
-                    if (entry.enabled > 1)
-                    {
-                        throw new InvalidOperationException(
-                            "Native property IK enabled value is not an ABI-safe boolean: key " +
-                            keyIndex + ", entry " + entryIndex + ".");
-                    }
-
                     modelKey.constraintStates.Add(new MmdModelConstraintStateDefinition
                     {
                         boneName = DecodePropertyIkName(entry.nameBytes, keyIndex, entryIndex),

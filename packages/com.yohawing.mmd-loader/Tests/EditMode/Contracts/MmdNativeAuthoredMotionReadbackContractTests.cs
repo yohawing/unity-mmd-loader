@@ -164,6 +164,19 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void ReadbackTreatsNonCanonicalPropertyBooleanBytesAsNonZero()
+        {
+            byte[] vmdBytes = BuildPropertyVmdBytes(0x7f, 0x7f);
+            MmdMotionDefinition actual = new NativeMmdParser().LoadMotion(vmdBytes);
+
+            Assert.That(actual.modelKeyframes, Has.Count.EqualTo(1));
+            Assert.That(actual.modelKeyframes[0].visible, Is.True);
+            Assert.That(actual.modelKeyframes[0].constraintStates, Has.Count.EqualTo(1));
+            Assert.That(actual.modelKeyframes[0].constraintStates[0].enabled, Is.True);
+            MmdMotionValidator.ThrowIfInvalid(actual);
+        }
+
+        [Test]
         public void SharedContextReadbackUsesOneContextAndClipSurvivesContextDispose()
         {
             byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube.pmx");
@@ -257,7 +270,7 @@ namespace Mmd.Tests
                 Is.Not.TypeOf<MmdRuntimeNativeUnavailableException>());
         }
 
-        private static byte[] BuildPropertyVmdBytes()
+        private static byte[] BuildPropertyVmdBytes(byte visibility = 0, byte ikEnabled = 1)
         {
             using var stream = new MemoryStream();
             using var writer = new BinaryWriter(stream);
@@ -270,10 +283,10 @@ namespace Mmd.Tests
             writer.Write(0u); // self-shadow frames
             writer.Write(1u); // property frames
             writer.Write(14u);
-            writer.Write((byte)0);
+            writer.Write(visibility);
             writer.Write(1u); // IK states
             WriteFixedSjis(writer, "左IK", 20);
-            writer.Write((byte)1);
+            writer.Write(ikEnabled);
             return stream.ToArray();
         }
 
