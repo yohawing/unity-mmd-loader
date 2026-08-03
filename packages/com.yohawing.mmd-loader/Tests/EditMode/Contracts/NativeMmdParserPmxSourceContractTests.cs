@@ -334,11 +334,11 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void LoadModelRejectsInvalidNonGeometryJsonBeforeGeometryFallback()
+        public void LoadModelRejectsInvalidNonGeometryJsonBeforeGeometryDelegate()
         {
             var parser = new NativeMmdParser(
                 _ => string.Empty,
-                _ => throw new AssertionException("Invalid PMX must be rejected before geometry fallback."));
+                _ => throw new AssertionException("Invalid PMX must be rejected before geometry delegate."));
 
             Assert.Throws<InvalidOperationException>(() => parser.LoadModel(new byte[] { 9, 8, 7 }));
         }

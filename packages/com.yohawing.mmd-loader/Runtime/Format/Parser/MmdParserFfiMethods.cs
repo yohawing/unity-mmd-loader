@@ -24,42 +24,6 @@ namespace Mmd.Parser
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_parse_pmx_non_geometry_json", CallingConvention = CallingConvention.Cdecl)]
         private static extern ByteBuffer ParsePmxNonGeometryJsonBuffer(byte[] data, IntPtr len);
 
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_parse_pmx_positions_buffer", CallingConvention = CallingConvention.Cdecl)]
-        private static extern ByteBuffer ParsePmxPositionsBuffer(byte[] data, IntPtr len);
-
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_parse_pmx_normals_buffer", CallingConvention = CallingConvention.Cdecl)]
-        private static extern ByteBuffer ParsePmxNormalsBuffer(byte[] data, IntPtr len);
-
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_parse_pmx_uvs_buffer", CallingConvention = CallingConvention.Cdecl)]
-        private static extern ByteBuffer ParsePmxUvsBuffer(byte[] data, IntPtr len);
-
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_parse_pmx_edge_scale_buffer", CallingConvention = CallingConvention.Cdecl)]
-        private static extern ByteBuffer ParsePmxEdgeScaleBuffer(byte[] data, IntPtr len);
-
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_parse_pmx_indices_buffer", CallingConvention = CallingConvention.Cdecl)]
-        private static extern ByteBuffer ParsePmxIndicesBuffer(byte[] data, IntPtr len);
-
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_parse_pmx_skin_indices_buffer", CallingConvention = CallingConvention.Cdecl)]
-        private static extern ByteBuffer ParsePmxSkinIndicesBuffer(byte[] data, IntPtr len);
-
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_parse_pmx_skin_weights_buffer", CallingConvention = CallingConvention.Cdecl)]
-        private static extern ByteBuffer ParsePmxSkinWeightsBuffer(byte[] data, IntPtr len);
-
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_parse_pmx_sdef_enabled_buffer", CallingConvention = CallingConvention.Cdecl)]
-        private static extern ByteBuffer ParsePmxSdefEnabledBuffer(byte[] data, IntPtr len);
-
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_parse_pmx_sdef_c_buffer", CallingConvention = CallingConvention.Cdecl)]
-        private static extern ByteBuffer ParsePmxSdefCBuffer(byte[] data, IntPtr len);
-
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_parse_pmx_sdef_r0_buffer", CallingConvention = CallingConvention.Cdecl)]
-        private static extern ByteBuffer ParsePmxSdefR0Buffer(byte[] data, IntPtr len);
-
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_parse_pmx_sdef_r1_buffer", CallingConvention = CallingConvention.Cdecl)]
-        private static extern ByteBuffer ParsePmxSdefR1Buffer(byte[] data, IntPtr len);
-
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_parse_pmx_skinning_modes_json", CallingConvention = CallingConvention.Cdecl)]
-        private static extern ByteBuffer ParsePmxSkinningModesJsonBuffer(byte[] data, IntPtr len);
-
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_pmx_geometry_create", CallingConvention = CallingConvention.Cdecl)]
         private static extern IntPtr PmxGeometryCreate(byte[] data, IntPtr len);
 
@@ -111,42 +75,6 @@ namespace Mmd.Parser
 
             return ReadString(ParsePmxNonGeometryJsonBuffer(data, new IntPtr(data.Length)), "PMX non-geometry parser JSON");
         }
-
-        internal static float[] ParsePmxPositions(byte[] data)
-            => ByteBufferToFloatArray(ParsePmxPositionsBuffer(data, new IntPtr(data.Length)), "PMX positions buffer");
-
-        internal static float[] ParsePmxNormals(byte[] data)
-            => ByteBufferToFloatArray(ParsePmxNormalsBuffer(data, new IntPtr(data.Length)), "PMX normals buffer");
-
-        internal static float[] ParsePmxUvs(byte[] data)
-            => ByteBufferToFloatArray(ParsePmxUvsBuffer(data, new IntPtr(data.Length)), "PMX uvs buffer");
-
-        internal static float[] ParsePmxEdgeScale(byte[] data)
-            => ByteBufferToFloatArray(ParsePmxEdgeScaleBuffer(data, new IntPtr(data.Length)), "PMX edge scale buffer");
-
-        internal static uint[] ParsePmxIndices(byte[] data)
-            => ByteBufferToUintArray(ParsePmxIndicesBuffer(data, new IntPtr(data.Length)), "PMX indices buffer");
-
-        internal static uint[] ParsePmxSkinIndices(byte[] data)
-            => ByteBufferToUintArray(ParsePmxSkinIndicesBuffer(data, new IntPtr(data.Length)), "PMX skin indices buffer");
-
-        internal static float[] ParsePmxSkinWeights(byte[] data)
-            => ByteBufferToFloatArray(ParsePmxSkinWeightsBuffer(data, new IntPtr(data.Length)), "PMX skin weights buffer");
-
-        internal static bool[] ParsePmxSdefEnabled(byte[] data)
-            => ByteBufferToBoolArray(ParsePmxSdefEnabledBuffer(data, new IntPtr(data.Length)), "PMX sdef enabled buffer");
-
-        internal static float[] ParsePmxSdefC(byte[] data)
-            => ByteBufferToFloatArray(ParsePmxSdefCBuffer(data, new IntPtr(data.Length)), "PMX sdef C buffer");
-
-        internal static float[] ParsePmxSdefR0(byte[] data)
-            => ByteBufferToFloatArray(ParsePmxSdefR0Buffer(data, new IntPtr(data.Length)), "PMX sdef R0 buffer");
-
-        internal static float[] ParsePmxSdefR1(byte[] data)
-            => ByteBufferToFloatArray(ParsePmxSdefR1Buffer(data, new IntPtr(data.Length)), "PMX sdef R1 buffer");
-
-        internal static string ParsePmxSkinningModesJson(byte[] data)
-            => ReadString(ParsePmxSkinningModesJsonBuffer(data, new IntPtr(data.Length)), "PMX skinning modes JSON");
 
         internal static IntPtr CreatePmxGeometry(byte[] data)
         {
