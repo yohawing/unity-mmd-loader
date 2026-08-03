@@ -615,6 +615,40 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void LivePhysicsAppliesNativeAfterPhysicsPoseForDeformAfterPhysicsBone()
+        {
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
+            if (!availability.backendAvailable)
+            {
+                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
+            }
+
+            MmdUnityPlaybackBinding? binding = null;
+            try
+            {
+                MmdModelDefinition model = LoadPhysicsFixtureModel();
+                model.bones[0].deformAfterPhysics = true;
+                AddPinnedRootRigidbody(model);
+                binding = CreatePhysicsPlaybackBinding(model, "native-after-physics.vmd");
+                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.Configure(binding, 30.0f);
+                controller.SetPhysicsMode(MmdPhysicsMode.Live);
+                controller.ApplyFrame(LivePhysicsPlaybackFrame);
+
+                int rootBoneIndex = RootBoneIndex(model);
+                Vector3 expectedLocalPosition = binding.Instance.BindLocalPositions[rootBoneIndex] +
+                    ToUnityPosition(new[] { 2.0f, 0.0f, 0.0f }) * binding.Instance.ImportScale;
+                Assert.That(
+                    Vector3.Distance(binding.Instance.BoneTransforms[rootBoneIndex].localPosition, expectedLocalPosition),
+                    Is.LessThan(0.0001f));
+            }
+            finally
+            {
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
+            }
+        }
+
+        [Test]
         public void LivePhysicsReportsPinnedRigidbodySyncToAnimatedBone()
         {
             MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();

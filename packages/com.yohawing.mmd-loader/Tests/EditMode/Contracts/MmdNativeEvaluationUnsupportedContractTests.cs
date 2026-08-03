@@ -42,7 +42,7 @@ namespace Mmd.Tests.Contracts
         }
 
         [Test]
-        public void SourceBackedRuntimeSessionRejectsDeformAfterPhysicsBeforePhysicsNativeBoundary()
+        public void SourceBackedRuntimeSessionUsesNativeBeforePhysicsWithPostPhysicsBones()
         {
             (MmdModelDefinition model, MmdMotionDefinition motion) = LoadCubeFixturePair();
             model.bones[0].deformAfterPhysics = true;
@@ -52,16 +52,13 @@ namespace Mmd.Tests.Contracts
                 "test_1bone_cube.pmx",
                 "test_1bone_cube_motion.vmd");
 
-            NotSupportedException exception = Assert.Throws<NotSupportedException>(
-                () => session.EvaluateBeforePhysicsFrame(frame: 0, time: 0.0f))!;
+            MmdEvaluatedFrame frame = session.EvaluateBeforePhysicsFrame(frame: 0, time: 0.0f);
 
-            Assert.That(exception.Message, Does.Contain("source-backed PMX/VMD"));
-            Assert.That(exception.Message, Does.Contain("before-physics"));
-            Assert.That(exception.Message, Does.Contain("deform-after-physics bones"));
+            Assert.That(frame.bones, Is.Not.Empty);
         }
 
         [Test]
-        public void SourceBackedUnsupportedBeforePhysicsPreservesFrameAndTimeValidation()
+        public void SourceBackedBeforePhysicsPreservesFrameAndTimeValidation()
         {
             (MmdModelDefinition model, MmdMotionDefinition motion) = LoadCubeFixturePair();
             model.bones[0].deformAfterPhysics = true;
@@ -78,7 +75,7 @@ namespace Mmd.Tests.Contracts
         }
 
         [Test]
-        public void SourceBackedUnsupportedBeforePhysicsRevalidatesMutableTopology()
+        public void SourceBackedBeforePhysicsRevalidatesMutableModel()
         {
             (MmdModelDefinition model, MmdMotionDefinition motion) = LoadCubeFixturePair();
             using var session = new MmdRuntimeSession(
@@ -87,7 +84,6 @@ namespace Mmd.Tests.Contracts
                 "test_1bone_cube.pmx",
                 "test_1bone_cube_motion.vmd");
 
-            _ = session.TopologyPlan;
             model.bones[0].deformAfterPhysics = true;
             model.bones[0].parentIndex = model.bones[0].index;
 
@@ -96,7 +92,7 @@ namespace Mmd.Tests.Contracts
         }
 
         [Test]
-        public void SourceBackedUnsupportedBeforePhysicsRevalidatesMutableMotion()
+        public void SourceBackedBeforePhysicsRevalidatesMutableMotion()
         {
             (MmdModelDefinition model, MmdMotionDefinition motion) = LoadCubeFixturePair();
             using var session = new MmdRuntimeSession(

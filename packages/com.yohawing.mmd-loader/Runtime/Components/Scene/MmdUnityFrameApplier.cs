@@ -27,17 +27,42 @@ namespace Mmd.UnityIntegration
                 throw new ArgumentException("Evaluated frame bones are required.", nameof(frame));
             }
 
-            foreach (MmdEvaluatedBonePose bonePose in frame.bones)
+            ApplyBonePoses(instance, frame.bones);
+
+            ApplyMorphs(instance, frame);
+        }
+
+        internal static void ApplyBonePoses(
+            MmdUnityModelInstance instance,
+            IReadOnlyList<MmdEvaluatedBonePose> bonePoses,
+            Func<MmdEvaluatedBonePose, bool>? predicate = null)
+        {
+            if (instance == null)
+            {
+                throw new ArgumentNullException(nameof(instance));
+            }
+
+            if (bonePoses == null)
+            {
+                throw new ArgumentNullException(nameof(bonePoses));
+            }
+
+            foreach (MmdEvaluatedBonePose bonePose in bonePoses)
             {
                 if (bonePose == null)
                 {
-                    throw new ArgumentException("Evaluated frame bone entries must not be null.", nameof(frame));
+                    throw new ArgumentException("Evaluated frame bone entries must not be null.", nameof(bonePoses));
+                }
+
+                if (predicate != null && !predicate(bonePose))
+                {
+                    continue;
                 }
 
                 int slot = bonePose.index;
                 if (slot < 0 || slot >= instance.BoneTransforms.Length)
                 {
-                    throw new ArgumentException($"Evaluated bone index {slot} has no Unity bone transform.", nameof(frame));
+                    throw new ArgumentException($"Evaluated bone index {slot} has no Unity bone transform.", nameof(bonePoses));
                 }
 
                 Transform boneTransform = instance.BoneTransforms[slot];
@@ -46,8 +71,6 @@ namespace Mmd.UnityIntegration
                 boneTransform.localRotation = instance.BindLocalRotations[slot] * ToUnityRotation(ValidateQuaternion(bonePose.localRotation, slot));
                 boneTransform.localScale = ToUnityScale(ValidateVector3(bonePose.localScale, slot, "localScale"));
             }
-
-            ApplyMorphs(instance, frame);
         }
 
         internal static void ApplyMorphs(MmdUnityModelInstance instance, MmdEvaluatedFrame frame)

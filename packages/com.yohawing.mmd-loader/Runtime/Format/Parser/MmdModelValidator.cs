@@ -180,6 +180,16 @@ namespace Mmd.Parser
                 }
             }
 
+            var bonesByIndex = new Dictionary<int, MmdBoneDefinition>(bones.Count);
+            for (int i = 0; i < bones.Count; i++)
+            {
+                MmdBoneDefinition bone = bones[i];
+                if (!bonesByIndex.ContainsKey(bone.index))
+                {
+                    bonesByIndex.Add(bone.index, bone);
+                }
+            }
+
             for (int i = 0; i < bones.Count; i++)
             {
                 MmdBoneDefinition bone = bones[i];
@@ -191,6 +201,29 @@ namespace Mmd.Parser
                 if (bone.appendParentIndex != -1 && !boneIndices.Contains(bone.appendParentIndex))
                 {
                     errors.Add($"bone appendParentIndex does not reference an existing bone: {bone.index} -> {bone.appendParentIndex}");
+                }
+            }
+
+            var cycleChecked = new HashSet<int>();
+            for (int i = 0; i < bones.Count; i++)
+            {
+                int currentIndex = bones[i].index;
+                if (cycleChecked.Contains(currentIndex))
+                {
+                    continue;
+                }
+
+                var path = new HashSet<int>();
+                while (currentIndex >= 0 && bonesByIndex.TryGetValue(currentIndex, out MmdBoneDefinition? currentBone))
+                {
+                    if (!path.Add(currentIndex))
+                    {
+                        errors.Add($"bone parent cycle detected at index {currentIndex}");
+                        break;
+                    }
+
+                    cycleChecked.Add(currentIndex);
+                    currentIndex = currentBone.parentIndex;
                 }
             }
 

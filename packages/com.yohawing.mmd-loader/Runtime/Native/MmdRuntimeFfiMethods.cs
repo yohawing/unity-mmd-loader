@@ -742,6 +742,9 @@ namespace Mmd.Native
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_evaluate_clip_frame", CallingConvention = CallingConvention.Cdecl)]
         internal static extern byte InstanceEvaluateClipFrame(IntPtr instance, IntPtr clip, float frame);
 
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_evaluate_clip_frame_before_physics", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int InstanceEvaluateClipFrameBeforePhysics(IntPtr instance, IntPtr clip, float frame);
+
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_world_matrix_f32_len", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr InstanceWorldMatrixF32Len(IntPtr instance);
 
@@ -1107,6 +1110,30 @@ namespace Mmd.Native
             {
                 throw new InvalidOperationException("mmd-runtime clip frame evaluation returned false.");
             }
+
+            CopyEvaluatedOutputs(worldMatrices, morphWeights, ikEnabled);
+        }
+
+        public void EvaluateBeforePhysicsAndCopy(float frame, float[] worldMatrices, float[] morphWeights, byte[] ikEnabled)
+        {
+            if (disposed)
+            {
+                throw new ObjectDisposedException(nameof(MmdRuntimeFfiPlaybackSession));
+            }
+
+            int status = MmdRuntimeFfiMethods.InstanceEvaluateClipFrameBeforePhysics(instance, clip, frame);
+            if (status != MmdRuntimeFfiMethods.StatusOk)
+            {
+                throw new InvalidOperationException(
+                    $"mmd-runtime before-physics clip frame evaluation failed with status {status}: " +
+                    MmdRuntimeFfiMarshal.LastErrorMessage());
+            }
+
+            CopyEvaluatedOutputs(worldMatrices, morphWeights, ikEnabled);
+        }
+
+        private void CopyEvaluatedOutputs(float[] worldMatrices, float[] morphWeights, byte[] ikEnabled)
+        {
 
             if (worldMatrices.Length > 0 &&
                 MmdRuntimeFfiMethods.InstanceCopyWorldMatrices(instance, worldMatrices, new IntPtr(worldMatrices.Length)) == 0)

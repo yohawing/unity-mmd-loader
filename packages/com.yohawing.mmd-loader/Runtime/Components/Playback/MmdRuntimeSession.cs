@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using Mmd.Native;
 using Mmd.Parser;
-using Mmd.Pose;
 using Mmd.Rendering;
 
 namespace Mmd
@@ -21,7 +20,6 @@ namespace Mmd
         private readonly int nativeMotionSourceLength;
         private readonly ulong nativeModelSourceFingerprint;
         private readonly ulong nativeMotionSourceFingerprint;
-        private MmdTopologyPlan? topologyPlan;
         private MmdRuntimeFfiPlaybackSession? nativePlaybackSession;
         private float[]? nativeWorldMatrices;
         private float[]? nativeMorphWeights;
@@ -75,15 +73,6 @@ namespace Mmd
             Dispose(disposing: false);
         }
 
-        internal MmdTopologyPlan TopologyPlan
-        {
-            get
-            {
-                ThrowIfDisposed();
-                return topologyPlan ??= MmdTopologyPlan.CreateFromValidatedModel(model);
-            }
-        }
-
         public MmdPlaybackSnapshot BuildSnapshot(int frame, float time)
         {
             ThrowIfDisposed();
@@ -105,30 +94,23 @@ namespace Mmd
         internal MmdEvaluatedFrame EvaluateBeforePhysicsFrame(int frame, float time)
         {
             ThrowIfDisposed();
-            if (nativeModelSourceIdentity != null && nativeMotionSourceIdentity != null)
+            if (nativeModelSourceIdentity == null || nativeMotionSourceIdentity == null)
             {
-                if (model.HasDeformAfterPhysicsBones)
-                {
-                    MmdPlaybackTime.ValidateFrame(frame);
-                    MmdPlaybackTime.ValidateTime(time);
-                    MmdModelValidator.ThrowIfInvalid(model);
-                    MmdMotionValidator.ThrowIfInvalid(motion);
-                    TopologyPlan.EnsureModel(model);
-                    EnsureNativeSourcesUnchangedBeforeCompilation();
-                    throw new NotSupportedException(
-                        "Native before-physics evaluation is unsupported for source-backed PMX/VMD " +
-                        "when the model has deform-after-physics bones.");
-                }
-
-                return EvaluateNativeFrame(frame, time);
+                throw new InvalidOperationException(
+                    "Model sourceBytes and motion sourceBytes are required for native evaluation.");
             }
 
-            return MmdRuntimeFrameEvaluator.EvaluateValidatedBeforePhysicsPlaybackFrame(
-                model,
-                motion,
-                frame,
-                time,
-                topologyPlan: TopologyPlan);
+            if (model.HasDeformAfterPhysicsBones)
+            {
+                MmdPlaybackTime.ValidateFrame(frame);
+                MmdPlaybackTime.ValidateTime(time);
+                MmdModelValidator.ThrowIfInvalid(model);
+                MmdMotionValidator.ThrowIfInvalid(motion);
+                EnsureNativeSourcesUnchangedBeforeCompilation();
+                return EvaluateNativeBeforePhysicsFrame(frame, time);
+            }
+
+            return EvaluateNativeFrame(frame, time);
         }
 
         public MmdEvaluatedFrame EvaluateFrameAtTime(float time, float frameRate)
@@ -218,6 +200,27 @@ namespace Mmd
             EnsureNativePlaybackSession();
 
             nativePlaybackSession!.EvaluateAndCopy(
+                frame,
+                nativeWorldMatrices!,
+                nativeMorphWeights!,
+                nativeIkEnabled!);
+            return MmdRuntimeFrameEvaluator.BuildFrameFromNative(
+                model,
+                frame,
+                time,
+                nativeWorldMatrices!,
+                nativeMorphWeights!,
+                includeMaterials: false);
+        }
+
+        private MmdEvaluatedFrame EvaluateNativeBeforePhysicsFrame(int frame, float time)
+        {
+            ThrowIfDisposed();
+            MmdPlaybackTime.ValidateFrame(frame);
+            MmdPlaybackTime.ValidateTime(time);
+            EnsureNativePlaybackSession();
+
+            nativePlaybackSession!.EvaluateBeforePhysicsAndCopy(
                 frame,
                 nativeWorldMatrices!,
                 nativeMorphWeights!,
