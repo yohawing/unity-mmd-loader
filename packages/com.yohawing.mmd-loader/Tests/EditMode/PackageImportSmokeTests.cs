@@ -146,18 +146,6 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void NullPhysicsBackendIsDeterministicNoOp()
-        {
-            IMmdPhysicsBackend backend = new NullMmdPhysicsBackend();
-
-            backend.Reset();
-            backend.Step(frame: 0, deltaTime: 0.0f);
-
-            Assert.That(backend.Name, Is.EqualTo("Null"));
-            Assert.That(backend.IsDeterministic, Is.True);
-        }
-
-        [Test]
         public void PhysicsDescriptorValidatorRejectsUnsupportedRigidbodyShape()
         {
             var model = new MmdModelDefinition();

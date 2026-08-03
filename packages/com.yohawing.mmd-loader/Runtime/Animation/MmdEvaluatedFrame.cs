@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using System.Linq;
 using Mmd.Native;
 using Mmd.Parser;
-using Mmd.Pose;
 using Mmd.Rendering;
 
 namespace Mmd
@@ -55,27 +54,6 @@ namespace Mmd
             int frame,
             float time)
         {
-            return EvaluateNativeFrame(model, motion, frame, time, includeMaterials: false);
-        }
-
-        internal static MmdEvaluatedFrame EvaluateValidatedBeforePhysicsPlaybackFrame(
-            MmdModelDefinition model,
-            MmdMotionDefinition motion,
-            int frame,
-            float time,
-            MmdTopologyPlan? topologyPlan = null)
-        {
-            ValidateInputs(model, motion);
-            ValidateFrame(frame);
-            ValidateTime(time);
-            topologyPlan?.EnsureModel(model);
-            if (model.HasDeformAfterPhysicsBones && model.sourceBytes != null && motion.sourceBytes != null)
-            {
-                throw new NotSupportedException(
-                    "Native before-physics evaluation is unsupported for source-backed PMX/VMD " +
-                    "when the model has deform-after-physics bones.");
-            }
-
             return EvaluateNativeFrame(model, motion, frame, time, includeMaterials: false);
         }
 

@@ -8,7 +8,6 @@ using Mmd.Motion;
 using Mmd.Native;
 using Mmd.Parser;
 using Mmd.Physics;
-using Mmd.Pose;
 using Mmd.Rendering;
 using UnityEngine;
 

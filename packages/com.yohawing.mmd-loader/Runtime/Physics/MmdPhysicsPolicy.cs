@@ -20,33 +20,30 @@ namespace Mmd.Physics
         public const string StatusAvailable = "available";
         public const string StatusUnsupported = "unsupported";
 
-        public static MmdPhysicsModePolicyRecord Describe(MmdPhysicsMode mode, IMmdPhysicsBackend? backend = null)
+        public static MmdPhysicsModePolicyRecord Describe(MmdPhysicsMode mode)
         {
-            backend ??= new NullMmdPhysicsBackend();
-            ValidateBackendName(backend.Name);
-
             return mode switch
             {
                 MmdPhysicsMode.Off => new MmdPhysicsModePolicyRecord
                 {
                     physicsMode = "off",
-                    backendName = backend.Name,
+                    backendName = "none",
                     supportsRandomAccess = true,
-                    isDeterministic = backend.IsDeterministic,
+                    isDeterministic = true,
                     status = StatusAvailable
                 },
                 MmdPhysicsMode.Live => new MmdPhysicsModePolicyRecord
                 {
                     physicsMode = "live",
-                    backendName = backend.Name,
+                    backendName = "mmd-anim-host",
                     supportsRandomAccess = false,
-                    isDeterministic = backend.IsDeterministic,
+                    isDeterministic = false,
                     status = StatusAvailable
                 },
                 MmdPhysicsMode.Cache => new MmdPhysicsModePolicyRecord
                 {
                     physicsMode = "cache",
-                    backendName = backend.Name,
+                    backendName = "none",
                     supportsRandomAccess = true,
                     isDeterministic = true,
                     status = StatusUnsupported,
@@ -74,12 +71,5 @@ namespace Mmd.Physics
             }
         }
 
-        private static void ValidateBackendName(string name)
-        {
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                throw new ArgumentException("Physics backend name must be a non-empty string.", nameof(name));
-            }
-        }
     }
 }

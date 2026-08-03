@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using Mmd.Motion;
 using Mmd.Native;
 using Mmd.Parser;
-using Mmd.Pose;
 using UnityEngine;
 
 namespace Mmd.UnityIntegration
