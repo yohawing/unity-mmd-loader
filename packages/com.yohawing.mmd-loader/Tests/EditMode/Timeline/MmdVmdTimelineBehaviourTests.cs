@@ -57,44 +57,6 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void ProcessFrameWithZeroEffectiveWeightDoesNotApplyPose()
-        {
-            MmdUnityPlaybackBinding? binding = null;
-            int processFrameCallbackCount = 0;
-            void OnProcessFrame(double _)
-            {
-                processFrameCallbackCount++;
-            }
-
-            try
-            {
-                binding = CreatePlaybackBinding();
-                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
-                controller.Configure(binding, 30.0f);
-                var behaviour = new MmdVmdTimelineBehaviour
-                {
-                    FrameRate = 30.0f
-                };
-                MmdPlaybackSnapshot frameNine = behaviour.EvaluateAtLocalTime(controller, 9.25 / 30.0);
-                Quaternion beforeRotation = binding.Instance.BoneTransforms[0].localRotation;
-
-                MmdVmdTimelineBehaviour.ProcessFrameEvaluated += OnProcessFrame;
-                behaviour.ProcessFrame(default, default, controller);
-
-                Assert.That(frameNine.frame.frame, Is.EqualTo(9));
-                Assert.That(controller.CurrentFrame, Is.EqualTo(9));
-                Assert.That(controller.LastSnapshot, Is.SameAs(frameNine));
-                Assert.That(Quaternion.Angle(binding.Instance.BoneTransforms[0].localRotation, beforeRotation), Is.LessThan(0.001f));
-                Assert.That(processFrameCallbackCount, Is.EqualTo(0));
-            }
-            finally
-            {
-                MmdVmdTimelineBehaviour.ProcessFrameEvaluated -= OnProcessFrame;
-                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
-            }
-        }
-
-        [Test]
         public void TimelineBehaviourUsesSharedTimePolicyForRepeatAndReverseSeek()
         {
             MmdUnityPlaybackBinding? binding = null;
@@ -857,7 +819,6 @@ namespace Mmd.Tests
                 mixer.SetInputWeight(1, 0.75f);
 
                 MmdVmdTimelineMixerBehaviour mixerBehaviour = mixer.GetBehaviour();
-                mixerBehaviour.PrepareFrame(mixer, default);
                 mixerBehaviour.ProcessFrame(mixer, default, controller);
 
                 // Highest weight is input 1 (frame 0), full pose — not weight-scaled.
@@ -922,7 +883,6 @@ namespace Mmd.Tests
 
                 MmdVmdTimelineBehaviour.ProcessFrameEvaluated += OnProcessFrame;
                 MmdVmdTimelineMixerBehaviour mixerBehaviour = mixer.GetBehaviour();
-                mixerBehaviour.PrepareFrame(mixer, default);
                 mixerBehaviour.ProcessFrame(mixer, default, controller);
 
                 Assert.That(processFrameCallbackCount, Is.EqualTo(0));
@@ -940,58 +900,6 @@ namespace Mmd.Tests
 
                 Assert.That(processFrameCallbackCount, Is.EqualTo(1));
                 Assert.That(controller.CurrentFrame, Is.EqualTo(0));
-            }
-            finally
-            {
-                MmdVmdTimelineBehaviour.ProcessFrameEvaluated -= OnProcessFrame;
-                if (graph.IsValid())
-                {
-                    graph.Destroy();
-                }
-
-                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
-            }
-        }
-
-        [Test]
-        public void DirectProcessFrameStillAppliesWhenNotTrackManaged()
-        {
-            // Compatibility path: a behaviour not owned by MmdVmdTimelineTrack/mixer still applies pose
-            // from its own ProcessFrame during graph evaluation.
-            MmdUnityPlaybackBinding? binding = null;
-            PlayableGraph graph = default;
-            int processFrameCallbackCount = 0;
-            void OnProcessFrame(double _)
-            {
-                processFrameCallbackCount++;
-            }
-
-            try
-            {
-                binding = CreatePlaybackBinding();
-                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
-                controller.Configure(binding, 30.0f);
-
-                graph = PlayableGraph.Create("mmd-vmd-direct-process-frame");
-                ScriptPlayable<MmdVmdTimelineBehaviour> playable =
-                    ScriptPlayable<MmdVmdTimelineBehaviour>.Create(graph);
-                MmdVmdTimelineBehaviour behaviour = playable.GetBehaviour();
-                behaviour.Controller = controller;
-                behaviour.FrameRate = 30.0f;
-                playable.SetTime(9.25 / 30.0);
-
-                ScriptPlayableOutput output = ScriptPlayableOutput.Create(graph, "mmd-vmd-direct");
-                output.SetSourcePlayable(playable);
-                output.SetUserData(controller);
-
-                MmdVmdTimelineBehaviour.ProcessFrameEvaluated += OnProcessFrame;
-                graph.Evaluate();
-
-                Assert.That(processFrameCallbackCount, Is.EqualTo(1));
-                Assert.That(controller.CurrentFrame, Is.EqualTo(9));
-                Assert.That(
-                    Quaternion.Angle(binding.Instance.BoneTransforms[0].localRotation, ExpectedFrameNineUnityRotation(binding)),
-                    Is.LessThan(0.001f));
             }
             finally
             {
