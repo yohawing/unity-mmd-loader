@@ -292,6 +292,7 @@ namespace Mmd.Tests
                     pmxPath,
                     assetImportScale: 1.0f,
                     materialRemapAssets: new[] { remapMaterial },
+                    importedMaterialAssets: new[] { originalMaterial },
                     importedMaterialOverrideAsset: overrideAsset);
                 vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
                 vmdAsset.Initialize(vmdBytes, "test_1bone_cube_motion.vmd", vmdPath);
@@ -321,6 +322,112 @@ namespace Mmd.Tests
                 {
                     Object.DestroyImmediate(originalMaterial);
                 }
+            }
+        }
+
+        [Test]
+        public void PmxAssetShaderPresetReachesOwnedPlaybackMaterials()
+        {
+            MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
+            MmdUnityPlaybackBinding? binding = null;
+
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                pmxAsset.Initialize(
+                    File.ReadAllBytes(pmxPath),
+                    "test_1bone_cube.pmx",
+                    pmxPath,
+                    assetImportScale: 1.0f,
+                    assetShaderPreset: "MMD URP Toon");
+                vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
+
+                binding = MmdUnityPlaybackBinding.CreateSkinned(pmxAsset, vmdAsset);
+
+                Assert.That(binding.Instance.Materials[0].shader, Is.Not.Null);
+                Assert.That(binding.Instance.Materials[0].shader.name, Is.EqualTo("MMD URP Toon"));
+            }
+            finally
+            {
+                binding?.Dispose();
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+            }
+        }
+
+        [Test]
+        public void BorrowedPlaybackUsesImportedMaterialsAndDoesNotAccumulatePlaybackNames()
+        {
+            MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
+            MmdUnityModelInstance? previewInstance = null;
+            MmdUnityPlaybackController? controller = null;
+            Material? importedMaterial = null;
+
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                byte[] pmxBytes = File.ReadAllBytes(pmxPath);
+                byte[] vmdBytes = File.ReadAllBytes(vmdPath);
+                var parser = new NativeMmdParser();
+                MmdModelDefinition model = parser.LoadModel(pmxBytes);
+                previewInstance = MmdUnityModelFactory.CreateSkinnedModel(model, pmxPath);
+                Material authoredMaterial = previewInstance.Materials[0];
+                Shader importedShader = Shader.Find("MMD URP Toon")
+                    ?? throw new InvalidOperationException("MMD URP Toon shader is required for the playback material source test.");
+                importedMaterial = new Material(importedShader)
+                {
+                    name = "Cheek"
+                };
+
+                pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                pmxAsset.Initialize(
+                    pmxBytes,
+                    "test_1bone_cube.pmx",
+                    pmxPath,
+                    assetImportScale: 1.0f,
+                    assetShaderPreset: "MMD URP Toon",
+                    importedMaterialAssets: new[] { importedMaterial });
+                vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                vmdAsset.Initialize(vmdBytes, "test_1bone_cube_motion.vmd", vmdPath);
+                controller = previewInstance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+
+                for (int i = 0; i < 3; i++)
+                {
+                    MmdUnityPlaybackBinding next =
+                        MmdUnityPlaybackBinding.CreateSkinned(previewInstance, pmxAsset, vmdAsset);
+                    controller.Configure(next, 30.0f, playOnStart: false);
+                    controller.ApplyFrame(0);
+
+                    Material runtimeMaterial = previewInstance.SkinnedMeshRenderer!.sharedMaterials[0];
+                    Assert.That(runtimeMaterial.shader, Is.Not.Null);
+                    Assert.That(runtimeMaterial.shader.name, Is.EqualTo("MMD URP Toon"));
+                    Assert.That(runtimeMaterial.name, Is.EqualTo("Cheek Playback"));
+                    Assert.That(runtimeMaterial, Is.Not.SameAs(importedMaterial));
+                }
+
+                controller.ReleasePlaybackResources();
+                Assert.That(previewInstance.SkinnedMeshRenderer!.sharedMaterials[0], Is.SameAs(authoredMaterial));
+            }
+            finally
+            {
+                if (controller != null)
+                {
+                    controller.ReleasePlaybackResources();
+                    Object.DestroyImmediate(controller);
+                }
+
+                MmdTestInstanceScope.DestroyInstance(previewInstance);
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+                Object.DestroyImmediate(importedMaterial);
             }
         }
 
