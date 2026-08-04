@@ -16,7 +16,7 @@
     "editor"
   ],
   "dependencies": {
-    "com.yohawing.mmd-loader": "0.3.0",
+    "com.yohawing.mmd-loader": "0.4.0",
     "com.unity.timeline": "1.8.12"
   }
 }
