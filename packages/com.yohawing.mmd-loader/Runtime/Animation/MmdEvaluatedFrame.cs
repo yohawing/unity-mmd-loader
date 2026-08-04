@@ -3,11 +3,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Mmd.Motion;
 using Mmd.Native;
 using Mmd.Parser;
-using Mmd.Physics;
-using Mmd.Pose;
 using Mmd.Rendering;
 
 namespace Mmd
@@ -46,17 +43,8 @@ namespace Mmd
             MmdModelDefinition model,
             MmdMotionDefinition motion,
             int frame,
-            float time,
-            IMmdPhysicsBackend? physicsBackend = null,
-            IMmdIkSolver? ikSolver = null)
+            float time)
         {
-            if (!CanUseNativeEvaluation(model, motion, physicsBackend, ikSolver))
-            {
-                return EvaluateManagedFrame(
-                    model, motion, frame, time, includeMaterials: true,
-                    physicsBackend, ikSolver ?? new MmdIkSolver());
-            }
-
             return EvaluateNativeFrame(model, motion, frame, time, includeMaterials: true);
         }
 
@@ -64,115 +52,16 @@ namespace Mmd
             MmdModelDefinition model,
             MmdMotionDefinition motion,
             int frame,
-            float time,
-            IMmdPhysicsBackend? physicsBackend = null,
-            IMmdIkSolver? ikSolver = null)
+            float time)
         {
-            if (!CanUseNativeEvaluation(model, motion, physicsBackend, ikSolver))
-            {
-                return EvaluateManagedFrame(
-                    model, motion, frame, time, includeMaterials: false,
-                    physicsBackend, ikSolver ?? new MmdIkSolver());
-            }
-
             return EvaluateNativeFrame(model, motion, frame, time, includeMaterials: false);
-        }
-
-        internal static MmdEvaluatedFrame EvaluateValidatedPhaseOnePlaybackFrame(
-            MmdModelDefinition model,
-            MmdMotionDefinition motion,
-            int frame,
-            float time,
-            IMmdPhysicsBackend? physicsBackend = null,
-            IMmdIkSolver? ikSolver = null)
-        {
-            ValidateFrame(frame);
-            ValidateTime(time);
-            if (!CanUseNativeEvaluation(model, motion, physicsBackend, ikSolver))
-            {
-                return EvaluateManagedFrame(
-                    model, motion, frame, time, includeMaterials: false,
-                    physicsBackend, ikSolver ?? new MmdIkSolver());
-            }
-
-            return EvaluateNativeFrame(model, motion, frame, time, includeMaterials: false);
-        }
-
-        internal static MmdEvaluatedFrame EvaluateValidatedPhaseOnePlaybackFrame(
-            MmdModelDefinition model,
-            MmdMotionDefinition motion,
-            int frame,
-            float time,
-            MmdTopologyPlan topologyPlan,
-            IMmdPhysicsBackend? physicsBackend = null,
-            IMmdIkSolver? ikSolver = null)
-        {
-            ValidateFrame(frame);
-            ValidateTime(time);
-            if (!CanUseNativeEvaluation(model, motion, physicsBackend, ikSolver))
-            {
-                return EvaluateManagedFrame(
-                    model, motion, frame, time, includeMaterials: false,
-                    physicsBackend, ikSolver ?? new MmdIkSolver(), topologyPlan);
-            }
-
-            topologyPlan.EnsureModel(model);
-            return EvaluateNativeFrame(model, motion, frame, time, includeMaterials: false);
-        }
-
-        internal static MmdEvaluatedFrame EvaluateValidatedBeforePhysicsPlaybackFrame(
-            MmdModelDefinition model,
-            MmdMotionDefinition motion,
-            int frame,
-            float time,
-            IMmdPhysicsBackend? physicsBackend = null,
-            IMmdIkSolver? ikSolver = null)
-        {
-            ValidateFrame(frame);
-            ValidateTime(time);
-            if (!model.HasDeformAfterPhysicsBones &&
-                CanUseNativeEvaluation(model, motion, physicsBackend, ikSolver))
-            {
-                return EvaluateNativeFrame(model, motion, frame, time, includeMaterials: false);
-            }
-
-            return EvaluateManagedFrame(
-                model, motion, frame, time, includeMaterials: false,
-                physicsBackend, ikSolver ?? new MmdIkSolver(),
-                stopBeforePhysics: true);
-        }
-
-        internal static MmdEvaluatedFrame EvaluateValidatedBeforePhysicsPlaybackFrame(
-            MmdModelDefinition model,
-            MmdMotionDefinition motion,
-            int frame,
-            float time,
-            MmdTopologyPlan topologyPlan,
-            IMmdPhysicsBackend? physicsBackend = null,
-            IMmdIkSolver? ikSolver = null)
-        {
-            ValidateFrame(frame);
-            ValidateTime(time);
-            if (!model.HasDeformAfterPhysicsBones &&
-                CanUseNativeEvaluation(model, motion, physicsBackend, ikSolver))
-            {
-                topologyPlan.EnsureModel(model);
-                return EvaluateNativeFrame(model, motion, frame, time, includeMaterials: false);
-            }
-
-            return EvaluateManagedFrame(
-                model, motion, frame, time, includeMaterials: false,
-                physicsBackend, ikSolver ?? new MmdIkSolver(), topologyPlan,
-                stopBeforePhysics: true);
         }
 
         public static IReadOnlyList<MmdEvaluatedFrame> EvaluatePhaseOneFrames(
             MmdModelDefinition model,
             MmdMotionDefinition motion,
             IReadOnlyList<int> frames,
-            float frameRate,
-            IMmdPhysicsBackend? physicsBackend = null,
-            IMmdIkSolver? ikSolver = null)
+            float frameRate)
         {
             ValidateInputs(model, motion);
             if (frames == null)
@@ -180,33 +69,6 @@ namespace Mmd
             if (frames.Count == 0)
                 throw new ArgumentException("At least one frame is required.", nameof(frames));
             MmdPlaybackTime.ValidateFrameRate(frameRate);
-
-            if (!CanUseNativeEvaluation(model, motion, physicsBackend, ikSolver))
-            {
-                physicsBackend ??= new NullMmdPhysicsBackend();
-                ikSolver ??= new MmdIkSolver();
-                physicsBackend.Reset();
-
-                var managedEvaluatedFrames = new List<MmdEvaluatedFrame>(frames.Count);
-                var managedSeenFrames = new HashSet<int>(frames.Count);
-                foreach (int frame in frames.OrderBy(value => value))
-                {
-                    ValidateFrame(frame);
-                    if (!managedSeenFrames.Add(frame))
-                        throw new ArgumentException("Frame indices must be unique.", nameof(frames));
-
-                    managedEvaluatedFrames.Add(EvaluateManagedFrame(
-                        model,
-                        motion,
-                        frame,
-                        MmdPlaybackTime.ToTime(frame, frameRate),
-                        includeMaterials: true,
-                        physicsBackend,
-                        ikSolver));
-                }
-
-                return managedEvaluatedFrames;
-            }
 
             byte[] pmxBytes = RequireSourceBytes(model);
             byte[] vmdBytes = RequireSourceBytes(motion);
@@ -233,18 +95,6 @@ namespace Mmd
             return evaluatedFrames;
         }
 
-        private static bool CanUseNativeEvaluation(
-            MmdModelDefinition? model,
-            MmdMotionDefinition? motion,
-            IMmdPhysicsBackend? physicsBackend,
-            IMmdIkSolver? ikSolver)
-        {
-            return physicsBackend == null &&
-                   ikSolver == null &&
-                   model?.sourceBytes != null &&
-                   motion?.sourceBytes != null;
-        }
-
         private static MmdEvaluatedFrame EvaluateNativeFrame(
             MmdModelDefinition model,
             MmdMotionDefinition motion,
@@ -266,33 +116,6 @@ namespace Mmd
 
             session.EvaluateAndCopy(frame, nativeWorldMatrices, nativeMorphWeights, nativeIkEnabled);
             return BuildFrameFromNative(model, frame, time, nativeWorldMatrices, nativeMorphWeights, includeMaterials);
-        }
-
-        private static MmdEvaluatedFrame EvaluateManagedFrame(
-            MmdModelDefinition model,
-            MmdMotionDefinition motion,
-            int frame,
-            float time,
-            bool includeMaterials,
-            IMmdPhysicsBackend? physicsBackend,
-            IMmdIkSolver ikSolver,
-            MmdTopologyPlan? topologyPlan = null,
-            bool stopBeforePhysics = false)
-        {
-            ValidateInputs(model, motion);
-            ValidateFrame(frame);
-            ValidateTime(time);
-
-            physicsBackend ??= new NullMmdPhysicsBackend();
-            MmdRuntimeFrameEvaluation evaluation = MmdRuntimeFramePipeline.EvaluateWithOptions(
-                model,
-                motion,
-                frame,
-                physicsBackend,
-                ikSolver,
-                topologyPlan: topologyPlan,
-                stopBeforePhysics: stopBeforePhysics);
-            return BuildFrameFromManagedEvaluation(model, frame, time, evaluation, includeMaterials);
         }
 
         internal static MmdEvaluatedFrame BuildFrameFromNative(
@@ -375,60 +198,6 @@ namespace Mmd
                         name = model.morphs[i].name,
                         weight = nativeMorphWeights[i]
                     });
-                }
-            }
-            morphs.Sort((a, b) => StringComparer.Ordinal.Compare(a.name, b.name));
-
-            return new MmdEvaluatedFrame
-            {
-                frame = frame,
-                time = time,
-                bones = bones,
-                morphs = morphs,
-                materials = includeMaterials ? MmdMaterialDescriptorBuilder.Build(model).ToList() : new List<MmdMaterialDescriptor>()
-            };
-        }
-
-        private static MmdEvaluatedFrame BuildFrameFromManagedEvaluation(
-            MmdModelDefinition model,
-            int frame,
-            float time,
-            MmdRuntimeFrameEvaluation evaluation,
-            bool includeMaterials)
-        {
-            var orderedBones = new List<MmdBoneDefinition>(model.bones);
-            orderedBones.Sort((left, right) => left.index.CompareTo(right.index));
-
-            var bones = new List<MmdEvaluatedBonePose>(orderedBones.Count);
-            foreach (MmdBoneDefinition bone in orderedBones)
-            {
-                MmdBonePoseSample sample = evaluation.FinalMotion.Bones.TryGetValue(bone.name, out MmdBonePoseSample found)
-                    ? found
-                    : MmdBonePoseSample.Identity;
-                float[] worldMatrix = evaluation.WorldMatrices.TryGetValue(bone.index, out float[]? foundWorldMatrix)
-                    ? CopyArray(foundWorldMatrix)
-                    : MmdPoseMath.LocalMatrix(
-                        new[] { 0.0f, 0.0f, 0.0f },
-                        new[] { 0.0f, 0.0f, 0.0f, 1.0f },
-                        new[] { 1.0f, 1.0f, 1.0f });
-
-                bones.Add(new MmdEvaluatedBonePose
-                {
-                    index = bone.index,
-                    name = string.IsNullOrWhiteSpace(bone.name) ? bone.index.ToString() : bone.name,
-                    localPosition = CopyArray(sample.Translation),
-                    localRotation = CopyArray(sample.Rotation),
-                    localScale = new[] { 1.0f, 1.0f, 1.0f },
-                    worldMatrix = worldMatrix
-                });
-            }
-
-            var morphs = new List<MmdEvaluatedMorphWeight>();
-            foreach (KeyValuePair<string, float> morph in evaluation.FinalMotion.Morphs)
-            {
-                if (morph.Value != 0.0f)
-                {
-                    morphs.Add(new MmdEvaluatedMorphWeight { name = morph.Key, weight = morph.Value });
                 }
             }
             morphs.Sort((a, b) => StringComparer.Ordinal.Compare(a.name, b.name));
@@ -555,13 +324,6 @@ namespace Mmd
                     return SafeOrigin(orderedBones[i].origin);
             }
             return new[] { 0f, 0f, 0f };
-        }
-
-        private static float[] CopyArray(float[] source)
-        {
-            var copy = new float[source.Length];
-            Array.Copy(source, copy, source.Length);
-            return copy;
         }
 
         private static float[] SafeOrigin(float[]? origin)

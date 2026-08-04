@@ -28,34 +28,6 @@ namespace Mmd.Editor
         private string? humanoidPlannerError;
         private readonly List<string> diagnostics = new();
 
-        [Obsolete("Use OpenFromVmd so AnimationClip baking starts from the motion asset.")]
-        public static MmdGenericAnimationClipBakeWindow Open(MmdPmxAsset? pmxAsset)
-        {
-            return OpenFromPmx(pmxAsset, preferHumanoid: false);
-        }
-
-        [Obsolete("Use OpenFromVmd so AnimationClip baking starts from the motion asset.")]
-        public static MmdGenericAnimationClipBakeWindow OpenFromPmx(
-            MmdPmxAsset? pmxAsset,
-            bool preferHumanoid = false)
-        {
-            MmdGenericAnimationClipBakeWindow window = GetWindow<MmdGenericAnimationClipBakeWindow>();
-            window.titleContent = new GUIContent("AnimationClip Bake");
-            window.minSize = new Vector2(440.0f, 300.0f);
-            window.pmxAsset = pmxAsset;
-            window.vmdAsset = null;
-            window.clipType = preferHumanoid ? ClipType.Humanoid : ClipType.Generic;
-            window.startFrame = 0;
-            window.endFrame = 0;
-            window.frameRate = 30.0f;
-            window.reduceKeys = true;
-            window.highPrecision = false;
-            window.diagnostics.Clear();
-            window.RefreshVmdMetadataAndOutputPath();
-            window.Show();
-            return window;
-        }
-
         public static MmdGenericAnimationClipBakeWindow OpenFromVmd(MmdVmdAsset? vmdAsset)
         {
             MmdGenericAnimationClipBakeWindow window = GetWindow<MmdGenericAnimationClipBakeWindow>();
@@ -89,11 +61,6 @@ namespace Mmd.Editor
         internal void SetPmxAssetForTests(MmdPmxAsset? asset)
         {
             SetPmxAsset(asset);
-        }
-
-        internal void SetVmdAssetForTests(MmdVmdAsset? asset)
-        {
-            SetVmdAsset(asset);
         }
 
         internal void SetClipTypeForTests(ClipType type)

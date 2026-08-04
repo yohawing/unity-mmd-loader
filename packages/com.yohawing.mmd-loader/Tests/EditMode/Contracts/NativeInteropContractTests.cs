@@ -29,27 +29,18 @@ namespace Mmd.Tests
 
         [TestCase("test_1bone_cube.pmx", 1, false)]
         [TestCase("GeneratedPmx/mixed-deform-types.pmx", 3, true)]
-        public void ParseOnceHandleAndLegacyFallbackBuildEquivalentModel(
+        public void NativeParserHandlePreservesSkinningMetadata(
             string fixtureName,
             int minimumDistinctSkinningModes,
             bool requireMultiBoneWeighting)
         {
-            byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes(fixtureName);
-            MmdModelDefinition handleModel = new NativeMmdParser().LoadModel(pmxBytes);
+            MmdModelDefinition model = new NativeMmdParser().LoadModel(
+                MmdTestFixtures.ReadFixtureAssetBytes(fixtureName));
 
-            string nonGeometryJson = MmdParserFfiMethods.ParsePmxNonGeometryJson(pmxBytes);
-            NativeMmdParser.PmxModelSourceSnapshot legacySnapshot =
-                JsonUtility.FromJson<NativeMmdParser.PmxModelSourceSnapshot>(nonGeometryJson)
-                ?? new NativeMmdParser.PmxModelSourceSnapshot();
-            legacySnapshot.geometry = NativeMmdParser.CreatePmxGeometryFromLegacyBuffers(pmxBytes);
-            MmdModelDefinition legacyModel = NativeMmdParser.BuildModelDefinition(legacySnapshot);
-
-            AssertModelGeometryAndSkinningParity(handleModel, legacyModel, fixtureName);
-
-            Assert.That(handleModel.vertices.Select(vertex => vertex.skinningMode).Distinct().Count(),
+            Assert.That(model.vertices.Select(vertex => vertex.skinningMode).Distinct().Count(),
                 Is.GreaterThanOrEqualTo(minimumDistinctSkinningModes),
                 fixtureName + " must retain the expected number of skinning modes.");
-            Assert.That(handleModel.vertices.Any(vertex => vertex.boneIndices.Length > 1 &&
+            Assert.That(model.vertices.Any(vertex => vertex.boneIndices.Length > 1 &&
                 vertex.boneWeights.Skip(1).Any(weight => weight > 0.0f)),
                 Is.EqualTo(requireMultiBoneWeighting),
                 fixtureName + " multi-bone weighting expectation.");
@@ -154,63 +145,6 @@ namespace Mmd.Tests
             }
         }
 
-        private static void AssertModelGeometryAndSkinningParity(
-            MmdModelDefinition expected,
-            MmdModelDefinition actual,
-            string fixtureName)
-        {
-            Assert.That(actual.vertices.Count, Is.EqualTo(expected.vertices.Count), fixtureName + " vertex count");
-            Assert.That(actual.indices, Is.EqualTo(expected.indices), fixtureName + " indices");
-            for (int i = 0; i < expected.vertices.Count; i++)
-            {
-                MmdVertexDefinition expectedVertex = expected.vertices[i];
-                MmdVertexDefinition actualVertex = actual.vertices[i];
-                AssertFloatArraysEqual(expectedVertex.position, actualVertex.position, fixtureName + " position[" + i + "]");
-                AssertFloatArraysEqual(expectedVertex.normal, actualVertex.normal, fixtureName + " normal[" + i + "]");
-                AssertFloatArraysEqual(expectedVertex.uv, actualVertex.uv, fixtureName + " uv[" + i + "]");
-                AssertFloatEqualNaNAware(expectedVertex.edgeScale, actualVertex.edgeScale, fixtureName + " edgeScale[" + i + "]");
-                Assert.That(actualVertex.skinningMode, Is.EqualTo(expectedVertex.skinningMode), fixtureName + " skinningMode[" + i + "]");
-                Assert.That(actualVertex.boneIndices, Is.EqualTo(expectedVertex.boneIndices), fixtureName + " boneIndices[" + i + "]");
-                AssertFloatArraysEqual(expectedVertex.boneWeights, actualVertex.boneWeights, fixtureName + " boneWeights[" + i + "]");
-                Assert.That(actualVertex.hasSdefParameters, Is.EqualTo(expectedVertex.hasSdefParameters), fixtureName + " hasSdef[" + i + "]");
-                AssertFloatArraysEqual(expectedVertex.sdefC, actualVertex.sdefC, fixtureName + " sdefC[" + i + "]");
-                AssertFloatArraysEqual(expectedVertex.sdefR0, actualVertex.sdefR0, fixtureName + " sdefR0[" + i + "]");
-                AssertFloatArraysEqual(expectedVertex.sdefR1, actualVertex.sdefR1, fixtureName + " sdefR1[" + i + "]");
-            }
-        }
-
-        private static void AssertFloatArraysEqual(float[] expected, float[] actual, string label)
-        {
-            Assert.That(actual.Length, Is.EqualTo(expected.Length), label + " length");
-            for (int i = 0; i < expected.Length; i++)
-            {
-                if (float.IsNaN(expected[i]))
-                {
-                    Assert.That(actual[i], Is.NaN, label + "[" + i + "]");
-                }
-                else
-                {
-                    Assert.That(actual[i], Is.EqualTo(expected[i]).Within(0.000001f), label + "[" + i + "]");
-                }
-            }
-        }
-
-        private static void AssertFloatEqualNaNAware(float expected, float actual, string label)
-        {
-            if (float.IsNaN(expected))
-            {
-                Assert.That(actual, Is.NaN, label);
-            }
-            else if (float.IsInfinity(expected))
-            {
-                Assert.That(actual, Is.EqualTo(expected), label);
-            }
-            else
-            {
-                Assert.That(actual, Is.EqualTo(expected).Within(0.000001f), label);
-            }
-        }
-
         [Test]
         public void FastRuntimeNameAndAbiArePinned()
         {
@@ -234,6 +168,441 @@ namespace Mmd.Tests
             AssertRuntimeFfiSignature("VmdSelfShadowTrackSample", typeof(byte), typeof(IntPtr), typeof(float), typeof(float[]), typeof(IntPtr));
             AssertRuntimeFfiSignature("VmdSelfShadowTrackFree", typeof(void), typeof(IntPtr));
             AssertRuntimeFfiSignature("VmdCameraTrackFree", typeof(void), typeof(IntPtr));
+        }
+
+        [Test]
+        public void RuntimeFfiPinsAuthoredVmdTrackReadbackEntrypointsAndLayouts()
+        {
+            AssertRuntimeFfiSignature(
+                "VmdCameraTrackCopyKeyframes",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr).MakeByRefType());
+            AssertRuntimeFfiSignature(
+                "VmdLightTrackCopyKeyframes",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr).MakeByRefType());
+            AssertRuntimeFfiSignature(
+                "VmdSelfShadowTrackCopyKeyframes",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr).MakeByRefType());
+
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.VmdCurve>(), Is.EqualTo(20));
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.VmdCameraKeyframe>(), Is.EqualTo(184));
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.VmdLightKeyframe>(), Is.EqualTo(28));
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.VmdSelfShadowKeyframe>(), Is.EqualTo(12));
+        }
+
+        [Test]
+        public void RuntimeFfiReadsAuthoredSceneTrackKeyframesInBulk()
+        {
+            string cameraFixturePath = Path.Combine(
+                MmdTestFixtures.RepositoryRoot,
+                "native",
+                "mmd-anim",
+                "crates",
+                "mmd-anim-format",
+                "fixtures",
+                "vmd",
+                "simple_camera.vmd");
+            byte[] cameraBytes = File.ReadAllBytes(cameraFixturePath);
+            IntPtr cameraTrack = MmdRuntimeFfiMethods.VmdCameraTrackCreateFromVmdBytes(
+                cameraBytes,
+                new IntPtr(cameraBytes.Length));
+            Assert.That(cameraTrack, Is.Not.EqualTo(IntPtr.Zero));
+
+            try
+            {
+                MmdRuntimeFfiMethods.VmdCameraKeyframe[] cameraKeys =
+                    MmdRuntimeFfiTrackReadback.CopyVmdCameraTrackKeyframes(cameraTrack);
+                Assert.That(cameraKeys.Length, Is.GreaterThan(0));
+                Assert.That(cameraKeys.All(key =>
+                    key.positionXyz != null && key.positionXyz.Length == 3 &&
+                    key.rotationXyz != null && key.rotationXyz.Length == 3 &&
+                    key.interpolation != null && key.interpolation.Length == 24), Is.True);
+                AssertFramesAreSorted(cameraKeys.Select(key => (int)key.frame), "camera authored keys");
+            }
+            finally
+            {
+                MmdRuntimeFfiMethods.VmdCameraTrackFree(cameraTrack);
+            }
+
+            byte[] sceneBytes = MmdTestFixtures.BuildSceneTrackVmdBytes("light_shadow");
+            IntPtr lightTrack = MmdRuntimeFfiMethods.VmdLightTrackCreateFromVmdBytes(
+                sceneBytes,
+                new IntPtr(sceneBytes.Length));
+            IntPtr selfShadowTrack = MmdRuntimeFfiMethods.VmdSelfShadowTrackCreateFromVmdBytes(
+                sceneBytes,
+                new IntPtr(sceneBytes.Length));
+            Assert.That(lightTrack, Is.Not.EqualTo(IntPtr.Zero));
+            Assert.That(selfShadowTrack, Is.Not.EqualTo(IntPtr.Zero));
+
+            try
+            {
+                MmdRuntimeFfiMethods.VmdLightKeyframe[] lightKeys =
+                    MmdRuntimeFfiTrackReadback.CopyVmdLightTrackKeyframes(lightTrack);
+                MmdRuntimeFfiMethods.VmdSelfShadowKeyframe[] selfShadowKeys =
+                    MmdRuntimeFfiTrackReadback.CopyVmdSelfShadowTrackKeyframes(selfShadowTrack);
+                Assert.That(lightKeys, Has.Length.EqualTo(2));
+                Assert.That(selfShadowKeys, Has.Length.EqualTo(2));
+                Assert.That(lightKeys.All(key =>
+                    key.color != null && key.color.Length == 3 &&
+                    key.direction != null && key.direction.Length == 3), Is.True);
+                AssertFramesAreSorted(lightKeys.Select(key => (int)key.frame), "light authored keys");
+                AssertFramesAreSorted(selfShadowKeys.Select(key => (int)key.frame), "self-shadow authored keys");
+            }
+            finally
+            {
+                MmdRuntimeFfiMethods.VmdSelfShadowTrackFree(selfShadowTrack);
+                MmdRuntimeFfiMethods.VmdLightTrackFree(lightTrack);
+            }
+        }
+
+        [Test]
+        public void RuntimeFfiAuthoredTrackReadbackRejectsShortBuffersWithoutPartialWrites()
+        {
+            byte[] sceneBytes = MmdTestFixtures.BuildSceneTrackVmdBytes("light_shadow");
+            IntPtr track = MmdRuntimeFfiMethods.VmdLightTrackCreateFromVmdBytes(
+                sceneBytes,
+                new IntPtr(sceneBytes.Length));
+            Assert.That(track, Is.Not.EqualTo(IntPtr.Zero));
+
+            int stride = Marshal.SizeOf<MmdRuntimeFfiMethods.VmdLightKeyframe>();
+            IntPtr shortBuffer = Marshal.AllocHGlobal(stride);
+            try
+            {
+                byte[] sentinel = Enumerable.Repeat((byte)0xA5, stride).ToArray();
+                Marshal.Copy(sentinel, 0, shortBuffer, sentinel.Length);
+                int status = MmdRuntimeFfiMethods.VmdLightTrackCopyKeyframes(
+                    track,
+                    shortBuffer,
+                    new IntPtr(1),
+                    out IntPtr written);
+
+                Assert.That(status, Is.EqualTo(MmdRuntimeFfiMethods.StatusBufferTooSmall));
+                Assert.That(written, Is.EqualTo(IntPtr.Zero));
+                byte[] after = new byte[stride];
+                Marshal.Copy(shortBuffer, after, 0, after.Length);
+                Assert.That(after, Is.EqualTo(sentinel));
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(shortBuffer);
+                MmdRuntimeFfiMethods.VmdLightTrackFree(track);
+            }
+        }
+
+        [Test]
+        public void RuntimeFfiPinsCompiledAuthoredTrackReadbackEntrypointsAndLayouts()
+        {
+            AssertRuntimeFfiSignature("ClipBoneTrackCount", typeof(IntPtr), typeof(IntPtr));
+            AssertRuntimeFfiSignature(
+                "ClipBoneTrackDescriptor",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(MmdRuntimeFfiMethods.BoneTrackDescriptor).MakeByRefType());
+            AssertRuntimeFfiSignature("ClipBoneTrackKeyCount", typeof(IntPtr), typeof(IntPtr), typeof(IntPtr));
+            AssertRuntimeFfiSignature(
+                "ClipCopyBoneTrackKeys",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr).MakeByRefType());
+            AssertRuntimeFfiSignature("ClipMorphTrackCount", typeof(IntPtr), typeof(IntPtr));
+            AssertRuntimeFfiSignature(
+                "ClipMorphTrackDescriptor",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(MmdRuntimeFfiMethods.MorphTrackDescriptor).MakeByRefType());
+            AssertRuntimeFfiSignature("ClipMorphTrackKeyCount", typeof(IntPtr), typeof(IntPtr), typeof(IntPtr));
+            AssertRuntimeFfiSignature(
+                "ClipCopyMorphTrackKeys",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr).MakeByRefType());
+            AssertRuntimeFfiSignature("ClipPropertyTrackCount", typeof(IntPtr), typeof(IntPtr));
+            AssertRuntimeFfiSignature(
+                "ClipPropertyTrackDescriptor",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(MmdRuntimeFfiMethods.PropertyTrackDescriptor).MakeByRefType());
+            AssertRuntimeFfiSignature("ClipPropertyTrackKeyCount", typeof(IntPtr), typeof(IntPtr));
+            AssertRuntimeFfiSignature("ClipPropertyTrackIkEnabledCount", typeof(IntPtr), typeof(IntPtr));
+            AssertRuntimeFfiSignature(
+                "ClipCopyPropertyTrackKeys",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr).MakeByRefType());
+            AssertRuntimeFfiSignature(
+                "ClipCopyPropertyTrackIkEnabled",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr).MakeByRefType());
+
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.BoneTrackCurve>(), Is.EqualTo(20));
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.BoneTrackDescriptor>(), Is.EqualTo(16));
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.BoneTrackKey>(), Is.EqualTo(116));
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.MorphTrackDescriptor>(), Is.EqualTo(16));
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.MorphTrackKey>(), Is.EqualTo(12));
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.PropertyTrackDescriptor>(), Is.EqualTo(16));
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.PropertyTrackKey>(), Is.EqualTo(24));
+        }
+
+        [Test]
+        public void RuntimeFfiPinsSharedVmdContextEntrypointsAndLayouts()
+        {
+            Assert.That(MmdRuntimeFfiMethods.FeatureVmdSharedContext, Is.EqualTo(1u << 9));
+            Assert.That(MmdRuntimeFfiMethods.FeatureVmdSummaryBytes, Is.EqualTo(1u << 11));
+            Assert.That(MmdRuntimeFfiMethods.FeatureVmdSharedContextRawReadback, Is.EqualTo(1u << 12));
+            Assert.That(MmdRuntimeFfiMethods.VmdSharedContextAbiVersionV1, Is.EqualTo(1u));
+            Assert.That(MmdRuntimeFfiMethods.VmdSharedContextSummaryAbiVersionV1, Is.EqualTo(1u));
+            Assert.That(MmdRuntimeFfiMethods.VmdContextSummarySizeV1, Is.EqualTo(84));
+            Assert.That(MmdRuntimeFfiMethods.VmdSharedContextRawReadbackAbiVersionV1, Is.EqualTo(1u));
+            Assert.That(MmdRuntimeFfiMethods.VmdSummaryBytesAbiVersionV1, Is.EqualTo(1u));
+            Assert.That(
+                MmdRuntimeFfiMethods.ValidateVmdSharedContextCapability(),
+                Is.EqualTo(MmdRuntimeFfiMethods.VmdSharedContextAbiVersionV1));
+            Assert.That(
+                MmdRuntimeFfiMethods.ValidateVmdSharedContextRawReadbackCapability(),
+                Is.EqualTo(MmdRuntimeFfiMethods.VmdSharedContextRawReadbackAbiVersionV1));
+            Assert.That(
+                MmdRuntimeFfiMethods.ValidateVmdSummaryBytesCapability(),
+                Is.EqualTo(MmdRuntimeFfiMethods.VmdSummaryBytesAbiVersionV1));
+            AssertRuntimeFfiSignature(
+                "VmdContextCreateFromVmdBytes",
+                typeof(IntPtr),
+                typeof(byte[]),
+                typeof(IntPtr));
+            AssertRuntimeFfiSignature("VmdContextFree", typeof(void), typeof(IntPtr));
+            AssertRuntimeFfiSignature(
+                "VmdContextReadSummary",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr));
+            AssertRuntimeFfiSignature(
+                "VmdSummaryReadFromVmdBytes",
+                typeof(int),
+                typeof(byte[]),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr));
+            AssertRuntimeFfiSignature("VmdContextCameraFrameCount", typeof(IntPtr), typeof(IntPtr));
+            AssertRuntimeFfiSignature("VmdContextLightFrameCount", typeof(IntPtr), typeof(IntPtr));
+            AssertRuntimeFfiSignature("VmdContextSelfShadowFrameCount", typeof(IntPtr), typeof(IntPtr));
+            AssertRuntimeFfiSignature("VmdContextPropertyFrameCount", typeof(IntPtr), typeof(IntPtr));
+            AssertRuntimeFfiSignature("VmdContextPropertyIkEntryCount", typeof(IntPtr), typeof(IntPtr));
+            foreach (string methodName in new[]
+                     {
+                         "VmdContextCopyCameraKeyframes",
+                         "VmdContextCopyLightKeyframes",
+                         "VmdContextCopySelfShadowKeyframes",
+                         "VmdContextCopyPropertyKeyframes",
+                         "VmdContextCopyPropertyIkEntries"
+                     })
+            {
+                AssertRuntimeFfiSignature(
+                    methodName,
+                    typeof(int),
+                    typeof(IntPtr),
+                    typeof(IntPtr),
+                    typeof(IntPtr),
+                    typeof(IntPtr).MakeByRefType());
+            }
+
+            AssertRuntimeFfiSignature(
+                "ClipCreateFromVmdContextForModel",
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr));
+            AssertRuntimeFfiSignature("VmdContextBoneKeyframeCount", typeof(IntPtr), typeof(IntPtr));
+            AssertRuntimeFfiSignature(
+                "VmdContextCopyBoneKeyframes",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr).MakeByRefType());
+            AssertRuntimeFfiSignature("VmdContextMorphKeyframeCount", typeof(IntPtr), typeof(IntPtr));
+            AssertRuntimeFfiSignature(
+                "VmdContextCopyMorphKeyframes",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr).MakeByRefType());
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.VmdRawBoneKeyframe>(), Is.EqualTo(112));
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.VmdRawMorphKeyframe>(), Is.EqualTo(24));
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.VmdPropertyKeyframe>(), Is.EqualTo(24));
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.VmdPropertyIkEntry>(), Is.EqualTo(24));
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.VmdTrackSummary>(), Is.EqualTo(8));
+            Assert.That(Marshal.SizeOf<MmdRuntimeFfiMethods.VmdContextSummary>(), Is.EqualTo(84));
+            Assert.That(
+                Marshal.OffsetOf<MmdRuntimeFfiMethods.VmdContextSummary>("targetModelNameBytes").ToInt32(),
+                Is.EqualTo(8));
+            Assert.That(
+                Marshal.OffsetOf<MmdRuntimeFfiMethods.VmdContextSummary>("maxFrame").ToInt32(),
+                Is.EqualTo(28));
+            Assert.That(
+                Marshal.OffsetOf<MmdRuntimeFfiMethods.VmdContextSummary>("propertyIkEntryCount").ToInt32(),
+                Is.EqualTo(80));
+            Assert.That(
+                Marshal.OffsetOf<MmdRuntimeFfiMethods.VmdPropertyKeyframe>("ikEntryOffset").ToInt32(),
+                Is.EqualTo(8));
+            Assert.That(
+                Marshal.OffsetOf<MmdRuntimeFfiMethods.VmdPropertyIkEntry>("enabled").ToInt32(),
+                Is.EqualTo(20));
+        }
+
+        [Test]
+        public void RuntimeFfiSharedVmdSummaryRejectsNullAndShortBuffersWithoutPartialWrites()
+        {
+            byte[] vmdBytes = MmdTestFixtures.BuildSceneTrackVmdBytes("summary-contract");
+            IntPtr context = MmdRuntimeFfiMethods.VmdContextCreateFromVmdBytes(
+                vmdBytes,
+                new IntPtr(vmdBytes.Length));
+            Assert.That(context, Is.Not.EqualTo(IntPtr.Zero));
+
+            IntPtr buffer = Marshal.AllocHGlobal(MmdRuntimeFfiMethods.VmdContextSummarySizeV1);
+            try
+            {
+                Assert.That(
+                    MmdRuntimeFfiMethods.VmdContextReadSummary(
+                        context,
+                        IntPtr.Zero,
+                        new IntPtr(MmdRuntimeFfiMethods.VmdContextSummarySizeV1)),
+                    Is.EqualTo(MmdRuntimeFfiMethods.StatusInvalidInput));
+
+                byte[] sentinel = Enumerable.Repeat(
+                    (byte)0xA5,
+                    MmdRuntimeFfiMethods.VmdContextSummarySizeV1).ToArray();
+                Marshal.Copy(sentinel, 0, buffer, sentinel.Length);
+                Assert.That(
+                    MmdRuntimeFfiMethods.VmdContextReadSummary(
+                        context,
+                        buffer,
+                        new IntPtr(MmdRuntimeFfiMethods.VmdContextSummarySizeV1 - 1)),
+                    Is.EqualTo(MmdRuntimeFfiMethods.StatusBufferTooSmall));
+
+                byte[] after = new byte[sentinel.Length];
+                Marshal.Copy(buffer, after, 0, after.Length);
+                Assert.That(after, Is.EqualTo(sentinel));
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+                MmdRuntimeFfiMethods.VmdContextFree(context);
+            }
+        }
+
+        [Test]
+        public void RuntimeFfiReadsVmdSummaryDirectlyFromBytesWithoutCreatingContext()
+        {
+            byte[] vmdBytes = MmdTestFixtures.BuildSceneTrackVmdBytes("summary-only-contract");
+            IntPtr buffer = Marshal.AllocHGlobal(MmdRuntimeFfiMethods.VmdContextSummarySizeV1);
+            try
+            {
+                Assert.That(
+                    MmdRuntimeFfiMethods.VmdSummaryReadFromVmdBytes(
+                        vmdBytes,
+                        new IntPtr(vmdBytes.Length),
+                        buffer,
+                        new IntPtr(MmdRuntimeFfiMethods.VmdContextSummarySizeV1)),
+                    Is.EqualTo(MmdRuntimeFfiMethods.StatusOk));
+
+                MmdRuntimeFfiMethods.VmdContextSummary summary =
+                    Marshal.PtrToStructure<MmdRuntimeFfiMethods.VmdContextSummary>(buffer);
+                Assert.That(summary.structSize, Is.EqualTo(84u));
+                Assert.That(summary.abiVersion, Is.EqualTo(1u));
+                Assert.That(summary.lights.keyCount, Is.GreaterThan(0u));
+                Assert.That(summary.selfShadows.keyCount, Is.GreaterThan(0u));
+
+                Assert.That(
+                    MmdRuntimeFfiMethods.VmdSummaryReadFromVmdBytes(
+                        vmdBytes,
+                        new IntPtr(vmdBytes.Length),
+                        IntPtr.Zero,
+                        new IntPtr(MmdRuntimeFfiMethods.VmdContextSummarySizeV1)),
+                    Is.EqualTo(MmdRuntimeFfiMethods.StatusInvalidInput));
+
+                byte[] sentinel = Enumerable.Repeat(
+                    (byte)0x5A,
+                    MmdRuntimeFfiMethods.VmdContextSummarySizeV1).ToArray();
+                Marshal.Copy(sentinel, 0, buffer, sentinel.Length);
+                Assert.That(
+                    MmdRuntimeFfiMethods.VmdSummaryReadFromVmdBytes(
+                        new byte[] { 0x01 },
+                        new IntPtr(1),
+                        buffer,
+                        new IntPtr(MmdRuntimeFfiMethods.VmdContextSummarySizeV1)),
+                    Is.EqualTo(MmdRuntimeFfiMethods.StatusInvalidInput));
+                byte[] after = new byte[sentinel.Length];
+                Marshal.Copy(buffer, after, 0, after.Length);
+                Assert.That(after, Is.EqualTo(sentinel));
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
+
+        [Test]
+        public void RuntimeFfiReadsCompiledAuthoredBoneAndMorphTracks()
+        {
+            byte[] bonePmx = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube.pmx");
+            byte[] boneVmd = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube_motion.vmd");
+            using (MmdRuntimeFfiPlaybackSession session = MmdRuntimeFfiPlaybackSession.Create(bonePmx, boneVmd))
+            {
+                int boneTrackCount = session.GetBoneTrackCount();
+                Assert.That(boneTrackCount, Is.GreaterThan(0));
+                MmdRuntimeFfiMethods.BoneTrackDescriptor descriptor = session.GetBoneTrackDescriptor(0);
+                int keyCount = MmdFfiMarshal.CheckedIntPtrToInt(descriptor.keyCount, "bone descriptor key count");
+                MmdRuntimeFfiMethods.BoneTrackKey[] keys = session.GetBoneTrackKeys(0);
+                Assert.That(keys, Has.Length.EqualTo(keyCount));
+                Assert.That(keys.All(key =>
+                    key.positionXyz != null && key.positionXyz.Length == 3 &&
+                    key.rotationXyzw != null && key.rotationXyzw.Length == 4 &&
+                    (key.translationX.kind == MmdRuntimeFfiMethods.VmdCurveNone ||
+                     key.translationX.kind == MmdRuntimeFfiMethods.VmdCurveCubicBezier)), Is.True);
+                Assert.That(keys.All(key => key.boneIndex == descriptor.boneIndex), Is.True);
+                AssertFramesAreSorted(keys.Select(key => (int)key.frame), "bone authored keys");
+            }
+
+            byte[] morphPmx = MmdTestFixtures.ReadFixtureAssetBytes("test_vertex_morph.pmx");
+            byte[] morphVmd = MmdTestFixtures.ReadFixtureAssetBytes("test_vertex_morph_motion.vmd");
+            using (MmdRuntimeFfiPlaybackSession session = MmdRuntimeFfiPlaybackSession.Create(morphPmx, morphVmd))
+            {
+                int morphTrackCount = session.GetMorphTrackCount();
+                Assert.That(morphTrackCount, Is.GreaterThan(0));
+                MmdRuntimeFfiMethods.MorphTrackDescriptor descriptor = session.GetMorphTrackDescriptor(0);
+                int keyCount = MmdFfiMarshal.CheckedIntPtrToInt(descriptor.keyCount, "morph descriptor key count");
+                MmdRuntimeFfiMethods.MorphTrackKey[] keys = session.GetMorphTrackKeys(0);
+                Assert.That(keys, Has.Length.EqualTo(keyCount));
+                Assert.That(keys.All(key => key.morphIndex == descriptor.morphIndex && float.IsFinite(key.weight)), Is.True);
+                AssertFramesAreSorted(keys.Select(key => (int)key.frame), "morph authored keys");
+                Assert.That(session.GetPropertyTrackCount(), Is.EqualTo(0));
+                Assert.That(session.GetPropertyTrackKeys(), Is.Empty);
+                Assert.That(session.GetPropertyTrackIkEnabled(), Is.Empty);
+            }
         }
 
         [Test]
@@ -641,6 +1010,12 @@ namespace Mmd.Tests
             Assert.That(values[6], Is.EqualTo(0.75f).Within(0.0001f), "rotation.z");
             Assert.That(values[7], Is.EqualTo(47.5f).Within(0.0001f), "fov");
             Assert.That(values[8], Is.EqualTo(1.0f).Within(0.0001f), "perspective");
+        }
+
+        private static void AssertFramesAreSorted(System.Collections.Generic.IEnumerable<int> frames, string label)
+        {
+            int[] actual = frames.ToArray();
+            Assert.That(actual, Is.EqualTo(actual.OrderBy(frame => frame).ToArray()), label);
         }
 
         private static void AssertLightSample(float[] values)

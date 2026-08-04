@@ -292,6 +292,7 @@ namespace Mmd.Tests
                     pmxPath,
                     assetImportScale: 1.0f,
                     materialRemapAssets: new[] { remapMaterial },
+                    importedMaterialAssets: new[] { originalMaterial },
                     importedMaterialOverrideAsset: overrideAsset);
                 vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
                 vmdAsset.Initialize(vmdBytes, "test_1bone_cube_motion.vmd", vmdPath);
@@ -321,6 +322,112 @@ namespace Mmd.Tests
                 {
                     Object.DestroyImmediate(originalMaterial);
                 }
+            }
+        }
+
+        [Test]
+        public void PmxAssetShaderPresetReachesOwnedPlaybackMaterials()
+        {
+            MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
+            MmdUnityPlaybackBinding? binding = null;
+
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                pmxAsset.Initialize(
+                    File.ReadAllBytes(pmxPath),
+                    "test_1bone_cube.pmx",
+                    pmxPath,
+                    assetImportScale: 1.0f,
+                    assetShaderPreset: "MMD URP Toon");
+                vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
+
+                binding = MmdUnityPlaybackBinding.CreateSkinned(pmxAsset, vmdAsset);
+
+                Assert.That(binding.Instance.Materials[0].shader, Is.Not.Null);
+                Assert.That(binding.Instance.Materials[0].shader.name, Is.EqualTo("MMD URP Toon"));
+            }
+            finally
+            {
+                binding?.Dispose();
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+            }
+        }
+
+        [Test]
+        public void BorrowedPlaybackUsesImportedMaterialsAndDoesNotAccumulatePlaybackNames()
+        {
+            MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
+            MmdUnityModelInstance? previewInstance = null;
+            MmdUnityPlaybackController? controller = null;
+            Material? importedMaterial = null;
+
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                byte[] pmxBytes = File.ReadAllBytes(pmxPath);
+                byte[] vmdBytes = File.ReadAllBytes(vmdPath);
+                var parser = new NativeMmdParser();
+                MmdModelDefinition model = parser.LoadModel(pmxBytes);
+                previewInstance = MmdUnityModelFactory.CreateSkinnedModel(model, pmxPath);
+                Material authoredMaterial = previewInstance.Materials[0];
+                Shader importedShader = Shader.Find("MMD URP Toon")
+                    ?? throw new InvalidOperationException("MMD URP Toon shader is required for the playback material source test.");
+                importedMaterial = new Material(importedShader)
+                {
+                    name = "Cheek"
+                };
+
+                pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                pmxAsset.Initialize(
+                    pmxBytes,
+                    "test_1bone_cube.pmx",
+                    pmxPath,
+                    assetImportScale: 1.0f,
+                    assetShaderPreset: "MMD URP Toon",
+                    importedMaterialAssets: new[] { importedMaterial });
+                vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                vmdAsset.Initialize(vmdBytes, "test_1bone_cube_motion.vmd", vmdPath);
+                controller = previewInstance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+
+                for (int i = 0; i < 3; i++)
+                {
+                    MmdUnityPlaybackBinding next =
+                        MmdUnityPlaybackBinding.CreateSkinned(previewInstance, pmxAsset, vmdAsset);
+                    controller.Configure(next, 30.0f, playOnStart: false);
+                    controller.ApplyFrame(0);
+
+                    Material runtimeMaterial = previewInstance.SkinnedMeshRenderer!.sharedMaterials[0];
+                    Assert.That(runtimeMaterial.shader, Is.Not.Null);
+                    Assert.That(runtimeMaterial.shader.name, Is.EqualTo("MMD URP Toon"));
+                    Assert.That(runtimeMaterial.name, Is.EqualTo("Cheek Playback"));
+                    Assert.That(runtimeMaterial, Is.Not.SameAs(importedMaterial));
+                }
+
+                controller.ReleasePlaybackResources();
+                Assert.That(previewInstance.SkinnedMeshRenderer!.sharedMaterials[0], Is.SameAs(authoredMaterial));
+            }
+            finally
+            {
+                if (controller != null)
+                {
+                    controller.ReleasePlaybackResources();
+                    Object.DestroyImmediate(controller);
+                }
+
+                MmdTestInstanceScope.DestroyInstance(previewInstance);
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+                Object.DestroyImmediate(importedMaterial);
             }
         }
 
@@ -607,6 +714,40 @@ namespace Mmd.Tests
                 Assert.That(controller.CurrentFrame, Is.EqualTo(0));
                 Assert.That(controller.LastSnapshot, Is.Null);
                 Assert.That(binding.Instance.BoneTransforms[0].localPosition, Is.EqualTo(Vector3.zero));
+            }
+            finally
+            {
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
+            }
+        }
+
+        [Test]
+        public void LivePhysicsAppliesNativeAfterPhysicsPoseForDeformAfterPhysicsBone()
+        {
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
+            if (!availability.backendAvailable)
+            {
+                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
+            }
+
+            MmdUnityPlaybackBinding? binding = null;
+            try
+            {
+                MmdModelDefinition model = LoadPhysicsFixtureModel();
+                model.bones[0].deformAfterPhysics = true;
+                AddPinnedRootRigidbody(model);
+                binding = CreatePhysicsPlaybackBinding(model, "native-after-physics.vmd");
+                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.Configure(binding, 30.0f);
+                controller.SetPhysicsMode(MmdPhysicsMode.Live);
+                controller.ApplyFrame(LivePhysicsPlaybackFrame);
+
+                int rootBoneIndex = RootBoneIndex(model);
+                Vector3 expectedLocalPosition = binding.Instance.BindLocalPositions[rootBoneIndex] +
+                    ToUnityPosition(new[] { 2.0f, 0.0f, 0.0f }) * binding.Instance.ImportScale;
+                Assert.That(
+                    Vector3.Distance(binding.Instance.BoneTransforms[rootBoneIndex].localPosition, expectedLocalPosition),
+                    Is.LessThan(0.0001f));
             }
             finally
             {
@@ -1191,22 +1332,111 @@ namespace Mmd.Tests
                 controller.ConfigureFromAssets(pmxAsset, vmdAsset, 30.0f, startFrame: 0);
 
                 Assert.That(controller.IsConfigured, Is.True);
+                Assert.That(controller.IsFastRuntimeEnabled, Is.True);
+                Assert.That(controller.LastFastRuntimeReason, Is.Empty);
                 Assert.That(controller.LastSnapshot, Is.Not.Null);
-                if (controller.IsFastRuntimeEnabled)
-                {
-                    Assert.That(controller.LastFastRuntimeReason, Is.Empty);
-                    // fast runtime enablement by default (during ConfigureFromAssets with source bytes) is the intent of this test; after default-Live + snapshot cleanup,
-                    // frame-0 snapshot populates bones even on fast path (previously expected empty under off-default). Keep fast check via reason/flag.
-                    Assert.That(controller.LastSnapshot!.frame.bones, Is.Not.Empty);
-                }
-                else
-                {
-                    Assert.That(controller.LastFastRuntimeReason, Is.Not.Empty);
-                    Assert.That(controller.LastSnapshot!.frame.bones, Is.Not.Empty);
-                }
+                Assert.That(controller.LastSnapshot!.frame.bones, Is.Not.Empty);
             }
             finally
             {
+                MmdTestInstanceScope.DestroyInstance(previewInstance);
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+            }
+        }
+
+        [Test]
+        public void ConfigureFromAssetsThrowsAndReleasesExistingBindingWhenNativeUnavailable()
+        {
+            MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
+            MmdUnityModelInstance? previewInstance = null;
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                byte[] pmxBytes = File.ReadAllBytes(pmxPath);
+                var parser = new NativeMmdParser();
+                previewInstance = MmdUnityModelFactory.CreateSkinnedModel(parser.LoadModel(pmxBytes), pmxPath);
+                pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                pmxAsset.Initialize(pmxBytes, "test_1bone_cube.pmx", pmxPath, assetImportScale: 1.0f);
+                vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
+                MmdUnityPlaybackController controller = previewInstance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+                controller.ConfigureFromAssets(pmxAsset, vmdAsset, 30.0f, startFrame: 0, playOnStart: false);
+                Assert.That(controller.IsFastRuntimeEnabled, Is.True);
+
+                SkinnedMeshRenderer renderer = previewInstance.SkinnedMeshRenderer!;
+                Mesh activePlaybackMesh = renderer.sharedMesh!;
+                MmdUnityPlaybackController.NativeRuntimeAvailabilityOverrideForTests = (_, _) => false;
+
+                InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+                    controller.ConfigureFromAssets(pmxAsset, vmdAsset, 30.0f, startFrame: 0, playOnStart: false))!;
+
+                Assert.That(exception.Message, Does.Contain("Normal playback requires mmd-anim native clip playback"));
+                Assert.That(exception.Message, Does.Contain("native runtime unavailable (forced by test)."));
+                Assert.That(controller.LastFastRuntimeReason, Does.Contain("forced by test"));
+                Assert.That(controller.IsConfigured, Is.False);
+                Assert.That(controller.LastSnapshot, Is.Null);
+                Assert.That(activePlaybackMesh == null, Is.True, "failed native reconfiguration must dispose the previous playback clone");
+                Assert.That(renderer.sharedMesh, Is.Not.Null);
+                Assert.That(renderer.sharedMaterials, Is.Not.Empty);
+            }
+            finally
+            {
+                MmdUnityPlaybackController.NativeRuntimeAvailabilityOverrideForTests = null;
+                MmdTestInstanceScope.DestroyInstance(previewInstance);
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+            }
+        }
+
+        [Test]
+        public void ConfigureFromAssetsPropagatesSharedVmdContextFailureToFinalNativeCaller()
+        {
+            MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
+            MmdUnityModelInstance? previewInstance = null;
+            const string sharedContextFailure = "shared VMD context unavailable (forced by test).";
+            const string nativeSetupFailure = "native runtime unavailable (forced by test).";
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                byte[] pmxBytes = File.ReadAllBytes(pmxPath);
+                var parser = new NativeMmdParser();
+                previewInstance = MmdUnityModelFactory.CreateSkinnedModel(parser.LoadModel(pmxBytes), pmxPath);
+                pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                pmxAsset.Initialize(pmxBytes, "test_1bone_cube.pmx", pmxPath, assetImportScale: 1.0f);
+                vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
+                MmdUnityPlaybackController controller = previewInstance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+
+                MmdVmdAsset.NativeVmdContextFailureReasonOverrideForTests = _ => sharedContextFailure;
+
+                controller.ConfigureFromAssets(pmxAsset, vmdAsset, 30.0f, startFrame: 0, playOnStart: false);
+
+                Assert.That(controller.IsConfigured, Is.True);
+                Assert.That(controller.IsFastRuntimeEnabled, Is.True);
+                Assert.That(controller.LastFastRuntimeReason, Is.Empty);
+
+                MmdUnityPlaybackController.NativeRuntimeAvailabilityOverrideForTests = (_, _) => false;
+
+                InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+                    controller.ConfigureFromAssets(pmxAsset, vmdAsset, 30.0f, startFrame: 0, playOnStart: false))!;
+
+                string expectedFailure =
+                    "Shared VMD context setup failed: " + sharedContextFailure +
+                    "; standalone native setup failed: " + nativeSetupFailure;
+                Assert.That(exception.Message, Does.Contain(expectedFailure));
+                Assert.That(controller.LastFastRuntimeReason, Is.EqualTo(expectedFailure));
+            }
+            finally
+            {
+                MmdVmdAsset.NativeVmdContextFailureReasonOverrideForTests = null;
+                MmdUnityPlaybackController.NativeRuntimeAvailabilityOverrideForTests = null;
                 MmdTestInstanceScope.DestroyInstance(previewInstance);
                 Object.DestroyImmediate(pmxAsset);
                 Object.DestroyImmediate(vmdAsset);
@@ -1482,19 +1712,10 @@ namespace Mmd.Tests
                 controller.ConfigureMotionFromProviderModelSource(vmdAsset, 30.0f, startFrame: 0);
 
                 Assert.That(controller.IsConfigured, Is.True);
+                Assert.That(controller.IsFastRuntimeEnabled, Is.True);
+                Assert.That(controller.LastFastRuntimeReason, Is.Empty);
                 Assert.That(controller.LastSnapshot, Is.Not.Null);
-                if (controller.IsFastRuntimeEnabled)
-                {
-                    Assert.That(controller.LastFastRuntimeReason, Is.Empty);
-                    // fast runtime enablement by default (via ConfigureMotionFromProviderModelSource) is the intent; after default-Live + snapshot changes,
-                    // frame-0 snapshot has bones even when fast (previously empty under off). Fast check kept via reason/IsFast.
-                    Assert.That(controller.LastSnapshot!.frame.bones, Is.Not.Empty);
-                }
-                else
-                {
-                    Assert.That(controller.LastFastRuntimeReason, Is.Not.Empty);
-                    Assert.That(controller.LastSnapshot!.frame.bones, Is.Not.Empty);
-                }
+                Assert.That(controller.LastSnapshot!.frame.bones, Is.Not.Empty);
 
                 Assert.That(previewRenderers.All(renderer => renderer.enabled), Is.True);
             }
@@ -1531,19 +1752,10 @@ namespace Mmd.Tests
                 controller.ConfigureMotionFromProviderModelSource(vmdAsset, 30.0f, startFrame: 0);
 
                 Assert.That(controller.IsConfigured, Is.True);
+                Assert.That(controller.IsFastRuntimeEnabled, Is.True);
+                Assert.That(controller.LastFastRuntimeReason, Is.Empty);
                 Assert.That(controller.LastSnapshot, Is.Not.Null);
-                if (controller.IsFastRuntimeEnabled)
-                {
-                    Assert.That(controller.LastFastRuntimeReason, Is.Empty);
-                    // fast runtime enablement by default via model-source + ConfigureMotion path; post Live-default cleanup the frame0 snapshot has bones on fast enable too.
-                    // keep the fast enablement assertion meaningful via reason (bones-empty expectation adjusted for current snapshot behavior)
-                    Assert.That(controller.LastSnapshot!.frame.bones, Is.Not.Empty);
-                }
-                else
-                {
-                    Assert.That(controller.LastFastRuntimeReason, Is.Not.Empty);
-                    Assert.That(controller.LastSnapshot!.frame.bones, Is.Not.Empty);
-                }
+                Assert.That(controller.LastSnapshot!.frame.bones, Is.Not.Empty);
 
                 Assert.That(previewRenderers.All(renderer => renderer.enabled), Is.True);
                 Assert.That(controller.ModelAssetSource, Is.SameAs(pmxAssetForSource));
@@ -1586,17 +1798,10 @@ namespace Mmd.Tests
 
                 Assert.That(configured, Is.True);
                 Assert.That(controller.IsConfigured, Is.True);
+                Assert.That(controller.IsFastRuntimeEnabled, Is.True);
+                Assert.That(controller.LastFastRuntimeReason, Is.Empty);
                 Assert.That(controller.LastSnapshot, Is.Not.Null);
-                if (controller.IsFastRuntimeEnabled)
-                {
-                    Assert.That(controller.LastFastRuntimeReason, Is.Empty);
-                    Assert.That(controller.LastSnapshot!.frame.bones, Is.Not.Empty);
-                }
-                else
-                {
-                    Assert.That(controller.LastFastRuntimeReason, Is.Not.Empty);
-                    Assert.That(controller.LastSnapshot!.frame.bones, Is.Not.Empty);
-                }
+                Assert.That(controller.LastSnapshot!.frame.bones, Is.Not.Empty);
                 Assert.That(previewRenderers.All(renderer => renderer.enabled), Is.True);
                 Assert.That(controller.ModelAssetSource, Is.SameAs(pmxAssetForSource));
                 Assert.That(controller.MotionAssetSource, Is.SameAs(vmdAsset));
@@ -1768,18 +1973,10 @@ namespace Mmd.Tests
                 Assert.That(snapshot.frame.time, Is.EqualTo(inputTime).Within(0.00001f));
                 Assert.That(controller.CurrentFrame, Is.EqualTo(10));
                 Assert.That(controller.LastSnapshot, Is.SameAs(snapshot));
-                if (controller.IsFastRuntimeEnabled)
-                {
-                    Assert.That(controller.LastFastRuntimeReason, Is.Empty);
-                    // random-access ApplyTime forces Off (even if fast was enabled at ConfigureFromAssets); observed fast runtime snapshot has empty bones (EditMode random-access path).
-                    // fast enablement contract kept meaningful via IsFast + empty reason; only bones expectation adjusted to observed behavior
-                    Assert.That(snapshot.frame.bones, Is.Empty);
-                }
-                else
-                {
-                    Assert.That(controller.LastFastRuntimeReason, Is.Not.Empty);
-                    Assert.That(snapshot.frame.bones, Is.Not.Empty);
-                }
+                Assert.That(controller.IsFastRuntimeEnabled, Is.True);
+                Assert.That(controller.LastFastRuntimeReason, Is.Empty);
+                // random-access ApplyTime forces Off; the native path returns a lightweight snapshot.
+                Assert.That(snapshot.frame.bones, Is.Empty);
             }
             finally
             {

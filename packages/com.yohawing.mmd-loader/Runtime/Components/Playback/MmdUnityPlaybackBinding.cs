@@ -8,7 +8,6 @@ using Mmd.Motion;
 using Mmd.Native;
 using Mmd.Parser;
 using Mmd.Physics;
-using Mmd.Pose;
 using Mmd.Rendering;
 using UnityEngine;
 
@@ -45,9 +44,18 @@ namespace Mmd.UnityIntegration
         private byte[]? fastIkEnabled;
         private MmdEvaluatedFrame? fastMorphFrame;
         private float[]? fastLastAppliedMorphWeights;
+        private MmdEvaluatedFrame? fastLivePhysicsFrame;
         private bool fastMorphApplied;
         private bool fastMorphCacheValid;
         private MmdPlaybackSnapshot? fastSnapshot;
+        private readonly int[] fastPoseBoneIndices;
+        private readonly int[] fastMorphIndices;
+        private readonly int[] fastAfterPhysicsBoneIndices;
+        private float[]? livePhysicsLocalPositionOffsets;
+        private float[]? livePhysicsLocalRotations;
+        private float[]? livePhysicsLocalScales;
+        private float[]? livePhysicsMorphWeights;
+        private byte[]? livePhysicsIkEnabled;
         private readonly MmdUnityModelInstanceOwnership instanceOwnership;
         private readonly MmdBorrowedSceneMutationLease? borrowedMutationLease;
         private readonly IDisposable? borrowedSourceMutation;
@@ -70,6 +78,9 @@ namespace Mmd.UnityIntegration
             this.model = model;
             this.modelId = modelId;
             this.motionId = motionId;
+            fastPoseBoneIndices = MmdUnityPlaybackWorkset.BuildBoneIndices(model, instance);
+            fastMorphIndices = MmdUnityPlaybackWorkset.BuildMorphIndices(model, instance.RenderingDescriptor);
+            fastAfterPhysicsBoneIndices = MmdUnityPlaybackWorkset.BuildAfterPhysicsBoneIndices(model);
             this.instanceOwnership = instanceOwnership;
             this.borrowedMutationLease = borrowedMutationLease;
             this.borrowedSourceMutation = borrowedSourceMutation;
@@ -105,6 +116,14 @@ namespace Mmd.UnityIntegration
 
         public bool IsFastRuntimeEnabled => fastSession != null;
 
+        internal int FastRuntimePoseBoneCount => fastPoseBoneIndices.Length;
+
+        internal int FastRuntimeMorphCount => fastMorphIndices.Length;
+
+        internal int FastRuntimeAfterPhysicsBoneCount => fastAfterPhysicsBoneIndices.Length;
+
+        internal MmdEvaluatedFrame? FastLivePhysicsFrameForTests => fastLivePhysicsFrame;
+
         public int MotionMaxFrame => session.MotionMaxFrame;
 
         public static MmdUnityPlaybackBinding CreateSkinned(
@@ -124,7 +143,7 @@ namespace Mmd.UnityIntegration
             var parser = new NativeMmdParser();
             MmdModelDefinition model = modelAsset.LoadModel(parser);
             MmdModelValidator.ThrowIfInvalid(model);
-            MmdMotionDefinition motion = motionAsset.LoadMotion(parser);
+            MmdMotionDefinition motion = motionAsset.CreateNativeClipMotionHeader();
             MmdMotionValidator.ThrowIfInvalid(motion);
             float importScale = modelAsset.ImportScale;
             return CreateSkinned(
@@ -134,6 +153,7 @@ namespace Mmd.UnityIntegration
                 string.IsNullOrWhiteSpace(motionAsset.SourceId) ? motionAsset.name : motionAsset.SourceId,
                 string.IsNullOrWhiteSpace(modelAsset.SourcePath) ? null : modelAsset.SourcePath,
                 importScale,
+                ResolveMaterialPreset(modelAsset),
                 modelAsset.MaterialOverrideAsset);
         }
 
@@ -147,8 +167,7 @@ namespace Mmd.UnityIntegration
                 throw new ArgumentNullException(nameof(motionAsset));
             }
 
-            var parser = new NativeMmdParser();
-            MmdMotionDefinition motion = motionAsset.LoadMotion(parser);
+            MmdMotionDefinition motion = motionAsset.CreateNativeClipMotionHeader();
             MmdMotionValidator.ThrowIfInvalid(motion);
             return CreateSkinned(instance, modelAsset, motionAsset, motion);
         }
@@ -191,7 +210,8 @@ namespace Mmd.UnityIntegration
             var lease = new MmdBorrowedSceneMutationLease(
                 instance,
                 modelAsset.MaterialOverrideAsset,
-                modelAsset.MaterialRemaps);
+                modelAsset.MaterialRemaps,
+                importedMaterials: modelAsset.ImportedMaterials);
             return new MmdUnityPlaybackBinding(
                 instance,
                 session,
@@ -312,54 +332,44 @@ namespace Mmd.UnityIntegration
 
             var parser = new NativeMmdParser();
             MmdModelDefinition model = modelAsset.LoadModel(parser);
-            MmdModelValidator.ThrowIfInvalid(model);
-            MmdMotionValidator.ThrowIfInvalid(motion);
-            float importScale = modelAsset.ImportScale;
-            var sourceMutation = new MmdExistingSceneRebindLease(root);
-            MmdUnityModelInstance? instance = null;
-            try
-            {
-                instance = MmdUnityModelFactory.CreateExistingSkinnedModelInstance(
-                    root,
-                    model,
-                    string.IsNullOrWhiteSpace(modelAsset.SourcePath) ? null : modelAsset.SourcePath,
-                    importScale,
-                    MmdPmxModelPresetPolicy.AllowsAutomaticSelfShadowTarget(modelAsset.ModelPreset),
-                    materialOverride: null,
-                    preserveExistingSelfShadowTarget: true);
-                sourceMutation.AdoptFactoryResult(instance);
-                var session = new MmdRuntimeSession(
-                    model,
-                    motion,
-                    string.IsNullOrWhiteSpace(modelAsset.SourceId) ? modelAsset.name : modelAsset.SourceId,
-                    string.IsNullOrWhiteSpace(motionAsset.SourceId) ? motionAsset.name : motionAsset.SourceId);
-                var playbackMutation = new MmdBorrowedSceneMutationLease(
-                    instance,
-                    modelAsset.MaterialOverrideAsset,
-                    modelAsset.MaterialRemaps);
-                return new MmdUnityPlaybackBinding(
-                    instance,
-                    session,
-                    model,
-                    string.IsNullOrWhiteSpace(modelAsset.SourceId) ? modelAsset.name : modelAsset.SourceId,
-                    string.IsNullOrWhiteSpace(motionAsset.SourceId) ? motionAsset.name : motionAsset.SourceId,
-                    MmdUnityModelInstanceOwnership.Borrowed,
-                    playbackMutation,
-                    sourceMutation);
-            }
-            catch
-            {
-                if (instance == null)
-                {
-                    sourceMutation.RollbackFactoryFailure();
-                }
-                else
-                {
-                    sourceMutation.Dispose();
-                }
+            return CreateSkinnedFromExistingSceneModel(
+                root,
+                modelAsset,
+                model,
+                motionAsset,
+                motion);
+        }
 
-                throw;
+        internal static MmdUnityPlaybackBinding CreateSkinnedFromExistingSceneModel(
+            GameObject root,
+            MmdPmxAsset modelAsset,
+            MmdModelDefinition model,
+            MmdVmdAsset motionAsset,
+            MmdMotionDefinition motion)
+        {
+            if (model == null)
+            {
+                throw new ArgumentNullException(nameof(model));
             }
+
+            if (motion == null)
+            {
+                throw new ArgumentNullException(nameof(motion));
+            }
+
+            return CreateSkinnedFromExistingSceneModel(
+                root,
+                model,
+                motion,
+                string.IsNullOrWhiteSpace(modelAsset.SourceId) ? modelAsset.name : modelAsset.SourceId,
+                string.IsNullOrWhiteSpace(motionAsset.SourceId) ? motionAsset.name : motionAsset.SourceId,
+                string.IsNullOrWhiteSpace(modelAsset.SourcePath) ? null : modelAsset.SourcePath,
+                modelAsset.ImportScale,
+                MmdPmxModelPresetPolicy.AllowsAutomaticSelfShadowTarget(modelAsset.ModelPreset),
+                modelAsset.MaterialOverrideAsset,
+                modelAsset.MaterialRemaps,
+                ResolveMaterialPreset(modelAsset),
+                modelAsset.ImportedMaterials);
         }
 
         internal static MmdUnityPlaybackBinding CreateSkinnedFromExistingSceneModel(
@@ -370,7 +380,11 @@ namespace Mmd.UnityIntegration
             string motionId,
             string? sourcePath = null,
             float importScale = 1.0f,
-            bool includeSelfShadowTarget = true)
+            bool includeSelfShadowTarget = true,
+            MmdMaterialOverrideAsset? materialOverride = null,
+            Material[]? materialRemaps = null,
+            MmdMaterialPreset materialPreset = MmdMaterialPreset.MmdToon,
+            Material[]? importedMaterials = null)
         {
             if (root == null)
             {
@@ -392,10 +406,15 @@ namespace Mmd.UnityIntegration
                     importScale,
                     includeSelfShadowTarget,
                     materialOverride: null,
-                    preserveExistingSelfShadowTarget: true);
+                    preserveExistingSelfShadowTarget: true,
+                    materialPreset: materialPreset);
                 sourceMutation.AdoptFactoryResult(instance);
                 var session = new MmdRuntimeSession(model, motion, resolvedModelId, resolvedMotionId);
-                var playbackMutation = new MmdBorrowedSceneMutationLease(instance);
+                var playbackMutation = new MmdBorrowedSceneMutationLease(
+                    instance,
+                    materialOverride,
+                    materialRemaps,
+                    importedMaterials: importedMaterials);
                 return new MmdUnityPlaybackBinding(
                     instance,
                     session,
@@ -456,13 +475,15 @@ namespace Mmd.UnityIntegration
                     importScale,
                     MmdPmxModelPresetPolicy.AllowsAutomaticSelfShadowTarget(modelAsset.ModelPreset),
                     materialOverride: null,
-                    preserveExistingSelfShadowTarget: true);
+                    preserveExistingSelfShadowTarget: true,
+                    materialPreset: ResolveMaterialPreset(modelAsset));
                 sourceMutation.AdoptFactoryResult(instance);
                 var session = new MmdRuntimeSession(model, restMotion, resolvedModelId, resolvedMotionId);
                 var playbackMutation = new MmdBorrowedSceneMutationLease(
                     instance,
                     modelAsset.MaterialOverrideAsset,
-                    modelAsset.MaterialRemaps);
+                    modelAsset.MaterialRemaps,
+                    importedMaterials: modelAsset.ImportedMaterials);
                 return new MmdUnityPlaybackBinding(
                     instance,
                     session,
@@ -699,6 +720,27 @@ namespace Mmd.UnityIntegration
             {
                 playbackInstance = borrowedMutationLease.Activate();
             }
+        }
+
+        private static MmdMaterialPreset ResolveMaterialPreset(MmdPmxAsset modelAsset)
+        {
+            string shaderPreset = modelAsset.ShaderPreset ?? string.Empty;
+            if (string.Equals(shaderPreset, "URP Lit", StringComparison.Ordinal) ||
+                string.Equals(shaderPreset, "UrpLit", StringComparison.Ordinal))
+            {
+                return MmdMaterialPreset.UrpLit;
+            }
+
+            if (string.Equals(shaderPreset, "MMD URP Toon", StringComparison.Ordinal) ||
+                string.Equals(shaderPreset, "Mmd Toon Lit", StringComparison.Ordinal) ||
+                string.Equals(shaderPreset, "MmdToonLit", StringComparison.Ordinal))
+            {
+                return MmdMaterialPreset.MmdToonLit;
+            }
+
+            // MMD Basic Toon and custom profile summaries use the compatibility-safe built-in
+            // preset when no runtime mapper set is available at this boundary.
+            return MmdMaterialPreset.MmdToon;
         }
 
         private static MmdUnityPlaybackBinding CreateOwnedBinding(

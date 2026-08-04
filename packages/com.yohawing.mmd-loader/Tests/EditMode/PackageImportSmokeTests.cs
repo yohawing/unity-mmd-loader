@@ -7,11 +7,9 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
-using Mmd.Motion;
 using Mmd.Parser;
 using Mmd.Physics;
 using Mmd.Rendering;
-using Mmd.Tracing;
 
 namespace Mmd.Tests
 {
@@ -148,31 +146,6 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void ActualTraceDumperCreatesSchemaVersionOneJson()
-        {
-            MmdTrace trace = MmdActualTraceDumper.CreateTrace("minimal.pmx", "minimal.vmd");
-
-            string json = MmdActualTraceDumper.ToJson(trace, prettyPrint: false);
-
-            Assert.That(json, Does.Contain("\"schemaVersion\":1"));
-            Assert.That(json, Does.Contain("\"model\":\"minimal.pmx\""));
-            Assert.That(json, Does.Contain("\"motion\":\"minimal.vmd\""));
-            Assert.That(json, Does.Contain("\"space\":\"mmd\""));
-        }
-
-        [Test]
-        public void NullPhysicsBackendIsDeterministicNoOp()
-        {
-            IMmdPhysicsBackend backend = new NullMmdPhysicsBackend();
-
-            backend.Reset();
-            backend.Step(frame: 0, deltaTime: 0.0f);
-
-            Assert.That(backend.Name, Is.EqualTo("Null"));
-            Assert.That(backend.IsDeterministic, Is.True);
-        }
-
-        [Test]
         public void PhysicsDescriptorValidatorRejectsUnsupportedRigidbodyShape()
         {
             var model = new MmdModelDefinition();
@@ -222,162 +195,6 @@ namespace Mmd.Tests
             string[] errors = MmdPhysicsDescriptorValidator.Validate(model).ToArray();
 
             Assert.That(errors, Does.Contain("joint has both rigidbody endpoints set to -1 (unsupported world-anchored joint): 7"));
-        }
-
-        [Test]
-        public void VmdBoneSamplerUsesNextKeyframeInterpolationCurve()
-        {
-            var keyframes = new[]
-            {
-                new MmdBoneKeyframeDefinition
-                {
-                    boneName = "root",
-                    frame = 0,
-                    rotation = new[] { 0.0f, 0.0f, 0.0f, 1.0f },
-                    interpolation = new MmdBoneInterpolationDefinition
-                    {
-                        rotation = new byte[] { 0, 20, 107, 107 }
-                    }
-                },
-                new MmdBoneKeyframeDefinition
-                {
-                    boneName = "root",
-                    frame = 9,
-                    rotation = new[] { -0.38268337f, 0.0f, 0.0f, 0.92387956f },
-                    interpolation = new MmdBoneInterpolationDefinition
-                    {
-                        rotation = new byte[] { 0, 0, 85, 127 }
-                    }
-                }
-            };
-
-            MmdBonePoseSample sample = VmdBoneSampler.SamplePose(keyframes, "root", frame: 1.0f);
-
-            Assert.That(sample.Rotation[0], Is.EqualTo(-0.06206015f).Within(0.00001f));
-            Assert.That(sample.Rotation[3], Is.EqualTo(0.99807227f).Within(0.00001f));
-        }
-
-        [Test]
-        public void VmdMotionSamplerProjectsRegisteredRotationsToTheModelFixedAxis()
-        {
-            var model = new MmdModelDefinition();
-            model.bones.Add(new MmdBoneDefinition
-            {
-                index = 0,
-                name = "fixed",
-                parentIndex = -1,
-                fixedAxis = true,
-                fixedAxisVector = new[] { 1.0f, 0.0f, 0.0f }
-            });
-            var motion = new MmdMotionDefinition();
-            motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
-            {
-                boneName = "fixed",
-                frame = 0,
-                rotation = new[] { 0.3f, 0.4f, 0.0f, 0.8660254f }
-            });
-
-            MmdBonePoseSample raw = VmdMotionSampler.Sample(motion, 0.0f).Bones["fixed"];
-            MmdBonePoseSample registered = VmdMotionSampler.Sample(motion, model, 0.0f).Bones["fixed"];
-
-            Assert.That(raw.Rotation[1], Is.EqualTo(0.4f).Within(0.00001f));
-            Assert.That(registered.Rotation[0], Is.EqualTo(0.5f).Within(0.00001f));
-            Assert.That(registered.Rotation[1], Is.EqualTo(0.0f).Within(0.00001f));
-            Assert.That(registered.Rotation[2], Is.EqualTo(0.0f).Within(0.00001f));
-            Assert.That(registered.Rotation[3], Is.EqualTo(0.8660254f).Within(0.00001f));
-        }
-
-        [Test]
-        public void VmdMotionSamplerUsesRegisteredInterpolationOnlyWhenPairedWithAModel()
-        {
-            var model = new MmdModelDefinition();
-            model.bones.Add(new MmdBoneDefinition { index = 0, name = "root", parentIndex = -1 });
-            var registeredBlock = new byte[64];
-            registeredBlock[48] = 20;
-            registeredBlock[52] = 20;
-            registeredBlock[56] = 107;
-            registeredBlock[60] = 107;
-            var motion = new MmdMotionDefinition();
-            motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
-            {
-                boneName = "root",
-                frame = 0,
-                rotation = new[] { 0.0f, 0.0f, 0.0f, 1.0f }
-            });
-            motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
-            {
-                boneName = "root",
-                frame = 9,
-                rotation = new[] { -0.38268337f, 0.0f, 0.0f, 0.92387956f },
-                interpolation = new MmdBoneInterpolationDefinition
-                {
-                    rotation = new byte[] { 0, 0, 85, 127 }
-                },
-                rawInterpolation = registeredBlock
-            });
-
-            MmdBonePoseSample raw = VmdMotionSampler.Sample(motion, 1.0f).Bones["root"];
-            MmdBonePoseSample registered = VmdMotionSampler.Sample(motion, model, 1.0f).Bones["root"];
-
-            Assert.That(raw.Rotation[0], Is.EqualTo(-0.06206015f).Within(0.00001f));
-            Assert.That(registered.Rotation[0], Is.EqualTo(-0.04361939f).Within(0.00001f));
-        }
-
-        [Test]
-        public void RuntimePipelineRunsCcdIkByDefault()
-        {
-            var model = new MmdModelDefinition();
-            model.bones.Add(new MmdBoneDefinition
-            {
-                index = 0,
-                name = "root",
-                parentIndex = -1,
-                origin = new[] { 0.0f, 0.0f, 0.0f }
-            });
-            model.bones.Add(new MmdBoneDefinition
-            {
-                index = 1,
-                name = "link",
-                parentIndex = 0,
-                origin = new[] { 1.0f, 0.0f, 0.0f }
-            });
-            model.bones.Add(new MmdBoneDefinition
-            {
-                index = 2,
-                name = "effector",
-                parentIndex = 1,
-                origin = new[] { 2.0f, 0.0f, 0.0f }
-            });
-            model.bones.Add(new MmdBoneDefinition
-            {
-                index = 3,
-                name = "target",
-                parentIndex = 0,
-                origin = new[] { 1.0f, 1.0f, 0.0f }
-            });
-            model.ik.Add(new MmdIkDefinition
-            {
-                boneIndex = 3,
-                targetBoneIndex = 2,
-                iterationCount = 1,
-                angleLimit = 1.0f,
-                links =
-                {
-                    new MmdIkLinkDefinition { boneIndex = 1 }
-                }
-            });
-
-            MmdTrace trace = MmdRuntimeTraceEvaluator.EvaluatePhaseOneTrace(
-                model,
-                new MmdMotionDefinition(),
-                frame: 0,
-                time: 0.0f,
-                modelId: "ik-model.pmx",
-                motionId: "empty.vmd");
-
-            MmdTraceBone appendLink = trace.frames.Single(frame => frame.checkpoint == MmdTraceCheckpoints.AfterAppendTransform).bones.Single(bone => bone.name == "link");
-            MmdTraceBone ikLink = trace.frames.Single(frame => frame.checkpoint == MmdTraceCheckpoints.AfterIk).bones.Single(bone => bone.name == "link");
-            Assert.That(ikLink.localRotation[2], Is.Not.EqualTo(appendLink.localRotation[2]).Within(0.00001f));
         }
 
         [Test]
@@ -446,7 +263,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void RuntimeSessionEvaluatesTraceAndSnapshotFromNeutralIr()
+        public void RuntimeSessionBuildsSnapshotFromNativeIr()
         {
             (MmdModelDefinition model, MmdMotionDefinition motion) = LoadPlaybackFixturePair();
             var session = new MmdRuntimeSession(
@@ -455,7 +272,6 @@ namespace Mmd.Tests
                 "test_1bone_cube.pmx",
                 "test_1bone_cube_motion.vmd");
 
-            Assert.That(session.EvaluateTrace(frame: 0, time: 0.0f).frames, Has.Count.EqualTo(5));
             MmdPlaybackSnapshot snapshot = session.BuildSnapshot(frame: 0, time: 0.0f);
             Assert.That(snapshot.rendering.indices, Has.Count.GreaterThan(0));
             Assert.That(snapshot.frame.bones, Has.Count.GreaterThan(0));
@@ -463,48 +279,43 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void RuntimeSessionBuildSnapshotAppliesCustomIkSolver()
+        public void TransformBakeSummaryUsesNativeSourceBackedFramesWhenPhysicsIsOff()
         {
             (MmdModelDefinition model, MmdMotionDefinition motion) = LoadPlaybackFixturePair();
-            string targetBoneName = model.bones[0].name;
-            var session = new MmdRuntimeSession(
+            using var session = new MmdRuntimeSession(
                 model,
                 motion,
                 "test_1bone_cube.pmx",
                 "test_1bone_cube_motion.vmd");
 
-            MmdPlaybackSnapshot baseline = session.BuildSnapshot(frame: 0, time: 0.0f);
-            MmdPlaybackSnapshot adjusted = session.BuildSnapshot(
-                frame: 0,
-                time: 0.0f,
-                ikSolver: new TestOffsetIkSolver(targetBoneName, 2.0f));
+            MmdAnimationBakeSummary summary = session.BuildTransformBakeSummary(
+                startFrame: 0,
+                endFrame: 2,
+                frameRate: 30.0f);
 
-            Assert.That(adjusted.frame.bones[0].localPosition[0], Is.EqualTo(baseline.frame.bones[0].localPosition[0] + 2.0f).Within(0.00001f));
-            Assert.That(adjusted.frame.bones[0].worldMatrix[3], Is.EqualTo(baseline.frame.bones[0].worldMatrix[3] + 2.0f).Within(0.00001f));
+            Assert.That(summary.bakedFrameCount, Is.EqualTo(3));
+            Assert.That(summary.boneCurves, Is.Not.Empty);
+            Assert.That(summary.boneCurves[0].positionKeys, Has.Count.EqualTo(3));
+            Assert.That(summary.boneCurves[0].rotationKeys, Has.Count.EqualTo(3));
+            Assert.That(summary.frames, Is.EqualTo(new[] { 0, 1, 2 }));
         }
 
         [Test]
-        public void RuntimeSessionBuildSnapshotsWithCustomIkSolverDoesNotRequireNativeSourceBytes()
+        public void TransformBakeSummaryRejectsChangedNativeSourceBytes()
         {
-            var model = new MmdModelDefinition();
-            model.bones.Add(new MmdBoneDefinition
-            {
-                index = 0,
-                name = "root",
-                parentIndex = -1,
-                origin = new[] { 0.0f, 0.0f, 0.0f }
-            });
-            var motion = new MmdMotionDefinition();
-            var session = new MmdRuntimeSession(model, motion, "synthetic.pmx", "synthetic.vmd");
+            (MmdModelDefinition model, MmdMotionDefinition motion) = LoadPlaybackFixturePair();
+            using var session = new MmdRuntimeSession(
+                model,
+                motion,
+                "test_1bone_cube.pmx",
+                "test_1bone_cube_motion.vmd");
 
-            IReadOnlyList<MmdPlaybackSnapshot> snapshots = session.BuildSnapshots(
-                new[] { 0, 1 },
-                frameRate: 30.0f,
-                ikSolver: new TestOffsetIkSolver("root", 2.0f));
+            model.sourceBytes![0] ^= 0xff;
 
-            Assert.That(snapshots, Has.Count.EqualTo(2));
-            Assert.That(snapshots[0].frame.bones[0].localPosition[0], Is.EqualTo(2.0f).Within(0.00001f));
-            Assert.That(snapshots[1].frame.bones[0].localPosition[0], Is.EqualTo(2.0f).Within(0.00001f));
+            InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
+                () => session.BuildTransformBakeSummary(0, 2, 30.0f))!;
+
+            Assert.That(exception.Message, Does.Contain("source bytes changed before session compilation"));
         }
 
         private static (MmdModelDefinition Model, MmdMotionDefinition Motion) LoadPlaybackFixturePair()
@@ -513,58 +324,6 @@ namespace Mmd.Tests
             MmdModelDefinition model = parser.LoadModel(MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube.pmx"));
             MmdMotionDefinition motion = parser.LoadMotion(MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube_motion.vmd"));
             return (model, motion);
-        }
-
-        private sealed class TestOffsetIkSolver : IMmdIkSolver
-        {
-            private readonly string boneName;
-            private readonly float offsetX;
-
-            public TestOffsetIkSolver(string boneName, float offsetX)
-            {
-                this.boneName = boneName;
-                this.offsetX = offsetX;
-            }
-
-            public string Name => "TestOffsetIkSolver";
-
-            public MmdSampledMotion Solve(MmdModelDefinition model, MmdSampledMotion? sampledMotion)
-            {
-                MmdSampledMotion result = CopyMotion(sampledMotion);
-                MmdBonePoseSample source = result.Bones.TryGetValue(boneName, out MmdBonePoseSample found)
-                    ? found
-                    : MmdBonePoseSample.Identity;
-                result.Bones[boneName] = new MmdBonePoseSample(
-                    new[] { source.Translation[0] + offsetX, source.Translation[1], source.Translation[2] },
-                    source.Rotation);
-                return result;
-            }
-
-            private static MmdSampledMotion CopyMotion(MmdSampledMotion? source)
-            {
-                var result = new MmdSampledMotion();
-                if (source == null)
-                {
-                    return result;
-                }
-
-                foreach (KeyValuePair<string, MmdBonePoseSample> bone in source.Bones)
-                {
-                    result.Bones[bone.Key] = bone.Value;
-                }
-
-                foreach (KeyValuePair<string, float> morph in source.Morphs)
-                {
-                    result.Morphs[morph.Key] = morph.Value;
-                }
-
-                foreach (KeyValuePair<string, bool> ikState in source.IkStates)
-                {
-                    result.IkStates[ikState.Key] = ikState.Value;
-                }
-
-                return result;
-            }
         }
 
         [Test]
@@ -619,45 +378,6 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void GroupMorphOffsetsSelfReferenceRejected()
-        {
-            var model = new MmdModelDefinition();
-            model.bones.Add(new MmdBoneDefinition
-            {
-                index = 0,
-                name = "root",
-                parentIndex = -1,
-                origin = new[] { 0.0f, 0.0f, 0.0f }
-            });
-            model.vertices.Add(new MmdVertexDefinition
-            {
-                index = 0,
-                position = new[] { 0.0f, 0.0f, 0.0f },
-                normal = new[] { 0.0f, 1.0f, 0.0f },
-                uv = new[] { 0.0f, 0.0f },
-                boneIndices = new[] { 0 },
-                boneWeights = new[] { 1.0f }
-            });
-            model.indices.AddRange(new[] { 0, 0, 0 });
-            model.materials.Add(new MmdMaterialDefinition { index = 0, name = "mat", vertexCount = 3 });
-
-            // Group morph referencing itself
-            model.morphs.Add(new MmdMorphDefinition
-            {
-                index = 0,
-                name = "self-ref-group",
-                type = "group",
-                groupOffsets =
-                {
-                    new MmdGroupMorphOffsetDefinition { morphIndex = 0, weight = 1.0f }
-                }
-            });
-
-            var errors = MmdModelValidator.ValidateStructuralModel(model);
-            Assert.That(errors, Has.Some.Matches<string>(msg => msg.Contains("self-reference")));
-        }
-
-        [Test]
         public void GroupMorphOffsetsNonExistentTargetRejected()
         {
             var model = new MmdModelDefinition();
@@ -681,38 +401,6 @@ namespace Mmd.Tests
 
             var errors = MmdModelValidator.ValidateStructuralModel(model);
             Assert.That(errors, Has.Some.Matches<string>(msg => msg.Contains("does not exist")));
-        }
-
-        [Test]
-        public void GroupMorphOffsetsNonFiniteWeightRejected()
-        {
-            var model = new MmdModelDefinition();
-            model.bones.Add(new MmdBoneDefinition
-            {
-                index = 0,
-                name = "root",
-                parentIndex = -1,
-                origin = new[] { 0.0f, 0.0f, 0.0f }
-            });
-            model.morphs.Add(new MmdMorphDefinition
-            {
-                index = 0,
-                name = "target-morph",
-                type = "vertex"
-            });
-            model.morphs.Add(new MmdMorphDefinition
-            {
-                index = 1,
-                name = "group-morph",
-                type = "group",
-                groupOffsets =
-                {
-                    new MmdGroupMorphOffsetDefinition { morphIndex = 0, weight = float.NaN }
-                }
-            });
-
-            var errors = MmdModelValidator.ValidateStructuralModel(model);
-            Assert.That(errors, Has.Some.Matches<string>(msg => msg.Contains("weight must be finite")));
         }
 
         [Test]

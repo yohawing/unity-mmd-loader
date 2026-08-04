@@ -2,12 +2,86 @@
 
 using System;
 using System.IO;
+using Mmd;
+using Mmd.Native;
 using UnityEngine;
 
 namespace Mmd.UnityIntegration
 {
     public sealed partial class MmdUnityPlaybackController
     {
+        // Test-only seam for deterministic native-unavailable fallback coverage. Production code
+        // leaves this null and calls the real binding setup below.
+        internal static Func<byte[], byte[], bool>? NativeRuntimeAvailabilityOverrideForTests { get; set; }
+
+        private static bool TryCheckNativeRuntimeAvailability(
+            byte[] pmxBytes,
+            byte[] vmdBytes,
+            out string reason)
+        {
+            Func<byte[], byte[], bool>? overrideForTests = NativeRuntimeAvailabilityOverrideForTests;
+            if (overrideForTests != null)
+            {
+                bool available = overrideForTests(pmxBytes, vmdBytes);
+                reason = available ? string.Empty : "native runtime unavailable (forced by test).";
+                if (!available)
+                {
+                    return false;
+                }
+            }
+
+            try
+            {
+                MmdRuntimeFfiMethods.ValidateAbiVersion();
+                reason = string.Empty;
+                return true;
+            }
+            catch (DllNotFoundException ex)
+            {
+                reason = ex.GetType().Name + ": " + ex.Message;
+                return false;
+            }
+            catch (EntryPointNotFoundException ex)
+            {
+                reason = ex.GetType().Name + ": " + ex.Message;
+                return false;
+            }
+            catch (BadImageFormatException ex)
+            {
+                reason = ex.GetType().Name + ": " + ex.Message;
+                return false;
+            }
+            catch (InvalidOperationException ex)
+            {
+                reason = ex.GetType().Name + ": " + ex.Message;
+                return false;
+            }
+        }
+
+        private static bool TryEnableNativeRuntime(
+            MmdUnityPlaybackBinding candidate,
+            byte[] pmxBytes,
+            byte[] vmdBytes,
+            MmdRuntimeFfiVmdContext? sharedVmdContext,
+            out string reason)
+        {
+            if (sharedVmdContext != null)
+            {
+                return candidate.TryEnableFastRuntimeWithSharedVmdContext(
+                    pmxBytes,
+                    vmdBytes,
+                    sharedVmdContext,
+                    out reason,
+                    abiAlreadyValidated: true);
+            }
+
+            return candidate.TryEnableFastRuntime(
+                pmxBytes,
+                vmdBytes,
+                out reason,
+                abiAlreadyValidated: true);
+        }
+
         public bool TryEnableFastRuntime(byte[] pmxBytes, byte[] vmdBytes, out string reason)
         {
             if (binding == null)
@@ -80,27 +154,5 @@ namespace Mmd.UnityIntegration
             lastFastRuntimeReason = string.Empty;
         }
 
-        private void TryEnableFastRuntimeFromAssetBytesForDefaultPlayback(MmdPmxAsset pmxAsset, MmdVmdAsset vmdAsset)
-        {
-            TryEnableFastRuntimeFromBytesForDefaultPlayback(pmxAsset.GetBytesCopy(), vmdAsset.GetBytesCopy());
-        }
-
-        private void TryEnableFastRuntimeFromBytesForDefaultPlayback(byte[] pmxBytes, byte[] vmdBytes)
-        {
-            if (binding == null)
-            {
-                lastFastRuntimeReason = string.Empty;
-                return;
-            }
-
-            if (TryEnableFastRuntime(pmxBytes, vmdBytes, out string reason))
-            {
-                lastFastRuntimeReason = string.Empty;
-                return;
-            }
-
-            lastFastRuntimeReason = reason;
-            Debug.LogWarning("MMD fast runtime unavailable; managed playback remains active: " + reason, this);
-        }
     }
 }

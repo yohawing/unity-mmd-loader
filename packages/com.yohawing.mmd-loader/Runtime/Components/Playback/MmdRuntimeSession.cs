@@ -2,13 +2,9 @@
 
 using System;
 using System.Collections.Generic;
-using Mmd.Motion;
 using Mmd.Native;
 using Mmd.Parser;
-using Mmd.Physics;
-using Mmd.Pose;
 using Mmd.Rendering;
-using Mmd.Tracing;
 
 namespace Mmd
 {
@@ -24,7 +20,6 @@ namespace Mmd
         private readonly int nativeMotionSourceLength;
         private readonly ulong nativeModelSourceFingerprint;
         private readonly ulong nativeMotionSourceFingerprint;
-        private MmdTopologyPlan? topologyPlan;
         private MmdRuntimeFfiPlaybackSession? nativePlaybackSession;
         private float[]? nativeWorldMatrices;
         private float[]? nativeMorphWeights;
@@ -78,88 +73,50 @@ namespace Mmd
             Dispose(disposing: false);
         }
 
-        internal byte[]? MotionSourceBytes => motion.sourceBytes;
-
-        internal MmdTopologyPlan TopologyPlan
-        {
-            get
-            {
-                ThrowIfDisposed();
-                return topologyPlan ??= MmdTopologyPlan.CreateFromValidatedModel(model);
-            }
-        }
-
-        public MmdTrace EvaluateTrace(int frame, float time, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
+        public MmdPlaybackSnapshot BuildSnapshot(int frame, float time)
         {
             ThrowIfDisposed();
-            return MmdRuntimeTraceEvaluator.EvaluatePhaseOneTrace(model, motion, frame, time, modelId, motionId, physicsBackend, ikSolver);
+            return MmdPlaybackSnapshotBuilder.BuildPhaseOneSnapshot(model, motion, frame, time, modelId, motionId);
         }
 
-        public MmdTrace EvaluateTraceFrames(IReadOnlyList<int> frames, float frameRate, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
-        {
-            ThrowIfDisposed();
-            return MmdRuntimeTraceEvaluator.EvaluatePhaseOneTraceFrames(model, motion, frames, frameRate, modelId, motionId, physicsBackend, ikSolver);
-        }
-
-        public MmdPlaybackSnapshot BuildSnapshot(int frame, float time, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
-        {
-            ThrowIfDisposed();
-            return MmdPlaybackSnapshotBuilder.BuildPhaseOneSnapshot(model, motion, frame, time, modelId, motionId, physicsBackend, ikSolver);
-        }
-
-        public MmdPlaybackSnapshot BuildSnapshotAtTime(float time, float frameRate, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
+        public MmdPlaybackSnapshot BuildSnapshotAtTime(float time, float frameRate)
         {
             MmdPlaybackTimeMapping mapping = DescribePlaybackTime(time, frameRate);
-            return BuildSnapshot(mapping.frame, time, physicsBackend, ikSolver);
+            return BuildSnapshot(mapping.frame, time);
         }
 
-        public MmdEvaluatedFrame EvaluateFrame(int frame, float time, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
+        public MmdEvaluatedFrame EvaluateFrame(int frame, float time)
         {
             ThrowIfDisposed();
-            if (physicsBackend == null &&
-                ikSolver == null &&
-                nativeModelSourceIdentity != null &&
-                nativeMotionSourceIdentity != null)
-            {
-                return EvaluateNativeFrame(frame, time);
-            }
-
-            return MmdRuntimeFrameEvaluator.EvaluateValidatedPhaseOnePlaybackFrame(
-                model,
-                motion,
-                frame,
-                time,
-                TopologyPlan,
-                physicsBackend,
-                ikSolver);
+            return EvaluateNativeFrame(frame, time);
         }
 
-        internal MmdEvaluatedFrame EvaluateBeforePhysicsFrame(int frame, float time, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
+        internal MmdEvaluatedFrame EvaluateBeforePhysicsFrame(int frame, float time)
         {
             ThrowIfDisposed();
-            if (!model.HasDeformAfterPhysicsBones &&
-                physicsBackend == null &&
-                ikSolver == null &&
-                nativeModelSourceIdentity != null &&
-                nativeMotionSourceIdentity != null)
+            if (nativeModelSourceIdentity == null || nativeMotionSourceIdentity == null)
             {
-                return EvaluateNativeFrame(frame, time);
+                throw new InvalidOperationException(
+                    "Model sourceBytes and motion sourceBytes are required for native evaluation.");
             }
 
-            return MmdRuntimeFrameEvaluator.EvaluateValidatedBeforePhysicsPlaybackFrame(
-                model,
-                motion,
-                frame,
-                time,
-                TopologyPlan,
-                physicsBackend,
-                ikSolver);
+            if (model.HasDeformAfterPhysicsBones)
+            {
+                MmdPlaybackTime.ValidateFrame(frame);
+                MmdPlaybackTime.ValidateTime(time);
+                MmdModelValidator.ThrowIfInvalid(model);
+                MmdMotionValidator.ThrowIfInvalid(motion);
+                EnsureNativeSourcesUnchangedBeforeCompilation();
+                return EvaluateNativeBeforePhysicsFrame(frame, time);
+            }
+
+            return EvaluateNativeFrame(frame, time);
         }
 
-        public MmdEvaluatedFrame EvaluateFrameAtTime(float time, float frameRate, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
+        public MmdEvaluatedFrame EvaluateFrameAtTime(float time, float frameRate)
         {
             MmdPlaybackTimeMapping mapping = DescribePlaybackTime(time, frameRate);
-            return EvaluateFrame(mapping.frame, time, physicsBackend, ikSolver);
+            return EvaluateFrame(mapping.frame, time);
         }
 
         public MmdPlaybackSnapshot BuildSnapshotFromEvaluatedFrame(MmdEvaluatedFrame frame, MmdRenderingDescriptor rendering)
@@ -180,20 +137,22 @@ namespace Mmd
             return MmdPlaybackTime.Map(time, frameRate, motion.maxFrame);
         }
 
-        public MmdPlaybackSnapshotSummary BuildSnapshotSummary(int frame, float time, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
+        public MmdPlaybackSnapshotSummary BuildSnapshotSummary(int frame, float time)
         {
-            return MmdPlaybackSnapshotDiagnostics.Summarize(BuildSnapshot(frame, time, physicsBackend, ikSolver));
+            return MmdPlaybackSnapshotDiagnostics.Summarize(BuildSnapshot(frame, time));
         }
 
-        public IReadOnlyList<MmdPlaybackSnapshot> BuildSnapshots(IReadOnlyList<int> frames, float frameRate, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
+        public IReadOnlyList<MmdPlaybackSnapshot> BuildSnapshots(IReadOnlyList<int> frames, float frameRate)
         {
             ThrowIfDisposed();
-            return MmdPlaybackSnapshotBuilder.BuildPhaseOneSnapshots(model, motion, frames, frameRate, modelId, motionId, physicsBackend, ikSolver);
+            EnsureNativeSourcesUnchanged();
+
+            return MmdPlaybackSnapshotBuilder.BuildPhaseOneSnapshots(model, motion, frames, frameRate, modelId, motionId);
         }
 
-        public MmdPlaybackSnapshotSequenceSummary BuildSnapshotSequenceSummary(IReadOnlyList<int> frames, float frameRate, IMmdPhysicsBackend? physicsBackend = null, IMmdIkSolver? ikSolver = null)
+        public MmdPlaybackSnapshotSequenceSummary BuildSnapshotSequenceSummary(IReadOnlyList<int> frames, float frameRate)
         {
-            return MmdPlaybackSnapshotDiagnostics.SummarizeSequence(BuildSnapshots(frames, frameRate, physicsBackend, ikSolver));
+            return MmdPlaybackSnapshotDiagnostics.SummarizeSequence(BuildSnapshots(frames, frameRate));
         }
 
         public MmdAnimationBakeSummary BuildTransformBakeSummary(
@@ -238,10 +197,30 @@ namespace Mmd
             ThrowIfDisposed();
             MmdPlaybackTime.ValidateFrame(frame);
             MmdPlaybackTime.ValidateTime(time);
-            EnsureNativeSourcesUnchanged();
             EnsureNativePlaybackSession();
 
             nativePlaybackSession!.EvaluateAndCopy(
+                frame,
+                nativeWorldMatrices!,
+                nativeMorphWeights!,
+                nativeIkEnabled!);
+            return MmdRuntimeFrameEvaluator.BuildFrameFromNative(
+                model,
+                frame,
+                time,
+                nativeWorldMatrices!,
+                nativeMorphWeights!,
+                includeMaterials: false);
+        }
+
+        private MmdEvaluatedFrame EvaluateNativeBeforePhysicsFrame(int frame, float time)
+        {
+            ThrowIfDisposed();
+            MmdPlaybackTime.ValidateFrame(frame);
+            MmdPlaybackTime.ValidateTime(time);
+            EnsureNativePlaybackSession();
+
+            nativePlaybackSession!.EvaluateBeforePhysicsAndCopy(
                 frame,
                 nativeWorldMatrices!,
                 nativeMorphWeights!,
@@ -266,11 +245,7 @@ namespace Mmd
                 ?? throw new InvalidOperationException("Model source bytes are required for native runtime evaluation.");
             byte[] motionSourceIdentity = nativeMotionSourceIdentity
                 ?? throw new InvalidOperationException("Motion source bytes are required for native runtime evaluation.");
-            if (ComputeSourceFingerprint(modelSourceIdentity) != nativeModelSourceFingerprint
-                || ComputeSourceFingerprint(motionSourceIdentity) != nativeMotionSourceFingerprint)
-            {
-                throw new InvalidOperationException("Native runtime source bytes changed before session compilation.");
-            }
+            EnsureNativeSourcesUnchangedBeforeCompilation();
 
             byte[] modelSource = (byte[])modelSourceIdentity.Clone();
             byte[] motionSource = (byte[])motionSourceIdentity.Clone();
@@ -292,14 +267,34 @@ namespace Mmd
             }
         }
 
+        private void EnsureNativeSourcesUnchangedBeforeCompilation()
+        {
+            if (nativePlaybackSession != null)
+            {
+                return;
+            }
+
+            EnsureNativeSourcesUnchanged();
+        }
+
         private void EnsureNativeSourcesUnchanged()
         {
+            string phase = nativePlaybackSession == null
+                ? "before session compilation"
+                : "after session compilation";
             if (!ReferenceEquals(model.sourceBytes, nativeModelSourceIdentity)
                 || !ReferenceEquals(motion.sourceBytes, nativeMotionSourceIdentity)
                 || (model.sourceBytes?.Length ?? 0) != nativeModelSourceLength
                 || (motion.sourceBytes?.Length ?? 0) != nativeMotionSourceLength)
             {
-                throw new InvalidOperationException("Native runtime session source identity changed after construction.");
+                throw new InvalidOperationException(
+                    "Native runtime session source identity changed " + phase + ".");
+            }
+
+            if (ComputeSourceFingerprint(model.sourceBytes) != nativeModelSourceFingerprint ||
+                ComputeSourceFingerprint(motion.sourceBytes) != nativeMotionSourceFingerprint)
+            {
+                throw new InvalidOperationException("Native runtime source bytes changed " + phase + ".");
             }
         }
 

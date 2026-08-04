@@ -45,7 +45,6 @@ namespace Mmd.UnityIntegration
         private bool isApplyingPlaybackPose;
         private bool pendingSeekReseed;
 
-        private bool _userExplicitLive;
 
         public bool IsConfigured => binding != null;
 
@@ -111,8 +110,6 @@ namespace Mmd.UnityIntegration
             }
         }
 
-        internal bool HasHumanoidPhysicsBinding => humanoidPhysicsBinding != null;
-
         public Transform? HumanoidProxyRoot => proxyRoot;
 
         public IReadOnlyList<MmdHumanoidRetargetBinding> HumanoidRetargetEntries => humanoidRetargetEntries;
@@ -155,7 +152,7 @@ namespace Mmd.UnityIntegration
                 throw new ArgumentNullException(nameof(playbackBinding));
             }
 
-            ValidateFrameRate(playbackFrameRate);
+            MmdPlaybackTime.ValidateFrameRate(playbackFrameRate);
             if (binding != null && !ReferenceEquals(binding, playbackBinding))
             {
                 binding.Dispose();
@@ -182,12 +179,10 @@ namespace Mmd.UnityIntegration
 
         public void SetPhysicsMode(MmdPhysicsMode mode)
         {
-            ApplyPhysicsMode(mode, markUserExplicit: true);
+            ApplyPhysicsMode(mode);
         }
 
-        internal bool IsUserExplicitLive => physicsMode == MmdPhysicsMode.Live && _userExplicitLive;
-
-        private void ApplyPhysicsMode(MmdPhysicsMode mode, bool markUserExplicit)
+        private void ApplyPhysicsMode(MmdPhysicsMode mode)
         {
             if (binding != null)
             {
@@ -199,15 +194,6 @@ namespace Mmd.UnityIntegration
             }
 
             physicsMode = mode;
-            if (mode == MmdPhysicsMode.Live)
-            {
-                _userExplicitLive = markUserExplicit;
-            }
-            else
-            {
-                _userExplicitLive = false;
-            }
-
             if (humanoidPhysicsBinding != null)
             {
                 if (mode == MmdPhysicsMode.Live)
@@ -480,11 +466,6 @@ namespace Mmd.UnityIntegration
             {
                 throw new InvalidOperationException("Playback controller must be configured before playback starts.");
             }
-        }
-
-        private static void ValidateFrameRate(float playbackFrameRate)
-        {
-            MmdPlaybackTime.ValidateFrameRate(playbackFrameRate);
         }
 
         private static void ValidatePhysicsMode(MmdPhysicsMode mode)

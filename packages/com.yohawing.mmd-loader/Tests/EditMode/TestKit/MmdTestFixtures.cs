@@ -149,6 +149,24 @@ namespace Mmd.Tests
             return stream.ToArray();
         }
 
+        internal static byte[] BuildCameraTrackVmdBytes(string modelName)
+        {
+            using var stream = new MemoryStream();
+            using var writer = new BinaryWriter(stream);
+
+            WriteFixedSjis(writer, "Vocaloid Motion Data 0002", 30);
+            WriteFixedSjis(writer, modelName ?? string.Empty, 20);
+            writer.Write(0u); // bone frames
+            writer.Write(0u); // morph frames
+            writer.Write(2u); // camera frames
+            WriteSceneTrackCameraFrame(writer, 0u, -40.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 20u, 0);
+            WriteSceneTrackCameraFrame(writer, 30u, -20.0f, 2.0f, 20.0f, -4.0f, 0.1f, 0.2f, 0.1f, 40u, 1);
+            writer.Write(0u); // light frames
+            writer.Write(0u); // self-shadow frames
+            writer.Write(0u); // property frames
+            return stream.ToArray();
+        }
+
         internal static string MotionFixtureFileName(string baseName)
         {
             return baseName == "test_1bone_cube" ? "test_1bone_cube_motion.vmd" : baseName + ".vmd";
@@ -396,6 +414,43 @@ namespace Mmd.Tests
             return stream.ToArray();
         }
 
+        internal static byte[] CreateDenseVmdBytes(
+            string modelName,
+            string boneName,
+            int boneKeyframeCount,
+            int frameSpan)
+        {
+            Assert.That(boneKeyframeCount, Is.GreaterThan(0));
+            Assert.That(frameSpan, Is.GreaterThan(0));
+
+            using var stream = new MemoryStream(checked(54 + boneKeyframeCount * 111 + 16));
+            using var writer = new BinaryWriter(stream);
+            WriteFixedSjis(writer, "Vocaloid Motion Data 0002", 30);
+            WriteFixedSjis(writer, modelName ?? string.Empty, 20);
+            writer.Write((uint)boneKeyframeCount);
+            byte[] interpolation = LinearVmdInterpolationBytes();
+            for (int i = 0; i < boneKeyframeCount; i++)
+            {
+                WriteFixedSjis(writer, boneName ?? string.Empty, 15);
+                writer.Write((uint)(i % frameSpan));
+                writer.Write((float)(i % 97) * 0.001f);
+                writer.Write((float)(i % 53) * -0.001f);
+                writer.Write((float)(i % 31) * 0.002f);
+                writer.Write(0.0f);
+                writer.Write(0.0f);
+                writer.Write(0.0f);
+                writer.Write(1.0f);
+                writer.Write(interpolation);
+            }
+
+            writer.Write(0u); // morph count
+            writer.Write(0u); // camera count
+            writer.Write(0u); // light count
+            writer.Write(0u); // self-shadow count
+            writer.Write(0u); // show/IK count
+            return stream.ToArray();
+        }
+
         private static void WriteFixedSjis(BinaryWriter writer, string value, int byteCount)
         {
             byte[] buffer = new byte[byteCount];
@@ -421,6 +476,32 @@ namespace Mmd.Tests
             writer.Write(x);
             writer.Write(y);
             writer.Write(z);
+        }
+
+        private static void WriteSceneTrackCameraFrame(
+            BinaryWriter writer,
+            uint frame,
+            float distance,
+            float posX,
+            float posY,
+            float posZ,
+            float rotX,
+            float rotY,
+            float rotZ,
+            uint viewAngle,
+            byte perspective)
+        {
+            writer.Write(frame);
+            writer.Write(distance);
+            writer.Write(posX);
+            writer.Write(posY);
+            writer.Write(posZ);
+            writer.Write(rotX);
+            writer.Write(rotY);
+            writer.Write(rotZ);
+            writer.Write(new byte[24]); // interpolation
+            writer.Write(viewAngle);
+            writer.Write(perspective);
         }
 
         private static void WriteSceneTrackSelfShadowFrame(BinaryWriter writer, uint frame, byte mode, float distance)

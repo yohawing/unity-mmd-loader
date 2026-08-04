@@ -7,6 +7,7 @@ using UnityEngine;
 using UnityEngine.Playables;
 using UnityEngine.Timeline;
 using Mmd.Parser;
+using Mmd.Native;
 using Mmd.Physics;
 using Mmd.Timeline;
 using Mmd.UnityIntegration;
@@ -52,44 +53,6 @@ namespace Mmd.Tests
                 {
                     Object.DestroyImmediate(track);
                 }
-            }
-        }
-
-        [Test]
-        public void ProcessFrameWithZeroEffectiveWeightDoesNotApplyPose()
-        {
-            MmdUnityPlaybackBinding? binding = null;
-            int processFrameCallbackCount = 0;
-            void OnProcessFrame(double _)
-            {
-                processFrameCallbackCount++;
-            }
-
-            try
-            {
-                binding = CreatePlaybackBinding();
-                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
-                controller.Configure(binding, 30.0f);
-                var behaviour = new MmdVmdTimelineBehaviour
-                {
-                    FrameRate = 30.0f
-                };
-                MmdPlaybackSnapshot frameNine = behaviour.EvaluateAtLocalTime(controller, 9.25 / 30.0);
-                Quaternion beforeRotation = binding.Instance.BoneTransforms[0].localRotation;
-
-                MmdVmdTimelineBehaviour.ProcessFrameEvaluated += OnProcessFrame;
-                behaviour.ProcessFrame(default, default, controller);
-
-                Assert.That(frameNine.frame.frame, Is.EqualTo(9));
-                Assert.That(controller.CurrentFrame, Is.EqualTo(9));
-                Assert.That(controller.LastSnapshot, Is.SameAs(frameNine));
-                Assert.That(Quaternion.Angle(binding.Instance.BoneTransforms[0].localRotation, beforeRotation), Is.LessThan(0.001f));
-                Assert.That(processFrameCallbackCount, Is.EqualTo(0));
-            }
-            finally
-            {
-                MmdVmdTimelineBehaviour.ProcessFrameEvaluated -= OnProcessFrame;
-                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
             }
         }
 
@@ -166,10 +129,9 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void TimelineEvaluationPreservesSerializedLiveWithoutUserExplicit()
+        public void TimelineEvaluationPreservesSerializedLiveMode()
         {
-            // Verifies that serialized/Inspector Live stays Live after Timeline evaluation
-            // even when SetPhysicsMode(Live) was never called explicitly (non-user-explicit Live).
+            // Verifies that serialized/Inspector Live stays Live after Timeline evaluation.
             MmdUnityPlaybackBinding? binding = null;
             try
             {
@@ -177,7 +139,6 @@ namespace Mmd.Tests
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f);
                 // Do NOT call SetPhysicsMode(Live) explicitly — rely on the serialized default (Live).
-                // _userExplicitLive remains false, making this the "non-explicit Live" case.
                 var behaviour = new MmdVmdTimelineBehaviour
                 {
                     FrameRate = 30.0f
@@ -188,8 +149,6 @@ namespace Mmd.Tests
                 // Serialized physicsMode is preserved — still Live.
                 Assert.That(controller.PhysicsMode, Is.EqualTo(MmdPhysicsMode.Live));
                 Assert.That(snapshot.frame.frame, Is.EqualTo(10));
-                // IsUserExplicitLive is false (never explicitly set), but controller is still Live.
-                Assert.That(controller.PhysicsMode, Is.EqualTo(MmdPhysicsMode.Live));
             }
             finally
             {
@@ -354,6 +313,163 @@ namespace Mmd.Tests
             }
             finally
             {
+                MmdTestInstanceScope.DestroyInstance(instance);
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+            }
+        }
+
+        [Test]
+        public void ProviderMotionConfigurationUsesCachedNativeHeaderMetadata()
+        {
+            IgnoreIfNativeRuntimeUnavailable();
+            MmdPmxAsset pmxAsset = null!;
+            MmdVmdAsset vmdAsset = null!;
+            MmdUnityModelInstance instance = null!;
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                byte[] vmdBytes = File.ReadAllBytes(vmdPath);
+                MmdVmdParseSummary parsedSummary = MmdVmdNativeSummaryAdapter.Read(vmdBytes);
+                const int cachedMaxFrameOffset = 17;
+                int cachedMaxFrame = parsedSummary.MaxFrame + cachedMaxFrameOffset;
+                var cachedSummary = new MmdVmdParseSummary(
+                    parsedSummary.TargetModelName,
+                    cachedMaxFrame,
+                    parsedSummary.BoneKeyframeCount,
+                    parsedSummary.MorphKeyframeCount,
+                    parsedSummary.ModelKeyframeCount,
+                    parsedSummary.ConstraintStateCount,
+                    parsedSummary.CameraKeyframeCount,
+                    parsedSummary.LightKeyframeCount,
+                    parsedSummary.SelfShadowKeyframeCount);
+                MmdUnityPlaybackController controller = CreateProviderController(
+                    pmxPath,
+                    vmdPath,
+                    out pmxAsset,
+                    out vmdAsset,
+                    out instance,
+                    cachedSummary);
+
+                controller.ConfigureMotionFromProviderModelSource(
+                    vmdAsset,
+                    playbackFrameRate: 30.0f,
+                    startFrame: 0,
+                    playOnStart: false);
+
+                Assert.That(controller.IsConfigured, Is.True);
+                Assert.That(controller.IsFastRuntimeEnabled, Is.True,
+                    "cached native header metadata regression requires the native playback path.");
+                Assert.That(controller.LastSnapshot, Is.Not.Null);
+                Assert.That(controller.MotionMaxFrame, Is.EqualTo(cachedMaxFrame),
+                    "native provider playback must use the imported header metadata.");
+                Assert.That(controller.LastFastRuntimeReason, Is.Empty);
+                Assert.That(controller.LastSnapshot!.frame.bones, Is.Empty,
+                    "native playback must not materialize managed VMD bone keyframes.");
+
+                controller.DisableFastRuntime();
+                MmdPlaybackSnapshot managedSnapshot = controller.ApplyFrame(0);
+                Assert.That(managedSnapshot.frame.bones, Is.Not.Empty,
+                    "disabling native playback must retain complete managed motion data.");
+            }
+            finally
+            {
+                MmdTestInstanceScope.DestroyInstance(instance);
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+            }
+        }
+
+        [Test]
+        public void ProviderMotionConfigurationFailsClosedWhenNativeUnavailable()
+        {
+            MmdPmxAsset pmxAsset = null!;
+            MmdVmdAsset vmdAsset = null!;
+            MmdUnityModelInstance instance = null!;
+            MmdUnityPlaybackController.NativeRuntimeAvailabilityOverrideForTests = (_, _) => false;
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                MmdUnityPlaybackController controller = CreateProviderController(
+                    pmxPath,
+                    vmdPath,
+                    out pmxAsset,
+                    out vmdAsset,
+                    out instance);
+
+                InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+                    controller.ConfigureMotionFromProviderModelSource(
+                        vmdAsset,
+                        playbackFrameRate: 30.0f,
+                        startFrame: 0,
+                        playOnStart: false))!;
+
+                Assert.That(exception.Message, Does.Contain("Normal playback requires mmd-anim native clip playback"));
+                Assert.That(exception.Message, Does.Contain("native runtime unavailable (forced by test)."));
+                Assert.That(controller.LastFastRuntimeReason, Does.Contain("forced by test"));
+                Assert.That(controller.IsConfigured, Is.False);
+                Assert.That(controller.LastSnapshot, Is.Null);
+                Assert.That(instance.SkinnedMeshRenderer!.sharedMesh, Is.Not.Null);
+                Assert.That(instance.SkinnedMeshRenderer.sharedMaterials, Is.Not.Empty);
+            }
+            finally
+            {
+                MmdUnityPlaybackController.NativeRuntimeAvailabilityOverrideForTests = null;
+                MmdTestInstanceScope.DestroyInstance(instance);
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+            }
+        }
+
+        [Test]
+        public void ProviderMotionReconfigurationFailsClosedWhenNativeUnavailable()
+        {
+            MmdPmxAsset pmxAsset = null!;
+            MmdVmdAsset vmdAsset = null!;
+            MmdUnityModelInstance instance = null!;
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                MmdUnityPlaybackController controller = CreateProviderController(
+                    pmxPath,
+                    vmdPath,
+                    out pmxAsset,
+                    out vmdAsset,
+                    out instance);
+
+                controller.ConfigureMotionFromProviderModelSource(
+                    vmdAsset,
+                    playbackFrameRate: 30.0f,
+                    startFrame: 0,
+                    playOnStart: false);
+                Assert.That(controller.IsConfigured, Is.True);
+                Assert.That(controller.IsFastRuntimeEnabled, Is.True);
+                Mesh activePlaybackMesh = instance.SkinnedMeshRenderer!.sharedMesh!;
+
+                MmdUnityPlaybackController.NativeRuntimeAvailabilityOverrideForTests = (_, _) => false;
+                InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+                    controller.ConfigureMotionFromProviderModelSource(
+                        vmdAsset,
+                        playbackFrameRate: 30.0f,
+                        startFrame: 1,
+                        playOnStart: false))!;
+
+                Assert.That(exception.Message, Does.Contain("Normal playback requires mmd-anim native clip playback"));
+                Assert.That(exception.Message, Does.Contain("native runtime unavailable (forced by test)."));
+                Assert.That(controller.LastFastRuntimeReason, Does.Contain("forced by test"));
+                Assert.That(controller.IsConfigured, Is.False);
+                Assert.That(controller.LastSnapshot, Is.Null);
+                Assert.That(activePlaybackMesh == null, Is.True,
+                    "failed native reconfiguration must dispose the previous playback clone");
+                Assert.That(instance.SkinnedMeshRenderer!.sharedMesh, Is.Not.Null);
+                Assert.That(instance.SkinnedMeshRenderer.sharedMaterials, Is.Not.Empty);
+            }
+            finally
+            {
+                MmdUnityPlaybackController.NativeRuntimeAvailabilityOverrideForTests = null;
                 MmdTestInstanceScope.DestroyInstance(instance);
                 Object.DestroyImmediate(pmxAsset);
                 Object.DestroyImmediate(vmdAsset);
@@ -703,7 +819,6 @@ namespace Mmd.Tests
                 mixer.SetInputWeight(1, 0.75f);
 
                 MmdVmdTimelineMixerBehaviour mixerBehaviour = mixer.GetBehaviour();
-                mixerBehaviour.PrepareFrame(mixer, default);
                 mixerBehaviour.ProcessFrame(mixer, default, controller);
 
                 // Highest weight is input 1 (frame 0), full pose — not weight-scaled.
@@ -768,7 +883,6 @@ namespace Mmd.Tests
 
                 MmdVmdTimelineBehaviour.ProcessFrameEvaluated += OnProcessFrame;
                 MmdVmdTimelineMixerBehaviour mixerBehaviour = mixer.GetBehaviour();
-                mixerBehaviour.PrepareFrame(mixer, default);
                 mixerBehaviour.ProcessFrame(mixer, default, controller);
 
                 Assert.That(processFrameCallbackCount, Is.EqualTo(0));
@@ -786,58 +900,6 @@ namespace Mmd.Tests
 
                 Assert.That(processFrameCallbackCount, Is.EqualTo(1));
                 Assert.That(controller.CurrentFrame, Is.EqualTo(0));
-            }
-            finally
-            {
-                MmdVmdTimelineBehaviour.ProcessFrameEvaluated -= OnProcessFrame;
-                if (graph.IsValid())
-                {
-                    graph.Destroy();
-                }
-
-                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
-            }
-        }
-
-        [Test]
-        public void DirectProcessFrameStillAppliesWhenNotTrackManaged()
-        {
-            // Compatibility path: a behaviour not owned by MmdVmdTimelineTrack/mixer still applies pose
-            // from its own ProcessFrame during graph evaluation.
-            MmdUnityPlaybackBinding? binding = null;
-            PlayableGraph graph = default;
-            int processFrameCallbackCount = 0;
-            void OnProcessFrame(double _)
-            {
-                processFrameCallbackCount++;
-            }
-
-            try
-            {
-                binding = CreatePlaybackBinding();
-                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
-                controller.Configure(binding, 30.0f);
-
-                graph = PlayableGraph.Create("mmd-vmd-direct-process-frame");
-                ScriptPlayable<MmdVmdTimelineBehaviour> playable =
-                    ScriptPlayable<MmdVmdTimelineBehaviour>.Create(graph);
-                MmdVmdTimelineBehaviour behaviour = playable.GetBehaviour();
-                behaviour.Controller = controller;
-                behaviour.FrameRate = 30.0f;
-                playable.SetTime(9.25 / 30.0);
-
-                ScriptPlayableOutput output = ScriptPlayableOutput.Create(graph, "mmd-vmd-direct");
-                output.SetSourcePlayable(playable);
-                output.SetUserData(controller);
-
-                MmdVmdTimelineBehaviour.ProcessFrameEvaluated += OnProcessFrame;
-                graph.Evaluate();
-
-                Assert.That(processFrameCallbackCount, Is.EqualTo(1));
-                Assert.That(controller.CurrentFrame, Is.EqualTo(9));
-                Assert.That(
-                    Quaternion.Angle(binding.Instance.BoneTransforms[0].localRotation, ExpectedFrameNineUnityRotation(binding)),
-                    Is.LessThan(0.001f));
             }
             finally
             {
@@ -940,7 +1002,7 @@ namespace Mmd.Tests
                 MmdUnityPlaybackController controller = holder.AddComponent<MmdUnityPlaybackController>();
                 controller.ConfigureModelAsset(pmxAsset);
                 controller.ConfigureMotionAsset(vmdAsset);
-                // No SkinnedMeshRenderer on holder or children — TryCreateExistingSceneBinding will fail.
+                // No SkinnedMeshRenderer on holder or children — provider scene binding will fail.
                 Assert.That(controller.HasModelSource, Is.True);
                 Assert.That(controller.IsConfigured, Is.False);
                 var behaviour = new MmdVmdTimelineBehaviour
@@ -1008,7 +1070,7 @@ namespace Mmd.Tests
                     playbackFrameRate: 30.0f,
                     startFrame: 0,
                     shouldPlayOnStart: false);
-                // No SkinnedMeshRenderer on holder/children — TryCreateExistingSceneBinding
+                // No SkinnedMeshRenderer on holder/children — provider scene binding
                 // via MmdUnityModelFactory.CreateExistingSkinnedModelInstance will throw.
                 Assert.That(controller.HasModelSource, Is.True);
                 Assert.That(controller.IsConfigured, Is.False);
@@ -1057,6 +1119,64 @@ namespace Mmd.Tests
             var asset = ScriptableObject.CreateInstance<MmdPmxAsset>();
             asset.Initialize(File.ReadAllBytes(pmxPath), Path.GetFileName(pmxPath), pmxPath, assetImportScale: 1.0f);
             return asset;
+        }
+
+        private static void IgnoreIfNativeRuntimeUnavailable()
+        {
+#if !UNITY_EDITOR_WIN
+            Assert.Ignore("The native header metadata test is only supported by the Windows Editor runtime.");
+#else
+            try
+            {
+                MmdRuntimeFfiMethods.ValidateAbiVersion();
+            }
+            catch (DllNotFoundException ex)
+            {
+                Assert.Ignore("Native runtime is unavailable: " + ex.Message);
+            }
+            catch (EntryPointNotFoundException ex)
+            {
+                Assert.Ignore("Native runtime ABI entry point is unavailable: " + ex.Message);
+            }
+            catch (BadImageFormatException ex)
+            {
+                Assert.Ignore("Native runtime binary is incompatible: " + ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                Assert.Ignore("Native runtime ABI is unsupported: " + ex.Message);
+            }
+#endif
+        }
+
+        private static MmdUnityPlaybackController CreateProviderController(
+            string pmxPath,
+            string vmdPath,
+            out MmdPmxAsset pmxAsset,
+            out MmdVmdAsset vmdAsset,
+            out MmdUnityModelInstance instance,
+            MmdVmdParseSummary? importSummary = null)
+        {
+            pmxAsset = CreatePmxAsset(pmxPath);
+            vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+            byte[] vmdBytes = File.ReadAllBytes(vmdPath);
+            if (importSummary.HasValue)
+            {
+                vmdAsset.Initialize(vmdBytes, Path.GetFileName(vmdPath), vmdPath, importSummary);
+            }
+            else
+            {
+                vmdAsset.Initialize(vmdBytes, Path.GetFileName(vmdPath), vmdPath);
+            }
+
+            var parser = new NativeMmdParser();
+            instance = MmdUnityModelFactory.CreateSkinnedModel(
+                parser.LoadModel(File.ReadAllBytes(pmxPath)),
+                pmxPath);
+            MmdUnityPlaybackController controller = instance.Root.AddComponent<MmdUnityPlaybackController>();
+            controller.SetPhysicsMode(MmdPhysicsMode.Off);
+            controller.ConfigureModelAsset(pmxAsset);
+            return controller;
         }
 
         private static MmdVmdAsset CreateVmdAsset(string vmdPath)

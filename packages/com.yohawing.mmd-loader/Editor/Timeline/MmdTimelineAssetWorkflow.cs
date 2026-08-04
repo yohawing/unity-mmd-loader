@@ -223,16 +223,6 @@ namespace Mmd.Editor.Timeline
             return clip;
         }
 
-        public static double CalculateClipDurationSeconds(MmdMotionDefinition motion, float frameRate)
-        {
-            if (motion == null)
-            {
-                throw new ArgumentNullException(nameof(motion));
-            }
-
-            return CalculateClipDurationSeconds(motion.maxFrame, frameRate);
-        }
-
         /// <summary>
         /// Clip duration in seconds from a (cached) max frame, so callers that already have the
         /// import-time summary value can avoid re-parsing the VMD just to size a clip.

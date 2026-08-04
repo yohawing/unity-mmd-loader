@@ -15,6 +15,7 @@ namespace Mmd.UnityIntegration
         private readonly MmdUnityModelInstance sourceInstance;
         private readonly MmdMaterialOverrideAsset? materialOverride;
         private readonly Material[]? materialRemaps;
+        private readonly Material[]? importedMaterials;
         private SkinnedMeshRenderer? renderer;
         private Mesh? originalMesh;
         private Material[] originalMaterials = Array.Empty<Material>();
@@ -36,11 +37,13 @@ namespace Mmd.UnityIntegration
         internal MmdBorrowedSceneMutationLease(
             MmdUnityModelInstance sourceInstance,
             MmdMaterialOverrideAsset? materialOverride = null,
-            Material[]? materialRemaps = null)
+            Material[]? materialRemaps = null,
+            Material[]? importedMaterials = null)
         {
             this.sourceInstance = sourceInstance ?? throw new ArgumentNullException(nameof(sourceInstance));
             this.materialOverride = materialOverride;
             this.materialRemaps = materialRemaps;
+            this.importedMaterials = importedMaterials;
         }
 
         internal bool IsActive => active;
@@ -67,6 +70,7 @@ namespace Mmd.UnityIntegration
             MmdRenderingDescriptor descriptor = CloneRenderingDescriptor(sourceInstance.RenderingDescriptor);
             bool[] excludedSlots = BuildMaterialOverrideExclusionSlots(materialRemaps, sourceRenderer.sharedMaterials.Length);
             MmdMaterialOverrideApplier.ApplyToRenderingDescriptor(materialOverride, descriptor, excludedSlots);
+            Material[] sourceMaterials = ResolveSourceMaterials(sourceRenderer);
 
             Mesh? createdMesh = null;
             Material[] createdMaterials = Array.Empty<Material>();
@@ -75,8 +79,15 @@ namespace Mmd.UnityIntegration
             {
                 createdMesh = Object.Instantiate(sourceMesh);
                 createdMesh.name = sourceMesh.name + " Playback";
-                createdMaterials = CloneMaterials(sourceRenderer.sharedMaterials);
+                createdMaterials = CloneMaterials(sourceMaterials);
                 MmdMaterialOverrideApplier.Apply(materialOverride, createdMaterials, excludedSlots);
+
+                CaptureOriginalState(sourceRenderer, sourceMesh, bones);
+                capturedOriginalState = true;
+                sourceRenderer.sharedMesh = createdMesh;
+                sourceRenderer.sharedMaterials = createdMaterials;
+                MmdShaderBindingDiagnostics shaderDiagnostics =
+                    MmdUnityMaterialBuilder.BuildExistingShaderDiagnostics(sourceRenderer);
 
                 var candidate = new MmdUnityModelInstance(
                     sourceInstance.Root,
@@ -90,15 +101,11 @@ namespace Mmd.UnityIntegration
                     sourceInstance.SourceContext,
                     Array.Empty<Texture2D>(),
                     sourceInstance.TextureDiagnostics,
-                    sourceInstance.ShaderDiagnostics,
+                    shaderDiagnostics,
                     sourceInstance.ImportScale,
                     sourceInstance.MaterialRenderingTargets.ToArray());
                 CopyBindPose(sourceInstance, candidate);
 
-                CaptureOriginalState(sourceRenderer, sourceMesh, bones);
-                capturedOriginalState = true;
-                sourceRenderer.sharedMesh = createdMesh;
-                sourceRenderer.sharedMaterials = createdMaterials;
                 renderer = sourceRenderer;
                 workingMesh = createdMesh;
                 workingMaterials = createdMaterials;
@@ -267,7 +274,7 @@ namespace Mmd.UnityIntegration
                     Material source = materials[i];
                     if (source != null)
                     {
-                        clones[i] = new Material(source) { name = source.name + " Playback" };
+                        clones[i] = new Material(source) { name = BuildPlaybackMaterialName(source.name) };
                     }
                 }
 
@@ -278,6 +285,44 @@ namespace Mmd.UnityIntegration
                 DestroyCreatedResources(null, clones);
                 throw;
             }
+        }
+
+        private Material[] ResolveSourceMaterials(SkinnedMeshRenderer sourceRenderer)
+        {
+            Material[] sceneMaterials = sourceRenderer.sharedMaterials;
+            if (importedMaterials == null || importedMaterials.Length != sceneMaterials.Length)
+            {
+                return sceneMaterials;
+            }
+
+            Material[] resolvedMaterials = (Material[])importedMaterials.Clone();
+            if (materialRemaps == null || materialRemaps.Length == 0)
+            {
+                return resolvedMaterials;
+            }
+
+            int count = Math.Min(resolvedMaterials.Length, materialRemaps.Length);
+            for (int i = 0; i < count; i++)
+            {
+                if (materialRemaps[i] != null)
+                {
+                    resolvedMaterials[i] = materialRemaps[i];
+                }
+            }
+
+            return resolvedMaterials;
+        }
+
+        private static string BuildPlaybackMaterialName(string sourceName)
+        {
+            const string suffix = " Playback";
+            string normalized = sourceName ?? string.Empty;
+            while (normalized.EndsWith(suffix, StringComparison.Ordinal))
+            {
+                normalized = normalized.Substring(0, normalized.Length - suffix.Length);
+            }
+
+            return normalized + suffix;
         }
 
         private static MmdRenderingDescriptor CloneRenderingDescriptor(MmdRenderingDescriptor source)

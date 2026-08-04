@@ -8,7 +8,6 @@ using UnityEngine;
 using Mmd.Parser;
 using Mmd.Motion;
 using Mmd.Physics;
-using Mmd.Pose;
 using Mmd.UnityIntegration;
 
 namespace Mmd.Editor
@@ -160,38 +159,38 @@ namespace Mmd.Editor
                 return new MmdHumanoidClipConversionWriterResult(null, plan, diagnostics);
             }
 
-            MmdMotionDefinition motion;
+            MmdMotionDefinition motionHeader;
             try
             {
-                motion = vmdAsset.LoadMotion();
-                MmdMotionValidator.ThrowIfInvalid(motion);
+                motionHeader = vmdAsset.CreateNativeClipMotionHeader();
+                MmdMotionValidator.ThrowIfInvalid(motionHeader);
             }
             catch (Exception ex)
             {
-                diagnostics.Add("validation: failed to load VMD motion: " + ex.Message);
+                diagnostics.Add("validation: failed to create native VMD motion header: " + ex.Message);
                 return new MmdHumanoidClipConversionWriterResult(null, plan, diagnostics);
             }
 
-            int effectiveEndFrame = endFrame ?? motion.maxFrame;
+            int effectiveEndFrame = endFrame ?? motionHeader.maxFrame;
             if (effectiveEndFrame < startFrame)
             {
                 diagnostics.Add("validation: endFrame must be >= startFrame.");
                 return new MmdHumanoidClipConversionWriterResult(null, plan, diagnostics);
             }
 
-            if (startFrame > motion.maxFrame)
+            if (startFrame > motionHeader.maxFrame)
             {
                 diagnostics.Add(
                     "validation: startFrame must be <= motion.maxFrame "
-                    + motion.maxFrame + ".");
+                    + motionHeader.maxFrame + ".");
                 return new MmdHumanoidClipConversionWriterResult(null, plan, diagnostics);
             }
 
-            if (effectiveEndFrame > motion.maxFrame)
+            if (effectiveEndFrame > motionHeader.maxFrame)
             {
                 diagnostics.Add(
                     "validation: endFrame " + effectiveEndFrame
-                    + " must be <= motion.maxFrame " + motion.maxFrame + ".");
+                    + " must be <= motion.maxFrame " + motionHeader.maxFrame + ".");
                 return new MmdHumanoidClipConversionWriterResult(null, plan, diagnostics);
             }
 
@@ -215,7 +214,6 @@ namespace Mmd.Editor
             try
             {
                 var usedHumanBones = new HashSet<HumanBodyBones>();
-                var boneKeyframesByName = BuildBoneKeyframesByName(motion.boneKeyframes);
 
                 var importedStateDiagnostics = new List<string>();
                 if (!MmdHumanoidClipConversionPlanner.TryResolveImportedHumanoidState(
@@ -303,37 +301,63 @@ namespace Mmd.Editor
                     }
                     else
                     {
-                        diagnostics.Add("writer: native batch evaluation unavailable; using managed IK sampling: "
-                                        + fastRuntimeReason);
+                        diagnostics.Add(
+                            "unsupported: native batch evaluation is unavailable; managed VMD sampling is disabled: "
+                            + fastRuntimeReason);
+                        return new MmdHumanoidClipConversionWriterResult(null, plan, diagnostics);
                     }
                 }
                 catch (Exception ex)
                 {
-                    diagnostics.Add("writer: evaluated MMD pose unavailable; using direct VMD bone fallback: " + ex.Message);
-                    evaluatedBinding = null;
+                    diagnostics.Add(
+                        "unsupported: native batch evaluation could not be initialized; "
+                        + "managed VMD sampling is disabled: " + ex.Message);
+                    return new MmdHumanoidClipConversionWriterResult(null, plan, diagnostics);
                 }
 
-                AddMuscleCurvesToClip(
+                MmdModelDefinition model = pmxAsset.LoadModel();
+                int hipsBoneIndex = -1;
+                for (int mappedIndex = 0; mappedIndex < mappedBones.Count; mappedIndex++)
+                {
+                    if (mappedBones[mappedIndex].HumanBone == HumanBodyBones.Hips)
+                    {
+                        hipsBoneIndex = mappedBones[mappedIndex].Binding.MmdBoneIndex;
+                        break;
+                    }
+                }
+                int hipsParentIndex = -1;
+                MmdBoneDefinition? hipsBone = FindBoneByIndex(model, hipsBoneIndex);
+                if (hipsBone != null)
+                {
+                    hipsParentIndex = hipsBone.parentIndex;
+                }
+
+                if (!AddMuscleCurvesToClip(
                     clip,
                     proxyRoot,
                     proxyAvatar,
                     mappedBones,
                     evaluatedBinding,
-                    boneKeyframesByName,
+                    hipsBoneIndex,
+                    hipsParentIndex,
                     startFrame,
-                    effectiveEndFrame,
                     frameCount,
                     sampleFrameToTimeFactor,
                     diagnostics,
                     out Vector3[] bodyPositions,
-                    out Quaternion[] bodyRotations);
+                    out Quaternion[] bodyRotations,
+                    out NativeRootMotionSamples rootMotionSamples))
+                {
+                    return new MmdHumanoidClipConversionWriterResult(null, plan, diagnostics);
+                }
 
                 float humanScale = ResolveHumanScale(proxyAvatar);
 
                 AddRootMotionCurvesToClip(
                     clip,
                     pmxAsset,
-                    motion,
+                    model,
+                    rootMotionSamples,
                     mappedBones,
                     humanScale,
                     bodyPositions,
@@ -370,60 +394,21 @@ namespace Mmd.Editor
             }
         }
 
-        private static Dictionary<string, List<MmdBoneKeyframeDefinition>> BuildBoneKeyframesByName(
-            IReadOnlyList<MmdBoneKeyframeDefinition>? boneKeyframes)
-        {
-            var grouped = new Dictionary<string, List<MmdBoneKeyframeDefinition>>(StringComparer.Ordinal);
-            if (boneKeyframes == null)
-            {
-                return grouped;
-            }
-
-            foreach (MmdBoneKeyframeDefinition keyframe in boneKeyframes)
-            {
-                if (keyframe == null || string.IsNullOrWhiteSpace(keyframe.boneName))
-                {
-                    continue;
-                }
-
-                if (!grouped.TryGetValue(keyframe.boneName, out List<MmdBoneKeyframeDefinition>? list))
-                {
-                    list = new List<MmdBoneKeyframeDefinition>();
-                    grouped.Add(keyframe.boneName, list);
-                }
-                list.Add(keyframe);
-            }
-
-            foreach (List<MmdBoneKeyframeDefinition> list in grouped.Values)
-            {
-                list.Sort((left, right) => left.frame.CompareTo(right.frame));
-            }
-            return grouped;
-        }
-
-        private static IReadOnlyList<MmdBoneKeyframeDefinition> SelectBoneKeyframes(
-            Dictionary<string, List<MmdBoneKeyframeDefinition>> grouped,
-            string sourceBoneName)
-        {
-            return grouped.TryGetValue(sourceBoneName, out List<MmdBoneKeyframeDefinition>? keyframes)
-                ? keyframes
-                : Array.Empty<MmdBoneKeyframeDefinition>();
-        }
-
-        private static void AddMuscleCurvesToClip(
+        private static bool AddMuscleCurvesToClip(
             AnimationClip clip,
             GameObject proxyRoot,
             Avatar proxyAvatar,
             IReadOnlyList<(HumanBodyBones HumanBone, Transform ProxyTransform, string SourceBoneName, MmdHumanoidRetargetBinding Binding)> mappedBones,
             MmdUnityPlaybackBinding? evaluatedBinding,
-            Dictionary<string, List<MmdBoneKeyframeDefinition>> boneKeyframesByName,
+            int hipsBoneIndex,
+            int hipsParentIndex,
             int startFrame,
-            int endFrame,
             int frameCount,
             float sampleFrameToTimeFactor,
             List<string> diagnostics,
             out Vector3[] bodyPositions,
-            out Quaternion[] bodyRotations)
+            out Quaternion[] bodyRotations,
+            out NativeRootMotionSamples rootMotionSamples)
         {
             int muscleCount = HumanTrait.MuscleCount;
             var muscleKeys = new Keyframe[muscleCount][];
@@ -433,78 +418,53 @@ namespace Mmd.Editor
             }
             bodyPositions = new Vector3[frameCount];
             bodyRotations = new Quaternion[frameCount];
-            var baseRotations = new Quaternion[mappedBones.Count];
+            rootMotionSamples = NativeRootMotionSamples.Empty;
+            var proxyBaseLocalRotations = new Quaternion[mappedBones.Count];
             for (int boneIndex = 0; boneIndex < mappedBones.Count; boneIndex++)
             {
-                baseRotations[boneIndex] = mappedBones[boneIndex].ProxyTransform.localRotation;
+                proxyBaseLocalRotations[boneIndex] = mappedBones[boneIndex].ProxyTransform.localRotation;
             }
 
             using (var poseHandler = new HumanPoseHandler(proxyAvatar, proxyRoot.transform))
             {
                 var pose = new HumanPose { muscles = new float[muscleCount] };
-                bool usedNativeBatch = evaluatedBinding != null &&
-                    TryFillMuscleKeysFromNativeBatch(
-                        evaluatedBinding,
-                        mappedBones,
-                        poseHandler,
-                        ref pose,
-                        startFrame,
-                        frameCount,
-                        sampleFrameToTimeFactor,
-                        muscleKeys,
-                        bodyPositions,
-                        bodyRotations);
-                if (usedNativeBatch)
+                bool usedNativeBatch;
+                try
                 {
-                    diagnostics.Add("writer: sampled evaluated MMD IK pose through native batch output.");
+                    usedNativeBatch = evaluatedBinding != null &&
+                        TryFillMuscleKeysFromNativeBatch(
+                            evaluatedBinding,
+                            mappedBones,
+                            poseHandler,
+                            ref pose,
+                            startFrame,
+                            frameCount,
+                            sampleFrameToTimeFactor,
+                            muscleKeys,
+                            bodyPositions,
+                            bodyRotations,
+                            proxyBaseLocalRotations,
+                            hipsBoneIndex,
+                            hipsParentIndex,
+                            out rootMotionSamples);
                 }
-                else
+                catch (Exception ex)
                 {
-                    int sampleIndex = 0;
-                    for (int frame = startFrame; frame <= endFrame; frame++)
-                    {
-                        float time = (frame - startFrame) * sampleFrameToTimeFactor;
-                        evaluatedBinding?.ApplyFrame(frame, 1.0f / sampleFrameToTimeFactor);
-                        for (int boneIndex = 0; boneIndex < mappedBones.Count; boneIndex++)
-                        {
-                            (_, Transform proxyTransform, string sourceBoneName, MmdHumanoidRetargetBinding binding) = mappedBones[boneIndex];
-                            if (evaluatedBinding != null)
-                            {
-                                Transform evaluatedNative = evaluatedBinding.Instance.BoneTransforms[binding.MmdBoneIndex];
-                                ApplyEvaluatedLocalPoseToProxy(
-                                    proxyTransform,
-                                    binding,
-                                    evaluatedNative.localRotation);
-                            }
-                            else
-                            {
-                                IReadOnlyList<MmdBoneKeyframeDefinition> keyframes = SelectBoneKeyframes(
-                                    boneKeyframesByName,
-                                    sourceBoneName);
-                                float[] rotated = VmdBoneSampler.SampleSortedPose(
-                                    keyframes,
-                                    sourceBoneName,
-                                    frame).Rotation;
-                                var rotationDelta = new Quaternion(
-                                    -rotated[0],
-                                    rotated[1],
-                                    -rotated[2],
-                                    rotated[3]);
-                                proxyTransform.localRotation = baseRotations[boneIndex] * rotationDelta;
-                            }
-                        }
+                    diagnostics.Add(
+                        "unsupported: native batch evaluation failed; managed VMD sampling is disabled: "
+                        + ex.Message);
+                    return false;
+                }
 
-                        poseHandler.GetHumanPose(ref pose);
-                        bodyPositions[sampleIndex] = pose.bodyPosition;
-                        bodyRotations[sampleIndex] = pose.bodyRotation;
-                        for (int muscleIndex = 0; muscleIndex < muscleCount; muscleIndex++)
-                        {
-                            muscleKeys[muscleIndex][sampleIndex] =
-                                new Keyframe(time, pose.muscles[muscleIndex]);
-                        }
-                        sampleIndex++;
-                    }
+                if (!usedNativeBatch)
+                {
+                    diagnostics.Add(
+                        "unsupported: native batch evaluation eligibility failed; "
+                        + "managed VMD sampling is disabled.");
+                    return false;
                 }
+
+                diagnostics.Add("writer: sampled evaluated MMD IK pose through native batch output.");
             }
 
             for (int muscleIndex = 0; muscleIndex < muscleCount; muscleIndex++)
@@ -515,6 +475,7 @@ namespace Mmd.Editor
             }
 
             diagnostics.Add("writer: wrote " + muscleCount + " Humanoid muscle curves.");
+            return true;
         }
 
         private static bool TryFillMuscleKeysFromNativeBatch(
@@ -527,8 +488,13 @@ namespace Mmd.Editor
             float sampleFrameToTimeFactor,
             Keyframe[][] muscleKeys,
             Vector3[] bodyPositions,
-            Quaternion[] bodyRotations)
+            Quaternion[] bodyRotations,
+            Quaternion[] proxyBaseLocalRotations,
+            int hipsBoneIndex,
+            int hipsParentIndex,
+            out NativeRootMotionSamples rootMotionSamples)
         {
+            rootMotionSamples = NativeRootMotionSamples.Empty;
             MmdUnityModelInstance instance = binding.Instance;
             if (!MmdGenericAnimationClipWriter.CanUseNativeBatch(
                     binding,
@@ -547,6 +513,12 @@ namespace Mmd.Editor
             int bufferFrameCount = Math.Min(frameCount, ChunkFrameCount);
             var worldMatrices = new float[checked(worldFloatsPerFrame * bufferFrameCount)];
             var morphWeights = new float[checked(morphFloatsPerFrame * bufferFrameCount)];
+            Vector3[] hipsWorldPositions = hipsBoneIndex >= 0
+                ? new Vector3[frameCount]
+                : Array.Empty<Vector3>();
+            Quaternion[] ancestorWorldRotations = hipsParentIndex >= 0
+                ? new Quaternion[frameCount]
+                : Array.Empty<Quaternion>();
             float importScale = float.IsFinite(instance.ImportScale) && instance.ImportScale > 0.0f
                 ? instance.ImportScale
                 : 1.0f;
@@ -569,6 +541,34 @@ namespace Mmd.Editor
                     ReadOnlySpan<float> frameWorld = worldMatrices.AsSpan(
                         chunkSample * worldFloatsPerFrame,
                         worldFloatsPerFrame);
+                    if (hipsBoneIndex >= 0)
+                    {
+                        if (!TryReadNativeWorldPose(
+                                frameWorld,
+                                hipsBoneIndex,
+                                out hipsWorldPositions[sampleIndex],
+                                out _))
+                        {
+                            throw new InvalidOperationException(
+                                "native Hips world matrix is unavailable at frame "
+                                + (startFrame + sampleIndex) + ".");
+                        }
+
+                        if (hipsParentIndex >= 0)
+                        {
+                            if (!TryReadNativeWorldPose(
+                                    frameWorld,
+                                    hipsParentIndex,
+                                    out _,
+                                    out Quaternion ancestorWorldRotation))
+                            {
+                                throw new InvalidOperationException(
+                                    "native Hips ancestor world matrix is unavailable at frame "
+                                    + (startFrame + sampleIndex) + ".");
+                            }
+                            ancestorWorldRotations[sampleIndex] = ancestorWorldRotation;
+                        }
+                    }
                     for (int boneIndex = 0; boneIndex < mappedBones.Count; boneIndex++)
                     {
                         (_, Transform proxyTransform, _, MmdHumanoidRetargetBinding retargetBinding) = mappedBones[boneIndex];
@@ -585,7 +585,8 @@ namespace Mmd.Editor
                         ApplyEvaluatedLocalPoseToProxy(
                             proxyTransform,
                             retargetBinding,
-                            localRotation);
+                            localRotation,
+                            proxyBaseLocalRotations[boneIndex]);
                     }
 
                     poseHandler.GetHumanPose(ref pose);
@@ -600,6 +601,9 @@ namespace Mmd.Editor
                 }
             }
 
+            rootMotionSamples = new NativeRootMotionSamples(
+                hipsWorldPositions,
+                ancestorWorldRotations);
             return true;
         }
 
@@ -641,10 +645,11 @@ namespace Mmd.Editor
         private static void ApplyEvaluatedLocalPoseToProxy(
             Transform proxyTransform,
             MmdHumanoidRetargetBinding binding,
-            Quaternion evaluatedLocalRotation)
+            Quaternion evaluatedLocalRotation,
+            Quaternion proxyBaseLocalRotation)
         {
             proxyTransform.localRotation =
-                binding.ProxyBindLocalRotation *
+                proxyBaseLocalRotation *
                 Quaternion.Inverse(binding.NativeBindLocalRotation) *
                 evaluatedLocalRotation;
         }
@@ -665,10 +670,29 @@ namespace Mmd.Editor
             }
         }
 
+        private readonly struct NativeRootMotionSamples
+        {
+            internal static NativeRootMotionSamples Empty => new(
+                Array.Empty<Vector3>(),
+                Array.Empty<Quaternion>());
+
+            internal NativeRootMotionSamples(
+                Vector3[] hipsWorldPositions,
+                Quaternion[] ancestorWorldRotations)
+            {
+                HipsWorldPositions = hipsWorldPositions;
+                AncestorWorldRotations = ancestorWorldRotations;
+            }
+
+            internal Vector3[] HipsWorldPositions { get; }
+            internal Quaternion[] AncestorWorldRotations { get; }
+        }
+
         private static void AddRootMotionCurvesToClip(
             AnimationClip clip,
             MmdPmxAsset pmxAsset,
-            MmdMotionDefinition motion,
+            MmdModelDefinition model,
+            NativeRootMotionSamples rootMotionSamples,
             IReadOnlyList<(HumanBodyBones HumanBone, Transform ProxyTransform, string SourceBoneName, MmdHumanoidRetargetBinding Binding)> mappedBones,
             float humanScale,
             Vector3[] bodyPositions,
@@ -709,13 +733,12 @@ namespace Mmd.Editor
             {
                 try
                 {
-                    MmdModelDefinition model = pmxAsset.LoadModel();
                     MmdBoneDefinition? hipsBone = FindBoneByName(model, hipsSourceName!);
                     if (hipsBone != null)
                     {
-                        evaluated = TryBuildRootMotionKeys(
+                        evaluated = TryBuildRootMotionKeysFromNative(
                             model,
-                            motion,
+                            rootMotionSamples,
                             hipsBone.index,
                             pmxAsset.ImportScale,
                             humanScale,
@@ -736,7 +759,7 @@ namespace Mmd.Editor
                 }
                 catch (Exception ex)
                 {
-                    failureDiagnostic = "root-motion: PMX pose evaluation failed (" + ex.Message
+                    failureDiagnostic = "root-motion: native PMX pose evaluation failed (" + ex.Message
                                         + "); wrote baseline RootT/RootQ curves.";
                 }
             }
@@ -755,7 +778,7 @@ namespace Mmd.Editor
             }
             else
             {
-                diagnostics.Add("root-motion: wrote evaluated dense RootT/RootQ curves from mapped Hips hierarchy.");
+                diagnostics.Add("root-motion: wrote native evaluated dense RootT/RootQ curves from mapped Hips hierarchy.");
             }
 
             string[] positionProperties = { "RootT.x", "RootT.y", "RootT.z" };
@@ -793,9 +816,9 @@ namespace Mmd.Editor
                 new AnimationCurve(verticalOffsetKeys));
         }
 
-        internal static bool TryBuildRootMotionKeys(
+        private static bool TryBuildRootMotionKeysFromNative(
             MmdModelDefinition model,
-            MmdMotionDefinition motion,
+            NativeRootMotionSamples rootMotionSamples,
             int hipsBoneIndex,
             float importScale,
             float humanScale,
@@ -814,6 +837,7 @@ namespace Mmd.Editor
                 diagnostic = "root-motion: mapped Hips index is absent from the PMX model.";
                 return false;
             }
+
             int frameCount = endFrame - startFrame + 1;
             if (bodyPositions.Length != frameCount || bodyRotations.Length != frameCount)
             {
@@ -821,60 +845,47 @@ namespace Mmd.Editor
                 return false;
             }
 
-            Dictionary<int, float[]> bindWorldMatrices = MmdPoseEvaluator.EvaluateWorldMatrices(model, null);
-            if (!bindWorldMatrices.TryGetValue(hipsBone.index, out float[]? bindHipsMatrix))
+            if (rootMotionSamples.HipsWorldPositions.Length != frameCount)
             {
-                diagnostic = "root-motion: bind-pose Hips world matrix is unavailable.";
+                diagnostic = "root-motion: native mmd-runtime world-matrix evaluation is unavailable; wrote baseline RootT/RootQ curves.";
                 return false;
             }
 
-            Vector3 bindHipsPosition = ExtractPosition(bindHipsMatrix);
-            MmdBoneDefinition? hipsParent = FindBoneByIndex(model, hipsBone.parentIndex);
-            Quaternion bindAncestorRotation = Quaternion.identity;
-            if (hipsParent != null)
+            if (!TryReadBoneOrigin(hipsBone, out Vector3 bindHipsPosition))
             {
-                if (!bindWorldMatrices.TryGetValue(hipsParent.index, out float[]? bindParentMatrix))
-                {
-                    diagnostic = "root-motion: bind-pose Hips ancestor world matrix is unavailable.";
-                    return false;
-                }
-                bindAncestorRotation = MmdCoordinateSpace.MmdToUnityRotation(ExtractRotation(bindParentMatrix));
+                diagnostic = "root-motion: PMX bind-pose Hips origin is unavailable.";
+                return false;
             }
 
+            MmdBoneDefinition? hipsParent = FindBoneByIndex(model, hipsBone.parentIndex);
+            Quaternion bindAncestorRotation = Quaternion.identity;
             float scale = float.IsFinite(importScale) && importScale > 0.0f ? importScale : 1.0f;
             float normalizedHumanScale = float.IsFinite(humanScale) && humanScale > 0.0f ? humanScale : 1.0f;
-            Quaternion previousRotation = Quaternion.identity;
-            int sampleIndex = 0;
-            for (int frame = startFrame; frame <= endFrame; frame++)
+            if (hipsParent != null && rootMotionSamples.AncestorWorldRotations.Length != frameCount)
             {
-                float time = (frame - startFrame) * sampleFrameToTimeFactor;
-                MmdSampledMotion sampledMotion = VmdMotionSampler.Sample(motion, model, frame);
-                Dictionary<int, float[]> worldMatrices = MmdPoseEvaluator.EvaluateWorldMatrices(model, sampledMotion);
-                if (!worldMatrices.TryGetValue(hipsBone.index, out float[]? hipsMatrix))
-                {
-                    diagnostic = "root-motion: sampled Hips world matrix is unavailable at frame " + frame + ".";
-                    return false;
-                }
+                diagnostic = "root-motion: native Hips ancestor world-matrix evaluation is unavailable; wrote baseline RootT/RootQ curves.";
+                return false;
+            }
+            Quaternion previousRotation = Quaternion.identity;
 
-                Vector3 mmdPositionDelta = ExtractPosition(hipsMatrix) - bindHipsPosition;
+            for (int sampleIndex = 0; sampleIndex < frameCount; sampleIndex++)
+            {
+                Vector3 mmdPositionDelta = rootMotionSamples.HipsWorldPositions[sampleIndex]
+                                             - bindHipsPosition;
                 Vector3 rootPosition = bodyPositions[sampleIndex]
                                        + MmdCoordinateSpace.MmdToUnityPosition(mmdPositionDelta)
                                        * (scale / normalizedHumanScale);
                 Quaternion ancestorRotationDelta = Quaternion.identity;
                 if (hipsParent != null)
                 {
-                    if (!worldMatrices.TryGetValue(hipsParent.index, out float[]? parentMatrix))
-                    {
-                        diagnostic = "root-motion: sampled Hips ancestor world matrix is unavailable at frame " + frame + ".";
-                        return false;
-                    }
                     Quaternion currentAncestorRotation =
-                        MmdCoordinateSpace.MmdToUnityRotation(ExtractRotation(parentMatrix));
+                        MmdCoordinateSpace.MmdToUnityRotation(
+                            rootMotionSamples.AncestorWorldRotations[sampleIndex]);
                     ancestorRotationDelta = currentAncestorRotation * Quaternion.Inverse(bindAncestorRotation);
                 }
+
                 Quaternion rootRotation = ancestorRotationDelta * bodyRotations[sampleIndex];
                 rootRotation.Normalize();
-
                 if (sampleIndex > 0 && Quaternion.Dot(previousRotation, rootRotation) < 0.0f)
                 {
                     rootRotation = new Quaternion(
@@ -885,6 +896,7 @@ namespace Mmd.Editor
                 }
                 previousRotation = rootRotation;
 
+                float time = sampleIndex * sampleFrameToTimeFactor;
                 positionKeys[0][sampleIndex] = new Keyframe(time, rootPosition.x);
                 positionKeys[1][sampleIndex] = new Keyframe(time, rootPosition.y);
                 positionKeys[2][sampleIndex] = new Keyframe(time, rootPosition.z);
@@ -892,7 +904,6 @@ namespace Mmd.Editor
                 rotationKeys[1][sampleIndex] = new Keyframe(time, rootRotation.y);
                 rotationKeys[2][sampleIndex] = new Keyframe(time, rootRotation.z);
                 rotationKeys[3][sampleIndex] = new Keyframe(time, rootRotation.w);
-                sampleIndex++;
             }
 
             diagnostic = string.Empty;
@@ -953,18 +964,67 @@ namespace Mmd.Editor
             return null;
         }
 
-        private static Vector3 ExtractPosition(float[] matrix)
+        private static bool TryReadBoneOrigin(MmdBoneDefinition bone, out Vector3 origin)
         {
-            return new Vector3(matrix[3], matrix[7], matrix[11]);
+            origin = default;
+            if (bone.origin == null || bone.origin.Length != 3)
+            {
+                return false;
+            }
+
+            origin = new Vector3(bone.origin[0], bone.origin[1], bone.origin[2]);
+            return float.IsFinite(origin.x) && float.IsFinite(origin.y) && float.IsFinite(origin.z);
         }
 
-        private static Quaternion ExtractRotation(float[] matrix)
+        private static bool TryReadNativeWorldPose(
+            ReadOnlySpan<float> frameWorld,
+            int boneIndex,
+            out Vector3 mmdPosition,
+            out Quaternion mmdRotation)
         {
-            Vector3 forward = new(matrix[2], matrix[6], matrix[10]);
-            Vector3 up = new(matrix[1], matrix[5], matrix[9]);
-            return forward.sqrMagnitude > 0.0f && up.sqrMagnitude > 0.0f
-                ? Quaternion.LookRotation(forward.normalized, up.normalized)
-                : Quaternion.identity;
+            mmdPosition = default;
+            mmdRotation = Quaternion.identity;
+            if (boneIndex < 0 || (long)(boneIndex + 1) * 16L > frameWorld.Length)
+            {
+                return false;
+            }
+
+            int offset = boneIndex * 16;
+            mmdPosition = new Vector3(
+                frameWorld[offset + 12],
+                frameWorld[offset + 13],
+                frameWorld[offset + 14]);
+            if (!float.IsFinite(mmdPosition.x)
+                || !float.IsFinite(mmdPosition.y)
+                || !float.IsFinite(mmdPosition.z))
+            {
+                return false;
+            }
+
+            Vector3 forward = new Vector3(
+                frameWorld[offset + 8],
+                frameWorld[offset + 9],
+                frameWorld[offset + 10]);
+            Vector3 up = new Vector3(
+                frameWorld[offset + 4],
+                frameWorld[offset + 5],
+                frameWorld[offset + 6]);
+            if (!float.IsFinite(forward.x)
+                || !float.IsFinite(forward.y)
+                || !float.IsFinite(forward.z)
+                || !float.IsFinite(up.x)
+                || !float.IsFinite(up.y)
+                || !float.IsFinite(up.z))
+            {
+                return false;
+            }
+
+            if (forward.sqrMagnitude > 0.0f && up.sqrMagnitude > 0.0f)
+            {
+                mmdRotation = Quaternion.LookRotation(forward.normalized, up.normalized);
+            }
+
+            return true;
         }
 
         private static string ProjectRoot => Path.GetFullPath(Path.Combine(Application.dataPath, ".."));

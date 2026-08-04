@@ -278,7 +278,8 @@ namespace Mmd.UnityIntegration
             float importScale,
             bool includeSelfShadowTarget = true,
             MmdMaterialOverrideAsset? materialOverride = null,
-            bool preserveExistingSelfShadowTarget = false)
+            bool preserveExistingSelfShadowTarget = false,
+            MmdMaterialPreset materialPreset = MmdMaterialPreset.MmdToon)
         {
             if (root == null)
             {
@@ -296,7 +297,7 @@ namespace Mmd.UnityIntegration
             }
 
             float scale = NormalizeImportScale(importScale);
-            MmdRenderingDescriptor descriptor = BuildRuntimeRenderingDescriptor(model);
+            MmdRenderingDescriptor descriptor = BuildRuntimeRenderingDescriptor(model, materialPreset);
             ValidateDescriptor(descriptor);
             MmdMaterialOverrideApplier.ApplyToRenderingDescriptor(materialOverride, descriptor);
 
@@ -308,6 +309,9 @@ namespace Mmd.UnityIntegration
             {
                 throw new InvalidOperationException("Existing PMX scene SkinnedMeshRenderer material slots do not match the PMX material descriptor.");
             }
+
+            MmdMaterialRenderingTargets[] materialRenderingTargets =
+                BuildMaterialRenderingTargets(materials.Length, materialPreset);
 
             Transform[] boneTransforms = renderer.bones;
             IReadOnlyList<MmdBoneDefinition> orderedBones = CreateOrderedBones(model.bones);
@@ -362,7 +366,8 @@ namespace Mmd.UnityIntegration
                 Array.Empty<Texture2D>(),
                 new MmdTextureBindingDiagnostics(),
                 shaderDiagnostics,
-                scale);
+                scale,
+                materialRenderingTargets);
             rollback.Commit();
             return instance;
             }
@@ -485,6 +490,21 @@ namespace Mmd.UnityIntegration
             MmdMaterialPreset preset = MmdMaterialPreset.MmdToon)
         {
             return MmdRenderingMeshSplitter.SplitBySubmesh(MmdRenderingDescriptorBuilder.Build(model, preset)).rendering;
+        }
+
+        private static MmdMaterialRenderingTargets[] BuildMaterialRenderingTargets(
+            int materialCount,
+            MmdMaterialPreset preset)
+        {
+            MmdMaterialRenderingTargets defaultTargets =
+                MmdMaterialMapperSet.ForPreset(preset).DefaultRenderingTargets;
+            var targets = new MmdMaterialRenderingTargets[materialCount];
+            for (int i = 0; i < targets.Length; i++)
+            {
+                targets[i] = defaultTargets;
+            }
+
+            return targets;
         }
 
         private static MmdUnityModelInstance CreateStaticModel(

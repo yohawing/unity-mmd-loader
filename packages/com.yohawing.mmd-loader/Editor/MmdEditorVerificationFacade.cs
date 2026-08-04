@@ -114,7 +114,12 @@ namespace Mmd.Editor
             RunStage(PmxValidationStage, () => MmdModelValidator.ThrowIfInvalid(model));
 
             byte[] vmdBytes = RunStage(VmdReadStage, () => File.ReadAllBytes(fullVmdPath));
-            MmdMotionDefinition motion = RunStage(VmdParseStage, () => parser.LoadMotion(vmdBytes));
+            MmdVmdParseSummary summary = RunStage(
+                VmdParseStage,
+                () => MmdVmdNativeSummaryAdapter.Read(vmdBytes));
+            MmdMotionDefinition motion = RunStage(
+                VmdParseStage,
+                () => MmdVmdAsset.CreateNativeClipMotionHeader(vmdBytes, summary));
             RunStage(VmdValidationStage, () => MmdMotionValidator.ThrowIfInvalid(motion));
 
             MmdUnityPlaybackBinding? binding = null;
@@ -196,7 +201,7 @@ namespace Mmd.Editor
             var parser = new NativeMmdParser();
             MmdModelDefinition model = RunStage(PmxParseStage, () => pmxAsset.LoadModel(parser));
             RunStage(PmxValidationStage, () => MmdModelValidator.ThrowIfInvalid(model));
-            MmdMotionDefinition motion = RunStage(VmdParseStage, () => vmdAsset.LoadMotion(parser));
+            MmdMotionDefinition motion = RunStage(VmdParseStage, vmdAsset.CreateNativeClipMotionHeader);
             RunStage(VmdValidationStage, () => MmdMotionValidator.ThrowIfInvalid(motion));
 
             MmdUnityPlaybackBinding? binding = null;

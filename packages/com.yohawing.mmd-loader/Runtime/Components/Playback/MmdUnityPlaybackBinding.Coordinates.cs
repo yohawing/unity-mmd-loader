@@ -2,7 +2,6 @@
 
 using Mmd.Motion;
 using Mmd.Parser;
-using Mmd.Pose;
 using UnityEngine;
 
 namespace Mmd.UnityIntegration
@@ -24,10 +23,18 @@ namespace Mmd.UnityIntegration
                 Transform bone = playbackInstance.BoneTransforms[index];
                 Vector3 localDelta = bone.localPosition - playbackInstance.BindLocalPositions[index];
                 Quaternion localRotation = Quaternion.Inverse(playbackInstance.BindLocalRotations[index]) * bone.localRotation;
-                bonePose.localPosition = ToArray(ToMmdModelPosition(localDelta, importScale));
-                bonePose.localRotation = ToArray(ToMmdModelRotation(localRotation));
-                bonePose.localScale = ToArray(bone.localScale);
-                bonePose.worldMatrix = ToMmdModelMatrix(root, bone, importScale);
+                bonePose.localPosition = WriteVector3(
+                    bonePose.localPosition,
+                    ToMmdModelPosition(localDelta, importScale));
+                bonePose.localRotation = WriteQuaternion(
+                    bonePose.localRotation,
+                    ToMmdModelRotation(localRotation));
+                bonePose.localScale = WriteVector3(bonePose.localScale, bone.localScale);
+                bonePose.worldMatrix = WriteMmdModelMatrix(
+                    bonePose.worldMatrix,
+                    root,
+                    bone,
+                    importScale);
             }
         }
 
@@ -118,33 +125,67 @@ namespace Mmd.UnityIntegration
             return new Vector3(values[0], values[1], values[2]);
         }
 
-        private static float[] ToArray(Vector3 value)
+        private static float[] WriteVector3(float[]? destination, Vector3 value)
         {
-            return new[] { value.x, value.y, value.z };
+            destination ??= new float[3];
+            if (destination.Length < 3)
+            {
+                destination = new float[3];
+            }
+
+            destination[0] = value.x;
+            destination[1] = value.y;
+            destination[2] = value.z;
+            return destination;
         }
 
-        private static float[] ToArray(Quaternion value)
+        private static float[] WriteQuaternion(float[]? destination, Quaternion value)
         {
-            return new[] { value.x, value.y, value.z, value.w };
+            destination ??= new float[4];
+            if (destination.Length < 4)
+            {
+                destination = new float[4];
+            }
+
+            destination[0] = value.x;
+            destination[1] = value.y;
+            destination[2] = value.z;
+            destination[3] = value.w;
+            return destination;
         }
 
-        private static float[] ToMmdModelMatrix(Transform root, Transform bone)
+        private static float[] WriteMmdModelMatrix(
+            float[]? destination,
+            Transform root,
+            Transform bone,
+            float importScale)
         {
-            return ToMmdModelMatrix(root, bone, importScale: 1.0f);
-        }
+            destination ??= new float[16];
+            if (destination.Length < 16)
+            {
+                destination = new float[16];
+            }
 
-        private static float[] ToMmdModelMatrix(Transform root, Transform bone, float importScale)
-        {
             Vector3 position = ToMmdModelPosition(root.InverseTransformPoint(bone.position), importScale);
             Quaternion rotation = ToMmdModelRotation(Quaternion.Inverse(root.rotation) * bone.rotation);
             Matrix4x4 matrix = Matrix4x4.TRS(position, rotation, Vector3.one);
-            return new[]
-            {
-                matrix.m00, matrix.m10, matrix.m20, matrix.m30,
-                matrix.m01, matrix.m11, matrix.m21, matrix.m31,
-                matrix.m02, matrix.m12, matrix.m22, matrix.m32,
-                matrix.m03, matrix.m13, matrix.m23, matrix.m33
-            };
+            destination[0] = matrix.m00;
+            destination[1] = matrix.m10;
+            destination[2] = matrix.m20;
+            destination[3] = matrix.m30;
+            destination[4] = matrix.m01;
+            destination[5] = matrix.m11;
+            destination[6] = matrix.m21;
+            destination[7] = matrix.m31;
+            destination[8] = matrix.m02;
+            destination[9] = matrix.m12;
+            destination[10] = matrix.m22;
+            destination[11] = matrix.m32;
+            destination[12] = matrix.m03;
+            destination[13] = matrix.m13;
+            destination[14] = matrix.m23;
+            destination[15] = matrix.m33;
+            return destination;
         }
 
         private static float NormalizeImportScale(float importScale)

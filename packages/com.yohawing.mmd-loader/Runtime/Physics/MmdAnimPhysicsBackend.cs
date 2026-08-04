@@ -40,6 +40,7 @@ namespace Mmd.Physics
         private readonly IntPtr instance;
         private IntPtr world;
         private readonly int boneCount;
+        private readonly int worldMatrixFloatCount;
         private readonly int morphCount;
         private readonly int ikCount;
         private float[] rigidbodyStates;
@@ -72,6 +73,15 @@ namespace Mmd.Physics
 
                 boneCount = MmdFfiMarshal.CheckedIntPtrToInt(
                     MmdRuntimeFfiMethods.ModelBoneCount(createdModel), "native bone count");
+                worldMatrixFloatCount = MmdFfiMarshal.CheckedIntPtrToInt(
+                    MmdRuntimeFfiMethods.InstanceWorldMatrixF32Len(createdInstance),
+                    "native world-matrix float count");
+                if (worldMatrixFloatCount != checked(boneCount * 16))
+                {
+                    throw new InvalidOperationException(
+                        $"Native world-matrix float count {worldMatrixFloatCount} does not match bone count {boneCount}.");
+                }
+
                 morphCount = MmdFfiMarshal.CheckedIntPtrToInt(
                     MmdRuntimeFfiMethods.ModelMorphCount(createdModel), "native morph count");
                 ikCount = MmdFfiMarshal.CheckedIntPtrToInt(
@@ -122,6 +132,8 @@ namespace Mmd.Physics
         public string Name => "mmd-anim-bullet-native";
 
         public int SkippedWorldAnchorJointCount => skippedWorldAnchorJointCount;
+
+        internal int WorldMatrixFloatCount => worldMatrixFloatCount;
 
         internal static MmdPhysicsBackendAvailability ProbeAvailability()
         {
@@ -612,6 +624,32 @@ namespace Mmd.Physics
                 Free(ref morphHandle);
                 Free(ref ikHandle);
             }
+        }
+
+        /// <summary>
+        /// Copies the pose produced by the most recent native host-frame evaluation.
+        /// EvaluateHostFrame is atomic on the native side: the copied matrices include
+        /// the native after-physics bone pass after the physics world step.
+        /// </summary>
+        internal void CopyAfterPhysicsWorldMatrices(float[] destination)
+        {
+            ThrowIfDisposed();
+            ValidateHostPoseArray(destination, worldMatrixFloatCount, nameof(destination));
+            if (MmdRuntimeFfiMethods.InstanceCopyWorldMatrices(
+                    instance,
+                    destination,
+                    new IntPtr(destination.Length)) != 0)
+            {
+                return;
+            }
+
+            throw new MmdPhysicsBackendException(
+                "CopyAfterPhysicsWorldMatrices",
+                Name,
+                "copy-failed",
+                LastErrorMessage(),
+                modelId,
+                motionId);
         }
 
         public void Dispose()

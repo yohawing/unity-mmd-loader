@@ -13,23 +13,6 @@ namespace Mmd.Timeline
     [Serializable]
     public sealed class MmdVmdTimelineMixerBehaviour : PlayableBehaviour
     {
-        public override void PrepareFrame(Playable playable, FrameData info)
-        {
-            // PrepareFrame runs top-down before child ProcessFrame, so track-managed clips can
-            // no-op their direct apply path and leave evaluation to this mixer only.
-            int inputCount = playable.GetInputCount();
-            for (int i = 0; i < inputCount; i++)
-            {
-                Playable input = playable.GetInput(i);
-                if (!TryGetBehaviour(input, out MmdVmdTimelineBehaviour? behaviour) || behaviour == null)
-                {
-                    continue;
-                }
-
-                behaviour.IsTrackManaged = true;
-            }
-        }
-
         public override void ProcessFrame(Playable playable, FrameData info, object playerData)
         {
             if (!TrySelectWinner(playable, out int winnerIndex, out Playable winnerPlayable, out MmdVmdTimelineBehaviour? winner))

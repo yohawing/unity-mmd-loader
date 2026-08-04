@@ -1,7 +1,6 @@
 #nullable enable
 
 using System;
-using System.Collections.Generic;
 using System.IO;
 using NUnit.Framework;
 using UnityEngine;
@@ -16,68 +15,6 @@ namespace Mmd.Tests
 {
     public sealed class MmdVmdCameraTimelineTests
     {
-        private static MmdCameraKeyframeDefinition Keyframe(
-            int frame, float distance, float[] position, float[] rotation, int viewAngle, bool perspective)
-        {
-            return new MmdCameraKeyframeDefinition
-            {
-                frame = frame,
-                distance = distance,
-                position = position,
-                rotation = rotation,
-                viewAngle = viewAngle,
-                perspective = perspective,
-                interpolation = new byte[24]
-            };
-        }
-
-        private static List<MmdCameraKeyframeDefinition> TwoKeyframeTrack()
-        {
-            return new List<MmdCameraKeyframeDefinition>
-            {
-                Keyframe(0, -40f, new[] { 0f, 10f, 0f }, new[] { 0f, 0f, 0f }, 20, true),
-                Keyframe(30, -20f, new[] { 2f, 20f, -4f }, new[] { 0.1f, 0.2f, 0.1f }, 40, true)
-            };
-        }
-
-        private static List<MmdLightKeyframeDefinition> LightKeyframes()
-        {
-            return new List<MmdLightKeyframeDefinition>
-            {
-                new MmdLightKeyframeDefinition
-                {
-                    frame = 0,
-                    color = new[] { 0.2f, 0.2f, 0.2f },
-                    direction = new[] { -0.5f, -1f, 0.5f }
-                },
-                new MmdLightKeyframeDefinition
-                {
-                    frame = 30,
-                    color = new[] { 0.8f, 0.8f, 0.8f },
-                    direction = new[] { 0f, -1f, 0f }
-                }
-            };
-        }
-
-        private static List<MmdSelfShadowKeyframeDefinition> SelfShadowKeyframes()
-        {
-            return new List<MmdSelfShadowKeyframeDefinition>
-            {
-                new MmdSelfShadowKeyframeDefinition
-                {
-                    frame = 0,
-                    mode = 1,
-                    distance = 0.2f
-                },
-                new MmdSelfShadowKeyframeDefinition
-                {
-                    frame = 30,
-                    mode = 2,
-                    distance = 0.6f
-                }
-            };
-        }
-
         [Test]
         public void EvaluateAtLocalTimeAppliesSampledCameraStateToBoundProxy()
         {
@@ -94,7 +31,10 @@ namespace Mmd.Tests
                 {
                     MotionBytes = vmdBytes,
                     FrameRate = 30f,
-                    ImportScale = 1.0f
+                    ImportScale = 1.0f,
+                    ExpectedCameraKeyframeCount = 2,
+                    ExpectedLightKeyframeCount = 0,
+                    ExpectedSelfShadowKeyframeCount = 0
                 };
 
                 // localTime 0.5s at 30fps -> frame 15 (midway between keyframes 0 and 30).
@@ -107,6 +47,8 @@ namespace Mmd.Tests
                 Assert.That(Vector3.Distance(camera.transform.position, expectedPose.Position), Is.LessThan(0.001f));
                 Assert.That(Quaternion.Angle(camera.transform.rotation, expectedPose.Rotation), Is.LessThan(0.05f));
                 Assert.That(camera.fieldOfView, Is.EqualTo(expectedPose.FieldOfView).Within(0.001f));
+                Assert.That(behaviour.NativeLightTrackDiagnostic, Is.Empty);
+                Assert.That(behaviour.NativeSelfShadowTrackDiagnostic, Is.Empty);
             }
             finally
             {
@@ -178,11 +120,51 @@ namespace Mmd.Tests
 
                 Assert.That(status, Is.EqualTo(MmdSceneCameraApplyStatus.NotApplied));
                 Assert.That(camera.transform.position, Is.EqualTo(before));
+                Assert.That(
+                    behaviour.NativeCameraTrackDiagnostic,
+                    Does.StartWith("VMD native camera track unavailable: "));
+                Assert.That(
+                    behaviour.NativeLightTrackDiagnostic,
+                    Does.StartWith("VMD native light track unavailable: "));
+                Assert.That(
+                    behaviour.NativeSelfShadowTrackDiagnostic,
+                    Does.StartWith("VMD native self-shadow track unavailable: "));
             }
             finally
             {
                 UnityEngine.Object.DestroyImmediate(bindingGo);
                 UnityEngine.Object.DestroyImmediate(cameraGo);
+            }
+        }
+
+        [Test]
+        public void SourceBackedUnavailableNativeSelfShadowIsDiagnosticOnly()
+        {
+            var bindingGo = new GameObject("binding");
+            try
+            {
+                MmdSceneEnvironmentBinding binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
+                MmdSceneSelfShadowApplyStatus statusBefore = binding.LastSelfShadowApplyStatus;
+                MmdSelfShadowState stateBefore = binding.LastSelfShadowState;
+
+                var behaviour = new MmdVmdCameraBehaviour
+                {
+                    MotionBytes = new byte[] { 0, 1, 2, 3 },
+                    FrameRate = 30f
+                };
+
+                behaviour.EvaluateAtLocalTime(binding, 0.5);
+
+                Assert.That(
+                    behaviour.NativeSelfShadowTrackDiagnostic,
+                    Does.StartWith("VMD native self-shadow track unavailable: "));
+                Assert.That(binding.LastSelfShadowApplyStatus, Is.EqualTo(statusBefore));
+                Assert.That(binding.LastSelfShadowState.Mode, Is.EqualTo(stateBefore.Mode));
+                Assert.That(binding.LastSelfShadowState.Distance, Is.EqualTo(stateBefore.Distance).Within(0.001f));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(bindingGo);
             }
         }
 
@@ -286,8 +268,6 @@ namespace Mmd.Tests
 
                 var behaviour = new MmdVmdCameraBehaviour
                 {
-                    CameraKeyframes = Array.Empty<MmdCameraKeyframeDefinition>(),
-                    LightKeyframes = Array.Empty<MmdLightKeyframeDefinition>(),
                     MotionBytes = BuildLightOnlyVmdBytes(),
                     FrameRate = 30f,
                     ImportScale = 1.0f
@@ -346,7 +326,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void EvaluateAtLocalTimeRecordsSelfShadowByDefaultWithoutMutatingLight()
+        public void EvaluateAtLocalTimeDoesNotApplyWithoutMotionBytes()
         {
             var bindingGo = new GameObject("binding");
             var lightGo = new GameObject("light");
@@ -360,12 +340,11 @@ namespace Mmd.Tests
 
                 MmdSceneEnvironmentBinding binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
                 binding.TargetLight = light;
+                MmdSceneSelfShadowApplyStatus statusBefore = binding.LastSelfShadowApplyStatus;
+                MmdSelfShadowState stateBefore = binding.LastSelfShadowState;
 
                 var behaviour = new MmdVmdCameraBehaviour
                 {
-                    CameraKeyframes = Array.Empty<MmdCameraKeyframeDefinition>(),
-                    LightKeyframes = Array.Empty<MmdLightKeyframeDefinition>(),
-                    SelfShadowKeyframes = SelfShadowKeyframes(),
                     FrameRate = 30f,
                     ImportScale = 1.0f
                 };
@@ -373,9 +352,11 @@ namespace Mmd.Tests
                 MmdSceneCameraApplyStatus status = behaviour.EvaluateAtLocalTime(binding, 0.5);
 
                 Assert.That(status, Is.EqualTo(MmdSceneCameraApplyStatus.NotApplied));
-                Assert.That(binding.LastSelfShadowApplyStatus, Is.EqualTo(MmdSceneSelfShadowApplyStatus.Recorded));
-                Assert.That(binding.LastSelfShadowState.Mode, Is.EqualTo(1));
-                Assert.That(binding.LastSelfShadowState.Distance, Is.EqualTo(0.4f).Within(0.001f));
+                Assert.That(behaviour.NativeSelfShadowTrackDiagnostic,
+                    Is.EqualTo("VMD native self-shadow track unavailable: source bytes are empty"));
+                Assert.That(binding.LastSelfShadowApplyStatus, Is.EqualTo(statusBefore));
+                Assert.That(binding.LastSelfShadowState.Mode, Is.EqualTo(stateBefore.Mode));
+                Assert.That(binding.LastSelfShadowState.Distance, Is.EqualTo(stateBefore.Distance).Within(0.001f));
                 Assert.That(light.shadows, Is.EqualTo(LightShadows.Hard));
                 Assert.That(light.shadowStrength, Is.EqualTo(0.3f).Within(0.001f));
                 Assert.That(QualitySettings.shadowDistance, Is.EqualTo(originalShadowDistance).Within(0.001f));
@@ -389,7 +370,37 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void EvaluateAtLocalTimeKeepsEnabledDefaultSelfShadowWithoutSelfShadowKeyframes()
+        public void EvaluateAtLocalTimeAppliesNativeSelfShadowFromMotionBytes()
+        {
+            var bindingGo = new GameObject("binding");
+            MmdVmdCameraBehaviour behaviour = new MmdVmdCameraBehaviour
+            {
+                MotionBytes = MmdTestFixtures.BuildSceneTrackVmdBytes("native_self_shadow"),
+                FrameRate = 30f
+            };
+
+            try
+            {
+                MmdSceneEnvironmentBinding binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
+
+                // The fixture has self-shadow records at frames 10 and 30. Frame 20 exercises
+                // native step-mode selection and linear distance interpolation without managed keys.
+                MmdSceneCameraApplyStatus status = behaviour.EvaluateAtLocalTime(binding, 20.0 / 30.0);
+
+                Assert.That(status, Is.EqualTo(MmdSceneCameraApplyStatus.NotApplied));
+                Assert.That(binding.LastSelfShadowApplyStatus, Is.EqualTo(MmdSceneSelfShadowApplyStatus.Recorded));
+                Assert.That(binding.LastSelfShadowState.Mode, Is.EqualTo(1));
+                Assert.That(binding.LastSelfShadowState.Distance, Is.EqualTo(0.3f).Within(0.001f));
+            }
+            finally
+            {
+                behaviour.OnPlayableDestroy(Playable.Null);
+                UnityEngine.Object.DestroyImmediate(bindingGo);
+            }
+        }
+
+        [Test]
+        public void EvaluateAtLocalTimeKeepsEnabledDefaultSelfShadowWithoutMotionBytes()
         {
             var bindingGo = new GameObject("binding");
             var lightGo = new GameObject("light");
@@ -405,9 +416,6 @@ namespace Mmd.Tests
 
                 var behaviour = new MmdVmdCameraBehaviour
                 {
-                    CameraKeyframes = Array.Empty<MmdCameraKeyframeDefinition>(),
-                    LightKeyframes = Array.Empty<MmdLightKeyframeDefinition>(),
-                    SelfShadowKeyframes = Array.Empty<MmdSelfShadowKeyframeDefinition>(),
                     FrameRate = 30f,
                     ImportScale = 1.0f
                 };
@@ -419,49 +427,8 @@ namespace Mmd.Tests
                 Assert.That(binding.LastSelfShadowState.Mode, Is.EqualTo(MmdSceneEnvironmentBinding.DefaultSelfShadowMode));
                 Assert.That(binding.LastSelfShadowState.Distance, Is.EqualTo(MmdSceneEnvironmentBinding.DefaultSelfShadowDistance));
                 Assert.That(binding.LastSelfShadowDiagnosticStatus, Is.EqualTo(MmdSceneSelfShadowDiagnosticStatus.Active));
-                Assert.That(light.shadows, Is.EqualTo(LightShadows.None));
-                Assert.That(light.shadowStrength, Is.EqualTo(0.25f).Within(0.001f));
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(lightGo);
-                UnityEngine.Object.DestroyImmediate(bindingGo);
-            }
-        }
-
-        [Test]
-        public void EvaluateAtLocalTimeRecordsSelfShadowWhenBindingExplicitlyEnabledWithoutMutatingLight()
-        {
-            var bindingGo = new GameObject("binding");
-            var lightGo = new GameObject("light");
-            try
-            {
-                Light light = lightGo.AddComponent<Light>();
-                light.type = LightType.Directional;
-                light.shadows = LightShadows.None;
-                light.shadowStrength = 0.25f;
-
-                MmdSceneEnvironmentBinding binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
-                binding.TargetLight = light;
-                binding.SelfShadowEnabled = true;
-
-                var behaviour = new MmdVmdCameraBehaviour
-                {
-                    CameraKeyframes = Array.Empty<MmdCameraKeyframeDefinition>(),
-                    LightKeyframes = Array.Empty<MmdLightKeyframeDefinition>(),
-                    SelfShadowKeyframes = SelfShadowKeyframes(),
-                    FrameRate = 30f,
-                    ImportScale = 1.0f
-                };
-
-                MmdSceneCameraApplyStatus status = behaviour.EvaluateAtLocalTime(binding, 0.5);
-
-                Assert.That(status, Is.EqualTo(MmdSceneCameraApplyStatus.NotApplied));
-                Assert.That(binding.LastSelfShadowApplyStatus, Is.EqualTo(MmdSceneSelfShadowApplyStatus.Recorded));
-                Assert.That(binding.LastSelfShadowState.Mode, Is.EqualTo(1));
-                Assert.That(binding.LastSelfShadowState.Distance, Is.EqualTo(0.4f).Within(0.001f));
-                Assert.That(binding.LastSelfShadowSettings.Mode, Is.EqualTo(1));
-                Assert.That(binding.LastSelfShadowSettings.RuntimeApplicationEnabled, Is.False);
+                Assert.That(behaviour.NativeSelfShadowTrackDiagnostic,
+                    Is.EqualTo("VMD native self-shadow track unavailable: source bytes are empty"));
                 Assert.That(light.shadows, Is.EqualTo(LightShadows.None));
                 Assert.That(light.shadowStrength, Is.EqualTo(0.25f).Within(0.001f));
             }
@@ -490,9 +457,6 @@ namespace Mmd.Tests
 
                 var behaviour = new MmdVmdCameraBehaviour
                 {
-                    CameraKeyframes = Array.Empty<MmdCameraKeyframeDefinition>(),
-                    LightKeyframes = Array.Empty<MmdLightKeyframeDefinition>(),
-                    SelfShadowKeyframes = SelfShadowKeyframes(),
                     FrameRate = 30f,
                     ImportScale = 1.0f
                 };
@@ -560,7 +524,6 @@ namespace Mmd.Tests
 
                 var behaviour = new MmdVmdCameraBehaviour
                 {
-                    CameraKeyframes = Array.Empty<MmdCameraKeyframeDefinition>(),
                     FrameRate = 30f,
                     ImportScale = 1.0f
                 };
@@ -584,7 +547,7 @@ namespace Mmd.Tests
             try
             {
                 MmdSceneEnvironmentBinding binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
-                var behaviour = new MmdVmdCameraBehaviour { CameraKeyframes = TwoKeyframeTrack() };
+                var behaviour = new MmdVmdCameraBehaviour();
 
                 Assert.Throws<ArgumentOutOfRangeException>(() => behaviour.EvaluateAtLocalTime(binding, -1.0));
             }
@@ -597,7 +560,7 @@ namespace Mmd.Tests
         [Test]
         public void NullTargetThrows()
         {
-            var behaviour = new MmdVmdCameraBehaviour { CameraKeyframes = TwoKeyframeTrack() };
+            var behaviour = new MmdVmdCameraBehaviour();
             Assert.Throws<ArgumentNullException>(() => behaviour.EvaluateAtLocalTime(null, 0.0));
         }
 
@@ -629,9 +592,6 @@ namespace Mmd.Tests
                 Assert.That(behaviour.MotionSourceId, Is.EqualTo("cam-src"));
                 Assert.That(behaviour.LoopPolicy, Is.EqualTo(MmdVmdTimelineLoopPolicy.None));
                 Assert.That(behaviour.MotionBytes, Is.Null);
-                Assert.That(behaviour.CameraKeyframes, Is.Empty);
-                Assert.That(behaviour.LightKeyframes, Is.Empty);
-                Assert.That(behaviour.SelfShadowKeyframes, Is.Empty);
                 Assert.That(behaviour.Binding, Is.Null, "unresolved ExposedReference resolves to null");
             }
             finally
@@ -662,20 +622,7 @@ namespace Mmd.Tests
 
         private static byte[] BuildCameraVmdBytes()
         {
-            using var stream = new MemoryStream();
-            using var writer = new BinaryWriter(stream);
-
-            WriteFixedAscii(writer, "Vocaloid Motion Data 0002", 30);
-            WriteFixedAscii(writer, "camera_test", 20);
-            writer.Write(0u); // bone frames
-            writer.Write(0u); // morph frames
-            writer.Write(2u); // camera frames
-            WriteCameraFrame(writer, 0u, -40f, 0f, 10f, 0f, 0f, 0f, 0f, 20u, 0);
-            WriteCameraFrame(writer, 30u, -20f, 2f, 20f, -4f, 0.1f, 0.2f, 0.1f, 40u, 0);
-            writer.Write(0u); // light frames
-            writer.Write(0u); // self-shadow frames
-            writer.Write(0u); // property frames
-            return stream.ToArray();
+            return MmdTestFixtures.BuildCameraTrackVmdBytes("camera_test");
         }
 
         private static byte[] BuildCameraAndLightVmdBytes()

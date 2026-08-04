@@ -4,6 +4,37 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-04
+
+### Added
+
+- Added native VMD summary and raw-track readback for source-backed import and playback, including bone, morph, camera, light, and self-shadow channels.
+- Added fail-closed diagnostics and contract coverage for native runtime unavailability, invalid motion bytes, ABI mismatch, and retained native-handle lifetime.
+
+### Changed
+
+- Routed source-backed PMX/VMD playback, Timeline evaluation, post-physics pose handoff, and Generic/Humanoid AnimationClip baking through the native `mmd-anim` runtime.
+- Updated the packaged Windows native runtime and `native/mmd-anim` pin to `mmd-anim` `v0.4.0` / remote `main` commit `22e7d7b`, retaining runtime ABI version 3.
+- Reduced fast-playback overhead by reusing native pose worksets and avoiding repeated per-frame source fingerprint scans.
+
+### Fixed
+
+- Fixed fast playback material preset rebinding and preserved the native post-physics pose handoff for deform-after-physics models.
+
+### Removed
+
+- Removed the obsolete managed VMD JSON parser/evaluator, source-less frame and trace evaluation stack, managed physics/IK/pose compatibility paths, legacy camera keyframe shims, and direct Timeline `ProcessFrame` compatibility path.
+- Removed the legacy PMX buffer fallback; native parser failures now remain explicit instead of silently switching to a managed fallback.
+
+### Known Limitations
+
+- Runtime evaluation requires the bundled native runtime; unavailable or incompatible native paths report diagnostics and do not fall back to the removed managed evaluator.
+- macOS and Linux native binaries are not distributed in the package.
+- Timeline random access keeps physics off; Live physics is limited to Play Mode forward playback.
+- Raw VMD Timeline clips use deterministic hard-cut selection rather than weighted blending.
+- Humanoid bake does not include Live physics, facial morphs, or native MMD IK/helper behavior.
+- The Unity Toon Shader adapter remains optional and conservative; it falls back to MMD Toon when UTS is absent or its shader schema is unsupported.
+
 ## [0.3.0] - 2026-07-30
 
 ### Added

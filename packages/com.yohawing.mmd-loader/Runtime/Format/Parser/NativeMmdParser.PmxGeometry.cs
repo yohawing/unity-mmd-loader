@@ -57,17 +57,7 @@ namespace Mmd.Parser
         }
 
         internal static PmxModelSourceGeometry CreatePmxGeometryFromNativeBuffers(byte[] data)
-        {
-            try
-            {
-                return CreatePmxGeometryFromNativeHandle(data, NativePmxGeometryReader.Instance);
-            }
-            catch (EntryPointNotFoundException)
-            {
-                // Packages carrying an older ABI-3 DLL keep the legacy calls at this boundary only.
-                return CreatePmxGeometryFromLegacyBuffers(data);
-            }
-        }
+            => CreatePmxGeometryFromNativeHandle(data, NativePmxGeometryReader.Instance);
 
         internal static PmxModelSourceGeometry CreatePmxGeometryFromNativeHandle(byte[] data, IPmxGeometryReader reader)
         {
@@ -96,27 +86,6 @@ namespace Mmd.Parser
             {
                 reader.Free(geometry);
             }
-        }
-
-        // Kept internal so the EditMode contract can compare the compatibility path
-        // with the parse-once handle path against tracked PMX fixtures.
-        internal static PmxModelSourceGeometry CreatePmxGeometryFromLegacyBuffers(byte[] data)
-        {
-            return CreatePmxGeometry(new PmxGeometryData
-            {
-                skinningModesJson = MmdParserFfiMethods.ParsePmxSkinningModesJson(data),
-                positions = MmdParserFfiMethods.ParsePmxPositions(data),
-                normals = MmdParserFfiMethods.ParsePmxNormals(data),
-                uvs = MmdParserFfiMethods.ParsePmxUvs(data),
-                edgeScale = MmdParserFfiMethods.ParsePmxEdgeScale(data),
-                indices = MmdParserFfiMethods.ParsePmxIndices(data),
-                skinIndices = MmdParserFfiMethods.ParsePmxSkinIndices(data),
-                skinWeights = MmdParserFfiMethods.ParsePmxSkinWeights(data),
-                hasSdefParameters = MmdParserFfiMethods.ParsePmxSdefEnabled(data),
-                sdefC = MmdParserFfiMethods.ParsePmxSdefC(data),
-                sdefR0 = MmdParserFfiMethods.ParsePmxSdefR0(data),
-                sdefR1 = MmdParserFfiMethods.ParsePmxSdefR1(data),
-            });
         }
 
         private static PmxModelSourceGeometry CreatePmxGeometry(PmxGeometryData data)

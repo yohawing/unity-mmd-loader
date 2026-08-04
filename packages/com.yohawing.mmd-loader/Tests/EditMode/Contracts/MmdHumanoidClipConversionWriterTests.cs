@@ -23,26 +23,6 @@ namespace Mmd.Tests
         private const string FixtureVmdPath =
             "Packages/com.yohawing.mmd-loader/Tests/Fixtures/Assets/test_1bone_cube_motion.vmd";
 
-        private static readonly string[] RequiredBoneNames =
-        {
-            "下半身",
-            "上半身",
-            "首",
-            "頭",
-            "左足",
-            "左ひざ",
-            "左足首",
-            "右足",
-            "右ひざ",
-            "右足首",
-            "左腕",
-            "左ひじ",
-            "左手首",
-            "右腕",
-            "右ひじ",
-            "右手首",
-        };
-
         [Test]
         public void CreateInMemoryClipUsesImportedHumanoidAvatarAndBindings()
         {
@@ -70,6 +50,12 @@ namespace Mmd.Tests
                 Assert.That(
                     string.Join("\n", result.Diagnostics),
                     Does.Contain(MmdHumanoidClipConversionPlanner.ImportedPmxHumanoidMappingSource));
+                Assert.That(
+                    string.Join("\n", result.Diagnostics),
+                    Does.Contain("native batch evaluation"));
+                Assert.That(
+                    string.Join("\n", result.Diagnostics),
+                    Does.Contain("root-motion: wrote native evaluated"));
                 AssertHumanoidClipHasMuscleBindings(result.Clip!);
                 AssertRootMotionBindings(result.Clip!);
             }
@@ -392,204 +378,29 @@ namespace Mmd.Tests
             }
         }
 
-        [Test]
-        public void RootMotionKeysComposeAncestorDeltaWithPerFrameHumanoidBodyPose()
-        {
-            var model = new MmdModelDefinition();
-            model.bones.Add(new MmdBoneDefinition
-            {
-                index = 0,
-                name = "全ての親",
-                parentIndex = -1,
-                origin = new[] { 0.0f, 0.0f, 0.0f },
-            });
-            model.bones.Add(new MmdBoneDefinition
-            {
-                index = 1,
-                name = "センター",
-                parentIndex = 0,
-                origin = new[] { 0.0f, 1.0f, 0.0f },
-            });
-            model.bones.Add(new MmdBoneDefinition
-            {
-                index = 2,
-                name = "下半身",
-                parentIndex = 1,
-                origin = new[] { 0.0f, 2.0f, 0.0f },
-            });
-
-            Quaternion parentRotation = Quaternion.AngleAxis(90.0f, Vector3.up);
-            Quaternion hipsRotation = Quaternion.AngleAxis(75.0f, Vector3.right);
-            var motion = new MmdMotionDefinition { maxFrame = 1 };
-            AddLinearBoneKeys(
-                motion,
-                "全ての親",
-                new Vector3(1.0f, 2.0f, 3.0f),
-                Quaternion.identity);
-            AddLinearBoneKeys(
-                motion,
-                "センター",
-                new Vector3(4.0f, 5.0f, 6.0f),
-                parentRotation);
-            AddLinearBoneKeys(
-                motion,
-                "下半身",
-                new Vector3(7.0f, 8.0f, 9.0f),
-                hipsRotation);
-
-            var positionKeys = new[] { new Keyframe[2], new Keyframe[2], new Keyframe[2] };
-            var rotationKeys = new[]
-            {
-                new Keyframe[2],
-                new Keyframe[2],
-                new Keyframe[2],
-                new Keyframe[2],
-            };
-            var bodyPositions = new[]
-            {
-                new Vector3(0.25f, 1.5f, -0.5f),
-                new Vector3(0.25f, 1.5f, -0.5f),
-            };
-            var bodyRotations = new[]
-            {
-                Quaternion.AngleAxis(30.0f, Vector3.forward),
-                Quaternion.AngleAxis(75.0f, Vector3.right),
-            };
-
-            bool success = MmdHumanoidClipConversionWriter.TryBuildRootMotionKeys(
-                model,
-                motion,
-                hipsBoneIndex: 2,
-                importScale: 0.5f,
-                humanScale: 2.0f,
-                bodyPositions,
-                bodyRotations,
-                startFrame: 0,
-                endFrame: 1,
-                sampleFrameToTimeFactor: 1.0f / 30.0f,
-                positionKeys,
-                rotationKeys,
-                out string diagnostic);
-
-            Assert.That(success, Is.True, diagnostic);
-            // The center rotation turns the Hips local translation before the root translation is added.
-            // MMD end position delta: (14, 15, 2), then coordinate flip, import scale,
-            // and HumanPose normalization => (-3.5, 3.75, -0.5), added to the baseline pose.
-            Assert.That(positionKeys[0][1].value, Is.EqualTo(-3.25f).Within(0.0001f));
-            Assert.That(positionKeys[1][1].value, Is.EqualTo(5.25f).Within(0.0001f));
-            Assert.That(positionKeys[2][1].value, Is.EqualTo(-1.0f).Within(0.0001f));
-
-            var actualRootRotation = new Quaternion(
-                rotationKeys[0][1].value,
-                rotationKeys[1][1].value,
-                rotationKeys[2][1].value,
-                rotationKeys[3][1].value);
-            Quaternion expectedRootRotation =
-                MmdCoordinateSpace.MmdToUnityRotation(parentRotation) * bodyRotations[1];
-            Assert.That(Mathf.Abs(Quaternion.Dot(actualRootRotation, expectedRootRotation)),
-                Is.EqualTo(1.0f).Within(0.0001f),
-                "RootQ must add only non-Humanoid ancestor rotation to the per-frame body orientation.");
-            Assert.That(positionKeys[1][0].value, Is.EqualTo(bodyPositions[0].y).Within(0.0001f));
-            var initialRootRotation = new Quaternion(
-                rotationKeys[0][0].value,
-                rotationKeys[1][0].value,
-                rotationKeys[2][0].value,
-                rotationKeys[3][0].value);
-            Assert.That(Mathf.Abs(Quaternion.Dot(initialRootRotation, bodyRotations[0])),
-                Is.EqualTo(1.0f).Within(0.0001f));
-            Assert.That(positionKeys[0][0].time, Is.Zero.Within(0.0001f));
-            Assert.That(positionKeys[0][1].time, Is.EqualTo(1.0f / 30.0f).Within(0.0001f));
-        }
-
         private static void CreateReadyFixturePmx(
             out MmdPmxAsset pmxAsset,
             List<UnityEngine.Object> ownedObjects)
         {
-            var hierarchyRoot = new GameObject("H6WriterReadyPmxRoot");
-            var modelObject = new GameObject("ReadyModel");
-            modelObject.transform.SetParent(hierarchyRoot.transform, worldPositionStays: false);
-
-            SkinnedMeshRenderer smr = modelObject.AddComponent<SkinnedMeshRenderer>();
-            Mesh mesh = new Mesh
-            {
-                name = "H6WriterReadyPmxMesh",
-            };
-            mesh.vertices = new Vector3[]
-            {
-                new Vector3(-0.5f, 0f, -0.5f),
-                new Vector3(0.5f, 0f, -0.5f),
-                new Vector3(0f, 1f, 0.5f),
-            };
-            mesh.triangles = new int[] { 0, 1, 2 };
-            mesh.bindposes = new Matrix4x4[RequiredBoneNames.Length];
-            smr.sharedMesh = mesh;
-
-            Transform[] bones = new Transform[RequiredBoneNames.Length];
-            for (int i = 0; i < RequiredBoneNames.Length; i++)
-            {
-                GameObject boneObject = new GameObject(RequiredBoneNames[i]);
-                boneObject.transform.SetParent(modelObject.transform, worldPositionStays: false);
-                boneObject.transform.localPosition = GetHumanoidFixtureBonePosition(RequiredBoneNames[i]);
-                bones[i] = boneObject.transform;
-            }
-            smr.bones = bones;
+            byte[] modelBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_basic_bone.pmx");
+            MmdModelDefinition model = new NativeMmdParser().LoadModel(modelBytes);
+            MmdUnityModelInstance generatedAssets = MmdUnityModelFactory.CreateSkinnedModel(model);
 
             pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
             pmxAsset.Initialize(
-                new byte[] { 0x10, 0x20, 0x30 },
+                modelBytes,
                 "ready-h6-writer-slice1.pmx",
                 System.IO.Path.Combine("Assets", "ready-h6-writer-slice1.pmx"),
-                importedMeshAsset: mesh,
-                importedRootAsset: hierarchyRoot,
+                importedMeshAsset: generatedAssets.Mesh,
+                importedMaterialAssets: generatedAssets.Materials,
+                importedRootAsset: generatedAssets.Root,
                 hierarchyReadinessValue: MmdImportReadiness.Ready,
                 rendererReadinessValue: MmdImportReadiness.Ready,
                 boneBindingReadinessValue: MmdImportReadiness.Ready,
-                parseSummary: new MmdPmxParseSummary(
-                    "ready-h6-writer",
-                    vertexCount: 3,
-                    indexCount: 3,
-                    boneCount: RequiredBoneNames.Length,
-                    morphCount: 0,
-                    materialCount: 1,
-                    diffuseTextureReferenceCount: 0,
-                    sphereTextureReferenceCount: 0,
-                    toonTextureReferenceCount: 0,
-                    transparentMaterialCount: 0,
-                    edgeMaterialCount: 0,
-                    ikCount: 0,
-                    rigidbodyCount: 0,
-                    jointCount: 0,
-                    boundsMin: new Vector3(-0.5f, 0f, -0.5f),
-                    boundsMax: new Vector3(0.5f, 1f, 0.5f),
-                    materialSummaries: Array.Empty<MmdPmxMaterialSummary>()));
+                parseSummary: MmdPmxParseSummary.FromModel(model));
 
             ownedObjects.Add(pmxAsset);
-            ownedObjects.Add(hierarchyRoot);
-            ownedObjects.Add(mesh);
-        }
-
-        private static Vector3 GetHumanoidFixtureBonePosition(string boneName)
-        {
-            return boneName switch
-            {
-                "下半身" => new Vector3(0.0f, 1.0f, 0.0f),
-                "上半身" => new Vector3(0.0f, 1.25f, 0.0f),
-                "首" => new Vector3(0.0f, 1.65f, 0.0f),
-                "頭" => new Vector3(0.0f, 1.85f, 0.0f),
-                "左足" => new Vector3(-0.18f, 0.9f, 0.0f),
-                "左ひざ" => new Vector3(-0.18f, 0.5f, 0.0f),
-                "左足首" => new Vector3(-0.18f, 0.1f, 0.0f),
-                "右足" => new Vector3(0.18f, 0.9f, 0.0f),
-                "右ひざ" => new Vector3(0.18f, 0.5f, 0.0f),
-                "右足首" => new Vector3(0.18f, 0.1f, 0.0f),
-                "左腕" => new Vector3(-0.35f, 1.5f, 0.0f),
-                "左ひじ" => new Vector3(-0.65f, 1.5f, 0.0f),
-                "左手首" => new Vector3(-0.9f, 1.5f, 0.0f),
-                "右腕" => new Vector3(0.35f, 1.5f, 0.0f),
-                "右ひじ" => new Vector3(0.65f, 1.5f, 0.0f),
-                "右手首" => new Vector3(0.9f, 1.5f, 0.0f),
-                _ => Vector3.zero,
-            };
+            ownedObjects.Add(generatedAssets.Root);
         }
 
         private static void ConfigureImportedHumanoidState(
@@ -753,31 +564,6 @@ namespace Mmd.Tests
                     UnityEngine.Object.DestroyImmediate(obj);
                 }
             }
-        }
-
-        private static void AddLinearBoneKeys(
-            MmdMotionDefinition motion,
-            string boneName,
-            Vector3 endTranslation,
-            Quaternion endRotation)
-        {
-            MmdBoneInterpolationDefinition interpolation = MmdTestFixtures.LinearBoneInterpolation();
-            motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
-            {
-                boneName = boneName,
-                frame = 0,
-                translation = new[] { 0.0f, 0.0f, 0.0f },
-                rotation = new[] { 0.0f, 0.0f, 0.0f, 1.0f },
-                interpolation = interpolation,
-            });
-            motion.boneKeyframes.Add(new MmdBoneKeyframeDefinition
-            {
-                boneName = boneName,
-                frame = 1,
-                translation = new[] { endTranslation.x, endTranslation.y, endTranslation.z },
-                rotation = new[] { endRotation.x, endRotation.y, endRotation.z, endRotation.w },
-                interpolation = interpolation,
-            });
         }
 
         private static void CreateFolderIfMissing(string folderPath)

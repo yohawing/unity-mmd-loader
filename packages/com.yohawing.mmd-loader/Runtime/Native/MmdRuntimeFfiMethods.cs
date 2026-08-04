@@ -12,7 +12,13 @@ namespace Mmd.Native
         internal const uint FeatureSplitPhysicsEvaluation = 1u << 0;
         internal const uint FeaturePhysicsBulletNative = 1u << 1;
         internal const uint FeatureHostPoseNativeMorphs = 1u << 3;
-        internal const uint FeatureReducedPoseGenericCurves = 1u << 4;
+        internal const uint FeatureClipBoneTrackIntrospection = 1u << 5;
+        internal const uint FeatureClipMorphTrackIntrospection = 1u << 6;
+        internal const uint FeatureClipPropertyTrackIntrospection = 1u << 7;
+        internal const uint FeatureVmdTrackKeyframeIntrospection = 1u << 8;
+        internal const uint FeatureVmdSharedContext = 1u << 9;
+        internal const uint FeatureVmdSummaryBytes = 1u << 11;
+        internal const uint FeatureVmdSharedContextRawReadback = 1u << 12;
         internal const uint PhysicsModeLive = 2;
         internal const uint PhysicsFrameActionSeed = 0;
         internal const uint PhysicsFrameActionStep = 1;
@@ -24,8 +30,10 @@ namespace Mmd.Native
         internal const uint PhysicsBodyModeDynamicBone = 2;
         internal const uint PhysicsJointKindGeneric6DofSpring = 0;
         internal const int StatusOk = 0;
+        internal const int StatusInvalidInput = 1;
         internal const int StatusUnsupported = 2;
         internal const int StatusBufferTooSmall = 3;
+        internal const int StatusError = 4;
         internal const uint ReductionTargetDccCubic = 2;
         internal const uint GenericCurveAbiVersionV1 = 1;
         internal const uint GenericCurveBoneLocal = 0;
@@ -35,6 +43,17 @@ namespace Mmd.Native
         internal const uint GenericValueScalar = 1u << 2;
         internal const uint GenericRotationBasisNone = 0;
         internal const uint GenericRotationBasisRuntimeQuaternion = 1;
+        internal const uint ClipBoneTrackIntrospectionAbiVersionV1 = 1;
+        internal const uint ClipMorphTrackIntrospectionAbiVersionV1 = 1;
+        internal const uint ClipPropertyTrackIntrospectionAbiVersionV1 = 1;
+        internal const uint VmdTrackKeyframeIntrospectionAbiVersionV1 = 1;
+        internal const uint VmdSharedContextAbiVersionV1 = 1;
+        internal const uint VmdSharedContextSummaryAbiVersionV1 = 1;
+        internal const int VmdContextSummarySizeV1 = 84;
+        internal const uint VmdSharedContextRawReadbackAbiVersionV1 = 1;
+        internal const uint VmdSummaryBytesAbiVersionV1 = 1;
+        internal const uint VmdCurveNone = 0;
+        internal const uint VmdCurveCubicBezier = 1;
 
         [StructLayout(LayoutKind.Sequential)]
         internal struct PhysicsStepStats
@@ -251,6 +270,185 @@ namespace Mmd.Native
             internal float segmentCurrentInScalar;
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct VmdCurve
+        {
+            internal uint kind;
+            internal float x1;
+            internal float y1;
+            internal float x2;
+            internal float y2;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct VmdCameraKeyframe
+        {
+            internal uint frame;
+            internal float distance;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3, ArraySubType = UnmanagedType.R4)]
+            internal float[] positionXyz;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3, ArraySubType = UnmanagedType.R4)]
+            internal float[] rotationXyz;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 24, ArraySubType = UnmanagedType.U1)]
+            internal byte[] interpolation;
+            internal uint fov;
+            internal byte perspective;
+            internal VmdCurve positionX;
+            internal VmdCurve positionY;
+            internal VmdCurve positionZ;
+            internal VmdCurve rotation;
+            internal VmdCurve distanceCurve;
+            internal VmdCurve fovCurve;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct VmdLightKeyframe
+        {
+            internal uint frame;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3, ArraySubType = UnmanagedType.R4)]
+            internal float[] color;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3, ArraySubType = UnmanagedType.R4)]
+            internal float[] direction;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct VmdSelfShadowKeyframe
+        {
+            internal uint frame;
+            internal byte mode;
+            internal float distance;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct VmdRawBoneKeyframe
+        {
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 15, ArraySubType = UnmanagedType.U1)]
+            internal byte[] boneNameBytes;
+            internal uint frame;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3, ArraySubType = UnmanagedType.R4)]
+            internal float[] positionXyz;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4, ArraySubType = UnmanagedType.R4)]
+            internal float[] rotationXyzw;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 64, ArraySubType = UnmanagedType.U1)]
+            internal byte[] interpolation;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct VmdRawMorphKeyframe
+        {
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 15, ArraySubType = UnmanagedType.U1)]
+            internal byte[] morphNameBytes;
+            internal uint frame;
+            internal float weight;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct VmdPropertyKeyframe
+        {
+            internal uint frame;
+            internal byte visible;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3, ArraySubType = UnmanagedType.U1)]
+            internal byte[] reserved;
+            internal IntPtr ikEntryOffset;
+            internal IntPtr ikEntryCount;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct VmdPropertyIkEntry
+        {
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 20, ArraySubType = UnmanagedType.U1)]
+            internal byte[] nameBytes;
+            internal byte enabled;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3, ArraySubType = UnmanagedType.U1)]
+            internal byte[] reserved;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct VmdTrackSummary
+        {
+            internal uint trackCount;
+            internal uint keyCount;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct VmdContextSummary
+        {
+            internal uint structSize;
+            internal uint abiVersion;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 20, ArraySubType = UnmanagedType.U1)]
+            internal byte[] targetModelNameBytes;
+            internal uint maxFrame;
+            internal VmdTrackSummary bones;
+            internal VmdTrackSummary morphs;
+            internal VmdTrackSummary cameras;
+            internal VmdTrackSummary lights;
+            internal VmdTrackSummary selfShadows;
+            internal VmdTrackSummary properties;
+            internal uint propertyIkEntryCount;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct BoneTrackCurve
+        {
+            internal uint kind;
+            internal float x1;
+            internal float y1;
+            internal float x2;
+            internal float y2;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct BoneTrackDescriptor
+        {
+            internal uint boneIndex;
+            internal IntPtr keyCount;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct BoneTrackKey
+        {
+            internal uint boneIndex;
+            internal uint frame;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3, ArraySubType = UnmanagedType.R4)]
+            internal float[] positionXyz;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4, ArraySubType = UnmanagedType.R4)]
+            internal float[] rotationXyzw;
+            internal BoneTrackCurve translationX;
+            internal BoneTrackCurve translationY;
+            internal BoneTrackCurve translationZ;
+            internal BoneTrackCurve rotation;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct MorphTrackDescriptor
+        {
+            internal uint morphIndex;
+            internal IntPtr keyCount;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct MorphTrackKey
+        {
+            internal uint morphIndex;
+            internal uint frame;
+            internal float weight;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct PropertyTrackDescriptor
+        {
+            internal IntPtr keyCount;
+            internal IntPtr ikEnabledCount;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct PropertyTrackKey
+        {
+            internal uint frame;
+            internal IntPtr ikEnabledOffset;
+            internal IntPtr ikEnabledCount;
+        }
+
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_abi_version", CallingConvention = CallingConvention.Cdecl)]
         internal static extern uint AbiVersion();
 
@@ -278,11 +476,178 @@ namespace Mmd.Native
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_create_from_vmd_bytes_for_model", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr ClipCreateFromVmdBytesForModel(IntPtr model, byte[] data, IntPtr len);
 
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_create_from_vmd_bytes", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr VmdContextCreateFromVmdBytes(byte[] data, IntPtr len);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_free", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void VmdContextFree(IntPtr context);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_read_summary", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int VmdContextReadSummary(
+            IntPtr context,
+            IntPtr outSummary,
+            IntPtr outSummarySize);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_summary_read_from_vmd_bytes", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int VmdSummaryReadFromVmdBytes(
+            byte[] data,
+            IntPtr len,
+            IntPtr outSummary,
+            IntPtr outSummarySize);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_camera_frame_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr VmdContextCameraFrameCount(IntPtr context);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_copy_camera_keyframes", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int VmdContextCopyCameraKeyframes(
+            IntPtr context,
+            IntPtr outKeys,
+            IntPtr outKeyCapacity,
+            out IntPtr outWritten);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_light_frame_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr VmdContextLightFrameCount(IntPtr context);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_copy_light_keyframes", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int VmdContextCopyLightKeyframes(
+            IntPtr context,
+            IntPtr outKeys,
+            IntPtr outKeyCapacity,
+            out IntPtr outWritten);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_self_shadow_frame_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr VmdContextSelfShadowFrameCount(IntPtr context);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_copy_self_shadow_keyframes", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int VmdContextCopySelfShadowKeyframes(
+            IntPtr context,
+            IntPtr outKeys,
+            IntPtr outKeyCapacity,
+            out IntPtr outWritten);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_property_frame_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr VmdContextPropertyFrameCount(IntPtr context);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_property_ik_entry_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr VmdContextPropertyIkEntryCount(IntPtr context);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_copy_property_keyframes", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int VmdContextCopyPropertyKeyframes(
+            IntPtr context,
+            IntPtr outKeys,
+            IntPtr outKeyCapacity,
+            out IntPtr outWritten);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_copy_property_ik_entries", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int VmdContextCopyPropertyIkEntries(
+            IntPtr context,
+            IntPtr outEntries,
+            IntPtr outEntryCapacity,
+            out IntPtr outWritten);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_create_from_vmd_context_for_model", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr ClipCreateFromVmdContextForModel(IntPtr model, IntPtr context);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_bone_keyframe_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr VmdContextBoneKeyframeCount(IntPtr context);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_copy_bone_keyframes", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int VmdContextCopyBoneKeyframes(
+            IntPtr context,
+            IntPtr outKeys,
+            IntPtr outKeyCapacity,
+            out IntPtr outWritten);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_morph_keyframe_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr VmdContextMorphKeyframeCount(IntPtr context);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_context_copy_morph_keyframes", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int VmdContextCopyMorphKeyframes(
+            IntPtr context,
+            IntPtr outKeys,
+            IntPtr outKeyCapacity,
+            out IntPtr outWritten);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_bone_track_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr ClipBoneTrackCount(IntPtr clip);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_bone_track_descriptor", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ClipBoneTrackDescriptor(
+            IntPtr clip,
+            IntPtr trackIndex,
+            ref BoneTrackDescriptor outDescriptor);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_bone_track_key_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr ClipBoneTrackKeyCount(IntPtr clip, IntPtr trackIndex);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_copy_bone_track_keys", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ClipCopyBoneTrackKeys(
+            IntPtr clip,
+            IntPtr trackIndex,
+            IntPtr outKeys,
+            IntPtr outKeyCapacity,
+            out IntPtr outWritten);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_morph_track_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr ClipMorphTrackCount(IntPtr clip);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_morph_track_descriptor", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ClipMorphTrackDescriptor(
+            IntPtr clip,
+            IntPtr trackIndex,
+            ref MorphTrackDescriptor outDescriptor);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_morph_track_key_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr ClipMorphTrackKeyCount(IntPtr clip, IntPtr trackIndex);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_copy_morph_track_keys", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ClipCopyMorphTrackKeys(
+            IntPtr clip,
+            IntPtr trackIndex,
+            IntPtr outKeys,
+            IntPtr outKeyCapacity,
+            out IntPtr outWritten);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_property_track_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr ClipPropertyTrackCount(IntPtr clip);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_property_track_descriptor", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ClipPropertyTrackDescriptor(
+            IntPtr clip,
+            ref PropertyTrackDescriptor outDescriptor);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_property_track_key_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr ClipPropertyTrackKeyCount(IntPtr clip);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_property_track_ik_enabled_count", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr ClipPropertyTrackIkEnabledCount(IntPtr clip);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_copy_property_track_keys", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ClipCopyPropertyTrackKeys(
+            IntPtr clip,
+            IntPtr outKeys,
+            IntPtr outKeyCapacity,
+            out IntPtr outWritten);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_copy_property_track_ik_enabled", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int ClipCopyPropertyTrackIkEnabled(
+            IntPtr clip,
+            IntPtr outStates,
+            IntPtr outStateCapacity,
+            out IntPtr outWritten);
+
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_camera_track_create_from_vmd_bytes", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr VmdCameraTrackCreateFromVmdBytes(byte[] data, IntPtr len);
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_camera_track_frame_count", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr VmdCameraTrackFrameCount(IntPtr track);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_camera_track_copy_keyframes", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int VmdCameraTrackCopyKeyframes(
+            IntPtr track,
+            IntPtr outKeys,
+            IntPtr outKeyCapacity,
+            out IntPtr outWritten);
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_camera_track_sample", CallingConvention = CallingConvention.Cdecl)]
         internal static extern byte VmdCameraTrackSample(IntPtr track, float frame, [Out] float[] outF32, IntPtr outF32Len);
@@ -296,6 +661,13 @@ namespace Mmd.Native
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_light_track_frame_count", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr VmdLightTrackFrameCount(IntPtr track);
 
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_light_track_copy_keyframes", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int VmdLightTrackCopyKeyframes(
+            IntPtr track,
+            IntPtr outKeys,
+            IntPtr outKeyCapacity,
+            out IntPtr outWritten);
+
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_light_track_free", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void VmdLightTrackFree(IntPtr track);
 
@@ -308,14 +680,18 @@ namespace Mmd.Native
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_self_shadow_track_frame_count", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr VmdSelfShadowTrackFrameCount(IntPtr track);
 
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_self_shadow_track_copy_keyframes", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int VmdSelfShadowTrackCopyKeyframes(
+            IntPtr track,
+            IntPtr outKeys,
+            IntPtr outKeyCapacity,
+            out IntPtr outWritten);
+
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_self_shadow_track_free", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void VmdSelfShadowTrackFree(IntPtr track);
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_vmd_camera_track_free", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void VmdCameraTrackFree(IntPtr track);
-
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_frame_range", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern byte ClipFrameRange(IntPtr clip, out uint firstFrame, out uint lastFrame);
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_clip_free", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void ClipFree(IntPtr clip);
@@ -346,16 +722,6 @@ namespace Mmd.Native
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_physics_world_reset", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int PhysicsWorldReset(IntPtr world, IntPtr instance, out IntPtr seededRigidbodyCount);
 
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_evaluate_clip_frame_before_physics", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern int InstanceEvaluateClipFrameBeforePhysics(IntPtr instance, IntPtr clip, float frame);
-
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_physics_world_step_runtime", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern int PhysicsWorldStepRuntime(
-            IntPtr world,
-            IntPtr instance,
-            float deltaTime,
-            out PhysicsWorldStepReport outReport);
-
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_evaluate_host_frame", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int EvaluateHostFrame(
             IntPtr instance,
@@ -376,8 +742,8 @@ namespace Mmd.Native
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_evaluate_clip_frame", CallingConvention = CallingConvention.Cdecl)]
         internal static extern byte InstanceEvaluateClipFrame(IntPtr instance, IntPtr clip, float frame);
 
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_evaluate_clip_frame_without_ik", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern byte InstanceEvaluateClipFrameWithoutIk(IntPtr instance, IntPtr clip, float frame);
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_evaluate_clip_frame_before_physics", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int InstanceEvaluateClipFrameBeforePhysics(IntPtr instance, IntPtr clip, float frame);
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_world_matrix_f32_len", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr InstanceWorldMatrixF32Len(IntPtr instance);
@@ -471,14 +837,70 @@ namespace Mmd.Native
             return abiVersion;
         }
 
+        internal static uint ValidateVmdSharedContextCapability()
+        {
+            uint abiVersion = AbiVersion();
+            if (abiVersion != ExpectedAbiVersion)
+            {
+                throw new MmdRuntimeUnsupportedException(
+                    $"mmd-runtime ABI version {abiVersion} is not supported for the shared VMD context. " +
+                    $"Expected {ExpectedAbiVersion}.");
+            }
+
+            uint featureFlags = FeatureFlags();
+            if ((featureFlags & FeatureVmdSharedContext) == 0)
+            {
+                throw new MmdRuntimeUnsupportedException(
+                    "mmd-runtime does not provide the shared VMD context feature " +
+                    $"(required feature bit 9, flags=0x{featureFlags:X8}).");
+            }
+
+            return VmdSharedContextAbiVersionV1;
+        }
+
+        internal static uint ValidateVmdSummaryBytesCapability()
+        {
+            uint abiVersion = AbiVersion();
+            if (abiVersion != ExpectedAbiVersion)
+            {
+                throw new MmdRuntimeUnsupportedException(
+                    $"mmd-runtime ABI version {abiVersion} is not supported for VMD byte summaries. " +
+                    $"Expected {ExpectedAbiVersion}.");
+            }
+
+            uint featureFlags = FeatureFlags();
+            if ((featureFlags & FeatureVmdSummaryBytes) == 0)
+            {
+                throw new MmdRuntimeUnsupportedException(
+                    "mmd-runtime does not provide VMD byte summary parsing " +
+                    $"(required feature bit 11, flags=0x{featureFlags:X8}).");
+            }
+
+            return VmdSummaryBytesAbiVersionV1;
+        }
+
+        internal static uint ValidateVmdSharedContextRawReadbackCapability()
+        {
+            ValidateVmdSharedContextCapability();
+            uint featureFlags = FeatureFlags();
+            if ((featureFlags & FeatureVmdSharedContextRawReadback) == 0)
+            {
+                throw new MmdRuntimeUnsupportedException(
+                    "mmd-runtime does not provide shared VMD model-less raw readback " +
+                    $"(required feature bit 12, flags=0x{featureFlags:X8}).");
+            }
+
+            return VmdSharedContextRawReadbackAbiVersionV1;
+        }
+
     }
-    internal sealed class MmdRuntimeFfiPlaybackSession : IDisposable
+    internal sealed partial class MmdRuntimeFfiPlaybackSession : IDisposable
     {
         internal const long MaxReductionInputBytes = 256L * 1024L * 1024L;
 
-        private readonly IntPtr model;
-        private readonly IntPtr clip;
-        private readonly IntPtr instance;
+        private IntPtr model;
+        private IntPtr clip;
+        private IntPtr instance;
         private bool disposed;
 
         private MmdRuntimeFfiPlaybackSession(IntPtr model, IntPtr clip, IntPtr instance)
@@ -503,7 +925,16 @@ namespace Mmd.Native
         public int MorphWeightCount { get; }
         public int IkEnabledCount { get; }
 
-        public static MmdRuntimeFfiPlaybackSession Create(byte[] pmxBytes, byte[] vmdBytes)
+        internal IntPtr GetNativeModelHandle()
+        {
+            ThrowIfDisposed();
+            return model;
+        }
+
+        public static MmdRuntimeFfiPlaybackSession Create(
+            byte[] pmxBytes,
+            byte[] vmdBytes,
+            bool abiAlreadyValidated = false)
         {
             if (pmxBytes == null || pmxBytes.Length == 0)
             {
@@ -515,28 +946,104 @@ namespace Mmd.Native
                 throw new ArgumentException("VMD bytes are required.", nameof(vmdBytes));
             }
 
+            return MmdRuntimeNativeBoundary.Invoke(
+                "standard VMD playback session",
+                () =>
+                {
+                    if (!abiAlreadyValidated)
+                    {
+                        MmdRuntimeFfiMethods.ValidateAbiVersion();
+                    }
+
+                    return CreateFromModelClipFactory(
+                        pmxBytes,
+                        model => MmdRuntimeFfiMethods.ClipCreateFromVmdBytesForModel(
+                            model,
+                            vmdBytes,
+                            new IntPtr(vmdBytes.Length)),
+                        "mmd-runtime VMD import returned a null clip",
+                        unavailableOperation: "standard VMD playback session");
+                });
+        }
+
+        public static MmdRuntimeFfiPlaybackSession CreateFromVmdContext(
+            byte[] pmxBytes,
+            MmdRuntimeFfiVmdContext context,
+            bool abiAlreadyValidated = false)
+        {
+            if (pmxBytes == null || pmxBytes.Length == 0)
+            {
+                throw new ArgumentException("PMX bytes are required.", nameof(pmxBytes));
+            }
+
+            if (context == null)
+            {
+                throw new ArgumentNullException(nameof(context));
+            }
+
+            if (!abiAlreadyValidated)
+            {
+                try
+                {
+                    MmdRuntimeFfiMethods.ValidateVmdSharedContextCapability();
+                }
+                catch (DllNotFoundException exception)
+                {
+                    throw MmdRuntimeNativeBoundary.Unavailable(
+                        "shared VMD context-backed playback session", exception);
+                }
+                catch (EntryPointNotFoundException exception)
+                {
+                    throw MmdRuntimeNativeBoundary.Unavailable(
+                        "shared VMD context-backed playback session", exception);
+                }
+                catch (BadImageFormatException exception)
+                {
+                    throw MmdRuntimeNativeBoundary.Unavailable(
+                        "shared VMD context-backed playback session", exception);
+                }
+            }
+
+            IntPtr contextHandle = context.GetNativeHandle();
+            return CreateFromModelClipFactory(
+                pmxBytes,
+                model => MmdRuntimeFfiMethods.ClipCreateFromVmdContextForModel(model, contextHandle),
+                "mmd-runtime VMD context import returned a null clip",
+                "shared VMD context-backed playback session");
+        }
+
+        private static MmdRuntimeFfiPlaybackSession CreateFromModelClipFactory(
+            byte[] pmxBytes,
+            Func<IntPtr, IntPtr> createClip,
+            string clipFailureMessage,
+            string? unavailableOperation)
+        {
             IntPtr model = IntPtr.Zero;
             IntPtr clip = IntPtr.Zero;
             IntPtr instance = IntPtr.Zero;
             try
             {
-                MmdRuntimeFfiMethods.ValidateAbiVersion();
-                model = MmdRuntimeFfiMethods.ModelCreateFromPmxBytes(pmxBytes, new IntPtr(pmxBytes.Length));
+                model = MmdRuntimeFfiMethods.ModelCreateFromPmxBytes(
+                    pmxBytes,
+                    new IntPtr(pmxBytes.Length));
                 if (model == IntPtr.Zero)
                 {
-                    throw new InvalidOperationException("mmd-runtime PMX import returned a null model.");
+                    throw new InvalidOperationException(
+                        "mmd-runtime PMX import returned a null model: " + MmdRuntimeFfiMarshal.LastErrorMessage());
                 }
 
-                clip = MmdRuntimeFfiMethods.ClipCreateFromVmdBytesForModel(model, vmdBytes, new IntPtr(vmdBytes.Length));
+                clip = createClip(model);
                 if (clip == IntPtr.Zero)
                 {
-                    throw new InvalidOperationException("mmd-runtime VMD import returned a null clip.");
+                    throw new InvalidOperationException(clipFailureMessage + ": " +
+                        MmdRuntimeFfiMarshal.LastErrorMessage());
                 }
 
                 instance = MmdRuntimeFfiMethods.InstanceCreateForModel(model);
                 if (instance == IntPtr.Zero)
                 {
-                    throw new InvalidOperationException("mmd-runtime instance creation returned null.");
+                    throw new InvalidOperationException(
+                        "mmd-runtime instance creation returned null: " + MmdRuntimeFfiMarshal.LastErrorMessage());
                 }
 
                 MmdRuntimeFfiPlaybackSession session = new MmdRuntimeFfiPlaybackSession(model, clip, instance);
@@ -544,6 +1051,33 @@ namespace Mmd.Native
                 clip = IntPtr.Zero;
                 instance = IntPtr.Zero;
                 return session;
+            }
+            catch (DllNotFoundException exception)
+            {
+                if (unavailableOperation == null)
+                {
+                    throw;
+                }
+
+                throw MmdRuntimeNativeBoundary.Unavailable(unavailableOperation, exception);
+            }
+            catch (EntryPointNotFoundException exception)
+            {
+                if (unavailableOperation == null)
+                {
+                    throw;
+                }
+
+                throw MmdRuntimeNativeBoundary.Unavailable(unavailableOperation, exception);
+            }
+            catch (BadImageFormatException exception)
+            {
+                if (unavailableOperation == null)
+                {
+                    throw;
+                }
+
+                throw MmdRuntimeNativeBoundary.Unavailable(unavailableOperation, exception);
             }
             finally
             {
@@ -571,17 +1105,53 @@ namespace Mmd.Native
                 throw new ObjectDisposedException(nameof(MmdRuntimeFfiPlaybackSession));
             }
 
-            MmdRuntimeFfiSmoke.EvaluateAndCopy(instance, clip, frame, worldMatrices, morphWeights, ikEnabled);
+            byte evaluated = MmdRuntimeFfiMethods.InstanceEvaluateClipFrame(instance, clip, frame);
+            if (evaluated == 0)
+            {
+                throw new InvalidOperationException("mmd-runtime clip frame evaluation returned false.");
+            }
+
+            CopyEvaluatedOutputs(worldMatrices, morphWeights, ikEnabled);
         }
 
-        public void EvaluateWithoutIkAndCopy(float frame, float[] worldMatrices, float[] morphWeights, byte[] ikEnabled)
+        public void EvaluateBeforePhysicsAndCopy(float frame, float[] worldMatrices, float[] morphWeights, byte[] ikEnabled)
         {
             if (disposed)
             {
                 throw new ObjectDisposedException(nameof(MmdRuntimeFfiPlaybackSession));
             }
 
-            MmdRuntimeFfiSmoke.EvaluateWithoutIkAndCopy(instance, clip, frame, worldMatrices, morphWeights, ikEnabled);
+            int status = MmdRuntimeFfiMethods.InstanceEvaluateClipFrameBeforePhysics(instance, clip, frame);
+            if (status != MmdRuntimeFfiMethods.StatusOk)
+            {
+                throw new InvalidOperationException(
+                    $"mmd-runtime before-physics clip frame evaluation failed with status {status}: " +
+                    MmdRuntimeFfiMarshal.LastErrorMessage());
+            }
+
+            CopyEvaluatedOutputs(worldMatrices, morphWeights, ikEnabled);
+        }
+
+        private void CopyEvaluatedOutputs(float[] worldMatrices, float[] morphWeights, byte[] ikEnabled)
+        {
+
+            if (worldMatrices.Length > 0 &&
+                MmdRuntimeFfiMethods.InstanceCopyWorldMatrices(instance, worldMatrices, new IntPtr(worldMatrices.Length)) == 0)
+            {
+                throw new InvalidOperationException("mmd-runtime world matrix copy returned false.");
+            }
+
+            if (morphWeights.Length > 0 &&
+                MmdRuntimeFfiMethods.InstanceCopyMorphWeights(instance, morphWeights, new IntPtr(morphWeights.Length)) == 0)
+            {
+                throw new InvalidOperationException("mmd-runtime morph weight copy returned false.");
+            }
+
+            if (ikEnabled.Length > 0 &&
+                MmdRuntimeFfiMethods.InstanceCopyIkEnabled(instance, ikEnabled, new IntPtr(ikEnabled.Length)) == 0)
+            {
+                throw new InvalidOperationException("mmd-runtime IK enabled copy returned false.");
+            }
         }
 
         public void EvaluateBatch(
@@ -729,10 +1299,54 @@ namespace Mmd.Native
                 return;
             }
 
-            MmdRuntimeFfiMethods.InstanceFree(instance);
-            MmdRuntimeFfiMethods.ClipFree(clip);
-            MmdRuntimeFfiMethods.ModelFree(model);
             disposed = true;
+            Exception? firstCleanupException = null;
+            try
+            {
+                IntPtr handle = instance;
+                instance = IntPtr.Zero;
+                if (handle != IntPtr.Zero)
+                {
+                    MmdRuntimeFfiMethods.InstanceFree(handle);
+                }
+            }
+            catch (Exception exception)
+            {
+                firstCleanupException ??= exception;
+            }
+
+            try
+            {
+                IntPtr handle = clip;
+                clip = IntPtr.Zero;
+                if (handle != IntPtr.Zero)
+                {
+                    MmdRuntimeFfiMethods.ClipFree(handle);
+                }
+            }
+            catch (Exception exception)
+            {
+                firstCleanupException ??= exception;
+            }
+
+            try
+            {
+                IntPtr handle = model;
+                model = IntPtr.Zero;
+                if (handle != IntPtr.Zero)
+                {
+                    MmdRuntimeFfiMethods.ModelFree(handle);
+                }
+            }
+            catch (Exception exception)
+            {
+                firstCleanupException ??= exception;
+            }
+
+            if (firstCleanupException != null)
+            {
+                throw firstCleanupException;
+            }
         }
     }
 
@@ -890,64 +1504,5 @@ namespace Mmd.Native
         }
     }
 
-    internal static class MmdRuntimeFfiSmoke
-    {
-        internal static void EvaluateAndCopy(
-            IntPtr instance,
-            IntPtr clip,
-            float frame,
-            float[] worldMatrices,
-            float[] morphWeights,
-            byte[] ikEnabled)
-            => EvaluateAndCopyCore(instance, clip, frame, worldMatrices, morphWeights, ikEnabled, useIk: true);
-
-        internal static void EvaluateWithoutIkAndCopy(
-            IntPtr instance,
-            IntPtr clip,
-            float frame,
-            float[] worldMatrices,
-            float[] morphWeights,
-            byte[] ikEnabled)
-            => EvaluateAndCopyCore(instance, clip, frame, worldMatrices, morphWeights, ikEnabled, useIk: false);
-
-        private static void EvaluateAndCopyCore(
-            IntPtr instance,
-            IntPtr clip,
-            float frame,
-            float[] worldMatrices,
-            float[] morphWeights,
-            byte[] ikEnabled,
-            bool useIk)
-        {
-            byte evaluated = useIk
-                ? MmdRuntimeFfiMethods.InstanceEvaluateClipFrame(instance, clip, frame)
-                : MmdRuntimeFfiMethods.InstanceEvaluateClipFrameWithoutIk(instance, clip, frame);
-            if (evaluated == 0)
-            {
-                throw new InvalidOperationException(useIk
-                    ? "mmd-runtime clip frame evaluation returned false."
-                    : "mmd-runtime clip frame without IK evaluation returned false.");
-            }
-
-            if (worldMatrices.Length > 0 &&
-                MmdRuntimeFfiMethods.InstanceCopyWorldMatrices(instance, worldMatrices, new IntPtr(worldMatrices.Length)) == 0)
-            {
-                throw new InvalidOperationException("mmd-runtime world matrix copy returned false.");
-            }
-
-            if (morphWeights.Length > 0 &&
-                MmdRuntimeFfiMethods.InstanceCopyMorphWeights(instance, morphWeights, new IntPtr(morphWeights.Length)) == 0)
-            {
-                throw new InvalidOperationException("mmd-runtime morph weight copy returned false.");
-            }
-
-            if (ikEnabled.Length > 0 &&
-                MmdRuntimeFfiMethods.InstanceCopyIkEnabled(instance, ikEnabled, new IntPtr(ikEnabled.Length)) == 0)
-            {
-                throw new InvalidOperationException("mmd-runtime IK enabled copy returned false.");
-            }
-        }
-
-    }
 }
 

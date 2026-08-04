@@ -25,7 +25,6 @@ namespace Mmd.Tests
         private const string TempMmePmxPath = TempDirectory + "/mme_test_1bone_cube.pmx";
         private const string TempHumanoidPmxPath = TempDirectory + "/test_semi_basic_bone.pmx";
         private const string TempVmdPath = TempDirectory + "/test_1bone_cube_motion.vmd";
-        private const string TempConfigPath = TempDirectory + "/test_playback_config.asset";
         private const string TempPrefabPath = TempDirectory + "/test_1bone_cube.prefab";
         private const string TempScenePath = TempDirectory + "/test_1bone_cube_scene.unity";
         private const string TempRemapMaterialPath = TempDirectory + "/remapped_body.mat";

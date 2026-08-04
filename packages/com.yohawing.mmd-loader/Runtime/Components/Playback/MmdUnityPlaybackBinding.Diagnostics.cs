@@ -25,6 +25,10 @@ namespace Mmd.UnityIntegration
         public int unsupportedWorldAnchorJointCount;
         public string comparisonSpace = "runtime-forward-playback-diagnostics";
         public float importScale = 1.0f;
+        public int modelBoneCount;
+        public int appliedBoneCount;
+        public int modelMorphCount;
+        public int appliedMorphCount;
         public MmdLivePhysicsPinnedBodyDiagnostics pinnedBodies = new();
         public MmdLivePhysicsBodyDiagnostics[] bodyDiagnostics = System.Array.Empty<MmdLivePhysicsBodyDiagnostics>();
     }

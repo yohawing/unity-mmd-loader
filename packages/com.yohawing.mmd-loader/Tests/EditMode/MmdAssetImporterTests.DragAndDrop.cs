@@ -85,6 +85,34 @@ namespace Mmd.Tests
             }
         }
         [Test]
+        public void EditorFacadeLoadsRawPlaybackWithNativeMotionHeader()
+        {
+            string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
+            string vmdPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
+            MmdEditorPlaybackSceneLoadResult? result = null;
+
+            try
+            {
+                result = MmdEditorVerificationFacade.LoadPlaybackIntoScene(
+                    pmxPath,
+                    vmdPath,
+                    frameRate: 30.0f,
+                    initialFrame: 10,
+                    playOnStart: false);
+
+                Assert.That(result.Motion.boneKeyframes, Is.Empty);
+                Assert.That(result.Motion.sourceBytes, Is.Not.Null.And.Not.Empty);
+                Assert.That(result.Controller.IsConfigured, Is.True);
+                Assert.That(result.InitialSnapshot.frame.frame, Is.EqualTo(10));
+                Assert.That(result.ModelPath, Does.EndWith("test_1bone_cube.pmx"));
+                Assert.That(result.MotionPath, Does.EndWith("test_1bone_cube_motion.vmd"));
+            }
+            finally
+            {
+                MmdTestInstanceScope.DestroyImporterCacheInstance(result?.Instance);
+            }
+        }
+        [Test]
         public void EditorPlaybackLoaderLoadsPlaybackFromImportedAssetReferences()
         {
             CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);

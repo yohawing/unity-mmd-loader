@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using Mmd.Motion;
 using Mmd.Native;
 using Mmd.Parser;
-using Mmd.Pose;
 using UnityEngine;
 
 namespace Mmd.UnityIntegration
@@ -19,7 +18,46 @@ namespace Mmd.UnityIntegration
         /// Returns false with a diagnostic message in <paramref name="reason"/> when the native library is absent,
         /// ABI-incompatible, or the bone/morph counts do not match the managed model.
         /// </summary>
-        public bool TryEnableFastRuntime(byte[] pmxBytes, byte[] vmdBytes, out string reason)
+        public bool TryEnableFastRuntime(
+            byte[] pmxBytes,
+            byte[] vmdBytes,
+            out string reason,
+            bool abiAlreadyValidated = false)
+        {
+            return TryEnableFastRuntimeCore(
+                pmxBytes,
+                vmdBytes,
+                sharedVmdContext: null,
+                out reason,
+                abiAlreadyValidated);
+        }
+
+        internal bool TryEnableFastRuntimeWithSharedVmdContext(
+            byte[] pmxBytes,
+            byte[] vmdBytes,
+            MmdRuntimeFfiVmdContext sharedVmdContext,
+            out string reason,
+            bool abiAlreadyValidated = false)
+        {
+            if (sharedVmdContext == null)
+            {
+                throw new ArgumentNullException(nameof(sharedVmdContext));
+            }
+
+            return TryEnableFastRuntimeCore(
+                pmxBytes,
+                vmdBytes,
+                sharedVmdContext,
+                out reason,
+                abiAlreadyValidated);
+        }
+
+        private bool TryEnableFastRuntimeCore(
+            byte[] pmxBytes,
+            byte[] vmdBytes,
+            MmdRuntimeFfiVmdContext? sharedVmdContext,
+            out string reason,
+            bool abiAlreadyValidated)
         {
             if (pmxBytes == null || pmxBytes.Length == 0)
             {
@@ -31,82 +69,110 @@ namespace Mmd.UnityIntegration
                 throw new ArgumentException("VMD bytes are required.", nameof(vmdBytes));
             }
 
+            // A failed replacement must not leave the old session active for a new model/motion pair.
             DisposeFastRuntime();
+            MmdRuntimeFfiPlaybackSession? candidate = null;
+            reason = string.Empty;
             try
             {
-                MmdRuntimeFfiPlaybackSession candidate = MmdRuntimeFfiPlaybackSession.Create(pmxBytes, vmdBytes);
-                int candidateBoneCount = candidate.BoneCount;
-                int candidateMorphCount = candidate.MorphCount;
+                MmdRuntimeFfiPlaybackSession created = sharedVmdContext == null
+                    ? MmdRuntimeFfiPlaybackSession.Create(pmxBytes, vmdBytes, abiAlreadyValidated)
+                    : MmdRuntimeFfiPlaybackSession.CreateFromVmdContext(
+                        pmxBytes,
+                        sharedVmdContext,
+                        abiAlreadyValidated);
+                candidate = created;
+                int candidateBoneCount = created.BoneCount;
+                int candidateMorphCount = created.MorphCount;
                 if (candidateBoneCount != model.bones.Count)
                 {
-                    candidate.Dispose();
                     reason = $"mmd-runtime bone count {candidateBoneCount} does not match managed model bone count {model.bones.Count}.";
                     return false;
                 }
 
                 if (candidateMorphCount != model.morphs.Count)
                 {
-                    candidate.Dispose();
                     reason = $"mmd-runtime morph count {candidateMorphCount} does not match managed model morph count {model.morphs.Count}.";
                     return false;
                 }
 
                 int expectedWorldMatrixFloatCount = model.bones.Count * 16;
-                if (candidate.WorldMatrixFloatCount < expectedWorldMatrixFloatCount)
+                if (created.WorldMatrixFloatCount < expectedWorldMatrixFloatCount)
                 {
-                    candidate.Dispose();
-                    reason = $"mmd-runtime world matrix float count {candidate.WorldMatrixFloatCount} is smaller than required {expectedWorldMatrixFloatCount}.";
+                    reason = $"mmd-runtime world matrix float count {created.WorldMatrixFloatCount} is smaller than required {expectedWorldMatrixFloatCount}.";
                     return false;
                 }
 
-                if (candidate.MorphWeightCount != model.morphs.Count)
+                if (created.MorphWeightCount != model.morphs.Count)
                 {
-                    candidate.Dispose();
-                    reason = $"mmd-runtime morph weight count {candidate.MorphWeightCount} does not match managed model morph count {model.morphs.Count}.";
+                    reason = $"mmd-runtime morph weight count {created.MorphWeightCount} does not match managed model morph count {model.morphs.Count}.";
                     return false;
                 }
 
-                if (candidate.IkEnabledCount != model.ik.Count)
+                if (created.IkEnabledCount != model.ik.Count)
                 {
-                    candidate.Dispose();
-                    reason = $"mmd-runtime IK enabled count {candidate.IkEnabledCount} does not match managed model IK count {model.ik.Count}.";
+                    reason = $"mmd-runtime IK enabled count {created.IkEnabledCount} does not match managed model IK count {model.ik.Count}.";
                     return false;
                 }
 
-                fastSession = candidate;
-                fastWorldMatrices = new float[fastSession.WorldMatrixFloatCount];
-                fastMorphWeights = new float[fastSession.MorphWeightCount];
-                fastIkEnabled = new byte[fastSession.IkEnabledCount];
-                fastLastAppliedMorphWeights = new float[fastSession.MorphWeightCount];
-                fastMorphFrame = BuildFastMorphFrame(fastMorphWeights);
+                float[] worldMatrices = new float[created.WorldMatrixFloatCount];
+                float[] morphWeights = new float[created.MorphWeightCount];
+                byte[] ikEnabled = new byte[created.IkEnabledCount];
+                float[] lastAppliedMorphWeights = new float[fastMorphIndices.Length];
+                MmdEvaluatedFrame? morphFrame = BuildFastMorphFrame(morphWeights);
+
+                fastSession = created;
+                fastWorldMatrices = worldMatrices;
+                fastMorphWeights = morphWeights;
+                fastIkEnabled = ikEnabled;
+                fastLastAppliedMorphWeights = lastAppliedMorphWeights;
+                fastMorphFrame = morphFrame;
                 fastMorphApplied = false;
                 fastMorphCacheValid = false;
+                candidate = null;
                 reason = string.Empty;
                 return true;
             }
             catch (DllNotFoundException ex)
             {
-                DisposeFastRuntime();
                 reason = ex.GetType().Name + ": " + ex.Message;
                 return false;
             }
             catch (EntryPointNotFoundException ex)
             {
-                DisposeFastRuntime();
                 reason = ex.GetType().Name + ": " + ex.Message;
                 return false;
             }
             catch (BadImageFormatException ex)
             {
-                DisposeFastRuntime();
+                reason = ex.GetType().Name + ": " + ex.Message;
+                return false;
+            }
+            catch (MmdRuntimeNativeUnavailableException ex)
+            {
                 reason = ex.GetType().Name + ": " + ex.Message;
                 return false;
             }
             catch (InvalidOperationException ex)
             {
-                DisposeFastRuntime();
                 reason = ex.GetType().Name + ": " + ex.Message;
                 return false;
+            }
+            finally
+            {
+                if (candidate != null)
+                {
+                    try
+                    {
+                        candidate.Dispose();
+                    }
+                    catch (Exception)
+                    {
+                        reason = string.IsNullOrEmpty(reason)
+                            ? "native runtime cleanup failed while releasing a candidate session."
+                            : reason + " Native runtime cleanup also failed while releasing the candidate session.";
+                    }
+                }
             }
         }
 
@@ -152,6 +218,7 @@ namespace Mmd.UnityIntegration
             fastIkEnabled = null;
             fastMorphFrame = null;
             fastLastAppliedMorphWeights = null;
+            fastLivePhysicsFrame = null;
             fastMorphApplied = false;
             fastMorphCacheValid = false;
             fastSnapshot = null;
@@ -183,7 +250,10 @@ namespace Mmd.UnityIntegration
         private MmdPlaybackSnapshot ApplyFastCore(int frame, float time)
         {
             fastSession!.EvaluateAndCopy(frame, fastWorldMatrices!, fastMorphWeights!, fastIkEnabled!);
-            MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(playbackInstance, fastWorldMatrices!);
+            MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(
+                playbackInstance,
+                fastWorldMatrices!,
+                fastPoseBoneIndices);
             ApplyFastMorphWeights();
             // Lightweight snapshot: no managed session.EvaluateFrame call.
             // fastMorphFrame is reused in-place; frame/time are updated each call.
@@ -223,7 +293,10 @@ namespace Mmd.UnityIntegration
             // time and over-drive (roughly double) the member blend shapes. Flip morphs are NOT expanded by
             // the native runtime, so the applier still resolves those.
             MmdUnityFrameApplier.ApplyMorphs(playbackInstance, fastMorphFrame!, groupMorphsResolvedExternally: true);
-            Array.Copy(fastMorphWeights!, fastLastAppliedMorphWeights!, fastMorphWeights!.Length);
+            for (int i = 0; i < fastMorphIndices.Length; i++)
+            {
+                fastLastAppliedMorphWeights![i] = fastMorphWeights![fastMorphIndices[i]];
+            }
             fastMorphApplied = hasNonZero;
             fastMorphCacheValid = true;
         }
@@ -233,21 +306,23 @@ namespace Mmd.UnityIntegration
             List<MmdEvaluatedMorphWeight> morphList = fastMorphFrame!.morphs;
             for (int i = 0; i < morphList.Count; i++)
             {
-                morphList[i].weight = i < weights.Length ? weights[i] : 0.0f;
+                int morphIndex = fastMorphIndices[i];
+                morphList[i].weight = morphIndex < weights.Length ? weights[morphIndex] : 0.0f;
             }
         }
 
         private MmdEvaluatedFrame BuildFastMorphFrame(float[] weights)
         {
-            var morphList = new List<MmdEvaluatedMorphWeight>(model.morphs.Count);
-            for (int i = 0; i < model.morphs.Count; i++)
+            var morphList = new List<MmdEvaluatedMorphWeight>(fastMorphIndices.Length);
+            for (int i = 0; i < fastMorphIndices.Length; i++)
             {
+                int morphIndex = fastMorphIndices[i];
                 morphList.Add(new MmdEvaluatedMorphWeight
                 {
-                    name = string.IsNullOrWhiteSpace(model.morphs[i].name)
-                        ? model.morphs[i].index.ToString(System.Globalization.CultureInfo.InvariantCulture)
-                        : model.morphs[i].name,
-                    weight = i < weights.Length ? weights[i] : 0.0f
+                    name = string.IsNullOrWhiteSpace(model.morphs[morphIndex].name)
+                        ? model.morphs[morphIndex].index.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                        : model.morphs[morphIndex].name,
+                    weight = morphIndex < weights.Length ? weights[morphIndex] : 0.0f
                 });
             }
 
@@ -256,42 +331,48 @@ namespace Mmd.UnityIntegration
 
         private MmdEvaluatedFrame BuildFastLivePhysicsFrame(int frame, float time)
         {
-            var bones = new List<MmdEvaluatedBonePose>(model.bones.Count);
-            foreach (MmdBoneDefinition bone in model.bones)
+            if (fastLivePhysicsFrame == null)
             {
-                bones.Add(new MmdEvaluatedBonePose
+                var bones = new List<MmdEvaluatedBonePose>(model.bones.Count);
+                foreach (MmdBoneDefinition bone in model.bones)
                 {
-                    index = bone.index,
-                    name = string.IsNullOrWhiteSpace(bone.name)
-                        ? bone.index.ToString(System.Globalization.CultureInfo.InvariantCulture)
-                        : bone.name,
-                    localPosition = new[] { 0.0f, 0.0f, 0.0f },
-                    localRotation = new[] { 0.0f, 0.0f, 0.0f, 1.0f },
-                    localScale = new[] { 1.0f, 1.0f, 1.0f },
-                    worldMatrix = new[]
+                    bones.Add(new MmdEvaluatedBonePose
                     {
-                        1.0f, 0.0f, 0.0f, 0.0f,
-                        0.0f, 1.0f, 0.0f, 0.0f,
-                        0.0f, 0.0f, 1.0f, 0.0f,
-                        0.0f, 0.0f, 0.0f, 1.0f
-                    }
-                });
+                        index = bone.index,
+                        name = string.IsNullOrWhiteSpace(bone.name)
+                            ? bone.index.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                            : bone.name,
+                        localPosition = new[] { 0.0f, 0.0f, 0.0f },
+                        localRotation = new[] { 0.0f, 0.0f, 0.0f, 1.0f },
+                        localScale = new[] { 1.0f, 1.0f, 1.0f },
+                        worldMatrix = new[]
+                        {
+                            1.0f, 0.0f, 0.0f, 0.0f,
+                            0.0f, 1.0f, 0.0f, 0.0f,
+                            0.0f, 0.0f, 1.0f, 0.0f,
+                            0.0f, 0.0f, 0.0f, 1.0f
+                        }
+                    });
+                }
+
+                fastLivePhysicsFrame = new MmdEvaluatedFrame
+                {
+                    bones = bones,
+                    morphs = fastMorphFrame!.morphs
+                };
             }
 
-            return new MmdEvaluatedFrame
-            {
-                frame = frame,
-                time = time,
-                bones = bones,
-                morphs = BuildFastMorphFrame(fastMorphWeights!).morphs
-            };
+            fastLivePhysicsFrame.frame = frame;
+            fastLivePhysicsFrame.time = time;
+            return fastLivePhysicsFrame;
         }
 
-        private static bool HasAnyNonZeroMorphWeight(float[] weights)
+        private bool HasAnyNonZeroMorphWeight(float[] weights)
         {
-            for (int i = 0; i < weights.Length; i++)
+            for (int i = 0; i < fastMorphIndices.Length; i++)
             {
-                if (weights[i] != 0.0f)
+                int morphIndex = fastMorphIndices[i];
+                if (morphIndex < weights.Length && weights[morphIndex] != 0.0f)
                 {
                     return true;
                 }
@@ -300,16 +381,17 @@ namespace Mmd.UnityIntegration
             return false;
         }
 
-        private static bool MorphWeightsEqual(float[] a, float[] b)
+        private bool MorphWeightsEqual(float[] weights, float[] lastAppliedWeights)
         {
-            if (a.Length != b.Length)
+            if (lastAppliedWeights.Length != fastMorphIndices.Length)
             {
                 return false;
             }
 
-            for (int i = 0; i < a.Length; i++)
+            for (int i = 0; i < fastMorphIndices.Length; i++)
             {
-                if (a[i] != b[i])
+                int morphIndex = fastMorphIndices[i];
+                if (morphIndex >= weights.Length || weights[morphIndex] != lastAppliedWeights[i])
                 {
                     return false;
                 }
