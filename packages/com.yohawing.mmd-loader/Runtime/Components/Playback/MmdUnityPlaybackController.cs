@@ -136,6 +136,8 @@ namespace Mmd.UnityIntegration
             LastHumanoidRetargetGate = EvaluateHumanoidRetargetGate(requireAnimatorDriver: true);
             LastHumanoidRetargetResult = null;
             DisposeHumanoidPhysicsBinding();
+            DisposeHumanoidHostPoseSession();
+            ResetHumanoidHostPoseFailureLatch();
         }
 
         public void Configure(MmdUnityPlaybackBinding playbackBinding, MmdPlaybackConfig config)
@@ -153,12 +155,15 @@ namespace Mmd.UnityIntegration
             }
 
             MmdPlaybackTime.ValidateFrameRate(playbackFrameRate);
+            ValidatePhysicsModeForSerialization();
+            DisposeHumanoidHostPoseSession();
             if (binding != null && !ReferenceEquals(binding, playbackBinding))
             {
                 binding.Dispose();
             }
 
             DisposeHumanoidPhysicsBinding();
+            ResetHumanoidHostPoseFailureLatch();
             binding = playbackBinding;
             frameRate = playbackFrameRate;
             playbackFrame = 0.0f;
@@ -184,6 +189,17 @@ namespace Mmd.UnityIntegration
 
         private void ApplyPhysicsMode(MmdPhysicsMode mode)
         {
+            ValidatePhysicsMode(mode);
+            MmdPhysicsMode previousMode = physicsMode;
+            if (mode != MmdPhysicsMode.Off)
+            {
+                DisposeHumanoidHostPoseSession();
+            }
+            else if (previousMode != MmdPhysicsMode.Off)
+            {
+                ResetHumanoidHostPoseFailureLatch();
+            }
+
             if (binding != null)
             {
                 ApplyPhysicsModeToBinding(mode);
@@ -395,6 +411,15 @@ namespace Mmd.UnityIntegration
             if (binding == null)
             {
                 ValidatePhysicsModeForSerialization();
+                if (physicsMode == MmdPhysicsMode.Off)
+                {
+                    ResetHumanoidHostPoseFailureLatch();
+                }
+                else
+                {
+                    DisposeHumanoidHostPoseSession();
+                }
+
                 if (humanoidPhysicsBinding != null)
                 {
                     if (physicsMode == MmdPhysicsMode.Live)
@@ -449,6 +474,7 @@ namespace Mmd.UnityIntegration
         internal void ReleasePlaybackResources()
         {
             DisposeHumanoidPhysicsBinding();
+            DisposeHumanoidHostPoseSession();
             binding?.Dispose();
             binding = null;
             LastSnapshot = null;
@@ -458,6 +484,7 @@ namespace Mmd.UnityIntegration
         private void OnDisable()
         {
             DisposeHumanoidPhysicsBinding();
+            DisposeHumanoidHostPoseSession();
         }
 
         private void EnsureConfigured()
@@ -500,6 +527,16 @@ namespace Mmd.UnityIntegration
             if (binding == null || binding.PhysicsMode == physicsMode)
             {
                 return;
+            }
+
+            ValidatePhysicsMode(physicsMode);
+            if (physicsMode == MmdPhysicsMode.Off)
+            {
+                ResetHumanoidHostPoseFailureLatch();
+            }
+            else
+            {
+                DisposeHumanoidHostPoseSession();
             }
 
             ApplyPhysicsModeToBinding(physicsMode);

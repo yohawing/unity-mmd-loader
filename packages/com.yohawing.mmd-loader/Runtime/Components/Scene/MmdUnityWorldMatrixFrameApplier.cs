@@ -23,20 +23,49 @@ namespace Mmd.UnityIntegration
                 throw new ArgumentNullException(nameof(worldMatrices));
             }
 
-            int boneCount = instance.BoneTransforms.Length;
+            ApplyColumnMajorWorldMatrices(
+                instance.Root.transform,
+                instance.BoneTransforms,
+                instance.ImportScale,
+                worldMatrices,
+                boneIndices);
+        }
+
+        internal static void ApplyColumnMajorWorldMatrices(
+            Transform root,
+            Transform[] bones,
+            float importScale,
+            float[] worldMatrices,
+            IReadOnlyList<int>? boneIndices = null)
+        {
+            if (root == null)
+            {
+                throw new ArgumentNullException(nameof(root));
+            }
+
+            if (bones == null)
+            {
+                throw new ArgumentNullException(nameof(bones));
+            }
+
+            if (worldMatrices == null)
+            {
+                throw new ArgumentNullException(nameof(worldMatrices));
+            }
+
+            int boneCount = bones.Length;
             int required = boneCount * 16;
             if (worldMatrices.Length < required)
             {
                 throw new ArgumentException($"World matrix buffer must contain at least {required} float values.", nameof(worldMatrices));
             }
 
-            Transform root = instance.Root.transform;
-            float importScale = NormalizeImportScale(instance.ImportScale);
+            importScale = NormalizeImportScale(importScale);
             if (boneIndices == null)
             {
                 for (int boneIndex = 0; boneIndex < boneCount; boneIndex++)
                 {
-                    ApplyBoneWorldMatrix(instance, root, importScale, worldMatrices, boneIndex);
+                    ApplyBoneWorldMatrix(bones, root, importScale, worldMatrices, boneIndex);
                 }
 
                 return;
@@ -52,18 +81,18 @@ namespace Mmd.UnityIntegration
                         nameof(boneIndices));
                 }
 
-                ApplyBoneWorldMatrix(instance, root, importScale, worldMatrices, boneIndex);
+                ApplyBoneWorldMatrix(bones, root, importScale, worldMatrices, boneIndex);
             }
         }
 
         private static void ApplyBoneWorldMatrix(
-            MmdUnityModelInstance instance,
+            Transform[] bones,
             Transform root,
             float importScale,
             float[] worldMatrices,
             int boneIndex)
         {
-            Transform bone = instance.BoneTransforms[boneIndex];
+            Transform bone = bones[boneIndex];
             int offset = boneIndex * 16;
             Vector3 mmdPosition = new Vector3(
                 worldMatrices[offset + 12],

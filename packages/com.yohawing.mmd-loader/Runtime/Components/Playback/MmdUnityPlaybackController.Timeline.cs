@@ -27,8 +27,12 @@ namespace Mmd.UnityIntegration
                 return LastHumanoidRetargetResult;
             }
 
+            RestoreHumanoidHostPoseInputIfAvailable();
             LastHumanoidRetargetResult = MmdHumanoidRetargeter.RetargetPose(humanoidRetargetEntries);
-            MmdHumanoidAppendTransformApplier.Apply(humanoidAppendEntries);
+            if (!TryApplyHumanoidNativeHostPose(LastHumanoidRetargetResult))
+            {
+                MmdHumanoidAppendTransformApplier.Apply(humanoidAppendEntries);
+            }
             return LastHumanoidRetargetResult;
         }
 
@@ -48,10 +52,14 @@ namespace Mmd.UnityIntegration
             // that translation twice. Keep the legacy position-copy path when no driver is active.
             bool copyLocalPositions =
                 !(GetComponent<MmdHumanoidRootMotionDriver>()?.IsTimelineEvaluationActive ?? false);
+            RestoreHumanoidHostPoseInputIfAvailable();
             LastHumanoidRetargetResult = MmdHumanoidRetargeter.RetargetPose(
                 humanoidRetargetEntries,
                 copyLocalPositions);
-            MmdHumanoidAppendTransformApplier.Apply(humanoidAppendEntries);
+            if (!TryApplyHumanoidNativeHostPose(LastHumanoidRetargetResult))
+            {
+                MmdHumanoidAppendTransformApplier.Apply(humanoidAppendEntries);
+            }
             StepHumanoidRetargetLivePhysicsIfNeeded(LastHumanoidRetargetResult);
             return LastHumanoidRetargetResult;
         }

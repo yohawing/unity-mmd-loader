@@ -21,6 +21,8 @@ namespace Mmd.UnityIntegration
             if (!ReferenceEquals(modelAsset, pmxAsset))
             {
                 DisposeHumanoidPhysicsBinding();
+                DisposeHumanoidHostPoseSession();
+                ResetHumanoidHostPoseFailureLatch();
             }
 
             modelAsset = pmxAsset;
