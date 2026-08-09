@@ -4,10 +4,14 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using NUnit.Framework;
+using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
+using UnityEngine.Playables;
+using UnityEngine.Timeline;
 using Mmd.Parser;
 using Mmd.Physics;
+using Mmd.Timeline;
 using Mmd.UnityIntegration;
 
 namespace Mmd.Tests
@@ -218,8 +222,13 @@ namespace Mmd.Tests
             }
         }
 
-        [Test]
-        public void ApplyRetargetNowUsesModelOnlyNativeHostPoseAndPreservesControllerRootSpace()
+        [TestCase(false, TestName = "NativeHostPoseSupportsRepeatWithoutDrift")]
+        [TestCase(
+            true,
+            Explicit = true,
+            Reason = "Uses UnityEditor.AnimationMode; run on demand to avoid AnimationMode session noise polluting later tests.",
+            TestName = "NativeHostPoseTimelineSupportsRepeatAndReverseWithoutDrift")]
+        public void NativeHostPoseSupportsRepeatAndOptionalTimelineReverseWithoutDrift(bool verifyTimeline)
         {
             string fixturePath = MmdTestFixtures.FixtureAssetPath("test_semi_basic_bone.pmx");
             MmdPmxAsset pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
@@ -228,6 +237,10 @@ namespace Mmd.Tests
             Avatar? avatar = null;
             RuntimeAnimatorController? animatorController = null;
             GameObject? appendTargetObject = null;
+            GameObject? directorObject = null;
+            TimelineAsset? timeline = null;
+            AnimationClip? timelineClip = null;
+            bool animationModeStarted = false;
             try
             {
                 pmxAsset.Initialize(File.ReadAllBytes(fixturePath), fixturePath, fixturePath, assetImportScale: 1.0f);
@@ -363,7 +376,6 @@ namespace Mmd.Tests
                 Quaternion firstAppendRotation = instance.BoneTransforms[appendTargetIndex].localRotation;
                 Quaternion firstIkRotationA = instance.BoneTransforms[ikLinkIndexA].localRotation;
                 Quaternion firstIkRotationB = instance.BoneTransforms[ikLinkIndexB].localRotation;
-
                 MmdHumanoidRetargeterResult repeatedResult = controller.ApplyHumanoidRetargetNow();
 
                 Assert.That(repeatedResult.AllSucceeded, Is.True);
@@ -383,9 +395,101 @@ namespace Mmd.Tests
                         model.bones[0].origin[2])));
                 Assert.That(Vector3.Distance(instance.BoneTransforms[0].position, expectedRootBonePosition), Is.LessThan(0.001f),
                     "native world matrices must use the controller root coordinate space");
+                if (!verifyTimeline)
+                {
+                    return;
+                }
+
+                MmdHumanoidRetargetBinding? timelineMapped = entries.Find(
+                    entry => entry.HumanBone == HumanBodyBones.Spine);
+                Assert.That(timelineMapped, Is.Not.Null, "fixture Humanoid spine mapping");
+                string timelineMuscle = ResolveMuscleName(timelineMapped!.HumanBone);
+                Assert.That(timelineMuscle, Is.Not.Empty, "fixture Timeline muscle curve");
+                timelineClip = new AnimationClip { frameRate = 30.0f };
+                timelineClip.SetCurve(
+                    string.Empty,
+                    typeof(Animator),
+                    timelineMuscle,
+                    AnimationCurve.Linear(0.0f, -0.6f, 1.0f, 0.8f));
+                timeline = ScriptableObject.CreateInstance<TimelineAsset>();
+                MmdHumanoidAnimationTrack track =
+                    timeline.CreateTrack<MmdHumanoidAnimationTrack>(null, "MMD Humanoid native host pose");
+                TimelineClip clip = track.CreateClip<MmdHumanoidAnimationClip>();
+                clip.start = 0.0;
+                clip.duration = 1.0;
+                ((MmdHumanoidAnimationClip)clip.asset).clip = timelineClip;
+                directorObject = new GameObject("native-host-pose-timeline-director");
+                PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
+                director.playOnAwake = false;
+                director.playableAsset = timeline;
+                director.SetGenericBinding(track, controller);
+
+                AnimationMode.StartAnimationMode();
+                animationModeStarted = true;
+                director.RebuildGraph();
+                EvaluateTimelineAt(director, 0.8);
+                Quaternion timelineForwardMappedRotation = timelineMapped.NativeTransform!.localRotation;
+                Quaternion timelineForwardAppendRotation = instance.BoneTransforms[appendTargetIndex].localRotation;
+                Quaternion timelineForwardIkRotationA = instance.BoneTransforms[ikLinkIndexA].localRotation;
+                Quaternion timelineForwardIkRotationB = instance.BoneTransforms[ikLinkIndexB].localRotation;
+
+                EvaluateTimelineAt(director, 0.8);
+                AssertNativeTimelinePose(
+                    timelineMapped,
+                    instance,
+                    appendTargetIndex,
+                    ikLinkIndexA,
+                    ikLinkIndexB,
+                    timelineForwardMappedRotation,
+                    timelineForwardAppendRotation,
+                    timelineForwardIkRotationA,
+                    timelineForwardIkRotationB,
+                    "same-frame re-evaluation");
+
+                EvaluateTimelineAt(director, 0.2);
+                Quaternion timelineReverseMappedRotation = timelineMapped.NativeTransform.localRotation;
+                Assert.That(Quaternion.Angle(timelineReverseMappedRotation, timelineForwardMappedRotation), Is.GreaterThan(0.01f),
+                    "PlayableDirector reverse seek must sample and retarget a different Humanoid pose");
+
+                EvaluateTimelineAt(director, 0.2);
+                Assert.That(Quaternion.Angle(timelineMapped.NativeTransform.localRotation, timelineReverseMappedRotation), Is.LessThan(0.001f),
+                    "PlayableDirector same-time reverse evaluation must not drift the mapped pose");
+
+                EvaluateTimelineAt(director, 0.8);
+                AssertNativeTimelinePose(
+                    timelineMapped,
+                    instance,
+                    appendTargetIndex,
+                    ikLinkIndexA,
+                    ikLinkIndexB,
+                    timelineForwardMappedRotation,
+                    timelineForwardAppendRotation,
+                    timelineForwardIkRotationA,
+                    timelineForwardIkRotationB,
+                    "forward-after-reverse seek");
             }
             finally
             {
+                if (animationModeStarted)
+                {
+                    AnimationMode.StopAnimationMode();
+                }
+
+                if (directorObject != null)
+                {
+                    Object.DestroyImmediate(directorObject);
+                }
+
+                if (timeline != null)
+                {
+                    Object.DestroyImmediate(timeline);
+                }
+
+                if (timelineClip != null)
+                {
+                    Object.DestroyImmediate(timelineClip);
+                }
+
                 if (appendTargetObject != null && instance == null)
                 {
                     Object.DestroyImmediate(appendTargetObject);
@@ -404,6 +508,50 @@ namespace Mmd.Tests
 
                 Object.DestroyImmediate(pmxAsset);
             }
+        }
+
+        private static void EvaluateTimelineAt(PlayableDirector director, double time)
+        {
+            director.time = time;
+            director.Evaluate();
+            director.time = time;
+            director.Evaluate();
+        }
+
+        private static string ResolveMuscleName(HumanBodyBones humanBone)
+        {
+            for (int dof = 0; dof < 3; dof++)
+            {
+                int muscle = HumanTrait.MuscleFromBone((int)humanBone, dof);
+                if (muscle >= 0)
+                {
+                    return HumanTrait.MuscleName[muscle];
+                }
+            }
+
+            return string.Empty;
+        }
+
+        private static void AssertNativeTimelinePose(
+            MmdHumanoidRetargetBinding mappedEntry,
+            MmdUnityModelInstance instance,
+            int appendTargetIndex,
+            int ikLinkIndexA,
+            int ikLinkIndexB,
+            Quaternion expectedMappedRotation,
+            Quaternion expectedAppendRotation,
+            Quaternion expectedIkRotationA,
+            Quaternion expectedIkRotationB,
+            string phase)
+        {
+            Assert.That(Quaternion.Angle(mappedEntry.NativeTransform!.localRotation, expectedMappedRotation), Is.LessThan(0.001f),
+                "Timeline " + phase + " must reproduce the mapped pose");
+            Assert.That(Quaternion.Angle(instance.BoneTransforms[appendTargetIndex].localRotation, expectedAppendRotation), Is.LessThan(0.001f),
+                "Timeline " + phase + " must not drift native append");
+            Assert.That(Quaternion.Angle(instance.BoneTransforms[ikLinkIndexA].localRotation, expectedIkRotationA), Is.LessThan(0.001f),
+                "Timeline " + phase + " must not drift native IK link A");
+            Assert.That(Quaternion.Angle(instance.BoneTransforms[ikLinkIndexB].localRotation, expectedIkRotationB), Is.LessThan(0.001f),
+                "Timeline " + phase + " must not drift native IK link B");
         }
 
         private static RetargetFixture CreateFixture(bool controllerAssigned)
