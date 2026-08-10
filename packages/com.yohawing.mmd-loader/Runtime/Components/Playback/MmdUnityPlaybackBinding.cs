@@ -56,6 +56,15 @@ namespace Mmd.UnityIntegration
         private float[]? livePhysicsLocalScales;
         private float[]? livePhysicsMorphWeights;
         private byte[]? livePhysicsIkEnabled;
+        private float[]? livePhysicsNativeWorldMatrices;
+        private float[]? livePhysicsNativeMorphWeights;
+        private byte[]? livePhysicsNativeIkEnabled;
+        private float[]? livePhysicsRowMajorMatrices;
+        private float[]? livePhysicsLocalMatrixScratch;
+        private MmdEvaluatedFrame? livePhysicsFrame;
+        private MmdEvaluatedMorphWeight[]? livePhysicsMorphEntries;
+        private int[]? livePhysicsMorphOrder;
+        private readonly MmdBoneDefinition[] livePhysicsOrderedBones;
         private readonly MmdUnityModelInstanceOwnership instanceOwnership;
         private readonly MmdBorrowedSceneMutationLease? borrowedMutationLease;
         private readonly IDisposable? borrowedSourceMutation;
@@ -81,6 +90,9 @@ namespace Mmd.UnityIntegration
             fastPoseBoneIndices = MmdUnityPlaybackWorkset.BuildBoneIndices(model, instance);
             fastMorphIndices = MmdUnityPlaybackWorkset.BuildMorphIndices(model, instance.RenderingDescriptor);
             fastAfterPhysicsBoneIndices = MmdUnityPlaybackWorkset.BuildAfterPhysicsBoneIndices(model);
+            var orderedBones = new List<MmdBoneDefinition>(model.bones);
+            orderedBones.Sort((left, right) => left.index.CompareTo(right.index));
+            livePhysicsOrderedBones = orderedBones.ToArray();
             this.instanceOwnership = instanceOwnership;
             this.borrowedMutationLease = borrowedMutationLease;
             this.borrowedSourceMutation = borrowedSourceMutation;
@@ -123,6 +135,10 @@ namespace Mmd.UnityIntegration
         internal int FastRuntimeAfterPhysicsBoneCount => fastAfterPhysicsBoneIndices.Length;
 
         internal MmdEvaluatedFrame? FastLivePhysicsFrameForTests => fastLivePhysicsFrame;
+
+        internal MmdEvaluatedFrame? LivePhysicsFrameForTests => livePhysicsFrame;
+
+        internal float[]? LivePhysicsNativeWorldMatricesForTests => livePhysicsNativeWorldMatrices;
 
         public int MotionMaxFrame => session.MotionMaxFrame;
 

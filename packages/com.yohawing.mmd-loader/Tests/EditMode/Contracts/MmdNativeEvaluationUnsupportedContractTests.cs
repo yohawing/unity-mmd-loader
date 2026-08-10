@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using System.Collections.Generic;
 using NUnit.Framework;
 using Mmd.Parser;
 
@@ -110,6 +111,63 @@ namespace Mmd.Tests.Contracts
                 MmdEvaluatedFrame steadyFrame = session.EvaluateBeforePhysicsFrame(frame: 0, time: 0.0f);
                 Assert.That(steadyFrame.bones, Is.Not.Empty);
             }
+        }
+
+        [Test]
+        public void InPlaceNativeFrameBuilderPreservesLegacyPoseBitsAndFrameIdentity()
+        {
+            (MmdModelDefinition model, MmdMotionDefinition motion) = LoadAppendFixturePair();
+            using var session = new MmdRuntimeSession(model, motion, "test_append_bone.pmx", "test_append_bone.vmd");
+            session.GetNativeOutputBufferLengths(out int worldMatrixFloatCount, out int morphWeightCount, out int ikEnabledCount);
+            var nativeWorldMatrices = new float[worldMatrixFloatCount];
+            var nativeMorphWeights = new float[morphWeightCount];
+            var nativeIkEnabled = new byte[ikEnabledCount];
+            Assert.Throws<ArgumentException>(() => session.EvaluateBeforePhysicsFrameInto(0, 0.0f,
+                new float[nativeWorldMatrices.Length - 1], nativeMorphWeights, nativeIkEnabled));
+            session.EvaluateBeforePhysicsFrameInto(0, 0.0f, nativeWorldMatrices, nativeMorphWeights, nativeIkEnabled);
+            MmdEvaluatedFrame legacyFrame = MmdRuntimeFrameEvaluator.BuildFrameFromNative(
+                model, 0, 0.0f, nativeWorldMatrices, nativeMorphWeights, includeMaterials: false);
+            var orderedBones = new List<MmdBoneDefinition>(model.bones);
+            orderedBones.Sort((left, right) => left.index.CompareTo(right.index));
+            var morphEntries = Array.Empty<MmdEvaluatedMorphWeight>();
+            var morphOrder = Array.Empty<int>();
+            var reusableFrame = new MmdEvaluatedFrame();
+            MmdEvaluatedFrame inPlaceFrame = MmdRuntimeFrameEvaluator.BuildFrameFromNativeInPlace(
+                model, 0, 0.0f, nativeWorldMatrices, nativeMorphWeights, reusableFrame,
+                new float[orderedBones.Count * 16], new float[16], orderedBones, morphEntries, morphOrder, false);
+
+            Assert.That(inPlaceFrame, Is.SameAs(reusableFrame));
+            Assert.That(inPlaceFrame.bones.Count, Is.EqualTo(legacyFrame.bones.Count));
+            for (int i = 0; i < legacyFrame.bones.Count; i++)
+            {
+                MmdEvaluatedBonePose expected = legacyFrame.bones[i];
+                MmdEvaluatedBonePose actual = inPlaceFrame.bones[i];
+                AssertFloatBitsEqual(expected.localPosition, actual.localPosition);
+                AssertFloatBitsEqual(expected.localRotation, actual.localRotation);
+                AssertFloatBitsEqual(expected.worldMatrix, actual.worldMatrix);
+            }
+            MmdEvaluatedFrame secondFrame = MmdRuntimeFrameEvaluator.BuildFrameFromNativeInPlace(
+                model, 1, 1.0f / 30.0f, nativeWorldMatrices, nativeMorphWeights, reusableFrame,
+                new float[orderedBones.Count * 16], new float[16], orderedBones, morphEntries, morphOrder, false);
+            Assert.That(secondFrame, Is.SameAs(reusableFrame));
+        }
+
+        private static void AssertFloatBitsEqual(float[] expected, float[] actual)
+        {
+            Assert.That(actual.Length, Is.EqualTo(expected.Length));
+            for (int i = 0; i < expected.Length; i++)
+                Assert.That(BitConverter.SingleToInt32Bits(actual[i]),
+                    Is.EqualTo(BitConverter.SingleToInt32Bits(expected[i])));
+        }
+
+        private static (MmdModelDefinition Model, MmdMotionDefinition Motion) LoadAppendFixturePair()
+        {
+            var parser = new NativeMmdParser();
+            MmdModelDefinition model = parser.LoadModel(
+                MmdTestFixtures.ReadFixtureAssetBytes("test_append_bone.pmx"));
+            MmdMotionDefinition motion = parser.LoadMotion(
+                MmdTestFixtures.ReadFixtureAssetBytes("test_append_bone.vmd"));
+            return (model, motion);
         }
 
         private static (MmdModelDefinition Model, MmdMotionDefinition Motion) LoadCubeFixturePair()

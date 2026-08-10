@@ -111,6 +111,37 @@ namespace Mmd
             return EvaluateNativeFrame(frame, time);
         }
 
+        internal void GetNativeOutputBufferLengths(
+            out int worldMatrixFloatCount,
+            out int morphWeightCount,
+            out int ikEnabledCount)
+        {
+            ThrowIfDisposed();
+            EnsureNativePlaybackSession();
+            worldMatrixFloatCount = nativeWorldMatrices!.Length;
+            morphWeightCount = nativeMorphWeights!.Length;
+            ikEnabledCount = nativeIkEnabled!.Length;
+        }
+
+        internal void EvaluateBeforePhysicsFrameInto(
+            int frame,
+            float time,
+            float[] worldMatrices,
+            float[] morphWeights,
+            byte[] ikEnabled)
+        {
+            ThrowIfDisposed();
+            MmdPlaybackTime.ValidateFrame(frame);
+            MmdPlaybackTime.ValidateTime(time);
+            EnsureNativePlaybackSession();
+            ValidateNativeOutputBuffers(worldMatrices, morphWeights, ikEnabled);
+
+            if (model.HasDeformAfterPhysicsBones)
+                nativePlaybackSession!.EvaluateBeforePhysicsAndCopy(frame, worldMatrices, morphWeights, ikEnabled);
+            else
+                nativePlaybackSession!.EvaluateAndCopy(frame, worldMatrices, morphWeights, ikEnabled);
+        }
+
         public MmdEvaluatedFrame EvaluateFrameAtTime(float time, float frameRate)
         {
             MmdPlaybackTimeMapping mapping = DescribePlaybackTime(time, frameRate);
@@ -230,6 +261,19 @@ namespace Mmd
                 nativeWorldMatrices!,
                 nativeMorphWeights!,
                 includeMaterials: false);
+        }
+
+        private void ValidateNativeOutputBuffers(
+            float[] worldMatrices,
+            float[] morphWeights,
+            byte[] ikEnabled)
+        {
+            if (worldMatrices == null || worldMatrices.Length != nativeWorldMatrices!.Length)
+                throw new ArgumentException("Native world matrix buffer length must match the runtime session.", nameof(worldMatrices));
+            if (morphWeights == null || morphWeights.Length != nativeMorphWeights!.Length)
+                throw new ArgumentException("Native morph weight buffer length must match the runtime session.", nameof(morphWeights));
+            if (ikEnabled == null || ikEnabled.Length != nativeIkEnabled!.Length)
+                throw new ArgumentException("Native IK enabled buffer length must match the runtime session.", nameof(ikEnabled));
         }
 
         private void EnsureNativePlaybackSession()

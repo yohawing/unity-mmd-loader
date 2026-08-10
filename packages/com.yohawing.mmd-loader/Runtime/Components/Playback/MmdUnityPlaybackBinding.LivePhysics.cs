@@ -216,7 +216,7 @@ namespace Mmd.UnityIntegration
             MmdEvaluatedFrame? evaluatedFrame = null;
             if (fastSession == null)
             {
-                evaluatedFrame = session.EvaluateBeforePhysicsFrame(frame, time);
+                evaluatedFrame = EvaluateLiveAnimationFrame(frame, time);
             }
 
             double evaluateFrameMs = stageWatch.Elapsed.TotalMilliseconds;
@@ -228,7 +228,7 @@ namespace Mmd.UnityIntegration
             }
             else
             {
-                MmdUnityFrameApplier.ApplyFrame(playbackInstance, evaluatedFrame!);
+                ApplyLiveAnimationFrame(evaluatedFrame!);
             }
 
             double applyAnimationFrameMs = stageWatch.Elapsed.TotalMilliseconds;
@@ -259,6 +259,96 @@ namespace Mmd.UnityIntegration
             diagnostics.totalMs = totalWatch.Elapsed.TotalMilliseconds;
             lastLivePhysicsDiagnostics = diagnostics;
             return lastLiveSnapshot;
+        }
+
+        private MmdEvaluatedFrame EvaluateLiveAnimationFrame(int frame, float time)
+        {
+            EnsureLivePhysicsNativeOutputBuffers();
+            session.EvaluateBeforePhysicsFrameInto(
+                frame,
+                time,
+                livePhysicsNativeWorldMatrices!,
+                livePhysicsNativeMorphWeights!,
+                livePhysicsNativeIkEnabled!);
+            return MmdRuntimeFrameEvaluator.BuildFrameFromNativeInPlace(
+                model,
+                frame,
+                time,
+                livePhysicsNativeWorldMatrices!,
+                livePhysicsNativeMorphWeights!,
+                EnsureLivePhysicsFrame(),
+                livePhysicsRowMajorMatrices!,
+                livePhysicsLocalMatrixScratch!,
+                livePhysicsOrderedBones,
+                livePhysicsMorphEntries!,
+                livePhysicsMorphOrder!,
+                includeMaterials: false);
+        }
+
+        private void ApplyLiveAnimationFrame(MmdEvaluatedFrame frame)
+        {
+            MmdUnityFrameApplier.ApplyBonePoses(playbackInstance, frame.bones);
+            MmdUnityFrameApplier.ApplyMorphs(
+                playbackInstance,
+                frame,
+                groupMorphsResolvedExternally: true);
+        }
+
+        private void EnsureLivePhysicsNativeOutputBuffers()
+        {
+            session.GetNativeOutputBufferLengths(
+                out int worldMatrixCount,
+                out int morphWeightCount,
+                out int ikEnabledCount);
+            if (livePhysicsNativeWorldMatrices == null || livePhysicsNativeWorldMatrices.Length != worldMatrixCount)
+                livePhysicsNativeWorldMatrices = new float[worldMatrixCount];
+            if (livePhysicsNativeMorphWeights == null || livePhysicsNativeMorphWeights.Length != morphWeightCount)
+                livePhysicsNativeMorphWeights = new float[morphWeightCount];
+            if (livePhysicsNativeIkEnabled == null || livePhysicsNativeIkEnabled.Length != ikEnabledCount)
+                livePhysicsNativeIkEnabled = new byte[ikEnabledCount];
+            int rowMajorLength = checked(livePhysicsOrderedBones.Length * 16);
+            if (livePhysicsRowMajorMatrices == null || livePhysicsRowMajorMatrices.Length != rowMajorLength)
+                livePhysicsRowMajorMatrices = new float[rowMajorLength];
+            if (livePhysicsLocalMatrixScratch == null || livePhysicsLocalMatrixScratch.Length != 16)
+                livePhysicsLocalMatrixScratch = new float[16];
+        }
+
+        private MmdEvaluatedFrame EnsureLivePhysicsFrame()
+        {
+            if (livePhysicsFrame != null)
+                return livePhysicsFrame;
+
+            var bones = new List<MmdEvaluatedBonePose>(livePhysicsOrderedBones.Length);
+            for (int i = 0; i < livePhysicsOrderedBones.Length; i++)
+            {
+                MmdBoneDefinition bone = livePhysicsOrderedBones[i];
+                bones.Add(new MmdEvaluatedBonePose
+                {
+                    index = bone.index,
+                    name = string.IsNullOrWhiteSpace(bone.name) ? bone.index.ToString() : bone.name,
+                    localPosition = new float[3],
+                    localRotation = new float[4],
+                    localScale = new[] { 1.0f, 1.0f, 1.0f },
+                    worldMatrix = new float[16]
+                });
+            }
+
+            livePhysicsMorphEntries = new MmdEvaluatedMorphWeight[model.morphs.Count];
+            livePhysicsMorphOrder = new int[model.morphs.Count];
+            for (int i = 0; i < model.morphs.Count; i++)
+            {
+                livePhysicsMorphEntries[i] = new MmdEvaluatedMorphWeight { name = model.morphs[i].name };
+                livePhysicsMorphOrder[i] = i;
+            }
+            Array.Sort(livePhysicsMorphOrder, (left, right) => StringComparer.Ordinal.Compare(
+                livePhysicsMorphEntries[left].name,
+                livePhysicsMorphEntries[right].name));
+            livePhysicsFrame = new MmdEvaluatedFrame
+            {
+                bones = bones,
+                morphs = new List<MmdEvaluatedMorphWeight>(model.morphs.Count)
+            };
+            return livePhysicsFrame;
         }
 
         private MmdLivePhysicsFrameDiagnostics StepLivePhysicsCore(

@@ -128,88 +128,128 @@ namespace Mmd
         {
             var orderedBones = new List<MmdBoneDefinition>(model.bones);
             orderedBones.Sort((left, right) => left.index.CompareTo(right.index));
-            int boneCount = orderedBones.Count;
+            var destination = new MmdEvaluatedFrame { bones = new List<MmdEvaluatedBonePose>(orderedBones.Count) };
+            var morphEntries = new MmdEvaluatedMorphWeight[model.morphs.Count];
+            var activeMorphOrder = new List<int>();
+            for (int i = 0; i < model.morphs.Count && i < nativeMorphWeights.Length; i++)
+            {
+                if (nativeMorphWeights[i] == 0.0f)
+                    continue;
+                morphEntries[i] = new MmdEvaluatedMorphWeight { name = model.morphs[i].name };
+                activeMorphOrder.Add(i);
+            }
+            activeMorphOrder.Sort((left, right) => StringComparer.Ordinal.Compare(
+                morphEntries[left].name, morphEntries[right].name));
+            return BuildFrameFromNativeInPlace(
+                model,
+                frame,
+                time,
+                nativeWorldMatrices,
+                nativeMorphWeights,
+                destination,
+                new float[checked(orderedBones.Count * 16)],
+                new float[16],
+                orderedBones,
+                morphEntries,
+                activeMorphOrder.ToArray(),
+                includeMaterials);
+        }
 
-            var rowMajorAll = new float[boneCount * 16];
+        internal static MmdEvaluatedFrame BuildFrameFromNativeInPlace(
+            MmdModelDefinition model,
+            int frame,
+            float time,
+            float[] nativeWorldMatrices,
+            float[] nativeMorphWeights,
+            MmdEvaluatedFrame destination,
+            float[] rowMajorAll,
+            float[] localMatrixScratch,
+            IReadOnlyList<MmdBoneDefinition> orderedBones,
+            MmdEvaluatedMorphWeight[] morphEntries,
+            int[] morphOrder,
+            bool includeMaterials)
+        {
+            int boneCount = orderedBones.Count;
             for (int i = 0; i < boneCount; i++)
                 TransposeMatrix4x4(nativeWorldMatrices, i * 16, rowMajorAll, i * 16);
 
-            var bones = new List<MmdEvaluatedBonePose>(boneCount);
-            foreach (MmdBoneDefinition bone in orderedBones)
+            EnsureBoneEntries(destination, orderedBones);
+            for (int i = 0; i < boneCount; i++)
             {
+                MmdBoneDefinition bone = orderedBones[i];
+                MmdEvaluatedBonePose pose = destination.bones[i];
                 int boneIdx = bone.index;
                 int offset = boneIdx * 16;
-                float[] worldMatrix = new float[16];
-                Array.Copy(rowMajorAll, offset, worldMatrix, 0, 16);
-
-                float[] localPosition;
-                float[] localRotation;
+                pose.index = boneIdx;
+                pose.name = string.IsNullOrWhiteSpace(bone.name) ? boneIdx.ToString() : bone.name;
+                Array.Copy(rowMajorAll, offset, pose.worldMatrix, 0, 16);
+                pose.localScale[0] = 1.0f;
+                pose.localScale[1] = 1.0f;
+                pose.localScale[2] = 1.0f;
 
                 if (bone.parentIndex >= 0 && bone.parentIndex < boneCount)
                 {
-                    float[] localMatrix = MultiplyInverseRigidRowMajor(
-                        rowMajorAll, bone.parentIndex * 16,
-                        rowMajorAll, offset);
-
-                    float[] parentOrigin = FindBoneOrigin(orderedBones, bone.parentIndex);
-                    float[] boneOrigin = SafeOrigin(bone.origin);
-                    float restX = boneOrigin[0] - parentOrigin[0];
-                    float restY = boneOrigin[1] - parentOrigin[1];
-                    float restZ = boneOrigin[2] - parentOrigin[2];
-
-                    localPosition = new[]
-                    {
-                        localMatrix[3] - restX,
-                        localMatrix[7] - restY,
-                        localMatrix[11] - restZ
-                    };
-                    localRotation = ExtractQuaternionRowMajor(localMatrix, 0);
+                    MultiplyInverseRigidRowMajorInto(
+                        rowMajorAll,
+                        bone.parentIndex * 16,
+                        rowMajorAll,
+                        offset,
+                        localMatrixScratch,
+                        0);
+                    FindBoneOriginInto(orderedBones, bone.parentIndex, out float parentX, out float parentY, out float parentZ);
+                    GetSafeOriginInto(bone.origin, out float boneX, out float boneY, out float boneZ);
+                    float restX = boneX - parentX;
+                    float restY = boneY - parentY;
+                    float restZ = boneZ - parentZ;
+                    pose.localPosition[0] = localMatrixScratch[3] - restX;
+                    pose.localPosition[1] = localMatrixScratch[7] - restY;
+                    pose.localPosition[2] = localMatrixScratch[11] - restZ;
+                    ExtractQuaternionRowMajorInto(localMatrixScratch, 0, pose.localRotation, 0);
                 }
                 else
                 {
-                    float[] boneOrigin = SafeOrigin(bone.origin);
-                    localPosition = new[]
-                    {
-                        worldMatrix[3] - boneOrigin[0],
-                        worldMatrix[7] - boneOrigin[1],
-                        worldMatrix[11] - boneOrigin[2]
-                    };
-                    localRotation = ExtractQuaternionRowMajor(worldMatrix, 0);
+                    GetSafeOriginInto(bone.origin, out float boneX, out float boneY, out float boneZ);
+                    pose.localPosition[0] = pose.worldMatrix[3] - boneX;
+                    pose.localPosition[1] = pose.worldMatrix[7] - boneY;
+                    pose.localPosition[2] = pose.worldMatrix[11] - boneZ;
+                    ExtractQuaternionRowMajorInto(pose.worldMatrix, 0, pose.localRotation, 0);
                 }
+            }
 
-                bones.Add(new MmdEvaluatedBonePose
+            destination.morphs.Clear();
+            for (int i = 0; i < morphOrder.Length; i++)
+            {
+                int morphIndex = morphOrder[i];
+                MmdEvaluatedMorphWeight morph = morphEntries[morphIndex];
+                morph.weight = morphIndex < nativeMorphWeights.Length ? nativeMorphWeights[morphIndex] : 0.0f;
+                if (morph.weight != 0.0f)
+                    destination.morphs.Add(morph);
+            }
+            destination.frame = frame;
+            destination.time = time;
+            destination.materials.Clear();
+            if (includeMaterials)
+                destination.materials.AddRange(MmdMaterialDescriptorBuilder.Build(model));
+            return destination;
+        }
+
+        private static void EnsureBoneEntries(MmdEvaluatedFrame destination, IReadOnlyList<MmdBoneDefinition> orderedBones)
+        {
+            if (destination.bones.Count == orderedBones.Count)
+                return;
+            destination.bones.Clear();
+            for (int i = 0; i < orderedBones.Count; i++)
+            {
+                destination.bones.Add(new MmdEvaluatedBonePose
                 {
-                    index = boneIdx,
-                    name = string.IsNullOrWhiteSpace(bone.name) ? boneIdx.ToString() : bone.name,
-                    localPosition = localPosition,
-                    localRotation = localRotation,
+                    index = orderedBones[i].index,
+                    name = orderedBones[i].name,
+                    localPosition = new float[3],
+                    localRotation = new float[4],
                     localScale = new[] { 1.0f, 1.0f, 1.0f },
-                    worldMatrix = worldMatrix
+                    worldMatrix = new float[16]
                 });
             }
-
-            var morphs = new List<MmdEvaluatedMorphWeight>();
-            for (int i = 0; i < model.morphs.Count && i < nativeMorphWeights.Length; i++)
-            {
-                if (nativeMorphWeights[i] != 0.0f)
-                {
-                    morphs.Add(new MmdEvaluatedMorphWeight
-                    {
-                        name = model.morphs[i].name,
-                        weight = nativeMorphWeights[i]
-                    });
-                }
-            }
-            morphs.Sort((a, b) => StringComparer.Ordinal.Compare(a.name, b.name));
-
-            return new MmdEvaluatedFrame
-            {
-                frame = frame,
-                time = time,
-                bones = bones,
-                morphs = morphs,
-                materials = includeMaterials ? MmdMaterialDescriptorBuilder.Build(model).ToList() : new List<MmdMaterialDescriptor>()
-            };
         }
 
         private static void ValidateInputs(MmdModelDefinition model, MmdMotionDefinition motion)
@@ -246,7 +286,13 @@ namespace Mmd
                 dst[doff + r * 4 + c] = src[so + c * 4 + r];
         }
 
-        private static float[] MultiplyInverseRigidRowMajor(float[] a, int ao, float[] b, int bo)
+        private static void MultiplyInverseRigidRowMajorInto(
+            float[] a,
+            int ao,
+            float[] b,
+            int bo,
+            float[] destination,
+            int destinationOffset)
         {
             float a00 = a[ao], a01 = a[ao + 1], a02 = a[ao + 2], atx = a[ao + 3];
             float a10 = a[ao + 4], a11 = a[ao + 5], a12 = a[ao + 6], aty = a[ao + 7];
@@ -260,16 +306,29 @@ namespace Mmd
             float b10 = b[bo + 4], b11 = b[bo + 5], b12 = b[bo + 6];
             float b20 = b[bo + 8], b21 = b[bo + 9], b22 = b[bo + 10];
 
-            return new[]
-            {
-                a00 * b00 + a10 * b10 + a20 * b20, a00 * b01 + a10 * b11 + a20 * b21, a00 * b02 + a10 * b12 + a20 * b22, a00 * dx + a10 * dy + a20 * dz,
-                a01 * b00 + a11 * b10 + a21 * b20, a01 * b01 + a11 * b11 + a21 * b21, a01 * b02 + a11 * b12 + a21 * b22, a01 * dx + a11 * dy + a21 * dz,
-                a02 * b00 + a12 * b10 + a22 * b20, a02 * b01 + a12 * b11 + a22 * b21, a02 * b02 + a12 * b12 + a22 * b22, a02 * dx + a12 * dy + a22 * dz,
-                0f, 0f, 0f, 1f
-            };
+            destination[destinationOffset] = a00 * b00 + a10 * b10 + a20 * b20;
+            destination[destinationOffset + 1] = a00 * b01 + a10 * b11 + a20 * b21;
+            destination[destinationOffset + 2] = a00 * b02 + a10 * b12 + a20 * b22;
+            destination[destinationOffset + 3] = a00 * dx + a10 * dy + a20 * dz;
+            destination[destinationOffset + 4] = a01 * b00 + a11 * b10 + a21 * b20;
+            destination[destinationOffset + 5] = a01 * b01 + a11 * b11 + a21 * b21;
+            destination[destinationOffset + 6] = a01 * b02 + a11 * b12 + a21 * b22;
+            destination[destinationOffset + 7] = a01 * dx + a11 * dy + a21 * dz;
+            destination[destinationOffset + 8] = a02 * b00 + a12 * b10 + a22 * b20;
+            destination[destinationOffset + 9] = a02 * b01 + a12 * b11 + a22 * b21;
+            destination[destinationOffset + 10] = a02 * b02 + a12 * b12 + a22 * b22;
+            destination[destinationOffset + 11] = a02 * dx + a12 * dy + a22 * dz;
+            destination[destinationOffset + 12] = 0f;
+            destination[destinationOffset + 13] = 0f;
+            destination[destinationOffset + 14] = 0f;
+            destination[destinationOffset + 15] = 1f;
         }
 
-        private static float[] ExtractQuaternionRowMajor(float[] m, int o)
+        private static void ExtractQuaternionRowMajorInto(
+            float[] m,
+            int o,
+            float[] destination,
+            int destinationOffset)
         {
             float m00 = m[o], m01 = m[o + 1], m02 = m[o + 2];
             float m10 = m[o + 4], m11 = m[o + 5], m12 = m[o + 6];
@@ -311,24 +370,53 @@ namespace Mmd
                 z = 0.25f * s;
             }
 
-            return new[] { x, y, z, w };
+            destination[destinationOffset] = x;
+            destination[destinationOffset + 1] = y;
+            destination[destinationOffset + 2] = z;
+            destination[destinationOffset + 3] = w;
         }
 
-        private static float[] FindBoneOrigin(List<MmdBoneDefinition> orderedBones, int boneIndex)
+        private static void FindBoneOriginInto(
+            IReadOnlyList<MmdBoneDefinition> orderedBones,
+            int boneIndex,
+            out float x,
+            out float y,
+            out float z)
         {
             if (boneIndex >= 0 && boneIndex < orderedBones.Count && orderedBones[boneIndex].index == boneIndex)
-                return SafeOrigin(orderedBones[boneIndex].origin);
+            {
+                GetSafeOriginInto(orderedBones[boneIndex].origin, out x, out y, out z);
+                return;
+            }
             for (int i = 0; i < orderedBones.Count; i++)
             {
                 if (orderedBones[i].index == boneIndex)
-                    return SafeOrigin(orderedBones[i].origin);
+                {
+                    GetSafeOriginInto(orderedBones[i].origin, out x, out y, out z);
+                    return;
+                }
             }
-            return new[] { 0f, 0f, 0f };
+            x = 0f;
+            y = 0f;
+            z = 0f;
         }
 
-        private static float[] SafeOrigin(float[]? origin)
+        private static void GetSafeOriginInto(
+            float[]? origin,
+            out float x,
+            out float y,
+            out float z)
         {
-            return origin != null && origin.Length >= 3 ? origin : new[] { 0f, 0f, 0f };
+            if (origin != null && origin.Length >= 3)
+            {
+                x = origin[0];
+                y = origin[1];
+                z = origin[2];
+                return;
+            }
+            x = 0f;
+            y = 0f;
+            z = 0f;
         }
     }
 }
