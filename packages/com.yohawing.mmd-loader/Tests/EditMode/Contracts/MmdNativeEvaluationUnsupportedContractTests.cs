@@ -75,37 +75,41 @@ namespace Mmd.Tests.Contracts
         }
 
         [Test]
-        public void SourceBackedBeforePhysicsRevalidatesMutableModel()
+        public void RuntimeSessionValidatesModelAtConstruction()
         {
             (MmdModelDefinition model, MmdMotionDefinition motion) = LoadCubeFixturePair();
-            using var session = new MmdRuntimeSession(
-                model,
-                motion,
-                "test_1bone_cube.pmx",
-                "test_1bone_cube_motion.vmd");
-
-            model.bones[0].deformAfterPhysics = true;
             model.bones[0].parentIndex = model.bones[0].index;
 
             Assert.Throws<InvalidOperationException>(
-                () => session.EvaluateBeforePhysicsFrame(frame: 0, time: 0.0f));
+                () => new MmdRuntimeSession(
+                    model,
+                    motion,
+                    "test_1bone_cube.pmx",
+                    "test_1bone_cube_motion.vmd"));
         }
 
         [Test]
-        public void SourceBackedBeforePhysicsRevalidatesMutableMotion()
+        public void SourceBackedBeforePhysicsSteadyFramesDoNotRevalidateMutableInputs()
         {
             (MmdModelDefinition model, MmdMotionDefinition motion) = LoadCubeFixturePair();
+            model.bones[0].deformAfterPhysics = true;
             using var session = new MmdRuntimeSession(
                 model,
                 motion,
                 "test_1bone_cube.pmx",
                 "test_1bone_cube_motion.vmd");
 
-            model.bones[0].deformAfterPhysics = true;
+            MmdEvaluatedFrame initialFrame = session.EvaluateBeforePhysicsFrame(frame: 0, time: 0.0f);
+            Assert.That(initialFrame.bones, Is.Not.Empty);
+
+            model.bones[0].parentIndex = model.bones[0].index;
             motion.maxFrame = -1;
 
-            Assert.Throws<InvalidOperationException>(
-                () => session.EvaluateBeforePhysicsFrame(frame: 0, time: 0.0f));
+            for (int i = 0; i < 3; i++)
+            {
+                MmdEvaluatedFrame steadyFrame = session.EvaluateBeforePhysicsFrame(frame: 0, time: 0.0f);
+                Assert.That(steadyFrame.bones, Is.Not.Empty);
+            }
         }
 
         private static (MmdModelDefinition Model, MmdMotionDefinition Motion) LoadCubeFixturePair()

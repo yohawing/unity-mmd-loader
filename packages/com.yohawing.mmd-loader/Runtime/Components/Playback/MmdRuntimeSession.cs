@@ -104,8 +104,6 @@ namespace Mmd
             {
                 MmdPlaybackTime.ValidateFrame(frame);
                 MmdPlaybackTime.ValidateTime(time);
-                MmdModelValidator.ThrowIfInvalid(model);
-                MmdMotionValidator.ThrowIfInvalid(motion);
                 EnsureNativeSourcesUnchangedBeforeCompilation();
                 return EvaluateNativeBeforePhysicsFrame(frame, time);
             }
