@@ -375,8 +375,7 @@ namespace Mmd.UnityIntegration
                 return;
             }
 
-            MmdHumanoidRetargeterResult result = ApplyHumanoidRetargetNow();
-            StepHumanoidRetargetLivePhysicsIfNeeded(result);
+            ApplyHumanoidRetargetNow();
         }
 
         private bool HasHumanoidRetargetInputsForLateUpdate()

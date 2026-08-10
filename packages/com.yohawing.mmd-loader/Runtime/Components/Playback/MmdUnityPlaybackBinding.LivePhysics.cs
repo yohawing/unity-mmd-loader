@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using Mmd;
+using Mmd.Native;
 using Mmd.Motion;
 using Mmd.Parser;
 using Mmd.Physics;
@@ -19,6 +20,54 @@ namespace Mmd.UnityIntegration
         private MmdPhysicsBodyTransform[]? livePhysicsReadbackTransforms;
         private float[]? livePhysicsAfterPhysicsWorldMatrices;
         private int livePhysicsBodyDiagnosticsSampleInterval;
+        private bool nativeHumanoidHostPoseEnabled;
+
+        internal bool NativeHumanoidHostPoseEnabled => nativeHumanoidHostPoseEnabled;
+
+        /// <summary>
+        /// Enables the Humanoid Live path in which the native runtime owns append/IK and the
+        /// final world-matrix pose. The backend is established eagerly so callers can retain the
+        /// managed append path as a fallback before mutating the pose.
+        /// </summary>
+        internal bool TryEnableNativeHumanoidHostPose()
+        {
+            if (physicsMode != MmdPhysicsMode.Live)
+            {
+                return false;
+            }
+
+            try
+            {
+                EnsureLivePhysicsBackend(resetOnCreate: false);
+                nativeHumanoidHostPoseEnabled = true;
+                return true;
+            }
+            catch (Exception exception) when (
+                exception is MmdPhysicsBackendException ||
+                exception is MmdRuntimeNativeUnavailableException ||
+                exception is DllNotFoundException ||
+                exception is EntryPointNotFoundException ||
+                exception is BadImageFormatException ||
+                exception is InvalidOperationException ||
+                exception is ArgumentException)
+            {
+                nativeHumanoidHostPoseEnabled = false;
+                return false;
+            }
+        }
+
+        internal bool ReapplyNativeHumanoidHostPoseWorldMatrices()
+        {
+            if (!nativeHumanoidHostPoseEnabled || livePhysicsAfterPhysicsWorldMatrices == null)
+            {
+                return false;
+            }
+
+            MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(
+                playbackInstance,
+                livePhysicsAfterPhysicsWorldMatrices);
+            return true;
+        }
 
         /// <summary>
         /// Drives Timeline playback while Live physics is enabled. Only a forward-advancing frame steps
@@ -99,8 +148,24 @@ namespace Mmd.UnityIntegration
 
         public void ResetLivePhysics()
         {
-            livePhysicsBackend?.Dispose();
-            livePhysicsBackend = null;
+            nativeHumanoidHostPoseEnabled = false;
+            ResetLivePhysicsState();
+        }
+
+        internal void ResetLivePhysicsForDriveSource()
+        {
+            ResetLivePhysicsState();
+        }
+
+        private void ResetLivePhysicsState()
+        {
+            if (!nativeHumanoidHostPoseEnabled)
+            {
+                livePhysicsBackend?.Dispose();
+                livePhysicsBackend = null;
+            }
+            // A preflight-created Humanoid backend is intentionally retained without resetting;
+            // the immediately following seed step performs the single required SoftReset.
             lastLiveFrame = -1;
             lastForwardPlaybackFrame = -1;
             lastLiveSnapshot = null;
@@ -243,10 +308,20 @@ namespace Mmd.UnityIntegration
 
             stageWatch.Restart();
             CaptureLivePhysicsReadback(backend);
-            ApplyPhysicsBodyTransforms();
+            if (nativeHumanoidHostPoseEnabled)
+            {
+                ApplyNativeHumanoidHostPoseWorldMatrices(nativeBackend);
+            }
+            else
+            {
+                ApplyPhysicsBodyTransforms();
+            }
             double applyPhysicsBodiesMs = stageWatch.Elapsed.TotalMilliseconds;
             stageWatch.Restart();
-            ApplyAfterPhysicsBoneEvaluationFromNative(nativeBackend);
+            if (!nativeHumanoidHostPoseEnabled)
+            {
+                ApplyAfterPhysicsBoneEvaluationFromNative(nativeBackend);
+            }
             if (ShouldSampleLivePhysicsBodyDiagnostics(sequenceFrame))
             {
                 ApplyPhysicsBodyDebugTransforms(backend);
@@ -316,6 +391,23 @@ namespace Mmd.UnityIntegration
                 playbackInstance,
                 livePhysicsAfterPhysicsWorldMatrices,
                 fastAfterPhysicsBoneIndices);
+        }
+
+        private void ApplyNativeHumanoidHostPoseWorldMatrices(MmdAnimPhysicsBackend nativeBackend)
+        {
+            livePhysicsAfterPhysicsWorldMatrices ??= new float[nativeBackend.WorldMatrixFloatCount];
+            if (livePhysicsAfterPhysicsWorldMatrices.Length != nativeBackend.WorldMatrixFloatCount)
+            {
+                livePhysicsAfterPhysicsWorldMatrices = new float[nativeBackend.WorldMatrixFloatCount];
+            }
+
+            nativeBackend.CopyAfterPhysicsWorldMatrices(livePhysicsAfterPhysicsWorldMatrices);
+            // Humanoid Live intentionally applies the complete native post-physics pose once:
+            // this preserves append/IK results for helper bones while keeping static, dynamic,
+            // dynamic-orientation, and after-physics ownership in the native runtime.
+            MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(
+                playbackInstance,
+                livePhysicsAfterPhysicsWorldMatrices);
         }
 
         private void CaptureHostPoseFromUnityTransforms(
@@ -398,10 +490,21 @@ namespace Mmd.UnityIntegration
                 }
             }
 
-            // The Unity pose is already after the host's animation/retargeting pass. Keep native IK
-            // disabled here so evaluate_host_frame does not solve a second, unrelated IK pass.
+            // Humanoid Live supplies the retargeted pre-append pose to the native runtime, so native
+            // IK remains enabled. Ordinary VMD Live keeps the legacy managed-pose contract and
+            // disables native IK to avoid a second solve.
             ikEnabled = EnsureLivePhysicsBuffer(ref livePhysicsIkEnabled, model.ik.Count);
-            Array.Clear(ikEnabled, 0, ikEnabled.Length);
+            if (nativeHumanoidHostPoseEnabled)
+            {
+                for (int i = 0; i < ikEnabled.Length; i++)
+                {
+                    ikEnabled[i] = 1;
+                }
+            }
+            else
+            {
+                Array.Clear(ikEnabled, 0, ikEnabled.Length);
+            }
         }
 
         private static float[] EnsureLivePhysicsBuffer(ref float[]? buffer, int length)
@@ -461,7 +564,7 @@ namespace Mmd.UnityIntegration
             return diagnostics;
         }
 
-        private IMmdLivePhysicsBackend EnsureLivePhysicsBackend()
+        private IMmdLivePhysicsBackend EnsureLivePhysicsBackend(bool resetOnCreate = true)
         {
             if (livePhysicsBackend != null)
             {
@@ -487,7 +590,10 @@ namespace Mmd.UnityIntegration
             try
             {
                 nativeBackend!.InitializeWorld(model);
-                nativeBackend.Reset();
+                if (resetOnCreate)
+                {
+                    nativeBackend.Reset();
+                }
                 livePhysicsBackend = nativeBackend;
                 return nativeBackend;
             }

@@ -27,13 +27,7 @@ namespace Mmd.UnityIntegration
                 return LastHumanoidRetargetResult;
             }
 
-            RestoreHumanoidHostPoseInputIfAvailable();
-            LastHumanoidRetargetResult = MmdHumanoidRetargeter.RetargetPose(humanoidRetargetEntries);
-            if (!TryApplyHumanoidNativeHostPose(LastHumanoidRetargetResult))
-            {
-                MmdHumanoidAppendTransformApplier.Apply(humanoidAppendEntries);
-            }
-            return LastHumanoidRetargetResult;
+            return ApplyHumanoidRetargetCore(copyLocalPositions: true);
         }
 
         internal MmdHumanoidRetargeterResult ApplyHumanoidRetargetFromTimeline()
@@ -52,15 +46,26 @@ namespace Mmd.UnityIntegration
             // that translation twice. Keep the legacy position-copy path when no driver is active.
             bool copyLocalPositions =
                 !(GetComponent<MmdHumanoidRootMotionDriver>()?.IsTimelineEvaluationActive ?? false);
+            return ApplyHumanoidRetargetCore(copyLocalPositions);
+        }
+
+        private MmdHumanoidRetargeterResult ApplyHumanoidRetargetCore(bool copyLocalPositions)
+        {
+            bool nativeLivePrepared = physicsMode == MmdPhysicsMode.Live &&
+                                      TryPrepareHumanoidNativeLivePhysics();
             RestoreHumanoidHostPoseInputIfAvailable();
             LastHumanoidRetargetResult = MmdHumanoidRetargeter.RetargetPose(
                 humanoidRetargetEntries,
                 copyLocalPositions);
-            if (!TryApplyHumanoidNativeHostPose(LastHumanoidRetargetResult))
+            bool nativePoseApplied = physicsMode == MmdPhysicsMode.Live
+                ? nativeLivePrepared && TryCaptureHumanoidNativeLivePose(LastHumanoidRetargetResult) &&
+                  StepHumanoidRetargetLivePhysicsIfNeeded(LastHumanoidRetargetResult)
+                : TryApplyHumanoidNativeHostPose(LastHumanoidRetargetResult);
+            if (!nativePoseApplied)
             {
                 MmdHumanoidAppendTransformApplier.Apply(humanoidAppendEntries);
             }
-            StepHumanoidRetargetLivePhysicsIfNeeded(LastHumanoidRetargetResult);
+
             return LastHumanoidRetargetResult;
         }
 

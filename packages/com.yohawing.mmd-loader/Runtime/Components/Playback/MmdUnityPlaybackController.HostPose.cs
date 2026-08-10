@@ -27,6 +27,7 @@ namespace Mmd.UnityIntegration
         private float[]? humanoidHostPoseWorldMatrices;
         private bool humanoidHostPoseFailureLatched;
         private MmdPmxAsset? humanoidHostPoseFailureModelAsset;
+        private uint humanoidHostPoseInputFingerprint;
 
         private bool TryApplyHumanoidNativeHostPose(MmdHumanoidRetargeterResult result)
         {
@@ -73,7 +74,67 @@ namespace Mmd.UnityIntegration
             }
         }
 
-        private void EnsureHumanoidHostPoseSession()
+        /// <summary>
+        /// Captures the retargeted (pre-append) Unity pose after the Live native binding has been
+        /// prepared. The live physics binding evaluates and applies the native final world matrices
+        /// later in the frame; this capture deliberately does not mutate Unity transforms.
+        /// </summary>
+        private bool TryCaptureHumanoidNativeLivePose(MmdHumanoidRetargeterResult result)
+        {
+            if (humanoidHostPoseFailureLatched ||
+                physicsMode != MmdPhysicsMode.Live ||
+                humanoidHostPoseModel == null ||
+                humanoidHostPoseBones == null ||
+                humanoidHostPoseRoot == null ||
+                result == null || result.CopiedBoneCount <= 0)
+            {
+                return false;
+            }
+
+            try
+            {
+                // Keep a clean pre-append input snapshot so the next frame can restore helper
+                // bones that the previous native evaluation owned.
+                CaptureHumanoidHostPose();
+                return true;
+            }
+            catch (Exception exception) when (IsNativeHostPoseFailure(exception))
+            {
+                DisposeHumanoidHostPoseSession();
+                humanoidHostPoseFailureLatched = true;
+                humanoidHostPoseFailureModelAsset = modelAsset;
+                return false;
+            }
+        }
+
+        private bool TryPrepareHumanoidNativeLivePhysics()
+        {
+            if (humanoidHostPoseFailureLatched || physicsMode != MmdPhysicsMode.Live)
+            {
+                return false;
+            }
+
+            try
+            {
+                EnsureHumanoidHostPoseSession(createNativeSession: false);
+                if (humanoidHostPoseModel == null ||
+                    humanoidHostPoseBones == null || humanoidHostPoseRoot == null)
+                {
+                    return false;
+                }
+
+                return TryPrepareHumanoidNativeLivePhysicsBinding();
+            }
+            catch (Exception exception) when (IsNativeHostPoseFailure(exception))
+            {
+                DisposeHumanoidHostPoseSession();
+                humanoidHostPoseFailureLatched = true;
+                humanoidHostPoseFailureModelAsset = modelAsset;
+                return false;
+            }
+        }
+
+        private void EnsureHumanoidHostPoseSession(bool createNativeSession = true)
         {
             if (humanoidHostPoseSession != null)
             {
@@ -140,17 +201,22 @@ namespace Mmd.UnityIntegration
                 throw new InvalidOperationException("Humanoid native host pose bone mapping does not match the PMX model.");
             }
 
+            humanoidHostPoseModel = model;
+            humanoidHostPoseSourceBytes = sourceBytes;
+            humanoidHostPoseBones = bones;
+            humanoidHostPoseRoot = root;
+            humanoidHostPoseImportScale = importScale;
+            if (!createNativeSession)
+            {
+                return;
+            }
+
             humanoidHostPoseSession = MmdRuntimeFfiHostPoseSession.Create(sourceBytes);
             if (humanoidHostPoseSession.BoneCount != model.bones.Count)
             {
                 throw new InvalidOperationException("Humanoid native host pose session bone count does not match the PMX model.");
             }
 
-            humanoidHostPoseModel = model;
-            humanoidHostPoseSourceBytes = sourceBytes;
-            humanoidHostPoseBones = bones;
-            humanoidHostPoseRoot = root;
-            humanoidHostPoseImportScale = importScale;
         }
 
         private void CaptureHumanoidHostPose()
@@ -158,7 +224,7 @@ namespace Mmd.UnityIntegration
             MmdModelDefinition model = humanoidHostPoseModel!;
             Transform[] bones = humanoidHostPoseBones!;
             int boneCount = model.bones.Count;
-            MmdUnityModelInstance? instance = binding?.PlaybackInstance;
+            MmdUnityModelInstance? instance = binding?.PlaybackInstance ?? humanoidPhysicsBinding?.PlaybackInstance;
             float scale = NormalizeHostPoseImportScale(humanoidHostPoseImportScale);
             humanoidHostPosePositions = EnsureFloatBuffer(humanoidHostPosePositions, checked(boneCount * 3));
             humanoidHostPoseRotations = EnsureFloatBuffer(humanoidHostPoseRotations, checked(boneCount * 4));
@@ -200,8 +266,37 @@ namespace Mmd.UnityIntegration
                 humanoidHostPoseScales[scaleOffset + 1] = localScale.y;
                 humanoidHostPoseScales[scaleOffset + 2] = localScale.z;
             }
+
+            humanoidHostPoseInputFingerprint = ComputeHumanoidHostPoseInputFingerprint(
+                humanoidHostPosePositions,
+                humanoidHostPoseRotations,
+                humanoidHostPoseScales);
             // Native morph expansion owns bone/material/vertex morph application. These are
             // pre-morph weights; this first Humanoid bridge has no managed morph authoring input.
+        }
+
+        private static uint ComputeHumanoidHostPoseInputFingerprint(
+            float[] positions,
+            float[] rotations,
+            float[] scales)
+        {
+            unchecked
+            {
+                uint hash = 2166136261u;
+                MixHumanoidHostPoseFingerprint(ref hash, positions);
+                MixHumanoidHostPoseFingerprint(ref hash, rotations);
+                MixHumanoidHostPoseFingerprint(ref hash, scales);
+                return hash;
+            }
+        }
+
+        private static void MixHumanoidHostPoseFingerprint(ref uint hash, float[] values)
+        {
+            for (int i = 0; i < values.Length; i++)
+            {
+                hash ^= (uint)values[i].GetHashCode();
+                hash *= 16777619u;
+            }
         }
 
         private void ApplyHumanoidHostPoseWorldMatrices()
@@ -222,7 +317,7 @@ namespace Mmd.UnityIntegration
                 return;
             }
 
-            MmdUnityModelInstance? instance = binding?.PlaybackInstance;
+            MmdUnityModelInstance? instance = binding?.PlaybackInstance ?? humanoidPhysicsBinding?.PlaybackInstance;
             float scale = NormalizeHostPoseImportScale(humanoidHostPoseImportScale);
             for (int index = 0; index < humanoidHostPoseBones.Length; index++)
             {
