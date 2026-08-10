@@ -587,6 +587,16 @@ namespace Mmd.Tests
                 Assert.That(controller.LastLivePhysicsDiagnostics, Is.Not.Null);
                 Assert.That(controller.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(0));
                 Assert.That(controller.LastLivePhysicsDiagnostics.deltaTime, Is.EqualTo(0.0f));
+                Assert.That(controller.LastLivePhysicsDiagnostics.evaluationPath, Is.EqualTo("HumanoidNativeFinal"));
+                Assert.That(controller.LastLivePhysicsDiagnostics.phaseDiagnosticsPresent, Is.True);
+                Assert.That(controller.LastLivePhysicsDiagnostics.nativeStepReportPresent, Is.True);
+                Assert.That(controller.LastLivePhysicsDiagnostics.nativeSubstepCount, Is.GreaterThanOrEqualTo(0));
+                Assert.That(controller.LastLivePhysicsDiagnostics.nativeRigidbodyCount, Is.EqualTo(model.physics.rigidbodies.Count));
+                Assert.That(controller.LastLivePhysicsDiagnostics.nativeBoneCount, Is.EqualTo(model.bones.Count));
+                Assert.That(controller.LastLivePhysicsDiagnostics.ensureBackendPresent, Is.True);
+                Assert.That(controller.LastLivePhysicsDiagnostics.evaluateFramePresent, Is.False);
+                Assert.That(controller.LastLivePhysicsDiagnostics.applyAnimationFramePresent, Is.False);
+                Assert.That(controller.LastLivePhysicsDiagnostics.snapshotBuildPresent, Is.False);
                 Assert.That(controller.LastSnapshot, Is.Null,
                     "Humanoid-driven live physics must not overwrite the VMD playback snapshot surface.");
 

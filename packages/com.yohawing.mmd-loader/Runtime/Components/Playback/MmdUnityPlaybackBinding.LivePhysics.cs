@@ -247,9 +247,15 @@ namespace Mmd.UnityIntegration
                 evaluatedFrame,
                 out double refreshSnapshotFrameMs);
             lastLiveFrame = frame;
+            long snapshotBuildStartTimestamp = Stopwatch.GetTimestamp();
             lastLiveSnapshot = BuildOrUpdateLiveSnapshot(evaluatedFrame!);
+            long snapshotBuildEndTimestamp = Stopwatch.GetTimestamp();
             totalWatch.Stop();
             diagnostics.refreshSnapshotFrameMs = refreshSnapshotFrameMs;
+            diagnostics.snapshotBuildMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(
+                snapshotBuildStartTimestamp,
+                snapshotBuildEndTimestamp);
+            diagnostics.snapshotBuildPresent = true;
             diagnostics.totalMs = totalWatch.Elapsed.TotalMilliseconds;
             lastLivePhysicsDiagnostics = diagnostics;
             return lastLiveSnapshot;
@@ -269,15 +275,26 @@ namespace Mmd.UnityIntegration
         {
             livePhysicsReadbackTransformCount = 0;
             livePhysicsReadbackShapeTypeCount = 0;
+            long bridgeStartTimestamp = Stopwatch.GetTimestamp();
             var stageWatch = Stopwatch.StartNew();
+            long hostPoseCaptureStartTimestamp = Stopwatch.GetTimestamp();
             CaptureHostPoseFromUnityTransforms(
                 out float[] localPositionOffsets,
                 out float[] localRotations,
                 out float[] localScales,
                 out float[] morphWeights,
                 out byte[] ikEnabled);
+            long hostPoseCaptureEndTimestamp = Stopwatch.GetTimestamp();
+            long pinnedDiagnosticsStartTimestamp = Stopwatch.GetTimestamp();
             MmdLivePhysicsPinnedBodyDiagnostics pinnedBodyDiagnostics =
                 BuildHostPosePinnedBodyDiagnostics(resetSeed);
+            long pinnedDiagnosticsEndTimestamp = Stopwatch.GetTimestamp();
+            double hostPoseCaptureMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(
+                hostPoseCaptureStartTimestamp,
+                hostPoseCaptureEndTimestamp);
+            double pinnedDiagnosticsMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(
+                pinnedDiagnosticsStartTimestamp,
+                pinnedDiagnosticsEndTimestamp);
             double syncBoneDrivenBodiesMs = stageWatch.Elapsed.TotalMilliseconds;
             stageWatch.Restart();
             if (backend is not MmdAnimPhysicsBackend nativeBackend)
@@ -299,47 +316,126 @@ namespace Mmd.UnityIntegration
                 morphWeights,
                 ikEnabled,
                 resetSeed,
-                resetSeed ? 0.0f : deltaTime);
+                resetSeed ? 0.0f : deltaTime,
+                out MmdPhysicsHostStepDiagnostics nativeStepDiagnostics);
             double stepPhysicsMs = stageWatch.Elapsed.TotalMilliseconds;
             if (resetSeed)
             {
                 deltaTime = 0.0f;
             }
 
+            long managedRigidbodyFanOutStartTimestamp = Stopwatch.GetTimestamp();
             stageWatch.Restart();
             CaptureLivePhysicsReadback(backend);
-            if (nativeHumanoidHostPoseEnabled)
-            {
-                ApplyNativeHumanoidHostPoseWorldMatrices(nativeBackend);
-            }
-            else
+            long managedRigidbodyFanOutEndTimestamp = Stopwatch.GetTimestamp();
+            double managedRigidbodyFanOutMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(
+                managedRigidbodyFanOutStartTimestamp,
+                managedRigidbodyFanOutEndTimestamp);
+
+            long managedBodyTransformApplyStartTimestamp = Stopwatch.GetTimestamp();
+            bool managedBodyTransformApplyPresent = !nativeHumanoidHostPoseEnabled;
+            if (managedBodyTransformApplyPresent)
             {
                 ApplyPhysicsBodyTransforms();
             }
+            long managedBodyTransformApplyEndTimestamp = Stopwatch.GetTimestamp();
+            double managedBodyTransformApplyMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(
+                managedBodyTransformApplyStartTimestamp,
+                managedBodyTransformApplyEndTimestamp);
             double applyPhysicsBodiesMs = stageWatch.Elapsed.TotalMilliseconds;
+
             stageWatch.Restart();
-            if (!nativeHumanoidHostPoseEnabled)
+            long afterPhysicsMatrixReadbackStartTimestamp = Stopwatch.GetTimestamp();
+            bool afterPhysicsMatrixWorkPerformed = CaptureAfterPhysicsWorldMatrices(nativeBackend);
+            long afterPhysicsMatrixReadbackEndTimestamp = Stopwatch.GetTimestamp();
+            double afterPhysicsMatrixReadbackMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(
+                afterPhysicsMatrixReadbackStartTimestamp,
+                afterPhysicsMatrixReadbackEndTimestamp);
+
+            long matrixTransformApplyStartTimestamp = Stopwatch.GetTimestamp();
+            if (afterPhysicsMatrixWorkPerformed)
             {
-                ApplyAfterPhysicsBoneEvaluationFromNative(nativeBackend);
+                ApplyAfterPhysicsWorldMatrices();
             }
-            if (ShouldSampleLivePhysicsBodyDiagnostics(sequenceFrame))
+            long matrixTransformApplyEndTimestamp = Stopwatch.GetTimestamp();
+            double matrixTransformApplyMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(
+                matrixTransformApplyStartTimestamp,
+                matrixTransformApplyEndTimestamp);
+            if (nativeHumanoidHostPoseEnabled)
+            {
+                // Preserve the historical Humanoid aggregate: it covered the complete native
+                // matrix readback/apply stage in addition to the shared rigidbody fan-out.
+                applyPhysicsBodiesMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(
+                    managedRigidbodyFanOutStartTimestamp,
+                    matrixTransformApplyEndTimestamp);
+            }
+
+            long sampledDiagnosticsStartTimestamp = Stopwatch.GetTimestamp();
+            bool sampledBodyDiagnosticsThisFrame = ShouldSampleLivePhysicsBodyDiagnostics(sequenceFrame);
+            if (sampledBodyDiagnosticsThisFrame)
             {
                 ApplyPhysicsBodyDebugTransforms(backend);
                 lastLivePhysicsBodyDiagnostics = BuildBodyDiagnostics(backend);
                 lastLivePhysicsBodyDiagnosticsFrame = sequenceFrame;
             }
+            long sampledDiagnosticsEndTimestamp = Stopwatch.GetTimestamp();
+            double sampledDiagnosticsMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(
+                sampledDiagnosticsStartTimestamp,
+                sampledDiagnosticsEndTimestamp);
+
+            long evaluatedFrameRefreshStartTimestamp = Stopwatch.GetTimestamp();
+            bool evaluatedFrameRefreshPresent = evaluatedFrame != null;
             if (evaluatedFrame != null)
             {
                 RefreshEvaluatedFrameFromUnityTransforms(evaluatedFrame);
             }
+            long evaluatedFrameRefreshEndTimestamp = Stopwatch.GetTimestamp();
+            double evaluatedFrameRefreshMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(
+                evaluatedFrameRefreshStartTimestamp,
+                evaluatedFrameRefreshEndTimestamp);
 
             refreshSnapshotFrameMs = stageWatch.Elapsed.TotalMilliseconds;
-            lastLivePhysicsDiagnostics = new MmdLivePhysicsFrameDiagnostics
+            long diagnosticsConstructionStartTimestamp = Stopwatch.GetTimestamp();
+            MmdLivePhysicsFrameDiagnostics diagnostics = new MmdLivePhysicsFrameDiagnostics
             {
                 frame = sequenceFrame,
                 backendName = backend.Name,
+                evaluationPath = nativeHumanoidHostPoseEnabled ? "HumanoidNativeFinal" : "VMDCompatibility",
+                phaseDiagnosticsPresent = true,
+                nativeStepReportPresent = nativeStepDiagnostics.reportPresent,
+                hostPoseCapturePresent = true,
+                pinnedDiagnosticsPresent = true,
+                pinMarshalPresent = nativeStepDiagnostics.reportPresent,
+                nativeHostFramePresent = nativeStepDiagnostics.reportPresent,
+                nativeRigidbodyCopyPresent = nativeStepDiagnostics.reportPresent,
+                managedRigidbodyFanOutPresent = true,
+                managedBodyTransformApplyPresent = managedBodyTransformApplyPresent,
+                // These production phases are measured even when this model has no
+                // deform-after-physics bones. In that valid no-work case their duration is zero,
+                // while presence remains true so it is distinct from unavailable instrumentation.
+                afterPhysicsMatrixReadbackPresent = true,
+                matrixTransformApplyPresent = true,
+                sampledDiagnosticsPresent = true,
+                sampledBodyDiagnosticsThisFrame = sampledBodyDiagnosticsThisFrame,
+                evaluatedFrameRefreshPresent = evaluatedFrameRefreshPresent,
+                diagnosticsConstructionPresent = true,
+                ensureBackendPresent = true,
+                evaluateFramePresent = !nativeHumanoidHostPoseEnabled,
+                applyAnimationFramePresent = !nativeHumanoidHostPoseEnabled,
+                snapshotBuildPresent = false,
                 deltaTime = deltaTime,
                 totalMs = totalWatch.Elapsed.TotalMilliseconds,
+                hostPoseCaptureMs = hostPoseCaptureMs,
+                pinnedDiagnosticsMs = pinnedDiagnosticsMs,
+                pinMarshalMs = nativeStepDiagnostics.pinMarshalMs,
+                nativeHostFrameMs = nativeStepDiagnostics.nativeHostFrameMs,
+                nativeRigidbodyCopyMs = nativeStepDiagnostics.nativeRigidbodyCopyMs,
+                managedRigidbodyFanOutMs = managedRigidbodyFanOutMs,
+                managedBodyTransformApplyMs = managedBodyTransformApplyMs,
+                afterPhysicsMatrixReadbackMs = afterPhysicsMatrixReadbackMs,
+                matrixTransformApplyMs = matrixTransformApplyMs,
+                sampledDiagnosticsMs = sampledDiagnosticsMs,
+                evaluatedFrameRefreshMs = evaluatedFrameRefreshMs,
                 ensureBackendMs = ensureBackendMs,
                 evaluateFrameMs = evaluateFrameMs,
                 applyAnimationFrameMs = applyAnimationFrameMs,
@@ -349,6 +445,11 @@ namespace Mmd.UnityIntegration
                 refreshSnapshotFrameMs = refreshSnapshotFrameMs,
                 readbackTransformCount = livePhysicsReadbackTransformCount,
                 readbackShapeTypeCount = livePhysicsReadbackShapeTypeCount,
+                nativeRigidbodyCount = nativeStepDiagnostics.nativeRigidbodyCount,
+                nativeBoneCount = nativeStepDiagnostics.nativeBoneCount,
+                nativeSubstepCount = nativeStepDiagnostics.nativeSubstepCount,
+                nativeKinematicRigidbodiesFed = nativeStepDiagnostics.nativeKinematicRigidbodiesFed,
+                nativeBonesWrittenBack = nativeStepDiagnostics.nativeBonesWrittenBack,
                 pinnedBodies = pinnedBodyDiagnostics,
                 unsupportedWorldAnchorJointCount = backend.SkippedWorldAnchorJointCount,
                 comparisonSpace = "runtime-forward-playback-diagnostics",
@@ -360,7 +461,39 @@ namespace Mmd.UnityIntegration
                 bodyDiagnosticsFrame = lastLivePhysicsBodyDiagnosticsFrame,
                 bodyDiagnostics = lastLivePhysicsBodyDiagnostics
             };
-            return lastLivePhysicsDiagnostics;
+            long diagnosticsConstructionEndTimestamp = Stopwatch.GetTimestamp();
+            diagnostics.diagnosticsConstructionMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(
+                diagnosticsConstructionStartTimestamp,
+                diagnosticsConstructionEndTimestamp);
+            diagnostics.bridgeTotalMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(
+                bridgeStartTimestamp,
+                diagnosticsConstructionEndTimestamp);
+            // Presence is represented independently from duration. A phase can be valid and do
+            // zero work (for example no deform-after-physics bones), while unsampled or unused
+            // phases remain explicitly absent rather than being mistaken for measured zeroes.
+            if (!managedBodyTransformApplyPresent)
+            {
+                diagnostics.managedBodyTransformApplyMs = 0.0;
+            }
+
+            if (!afterPhysicsMatrixWorkPerformed)
+            {
+                diagnostics.afterPhysicsMatrixReadbackMs = 0.0;
+                diagnostics.matrixTransformApplyMs = 0.0;
+            }
+
+            if (!sampledBodyDiagnosticsThisFrame)
+            {
+                diagnostics.sampledDiagnosticsMs = 0.0;
+            }
+
+            if (!evaluatedFrameRefreshPresent)
+            {
+                diagnostics.evaluatedFrameRefreshMs = 0.0;
+            }
+
+            lastLivePhysicsDiagnostics = diagnostics;
+            return diagnostics;
         }
 
         private MmdPlaybackSnapshot BuildOrUpdateLiveSnapshot(MmdEvaluatedFrame frame)
@@ -373,41 +506,45 @@ namespace Mmd.UnityIntegration
             return lastLiveSnapshot;
         }
 
-        private void ApplyAfterPhysicsBoneEvaluationFromNative(MmdAnimPhysicsBackend nativeBackend)
+        private bool CaptureAfterPhysicsWorldMatrices(MmdAnimPhysicsBackend nativeBackend)
         {
-            if (!model.HasDeformAfterPhysicsBones)
+            if (!nativeHumanoidHostPoseEnabled && !model.HasDeformAfterPhysicsBones)
+            {
+                return false;
+            }
+
+            livePhysicsAfterPhysicsWorldMatrices ??= new float[nativeBackend.WorldMatrixFloatCount];
+            if (livePhysicsAfterPhysicsWorldMatrices.Length != nativeBackend.WorldMatrixFloatCount)
+            {
+                livePhysicsAfterPhysicsWorldMatrices = new float[nativeBackend.WorldMatrixFloatCount];
+            }
+
+            nativeBackend.CopyAfterPhysicsWorldMatrices(livePhysicsAfterPhysicsWorldMatrices);
+            return true;
+        }
+
+        private void ApplyAfterPhysicsWorldMatrices()
+        {
+            if (livePhysicsAfterPhysicsWorldMatrices == null)
             {
                 return;
             }
 
-            livePhysicsAfterPhysicsWorldMatrices ??= new float[nativeBackend.WorldMatrixFloatCount];
-            if (livePhysicsAfterPhysicsWorldMatrices.Length != nativeBackend.WorldMatrixFloatCount)
+            if (nativeHumanoidHostPoseEnabled)
             {
-                livePhysicsAfterPhysicsWorldMatrices = new float[nativeBackend.WorldMatrixFloatCount];
+                // Humanoid Live intentionally applies the complete native post-physics pose once:
+                // this preserves append/IK results for helper bones while keeping static, dynamic,
+                // dynamic-orientation, and after-physics ownership in the native runtime.
+                MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(
+                    playbackInstance,
+                    livePhysicsAfterPhysicsWorldMatrices);
+                return;
             }
 
-            nativeBackend.CopyAfterPhysicsWorldMatrices(livePhysicsAfterPhysicsWorldMatrices);
             MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(
                 playbackInstance,
                 livePhysicsAfterPhysicsWorldMatrices,
                 fastAfterPhysicsBoneIndices);
-        }
-
-        private void ApplyNativeHumanoidHostPoseWorldMatrices(MmdAnimPhysicsBackend nativeBackend)
-        {
-            livePhysicsAfterPhysicsWorldMatrices ??= new float[nativeBackend.WorldMatrixFloatCount];
-            if (livePhysicsAfterPhysicsWorldMatrices.Length != nativeBackend.WorldMatrixFloatCount)
-            {
-                livePhysicsAfterPhysicsWorldMatrices = new float[nativeBackend.WorldMatrixFloatCount];
-            }
-
-            nativeBackend.CopyAfterPhysicsWorldMatrices(livePhysicsAfterPhysicsWorldMatrices);
-            // Humanoid Live intentionally applies the complete native post-physics pose once:
-            // this preserves append/IK results for helper bones while keeping static, dynamic,
-            // dynamic-orientation, and after-physics ownership in the native runtime.
-            MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(
-                playbackInstance,
-                livePhysicsAfterPhysicsWorldMatrices);
         }
 
         private void CaptureHostPoseFromUnityTransforms(

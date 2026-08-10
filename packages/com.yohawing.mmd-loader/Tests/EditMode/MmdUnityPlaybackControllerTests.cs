@@ -1074,6 +1074,77 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void LivePhysicsDiagnosticsExposeNativePhaseBreakdownAndStepReport()
+        {
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
+            if (!availability.backendAvailable)
+            {
+                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
+            }
+
+            MmdUnityPlaybackBinding? binding = null;
+            try
+            {
+                MmdModelDefinition model = LoadPhysicsFixtureModel();
+                AddPinnedRootRigidbody(model);
+                binding = CreatePhysicsPlaybackBinding(model, "phase-diagnostics.vmd");
+                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.Configure(binding, 30.0f);
+                controller.SetPhysicsMode(MmdPhysicsMode.Live);
+
+                MmdLivePhysicsFrameDiagnostics? diagnostics = binding.LastLivePhysicsDiagnostics;
+                Assert.That(diagnostics, Is.Not.Null);
+                Assert.That(diagnostics!.evaluationPath, Is.EqualTo("VMDCompatibility"));
+                Assert.That(diagnostics.phaseDiagnosticsPresent, Is.True);
+                Assert.That(diagnostics.nativeStepReportPresent, Is.True);
+                Assert.That(diagnostics.hostPoseCapturePresent, Is.True);
+                Assert.That(diagnostics.pinnedDiagnosticsPresent, Is.True);
+                Assert.That(diagnostics.pinMarshalPresent, Is.True);
+                Assert.That(diagnostics.nativeHostFramePresent, Is.True);
+                Assert.That(diagnostics.nativeRigidbodyCopyPresent, Is.True);
+                Assert.That(diagnostics.managedRigidbodyFanOutPresent, Is.True);
+                Assert.That(diagnostics.managedBodyTransformApplyPresent, Is.True);
+                Assert.That(diagnostics.afterPhysicsMatrixReadbackPresent, Is.True,
+                    "a valid no-work matrix phase must remain present rather than unavailable");
+                Assert.That(diagnostics.matrixTransformApplyPresent, Is.True,
+                    "a valid no-work matrix phase must remain present rather than unavailable");
+                Assert.That(diagnostics.diagnosticsConstructionPresent, Is.True);
+                Assert.That(diagnostics.ensureBackendPresent, Is.True);
+                Assert.That(diagnostics.evaluateFramePresent, Is.True);
+                Assert.That(diagnostics.applyAnimationFramePresent, Is.True);
+                Assert.That(diagnostics.snapshotBuildPresent, Is.True);
+                Assert.That(diagnostics.nativeRigidbodyCount, Is.EqualTo(model.physics.rigidbodies.Count));
+                Assert.That(diagnostics.nativeBoneCount, Is.EqualTo(model.bones.Count));
+                Assert.That(diagnostics.nativeSubstepCount, Is.GreaterThanOrEqualTo(0));
+                Assert.That(diagnostics.nativeKinematicRigidbodiesFed, Is.GreaterThanOrEqualTo(0));
+                Assert.That(diagnostics.nativeBonesWrittenBack, Is.GreaterThanOrEqualTo(0));
+
+                Assert.That(diagnostics.hostPoseCaptureMs, Is.GreaterThanOrEqualTo(0.0));
+                Assert.That(diagnostics.pinnedDiagnosticsMs, Is.GreaterThanOrEqualTo(0.0));
+                Assert.That(diagnostics.pinMarshalMs, Is.GreaterThanOrEqualTo(0.0));
+                Assert.That(diagnostics.nativeHostFrameMs, Is.GreaterThanOrEqualTo(0.0));
+                Assert.That(diagnostics.nativeRigidbodyCopyMs, Is.GreaterThanOrEqualTo(0.0));
+                Assert.That(diagnostics.managedRigidbodyFanOutMs, Is.GreaterThanOrEqualTo(0.0));
+                Assert.That(diagnostics.managedBodyTransformApplyMs, Is.GreaterThanOrEqualTo(0.0));
+                Assert.That(diagnostics.afterPhysicsMatrixReadbackMs, Is.GreaterThanOrEqualTo(0.0));
+                Assert.That(diagnostics.matrixTransformApplyMs, Is.GreaterThanOrEqualTo(0.0));
+                Assert.That(diagnostics.sampledDiagnosticsPresent, Is.True,
+                    "the diagnostics phase is measured even when detailed sampling is disabled");
+                Assert.That(diagnostics.sampledBodyDiagnosticsThisFrame, Is.False,
+                    "default detailed body diagnostics must remain disabled");
+                Assert.That(diagnostics.sampledDiagnosticsMs, Is.Zero);
+                Assert.That(diagnostics.evaluatedFrameRefreshMs, Is.GreaterThanOrEqualTo(0.0));
+                Assert.That(diagnostics.diagnosticsConstructionMs, Is.GreaterThanOrEqualTo(0.0));
+                Assert.That(diagnostics.snapshotBuildMs, Is.GreaterThanOrEqualTo(0.0));
+                Assert.That(diagnostics.bridgeTotalMs, Is.GreaterThanOrEqualTo(0.0));
+            }
+            finally
+            {
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
+            }
+        }
+
+        [Test]
         public void LivePhysicsDiagnosticsSummaryIncludesFrameStepMsAndPinnedCount()
         {
             var diagnostics = new MmdLivePhysicsFrameDiagnostics

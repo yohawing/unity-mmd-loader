@@ -2,12 +2,53 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Mmd.Native;
 using Mmd.Parser;
 
 namespace Mmd.Physics
 {
+    /// <summary>
+    /// Value-type timing/report data for one native host-frame evaluation. The backend does not
+    /// allocate timers or diagnostic objects on the hot path; the Unity binding copies this data
+    /// into its additive per-frame diagnostics record.
+    /// </summary>
+    internal readonly struct MmdPhysicsHostStepDiagnostics
+    {
+        internal readonly double pinMarshalMs;
+        internal readonly double nativeHostFrameMs;
+        internal readonly double nativeRigidbodyCopyMs;
+        internal readonly int nativeRigidbodyCount;
+        internal readonly int nativeBoneCount;
+        internal readonly int nativeSubstepCount;
+        internal readonly int nativeKinematicRigidbodiesFed;
+        internal readonly int nativeBonesWrittenBack;
+        internal readonly bool reportPresent;
+
+        internal MmdPhysicsHostStepDiagnostics(
+            double pinMarshalMs,
+            double nativeHostFrameMs,
+            double nativeRigidbodyCopyMs,
+            int nativeRigidbodyCount,
+            int nativeBoneCount,
+            int nativeSubstepCount,
+            int nativeKinematicRigidbodiesFed,
+            int nativeBonesWrittenBack,
+            bool reportPresent)
+        {
+            this.pinMarshalMs = pinMarshalMs;
+            this.nativeHostFrameMs = nativeHostFrameMs;
+            this.nativeRigidbodyCopyMs = nativeRigidbodyCopyMs;
+            this.nativeRigidbodyCount = nativeRigidbodyCount;
+            this.nativeBoneCount = nativeBoneCount;
+            this.nativeSubstepCount = nativeSubstepCount;
+            this.nativeKinematicRigidbodiesFed = nativeKinematicRigidbodiesFed;
+            this.nativeBonesWrittenBack = nativeBonesWrittenBack;
+            this.reportPresent = reportPresent;
+        }
+    }
+
     internal interface IMmdLivePhysicsBackend : IDisposable
     {
         string Name { get; }
@@ -573,7 +614,8 @@ namespace Mmd.Physics
             float[] morphWeights,
             byte[] ikEnabled,
             bool seed,
-            float deltaTime)
+            float deltaTime,
+            out MmdPhysicsHostStepDiagnostics diagnostics)
         {
             MmdPhysicsPolicy.ValidateLiveStepInput(frame, deltaTime);
             ThrowIfDisposed();
@@ -588,6 +630,15 @@ namespace Mmd.Physics
             GCHandle scaleHandle = default;
             GCHandle morphHandle = default;
             GCHandle ikHandle = default;
+            long pinStart = Stopwatch.GetTimestamp();
+            long pinEnd = pinStart;
+            long nativeStart = pinStart;
+            long nativeEnd = pinStart;
+            long rigidbodyCopyStart = pinStart;
+            long rigidbodyCopyEnd = pinStart;
+            long unpinStart = pinStart;
+            long unpinEnd = pinStart;
+            MmdRuntimeFfiMethods.PhysicsWorldStepReport report = default;
             try
             {
                 var pose = new MmdRuntimeFfiMethods.PhysicsHostPoseView
@@ -601,6 +652,8 @@ namespace Mmd.Physics
                     ikEnabled = Pin(ikEnabled, ref ikHandle),
                     ikCount = new IntPtr(ikCount)
                 };
+                pinEnd = Stopwatch.GetTimestamp();
+                nativeStart = pinEnd;
                 int status = MmdRuntimeFfiMethods.EvaluateHostFrame(
                     instance,
                     world,
@@ -611,19 +664,35 @@ namespace Mmd.Physics
                     deltaTime,
                     ikTolerance: 0.0001f,
                     ikMaxIterationsCap: 0,
-                    out _);
+                    out report);
+                nativeEnd = Stopwatch.GetTimestamp();
                 ThrowIfFailed(status, "EvaluateHostFrame", modelId, motionId);
+                rigidbodyCopyStart = nativeEnd;
                 CopyRigidbodyStates();
+                rigidbodyCopyEnd = Stopwatch.GetTimestamp();
                 seededSinceReset = true;
             }
             finally
             {
+                unpinStart = Stopwatch.GetTimestamp();
                 Free(ref positionHandle);
                 Free(ref rotationHandle);
                 Free(ref scaleHandle);
                 Free(ref morphHandle);
                 Free(ref ikHandle);
+                unpinEnd = Stopwatch.GetTimestamp();
             }
+
+            diagnostics = new MmdPhysicsHostStepDiagnostics(
+                ElapsedMilliseconds(pinStart, pinEnd) + ElapsedMilliseconds(unpinStart, unpinEnd),
+                ElapsedMilliseconds(nativeStart, nativeEnd),
+                ElapsedMilliseconds(rigidbodyCopyStart, rigidbodyCopyEnd),
+                rigidbodyStates.Length / TransformFloatCount,
+                boneCount,
+                CheckedCount(report.tick.substeps, "native physics substep count"),
+                MmdFfiMarshal.CheckedIntPtrToInt(report.kinematicRigidbodiesFed, "native kinematic rigidbody count"),
+                MmdFfiMarshal.CheckedIntPtrToInt(report.bonesWrittenBack, "native bones written back count"),
+                reportPresent: true);
         }
 
         /// <summary>
@@ -785,6 +854,27 @@ namespace Mmd.Physics
         private static string LastErrorMessage()
         {
             return Marshal.PtrToStringAnsi(MmdRuntimeFfiMethods.LastErrorMessage()) ?? "Native mmd-anim physics call failed.";
+        }
+
+        private static double ElapsedMilliseconds(long startTimestamp, long endTimestamp)
+        {
+            long elapsed = endTimestamp - startTimestamp;
+            if (elapsed <= 0)
+            {
+                return 0.0;
+            }
+
+            return elapsed * 1000.0 / Stopwatch.Frequency;
+        }
+
+        private static int CheckedCount(uint value, string label)
+        {
+            if (value > int.MaxValue)
+            {
+                throw new InvalidOperationException($"{label} exceeds Int32 range: {value}.");
+            }
+
+            return (int)value;
         }
     }
 
