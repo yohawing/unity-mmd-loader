@@ -277,6 +277,13 @@ namespace Mmd.UnityIntegration
 
         private MmdPlaybackSnapshot ApplyVmdNativePhysicsFrame(int frame, float frameRate)
         {
+            if (ikMaxIterationsCap > 0)
+            {
+                throw new NotSupportedException(
+                    "A positive IK iteration cap is not supported for VMD Live physics because the native seed " +
+                    "and after-physics entrypoints do not accept IK options. Use the compatibility default 0.");
+            }
+
             livePhysicsReadbackTransformCount = 0;
             livePhysicsReadbackShapeTypeCount = 0;
             var totalWatch = Stopwatch.StartNew();
@@ -306,6 +313,7 @@ namespace Mmd.UnityIntegration
                 livePhysicsNativeMorphWeights!,
                 livePhysicsNativeIkEnabled!,
                 livePhysicsAfterPhysicsWorldMatrices,
+                (uint)ikMaxIterationsCap,
                 out MmdPhysicsHostStepDiagnostics nativeStepDiagnostics);
             double evaluateFrameMs = stageWatch.Elapsed.TotalMilliseconds;
 
@@ -452,7 +460,8 @@ namespace Mmd.UnityIntegration
                 time,
                 livePhysicsNativeWorldMatrices!,
                 livePhysicsNativeMorphWeights!,
-                livePhysicsNativeIkEnabled!);
+                livePhysicsNativeIkEnabled!,
+                (uint)ikMaxIterationsCap);
             return MmdRuntimeFrameEvaluator.BuildFrameFromNativeInPlace(
                 model,
                 frame,
@@ -590,6 +599,7 @@ namespace Mmd.UnityIntegration
                 ikEnabled,
                 resetSeed,
                 resetSeed ? 0.0f : deltaTime,
+                (uint)ikMaxIterationsCap,
                 out MmdPhysicsHostStepDiagnostics nativeStepDiagnostics);
             double stepPhysicsMs = stageWatch.Elapsed.TotalMilliseconds;
             if (resetSeed)

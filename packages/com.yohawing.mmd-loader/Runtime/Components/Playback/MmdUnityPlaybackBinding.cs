@@ -38,6 +38,7 @@ namespace Mmd.UnityIntegration
         private int livePhysicsReadbackTransformCount;
         private int livePhysicsReadbackShapeTypeCount;
         private MmdPhysicsMode physicsMode = MmdPhysicsMode.Off;
+        private int ikMaxIterationsCap;
         private MmdRuntimeFfiPlaybackSession? fastSession;
         private float[]? fastWorldMatrices;
         private float[]? fastMorphWeights;
@@ -105,6 +106,27 @@ namespace Mmd.UnityIntegration
         public string MotionId => motionId;
 
         public MmdPhysicsMode PhysicsMode => physicsMode;
+
+        /// <summary>
+        /// Optional per-chain IK iteration ceiling. Zero preserves authored PMX iterations.
+        /// Positive values are supported for VMD Physics Off and Humanoid Live host-pose evaluation;
+        /// VMD Live fails closed because its native seed and after-physics ABI has no IK-options variant.
+        /// </summary>
+        public int IkMaxIterationsCap
+        {
+            get => ikMaxIterationsCap;
+            set
+            {
+                if (value < 0)
+                {
+                    throw new ArgumentOutOfRangeException(
+                        nameof(value),
+                        "IK maximum iterations cap must be non-negative; zero preserves authored PMX iteration counts.");
+                }
+
+                ikMaxIterationsCap = value;
+            }
+        }
 
         public MmdLivePhysicsFrameDiagnostics? LastLivePhysicsDiagnostics => lastLivePhysicsDiagnostics;
 
@@ -663,7 +685,10 @@ namespace Mmd.UnityIntegration
                 return ApplyFastFrame(frame, frameRate);
             }
 
-            MmdEvaluatedFrame evaluatedFrame = session.EvaluateFrame(frame, MmdPlaybackTime.ToTime(frame, frameRate));
+            MmdEvaluatedFrame evaluatedFrame = session.EvaluateFrame(
+                frame,
+                MmdPlaybackTime.ToTime(frame, frameRate),
+                (uint)ikMaxIterationsCap);
             MmdUnityFrameApplier.ApplyFrame(playbackInstance, evaluatedFrame);
             return session.BuildSnapshotFromEvaluatedFrame(evaluatedFrame, playbackInstance.RenderingDescriptor);
         }
@@ -683,7 +708,10 @@ namespace Mmd.UnityIntegration
                 return ApplyFastTime(time, frameRate);
             }
 
-            MmdEvaluatedFrame evaluatedFrame = session.EvaluateFrameAtTime(time, frameRate);
+            MmdEvaluatedFrame evaluatedFrame = session.EvaluateFrameAtTime(
+                time,
+                frameRate,
+                (uint)ikMaxIterationsCap);
             MmdUnityFrameApplier.ApplyFrame(playbackInstance, evaluatedFrame);
             InvalidateFastMorphCache();
             return session.BuildSnapshotFromEvaluatedFrame(evaluatedFrame, playbackInstance.RenderingDescriptor);

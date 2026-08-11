@@ -94,6 +94,7 @@ namespace Mmd.UnityIntegration
                     modelAsset,
                     "humanoid-physics");
                 humanoidPhysicsBinding.LivePhysicsBodyDiagnosticsSampleInterval = livePhysicsBodyDiagnosticsSampleInterval;
+                humanoidPhysicsBinding.IkMaxIterationsCap = ikMaxIterationsCap;
                 humanoidPhysicsBinding.SetPhysicsMode(MmdPhysicsMode.Live);
                 ResetLivePhysicsDriveSource();
                 ConfigurationRevision++;

@@ -634,6 +634,37 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void RuntimeFfiPinsIkOptionEvaluationEntrypoints()
+        {
+            AssertRuntimeFfiSignature(
+                "InstanceEvaluateClipFrameWithIkOptions",
+                typeof(byte),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(float),
+                typeof(float),
+                typeof(uint));
+            AssertRuntimeFfiSignature(
+                "InstanceEvaluateClipFrameBeforePhysicsWithIkOptions",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(float),
+                typeof(float),
+                typeof(uint));
+
+            foreach (string methodName in new[]
+                     {
+                         "InstanceEvaluateClipFrameWithIkOptions",
+                         "InstanceEvaluateClipFrameBeforePhysicsWithIkOptions"
+                     })
+            {
+                DllImportAttribute import = GetRuntimeFfiMethod(methodName).GetCustomAttribute<DllImportAttribute>()!;
+                Assert.That(import.CallingConvention, Is.EqualTo(CallingConvention.Cdecl), methodName);
+            }
+        }
+
+        [Test]
         public void RuntimeFfiPinsSparseReducedCurveEntrypointsWithoutDenseSampleBinding()
         {
             AssertRuntimeFfiSignature(

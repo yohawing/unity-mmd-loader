@@ -32,6 +32,87 @@ namespace Mmd.Tests
         private const int LivePhysicsPlaybackFrame = 10;
 
         [Test]
+        public void IkIterationCapDefaultsToCompatibilityAndPropagatesToPhysicsOffVmdEvaluation()
+        {
+            MmdUnityPlaybackBinding? binding = null;
+            try
+            {
+                binding = CreatePlaybackBinding();
+                MmdUnityPlaybackController controller =
+                    binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+
+                Assert.That(controller.IkMaxIterationsCap, Is.Zero);
+                Assert.That(binding.IkMaxIterationsCap, Is.Zero);
+                Assert.That(() => controller.IkMaxIterationsCap = -1,
+                    Throws.TypeOf<ArgumentOutOfRangeException>());
+
+                controller.IkMaxIterationsCap = 4;
+                controller.Configure(binding, 30.0f);
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+
+                Assert.That(binding.IkMaxIterationsCap, Is.EqualTo(4));
+                Assert.DoesNotThrow(() => controller.ApplyFrame(1),
+                    "A positive cap must use the VMD with-options entrypoint even when physics is Off.");
+            }
+            finally
+            {
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
+            }
+        }
+
+        [Test]
+        public void PositiveIkIterationCapRejectsUnsupportedHumanoidPhysicsOffCombination()
+        {
+            var root = new GameObject("humanoid-ik-cap-off");
+            try
+            {
+                MmdUnityPlaybackController controller = root.AddComponent<MmdUnityPlaybackController>();
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+                controller.IkMaxIterationsCap = 4;
+                var binding = new MmdHumanoidRetargetBinding(
+                    HumanBodyBones.Hips,
+                    0,
+                    root.transform,
+                    root.transform);
+
+                Assert.That(
+                    () => controller.ConfigureHumanoidRetarget(
+                        root.transform,
+                        new[] { binding },
+                        Array.Empty<MmdHumanoidAppendTransformBinding>()),
+                    Throws.TypeOf<NotSupportedException>()
+                        .With.Message.Contains("Physics Mode is Off"));
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void SerializedNegativeIkIterationCapClampsToCompatibilityDefault()
+        {
+            var root = new GameObject("serialized-ik-cap");
+            try
+            {
+                MmdUnityPlaybackController controller = root.AddComponent<MmdUnityPlaybackController>();
+                var serializedController = new SerializedObject(controller);
+                serializedController.FindProperty("ikMaxIterationsCap").intValue = -3;
+                serializedController.ApplyModifiedPropertiesWithoutUndo();
+
+                typeof(MmdUnityPlaybackController)
+                    .GetMethod("OnValidate", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                    .Invoke(controller, null);
+
+                Assert.That(controller.IkMaxIterationsCap, Is.Zero);
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
         public void ConfigureWithPlaybackConfigAppliesFrameRateAndPlayOnStart_ControllerPhysicsIsSourceOfTruth()
         {
             MmdUnityPlaybackBinding? binding = null;
@@ -1197,6 +1278,35 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void PositiveIkIterationCapRejectsVmdLiveWithoutSeedOptionsAbi()
+        {
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
+            if (!availability.backendAvailable)
+            {
+                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
+            }
+
+            MmdUnityPlaybackBinding? binding = null;
+            try
+            {
+                MmdModelDefinition model = LoadPhysicsFixtureModel();
+                AddPinnedRootRigidbody(model);
+                binding = CreatePhysicsPlaybackBinding(model, "ik-cap-live-unsupported.vmd");
+                binding.IkMaxIterationsCap = 4;
+                binding.SetPhysicsMode(MmdPhysicsMode.Live);
+
+                Assert.That(
+                    () => binding.ApplyFrame(0, 30.0f),
+                    Throws.TypeOf<NotSupportedException>()
+                        .With.Message.Contains("native seed"));
+            }
+            finally
+            {
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
+            }
+        }
+
+        [Test]
         public void LivePhysicsDiagnosticsSummaryIncludesFrameStepMsAndPinnedCount()
         {
             var diagnostics = new MmdLivePhysicsFrameDiagnostics
@@ -1263,6 +1373,7 @@ namespace Mmd.Tests
             Assert.That(excluded, Does.Contain(MmdUnityPlaybackControllerEditor.InitialFrameFieldName));
             Assert.That(excluded, Does.Contain(MmdUnityPlaybackControllerEditor.PlayOnStartFieldName));
             Assert.That(excluded, Does.Contain(MmdUnityPlaybackControllerEditor.PhysicsModeFieldName));
+            Assert.That(excluded, Does.Contain(MmdUnityPlaybackControllerEditor.IkMaxIterationsCapFieldName));
             Assert.That(excluded, Does.Contain(MmdUnityPlaybackControllerEditor.LastFastRuntimeReasonFieldName));
         }
 

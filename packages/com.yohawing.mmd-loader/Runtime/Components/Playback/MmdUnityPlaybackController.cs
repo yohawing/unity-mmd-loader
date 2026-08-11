@@ -28,6 +28,10 @@ namespace Mmd.UnityIntegration
     [DisallowMultipleComponent]
     public sealed partial class MmdUnityPlaybackController : MonoBehaviour
     {
+        private const string HumanoidPhysicsOffIkCapNotSupportedMessage =
+            "A positive IK iteration cap is not supported for Humanoid retargeting while Physics Mode is Off. " +
+            "Use the compatibility default 0 or Physics Mode Live.";
+
         private MmdUnityPlaybackBinding? binding;
         private MmdUnityPlaybackBinding? humanoidPhysicsBinding;
         [SerializeField] private bool playOnStart = true;
@@ -35,6 +39,7 @@ namespace Mmd.UnityIntegration
         [SerializeField] private float frameRate = 30.0f;
         [SerializeField] private MmdPhysicsMode physicsMode = MmdPhysicsMode.Live;
         [SerializeField] private int livePhysicsBodyDiagnosticsSampleInterval;
+        [SerializeField] private int ikMaxIterationsCap;
         [SerializeField] private MmdPmxAsset? modelAsset;
         [SerializeField] private MmdVmdAsset? motionAsset;
         [SerializeField] private string lastFastRuntimeReason = string.Empty;
@@ -126,6 +131,13 @@ namespace Mmd.UnityIntegration
             IReadOnlyList<MmdHumanoidRetargetBinding>? entries,
             IReadOnlyList<MmdHumanoidAppendTransformBinding>? appendEntries)
         {
+            if (physicsMode == MmdPhysicsMode.Off && ikMaxIterationsCap > 0 &&
+                proxyRoot != null && entries != null && entries.Count > 0)
+            {
+                throw new NotSupportedException(
+                    HumanoidPhysicsOffIkCapNotSupportedMessage);
+            }
+
             this.proxyRoot = proxyRoot;
             humanoidRetargetEntries = entries != null
                 ? new List<MmdHumanoidRetargetBinding>(entries)
@@ -172,6 +184,7 @@ namespace Mmd.UnityIntegration
             IsPlaying = false;
             this.playOnStart = playOnStart;
             binding.LivePhysicsBodyDiagnosticsSampleInterval = livePhysicsBodyDiagnosticsSampleInterval;
+            binding.IkMaxIterationsCap = ikMaxIterationsCap;
             binding.SetPhysicsMode(physicsMode);
             ResetLivePhysicsDriveSource();
             ConfigurationRevision++;
@@ -187,9 +200,30 @@ namespace Mmd.UnityIntegration
             ApplyPhysicsMode(mode);
         }
 
+        /// <summary>
+        /// Optional per-chain IK iteration ceiling. Zero preserves each PMX chain's authored
+        /// iteration count. Positive values are an advanced override for supported evaluation paths;
+        /// unsupported native physics combinations fail closed instead of silently ignoring the cap.
+        /// </summary>
+        public int IkMaxIterationsCap
+        {
+            get => ikMaxIterationsCap;
+            set
+            {
+                ValidateIkMaxIterationsCap(value);
+                ValidateHumanoidPhysicsOffIkCap(value);
+                ikMaxIterationsCap = value;
+                PropagateIkMaxIterationsCap();
+            }
+        }
+
         private void ApplyPhysicsMode(MmdPhysicsMode mode)
         {
             ValidatePhysicsMode(mode);
+            if (mode == MmdPhysicsMode.Off)
+            {
+                ValidateHumanoidPhysicsOffIkCap(ikMaxIterationsCap, mode);
+            }
             MmdPhysicsMode previousMode = physicsMode;
             if (mode != MmdPhysicsMode.Off)
             {
@@ -397,14 +431,25 @@ namespace Mmd.UnityIntegration
         private void OnValidate()
         {
             livePhysicsBodyDiagnosticsSampleInterval = Math.Max(0, livePhysicsBodyDiagnosticsSampleInterval);
+            ikMaxIterationsCap = Math.Max(0, ikMaxIterationsCap);
+            if (IsHumanoidPhysicsOffIkCapUnsupported(ikMaxIterationsCap))
+            {
+                Debug.LogError(
+                    HumanoidPhysicsOffIkCapNotSupportedMessage + " Reverting the serialized cap to 0.",
+                    this);
+                ikMaxIterationsCap = 0;
+            }
+
             if (binding != null)
             {
                 binding.LivePhysicsBodyDiagnosticsSampleInterval = livePhysicsBodyDiagnosticsSampleInterval;
+                binding.IkMaxIterationsCap = ikMaxIterationsCap;
             }
 
             if (humanoidPhysicsBinding != null)
             {
                 humanoidPhysicsBinding.LivePhysicsBodyDiagnosticsSampleInterval = livePhysicsBodyDiagnosticsSampleInterval;
+                humanoidPhysicsBinding.IkMaxIterationsCap = ikMaxIterationsCap;
             }
 
             if (binding == null)
@@ -505,6 +550,53 @@ namespace Mmd.UnityIntegration
                     throw new NotSupportedException("Physics Cache is not implemented yet.");
                 default:
                     throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unknown physics mode.");
+            }
+        }
+
+        private static void ValidateIkMaxIterationsCap(int value)
+        {
+            if (value < 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(value),
+                    "IK maximum iterations cap must be non-negative; zero preserves authored PMX iteration counts.");
+            }
+        }
+
+        private void ValidateHumanoidPhysicsOffIkCap(int value)
+        {
+            ValidateHumanoidPhysicsOffIkCap(value, physicsMode);
+        }
+
+        private void ValidateHumanoidPhysicsOffIkCap(int value, MmdPhysicsMode mode)
+        {
+            if (IsHumanoidPhysicsOffIkCapUnsupported(value, mode))
+            {
+                throw new NotSupportedException(HumanoidPhysicsOffIkCapNotSupportedMessage);
+            }
+        }
+
+        private bool IsHumanoidPhysicsOffIkCapUnsupported(int value)
+        {
+            return IsHumanoidPhysicsOffIkCapUnsupported(value, physicsMode);
+        }
+
+        private bool IsHumanoidPhysicsOffIkCapUnsupported(int value, MmdPhysicsMode mode)
+        {
+            return value > 0 && mode == MmdPhysicsMode.Off &&
+                   proxyRoot != null && humanoidRetargetEntries != null && humanoidRetargetEntries.Count > 0;
+        }
+
+        private void PropagateIkMaxIterationsCap()
+        {
+            if (binding != null)
+            {
+                binding.IkMaxIterationsCap = ikMaxIterationsCap;
+            }
+
+            if (humanoidPhysicsBinding != null)
+            {
+                humanoidPhysicsBinding.IkMaxIterationsCap = ikMaxIterationsCap;
             }
         }
 

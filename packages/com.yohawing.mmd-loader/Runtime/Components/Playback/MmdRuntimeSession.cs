@@ -87,11 +87,21 @@ namespace Mmd
 
         public MmdEvaluatedFrame EvaluateFrame(int frame, float time)
         {
+            return EvaluateFrame(frame, time, 0);
+        }
+
+        public MmdEvaluatedFrame EvaluateFrame(int frame, float time, uint ikMaxIterationsCap)
+        {
             ThrowIfDisposed();
-            return EvaluateNativeFrame(frame, time);
+            return EvaluateNativeFrame(frame, time, ikMaxIterationsCap);
         }
 
         internal MmdEvaluatedFrame EvaluateBeforePhysicsFrame(int frame, float time)
+        {
+            return EvaluateBeforePhysicsFrame(frame, time, 0);
+        }
+
+        internal MmdEvaluatedFrame EvaluateBeforePhysicsFrame(int frame, float time, uint ikMaxIterationsCap)
         {
             ThrowIfDisposed();
             if (nativeModelSourceIdentity == null || nativeMotionSourceIdentity == null)
@@ -105,10 +115,10 @@ namespace Mmd
                 MmdPlaybackTime.ValidateFrame(frame);
                 MmdPlaybackTime.ValidateTime(time);
                 EnsureNativeSourcesUnchangedBeforeCompilation();
-                return EvaluateNativeBeforePhysicsFrame(frame, time);
+                return EvaluateNativeBeforePhysicsFrame(frame, time, ikMaxIterationsCap);
             }
 
-            return EvaluateNativeFrame(frame, time);
+            return EvaluateNativeFrame(frame, time, ikMaxIterationsCap);
         }
 
         internal void GetNativeOutputBufferLengths(
@@ -138,7 +148,8 @@ namespace Mmd
             float time,
             float[] worldMatrices,
             float[] morphWeights,
-            byte[] ikEnabled)
+            byte[] ikEnabled,
+            uint ikMaxIterationsCap = 0)
         {
             ThrowIfDisposed();
             MmdPlaybackTime.ValidateFrame(frame);
@@ -147,15 +158,22 @@ namespace Mmd
             ValidateNativeOutputBuffers(worldMatrices, morphWeights, ikEnabled);
 
             if (model.HasDeformAfterPhysicsBones)
-                nativePlaybackSession!.EvaluateBeforePhysicsAndCopy(frame, worldMatrices, morphWeights, ikEnabled);
+                nativePlaybackSession!.EvaluateBeforePhysicsAndCopy(
+                    frame, worldMatrices, morphWeights, ikEnabled, ikMaxIterationsCap);
             else
-                nativePlaybackSession!.EvaluateAndCopy(frame, worldMatrices, morphWeights, ikEnabled);
+                nativePlaybackSession!.EvaluateAndCopy(
+                    frame, worldMatrices, morphWeights, ikEnabled, ikMaxIterationsCap);
         }
 
         public MmdEvaluatedFrame EvaluateFrameAtTime(float time, float frameRate)
         {
+            return EvaluateFrameAtTime(time, frameRate, 0);
+        }
+
+        public MmdEvaluatedFrame EvaluateFrameAtTime(float time, float frameRate, uint ikMaxIterationsCap)
+        {
             MmdPlaybackTimeMapping mapping = DescribePlaybackTime(time, frameRate);
-            return EvaluateFrame(mapping.frame, time);
+            return EvaluateFrame(mapping.frame, time, ikMaxIterationsCap);
         }
 
         public MmdPlaybackSnapshot BuildSnapshotFromEvaluatedFrame(MmdEvaluatedFrame frame, MmdRenderingDescriptor rendering)
@@ -231,7 +249,7 @@ namespace Mmd
             }
         }
 
-        internal MmdEvaluatedFrame EvaluateNativeFrame(int frame, float time)
+        internal MmdEvaluatedFrame EvaluateNativeFrame(int frame, float time, uint ikMaxIterationsCap = 0)
         {
             ThrowIfDisposed();
             MmdPlaybackTime.ValidateFrame(frame);
@@ -242,7 +260,8 @@ namespace Mmd
                 frame,
                 nativeWorldMatrices!,
                 nativeMorphWeights!,
-                nativeIkEnabled!);
+                nativeIkEnabled!,
+                ikMaxIterationsCap);
             return MmdRuntimeFrameEvaluator.BuildFrameFromNative(
                 model,
                 frame,
@@ -252,7 +271,10 @@ namespace Mmd
                 includeMaterials: false);
         }
 
-        private MmdEvaluatedFrame EvaluateNativeBeforePhysicsFrame(int frame, float time)
+        private MmdEvaluatedFrame EvaluateNativeBeforePhysicsFrame(
+            int frame,
+            float time,
+            uint ikMaxIterationsCap)
         {
             ThrowIfDisposed();
             MmdPlaybackTime.ValidateFrame(frame);
@@ -263,7 +285,8 @@ namespace Mmd
                 frame,
                 nativeWorldMatrices!,
                 nativeMorphWeights!,
-                nativeIkEnabled!);
+                nativeIkEnabled!,
+                ikMaxIterationsCap);
             return MmdRuntimeFrameEvaluator.BuildFrameFromNative(
                 model,
                 frame,

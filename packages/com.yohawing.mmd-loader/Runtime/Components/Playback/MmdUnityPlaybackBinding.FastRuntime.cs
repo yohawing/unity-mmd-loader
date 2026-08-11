@@ -254,7 +254,12 @@ namespace Mmd.UnityIntegration
 
         private MmdPlaybackSnapshot ApplyFastCore(int frame, float time)
         {
-            fastSession!.EvaluateAndCopy(frame, fastWorldMatrices!, fastMorphWeights!, fastIkEnabled!);
+            fastSession!.EvaluateAndCopy(
+                frame,
+                fastWorldMatrices!,
+                fastMorphWeights!,
+                fastIkEnabled!,
+                (uint)ikMaxIterationsCap);
             MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(
                 playbackInstance,
                 fastWorldMatrices!,

@@ -694,6 +694,31 @@ namespace Mmd.Physics
             float deltaTime,
             out MmdPhysicsHostStepDiagnostics diagnostics)
         {
+            StepFromHostPose(
+                frame,
+                localPositionOffsets,
+                localRotations,
+                localScales,
+                morphWeights,
+                ikEnabled,
+                seed,
+                deltaTime,
+                0,
+                out diagnostics);
+        }
+
+        public void StepFromHostPose(
+            int frame,
+            float[] localPositionOffsets,
+            float[] localRotations,
+            float[] localScales,
+            float[] morphWeights,
+            byte[] ikEnabled,
+            bool seed,
+            float deltaTime,
+            uint ikMaxIterationsCap,
+            out MmdPhysicsHostStepDiagnostics diagnostics)
+        {
             MmdPhysicsPolicy.ValidateLiveStepInput(frame, deltaTime);
             ThrowIfDisposed();
             ValidateHostPoseArray(localPositionOffsets, checked(boneCount * 3), nameof(localPositionOffsets));
@@ -739,8 +764,8 @@ namespace Mmd.Physics
                         ? MmdRuntimeFfiMethods.PhysicsFrameActionSeed
                         : MmdRuntimeFfiMethods.PhysicsFrameActionStep,
                     deltaTime,
-                    ikTolerance: 0.0001f,
-                    ikMaxIterationsCap: 0,
+                    ikTolerance: MmdRuntimeFfiMethods.DefaultIkTolerance,
+                    ikMaxIterationsCap: ikMaxIterationsCap,
                     out report);
                 nativeEnd = Stopwatch.GetTimestamp();
                 ThrowIfFailed(status, "EvaluateHostFrame", modelId, motionId);
@@ -784,6 +809,31 @@ namespace Mmd.Physics
             float[] afterPhysicsWorldMatrices,
             out MmdPhysicsHostStepDiagnostics diagnostics)
         {
+            StepPlaybackFrame(
+                playbackSession,
+                frame,
+                seed,
+                deltaTime,
+                worldMatrices,
+                morphWeights,
+                ikEnabled,
+                afterPhysicsWorldMatrices,
+                0,
+                out diagnostics);
+        }
+
+        internal void StepPlaybackFrame(
+            MmdRuntimeFfiPlaybackSession playbackSession,
+            int frame,
+            bool seed,
+            float deltaTime,
+            float[] worldMatrices,
+            float[] morphWeights,
+            byte[] ikEnabled,
+            float[] afterPhysicsWorldMatrices,
+            uint ikMaxIterationsCap,
+            out MmdPhysicsHostStepDiagnostics diagnostics)
+        {
             MmdPhysicsPolicy.ValidateLiveStepInput(frame, deltaTime);
             ThrowIfDisposed();
             ValidateHostPoseArray(worldMatrices, worldMatrixFloatCount, nameof(worldMatrices));
@@ -800,6 +850,8 @@ namespace Mmd.Physics
             MmdRuntimeFfiMethods.PhysicsWorldStepReport report;
             if (seed || !seededSinceReset)
             {
+                // The existing bake ABI has no IK-options variant. Keep seed behavior
+                // unchanged; the configured before-phase cap applies from the first forward step.
                 if (seededSinceReset)
                 {
                     int resetStatus = MmdRuntimeFfiMethods.PhysicsWorldReset(world, instance, out _);
@@ -832,7 +884,7 @@ namespace Mmd.Physics
             }
             else
             {
-                playbackSession.EvaluateBeforePhysics(frame);
+                playbackSession.EvaluateBeforePhysics(frame, ikMaxIterationsCap);
                 playbackSession.CopyEvaluatedOutputs(worldMatrices, morphWeights, ikEnabled);
                 int status = MmdRuntimeFfiMethods.PhysicsWorldStepRuntime(
                     world,

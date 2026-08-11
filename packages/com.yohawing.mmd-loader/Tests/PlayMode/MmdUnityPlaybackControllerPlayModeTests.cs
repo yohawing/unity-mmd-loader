@@ -535,6 +535,7 @@ namespace Mmd.Tests
                 Material authoredMaterial = renderer.sharedMaterials[0];
 
                 MmdUnityPlaybackController controller = instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.IkMaxIterationsCap = 64;
                 controller.ConfigureModelAsset(pmxAsset);
                 controller.SetPhysicsMode(MmdPhysicsMode.Live);
 
@@ -586,6 +587,7 @@ namespace Mmd.Tests
                     "Self-tick humanoid Live physics must not configure the VMD playback binding.");
                 Assert.That(controller.LastLivePhysicsDiagnostics, Is.Not.Null);
                 Assert.That(controller.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(0));
+                Assert.That(controller.IkMaxIterationsCap, Is.EqualTo(64));
                 Assert.That(controller.LastLivePhysicsDiagnostics.deltaTime, Is.EqualTo(0.0f));
                 Assert.That(controller.LastLivePhysicsDiagnostics.evaluationPath, Is.EqualTo("HumanoidNativeFinal"));
                 Assert.That(controller.LastLivePhysicsDiagnostics.phaseDiagnosticsPresent, Is.True);

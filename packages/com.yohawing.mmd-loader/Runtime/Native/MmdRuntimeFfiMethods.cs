@@ -35,6 +35,7 @@ namespace Mmd.Native
         internal const int StatusUnsupported = 2;
         internal const int StatusBufferTooSmall = 3;
         internal const int StatusError = 4;
+        internal const float DefaultIkTolerance = 0.0001f;
         internal const uint ReductionTargetDccCubic = 2;
         internal const uint GenericCurveAbiVersionV1 = 1;
         internal const uint GenericCurveBoneLocal = 0;
@@ -773,8 +774,24 @@ namespace Mmd.Native
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_evaluate_clip_frame", CallingConvention = CallingConvention.Cdecl)]
         internal static extern byte InstanceEvaluateClipFrame(IntPtr instance, IntPtr clip, float frame);
 
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_evaluate_clip_frame_with_ik_options", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern byte InstanceEvaluateClipFrameWithIkOptions(
+            IntPtr instance,
+            IntPtr clip,
+            float frame,
+            float ikTolerance,
+            uint ikMaxIterationsCap);
+
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_evaluate_clip_frame_before_physics", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int InstanceEvaluateClipFrameBeforePhysics(IntPtr instance, IntPtr clip, float frame);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_evaluate_clip_frame_before_physics_with_ik_options", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int InstanceEvaluateClipFrameBeforePhysicsWithIkOptions(
+            IntPtr instance,
+            IntPtr clip,
+            float frame,
+            float ikTolerance,
+            uint ikMaxIterationsCap);
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_world_matrix_f32_len", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr InstanceWorldMatrixF32Len(IntPtr instance);
@@ -1158,12 +1175,29 @@ namespace Mmd.Native
 
         public void EvaluateAndCopy(float frame, float[] worldMatrices, float[] morphWeights, byte[] ikEnabled)
         {
+            EvaluateAndCopy(frame, worldMatrices, morphWeights, ikEnabled, 0);
+        }
+
+        public void EvaluateAndCopy(
+            float frame,
+            float[] worldMatrices,
+            float[] morphWeights,
+            byte[] ikEnabled,
+            uint ikMaxIterationsCap)
+        {
             if (disposed)
             {
                 throw new ObjectDisposedException(nameof(MmdRuntimeFfiPlaybackSession));
             }
 
-            byte evaluated = MmdRuntimeFfiMethods.InstanceEvaluateClipFrame(instance, clip, frame);
+            byte evaluated = ikMaxIterationsCap == 0
+                ? MmdRuntimeFfiMethods.InstanceEvaluateClipFrame(instance, clip, frame)
+                : MmdRuntimeFfiMethods.InstanceEvaluateClipFrameWithIkOptions(
+                    instance,
+                    clip,
+                    frame,
+                    ikTolerance: MmdRuntimeFfiMethods.DefaultIkTolerance,
+                    ikMaxIterationsCap: ikMaxIterationsCap);
             if (evaluated == 0)
             {
                 throw new InvalidOperationException("mmd-runtime clip frame evaluation returned false.");
@@ -1174,14 +1208,36 @@ namespace Mmd.Native
 
         public void EvaluateBeforePhysicsAndCopy(float frame, float[] worldMatrices, float[] morphWeights, byte[] ikEnabled)
         {
-            EvaluateBeforePhysics(frame);
+            EvaluateBeforePhysicsAndCopy(frame, worldMatrices, morphWeights, ikEnabled, 0);
+        }
+
+        public void EvaluateBeforePhysicsAndCopy(
+            float frame,
+            float[] worldMatrices,
+            float[] morphWeights,
+            byte[] ikEnabled,
+            uint ikMaxIterationsCap)
+        {
+            EvaluateBeforePhysics(frame, ikMaxIterationsCap);
             CopyEvaluatedOutputs(worldMatrices, morphWeights, ikEnabled);
         }
 
         internal void EvaluateBeforePhysics(float frame)
         {
+            EvaluateBeforePhysics(frame, 0);
+        }
+
+        internal void EvaluateBeforePhysics(float frame, uint ikMaxIterationsCap)
+        {
             ThrowIfDisposed();
-            int status = MmdRuntimeFfiMethods.InstanceEvaluateClipFrameBeforePhysics(instance, clip, frame);
+            int status = ikMaxIterationsCap == 0
+                ? MmdRuntimeFfiMethods.InstanceEvaluateClipFrameBeforePhysics(instance, clip, frame)
+                : MmdRuntimeFfiMethods.InstanceEvaluateClipFrameBeforePhysicsWithIkOptions(
+                    instance,
+                    clip,
+                    frame,
+                    ikTolerance: MmdRuntimeFfiMethods.DefaultIkTolerance,
+                    ikMaxIterationsCap: ikMaxIterationsCap);
             if (status == MmdRuntimeFfiMethods.StatusOk)
                 return;
             throw new InvalidOperationException(
