@@ -1,0 +1,37 @@
+{
+  "name": "Mmd.CinemachinePlayModeTests",
+  "rootNamespace": "Mmd.Tests.Cinemachine",
+  "references": [
+    "Mmd.Runtime",
+    "Mmd.Cinemachine",
+    "Unity.Cinemachine",
+    "Unity.Timeline",
+    "UnityEngine.TestRunner"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "nunit.framework.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "MMD_CINEMACHINE_3",
+    "ENABLE_TIMELINE",
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "versionDefines": [
+    {
+      "name": "com.unity.cinemachine",
+      "expression": "[3.0.0,4.0.0)",
+      "define": "MMD_CINEMACHINE_3"
+    },
+    {
+      "name": "com.unity.timeline",
+      "expression": "[1.0.0,2.0.0)",
+      "define": "ENABLE_TIMELINE"
+    }
+  ],
+  "noEngineReferences": false
+}
