@@ -95,8 +95,16 @@ namespace Mmd.UnityIntegration
 
         internal static MmdUnityMorphApplyTimingSummary ApplyMorphsWithTiming(MmdUnityModelInstance instance, MmdEvaluatedFrame frame)
         {
+            return ApplyMorphsWithTiming(instance, frame, groupMorphsResolvedExternally: false);
+        }
+
+        internal static MmdUnityMorphApplyTimingSummary ApplyMorphsWithTiming(
+            MmdUnityModelInstance instance,
+            MmdEvaluatedFrame frame,
+            bool groupMorphsResolvedExternally)
+        {
             var timing = new MmdUnityMorphApplyTimingSummary();
-            ApplyMorphsCore(instance, frame, timing, groupMorphsResolvedExternally: false);
+            ApplyMorphsCore(instance, frame, timing, groupMorphsResolvedExternally);
             return timing;
         }
 

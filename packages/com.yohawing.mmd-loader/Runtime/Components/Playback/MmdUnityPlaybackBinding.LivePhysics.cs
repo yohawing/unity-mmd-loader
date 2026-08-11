@@ -179,6 +179,7 @@ namespace Mmd.UnityIntegration
             lastForwardPlaybackFrame = -1;
             lastLiveSnapshot = null;
             lastLivePhysicsDiagnostics = null;
+            LastDetailedApplyTiming = null;
             livePhysicsAfterPhysicsWorldMatrices = null;
             ClearLivePhysicsBodyDiagnostics();
         }
@@ -196,6 +197,7 @@ namespace Mmd.UnityIntegration
             lastLiveFrame = -1;
             lastLiveSnapshot = null;
             lastLivePhysicsDiagnostics = null;
+            LastDetailedApplyTiming = null;
             ClearLivePhysicsBodyDiagnostics();
         }
 
@@ -479,12 +481,37 @@ namespace Mmd.UnityIntegration
 
         private void ApplyLiveAnimationFrame(MmdEvaluatedFrame frame)
         {
+            if (DetailedApplyTimingEnabled)
+            {
+                long totalStart = Stopwatch.GetTimestamp();
+                long boneStart = totalStart;
+                MmdUnityFrameApplier.ApplyBonePoses(playbackInstance, frame.bones);
+                long boneEnd = Stopwatch.GetTimestamp();
+                MmdUnityMorphApplyTimingSummary morphTiming = MmdUnityFrameApplier.ApplyMorphsWithTiming(
+                    playbackInstance,
+                    frame,
+                    groupMorphsResolvedExternally: true);
+                long totalEnd = Stopwatch.GetTimestamp();
+                LastDetailedApplyTiming = new MmdUnityFrameApplyTimingSummary
+                {
+                    totalMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(totalStart, totalEnd),
+                    bonePoseApplyMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(boneStart, boneEnd),
+                    morph = morphTiming
+                };
+                return;
+            }
+
+            LastDetailedApplyTiming = null;
             MmdUnityFrameApplier.ApplyBonePoses(playbackInstance, frame.bones);
             MmdUnityFrameApplier.ApplyMorphs(
                 playbackInstance,
                 frame,
                 groupMorphsResolvedExternally: true);
         }
+
+        internal bool DetailedApplyTimingEnabled { get; set; }
+
+        internal MmdUnityFrameApplyTimingSummary? LastDetailedApplyTiming { get; private set; }
 
         private void EnsureLivePhysicsNativeOutputBuffers()
         {

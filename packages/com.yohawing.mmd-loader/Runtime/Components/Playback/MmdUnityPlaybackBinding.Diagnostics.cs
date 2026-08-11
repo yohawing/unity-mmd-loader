@@ -93,6 +93,14 @@ namespace Mmd.UnityIntegration
     }
 
     [Serializable]
+    internal sealed class MmdUnityFrameApplyTimingSummary
+    {
+        public double totalMs;
+        public double bonePoseApplyMs;
+        public MmdUnityMorphApplyTimingSummary morph = new();
+    }
+
+    [Serializable]
     public sealed class MmdLivePhysicsBodyDiagnostics
     {
         public int bodyIndex;
