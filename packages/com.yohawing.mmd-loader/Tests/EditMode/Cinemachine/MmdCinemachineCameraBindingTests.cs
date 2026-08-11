@@ -1,6 +1,7 @@
 #nullable enable
 
 using Mmd.Motion;
+using Mmd.Timeline;
 using Mmd.UnityIntegration;
 using Mmd.UnityIntegration.Cinemachine;
 using NUnit.Framework;
@@ -11,6 +12,53 @@ namespace Mmd.Tests.Cinemachine
 {
     public sealed class MmdCinemachineCameraBindingTests
     {
+        [Test]
+        public void NativeVmdTimelineSamplingMatchesDirectCameraAcrossRandomAccess()
+        {
+            var directBindingGo = new GameObject("direct binding");
+            var directCameraGo = new GameObject("direct camera");
+            var cinemachineBindingGo = new GameObject("cinemachine binding");
+            var cinemachineCameraGo = new GameObject("cinemachine camera");
+            var behaviour = new MmdVmdCameraBehaviour
+            {
+                MotionBytes = MmdTestFixtures.BuildCameraTrackVmdBytes("cinemachine_camera"),
+                FrameRate = 30f,
+                ImportScale = 0.1f
+            };
+            try
+            {
+                Camera directCamera = directCameraGo.AddComponent<Camera>();
+                MmdSceneEnvironmentBinding directBinding = directBindingGo.AddComponent<MmdSceneEnvironmentBinding>();
+                directBinding.TargetCamera = directCamera;
+                CinemachineCamera cinemachineCamera = cinemachineCameraGo.AddComponent<CinemachineCamera>();
+                MmdCinemachineCameraBinding cinemachineBinding =
+                    cinemachineBindingGo.AddComponent<MmdCinemachineCameraBinding>();
+                cinemachineBinding.TargetCinemachineCamera = cinemachineCamera;
+
+                foreach (double time in new[] { 0.0, 0.75, 0.25, 1.0, 0.5 })
+                {
+                    MmdSceneCameraApplyStatus directStatus = behaviour.EvaluateAtLocalTime(directBinding, time);
+                    MmdSceneCameraApplyStatus cinemachineStatus =
+                        behaviour.EvaluateAtLocalTime(cinemachineBinding, time);
+                    Assert.That(cinemachineStatus, Is.EqualTo(directStatus));
+                    Assert.That(Vector3.Distance(cinemachineCamera.transform.position, directCamera.transform.position),
+                        Is.LessThan(0.001f));
+                    Assert.That(Quaternion.Angle(cinemachineCamera.transform.rotation, directCamera.transform.rotation),
+                        Is.LessThan(0.05f));
+                    Assert.That(cinemachineCamera.Lens.FieldOfView,
+                        Is.EqualTo(directCamera.fieldOfView).Within(0.001f));
+                }
+            }
+            finally
+            {
+                behaviour.OnPlayableDestroy(UnityEngine.Playables.Playable.Null);
+                Object.DestroyImmediate(cinemachineCameraGo);
+                Object.DestroyImmediate(cinemachineBindingGo);
+                Object.DestroyImmediate(directCameraGo);
+                Object.DestroyImmediate(directBindingGo);
+            }
+        }
+
         [Test]
         public void ApplyCameraStateMatchesDirectCameraPoseAndVerticalFieldOfView()
         {
@@ -231,5 +279,6 @@ namespace Mmd.Tests.Cinemachine
         {
             return new MmdCameraState(distance, new[] { px, py, pz }, new[] { rx, ry, rz }, fov, perspective);
         }
+
     }
 }

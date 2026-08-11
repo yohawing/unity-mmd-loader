@@ -4,7 +4,10 @@
   "references": [
     "Mmd.Runtime",
     "Mmd.Cinemachine",
+    "Mmd.EditModeTestKit",
     "Unity.Cinemachine",
+    "Mmd.Timeline",
+    "Unity.Timeline",
     "UnityEngine.TestRunner",
     "UnityEditor.TestRunner"
   ],
