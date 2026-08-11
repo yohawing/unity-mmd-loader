@@ -590,6 +590,10 @@ namespace Mmd.Tests
                 Assert.That(controller.LastLivePhysicsDiagnostics.evaluationPath, Is.EqualTo("HumanoidNativeFinal"));
                 Assert.That(controller.LastLivePhysicsDiagnostics.phaseDiagnosticsPresent, Is.True);
                 Assert.That(controller.LastLivePhysicsDiagnostics.nativeStepReportPresent, Is.True);
+                Assert.That(controller.LastLivePhysicsDiagnostics.hostPoseCapturePresent, Is.True,
+                    "Humanoid Live must retain Animator/retarget output as its host-pose authority.");
+                Assert.That(controller.LastLivePhysicsDiagnostics.managedBodyTransformApplyPresent, Is.False,
+                    "Humanoid Live applies the native final matrix pose instead of the VMD compatibility body path.");
                 Assert.That(controller.LastLivePhysicsDiagnostics.nativeSubstepCount, Is.GreaterThanOrEqualTo(0));
                 Assert.That(controller.LastLivePhysicsDiagnostics.nativeRigidbodyCount, Is.EqualTo(model.physics.rigidbodies.Count));
                 Assert.That(controller.LastLivePhysicsDiagnostics.nativeBoneCount, Is.EqualTo(model.bones.Count));

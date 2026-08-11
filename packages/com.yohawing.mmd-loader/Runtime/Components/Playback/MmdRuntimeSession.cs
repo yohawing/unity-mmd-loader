@@ -123,6 +123,16 @@ namespace Mmd
             ikEnabledCount = nativeIkEnabled!.Length;
         }
 
+        internal MmdRuntimeFfiPlaybackSession NativePlaybackSession
+        {
+            get
+            {
+                ThrowIfDisposed();
+                EnsureNativePlaybackSession();
+                return nativePlaybackSession!;
+            }
+        }
+
         internal void EvaluateBeforePhysicsFrameInto(
             int frame,
             float time,

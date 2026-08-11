@@ -19,6 +19,7 @@ namespace Mmd.Physics
         internal readonly double pinMarshalMs;
         internal readonly double nativeHostFrameMs;
         internal readonly double nativeRigidbodyCopyMs;
+        internal readonly double afterPhysicsMatrixReadbackMs;
         internal readonly int nativeRigidbodyCount;
         internal readonly int nativeBoneCount;
         internal readonly int nativeSubstepCount;
@@ -30,6 +31,7 @@ namespace Mmd.Physics
             double pinMarshalMs,
             double nativeHostFrameMs,
             double nativeRigidbodyCopyMs,
+            double afterPhysicsMatrixReadbackMs,
             int nativeRigidbodyCount,
             int nativeBoneCount,
             int nativeSubstepCount,
@@ -40,6 +42,7 @@ namespace Mmd.Physics
             this.pinMarshalMs = pinMarshalMs;
             this.nativeHostFrameMs = nativeHostFrameMs;
             this.nativeRigidbodyCopyMs = nativeRigidbodyCopyMs;
+            this.afterPhysicsMatrixReadbackMs = afterPhysicsMatrixReadbackMs;
             this.nativeRigidbodyCount = nativeRigidbodyCount;
             this.nativeBoneCount = nativeBoneCount;
             this.nativeSubstepCount = nativeSubstepCount;
@@ -79,6 +82,7 @@ namespace Mmd.Physics
         private readonly string motionId;
         private readonly IntPtr model;
         private readonly IntPtr instance;
+        private readonly bool ownsRuntimeHandles;
         private IntPtr world;
         private readonly int boneCount;
         private readonly int worldMatrixFloatCount;
@@ -145,6 +149,7 @@ namespace Mmd.Physics
 
                 model = createdModel;
                 instance = createdInstance;
+                ownsRuntimeHandles = true;
                 world = createdWorld;
                 rigidbodyStates = Array.Empty<float>();
                 createdModel = IntPtr.Zero;
@@ -167,6 +172,47 @@ namespace Mmd.Physics
                 {
                     MmdRuntimeFfiMethods.ModelFree(createdModel);
                 }
+            }
+        }
+
+        private MmdAnimPhysicsBackend(
+            byte[] pmxBytes,
+            MmdRuntimeFfiPlaybackSession playbackSession,
+            string modelId,
+            string motionId)
+        {
+            this.modelId = modelId ?? string.Empty;
+            this.motionId = motionId ?? string.Empty;
+            model = playbackSession.GetNativeModelHandle();
+            instance = playbackSession.GetNativeInstanceHandle();
+            ownsRuntimeHandles = false;
+            boneCount = playbackSession.BoneCount;
+            worldMatrixFloatCount = playbackSession.WorldMatrixFloatCount;
+            morphCount = playbackSession.MorphWeightCount;
+            ikCount = playbackSession.IkEnabledCount;
+            rigidbodyStates = Array.Empty<float>();
+
+            IntPtr createdWorld = IntPtr.Zero;
+            try
+            {
+                int createStatus = MmdRuntimeFfiMethods.PhysicsWorldCreateFromPmxBytes(
+                    pmxBytes,
+                    new IntPtr(pmxBytes.Length),
+                    out createdWorld);
+                ThrowIfFailed(createStatus, "PhysicsWorldCreateFromPmxBytes", this.modelId, this.motionId);
+                if (createdWorld == IntPtr.Zero)
+                    throw CreateNativeException("PhysicsWorldCreateFromPmxBytes", 4);
+                int modeStatus = MmdRuntimeFfiMethods.InstanceSetPhysicsMode(
+                    instance,
+                    MmdRuntimeFfiMethods.PhysicsModeLive);
+                ThrowIfFailed(modeStatus, "InstanceSetPhysicsMode", this.modelId, this.motionId);
+                world = createdWorld;
+                createdWorld = IntPtr.Zero;
+            }
+            finally
+            {
+                if (createdWorld != IntPtr.Zero)
+                    MmdRuntimeFfiMethods.PhysicsWorldFree(createdWorld);
             }
         }
 
@@ -279,6 +325,37 @@ namespace Mmd.Physics
                 reason = ex.Message;
             }
 
+            backend?.Dispose();
+            backend = null;
+            return false;
+        }
+
+        internal static bool TryCreateForPlaybackSession(
+            byte[]? pmxBytes,
+            MmdRuntimeFfiPlaybackSession playbackSession,
+            string modelId,
+            string motionId,
+            out MmdAnimPhysicsBackend? backend,
+            out string reason)
+        {
+            backend = null;
+            reason = string.Empty;
+            if (pmxBytes == null || pmxBytes.Length == 0)
+            {
+                reason = "Model source bytes are unavailable.";
+                return false;
+            }
+            try
+            {
+                MmdRuntimeFfiMethods.ValidateAbiVersion();
+                backend = new MmdAnimPhysicsBackend(pmxBytes, playbackSession, modelId, motionId);
+                return true;
+            }
+            catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or
+                                       BadImageFormatException or InvalidOperationException)
+            {
+                reason = ex.Message;
+            }
             backend?.Dispose();
             backend = null;
             return false;
@@ -687,11 +764,101 @@ namespace Mmd.Physics
                 ElapsedMilliseconds(pinStart, pinEnd) + ElapsedMilliseconds(unpinStart, unpinEnd),
                 ElapsedMilliseconds(nativeStart, nativeEnd),
                 ElapsedMilliseconds(rigidbodyCopyStart, rigidbodyCopyEnd),
+                0.0,
                 rigidbodyStates.Length / TransformFloatCount,
                 boneCount,
                 CheckedCount(report.tick.substeps, "native physics substep count"),
                 MmdFfiMarshal.CheckedIntPtrToInt(report.kinematicRigidbodiesFed, "native kinematic rigidbody count"),
                 MmdFfiMarshal.CheckedIntPtrToInt(report.bonesWrittenBack, "native bones written back count"),
+                reportPresent: true);
+        }
+
+        internal void StepPlaybackFrame(
+            MmdRuntimeFfiPlaybackSession playbackSession,
+            int frame,
+            bool seed,
+            float deltaTime,
+            float[] worldMatrices,
+            float[] morphWeights,
+            byte[] ikEnabled,
+            float[] afterPhysicsWorldMatrices,
+            out MmdPhysicsHostStepDiagnostics diagnostics)
+        {
+            MmdPhysicsPolicy.ValidateLiveStepInput(frame, deltaTime);
+            ThrowIfDisposed();
+            ValidateHostPoseArray(worldMatrices, worldMatrixFloatCount, nameof(worldMatrices));
+            ValidateHostPoseArray(morphWeights, morphCount, nameof(morphWeights));
+            ValidateHostPoseArray(ikEnabled, ikCount, nameof(ikEnabled));
+            ValidateHostPoseArray(
+                afterPhysicsWorldMatrices,
+                worldMatrixFloatCount,
+                nameof(afterPhysicsWorldMatrices));
+            if (playbackSession.GetNativeInstanceHandle() != instance)
+                throw new InvalidOperationException("Playback physics must use the borrowed runtime instance.");
+
+            long nativeStart = Stopwatch.GetTimestamp();
+            MmdRuntimeFfiMethods.PhysicsWorldStepReport report;
+            if (seed || !seededSinceReset)
+            {
+                if (seededSinceReset)
+                {
+                    int resetStatus = MmdRuntimeFfiMethods.PhysicsWorldReset(world, instance, out _);
+                    ThrowIfFailed(resetStatus, "PhysicsWorldReset", modelId, motionId);
+                }
+                int status = MmdRuntimeFfiMethods.PhysicsWorldBakeClipFrames(
+                    world,
+                    instance,
+                    playbackSession.GetNativeClipHandle(),
+                    frame,
+                    frameStep: 0.0f,
+                    deltaTime: 0.0f,
+                    frameCount: new IntPtr(1),
+                    worldMatrices,
+                    new IntPtr(worldMatrices.Length),
+                    morphWeights,
+                    new IntPtr(morphWeights.Length),
+                    out report);
+                ThrowIfFailed(status, "PhysicsWorldBakeClipFrames", modelId, motionId);
+                playbackSession.CopyEvaluatedOutputs(worldMatrices, morphWeights, ikEnabled);
+                // The bake seed initializes Bullet from the evaluated clip pose but intentionally
+                // does not read the bodies back into the runtime. A zero-delta runtime step performs
+                // that readback and after-physics evaluation without advancing the solver clock.
+                status = MmdRuntimeFfiMethods.PhysicsWorldStepRuntime(
+                    world,
+                    instance,
+                    0.0f,
+                    out report);
+                ThrowIfFailed(status, "PhysicsWorldStepRuntime", modelId, motionId);
+            }
+            else
+            {
+                playbackSession.EvaluateBeforePhysics(frame);
+                playbackSession.CopyEvaluatedOutputs(worldMatrices, morphWeights, ikEnabled);
+                int status = MmdRuntimeFfiMethods.PhysicsWorldStepRuntime(
+                    world,
+                    instance,
+                    deltaTime,
+                    out report);
+                ThrowIfFailed(status, "PhysicsWorldStepRuntime", modelId, motionId);
+            }
+            long nativeEnd = Stopwatch.GetTimestamp();
+            long matrixCopyStart = nativeEnd;
+            CopyAfterPhysicsWorldMatrices(afterPhysicsWorldMatrices);
+            long matrixCopyEnd = Stopwatch.GetTimestamp();
+            CopyRigidbodyStates();
+            long copyEnd = Stopwatch.GetTimestamp();
+            seededSinceReset = true;
+
+            diagnostics = new MmdPhysicsHostStepDiagnostics(
+                pinMarshalMs: 0.0,
+                nativeHostFrameMs: ElapsedMilliseconds(nativeStart, nativeEnd),
+                nativeRigidbodyCopyMs: ElapsedMilliseconds(matrixCopyEnd, copyEnd),
+                afterPhysicsMatrixReadbackMs: ElapsedMilliseconds(matrixCopyStart, matrixCopyEnd),
+                nativeRigidbodyCount: rigidbodyStates.Length / TransformFloatCount,
+                nativeBoneCount: boneCount,
+                nativeSubstepCount: CheckedCount(report.tick.substeps, "native physics substep count"),
+                nativeKinematicRigidbodiesFed: MmdFfiMarshal.CheckedIntPtrToInt(report.kinematicRigidbodiesFed, "native kinematic rigidbody count"),
+                nativeBonesWrittenBack: MmdFfiMarshal.CheckedIntPtrToInt(report.bonesWrittenBack, "native bones written back count"),
                 reportPresent: true);
         }
 
@@ -734,12 +901,17 @@ namespace Mmd.Physics
                 MmdRuntimeFfiMethods.PhysicsWorldFree(world);
             }
 
-            if (instance != IntPtr.Zero)
+            if (!ownsRuntimeHandles && instance != IntPtr.Zero)
+            {
+                MmdRuntimeFfiMethods.InstanceSetPhysicsMode(instance, MmdRuntimeFfiMethods.PhysicsModeOff);
+            }
+
+            if (ownsRuntimeHandles && instance != IntPtr.Zero)
             {
                 MmdRuntimeFfiMethods.InstanceFree(instance);
             }
 
-            if (model != IntPtr.Zero)
+            if (ownsRuntimeHandles && model != IntPtr.Zero)
             {
                 MmdRuntimeFfiMethods.ModelFree(model);
             }

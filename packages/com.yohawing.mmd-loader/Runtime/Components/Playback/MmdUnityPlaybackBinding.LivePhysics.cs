@@ -36,10 +36,17 @@ namespace Mmd.UnityIntegration
                 return false;
             }
 
+            if (nativeHumanoidHostPoseEnabled && livePhysicsBackend != null)
+            {
+                return true;
+            }
+
+            livePhysicsBackend?.Dispose();
+            livePhysicsBackend = null;
+            nativeHumanoidHostPoseEnabled = true;
             try
             {
                 EnsureLivePhysicsBackend(resetOnCreate: false);
-                nativeHumanoidHostPoseEnabled = true;
                 return true;
             }
             catch (Exception exception) when (
@@ -52,6 +59,8 @@ namespace Mmd.UnityIntegration
                 exception is ArgumentException)
             {
                 nativeHumanoidHostPoseEnabled = false;
+                livePhysicsBackend?.Dispose();
+                livePhysicsBackend = null;
                 return false;
             }
         }
@@ -207,6 +216,11 @@ namespace Mmd.UnityIntegration
                 return lastLiveSnapshot;
             }
 
+            if (!nativeHumanoidHostPoseEnabled)
+            {
+                return ApplyVmdNativePhysicsFrame(frame, frameRate);
+            }
+
             var totalWatch = Stopwatch.StartNew();
             var stageWatch = Stopwatch.StartNew();
             IMmdLivePhysicsBackend backend = EnsureLivePhysicsBackend();
@@ -256,6 +270,175 @@ namespace Mmd.UnityIntegration
                 snapshotBuildStartTimestamp,
                 snapshotBuildEndTimestamp);
             diagnostics.snapshotBuildPresent = true;
+            diagnostics.totalMs = totalWatch.Elapsed.TotalMilliseconds;
+            lastLivePhysicsDiagnostics = diagnostics;
+            return lastLiveSnapshot;
+        }
+
+        private MmdPlaybackSnapshot ApplyVmdNativePhysicsFrame(int frame, float frameRate)
+        {
+            livePhysicsReadbackTransformCount = 0;
+            livePhysicsReadbackShapeTypeCount = 0;
+            var totalWatch = Stopwatch.StartNew();
+            var stageWatch = Stopwatch.StartNew();
+            IMmdLivePhysicsBackend backend = EnsureLivePhysicsBackend();
+            if (backend is not MmdAnimPhysicsBackend nativeBackend)
+                throw new MmdPhysicsBackendException("StepPlaybackFrame", backend.Name, "vmd-bridge-unsupported",
+                    "VMD native physics requires the mmd-anim backend.", modelId, motionId);
+            double ensureBackendMs = stageWatch.Elapsed.TotalMilliseconds;
+            bool seed = lastLiveFrame < 0;
+            float deltaTime = seed ? 0.0f : (frame - lastLiveFrame) / frameRate;
+
+            EnsureLivePhysicsNativeOutputBuffers();
+            MmdRuntimeFfiPlaybackSession playbackSession = fastSession ?? session.NativePlaybackSession;
+            livePhysicsAfterPhysicsWorldMatrices ??= new float[livePhysicsNativeWorldMatrices!.Length];
+            if (livePhysicsAfterPhysicsWorldMatrices.Length != livePhysicsNativeWorldMatrices!.Length)
+            {
+                livePhysicsAfterPhysicsWorldMatrices = new float[livePhysicsNativeWorldMatrices.Length];
+            }
+            stageWatch.Restart();
+            nativeBackend.StepPlaybackFrame(
+                playbackSession,
+                frame,
+                seed,
+                deltaTime,
+                livePhysicsNativeWorldMatrices!,
+                livePhysicsNativeMorphWeights!,
+                livePhysicsNativeIkEnabled!,
+                livePhysicsAfterPhysicsWorldMatrices,
+                out MmdPhysicsHostStepDiagnostics nativeStepDiagnostics);
+            double evaluateFrameMs = stageWatch.Elapsed.TotalMilliseconds;
+
+            long frameConstructionStart = Stopwatch.GetTimestamp();
+            MmdEvaluatedFrame evaluatedFrame = MmdRuntimeFrameEvaluator.BuildFrameFromNativeInPlace(
+                model,
+                frame,
+                MmdPlaybackTime.ToTime(frame, frameRate),
+                livePhysicsNativeWorldMatrices!,
+                livePhysicsNativeMorphWeights!,
+                EnsureLivePhysicsFrame(),
+                livePhysicsRowMajorMatrices!,
+                livePhysicsLocalMatrixScratch!,
+                livePhysicsOrderedBones,
+                livePhysicsMorphEntries!,
+                livePhysicsMorphOrder!,
+                includeMaterials: false);
+            long frameConstructionEnd = Stopwatch.GetTimestamp();
+            stageWatch.Restart();
+            ApplyLiveAnimationFrame(evaluatedFrame);
+            double applyAnimationFrameMs = stageWatch.Elapsed.TotalMilliseconds;
+
+            long fanOutStart = Stopwatch.GetTimestamp();
+            CaptureLivePhysicsReadback(backend);
+            long fanOutEnd = Stopwatch.GetTimestamp();
+
+            long managedApplyStart = Stopwatch.GetTimestamp();
+            ApplyPhysicsBodyTransforms();
+            long managedApplyEnd = Stopwatch.GetTimestamp();
+
+            bool afterPhysicsMatrixWorkPerformed = model.HasDeformAfterPhysicsBones;
+            long matrixApplyStart = Stopwatch.GetTimestamp();
+            if (afterPhysicsMatrixWorkPerformed)
+            {
+                ApplyAfterPhysicsWorldMatrices();
+            }
+            long matrixApplyEnd = Stopwatch.GetTimestamp();
+
+            bool sampled = ShouldSampleLivePhysicsBodyDiagnostics(frame);
+            long sampledStart = Stopwatch.GetTimestamp();
+            if (sampled)
+            {
+                ApplyPhysicsBodyDebugTransforms(backend);
+                lastLivePhysicsBodyDiagnostics = BuildBodyDiagnostics(backend);
+                lastLivePhysicsBodyDiagnosticsFrame = frame;
+            }
+            long sampledEnd = Stopwatch.GetTimestamp();
+
+            long frameRefreshStart = Stopwatch.GetTimestamp();
+            RefreshEvaluatedFrameFromUnityTransforms(evaluatedFrame);
+            long frameRefreshEnd = Stopwatch.GetTimestamp();
+            long pinnedStart = Stopwatch.GetTimestamp();
+            MmdLivePhysicsPinnedBodyDiagnostics pinned = BuildHostPosePinnedBodyDiagnostics(seed);
+            long pinnedEnd = Stopwatch.GetTimestamp();
+            lastLiveFrame = frame;
+            long snapshotStart = Stopwatch.GetTimestamp();
+            lastLiveSnapshot = BuildOrUpdateLiveSnapshot(evaluatedFrame);
+            long snapshotEnd = Stopwatch.GetTimestamp();
+            long diagnosticsStart = Stopwatch.GetTimestamp();
+            var diagnostics = new MmdLivePhysicsFrameDiagnostics
+            {
+                frame = frame,
+                backendName = backend.Name,
+                evaluationPath = "VmdNativePhysicsBridge",
+                phaseDiagnosticsPresent = true,
+                nativeStepReportPresent = nativeStepDiagnostics.reportPresent,
+                hostPoseCapturePresent = false,
+                pinnedDiagnosticsPresent = true,
+                pinMarshalPresent = false,
+                nativeHostFramePresent = true,
+                nativeRigidbodyCopyPresent = true,
+                managedRigidbodyFanOutPresent = true,
+                managedBodyTransformApplyPresent = true,
+                afterPhysicsMatrixReadbackPresent = true,
+                matrixTransformApplyPresent = true,
+                sampledDiagnosticsPresent = true,
+                sampledBodyDiagnosticsThisFrame = sampled,
+                evaluatedFrameRefreshPresent = true,
+                diagnosticsConstructionPresent = true,
+                ensureBackendPresent = true,
+                evaluateFramePresent = true,
+                applyAnimationFramePresent = true,
+                snapshotBuildPresent = true,
+                deltaTime = deltaTime,
+                hostPoseCaptureMs = 0.0,
+                pinnedDiagnosticsMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(pinnedStart, pinnedEnd),
+                pinMarshalMs = 0.0,
+                nativeHostFrameMs = nativeStepDiagnostics.nativeHostFrameMs,
+                nativeRigidbodyCopyMs = nativeStepDiagnostics.nativeRigidbodyCopyMs,
+                managedRigidbodyFanOutMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(fanOutStart, fanOutEnd),
+                managedBodyTransformApplyMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(managedApplyStart, managedApplyEnd),
+                afterPhysicsMatrixReadbackMs = nativeStepDiagnostics.afterPhysicsMatrixReadbackMs,
+                matrixTransformApplyMs = afterPhysicsMatrixWorkPerformed
+                    ? MmdLivePhysicsDiagnosticsClock.Milliseconds(matrixApplyStart, matrixApplyEnd)
+                    : 0.0,
+                sampledDiagnosticsMs = sampled
+                    ? MmdLivePhysicsDiagnosticsClock.Milliseconds(sampledStart, sampledEnd)
+                    : 0.0,
+                evaluatedFrameRefreshMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(frameRefreshStart, frameRefreshEnd),
+                ensureBackendMs = ensureBackendMs,
+                evaluateFrameMs = evaluateFrameMs,
+                applyAnimationFrameMs = applyAnimationFrameMs,
+                snapshotBuildMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(snapshotStart, snapshotEnd),
+                syncBoneDrivenBodiesMs = 0.0,
+                stepPhysicsMs = nativeStepDiagnostics.nativeHostFrameMs,
+                applyPhysicsBodiesMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(managedApplyStart, matrixApplyEnd),
+                refreshSnapshotFrameMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(frameRefreshStart, frameRefreshEnd),
+                readbackTransformCount = livePhysicsReadbackTransformCount,
+                readbackShapeTypeCount = livePhysicsReadbackShapeTypeCount,
+                nativeRigidbodyCount = nativeStepDiagnostics.nativeRigidbodyCount,
+                nativeBoneCount = nativeStepDiagnostics.nativeBoneCount,
+                nativeSubstepCount = nativeStepDiagnostics.nativeSubstepCount,
+                nativeKinematicRigidbodiesFed = nativeStepDiagnostics.nativeKinematicRigidbodiesFed,
+                nativeBonesWrittenBack = nativeStepDiagnostics.nativeBonesWrittenBack,
+                pinnedBodies = pinned,
+                unsupportedWorldAnchorJointCount = backend.SkippedWorldAnchorJointCount,
+                comparisonSpace = "runtime-forward-playback-diagnostics",
+                importScale = playbackInstance.ImportScale,
+                modelBoneCount = model.bones.Count,
+                appliedBoneCount = evaluatedFrame.bones.Count,
+                modelMorphCount = model.morphs.Count,
+                appliedMorphCount = evaluatedFrame.morphs.Count,
+                bodyDiagnosticsFrame = lastLivePhysicsBodyDiagnosticsFrame,
+                bodyDiagnostics = lastLivePhysicsBodyDiagnostics
+            };
+            long diagnosticsEnd = Stopwatch.GetTimestamp();
+            diagnostics.diagnosticsConstructionMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(
+                diagnosticsStart,
+                diagnosticsEnd);
+            diagnostics.bridgeTotalMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(
+                frameConstructionStart,
+                diagnosticsEnd);
+            totalWatch.Stop();
             diagnostics.totalMs = totalWatch.Elapsed.TotalMilliseconds;
             lastLivePhysicsDiagnostics = diagnostics;
             return lastLiveSnapshot;
@@ -798,12 +981,17 @@ namespace Mmd.UnityIntegration
                 return livePhysicsBackend;
             }
 
-            if (!MmdAnimPhysicsBackend.TryCreate(
+            bool created = nativeHumanoidHostPoseEnabled
+                ? MmdAnimPhysicsBackend.TryCreate(
+                    model.sourceBytes, modelId, motionId, out MmdAnimPhysicsBackend? nativeBackend, out string reason)
+                : MmdAnimPhysicsBackend.TryCreateForPlaybackSession(
                     model.sourceBytes,
+                    fastSession ?? session.NativePlaybackSession,
                     modelId,
                     motionId,
-                    out MmdAnimPhysicsBackend? nativeBackend,
-                    out string reason))
+                    out nativeBackend,
+                    out reason);
+            if (!created)
             {
                 throw new MmdPhysicsBackendException(
                     "EnsureLivePhysicsBackend",

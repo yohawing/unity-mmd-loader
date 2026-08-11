@@ -756,6 +756,51 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void LivePhysicsUsesEnabledFastRuntimeMotionAsNativeBridgeAuthority()
+        {
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
+            if (!availability.backendAvailable)
+            {
+                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
+            }
+
+            MmdUnityPlaybackBinding? binding = null;
+            try
+            {
+                byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes(PlaybackPmxId);
+                MmdModelDefinition model = new NativeMmdParser().LoadModel(pmxBytes);
+                model.bones[0].deformAfterPhysics = true;
+                AddPinnedRootRigidbody(model);
+                binding = CreatePhysicsPlaybackBinding(model, "managed-motion.vmd", endTranslationX: 2.0f);
+                MmdMotionDefinition fastMotion = MmdTestFixtures.ParseGeneratedBoneTranslationMotion(
+                    model.name,
+                    RootBoneName(model),
+                    LivePhysicsPlaybackFrame,
+                    endTranslationX: 4.0f);
+                Assert.That(
+                    binding.TryEnableFastRuntime(pmxBytes, fastMotion.sourceBytes!, out string reason),
+                    Is.True,
+                    reason);
+
+                binding.SetPhysicsMode(MmdPhysicsMode.Live);
+                binding.ApplyFrame(0, 30.0f);
+                binding.ApplyFrame(LivePhysicsPlaybackFrame, 30.0f);
+
+                int rootBoneIndex = RootBoneIndex(model);
+                Vector3 expectedLocalPosition = binding.Instance.BindLocalPositions[rootBoneIndex] +
+                    ToUnityPosition(new[] { 4.0f, 0.0f, 0.0f }) * binding.Instance.ImportScale;
+                Assert.That(
+                    Vector3.Distance(binding.Instance.BoneTransforms[rootBoneIndex].localPosition, expectedLocalPosition),
+                    Is.LessThan(0.0001f));
+                Assert.That(binding.LastLivePhysicsDiagnostics!.evaluationPath, Is.EqualTo("VmdNativePhysicsBridge"));
+            }
+            finally
+            {
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
+            }
+        }
+
+        [Test]
         public void LivePhysicsReportsPinnedRigidbodySyncToAnimatedBone()
         {
             MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
@@ -926,8 +971,10 @@ namespace Mmd.Tests
                 Assert.That(body0.descriptorPosition, Is.EqualTo(Vector3.zero));
                 Assert.That(body0.descriptorRotation, Is.EqualTo(Vector3.zero));
                 // Static body is pinned — bone and debug collider should be near
-                Assert.That(body0.boneToDebugWorldDistance, Is.LessThan(0.0001f));
-                Assert.That(body0.boneToReadbackWorldDistance, Is.LessThan(0.0001f));
+                Assert.That(body0.boneToDebugWorldDistance, Is.LessThan(0.0001f),
+                    $"bone={body0.boneWorldPosition}; debug={body0.debugColliderWorldPosition}; readback={body0.readbackWorldPosition}");
+                Assert.That(body0.boneToReadbackWorldDistance, Is.LessThan(0.0001f),
+                    $"bone={body0.boneWorldPosition}; debug={body0.debugColliderWorldPosition}; readback={body0.readbackWorldPosition}");
                 Assert.That(body0.debugToReadbackWorldDistance, Is.LessThan(0.0001f));
 
                 // --- body 1: dynamic-orientation ---
@@ -1091,19 +1138,24 @@ namespace Mmd.Tests
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f);
                 controller.SetPhysicsMode(MmdPhysicsMode.Live);
+                controller.ApplyFrame(LivePhysicsPlaybackFrame);
 
                 MmdLivePhysicsFrameDiagnostics? diagnostics = binding.LastLivePhysicsDiagnostics;
                 Assert.That(diagnostics, Is.Not.Null);
-                Assert.That(diagnostics!.evaluationPath, Is.EqualTo("VMDCompatibility"));
+                Assert.That(diagnostics!.frame, Is.EqualTo(LivePhysicsPlaybackFrame));
+                Assert.That(diagnostics.evaluationPath, Is.EqualTo("VmdNativePhysicsBridge"));
                 Assert.That(diagnostics.phaseDiagnosticsPresent, Is.True);
                 Assert.That(diagnostics.nativeStepReportPresent, Is.True);
-                Assert.That(diagnostics.hostPoseCapturePresent, Is.True);
+                Assert.That(diagnostics.hostPoseCapturePresent, Is.False,
+                    "VMD authority must remain on the borrowed native playback instance.");
                 Assert.That(diagnostics.pinnedDiagnosticsPresent, Is.True);
-                Assert.That(diagnostics.pinMarshalPresent, Is.True);
+                Assert.That(diagnostics.pinMarshalPresent, Is.False,
+                    "The VMD bridge must not marshal a Unity-captured host pose back to native.");
                 Assert.That(diagnostics.nativeHostFramePresent, Is.True);
                 Assert.That(diagnostics.nativeRigidbodyCopyPresent, Is.True);
                 Assert.That(diagnostics.managedRigidbodyFanOutPresent, Is.True);
-                Assert.That(diagnostics.managedBodyTransformApplyPresent, Is.True);
+                Assert.That(diagnostics.managedBodyTransformApplyPresent, Is.True,
+                    "The bridge retains managed PMX body-kind application semantics after the native step.");
                 Assert.That(diagnostics.afterPhysicsMatrixReadbackPresent, Is.True,
                     "a valid no-work matrix phase must remain present rather than unavailable");
                 Assert.That(diagnostics.matrixTransformApplyPresent, Is.True,
