@@ -124,71 +124,398 @@ namespace Mmd.UnityIntegration
             };
         }
 
-        private static void BakeVertexMorphBlendShapes(Mesh mesh, MmdRenderingDescriptor descriptor)
+        private static Bounds BakeVertexMorphBlendShapes(
+            Mesh mesh,
+            MmdRenderingDescriptor descriptor,
+            float importScale,
+            IReadOnlyList<MmdBoneDefinition>? bones)
         {
-            BakeVertexMorphBlendShapes(mesh, descriptor, importScale: 1.0f);
-        }
-
-        private static void BakeVertexMorphBlendShapes(Mesh mesh, MmdRenderingDescriptor descriptor, float importScale)
-        {
-            if (descriptor.vertexMorphs == null || descriptor.vertexMorphs.Count == 0)
-            {
-                return;
-            }
-
             float scale = NormalizeImportScale(importScale);
             int vertexCount = mesh.vertexCount;
             Vector3[] baseVertices = mesh.vertices;
-            Bounds expandedBounds = baseVertices.Length > 0
-                ? new Bounds(baseVertices[0], Vector3.zero)
-                : new Bounds(Vector3.zero, Vector3.zero);
-            foreach (Vector3 vertex in baseVertices)
+
+            if (descriptor.vertexMorphs != null && descriptor.vertexMorphs.Count > 0)
             {
-                expandedBounds.Encapsulate(vertex);
+                var deltaVertices = new Vector3[vertexCount];
+                var zeroNormals = new Vector3[vertexCount];
+                var zeroTangents = new Vector3[vertexCount];
+                IReadOnlyDictionary<string, int> morphNameCounts = MmdUnityBlendShapeNames.CountMorphNames(descriptor.vertexMorphs);
+
+                foreach (MmdVertexMorphDescriptor morph in descriptor.vertexMorphs)
+                {
+                    if (string.IsNullOrWhiteSpace(morph.morphName))
+                        continue;
+
+                    Array.Clear(deltaVertices, 0, vertexCount);
+
+                    foreach (MmdVertexMorphOffsetDescriptor offset in morph.offsets)
+                    {
+                        int vertexIndex = offset.vertexIndex;
+                        if (vertexIndex < 0 || vertexIndex >= vertexCount)
+                        {
+                            continue;
+                        }
+
+                        if (offset.positionDelta != null && offset.positionDelta.Length >= 3)
+                        {
+                            deltaVertices[vertexIndex] += ToUnityPosition(offset.positionDelta, scale);
+                        }
+                    }
+
+                    mesh.AddBlendShapeFrame(
+                        MmdUnityBlendShapeNames.ResolveVertexMorphBlendShapeName(morph, morphNameCounts),
+                        100f,
+                        deltaVertices,
+                        zeroNormals,
+                        zeroTangents);
+                }
             }
 
-            var deltaVertices = new Vector3[vertexCount];
-            var zeroNormals = new Vector3[vertexCount];
-            var zeroTangents = new Vector3[vertexCount];
-            IReadOnlyDictionary<string, int> morphNameCounts = MmdUnityBlendShapeNames.CountMorphNames(descriptor.vertexMorphs);
+            return BuildConservativeSkinnedBounds(mesh, descriptor, bones, scale);
+        }
 
-            foreach (MmdVertexMorphDescriptor morph in descriptor.vertexMorphs)
+        private static Bounds BuildConservativeSkinnedBounds(
+            Mesh mesh,
+            MmdRenderingDescriptor descriptor,
+            IReadOnlyList<MmdBoneDefinition>? bones,
+            float importScale)
+        {
+            float scale = NormalizeImportScale(importScale);
+            Vector3[] baseVertices = mesh.vertices;
+            IReadOnlyList<MmdBoneDefinition> orderedBones = bones == null || bones.Count == 0
+                ? Array.Empty<MmdBoneDefinition>()
+                : CreateOrderedBones(bones);
+
+            Vector3 center = Vector3.zero;
+            if (orderedBones.Count > 0 && TryToUnityPosition(orderedBones[0].origin, scale, out Vector3 rootOrigin))
             {
-                if (string.IsNullOrWhiteSpace(morph.morphName))
+                center = rootOrigin;
+            }
+
+            var bonesByIndex = new Dictionary<int, MmdBoneDefinition>(orderedBones.Count);
+            var boneOrigins = new Dictionary<int, Vector3>(orderedBones.Count);
+            foreach (MmdBoneDefinition bone in orderedBones)
+            {
+                bonesByIndex[bone.index] = bone;
+                if (TryToUnityPosition(bone.origin, scale, out Vector3 origin))
                 {
+                    boneOrigins[bone.index] = origin;
+                }
+            }
+
+            var chainLengths = new Dictionary<int, float>(orderedBones.Count);
+            var skinningByVertex = new Dictionary<int, MmdSkinningDescriptor>();
+            if (descriptor.skinning != null)
+            {
+                foreach (MmdSkinningDescriptor skinning in descriptor.skinning)
+                {
+                    if (skinning != null)
+                    {
+                        skinningByVertex[skinning.vertexIndex] = skinning;
+                    }
+                }
+            }
+
+            Dictionary<string, double> morphBudgets = BuildVertexMorphBudgets(descriptor);
+            Dictionary<int, double> morphRadiusByVertex = BuildMorphRadiusByVertex(descriptor, morphBudgets, scale);
+            double maxRadius = 0.0;
+            foreach (Vector3 vertex in baseVertices)
+            {
+                maxRadius = Math.Max(maxRadius, Vector3.Distance(vertex, center));
+            }
+
+            int vertexLimit = Math.Min(baseVertices.Length, descriptor.vertices?.Count ?? 0);
+            for (int vertexSlot = 0; vertexSlot < vertexLimit; vertexSlot++)
+            {
+                Vector3 baseVertex = baseVertices[vertexSlot];
+                int vertexIndex = descriptor.vertices[vertexSlot].vertexIndex;
+                double skeletonRadius = Vector3.Distance(baseVertex, center);
+
+                if (skinningByVertex.TryGetValue(vertexIndex, out MmdSkinningDescriptor? skinning) &&
+                    skinning.boneIndices != null && skinning.boneWeights != null)
+                {
+                    int influenceLimit = Math.Min(skinning.boneIndices.Length, skinning.boneWeights.Length);
+                    for (int influence = 0; influence < influenceLimit; influence++)
+                    {
+                        float weight = skinning.boneWeights[influence];
+                        if (!IsFinite(weight) || weight <= 0.0f)
+                        {
+                            continue;
+                        }
+
+                        int boneIndex = skinning.boneIndices[influence];
+                        if (!boneOrigins.TryGetValue(boneIndex, out Vector3 boneOrigin))
+                        {
+                            continue;
+                        }
+
+                        float chainLength = ComputeBindChainLength(
+                            boneIndex,
+                            bonesByIndex,
+                            boneOrigins,
+                            center,
+                            chainLengths);
+                        double candidate = chainLength + Vector3.Distance(baseVertex, boneOrigin);
+                        if (candidate > skeletonRadius)
+                        {
+                            skeletonRadius = candidate;
+                        }
+                    }
+                }
+
+                double morphRadius = morphRadiusByVertex.TryGetValue(vertexIndex, out double precomputedMorphRadius)
+                    ? precomputedMorphRadius
+                    : 0.0;
+                double candidateRadius = skeletonRadius + morphRadius;
+                if (candidateRadius > maxRadius)
+                {
+                    maxRadius = candidateRadius;
+                }
+            }
+
+            if (double.IsNaN(maxRadius) || double.IsInfinity(maxRadius))
+            {
+                maxRadius = float.MaxValue;
+            }
+
+            float radius = (float)Math.Min(maxRadius, float.MaxValue * 0.5);
+            return new Bounds(center, new Vector3(radius * 2.0f, radius * 2.0f, radius * 2.0f));
+        }
+
+        private static float ComputeBindChainLength(
+            int boneIndex,
+            IReadOnlyDictionary<int, MmdBoneDefinition> bonesByIndex,
+            IReadOnlyDictionary<int, Vector3> boneOrigins,
+            Vector3 center,
+            IDictionary<int, float> cache)
+        {
+            if (cache.TryGetValue(boneIndex, out float cached))
+            {
+                return cached;
+            }
+
+            float length = 0.0f;
+            int currentIndex = boneIndex;
+            var visited = new HashSet<int>();
+            while (bonesByIndex.TryGetValue(currentIndex, out MmdBoneDefinition? currentBone) &&
+                   boneOrigins.TryGetValue(currentIndex, out Vector3 currentOrigin))
+            {
+                if (!visited.Add(currentIndex))
+                {
+                    length += Vector3.Distance(center, currentOrigin);
+                    break;
+                }
+
+                if (currentBone.parentIndex >= 0 &&
+                    boneOrigins.TryGetValue(currentBone.parentIndex, out Vector3 parentOrigin))
+                {
+                    length += Vector3.Distance(currentOrigin, parentOrigin);
+                    currentIndex = currentBone.parentIndex;
                     continue;
                 }
 
-                Array.Clear(deltaVertices, 0, vertexCount);
+                length += Vector3.Distance(center, currentOrigin);
+                break;
+            }
 
-                foreach (MmdVertexMorphOffsetDescriptor offset in morph.offsets)
+            cache[boneIndex] = length;
+            return length;
+        }
+
+        private static Dictionary<string, double> BuildVertexMorphBudgets(MmdRenderingDescriptor descriptor)
+        {
+            var vertexMorphNames = new HashSet<string>(StringComparer.Ordinal);
+            var rawMorphNames = new HashSet<string>(StringComparer.Ordinal);
+            var compositeEdges = new Dictionary<string, List<KeyValuePair<string, double>>>(StringComparer.Ordinal);
+
+            if (descriptor.vertexMorphs != null)
+            {
+                foreach (MmdVertexMorphDescriptor morph in descriptor.vertexMorphs)
                 {
-                    int vertexIndex = offset.vertexIndex;
-                    if (vertexIndex < 0 || vertexIndex >= vertexCount)
+                    if (morph == null || string.IsNullOrWhiteSpace(morph.morphName))
+                        continue;
+
+                    vertexMorphNames.Add(morph.morphName);
+                    rawMorphNames.Add(morph.morphName);
+                }
+            }
+
+            if (descriptor.groupMorphs != null)
+            {
+                foreach (MmdGroupMorphDescriptor morph in descriptor.groupMorphs)
+                {
+                    if (morph == null || string.IsNullOrWhiteSpace(morph.morphName))
                     {
                         continue;
                     }
 
-                    if (offset.positionDelta != null && offset.positionDelta.Length >= 3)
+                    rawMorphNames.Add(morph.morphName);
+                    compositeEdges[morph.morphName] = new List<KeyValuePair<string, double>>();
+                    if (morph.offsets == null)
+                        continue;
+
+                    foreach (MmdGroupMorphOffsetDescriptor offset in morph.offsets)
                     {
-                        deltaVertices[vertexIndex] += ToUnityPosition(offset.positionDelta, scale);
+                        AddCompositeMorphEdge(
+                            compositeEdges,
+                            morph.morphName,
+                            ResolveMorphTargetName(offset.targetMorphName, offset.targetMorphIndex),
+                            offset.weight,
+                            IsFinite(offset.weight));
+                    }
+                }
+            }
+
+            if (descriptor.flipMorphs != null)
+            {
+                foreach (MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor morph in descriptor.flipMorphs)
+                {
+                    if (morph == null || string.IsNullOrWhiteSpace(morph.morphName))
+                        continue;
+
+                    rawMorphNames.Add(morph.morphName);
+                    compositeEdges[morph.morphName] = new List<KeyValuePair<string, double>>();
+                    if (morph.offsets == null)
+                    {
+                        continue;
+                    }
+
+                    foreach (MmdMorphDescriptorBuilder.MmdFlipMorphOffsetDescriptor offset in morph.offsets)
+                    {
+                        AddCompositeMorphEdge(
+                            compositeEdges,
+                            morph.morphName,
+                            ResolveMorphTargetName(offset.targetMorphName, offset.targetMorphIndex),
+                            offset.weight,
+                            offset.finiteWeight && IsFinite(offset.weight));
+                    }
+                }
+            }
+
+            var budgets = new Dictionary<string, double>(StringComparer.Ordinal);
+            foreach (string rawMorphName in rawMorphNames)
+            {
+                if (compositeEdges.ContainsKey(rawMorphName))
+                {
+                    AccumulateCompositeMorphBudget(
+                        rawMorphName,
+                        1.0,
+                        vertexMorphNames,
+                        compositeEdges,
+                        budgets,
+                        new HashSet<string>(StringComparer.Ordinal));
+                }
+                else if (vertexMorphNames.Contains(rawMorphName))
+                {
+                    budgets[rawMorphName] = budgets.TryGetValue(rawMorphName, out double current) ? current + 1.0 : 1.0;
+                }
+            }
+
+            return budgets;
+        }
+
+        private static void AddCompositeMorphEdge(
+            IDictionary<string, List<KeyValuePair<string, double>>> edges,
+            string sourceName, string targetName, float weight, bool finiteWeight)
+        {
+            if (finiteWeight && weight != 0.0f)
+            {
+                edges[sourceName].Add(new KeyValuePair<string, double>(targetName, Math.Abs((double)weight)));
+            }
+        }
+
+        private static void AccumulateCompositeMorphBudget(
+            string morphName, double coefficient, ISet<string> vertexMorphNames,
+            IReadOnlyDictionary<string, List<KeyValuePair<string, double>>> edges,
+            IDictionary<string, double> budgets, ISet<string> path)
+        {
+            if (!IsFiniteDouble(coefficient) || !path.Add(morphName) || !edges.TryGetValue(morphName, out List<KeyValuePair<string, double>>? targets))
+            {
+                return;
+            }
+
+            foreach (KeyValuePair<string, double> edge in targets)
+            {
+                double contribution = coefficient * edge.Value;
+                if (!IsFiniteDouble(contribution))
+                {
+                    continue;
+                }
+
+                if (vertexMorphNames.Contains(edge.Key))
+                {
+                    budgets[edge.Key] = budgets.TryGetValue(edge.Key, out double current)
+                        ? current + contribution
+                        : contribution;
+                }
+
+                if (edges.ContainsKey(edge.Key) && !path.Contains(edge.Key))
+                {
+                    AccumulateCompositeMorphBudget(edge.Key, contribution, vertexMorphNames, edges, budgets, path);
+                }
+            }
+
+            path.Remove(morphName);
+        }
+
+        private static string ResolveMorphTargetName(string? targetName, int targetIndex) => string.IsNullOrWhiteSpace(targetName) ? targetIndex.ToString() : targetName;
+
+        private static Dictionary<int, double> BuildMorphRadiusByVertex(
+            MmdRenderingDescriptor descriptor,
+            IReadOnlyDictionary<string, double> morphBudgets,
+            float importScale)
+        {
+            var radiusByVertex = new Dictionary<int, double>();
+            if (descriptor.vertexMorphs == null || descriptor.vertexMorphs.Count == 0)
+                return radiusByVertex;
+
+            foreach (MmdVertexMorphDescriptor morph in descriptor.vertexMorphs)
+            {
+                if (morph == null || string.IsNullOrWhiteSpace(morph.morphName) ||
+                    !morphBudgets.TryGetValue(morph.morphName, out double budget) || budget <= 0.0)
+                {
+                    continue;
+                }
+
+                var aggregateDeltas = new Dictionary<int, Vector3>();
+                if (morph.offsets != null)
+                {
+                    foreach (MmdVertexMorphOffsetDescriptor offset in morph.offsets)
+                    {
+                        if (TryToUnityPosition(offset.positionDelta, importScale, out Vector3 offsetPosition))
+                        {
+                            aggregateDeltas[offset.vertexIndex] = aggregateDeltas.TryGetValue(offset.vertexIndex, out Vector3 current)
+                                ? current + offsetPosition
+                                : offsetPosition;
+                        }
                     }
                 }
 
-                for (int i = 0; i < vertexCount && i < baseVertices.Length; i++)
+                foreach (KeyValuePair<int, Vector3> entry in aggregateDeltas)
                 {
-                    expandedBounds.Encapsulate(baseVertices[i] + deltaVertices[i]);
+                    double contribution = budget * entry.Value.magnitude;
+                    radiusByVertex[entry.Key] = radiusByVertex.TryGetValue(entry.Key, out double current)
+                        ? current + contribution
+                        : contribution;
                 }
-
-                mesh.AddBlendShapeFrame(
-                    MmdUnityBlendShapeNames.ResolveVertexMorphBlendShapeName(morph, morphNameCounts),
-                    100f,
-                    deltaVertices,
-                    zeroNormals,
-                    zeroTangents);
             }
 
-            mesh.bounds = expandedBounds;
+            return radiusByVertex;
         }
+
+        private static bool TryToUnityPosition(float[]? values, float importScale, out Vector3 position)
+        {
+            position = Vector3.zero;
+            if (values == null || values.Length < 3 ||
+                !IsFinite(values[0]) || !IsFinite(values[1]) || !IsFinite(values[2]))
+            {
+                return false;
+            }
+
+            position = ToUnityPosition(values, importScale);
+            return true;
+        }
+
+        private static bool IsFiniteDouble(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
     }
 }

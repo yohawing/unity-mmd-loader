@@ -234,8 +234,6 @@ namespace Mmd.UnityIntegration
             if (blendShapeRenderer != null)
             {
                 stageStart = timing != null ? Stopwatch.GetTimestamp() : 0L;
-                bool blendShapeBoundsWeightsChanged = false;
-                int bindingSlot = 0;
                 foreach (MmdUnityVertexMorphBlendShapeBinding binding in instance.VertexMorphBlendShapes)
                 {
                     float resolvedWeight = resolvedWeights.TryGetValue(binding.MorphName, out float w) ? w : 0f;
@@ -244,19 +242,7 @@ namespace Mmd.UnityIntegration
                         throw new InvalidOperationException($"BlendShape morph weight must be finite: {binding.MorphName}");
                     }
 
-                    if (bindingSlot >= instance.LastBlendShapeBoundsWeights.Length)
-                    {
-                        throw new InvalidOperationException("BlendShape bounds weight cache does not match BlendShape bindings.");
-                    }
-
-                    if (resolvedWeight != instance.LastBlendShapeBoundsWeights[bindingSlot])
-                    {
-                        blendShapeBoundsWeightsChanged = true;
-                        instance.LastBlendShapeBoundsWeights[bindingSlot] = resolvedWeight;
-                    }
-
                     blendShapeRenderer.SetBlendShapeWeight(binding.BlendShapeIndex, resolvedWeight * 100f);
-                    bindingSlot++;
                 }
 
                 if (timing != null)
@@ -290,17 +276,7 @@ namespace Mmd.UnityIntegration
                     }
                 }
 
-                if (blendShapeBoundsWeightsChanged)
-                {
-                    stageStart = timing != null ? Stopwatch.GetTimestamp() : 0L;
-                    blendShapeRenderer.localBounds = CalculateBlendShapeMorphedBounds(descriptor, resolvedWeights, instance.ImportScale);
-                    if (timing != null)
-                    {
-                        timing.localBoundsAssignMs = ToMilliseconds(Stopwatch.GetTimestamp() - stageStart);
-                        timing.localBoundsAssigned = true;
-                    }
-                }
-                else if (timing != null)
+                if (timing != null)
                 {
                     timing.localBoundsSkipped = true;
                 }
@@ -556,68 +532,6 @@ namespace Mmd.UnityIntegration
             }
 
             return count;
-        }
-
-        private static Bounds CalculateBlendShapeMorphedBounds(
-            MmdRenderingDescriptor descriptor,
-            IReadOnlyDictionary<string, float> resolvedWeights,
-            float importScale)
-        {
-            float scale = (float.IsFinite(importScale) && importScale > 0.0f) ? importScale : 1.0f;
-            IReadOnlyList<MmdMeshVertexDescriptor>? vertices = descriptor.vertices;
-            if (vertices == null || vertices.Count == 0)
-            {
-                return new Bounds(Vector3.zero, Vector3.zero);
-            }
-
-            IReadOnlyList<MmdVertexMorphDescriptor> vertexMorphs = descriptor.vertexMorphs
-                ?? throw new InvalidOperationException("Rendering descriptor vertex morphs are required for BlendShape bounds evaluation.");
-            var vertexSlotsByIndex = new Dictionary<int, int>(vertices.Count);
-            var positions = new Vector3[vertices.Count];
-            for (int i = 0; i < vertices.Count; i++)
-            {
-                MmdMeshVertexDescriptor vertex = vertices[i];
-                vertexSlotsByIndex[vertex.vertexIndex] = i;
-                positions[i] = ToUnityPosition(ValidateMorphedVector3(vertex.position, i, "position")) * scale;
-            }
-
-            foreach (MmdVertexMorphDescriptor morph in vertexMorphs)
-            {
-                if (string.IsNullOrWhiteSpace(morph.morphName))
-                {
-                    continue;
-                }
-
-                float resolvedWeight = resolvedWeights.TryGetValue(morph.morphName, out float weight) ? weight : 0.0f;
-                if (resolvedWeight == 0.0f)
-                {
-                    continue;
-                }
-
-                if (!IsFinite(resolvedWeight))
-                {
-                    throw new InvalidOperationException($"BlendShape morph weight must be finite: {morph.morphName}");
-                }
-
-                foreach (MmdVertexMorphOffsetDescriptor offset in morph.offsets)
-                {
-                    if (!vertexSlotsByIndex.TryGetValue(offset.vertexIndex, out int slot))
-                    {
-                        continue;
-                    }
-
-                    Vector3 delta = ToUnityPosition(ValidateMorphedVector3(offset.positionDelta, offset.vertexIndex, "positionDelta")) * scale;
-                    positions[slot] += delta * resolvedWeight;
-                }
-            }
-
-            var bounds = new Bounds(positions[0], Vector3.zero);
-            for (int i = 1; i < positions.Length; i++)
-            {
-                bounds.Encapsulate(positions[i]);
-            }
-
-            return bounds;
         }
 
         private static double ToMilliseconds(long ticks)

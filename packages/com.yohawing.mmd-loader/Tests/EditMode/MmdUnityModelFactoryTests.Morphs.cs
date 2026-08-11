@@ -214,6 +214,8 @@ namespace Mmd.Tests
             MmdModelDefinition model = CreateGroupMorphTriangleModel();
             using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
             MmdUnityModelInstance instance = scope.Instance;
+            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+            Bounds initialBounds = renderer.localBounds;
 
             // Frame with both direct vertex morph weight and group morph weight.
             // Direct "smile" at 1.0 + group "happy-face" at 0.5 targeting "smile" with offset 0.5.
@@ -226,8 +228,9 @@ namespace Mmd.Tests
 
             // smile(1.0) + happy-face(0.5) * 0.5 = resolved smile 1.25 -> BlendShape 125f
             int smileIndex = instance.Mesh.GetBlendShapeIndex("smile");
-            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
             Assert.That(renderer.GetBlendShapeWeight(smileIndex), Is.EqualTo(125f).Within(0.001f));
+            Assert.That(renderer.localBounds.center, Is.EqualTo(initialBounds.center));
+            Assert.That(renderer.localBounds.size, Is.EqualTo(initialBounds.size));
             Assert.That(renderer.localBounds.Contains(new Vector3(-1.0f, 2.5f, 0.0f)), Is.True);
         }
         [Test]

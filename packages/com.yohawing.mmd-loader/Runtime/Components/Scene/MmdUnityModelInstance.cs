@@ -87,7 +87,6 @@ namespace Mmd.UnityIntegration
 
             BlendShapeIndexMap = blendShapeMap;
             VertexMorphBlendShapes = BuildVertexMorphBlendShapeBindings(renderingDescriptor, mesh);
-            LastBlendShapeBoundsWeights = CreateUninitializedBlendShapeWeights(VertexMorphBlendShapes.Count);
         }
 
         public GameObject Root { get; }
@@ -127,8 +126,6 @@ namespace Mmd.UnityIntegration
         public IReadOnlyDictionary<string, int> BlendShapeIndexMap { get; }
 
         public IReadOnlyList<MmdUnityVertexMorphBlendShapeBinding> VertexMorphBlendShapes { get; }
-
-        internal float[] LastBlendShapeBoundsWeights { get; }
 
         internal int MaterialMorphPropertyWriteCount { get; private set; }
 
@@ -450,16 +447,6 @@ namespace Mmd.UnityIntegration
             return result;
         }
 
-        private static float[] CreateUninitializedBlendShapeWeights(int count)
-        {
-            var result = new float[count];
-            for (int i = 0; i < result.Length; i++)
-            {
-                result[i] = float.NaN;
-            }
-
-            return result;
-        }
     }
 
     public sealed class MmdUnityVertexMorphBlendShapeBinding

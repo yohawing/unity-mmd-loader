@@ -96,6 +96,7 @@ namespace Mmd.Tests
             SkinnedMeshRenderer renderer = binding.Instance.SkinnedMeshRenderer!;
             int blinkShapeIndex = binding.Instance.Mesh.GetBlendShapeIndex("blink");
             Assert.That(blinkShapeIndex, Is.GreaterThanOrEqualTo(0));
+            Bounds initialBounds = renderer.localBounds;
 
             binding.ApplyFrame(frame: 10, frameRate: 30.0f);
             float morphedWeight = renderer.GetBlendShapeWeight(blinkShapeIndex);
@@ -106,11 +107,15 @@ namespace Mmd.Tests
 
             binding.ApplyFrame(frame: 0, frameRate: 30.0f);
             float restoredWeight = renderer.GetBlendShapeWeight(blinkShapeIndex);
+            Bounds restoredBounds = renderer.localBounds;
 
             Assert.That(morphedWeight, Is.EqualTo(100f).Within(0.001f));
-            Assert.That(morphedBounds.Contains(new Vector3(-1.0f, 2.0f, 0.0f)), Is.True);
+            Assert.That(morphedBounds.center, Is.EqualTo(initialBounds.center));
+            Assert.That(morphedBounds.size, Is.EqualTo(initialBounds.size));
             Assert.That(repeatedWeight, Is.EqualTo(morphedWeight).Within(0.001f));
             Assert.That(restoredWeight, Is.EqualTo(0f).Within(0.001f));
+            Assert.That(restoredBounds.center, Is.EqualTo(initialBounds.center));
+            Assert.That(restoredBounds.size, Is.EqualTo(initialBounds.size));
             Assert.That(binding.Instance.RenderingDescriptor.vertices[1].position[1], Is.EqualTo(0.0f).Within(0.00001f));
         }
         [Test]
@@ -216,12 +221,14 @@ namespace Mmd.Tests
             Assert.That(renderer.GetBlendShapeWeight(instance.BlendShapeIndexMap["blink"]), Is.EqualTo(100f).Within(0.001f));
         }
         [Test]
-        public void BlendShapeBoundsUseLocalBoundsWithoutRecalculateForResolvedWeightsAboveOne()
+        public void BlendShapeWeightsPreserveFactoryLocalBoundsForResolvedWeightsAboveOne()
         {
 
             MmdModelDefinition model = CreateGroupMorphTriangleModel();
             using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
             MmdUnityModelInstance instance = scope.Instance;
+            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+            Bounds initialBounds = renderer.localBounds;
 
             MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
             frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "smile", weight = 1.0f });
@@ -230,45 +237,52 @@ namespace Mmd.Tests
             MmdUnityMorphApplyTimingSummary timing = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame);
 
             Assert.That(timing.blendShapePathUsed, Is.True);
-            Assert.That(timing.localBoundsAssigned, Is.True);
-            Assert.That(timing.localBoundsSkipped, Is.False);
+            Assert.That(timing.localBoundsAssigned, Is.False);
+            Assert.That(timing.localBoundsSkipped, Is.True);
             Assert.That(timing.recalculateBoundsMs, Is.EqualTo(0.0));
-            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
-            Assert.That(renderer.localBounds.Contains(new Vector3(-1.0f, 2.5f, 0.0f)), Is.True);
+            Assert.That(renderer.GetBlendShapeWeight(instance.BlendShapeIndexMap["smile"]), Is.EqualTo(125f).Within(0.001f));
+            Assert.That(renderer.localBounds.center, Is.EqualTo(initialBounds.center));
+            Assert.That(renderer.localBounds.size, Is.EqualTo(initialBounds.size));
         }
         [Test]
-        public void BlendShapeLocalBoundsSkipWhenResolvedWeightsAreUnchanged()
+        public void BlendShapeLocalBoundsRemainFactoryBoundsWhenResolvedWeightsAreUnchanged()
         {
 
             MmdModelDefinition model = CreateGroupMorphTriangleModel();
             using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
             MmdUnityModelInstance instance = scope.Instance;
+            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+            Bounds initialBounds = renderer.localBounds;
 
             MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
             frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "smile", weight = 1.0f });
             frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 0.5f });
 
             MmdUnityMorphApplyTimingSummary first = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame);
-            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
             Bounds firstBounds = renderer.localBounds;
             MmdUnityMorphApplyTimingSummary second = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame);
             Bounds secondBounds = renderer.localBounds;
 
-            Assert.That(first.localBoundsAssigned, Is.True);
-            Assert.That(first.localBoundsSkipped, Is.False);
+            Assert.That(first.localBoundsAssigned, Is.False);
+            Assert.That(first.localBoundsSkipped, Is.True);
             Assert.That(second.localBoundsAssigned, Is.False);
             Assert.That(second.localBoundsSkipped, Is.True);
             Assert.That(second.localBoundsAssignMs, Is.EqualTo(0.0));
-            Assert.That(secondBounds.center, Is.EqualTo(firstBounds.center));
-            Assert.That(secondBounds.size, Is.EqualTo(firstBounds.size));
+            Assert.That(firstBounds.center, Is.EqualTo(initialBounds.center));
+            Assert.That(firstBounds.size, Is.EqualTo(initialBounds.size));
+            Assert.That(secondBounds.center, Is.EqualTo(initialBounds.center));
+            Assert.That(secondBounds.size, Is.EqualTo(initialBounds.size));
+            Assert.That(renderer.GetBlendShapeWeight(instance.BlendShapeIndexMap["smile"]), Is.EqualTo(125f).Within(0.001f));
         }
         [Test]
-        public void BlendShapeLocalBoundsRecalculateWhenResolvedWeightsChangeAfterSkip()
+        public void BlendShapeLocalBoundsRemainFactoryBoundsWhenResolvedWeightsChange()
         {
 
             MmdModelDefinition model = CreateGroupMorphTriangleModel();
             using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
             MmdUnityModelInstance instance = scope.Instance;
+            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+            Bounds initialBounds = renderer.localBounds;
 
             MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
             frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "smile", weight = 1.0f });
@@ -282,11 +296,40 @@ namespace Mmd.Tests
             changed.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 1.0f });
             MmdUnityMorphApplyTimingSummary timing = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, changed);
 
-            Assert.That(timing.localBoundsAssigned, Is.True);
-            Assert.That(timing.localBoundsSkipped, Is.False);
+            Assert.That(timing.localBoundsAssigned, Is.False);
+            Assert.That(timing.localBoundsSkipped, Is.True);
             Assert.That(timing.recalculateBoundsMs, Is.EqualTo(0.0));
-            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+            Assert.That(renderer.GetBlendShapeWeight(instance.BlendShapeIndexMap["smile"]), Is.EqualTo(150f).Within(0.001f));
+            Assert.That(renderer.localBounds.center, Is.EqualTo(initialBounds.center));
+            Assert.That(renderer.localBounds.size, Is.EqualTo(initialBounds.size));
             Assert.That(renderer.localBounds.Contains(new Vector3(-1.0f, 3.0f, 0.0f)), Is.True);
+        }
+        [Test]
+        public void FactoryLocalBoundsContainRotatedArticulatedSkinnedPose()
+        {
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.vertices[1].boneIndices = new[] { 1 };
+            model.vertices[1].boneWeights = new[] { 1.0f };
+
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
+            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+            Bounds fixedBounds = renderer.localBounds;
+
+            instance.BoneTransforms[1].localRotation = Quaternion.Euler(0.0f, 0.0f, 180.0f);
+            var baked = new Mesh();
+            try
+            {
+                renderer.BakeMesh(baked);
+                foreach (Vector3 vertex in baked.vertices)
+                {
+                    Assert.That(fixedBounds.Contains(vertex), Is.True, $"Rotated vertex escaped fixed bounds: {vertex}; bounds={fixedBounds}");
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(baked);
+            }
         }
         [Test]
         public void DuplicateNameVertexMorphsBakeDistinctBlendShapesAndShareResolvedWeight()

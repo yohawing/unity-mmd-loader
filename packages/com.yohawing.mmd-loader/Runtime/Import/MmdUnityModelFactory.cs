@@ -343,11 +343,12 @@ namespace Mmd.UnityIntegration
                 mesh = BuildMesh(descriptor, scale);
                 rollback.AdoptGeneratedMesh(mesh);
                 ApplySkinning(mesh, descriptor, orderedBones, boneTransforms, modelRoot);
-                BakeVertexMorphBlendShapes(mesh, descriptor, scale);
+                Bounds localBounds = BakeVertexMorphBlendShapes(mesh, descriptor, scale, orderedBones);
                 mesh.name = sharedMesh == null || string.IsNullOrWhiteSpace(sharedMesh.name)
                     ? "MMD Rebound Mesh"
                     : sharedMesh.name + " Split Runtime";
                 renderer.sharedMesh = mesh;
+                renderer.localBounds = localBounds;
             }
             MmdShaderBindingDiagnostics shaderDiagnostics = MmdUnityMaterialBuilder.BuildExistingShaderDiagnostics(renderer);
             ApplySelfShadowTargetPolicy(root, modelRoot, includeSelfShadowTarget, preserveExistingSelfShadowTarget);
@@ -603,7 +604,7 @@ namespace Mmd.UnityIntegration
                 MmdUnityPhysicsBody[] physicsBodies = BuildPhysicsBodies(modelRoot, bones, boneTransforms, physics, importScale);
                 mesh = BuildMesh(descriptor, importScale);
                 ApplySkinning(mesh, descriptor, bones, boneTransforms, modelRoot);
-                BakeVertexMorphBlendShapes(mesh, descriptor, importScale);
+                Bounds localBounds = BakeVertexMorphBlendShapes(mesh, descriptor, importScale, bones);
                 textureResolution = MmdRuntimeTextureResolver.ResolveDiffuseTextures(descriptor, sourceContext);
                 materials = MmdUnityMaterialBuilder.BuildMaterials(
                     descriptor,
@@ -618,6 +619,7 @@ namespace Mmd.UnityIntegration
                 renderer.sharedMaterials = materials;
                 renderer.bones = boneTransforms;
                 renderer.rootBone = boneTransforms.Length > 0 ? boneTransforms[0] : modelRoot;
+                renderer.localBounds = localBounds;
                 ApplyRendererShadowPolicy(renderer);
                 ApplySelfShadowTargetPolicy(root, modelRoot, includeSelfShadowTarget);
 
