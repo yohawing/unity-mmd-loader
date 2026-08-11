@@ -26,7 +26,13 @@ namespace Mmd.UnityIntegration
         /// The state requested an orthographic projection (MMD perspective flag off). v1 keeps the
         /// camera in perspective and reports this; orthographic switching is a follow-up slice.
         /// </summary>
-        AppliedOrthographicNotSupported = 3
+        AppliedOrthographicNotSupported = 3,
+
+        /// <summary>More than one explicit camera target is configured for a single writer.</summary>
+        ConflictingCameraTargets = 4,
+
+        /// <summary>A procedural camera authority would compete with the sampled VMD camera state.</summary>
+        ProceduralCameraAuthorityConflict = 5
     }
 
     /// <summary>
@@ -119,7 +125,7 @@ namespace Mmd.UnityIntegration
     /// drives it. Nothing is auto-created; an unbound target is surfaced as a structured diagnostic
     /// (<see cref="MmdSceneCameraApplyStatus.NoTargetCamera"/>) rather than silently spawning a camera.
     /// </summary>
-    public sealed class MmdSceneEnvironmentBinding : MonoBehaviour
+    public class MmdSceneEnvironmentBinding : MonoBehaviour
     {
         public const byte DefaultSelfShadowMode = 2;
         public const float DefaultSelfShadowDistance = 0.5f;
@@ -341,15 +347,14 @@ namespace Mmd.UnityIntegration
         /// the bound Camera's transform and field of view. Returns a structured status; never throws on
         /// a missing target.
         /// </summary>
-        public MmdSceneCameraApplyStatus ApplyCameraState(
+        public virtual MmdSceneCameraApplyStatus ApplyCameraState(
             MmdCameraState state,
             float minFieldOfView = MmdCameraStateToUnity.DefaultMinFieldOfView,
             float importScale = 1.0f)
         {
             if (targetCamera == null)
             {
-                LastCameraApplyStatus = MmdSceneCameraApplyStatus.NoTargetCamera;
-                return LastCameraApplyStatus;
+                return SetLastCameraApplyStatus(MmdSceneCameraApplyStatus.NoTargetCamera);
             }
 
             MmdUnityCameraPose pose = MmdCameraStateToUnity.Convert(state, minFieldOfView, importScale);
@@ -361,10 +366,18 @@ namespace Mmd.UnityIntegration
             targetCamera.orthographic = false;
             targetCamera.fieldOfView = pose.FieldOfView;
 
-            LastCameraApplyStatus = pose.Perspective
+            return SetLastCameraApplyStatus(pose.Perspective
                 ? MmdSceneCameraApplyStatus.Applied
-                : MmdSceneCameraApplyStatus.AppliedOrthographicNotSupported;
-            return LastCameraApplyStatus;
+                : MmdSceneCameraApplyStatus.AppliedOrthographicNotSupported);
+        }
+
+        /// <summary>
+        /// Updates the camera apply diagnostic for an optional derived camera writer.
+        /// </summary>
+        protected MmdSceneCameraApplyStatus SetLastCameraApplyStatus(MmdSceneCameraApplyStatus status)
+        {
+            LastCameraApplyStatus = status;
+            return status;
         }
 
         /// <summary>

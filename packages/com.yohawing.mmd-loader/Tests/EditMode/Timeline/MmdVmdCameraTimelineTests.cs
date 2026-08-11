@@ -138,6 +138,24 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void RepeatEvaluationAtTheSameTimeDoesNotDrift()
+        {
+            AssertEvaluationSequenceEndsAtExpectedPose(new[] { 0.5, 0.5 }, 0.5);
+        }
+
+        [Test]
+        public void ReverseSeekDoesNotDependOnTheLaterSample()
+        {
+            AssertEvaluationSequenceEndsAtExpectedPose(new[] { 0.75, 0.25 }, 0.25);
+        }
+
+        [Test]
+        public void RandomAccessEvaluationDoesNotDependOnPriorSamples()
+        {
+            AssertEvaluationSequenceEndsAtExpectedPose(new[] { 0.1, 0.9, 0.4, 0.65 }, 0.65);
+        }
+
+        [Test]
         public void SourceBackedUnavailableNativeSelfShadowIsDiagnosticOnly()
         {
             var bindingGo = new GameObject("binding");
@@ -623,6 +641,46 @@ namespace Mmd.Tests
         private static byte[] BuildCameraVmdBytes()
         {
             return MmdTestFixtures.BuildCameraTrackVmdBytes("camera_test");
+        }
+
+        private static void AssertEvaluationSequenceEndsAtExpectedPose(double[] localTimes, double expectedLocalTime)
+        {
+            var bindingGo = new GameObject("binding");
+            var cameraGo = new GameObject("camera");
+            var behaviour = new MmdVmdCameraBehaviour
+            {
+                MotionBytes = BuildCameraVmdBytes(),
+                FrameRate = 30f,
+                ImportScale = 1.0f
+            };
+
+            try
+            {
+                Camera camera = cameraGo.AddComponent<Camera>();
+                MmdSceneEnvironmentBinding binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
+                binding.TargetCamera = camera;
+
+                foreach (double localTime in localTimes)
+                {
+                    Assert.That(
+                        behaviour.EvaluateAtLocalTime(binding, localTime),
+                        Is.EqualTo(MmdSceneCameraApplyStatus.Applied));
+                }
+
+                float expectedFrame = (float)(expectedLocalTime * behaviour.FrameRate);
+                MmdUnityCameraPose expected = MmdCameraStateToUnity.Convert(
+                    SampleNativeCamera(behaviour.MotionBytes!, expectedFrame));
+                Assert.That(Vector3.Distance(camera.transform.position, expected.Position), Is.LessThan(0.001f));
+                Assert.That(Quaternion.Angle(camera.transform.rotation, expected.Rotation), Is.LessThan(0.05f));
+                Assert.That(camera.fieldOfView, Is.EqualTo(expected.FieldOfView).Within(0.001f));
+                Assert.That(camera.orthographic, Is.False);
+            }
+            finally
+            {
+                behaviour.OnPlayableDestroy(Playable.Null);
+                UnityEngine.Object.DestroyImmediate(cameraGo);
+                UnityEngine.Object.DestroyImmediate(bindingGo);
+            }
         }
 
         private static byte[] BuildCameraAndLightVmdBytes()
