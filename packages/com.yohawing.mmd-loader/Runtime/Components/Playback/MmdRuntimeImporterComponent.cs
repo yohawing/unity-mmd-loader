@@ -102,14 +102,17 @@ namespace Mmd.UnityIntegration
             return TryConfigureControllerCore(controller, requireNativeClip: false);
         }
 
-        internal bool TryConfigureControllerForTimeline(MmdUnityPlaybackController? controller = null)
+        internal bool TryConfigureControllerForTimeline(
+            MmdUnityPlaybackController? controller = null,
+            MmdTimelineSetupTimingSummary? setupTiming = null)
         {
-            return TryConfigureControllerCore(controller, requireNativeClip: true);
+            return TryConfigureControllerCore(controller, requireNativeClip: true, setupTiming);
         }
 
         private bool TryConfigureControllerCore(
             MmdUnityPlaybackController? controller,
-            bool requireNativeClip)
+            bool requireNativeClip,
+            MmdTimelineSetupTimingSummary? setupTiming = null)
         {
             controller ??= GetComponent<MmdUnityPlaybackController>();
             if (controller == null)
@@ -145,7 +148,11 @@ namespace Mmd.UnityIntegration
             MmdPlaybackConfig config = ToConfig();
             if (requireNativeClip)
             {
-                controller.ConfigureFromRuntimeImporterPathsForTimeline(modelPath, motionPath, config);
+                controller.ConfigureFromRuntimeImporterPathsForTimeline(
+                    modelPath,
+                    motionPath,
+                    config,
+                    setupTiming);
             }
             else
             {

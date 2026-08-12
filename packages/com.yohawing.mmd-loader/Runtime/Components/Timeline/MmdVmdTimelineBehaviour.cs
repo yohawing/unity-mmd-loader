@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using System.Diagnostics;
 using UnityEngine;
 using UnityEngine.Playables;
 using Mmd;
@@ -91,14 +92,28 @@ namespace Mmd.Timeline
                 return false;
             }
 
-            MmdPlaybackTime.ValidateFrameRate(FrameRate);
-            if (!TryConfigureTimelineTarget(target))
+            var timing = new MmdTimelineSetupTimingSummary();
+            target.LastTimelineSetupTiming = timing;
+            Stopwatch totalWatch = Stopwatch.StartNew();
+            try
             {
-                return false;
-            }
+                MmdPlaybackTime.ValidateFrameRate(FrameRate);
+                if (!TryConfigureTimelineTarget(target, timing))
+                {
+                    return false;
+                }
 
-            target.PrewarmTimelineLivePhysics();
-            return true;
+                timing.configured = true;
+                Stopwatch prewarmWatch = Stopwatch.StartNew();
+                timing.livePhysicsPrewarmed = target.PrewarmTimelineLivePhysics();
+                timing.livePhysicsPrewarmMs = prewarmWatch.Elapsed.TotalMilliseconds;
+                timing.succeeded = true;
+                return true;
+            }
+            finally
+            {
+                timing.totalMs = totalWatch.Elapsed.TotalMilliseconds;
+            }
         }
 
         public MmdPlaybackSnapshot EvaluateAtLocalTime(MmdUnityPlaybackController target, double localTime)
@@ -134,7 +149,7 @@ namespace Mmd.Timeline
                 throw new ArgumentOutOfRangeException(nameof(localTime), "Timeline local time is too large for playback evaluation.");
             }
 
-            if (!TryConfigureTimelineTarget(target))
+            if (!TryConfigureTimelineTarget(target, setupTiming: null))
             {
                 throw new InvalidOperationException("Timeline target playback controller is not configured and has no provider-owned PMX/VMD source.");
             }
@@ -150,7 +165,9 @@ namespace Mmd.Timeline
             return target.ApplyTimelineTime((float)sourceTime, FrameRate);
         }
 
-        private bool TryConfigureTimelineTarget(MmdUnityPlaybackController target)
+        private bool TryConfigureTimelineTarget(
+            MmdUnityPlaybackController target,
+            MmdTimelineSetupTimingSummary? setupTiming)
         {
             if (MotionAsset != null && !target.IsConfiguredForMotionAsset(MotionAsset))
             {
@@ -158,10 +175,11 @@ namespace Mmd.Timeline
                     MotionAsset,
                     FrameRate,
                     startFrame: 0,
-                    playOnStart: false);
+                    playOnStart: false,
+                    setupTiming: setupTiming);
             }
             else if (!target.IsConfigured &&
-                !target.ConfigureFromPlaybackSourceIfAvailableForTimeline())
+                !target.ConfigureFromPlaybackSourceIfAvailableForTimeline(setupTiming))
             {
                 return false;
             }

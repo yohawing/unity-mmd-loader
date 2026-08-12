@@ -25,6 +25,27 @@ namespace Mmd.UnityIntegration
         HumanoidRetarget = 2
     }
 
+    [Serializable]
+    public sealed class MmdTimelineSetupTimingSummary
+    {
+        public double totalMs;
+        public double motionHeaderMs;
+        public double pmxParseMs;
+        public double compatibilityValidationMs;
+        public double sourceCopyMs;
+        public double sharedVmdContextMs;
+        public double nativeAvailabilityMs;
+        public double releasePreviousBindingMs;
+        public double sceneBindingMs;
+        public double nativeSessionMs;
+        public double controllerConfigureMs;
+        public double initialSeedMs;
+        public double livePhysicsPrewarmMs;
+        public bool configured;
+        public bool livePhysicsPrewarmed;
+        public bool succeeded;
+    }
+
     [DisallowMultipleComponent]
     public sealed partial class MmdUnityPlaybackController : MonoBehaviour
     {
@@ -90,6 +111,8 @@ namespace Mmd.UnityIntegration
         internal MmdUnityModelInstance? ConfiguredPlaybackInstance => binding?.PlaybackInstance;
 
         public MmdPlaybackSnapshot? LastSnapshot { get; private set; }
+
+        public MmdTimelineSetupTimingSummary? LastTimelineSetupTiming { get; internal set; }
 
         public MmdLivePhysicsFrameDiagnostics? LastLivePhysicsDiagnostics =>
             binding?.LastLivePhysicsDiagnostics ?? humanoidPhysicsBinding?.LastLivePhysicsDiagnostics;

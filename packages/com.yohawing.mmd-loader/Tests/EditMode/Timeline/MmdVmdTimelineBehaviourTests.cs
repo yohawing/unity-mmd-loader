@@ -607,12 +607,70 @@ namespace Mmd.Tests
                 Assert.That(controller.LastSnapshot, Is.Not.Null,
                     "Preparation must seed frame zero before the first clip frame.");
                 Assert.That(controller.LastSnapshot!.frame.frame, Is.EqualTo(0));
+                MmdTimelineSetupTimingSummary? timing = controller.LastTimelineSetupTiming;
+                Assert.That(timing, Is.Not.Null);
+                Assert.That(timing!.configured, Is.True);
+                Assert.That(timing.succeeded, Is.True);
+                Assert.That(timing.totalMs, Is.GreaterThan(0.0));
+                Assert.That(timing.motionHeaderMs, Is.GreaterThan(0.0));
+                Assert.That(timing.pmxParseMs, Is.GreaterThan(0.0));
+                Assert.That(timing.compatibilityValidationMs, Is.GreaterThanOrEqualTo(0.0));
+                Assert.That(timing.sourceCopyMs, Is.GreaterThanOrEqualTo(0.0));
+                Assert.That(timing.sharedVmdContextMs, Is.GreaterThanOrEqualTo(0.0));
+                Assert.That(timing.nativeAvailabilityMs, Is.GreaterThan(0.0));
+                Assert.That(timing.sceneBindingMs, Is.GreaterThan(0.0));
+                Assert.That(timing.nativeSessionMs, Is.GreaterThan(0.0));
+                Assert.That(timing.controllerConfigureMs, Is.GreaterThan(0.0));
+                Assert.That(timing.initialSeedMs, Is.GreaterThan(0.0));
+                Assert.That(timing.livePhysicsPrewarmMs, Is.GreaterThanOrEqualTo(0.0));
+                Assert.That(timing.totalMs, Is.GreaterThanOrEqualTo(timing.pmxParseMs));
+                TestContext.WriteLine("timelineSetup=" + JsonUtility.ToJson(timing));
             }
             finally
             {
                 MmdTestInstanceScope.DestroyInstance(instance);
                 Object.DestroyImmediate(pmxAsset);
                 Object.DestroyImmediate(vmdAsset);
+            }
+        }
+
+        [Test]
+        public void TimelinePreparationRecordsRuntimeImporterSetupPhases()
+        {
+            MmdUnityModelInstance? instance = null;
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                var parser = new NativeMmdParser();
+                instance = MmdUnityModelFactory.CreateSkinnedModel(
+                    parser.LoadModel(File.ReadAllBytes(pmxPath)),
+                    pmxPath);
+                MmdUnityPlaybackController controller = instance.Root.AddComponent<MmdUnityPlaybackController>();
+                MmdRuntimeImporterComponent importer = instance.Root.AddComponent<MmdRuntimeImporterComponent>();
+                importer.ConfigurePaths(pmxPath, vmdPath, 30.0f, 0, shouldPlayOnStart: false);
+                var behaviour = new MmdVmdTimelineBehaviour { FrameRate = 30.0f };
+                MethodInfo prepare = typeof(MmdVmdTimelineBehaviour).GetMethod(
+                    "TryPrepareTimelinePlayback",
+                    BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+                Assert.That(prepare.Invoke(behaviour, new object[] { controller }), Is.EqualTo(true));
+
+                MmdTimelineSetupTimingSummary timing = controller.LastTimelineSetupTiming!;
+                Assert.That(timing, Is.Not.Null);
+                Assert.That(timing.succeeded, Is.True);
+                Assert.That(timing.sourceCopyMs, Is.GreaterThan(0.0));
+                Assert.That(timing.pmxParseMs, Is.GreaterThan(0.0));
+                Assert.That(timing.motionHeaderMs, Is.GreaterThan(0.0));
+                Assert.That(timing.nativeAvailabilityMs, Is.GreaterThan(0.0));
+                Assert.That(timing.sceneBindingMs, Is.GreaterThan(0.0));
+                Assert.That(timing.nativeSessionMs, Is.GreaterThan(0.0));
+                Assert.That(timing.initialSeedMs, Is.GreaterThan(0.0));
+                TestContext.WriteLine("runtimeImporterTimelineSetup=" + JsonUtility.ToJson(timing));
+            }
+            finally
+            {
+                MmdTestInstanceScope.DestroyInstance(instance);
             }
         }
 
