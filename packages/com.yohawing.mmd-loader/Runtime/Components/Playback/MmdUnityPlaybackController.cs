@@ -87,6 +87,8 @@ namespace Mmd.UnityIntegration
 
         public GameObject? ConfiguredInstanceRoot => binding?.Instance.Root;
 
+        internal MmdUnityModelInstance? ConfiguredPlaybackInstance => binding?.PlaybackInstance;
+
         public MmdPlaybackSnapshot? LastSnapshot { get; private set; }
 
         public MmdLivePhysicsFrameDiagnostics? LastLivePhysicsDiagnostics =>

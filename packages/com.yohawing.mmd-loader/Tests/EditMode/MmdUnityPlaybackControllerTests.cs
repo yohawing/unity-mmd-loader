@@ -513,6 +513,102 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void PmxReimportRestoresBorrowedPlaybackTextureReferencesWithoutResettingColors()
+        {
+            MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
+            MmdUnityModelInstance? previewInstance = null;
+            MmdUnityPlaybackController? controller = null;
+            Material? importedMaterial = null;
+            Texture2D? importedTexture = null;
+
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                byte[] pmxBytes = File.ReadAllBytes(pmxPath);
+                byte[] vmdBytes = File.ReadAllBytes(vmdPath);
+                var parser = new NativeMmdParser();
+                previewInstance = MmdUnityModelFactory.CreateSkinnedModel(parser.LoadModel(pmxBytes), pmxPath);
+
+                Shader shader = Shader.Find("MMD URP Toon")
+                    ?? throw new InvalidOperationException("MMD URP Toon shader is required for the reimport test.");
+                importedTexture = new Texture2D(1, 1) { name = "Imported Diffuse" };
+                importedMaterial = new Material(shader) { name = "Imported Material" };
+                importedMaterial.SetTexture("_BaseMap", importedTexture);
+                importedMaterial.SetTexture("_MainTex", importedTexture);
+
+                pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                pmxAsset.Initialize(
+                    pmxBytes,
+                    "test_1bone_cube.pmx",
+                    pmxPath,
+                    assetImportScale: 1.0f,
+                    assetShaderPreset: "MMD URP Toon",
+                    importedMaterialAssets: new[] { importedMaterial });
+                vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                vmdAsset.Initialize(vmdBytes, "test_1bone_cube_motion.vmd", vmdPath);
+
+                controller = previewInstance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.ConfigureModelAsset(pmxAsset);
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+                controller.Configure(
+                    MmdUnityPlaybackBinding.CreateSkinned(previewInstance, pmxAsset, vmdAsset),
+                    30.0f,
+                    playOnStart: false);
+                controller.ApplyFrame(0);
+
+                Material playbackMaterial = previewInstance.SkinnedMeshRenderer!.sharedMaterials[0];
+                playbackMaterial.SetTexture("_BaseMap", null);
+                playbackMaterial.SetTexture("_MainTex", null);
+                playbackMaterial.SetColor("_Color", Color.magenta);
+
+                int updatedPropertyCount =
+                    MmdPlaybackMaterialReimportSynchronizer.RefreshController(controller);
+
+                Assert.That(updatedPropertyCount, Is.EqualTo(2));
+                Assert.That(playbackMaterial.GetTexture("_BaseMap"), Is.SameAs(importedTexture));
+                Assert.That(playbackMaterial.GetTexture("_MainTex"), Is.SameAs(importedTexture));
+                Assert.That(playbackMaterial.GetColor("_Color"), Is.EqualTo(Color.magenta),
+                    "Reimport recovery must not reset unrelated playback material properties.");
+
+                playbackMaterial.SetTextureScale("_BaseMap", new Vector2(2.0f, 3.0f));
+                playbackMaterial.SetTextureOffset("_BaseMap", new Vector2(0.25f, 0.5f));
+
+                updatedPropertyCount =
+                    MmdPlaybackMaterialReimportSynchronizer.RefreshController(controller);
+
+                Assert.That(updatedPropertyCount, Is.EqualTo(1));
+                Assert.That(playbackMaterial.GetTextureScale("_BaseMap"), Is.EqualTo(Vector2.one));
+                Assert.That(playbackMaterial.GetTextureOffset("_BaseMap"), Is.EqualTo(Vector2.zero));
+
+                playbackMaterial.name = "Different Material Playback";
+                playbackMaterial.SetTexture("_BaseMap", null);
+
+                updatedPropertyCount =
+                    MmdPlaybackMaterialReimportSynchronizer.RefreshController(controller);
+
+                Assert.That(updatedPropertyCount, Is.Zero,
+                    "A structural material mismatch must fail closed instead of updating the wrong slot.");
+                Assert.That(playbackMaterial.GetTexture("_BaseMap"), Is.Null);
+            }
+            finally
+            {
+                if (controller != null)
+                {
+                    controller.ReleasePlaybackResources();
+                    Object.DestroyImmediate(controller);
+                }
+
+                MmdTestInstanceScope.DestroyInstance(previewInstance);
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+                Object.DestroyImmediate(importedMaterial);
+                Object.DestroyImmediate(importedTexture);
+            }
+        }
+
+        [Test]
         public void ReconfigureBorrowedInstanceReleasesPreviousPlaybackClonesAndRestoresAuthoredResources()
         {
             MmdPmxAsset? pmxAsset = null;
