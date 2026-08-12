@@ -23,6 +23,19 @@ namespace Mmd.UnityIntegration
         private bool nativeHumanoidHostPoseEnabled;
 
         internal bool NativeHumanoidHostPoseEnabled => nativeHumanoidHostPoseEnabled;
+        internal bool HasLivePhysicsBackend => livePhysicsBackend != null;
+
+        internal bool PrewarmLivePhysicsBackend()
+        {
+            if (physicsMode != MmdPhysicsMode.Live)
+            {
+                return false;
+            }
+
+            EnsureBorrowedMutationActive();
+            EnsureLivePhysicsBackend(resetOnCreate: false);
+            return true;
+        }
 
         /// <summary>
         /// Enables the Humanoid Live path in which the native runtime owns append/IK and the
@@ -163,7 +176,10 @@ namespace Mmd.UnityIntegration
 
         internal void ResetLivePhysicsForDriveSource()
         {
-            ResetLivePhysicsState();
+            // Switching between controller/Timeline drive sources needs a clean simulation state,
+            // not a new native world. Keep the backend warm and let the next source seed it.
+            SoftResetLivePhysicsSimulation();
+            lastForwardPlaybackFrame = -1;
         }
 
         private void ResetLivePhysicsState()
@@ -199,6 +215,19 @@ namespace Mmd.UnityIntegration
             lastLivePhysicsDiagnostics = null;
             LastDetailedApplyTiming = null;
             ClearLivePhysicsBodyDiagnostics();
+        }
+
+        private void PrepareLivePhysicsForRandomAccessEvaluation()
+        {
+            // Timeline preview must invalidate forward-simulation state, but retaining the native
+            // backend avoids rebuilding the Bullet world at the next clip boundary. Repeated preview
+            // evaluations do not reset an already-clean world again.
+            if (lastLiveFrame >= 0 || lastForwardPlaybackFrame >= 0 || lastLiveSnapshot != null)
+            {
+                SoftResetLivePhysicsSimulation();
+            }
+
+            lastForwardPlaybackFrame = -1;
         }
 
         private MmdPlaybackSnapshot ApplyLivePhysicsFrame(int frame, float frameRate, bool allowArbitraryStart = false)

@@ -2,6 +2,7 @@
 
 using System;
 using System.IO;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.Playables;
@@ -116,8 +117,7 @@ namespace Mmd.Tests
 
                 MmdPlaybackSnapshot snapshot = behaviour.EvaluateAtLocalTime(controller, 10.0 / 30.0);
 
-                // ApplyTimelineTime temporarily suppresses Live on the binding so ApplyTime succeeds.
-                // The controller's serialized physicsMode is never touched.
+                // ApplyTimelineTime evaluates animation-only without changing either Live mode field.
                 Assert.That(snapshot.frame.frame, Is.EqualTo(10));
                 // Externally configured Live is preserved after evaluation (not permanently overwritten).
                 Assert.That(controller.PhysicsMode, Is.EqualTo(MmdPhysicsMode.Live));
@@ -563,6 +563,51 @@ namespace Mmd.Tests
                 Assert.That(controller.IsConfigured, Is.True);
                 Assert.That(controller.ModelAssetSource, Is.SameAs(pmxAsset));
                 Assert.That(controller.ConfiguredInstanceRoot, Is.SameAs(instance.Root));
+            }
+            finally
+            {
+                MmdTestInstanceScope.DestroyInstance(instance);
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+            }
+        }
+
+        [Test]
+        public void TimelinePreparationConfiguresProviderMotionBeforeFirstClipFrame()
+        {
+            MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
+            MmdUnityModelInstance? instance = null;
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                pmxAsset = CreatePmxAsset(pmxPath);
+                vmdAsset = CreateVmdAsset(vmdPath);
+                var parser = new NativeMmdParser();
+                instance = MmdUnityModelFactory.CreateSkinnedModel(
+                    parser.LoadModel(File.ReadAllBytes(pmxPath)),
+                    pmxPath);
+                MmdUnityPlaybackController controller = instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.ConfigureModelAsset(pmxAsset);
+                var behaviour = new MmdVmdTimelineBehaviour
+                {
+                    MotionAsset = vmdAsset,
+                    FrameRate = 30.0f
+                };
+
+                Assert.That(controller.IsConfigured, Is.False);
+                MethodInfo? prepare = typeof(MmdVmdTimelineBehaviour).GetMethod(
+                    "TryPrepareTimelinePlayback",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(prepare, Is.Not.Null);
+                Assert.That(prepare!.Invoke(behaviour, new object[] { controller }), Is.EqualTo(true));
+                Assert.That(controller.IsConfigured, Is.True);
+                Assert.That(controller.IsConfiguredForMotionAsset(vmdAsset), Is.True);
+                Assert.That(controller.ConfigurationRevision, Is.EqualTo(1));
+                Assert.That(controller.LastSnapshot, Is.Not.Null,
+                    "Preparation must seed frame zero before the first clip frame.");
+                Assert.That(controller.LastSnapshot!.frame.frame, Is.EqualTo(0));
             }
             finally
             {

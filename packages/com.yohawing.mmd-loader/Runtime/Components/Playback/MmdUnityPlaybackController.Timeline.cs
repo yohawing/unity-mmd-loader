@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using Mmd.Native;
 using Mmd.Physics;
 using UnityEngine;
 
@@ -121,11 +122,36 @@ namespace Mmd.UnityIntegration
             return ShouldSuppressSelfTick(lastHumanoidRetargetTimelineDriveFrameCount, currentFrameCount);
         }
 
+        internal bool PrewarmTimelineLivePhysics()
+        {
+            if (binding == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                return binding.PrewarmLivePhysicsBackend();
+            }
+            catch (Exception exception) when (
+                exception is MmdPhysicsBackendException ||
+                exception is MmdRuntimeNativeUnavailableException ||
+                exception is DllNotFoundException ||
+                exception is EntryPointNotFoundException ||
+                exception is BadImageFormatException ||
+                exception is InvalidOperationException ||
+                exception is ArgumentException)
+            {
+                // Prewarm is opportunistic. Preserve the previous behaviour outside active clips;
+                // the normal Live evaluation path remains authoritative for reporting failures.
+                return false;
+            }
+        }
+
         /// <summary>
-        /// Apply time for Timeline random-access evaluation, temporarily suppressing Live physics
-        /// on the binding without modifying the controller's serialized <see cref="physicsMode"/> field.
-        /// Preserves the binding's physics mode after evaluation without the frame-reset side effects
-        /// of <see cref="SetPhysicsMode(MmdPhysicsMode)"/> followed by <see cref="ApplyFrame"/>.
+        /// Apply time for Timeline random-access evaluation without stepping Live physics.
+        /// The native physics backend is soft-reset and retained so preview/scrubbing does not rebuild
+        /// the Bullet world when forward playback resumes.
         /// </summary>
         internal MmdPlaybackSnapshot ApplyTimelineTime(float sourceTime, float frameRate)
         {
@@ -138,39 +164,19 @@ namespace Mmd.UnityIntegration
             lastTimelineDriveFrameCount = Time.frameCount;
             int frame = MmdPlaybackTime.ToFrame(sourceTime, frameRate);
 
-            // Save the binding's current physics mode; we will restore it after ApplyTime.
-            MmdPhysicsMode originalBindingMode = binding.PhysicsMode;
-
-            // Temporarily suppress Live on the binding so ApplyTime (random-access) works.
-            // We go directly to the binding to avoid changing the controller's serialized physicsMode.
-            if (originalBindingMode == MmdPhysicsMode.Live)
-            {
-                binding.SetPhysicsMode(MmdPhysicsMode.Off);
-            }
-
             try
             {
                 return ApplyPlaybackPose(() =>
                 {
                     playbackFrame = frame;
                     CurrentFrame = frame;
-                    LastSnapshot = binding.ApplyTime(sourceTime, frameRate);
+                    LastSnapshot = binding.ApplyTimelinePreviewTime(sourceTime, frameRate);
                     return LastSnapshot;
                 });
             }
             finally
             {
-                // Restore the binding's original physics mode.
-                // We use binding.SetPhysicsMode directly rather than going through the controller's
-                // ApplyPhysicsModeToBinding, which would reset playbackFrame/CurrentFrame/LastSnapshot
-                // when switching back to Live.
-                if (originalBindingMode == MmdPhysicsMode.Live)
-                {
-                    binding.SetPhysicsMode(MmdPhysicsMode.Live);
-                }
-
                 ResetLivePhysicsDriveSource();
-                // controller.physicsMode is intentionally NOT modified — preserves serialized/Inspector value.
             }
         }
 

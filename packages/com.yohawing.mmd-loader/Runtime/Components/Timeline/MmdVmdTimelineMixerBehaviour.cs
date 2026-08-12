@@ -1,6 +1,8 @@
 #nullable enable
 
 using System;
+using Mmd.UnityIntegration;
+using UnityEngine;
 using UnityEngine.Playables;
 
 namespace Mmd.Timeline
@@ -13,9 +15,35 @@ namespace Mmd.Timeline
     [Serializable]
     public sealed class MmdVmdTimelineMixerBehaviour : PlayableBehaviour
     {
+        private bool preparationAttempted;
+
+        public override void OnGraphStart(Playable playable)
+        {
+            preparationAttempted = false;
+        }
+
         public override void ProcessFrame(Playable playable, FrameData info, object playerData)
         {
-            if (!TrySelectWinner(playable, out int winnerIndex, out Playable winnerPlayable, out MmdVmdTimelineBehaviour? winner))
+            bool hasWinner = TrySelectWinner(
+                playable,
+                out int winnerIndex,
+                out Playable winnerPlayable,
+                out MmdVmdTimelineBehaviour? winner);
+
+            if (Application.isPlaying && !preparationAttempted)
+            {
+                preparationAttempted = true;
+                if (hasWinner && winner != null)
+                {
+                    winner.TryPrepareTimelinePlayback(playerData);
+                }
+                else
+                {
+                    TryPrepareFirstInput(playable, playerData);
+                }
+            }
+
+            if (!hasWinner)
             {
                 return;
             }
@@ -26,6 +54,19 @@ namespace Mmd.Timeline
             }
 
             winner.ApplyTimelineEvaluation(winnerPlayable, playerData);
+        }
+
+        private static void TryPrepareFirstInput(Playable playable, object playerData)
+        {
+            for (int i = 0; i < playable.GetInputCount(); i++)
+            {
+                if (TryGetBehaviour(playable.GetInput(i), out MmdVmdTimelineBehaviour? behaviour) &&
+                    behaviour != null &&
+                    behaviour.TryPrepareTimelinePlayback(playerData))
+                {
+                    return;
+                }
+            }
         }
 
         /// <summary>

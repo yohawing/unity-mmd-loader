@@ -83,6 +83,24 @@ namespace Mmd.Timeline
             EvaluateAtLocalTime(target, playable.GetTime(), runLivePhysics);
         }
 
+        internal bool TryPrepareTimelinePlayback(object playerData)
+        {
+            MmdUnityPlaybackController? target = playerData as MmdUnityPlaybackController ?? Controller;
+            if (target == null)
+            {
+                return false;
+            }
+
+            MmdPlaybackTime.ValidateFrameRate(FrameRate);
+            if (!TryConfigureTimelineTarget(target))
+            {
+                return false;
+            }
+
+            target.PrewarmTimelineLivePhysics();
+            return true;
+        }
+
         public MmdPlaybackSnapshot EvaluateAtLocalTime(MmdUnityPlaybackController target, double localTime)
         {
             return EvaluateAtLocalTime(target, localTime, runLivePhysics: false);
@@ -116,6 +134,24 @@ namespace Mmd.Timeline
                 throw new ArgumentOutOfRangeException(nameof(localTime), "Timeline local time is too large for playback evaluation.");
             }
 
+            if (!TryConfigureTimelineTarget(target))
+            {
+                throw new InvalidOperationException("Timeline target playback controller is not configured and has no provider-owned PMX/VMD source.");
+            }
+
+            // Forward Play Mode playback steps Live physics so 揺れもの simulate during Timeline play.
+            // Random-access (scrub/seek/editor preview) instead uses ApplyTimelineTime, which evaluates
+            // animation-only while retaining the warmed native physics backend.
+            if (runLivePhysics && target.PhysicsMode == MmdPhysicsMode.Live)
+            {
+                return target.ApplyTimelineLivePhysicsForward((float)sourceTime, FrameRate);
+            }
+
+            return target.ApplyTimelineTime((float)sourceTime, FrameRate);
+        }
+
+        private bool TryConfigureTimelineTarget(MmdUnityPlaybackController target)
+        {
             if (MotionAsset != null && !target.IsConfiguredForMotionAsset(MotionAsset))
             {
                 target.ConfigureMotionFromProviderModelSourceForTimeline(
@@ -127,20 +163,10 @@ namespace Mmd.Timeline
             else if (!target.IsConfigured &&
                 !target.ConfigureFromPlaybackSourceIfAvailableForTimeline())
             {
-                throw new InvalidOperationException("Timeline target playback controller is not configured and has no provider-owned PMX/VMD source.");
+                return false;
             }
 
-            // Forward Play Mode playback steps Live physics so 揺れもの simulate during Timeline play.
-            // Random-access (scrub/seek/editor preview) instead uses ApplyTimelineTime, which
-            // temporarily suppresses Live physics on the binding without modifying the controller's
-            // serialized physicsMode field. This preserves the Inspector/serialized physicsMode value
-            // and avoids frame-reset side effects on CurrentFrame/LastSnapshot when restoring Live.
-            if (runLivePhysics && target.PhysicsMode == MmdPhysicsMode.Live)
-            {
-                return target.ApplyTimelineLivePhysicsForward((float)sourceTime, FrameRate);
-            }
-
-            return target.ApplyTimelineTime((float)sourceTime, FrameRate);
+            return true;
         }
     }
 }

@@ -703,6 +703,25 @@ namespace Mmd.UnityIntegration
             }
 
             EnsureBorrowedMutationActive();
+            return ApplyTimeCore(time, frameRate);
+        }
+
+        internal MmdPlaybackSnapshot ApplyTimelinePreviewTime(float time, float frameRate)
+        {
+            MmdPlaybackTime.ValidateTime(time);
+            MmdPlaybackTime.ValidateFrameRate(frameRate);
+            EnsureBorrowedMutationActive();
+
+            if (physicsMode == MmdPhysicsMode.Live)
+            {
+                PrepareLivePhysicsForRandomAccessEvaluation();
+            }
+
+            return ApplyTimeCore(time, frameRate);
+        }
+
+        private MmdPlaybackSnapshot ApplyTimeCore(float time, float frameRate)
+        {
             if (fastSession != null)
             {
                 return ApplyFastTime(time, frameRate);

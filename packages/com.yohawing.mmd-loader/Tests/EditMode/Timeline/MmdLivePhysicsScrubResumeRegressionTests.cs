@@ -90,6 +90,54 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void TimelineAnimationOnlyPreviewRetainsLivePhysicsBackendForResume()
+        {
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
+            if (!availability.backendAvailable)
+            {
+                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
+            }
+
+            MmdUnityPlaybackBinding? binding = null;
+            try
+            {
+                MmdModelDefinition model = CreateMode1ChainModel(out string pmxPath);
+                MmdMotionDefinition motion = CreateBoneTranslationMotion(
+                    model,
+                    RootBoneName(model),
+                    frames: 30,
+                    endTranslationX: 40.0f);
+                binding = MmdUnityPlaybackBinding.CreateSkinned(
+                    model,
+                    motion,
+                    Mode1ChainPmxId,
+                    "translate-root",
+                    pmxPath);
+                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.Configure(binding, 30.0f, playOnStart: false);
+                controller.SetPhysicsMode(MmdPhysicsMode.Live);
+                var behaviour = new MmdVmdTimelineBehaviour { FrameRate = 30.0f };
+
+                Assert.That(binding.PrewarmLivePhysicsBackend(), Is.True);
+                Assert.That(binding.HasLivePhysicsBackend, Is.True, "Timeline lead-in must prewarm the backend.");
+
+                behaviour.EvaluateAtLocalTime(controller, 10.0 / 30.0, runLivePhysics: false);
+                Assert.That(binding.HasLivePhysicsBackend, Is.True,
+                    "Animation-only Timeline preview must retain the warmed Bullet world.");
+                Assert.That(controller.PhysicsMode, Is.EqualTo(MmdPhysicsMode.Live));
+
+                behaviour.EvaluateAtLocalTime(controller, 11.0 / 30.0, runLivePhysics: true);
+                Assert.That(binding.HasLivePhysicsBackend, Is.True);
+                Assert.That(binding.LastLivePhysicsDiagnostics, Is.Not.Null,
+                    "Forward playback must resume from the retained backend.");
+            }
+            finally
+            {
+                DestroyBinding(binding);
+            }
+        }
+
+        [Test]
         public void TimelineScrubBackwardReSeedsPhysicsAsSettleNotForwardStep()
         {
             // A backward scrub must not FORWARD-integrate physics (which explodes the chain). Instead it
