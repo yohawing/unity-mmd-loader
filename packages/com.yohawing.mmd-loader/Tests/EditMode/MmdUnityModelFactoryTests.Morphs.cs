@@ -110,6 +110,38 @@ namespace Mmd.Tests
             // descriptor remains unscaled
             Assert.That(instance.RenderingDescriptor.vertices[1].position[1], Is.EqualTo(0.0f).Within(0.00001f));
         }
+
+        [Test]
+        public void StaticVertexMorphPlaybackRejectsCpuMeshFallback()
+        {
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.morphs.Add(new MmdMorphDefinition
+            {
+                index = 0,
+                name = "cpu-only",
+                type = "vertex",
+                panel = "other",
+                vertexOffsets =
+                {
+                    new MmdVertexMorphOffsetDefinition
+                    {
+                        vertexIndex = 1,
+                        positionDelta = new[] { 0.0f, 1.0f, 0.0f }
+                    }
+                }
+            });
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
+            Vector3[] originalVertices = instance.Mesh.vertices;
+            MmdEvaluatedFrame frame = CreateFrame();
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "cpu-only", weight = 1.0f });
+
+            NotSupportedException exception = Assert.Throws<NotSupportedException>(() =>
+                MmdUnityFrameApplier.ApplyFrame(instance, frame))!;
+
+            Assert.That(exception.Message, Does.Contain("CPU mesh vertex morph fallback is not supported"));
+            Assert.That(instance.Mesh.vertices, Is.EqualTo(originalVertices));
+        }
         [Test]
         public void CreateSkinnedModelPhysicsDebugBodyAndColliderScaleWhileDescriptorMetadataUnscaled()
         {

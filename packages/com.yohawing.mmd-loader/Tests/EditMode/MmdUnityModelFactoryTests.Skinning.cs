@@ -186,7 +186,7 @@ namespace Mmd.Tests
             Assert.That(instance.Mesh.vertices[0], Is.EqualTo(new Vector3(0.0f, 0.0f, 0.0f)));
         }
         [Test]
-        public void BlendShapeVertexMorphWithTextureUvMorphReportsUvMeshUpload()
+        public void BlendShapeVertexMorphWithTextureUvMorphFailsClosed()
         {
 
             MmdModelDefinition model = CreateTextureUvMorphTriangleModel();
@@ -212,13 +212,11 @@ namespace Mmd.Tests
             frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "blink", weight = 1.0f });
             frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "uv-shift", weight = 1.0f });
 
-            MmdUnityMorphApplyTimingSummary timing = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame);
+            NotSupportedException exception = Assert.Throws<NotSupportedException>(() =>
+                MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame))!;
 
-            Assert.That(timing.blendShapePathUsed, Is.True);
-            Assert.That(timing.meshUploadRequired, Is.True);
-            Assert.That(timing.setVerticesMs, Is.EqualTo(0.0));
-            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
-            Assert.That(renderer.GetBlendShapeWeight(instance.BlendShapeIndexMap["blink"]), Is.EqualTo(100f).Within(0.001f));
+            Assert.That(exception.Message, Does.Contain("does not support UV morphs"));
+            Assert.That(RequireSkinnedRenderer(instance).GetBlendShapeWeight(instance.BlendShapeIndexMap["blink"]), Is.Zero);
         }
         [Test]
         public void BlendShapeWeightsPreserveFactoryLocalBoundsForResolvedWeightsAboveOne()
@@ -370,53 +368,24 @@ namespace Mmd.Tests
             Assert.That(deltaVertices[1], Is.EqualTo(new Vector3(0.0f, 1.0f, 0.0f)));
         }
         [Test]
-        public void ApplyFrameAppliesTextureUvMorphToMeshUv()
+        public void ApplyFrameRejectsTextureUvMorphWithoutMutatingMeshUv()
         {
 
             MmdModelDefinition model = CreateTextureUvMorphTriangleModel();
             using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
             MmdUnityModelInstance instance = scope.Instance;
 
-            // Step 1: Apply texture UV morph at weight 1.0.
+            Vector2[] originalUvs = instance.Mesh.uv;
             MmdEvaluatedFrame frame1 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
             frame1.morphs.Add(new MmdEvaluatedMorphWeight { name = "uv-shift", weight = 1.0f });
-            MmdUnityFrameApplier.ApplyFrame(instance, frame1);
-            Vector2[] uv1 = instance.Mesh.uv;
+            NotSupportedException exception = Assert.Throws<NotSupportedException>(() =>
+                MmdUnityFrameApplier.ApplyFrame(instance, frame1))!;
 
-            // Vertex 1 source UV moves by (0.25, 0.5), then is converted to Unity viewport UV.
-            Assert.That(uv1[1].x, Is.EqualTo(1.25f).Within(0.00001f));
-            Assert.That(uv1[1].y, Is.EqualTo(0.5f).Within(0.00001f));
-            // Unmorphed vertices keep base viewport UV.
-            Assert.That(uv1[0].x, Is.EqualTo(0.0f).Within(0.00001f));
-            Assert.That(uv1[0].y, Is.EqualTo(1.0f).Within(0.00001f));
-            Assert.That(uv1[2].x, Is.EqualTo(0.0f).Within(0.00001f));
-            Assert.That(uv1[2].y, Is.EqualTo(0.0f).Within(0.00001f));
-
-            // Step 2: Apply the same frame again; UVs must not accumulate.
-            MmdUnityFrameApplier.ApplyFrame(instance, frame1);
-            Vector2[] uv2 = instance.Mesh.uv;
-            Assert.That(uv2[1].x, Is.EqualTo(uv1[1].x).Within(0.00001f));
-            Assert.That(uv2[1].y, Is.EqualTo(uv1[1].y).Within(0.00001f));
-
-            // Step 3: Apply zero-weight frame to restore base UV.
-            MmdEvaluatedFrame frame0 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-            frame0.morphs.Add(new MmdEvaluatedMorphWeight { name = "uv-shift", weight = 0.0f });
-            MmdUnityFrameApplier.ApplyFrame(instance, frame0);
-            Vector2[] uv0 = instance.Mesh.uv;
-
-            Assert.That(uv0[1].x, Is.EqualTo(1.0f).Within(0.00001f));
-            Assert.That(uv0[1].y, Is.EqualTo(1.0f).Within(0.00001f));
-            Assert.That(uv0[0].x, Is.EqualTo(0.0f).Within(0.00001f));
-            Assert.That(uv0[0].y, Is.EqualTo(1.0f).Within(0.00001f));
-            Assert.That(uv0[2].x, Is.EqualTo(0.0f).Within(0.00001f));
-            Assert.That(uv0[2].y, Is.EqualTo(0.0f).Within(0.00001f));
-
-            // Step 4: Underlying descriptor base UVs are unchanged.
-            Assert.That(instance.RenderingDescriptor.vertices[1].uv[0], Is.EqualTo(1.0f).Within(0.00001f));
-            Assert.That(instance.RenderingDescriptor.vertices[1].uv[1], Is.EqualTo(0.0f).Within(0.00001f));
+            Assert.That(exception.Message, Does.Contain("does not support UV morphs"));
+            Assert.That(instance.Mesh.uv, Is.EqualTo(originalUvs));
         }
         [Test]
-        public void ApplyTextureUvMorphToSplitSkinnedModelMovesBothCopies()
+        public void SplitSkinnedModelTextureUvMorphFailsClosed()
         {
 
             MmdModelDefinition model = CreateSharedVertexTwoSubmeshTextureUvMorphModel();
@@ -430,17 +399,14 @@ namespace Mmd.Tests
                 instance.RenderingDescriptor.uvMorphs[0].offsets.Select(offset => offset.vertexIndex),
                 Is.EqualTo(new[] { 0, 3 }));
 
-            // Apply texture UV morph at weight 1.0.
+            Vector2[] originalUvs = instance.Mesh.uv;
             MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
             frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "uv-shift", weight = 1.0f });
-            MmdUnityFrameApplier.ApplyFrame(instance, frame);
-            Vector2[] uv = instance.Mesh.uv;
+            NotSupportedException exception = Assert.Throws<NotSupportedException>(() =>
+                MmdUnityFrameApplier.ApplyFrame(instance, frame))!;
 
-            // Both split copies of source vertex 0 should receive the same UV delta.
-            Assert.That(uv[0].x, Is.EqualTo(0.25f).Within(0.00001f));
-            Assert.That(uv[0].y, Is.EqualTo(0.5f).Within(0.00001f));
-            Assert.That(uv[3].x, Is.EqualTo(0.25f).Within(0.00001f));
-            Assert.That(uv[3].y, Is.EqualTo(0.5f).Within(0.00001f));
+            Assert.That(exception.Message, Does.Contain("does not support UV morphs"));
+            Assert.That(instance.Mesh.uv, Is.EqualTo(originalUvs));
         }
         [Test]
         public void ExistingSkinnedModelRebindAssignsRuntimeOwnedMeshBeforeVertexMorphApplication()

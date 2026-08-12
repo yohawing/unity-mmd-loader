@@ -316,6 +316,7 @@ namespace Mmd.Tests
                 Mesh generatedMesh = renderer.sharedMesh!;
                 Material[] generatedMaterials = renderer.sharedMaterials;
                 Assert.That(generatedMesh, Is.Not.SameAs(borrowedMesh));
+                Assert.That(generatedMesh, Is.SameAs(binding.Instance.Mesh));
                 Assert.That(generatedMaterials[0], Is.Not.SameAs(originalMaterials[0]));
                 Assert.That(sceneInstance.Root.GetComponent<MmdSelfShadowTarget>(), Is.SameAs(selfShadowTarget));
                 Assert.That(selfShadowTarget.enabled, Is.False);

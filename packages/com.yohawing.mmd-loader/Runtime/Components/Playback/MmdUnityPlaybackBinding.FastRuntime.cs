@@ -254,6 +254,7 @@ namespace Mmd.UnityIntegration
 
         private MmdPlaybackSnapshot ApplyFastCore(int frame, float time)
         {
+            MmdUnityFrameApplier.ValidateSupportedMorphPlayback(playbackInstance);
             fastSession!.EvaluateAndCopy(
                 frame,
                 fastWorldMatrices!,

@@ -286,7 +286,7 @@ namespace Mmd.Tests
                 Assert.That(binding.Instance, Is.SameAs(previewInstance));
                 Assert.That(binding.PlaybackInstance, Is.Not.SameAs(previewInstance));
                 Assert.That(binding.Instance.Root, Is.SameAs(previewInstance.Root));
-                Assert.That(binding.PlaybackInstance.Mesh, Is.Not.SameAs(originalMesh));
+                Assert.That(binding.PlaybackInstance.Mesh, Is.SameAs(originalMesh));
                 Assert.That(renderer.sharedMesh, Is.SameAs(binding.PlaybackInstance.Mesh));
                 Assert.That(binding.PlaybackInstance.BindLocalPositions, Is.EqualTo(previewInstance.BindLocalPositions));
                 Assert.That(binding.PlaybackInstance.BindLocalRotations, Is.EqualTo(previewInstance.BindLocalRotations));
@@ -635,7 +635,7 @@ namespace Mmd.Tests
                 vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
                 vmdAsset.Initialize(vmdBytes, "test_1bone_cube_motion.vmd", vmdPath);
 
-                Mesh? previousPlaybackMesh = null;
+                Material? previousPlaybackMaterial = null;
                 for (int i = 0; i < 20; i++)
                 {
                     MmdUnityPlaybackBinding next = MmdUnityPlaybackBinding.CreateSkinned(previewInstance, pmxAsset, vmdAsset);
@@ -643,12 +643,12 @@ namespace Mmd.Tests
 
                     if (i > 0)
                     {
-                        Assert.That(previousPlaybackMesh == null, Is.True, $"reconfigure {i} must destroy the previous playback Mesh clone");
+                        Assert.That(previousPlaybackMaterial == null, Is.True, $"reconfigure {i} must destroy the previous playback Material clone");
                     }
 
-                    previousPlaybackMesh = renderer.sharedMesh;
-                    Assert.That(previousPlaybackMesh, Is.Not.SameAs(authoredMesh));
+                    Assert.That(renderer.sharedMesh, Is.SameAs(authoredMesh));
                     Assert.That(renderer.sharedMaterials[0], Is.Not.SameAs(authoredMaterial));
+                    previousPlaybackMaterial = renderer.sharedMaterials[0];
                 }
 
                 controller.ReleasePlaybackResources();
@@ -1734,8 +1734,8 @@ namespace Mmd.Tests
                 Assert.That(controller.LastFastRuntimeReason, Does.Contain("forced by test"));
                 Assert.That(controller.IsConfigured, Is.False);
                 Assert.That(controller.LastSnapshot, Is.Null);
-                Assert.That(activePlaybackMesh == null, Is.True, "failed native reconfiguration must dispose the previous playback clone");
-                Assert.That(renderer.sharedMesh, Is.Not.Null);
+                Assert.That(activePlaybackMesh, Is.Not.Null);
+                Assert.That(renderer.sharedMesh, Is.SameAs(activePlaybackMesh));
                 Assert.That(renderer.sharedMaterials, Is.Not.Empty);
             }
             finally
@@ -1917,11 +1917,11 @@ namespace Mmd.Tests
 
                 controller.ConfigureFromAssets(pmxAsset, vmdAsset, 30.0f, startFrame: 0, playOnStart: false);
                 Mesh secondPlaybackMesh = renderer.sharedMesh;
-                Assert.That(firstPlaybackMesh == null, Is.True, "reconfigure must destroy the first playback Mesh clone");
-                Assert.That(secondPlaybackMesh, Is.Not.SameAs(authoredMesh));
+                Assert.That(firstPlaybackMesh, Is.SameAs(authoredMesh));
+                Assert.That(secondPlaybackMesh, Is.SameAs(authoredMesh));
 
                 controller.ReleasePlaybackResources();
-                Assert.That(secondPlaybackMesh == null, Is.True, "release must destroy the second playback Mesh clone");
+                Assert.That(secondPlaybackMesh, Is.Not.Null);
                 Assert.That(renderer.sharedMesh, Is.SameAs(authoredMesh));
                 Assert.That(renderer.sharedMaterials[0], Is.SameAs(authoredMaterial));
                 Assert.That(renderer.rootBone, Is.SameAs(authoredRootBone));

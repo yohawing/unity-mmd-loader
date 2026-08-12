@@ -462,9 +462,8 @@ namespace Mmd.Tests
                 Assert.That(controller.LastFastRuntimeReason, Does.Contain("forced by test"));
                 Assert.That(controller.IsConfigured, Is.False);
                 Assert.That(controller.LastSnapshot, Is.Null);
-                Assert.That(activePlaybackMesh == null, Is.True,
-                    "failed native reconfiguration must dispose the previous playback clone");
-                Assert.That(instance.SkinnedMeshRenderer!.sharedMesh, Is.Not.Null);
+                Assert.That(activePlaybackMesh, Is.Not.Null);
+                Assert.That(instance.SkinnedMeshRenderer!.sharedMesh, Is.SameAs(activePlaybackMesh));
                 Assert.That(instance.SkinnedMeshRenderer.sharedMaterials, Is.Not.Empty);
             }
             finally

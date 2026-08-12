@@ -516,6 +516,7 @@ namespace Mmd.UnityIntegration
 
         private void ApplyLiveAnimationFrame(MmdEvaluatedFrame frame)
         {
+            MmdUnityFrameApplier.ValidateSupportedMorphPlayback(playbackInstance);
             if (DetailedApplyTimingEnabled)
             {
                 long totalStart = Stopwatch.GetTimestamp();
