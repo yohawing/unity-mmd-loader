@@ -280,7 +280,8 @@ namespace Mmd.UnityIntegration
             bool includeSelfShadowTarget = true,
             MmdMaterialOverrideAsset? materialOverride = null,
             bool preserveExistingSelfShadowTarget = false,
-            MmdMaterialPreset materialPreset = MmdMaterialPreset.MmdToon)
+            MmdMaterialPreset materialPreset = MmdMaterialPreset.MmdToon,
+            MmdRenderingDescriptor? existingPlaybackDescriptor = null)
         {
             if (root == null)
             {
@@ -303,7 +304,7 @@ namespace Mmd.UnityIntegration
             Mesh? sharedMesh = renderer.sharedMesh;
             bool useExistingMesh = sharedMesh != null && sharedMesh.vertexCount > 0;
             MmdRenderingDescriptor descriptor = useExistingMesh
-                ? BuildRuntimePlaybackRenderingDescriptor(model, materialPreset)
+                ? existingPlaybackDescriptor ?? BuildRuntimePlaybackRenderingDescriptor(model, materialPreset)
                 : BuildRuntimeRenderingDescriptor(model, materialPreset);
             if (!useExistingMesh)
             {
@@ -497,7 +498,7 @@ namespace Mmd.UnityIntegration
             return MmdRenderingMeshSplitter.SplitBySubmesh(MmdRenderingDescriptorBuilder.Build(model, preset)).rendering;
         }
 
-        private static MmdRenderingDescriptor BuildRuntimePlaybackRenderingDescriptor(
+        internal static MmdRenderingDescriptor BuildRuntimePlaybackRenderingDescriptor(
             MmdModelDefinition model,
             MmdMaterialPreset preset)
         {

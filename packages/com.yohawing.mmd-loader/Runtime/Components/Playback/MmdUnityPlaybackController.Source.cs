@@ -27,6 +27,8 @@ namespace Mmd.UnityIntegration
             }
 
             modelAsset = pmxAsset;
+            _ = pmxAsset.BeginSynchronousPlaybackPreload(
+                MmdUnityPlaybackBinding.ResolveMaterialPreset(pmxAsset));
         }
 
         public void ConfigureMotionAsset(MmdVmdAsset vmdAsset)

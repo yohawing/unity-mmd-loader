@@ -178,8 +178,9 @@ namespace Mmd.UnityIntegration
                 throw new ArgumentNullException(nameof(motionAsset));
             }
 
-            var parser = new NativeMmdParser();
-            MmdModelDefinition model = modelAsset.LoadModel(parser);
+            MmdModelDefinition model = modelAsset.LoadValidatedModelForSynchronousPlayback(
+                new NativeMmdParser(),
+                out _);
             MmdModelValidator.ThrowIfInvalid(model);
             MmdMotionDefinition motion = motionAsset.CreateNativeClipMotionHeader();
             MmdMotionValidator.ThrowIfInvalid(motion);
@@ -395,6 +396,12 @@ namespace Mmd.UnityIntegration
                 throw new ArgumentNullException(nameof(motion));
             }
 
+            MmdMaterialPreset materialPreset = ResolveMaterialPreset(modelAsset);
+            MmdRenderingDescriptor? playbackDescriptor =
+                modelAsset.MaterialOverrideAsset == null &&
+                (modelAsset.MaterialRemaps == null || modelAsset.MaterialRemaps.Length == 0)
+                    ? modelAsset.LoadSynchronousPlaybackDescriptor(materialPreset, out _)
+                    : null;
             return CreateSkinnedFromExistingSceneModel(
                 root,
                 model,
@@ -406,8 +413,9 @@ namespace Mmd.UnityIntegration
                 MmdPmxModelPresetPolicy.AllowsAutomaticSelfShadowTarget(modelAsset.ModelPreset),
                 modelAsset.MaterialOverrideAsset,
                 modelAsset.MaterialRemaps,
-                ResolveMaterialPreset(modelAsset),
-                modelAsset.ImportedMaterials);
+                materialPreset,
+                modelAsset.ImportedMaterials,
+                playbackDescriptor);
         }
 
         internal static MmdUnityPlaybackBinding CreateSkinnedFromExistingSceneModel(
@@ -422,7 +430,8 @@ namespace Mmd.UnityIntegration
             MmdMaterialOverrideAsset? materialOverride = null,
             Material[]? materialRemaps = null,
             MmdMaterialPreset materialPreset = MmdMaterialPreset.MmdToon,
-            Material[]? importedMaterials = null)
+            Material[]? importedMaterials = null,
+            MmdRenderingDescriptor? playbackDescriptor = null)
         {
             if (root == null)
             {
@@ -445,7 +454,8 @@ namespace Mmd.UnityIntegration
                     includeSelfShadowTarget,
                     materialOverride: null,
                     preserveExistingSelfShadowTarget: true,
-                    materialPreset: materialPreset);
+                    materialPreset: materialPreset,
+                    existingPlaybackDescriptor: playbackDescriptor);
                 sourceMutation.AdoptFactoryResult(instance);
                 var session = new MmdRuntimeSession(model, motion, resolvedModelId, resolvedMotionId);
                 var playbackMutation = new MmdBorrowedSceneMutationLease(
@@ -787,7 +797,7 @@ namespace Mmd.UnityIntegration
             }
         }
 
-        private static MmdMaterialPreset ResolveMaterialPreset(MmdPmxAsset modelAsset)
+        internal static MmdMaterialPreset ResolveMaterialPreset(MmdPmxAsset modelAsset)
         {
             string shaderPreset = modelAsset.ShaderPreset ?? string.Empty;
             if (string.Equals(shaderPreset, "URP Lit", StringComparison.Ordinal) ||

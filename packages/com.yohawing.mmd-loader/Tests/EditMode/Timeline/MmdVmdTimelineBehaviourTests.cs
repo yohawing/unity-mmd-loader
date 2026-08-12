@@ -589,6 +589,7 @@ namespace Mmd.Tests
                     pmxPath);
                 MmdUnityPlaybackController controller = instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.ConfigureModelAsset(pmxAsset);
+                pmxAsset.BeginSynchronousPlaybackPreload().GetAwaiter().GetResult();
                 var behaviour = new MmdVmdTimelineBehaviour
                 {
                     MotionAsset = vmdAsset,
@@ -627,7 +628,7 @@ namespace Mmd.Tests
                 Assert.That(timing.compatibilityValidationMs, Is.GreaterThanOrEqualTo(0.0));
                 Assert.That(timing.sourceAcquireMs, Is.GreaterThanOrEqualTo(0.0));
                 Assert.That(timing.pmxSourceBufferBorrowed, Is.True);
-                Assert.That(timing.pmxParseCacheHit, Is.False);
+                Assert.That(timing.pmxParseCacheHit, Is.True);
                 Assert.That(timing.sharedVmdContextMs, Is.GreaterThanOrEqualTo(0.0));
                 Assert.That(timing.nativeAvailabilityMs, Is.GreaterThan(0.0));
                 Assert.That(timing.sceneBindingMs, Is.GreaterThan(0.0));

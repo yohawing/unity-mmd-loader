@@ -563,6 +563,15 @@ namespace Mmd.UnityIntegration
             DisposeHumanoidHostPoseSession();
         }
 
+        private void OnEnable()
+        {
+            if (modelAsset != null)
+            {
+                _ = modelAsset.BeginSynchronousPlaybackPreload(
+                    MmdUnityPlaybackBinding.ResolveMaterialPreset(modelAsset));
+            }
+        }
+
         private void EnsureConfigured()
         {
             if (binding == null)
