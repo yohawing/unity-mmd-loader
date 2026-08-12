@@ -3,6 +3,7 @@
 using System;
 using System.IO;
 using System.Reflection;
+using System.Threading;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.Playables;
@@ -27,6 +28,42 @@ namespace Mmd.Tests
             var clip = new MmdVmdTimelineClip();
 
             Assert.That(clip.clipCaps, Is.EqualTo(ClipCaps.None));
+        }
+
+        [Test]
+        public void TimelineClipCreationStartsNativeVmdPreload()
+        {
+            string vmdPath = MmdTestFixtures.FixtureAssetPath(PlaybackVmdId);
+            MmdVmdAsset vmdAsset = CreateVmdAsset(vmdPath);
+            MmdVmdTimelineClip clip = ScriptableObject.CreateInstance<MmdVmdTimelineClip>();
+            PlayableGraph graph = PlayableGraph.Create("mmd-vmd-preload-test");
+            var owner = new GameObject("MMD VMD preload owner");
+            using var preloadStarted = new ManualResetEventSlim();
+            try
+            {
+                MmdVmdAsset.NativeVmdContextFailureReasonOverrideForTests = _ =>
+                {
+                    preloadStarted.Set();
+                    return "forced preload probe";
+                };
+                clip.MotionAsset = vmdAsset;
+
+                clip.CreatePlayable(graph, owner);
+
+                Assert.That(preloadStarted.Wait(TimeSpan.FromSeconds(5)), Is.True);
+            }
+            finally
+            {
+                MmdVmdAsset.NativeVmdContextFailureReasonOverrideForTests = null;
+                if (graph.IsValid())
+                {
+                    graph.Destroy();
+                }
+
+                Object.DestroyImmediate(owner);
+                Object.DestroyImmediate(clip);
+                Object.DestroyImmediate(vmdAsset);
+            }
         }
 
         [Test]

@@ -384,7 +384,8 @@ namespace Mmd.UnityIntegration
             MmdPmxAsset modelAsset,
             MmdModelDefinition model,
             MmdVmdAsset motionAsset,
-            MmdMotionDefinition motion)
+            MmdMotionDefinition motion,
+            bool sourcesAlreadyValidated = false)
         {
             if (model == null)
             {
@@ -415,7 +416,8 @@ namespace Mmd.UnityIntegration
                 modelAsset.MaterialRemaps,
                 materialPreset,
                 modelAsset.ImportedMaterials,
-                playbackDescriptor);
+                playbackDescriptor,
+                sourcesAlreadyValidated);
         }
 
         internal static MmdUnityPlaybackBinding CreateSkinnedFromExistingSceneModel(
@@ -431,15 +433,19 @@ namespace Mmd.UnityIntegration
             Material[]? materialRemaps = null,
             MmdMaterialPreset materialPreset = MmdMaterialPreset.MmdToon,
             Material[]? importedMaterials = null,
-            MmdRenderingDescriptor? playbackDescriptor = null)
+            MmdRenderingDescriptor? playbackDescriptor = null,
+            bool sourcesAlreadyValidated = false)
         {
             if (root == null)
             {
                 throw new ArgumentNullException(nameof(root));
             }
 
-            MmdModelValidator.ThrowIfInvalid(model);
-            MmdMotionValidator.ThrowIfInvalid(motion);
+            if (!sourcesAlreadyValidated)
+            {
+                MmdModelValidator.ThrowIfInvalid(model);
+                MmdMotionValidator.ThrowIfInvalid(motion);
+            }
             string resolvedModelId = string.IsNullOrWhiteSpace(modelId) ? "PMX" : modelId;
             string resolvedMotionId = string.IsNullOrWhiteSpace(motionId) ? "VMD" : motionId;
             var sourceMutation = new MmdExistingSceneRebindLease(root);
@@ -457,7 +463,13 @@ namespace Mmd.UnityIntegration
                     materialPreset: materialPreset,
                     existingPlaybackDescriptor: playbackDescriptor);
                 sourceMutation.AdoptFactoryResult(instance);
-                var session = new MmdRuntimeSession(model, motion, resolvedModelId, resolvedMotionId);
+                MmdRuntimeSession session = sourcesAlreadyValidated
+                    ? MmdRuntimeSession.CreateFromValidatedSources(
+                        model,
+                        motion,
+                        resolvedModelId,
+                        resolvedMotionId)
+                    : new MmdRuntimeSession(model, motion, resolvedModelId, resolvedMotionId);
                 var playbackMutation = new MmdBorrowedSceneMutationLease(
                     instance,
                     materialOverride,

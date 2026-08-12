@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using UnityEngine;
 using Mmd.Native;
 using Mmd.Parser;
@@ -83,6 +84,9 @@ namespace Mmd
 
         [NonSerialized] private MmdRuntimeFfiVmdContext? nativeVmdContext;
         [NonSerialized] private byte[]? nativeVmdContextSource;
+        [NonSerialized] private object? nativeVmdContextGate;
+        [NonSerialized] private Task<MmdRuntimeFfiVmdContext>? nativeVmdContextPreloadTask;
+        [NonSerialized] private byte[]? nativeVmdContextPreloadSource;
         [NonSerialized] private TextAsset? sourceReadbackAsset;
         [NonSerialized] private byte[]? sourceReadback;
 
@@ -244,27 +248,36 @@ namespace Mmd
             ValidateNativeClipHeaderSource();
             byte[] sourceBytes = ReadSourceBytes();
             reason = string.Empty;
-            if (nativeVmdContext != null && ReferenceEquals(nativeVmdContextSource, sourceBytes))
+            Task<MmdRuntimeFfiVmdContext> preloadTask;
+            lock (NativeVmdContextGate)
             {
-                context = nativeVmdContext;
-                return true;
-            }
+                if (nativeVmdContext != null && ReferenceEquals(nativeVmdContextSource, sourceBytes))
+                {
+                    context = nativeVmdContext;
+                    return true;
+                }
 
-            DisposeNativeVmdContext();
-            Func<byte[], string>? failureOverrideForTests = NativeVmdContextFailureReasonOverrideForTests;
-            if (failureOverrideForTests != null)
-            {
-                context = null;
-                reason = failureOverrideForTests(sourceBytes);
-                return false;
+                preloadTask = GetOrStartNativeVmdContextPreloadLocked(sourceBytes);
             }
 
             try
             {
-                nativeVmdContext = MmdRuntimeFfiVmdContext.Create(sourceBytes);
-                nativeVmdContextSource = sourceBytes;
-                context = nativeVmdContext;
-                return true;
+                MmdRuntimeFfiVmdContext created = preloadTask.GetAwaiter().GetResult();
+                lock (NativeVmdContextGate)
+                {
+                    if (ReferenceEquals(nativeVmdContextPreloadSource, sourceBytes))
+                    {
+                        nativeVmdContext = created;
+                        nativeVmdContextSource = sourceBytes;
+                        context = created;
+                        return true;
+                    }
+                }
+
+                created.Dispose();
+                context = null;
+                reason = "VMD source changed while its native playback context was being prepared.";
+                return false;
             }
             catch (Exception exception) when (
                 exception is MmdRuntimeUnsupportedException ||
@@ -273,6 +286,62 @@ namespace Mmd
                 context = null;
                 reason = exception.Message;
                 return false;
+            }
+            catch (NativeVmdContextPreloadException exception)
+            {
+                context = null;
+                reason = exception.Message;
+                return false;
+            }
+        }
+
+        internal Task BeginNativePlaybackPreload()
+        {
+            ValidateNativeClipHeaderSource();
+            byte[] sourceBytes = ReadSourceBytes();
+            lock (NativeVmdContextGate)
+            {
+                if (nativeVmdContext != null && ReferenceEquals(nativeVmdContextSource, sourceBytes))
+                {
+                    return Task.CompletedTask;
+                }
+
+                return GetOrStartNativeVmdContextPreloadLocked(sourceBytes);
+            }
+        }
+
+        private object NativeVmdContextGate => nativeVmdContextGate ??= new object();
+
+        private Task<MmdRuntimeFfiVmdContext> GetOrStartNativeVmdContextPreloadLocked(byte[] sourceBytes)
+        {
+            if (ReferenceEquals(nativeVmdContextPreloadSource, sourceBytes) &&
+                nativeVmdContextPreloadTask != null)
+            {
+                return nativeVmdContextPreloadTask;
+            }
+
+            Func<byte[], string>? failureOverrideForTests = NativeVmdContextFailureReasonOverrideForTests;
+            nativeVmdContextPreloadSource = sourceBytes;
+            nativeVmdContextPreloadTask = Task.Run(() =>
+            {
+                if (failureOverrideForTests != null)
+                {
+                    throw new NativeVmdContextPreloadException(failureOverrideForTests(sourceBytes));
+                }
+
+                return MmdRuntimeFfiVmdContext.Create(sourceBytes);
+            });
+            _ = nativeVmdContextPreloadTask.ContinueWith(
+                completed => _ = completed.Exception,
+                TaskContinuationOptions.OnlyOnFaulted);
+            return nativeVmdContextPreloadTask;
+        }
+
+        private sealed class NativeVmdContextPreloadException : Exception
+        {
+            internal NativeVmdContextPreloadException(string message)
+                : base(message)
+            {
             }
         }
 
@@ -418,18 +487,33 @@ namespace Mmd
 
         private void DisposeNativeVmdContext()
         {
-            if (nativeVmdContext == null)
+            lock (NativeVmdContextGate)
             {
-                nativeVmdContextSource = null;
-                return;
-            }
+                MmdRuntimeFfiVmdContext? context = nativeVmdContext;
+                if (context == null && nativeVmdContextPreloadTask != null)
+                {
+                    try
+                    {
+                        context = nativeVmdContextPreloadTask.GetAwaiter().GetResult();
+                    }
+                    catch
+                    {
+                        // A failed creation owns no native handle. Its diagnostic was already
+                        // observed by the preload continuation or the playback caller.
+                        nativeVmdContextPreloadTask = null;
+                        nativeVmdContextPreloadSource = null;
+                        return;
+                    }
+                }
 
-            // MmdRuntimeFfiVmdContext deliberately retains its native handle when
-            // cleanup crosses an unavailable P/Invoke boundary. Keep the asset's
-            // reference too so a later lifecycle retry can release that handle.
-            nativeVmdContext.Dispose();
-            nativeVmdContext = null;
-            nativeVmdContextSource = null;
+                // Dispose deliberately happens before clearing the references. If native cleanup
+                // is unavailable, the context retains its handle and a later lifecycle call can retry.
+                context?.Dispose();
+                nativeVmdContext = null;
+                nativeVmdContextSource = null;
+                nativeVmdContextPreloadTask = null;
+                nativeVmdContextPreloadSource = null;
+            }
         }
     }
 }

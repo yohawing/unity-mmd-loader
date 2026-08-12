@@ -165,7 +165,9 @@ namespace Mmd.UnityIntegration
                     nativeMotion,
                     resolvedPmxPath,
                     resolvedVmdPath,
-                    resolvedPmxPath),
+                    resolvedPmxPath,
+                    playbackDescriptor: null,
+                    sourcesAlreadyValidated: true),
                 candidate =>
                 {
                     if (setupTiming == null)
@@ -316,6 +318,14 @@ namespace Mmd.UnityIntegration
             {
                 setupTiming.sourceAcquireMs += TimelineSetupElapsedMilliseconds(phaseStart);
             }
+            phaseStart = Stopwatch.GetTimestamp();
+            vmdAsset.TryGetOrCreateNativeVmdContext(
+                out MmdRuntimeFfiVmdContext? sharedVmdContext,
+                out string sharedVmdContextFailure);
+            if (setupTiming != null)
+            {
+                setupTiming.sharedVmdContextMs += TimelineSetupElapsedMilliseconds(phaseStart);
+            }
             TryConfigureNativeFirst(
                 motion,
                 pathPmxBytes,
@@ -326,9 +336,13 @@ namespace Mmd.UnityIntegration
                     nativeMotion,
                     resolvedPmxPath,
                     string.IsNullOrWhiteSpace(vmdAsset.SourceId) ? vmdAsset.name : vmdAsset.SourceId,
-                    resolvedPmxPath),
+                    resolvedPmxPath,
+                    playbackDescriptor: null,
+                    sourcesAlreadyValidated: true),
                 candidate => Configure(candidate, playbackFrameRate, playOnStart),
                 timelineEvaluation,
+                sharedVmdContext,
+                sharedVmdContextFailure,
                 setupTiming: setupTiming);
 
             if (!timelineEvaluation)
@@ -512,7 +526,8 @@ namespace Mmd.UnityIntegration
                     pmxAsset,
                     model,
                     vmdAsset,
-                    nativeMotion),
+                    nativeMotion,
+                    sourcesAlreadyValidated: true),
                 configure,
                 timelineEvaluation,
                 sharedVmdContext,

@@ -20,6 +20,7 @@ namespace Mmd
         private readonly int nativeMotionSourceLength;
         private readonly ulong nativeModelSourceFingerprint;
         private readonly ulong nativeMotionSourceFingerprint;
+        private readonly bool verifyNativeSourceFingerprints;
         private MmdRuntimeFfiPlaybackSession? nativePlaybackSession;
         private float[]? nativeWorldMatrices;
         private float[]? nativeMorphWeights;
@@ -31,6 +32,16 @@ namespace Mmd
             MmdMotionDefinition motion,
             string modelId,
             string motionId)
+            : this(model, motion, modelId, motionId, validateSources: true)
+        {
+        }
+
+        private MmdRuntimeSession(
+            MmdModelDefinition model,
+            MmdMotionDefinition motion,
+            string modelId,
+            string motionId,
+            bool validateSources)
         {
             if (model == null)
             {
@@ -52,8 +63,11 @@ namespace Mmd
                 throw new ArgumentException("Motion identifier is required.", nameof(motionId));
             }
 
-            MmdModelValidator.ThrowIfInvalid(model);
-            MmdMotionValidator.ThrowIfInvalid(motion);
+            if (validateSources)
+            {
+                MmdModelValidator.ThrowIfInvalid(model);
+                MmdMotionValidator.ThrowIfInvalid(motion);
+            }
             this.model = model;
             this.motion = motion;
             this.modelId = modelId;
@@ -62,8 +76,30 @@ namespace Mmd
             nativeMotionSourceIdentity = motion.sourceBytes;
             nativeModelSourceLength = nativeModelSourceIdentity?.Length ?? 0;
             nativeMotionSourceLength = nativeMotionSourceIdentity?.Length ?? 0;
-            nativeModelSourceFingerprint = ComputeSourceFingerprint(nativeModelSourceIdentity);
-            nativeMotionSourceFingerprint = ComputeSourceFingerprint(nativeMotionSourceIdentity);
+            verifyNativeSourceFingerprints = validateSources;
+            nativeModelSourceFingerprint = validateSources
+                ? ComputeSourceFingerprint(nativeModelSourceIdentity)
+                : 0;
+            nativeMotionSourceFingerprint = validateSources
+                ? ComputeSourceFingerprint(nativeMotionSourceIdentity)
+                : 0;
+        }
+
+        internal static MmdRuntimeSession CreateFromValidatedSources(
+            MmdModelDefinition model,
+            MmdMotionDefinition motion,
+            string modelId,
+            string motionId)
+        {
+            // Playback assets keep their validated model private and create a fresh motion header.
+            // Identity and length checks still guard source replacement; avoid hashing the full PMX
+            // again on the Timeline frame that activates the binding.
+            return new MmdRuntimeSession(
+                model,
+                motion,
+                modelId,
+                motionId,
+                validateSources: false);
         }
 
         public int MotionMaxFrame => motion.maxFrame;
@@ -366,8 +402,9 @@ namespace Mmd
                     "Native runtime session source identity changed " + phase + ".");
             }
 
-            if (ComputeSourceFingerprint(model.sourceBytes) != nativeModelSourceFingerprint ||
-                ComputeSourceFingerprint(motion.sourceBytes) != nativeMotionSourceFingerprint)
+            if (verifyNativeSourceFingerprints &&
+                (ComputeSourceFingerprint(model.sourceBytes) != nativeModelSourceFingerprint ||
+                 ComputeSourceFingerprint(motion.sourceBytes) != nativeMotionSourceFingerprint))
             {
                 throw new InvalidOperationException("Native runtime source bytes changed " + phase + ".");
             }
