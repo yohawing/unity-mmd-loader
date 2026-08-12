@@ -592,6 +592,14 @@ namespace Mmd.Tests
                 Assert.That(controller.LastLivePhysicsDiagnostics.evaluationPath, Is.EqualTo("HumanoidNativeFinal"));
                 Assert.That(controller.LastLivePhysicsDiagnostics.phaseDiagnosticsPresent, Is.True);
                 Assert.That(controller.LastLivePhysicsDiagnostics.nativeStepReportPresent, Is.True);
+                Assert.That(controller.LastLivePhysicsDiagnostics.nativeHostFramePresent, Is.True);
+                Assert.That(controller.LastLivePhysicsDiagnostics.playbackEvaluateBeforePhysicsPresent, Is.False,
+                    "Humanoid Live uses the atomic host-frame ABI, not the VMD playback calls.");
+                Assert.That(controller.LastLivePhysicsDiagnostics.playbackCopyEvaluatedOutputsPresent, Is.False);
+                Assert.That(controller.LastLivePhysicsDiagnostics.physicsWorldStepRuntimePresent, Is.False);
+                Assert.That(controller.LastLivePhysicsDiagnostics.playbackEvaluateBeforePhysicsMs, Is.Zero);
+                Assert.That(controller.LastLivePhysicsDiagnostics.playbackCopyEvaluatedOutputsMs, Is.Zero);
+                Assert.That(controller.LastLivePhysicsDiagnostics.physicsWorldStepRuntimeMs, Is.Zero);
                 Assert.That(controller.LastLivePhysicsDiagnostics.hostPoseCapturePresent, Is.True,
                     "Humanoid Live must retain Animator/retarget output as its host-pose authority.");
                 Assert.That(controller.LastLivePhysicsDiagnostics.managedBodyTransformApplyPresent, Is.False,

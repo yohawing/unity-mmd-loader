@@ -1011,6 +1011,13 @@ namespace Mmd.Tests
                 MmdLivePhysicsFrameDiagnostics? seedDiagnostics = binding.LastLivePhysicsDiagnostics;
                 Assert.That(seedDiagnostics, Is.Not.Null);
                 Assert.That(seedDiagnostics!.frame, Is.EqualTo(0));
+                Assert.That(seedDiagnostics.playbackEvaluateBeforePhysicsPresent, Is.False,
+                    "The VMD seed uses BakeClipFrames, not EvaluateBeforePhysics.");
+                Assert.That(seedDiagnostics.playbackEvaluateBeforePhysicsMs, Is.Zero);
+                Assert.That(seedDiagnostics.playbackCopyEvaluatedOutputsPresent, Is.True);
+                Assert.That(seedDiagnostics.playbackCopyEvaluatedOutputsMs, Is.GreaterThanOrEqualTo(0.0));
+                Assert.That(seedDiagnostics.physicsWorldStepRuntimePresent, Is.True);
+                Assert.That(seedDiagnostics.physicsWorldStepRuntimeMs, Is.GreaterThanOrEqualTo(0.0));
                 Assert.That(seedDiagnostics.bodyDiagnosticsFrame, Is.EqualTo(0));
                 Assert.That(seedDiagnostics.readbackShapeTypeCount, Is.EqualTo(2));
                 Assert.That(seedDiagnostics.pinnedBodies.pinnedBodyCount, Is.EqualTo(2));
@@ -1219,6 +1226,9 @@ namespace Mmd.Tests
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f);
                 controller.SetPhysicsMode(MmdPhysicsMode.Live);
+                // SetPhysicsMode(Live) seeds frame 0; apply it explicitly so this assertion
+                // remains tied to a normal forward (non-seed) VMD frame if that setup changes.
+                controller.ApplyFrame(0);
                 controller.ApplyFrame(LivePhysicsPlaybackFrame);
 
                 MmdLivePhysicsFrameDiagnostics? diagnostics = binding.LastLivePhysicsDiagnostics;
@@ -1233,6 +1243,12 @@ namespace Mmd.Tests
                 Assert.That(diagnostics.pinMarshalPresent, Is.False,
                     "The VMD bridge must not marshal a Unity-captured host pose back to native.");
                 Assert.That(diagnostics.nativeHostFramePresent, Is.True);
+                Assert.That(diagnostics.playbackEvaluateBeforePhysicsPresent, Is.True,
+                    "A normal forward VMD frame must expose the borrowed playback before-physics call.");
+                Assert.That(diagnostics.playbackCopyEvaluatedOutputsPresent, Is.True,
+                    "A normal forward VMD frame must expose the evaluated-output copy call.");
+                Assert.That(diagnostics.physicsWorldStepRuntimePresent, Is.True,
+                    "A normal forward VMD frame must expose the runtime physics step call.");
                 Assert.That(diagnostics.nativeRigidbodyCopyPresent, Is.True);
                 Assert.That(diagnostics.managedRigidbodyFanOutPresent, Is.True);
                 Assert.That(diagnostics.managedBodyTransformApplyPresent, Is.True,
@@ -1256,6 +1272,15 @@ namespace Mmd.Tests
                 Assert.That(diagnostics.pinnedDiagnosticsMs, Is.GreaterThanOrEqualTo(0.0));
                 Assert.That(diagnostics.pinMarshalMs, Is.GreaterThanOrEqualTo(0.0));
                 Assert.That(diagnostics.nativeHostFrameMs, Is.GreaterThanOrEqualTo(0.0));
+                Assert.That(diagnostics.playbackEvaluateBeforePhysicsMs, Is.GreaterThanOrEqualTo(0.0));
+                Assert.That(diagnostics.playbackCopyEvaluatedOutputsMs, Is.GreaterThanOrEqualTo(0.0));
+                Assert.That(diagnostics.physicsWorldStepRuntimeMs, Is.GreaterThanOrEqualTo(0.0));
+                Assert.That(
+                    diagnostics.playbackEvaluateBeforePhysicsMs +
+                    diagnostics.playbackCopyEvaluatedOutputsMs +
+                    diagnostics.physicsWorldStepRuntimeMs,
+                    Is.LessThanOrEqualTo(diagnostics.nativeHostFrameMs + 0.1),
+                    "The additive call-boundary timings must fit inside the aggregate native host-frame timing.");
                 Assert.That(diagnostics.nativeRigidbodyCopyMs, Is.GreaterThanOrEqualTo(0.0));
                 Assert.That(diagnostics.managedRigidbodyFanOutMs, Is.GreaterThanOrEqualTo(0.0));
                 Assert.That(diagnostics.managedBodyTransformApplyMs, Is.GreaterThanOrEqualTo(0.0));

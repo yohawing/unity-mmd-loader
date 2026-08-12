@@ -18,6 +18,12 @@ namespace Mmd.Physics
     {
         internal readonly double pinMarshalMs;
         internal readonly double nativeHostFrameMs;
+        internal readonly double playbackEvaluateBeforePhysicsMs;
+        internal readonly double playbackCopyEvaluatedOutputsMs;
+        internal readonly double physicsWorldStepRuntimeMs;
+        internal readonly bool playbackEvaluateBeforePhysicsPresent;
+        internal readonly bool playbackCopyEvaluatedOutputsPresent;
+        internal readonly bool physicsWorldStepRuntimePresent;
         internal readonly double nativeRigidbodyCopyMs;
         internal readonly double afterPhysicsMatrixReadbackMs;
         internal readonly int nativeRigidbodyCount;
@@ -30,6 +36,12 @@ namespace Mmd.Physics
         internal MmdPhysicsHostStepDiagnostics(
             double pinMarshalMs,
             double nativeHostFrameMs,
+            double playbackEvaluateBeforePhysicsMs,
+            double playbackCopyEvaluatedOutputsMs,
+            double physicsWorldStepRuntimeMs,
+            bool playbackEvaluateBeforePhysicsPresent,
+            bool playbackCopyEvaluatedOutputsPresent,
+            bool physicsWorldStepRuntimePresent,
             double nativeRigidbodyCopyMs,
             double afterPhysicsMatrixReadbackMs,
             int nativeRigidbodyCount,
@@ -41,6 +53,12 @@ namespace Mmd.Physics
         {
             this.pinMarshalMs = pinMarshalMs;
             this.nativeHostFrameMs = nativeHostFrameMs;
+            this.playbackEvaluateBeforePhysicsMs = playbackEvaluateBeforePhysicsMs;
+            this.playbackCopyEvaluatedOutputsMs = playbackCopyEvaluatedOutputsMs;
+            this.physicsWorldStepRuntimeMs = physicsWorldStepRuntimeMs;
+            this.playbackEvaluateBeforePhysicsPresent = playbackEvaluateBeforePhysicsPresent;
+            this.playbackCopyEvaluatedOutputsPresent = playbackCopyEvaluatedOutputsPresent;
+            this.physicsWorldStepRuntimePresent = physicsWorldStepRuntimePresent;
             this.nativeRigidbodyCopyMs = nativeRigidbodyCopyMs;
             this.afterPhysicsMatrixReadbackMs = afterPhysicsMatrixReadbackMs;
             this.nativeRigidbodyCount = nativeRigidbodyCount;
@@ -786,15 +804,21 @@ namespace Mmd.Physics
             }
 
             diagnostics = new MmdPhysicsHostStepDiagnostics(
-                ElapsedMilliseconds(pinStart, pinEnd) + ElapsedMilliseconds(unpinStart, unpinEnd),
-                ElapsedMilliseconds(nativeStart, nativeEnd),
-                ElapsedMilliseconds(rigidbodyCopyStart, rigidbodyCopyEnd),
-                0.0,
-                rigidbodyStates.Length / TransformFloatCount,
-                boneCount,
-                CheckedCount(report.tick.substeps, "native physics substep count"),
-                MmdFfiMarshal.CheckedIntPtrToInt(report.kinematicRigidbodiesFed, "native kinematic rigidbody count"),
-                MmdFfiMarshal.CheckedIntPtrToInt(report.bonesWrittenBack, "native bones written back count"),
+                pinMarshalMs: ElapsedMilliseconds(pinStart, pinEnd) + ElapsedMilliseconds(unpinStart, unpinEnd),
+                nativeHostFrameMs: ElapsedMilliseconds(nativeStart, nativeEnd),
+                playbackEvaluateBeforePhysicsMs: 0.0,
+                playbackCopyEvaluatedOutputsMs: 0.0,
+                physicsWorldStepRuntimeMs: 0.0,
+                playbackEvaluateBeforePhysicsPresent: false,
+                playbackCopyEvaluatedOutputsPresent: false,
+                physicsWorldStepRuntimePresent: false,
+                nativeRigidbodyCopyMs: ElapsedMilliseconds(rigidbodyCopyStart, rigidbodyCopyEnd),
+                afterPhysicsMatrixReadbackMs: 0.0,
+                nativeRigidbodyCount: rigidbodyStates.Length / TransformFloatCount,
+                nativeBoneCount: boneCount,
+                nativeSubstepCount: CheckedCount(report.tick.substeps, "native physics substep count"),
+                nativeKinematicRigidbodiesFed: MmdFfiMarshal.CheckedIntPtrToInt(report.kinematicRigidbodiesFed, "native kinematic rigidbody count"),
+                nativeBonesWrittenBack: MmdFfiMarshal.CheckedIntPtrToInt(report.bonesWrittenBack, "native bones written back count"),
                 reportPresent: true);
         }
 
@@ -847,6 +871,15 @@ namespace Mmd.Physics
                 throw new InvalidOperationException("Playback physics must use the borrowed runtime instance.");
 
             long nativeStart = Stopwatch.GetTimestamp();
+            long playbackEvaluateBeforePhysicsStart = nativeStart;
+            long playbackEvaluateBeforePhysicsEnd = nativeStart;
+            long playbackCopyEvaluatedOutputsStart = nativeStart;
+            long playbackCopyEvaluatedOutputsEnd = nativeStart;
+            long physicsWorldStepRuntimeStart = nativeStart;
+            long physicsWorldStepRuntimeEnd = nativeStart;
+            bool playbackEvaluateBeforePhysicsPresent = false;
+            bool playbackCopyEvaluatedOutputsPresent = false;
+            bool physicsWorldStepRuntimePresent = false;
             MmdRuntimeFfiMethods.PhysicsWorldStepReport report;
             if (seed || !seededSinceReset)
             {
@@ -871,26 +904,41 @@ namespace Mmd.Physics
                     new IntPtr(morphWeights.Length),
                     out report);
                 ThrowIfFailed(status, "PhysicsWorldBakeClipFrames", modelId, motionId);
+                playbackCopyEvaluatedOutputsStart = Stopwatch.GetTimestamp();
                 playbackSession.CopyEvaluatedOutputs(worldMatrices, morphWeights, ikEnabled);
+                playbackCopyEvaluatedOutputsEnd = Stopwatch.GetTimestamp();
+                playbackCopyEvaluatedOutputsPresent = true;
                 // The bake seed initializes Bullet from the evaluated clip pose but intentionally
                 // does not read the bodies back into the runtime. A zero-delta runtime step performs
                 // that readback and after-physics evaluation without advancing the solver clock.
+                physicsWorldStepRuntimeStart = Stopwatch.GetTimestamp();
                 status = MmdRuntimeFfiMethods.PhysicsWorldStepRuntime(
                     world,
                     instance,
                     0.0f,
                     out report);
+                physicsWorldStepRuntimeEnd = Stopwatch.GetTimestamp();
+                physicsWorldStepRuntimePresent = true;
                 ThrowIfFailed(status, "PhysicsWorldStepRuntime", modelId, motionId);
             }
             else
             {
+                playbackEvaluateBeforePhysicsStart = Stopwatch.GetTimestamp();
                 playbackSession.EvaluateBeforePhysics(frame, ikMaxIterationsCap);
+                playbackEvaluateBeforePhysicsEnd = Stopwatch.GetTimestamp();
+                playbackEvaluateBeforePhysicsPresent = true;
+                playbackCopyEvaluatedOutputsStart = Stopwatch.GetTimestamp();
                 playbackSession.CopyEvaluatedOutputs(worldMatrices, morphWeights, ikEnabled);
+                playbackCopyEvaluatedOutputsEnd = Stopwatch.GetTimestamp();
+                playbackCopyEvaluatedOutputsPresent = true;
+                physicsWorldStepRuntimeStart = Stopwatch.GetTimestamp();
                 int status = MmdRuntimeFfiMethods.PhysicsWorldStepRuntime(
                     world,
                     instance,
                     deltaTime,
                     out report);
+                physicsWorldStepRuntimeEnd = Stopwatch.GetTimestamp();
+                physicsWorldStepRuntimePresent = true;
                 ThrowIfFailed(status, "PhysicsWorldStepRuntime", modelId, motionId);
             }
             long nativeEnd = Stopwatch.GetTimestamp();
@@ -904,6 +952,18 @@ namespace Mmd.Physics
             diagnostics = new MmdPhysicsHostStepDiagnostics(
                 pinMarshalMs: 0.0,
                 nativeHostFrameMs: ElapsedMilliseconds(nativeStart, nativeEnd),
+                playbackEvaluateBeforePhysicsMs: playbackEvaluateBeforePhysicsPresent
+                    ? ElapsedMilliseconds(playbackEvaluateBeforePhysicsStart, playbackEvaluateBeforePhysicsEnd)
+                    : 0.0,
+                playbackCopyEvaluatedOutputsMs: playbackCopyEvaluatedOutputsPresent
+                    ? ElapsedMilliseconds(playbackCopyEvaluatedOutputsStart, playbackCopyEvaluatedOutputsEnd)
+                    : 0.0,
+                physicsWorldStepRuntimeMs: physicsWorldStepRuntimePresent
+                    ? ElapsedMilliseconds(physicsWorldStepRuntimeStart, physicsWorldStepRuntimeEnd)
+                    : 0.0,
+                playbackEvaluateBeforePhysicsPresent: playbackEvaluateBeforePhysicsPresent,
+                playbackCopyEvaluatedOutputsPresent: playbackCopyEvaluatedOutputsPresent,
+                physicsWorldStepRuntimePresent: physicsWorldStepRuntimePresent,
                 nativeRigidbodyCopyMs: ElapsedMilliseconds(matrixCopyEnd, copyEnd),
                 afterPhysicsMatrixReadbackMs: ElapsedMilliseconds(matrixCopyStart, matrixCopyEnd),
                 nativeRigidbodyCount: rigidbodyStates.Length / TransformFloatCount,

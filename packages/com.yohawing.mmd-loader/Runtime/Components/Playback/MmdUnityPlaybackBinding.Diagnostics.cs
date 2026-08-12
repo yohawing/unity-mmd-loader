@@ -23,6 +23,9 @@ namespace Mmd.UnityIntegration
         public bool pinnedDiagnosticsPresent;
         public bool pinMarshalPresent;
         public bool nativeHostFramePresent;
+        public bool playbackEvaluateBeforePhysicsPresent;
+        public bool playbackCopyEvaluatedOutputsPresent;
+        public bool physicsWorldStepRuntimePresent;
         public bool nativeRigidbodyCopyPresent;
         public bool managedRigidbodyFanOutPresent;
         public bool managedBodyTransformApplyPresent;
@@ -43,6 +46,9 @@ namespace Mmd.UnityIntegration
         public double pinnedDiagnosticsMs;
         public double pinMarshalMs;
         public double nativeHostFrameMs;
+        public double playbackEvaluateBeforePhysicsMs;
+        public double playbackCopyEvaluatedOutputsMs;
+        public double physicsWorldStepRuntimeMs;
         public double nativeRigidbodyCopyMs;
         public double managedRigidbodyFanOutMs;
         public double managedBodyTransformApplyMs;
