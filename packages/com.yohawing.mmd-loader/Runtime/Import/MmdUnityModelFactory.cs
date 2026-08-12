@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Rendering;
 using Mmd.Parser;
@@ -297,13 +298,19 @@ namespace Mmd.UnityIntegration
             }
 
             float scale = NormalizeImportScale(importScale);
-            MmdRenderingDescriptor descriptor = BuildRuntimeRenderingDescriptor(model, materialPreset);
-            ValidateDescriptor(descriptor);
-            MmdMaterialOverrideApplier.ApplyToRenderingDescriptor(materialOverride, descriptor);
-
             Transform modelRoot = FindExistingSkinnedModelRoot(root.transform);
             SkinnedMeshRenderer renderer = ResolveExistingSkinnedMeshRenderer(root, modelRoot);
             Mesh? sharedMesh = renderer.sharedMesh;
+            bool useExistingMesh = sharedMesh != null && sharedMesh.vertexCount > 0;
+            MmdRenderingDescriptor descriptor = useExistingMesh
+                ? BuildRuntimePlaybackRenderingDescriptor(model, materialPreset)
+                : BuildRuntimeRenderingDescriptor(model, materialPreset);
+            if (!useExistingMesh)
+            {
+                ValidateDescriptor(descriptor);
+            }
+            MmdMaterialOverrideApplier.ApplyToRenderingDescriptor(materialOverride, descriptor);
+
             Material[] materials = renderer.sharedMaterials;
             if (materials.Length < descriptor.materials.Count)
             {
@@ -332,7 +339,6 @@ namespace Mmd.UnityIntegration
             // the SMR already carries the importer-owned Mesh sub-asset. Preserve it instead
             // of rebuilding with "Split Runtime" naming, which would break the importer
             // ownership chain across PlayMode domain reloads.
-            bool useExistingMesh = sharedMesh != null && sharedMesh.vertexCount > 0;
             Mesh mesh;
             if (useExistingMesh)
             {
@@ -406,10 +412,8 @@ namespace Mmd.UnityIntegration
                 throw new ArgumentException("Existing skinned MMD model rebinding requires at least one bone.", nameof(model));
             }
 
-            MmdRenderingDescriptor descriptor = BuildRuntimeRenderingDescriptor(model);
-            ValidateDescriptor(descriptor);
             SkinnedMeshRenderer renderer = ResolveExistingSkinnedMeshRenderer(root);
-            if (renderer.sharedMaterials.Length < descriptor.materials.Count)
+            if (renderer.sharedMaterials.Length < model.materials.Count)
             {
                 throw new InvalidOperationException("Existing PMX scene SkinnedMeshRenderer material slots do not match the PMX material descriptor.");
             }
@@ -491,6 +495,63 @@ namespace Mmd.UnityIntegration
             MmdMaterialPreset preset = MmdMaterialPreset.MmdToon)
         {
             return MmdRenderingMeshSplitter.SplitBySubmesh(MmdRenderingDescriptorBuilder.Build(model, preset)).rendering;
+        }
+
+        private static MmdRenderingDescriptor BuildRuntimePlaybackRenderingDescriptor(
+            MmdModelDefinition model,
+            MmdMaterialPreset preset)
+        {
+            // Existing imported meshes already own geometry, skinning and vertex-morph deltas.
+            // Build only metadata still consumed by playback, in parallel over the immutable,
+            // already-validated PMX definition.
+            Task<List<MmdMaterialDescriptor>> materialsTask = Task.Run(
+                () => MmdMaterialDescriptorBuilder.Build(model).ToList());
+            Task<List<MmdGroupMorphDescriptor>> groupsTask = Task.Run(
+                () => MmdMorphDescriptorBuilder.BuildGroupMorphs(model).ToList());
+            Task<List<MmdMorphDescriptorBuilder.MmdMaterialMorphDescriptor>> materialMorphsTask = Task.Run(
+                () => MmdMorphDescriptorBuilder.BuildMaterialMorphs(model).ToList());
+            Task<List<MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor>> flipsTask = Task.Run(
+                () => MmdMorphDescriptorBuilder.BuildFlipMorphs(model).ToList());
+            Task.WaitAll(materialsTask, groupsTask, materialMorphsTask, flipsTask);
+
+            List<MmdMaterialDescriptor> materials = materialsTask.Result;
+            List<MmdVertexMorphDescriptor> vertexMorphs = model.morphs
+                .Where(morph => MmdMorphDescriptorBuilder.NormalizeMorphType(morph.type) == "vertex")
+                .OrderBy(morph => morph.index)
+                .Select(morph => new MmdVertexMorphDescriptor
+                {
+                    morphIndex = morph.index,
+                    morphName = morph.name
+                })
+                .ToList();
+            List<MmdMorphDescriptorBuilder.MmdUvMorphDescriptor> uvMorphs = model.morphs
+                .Where(morph =>
+                {
+                    string type = MmdMorphDescriptorBuilder.NormalizeMorphType(morph.type);
+                    return type == "texture" || type == "uva1" || type == "uva2" ||
+                           type == "uva3" || type == "uva4";
+                })
+                .OrderBy(morph => morph.index)
+                .Select(morph => new MmdMorphDescriptorBuilder.MmdUvMorphDescriptor
+                {
+                    morphIndex = morph.index,
+                    morphName = morph.name,
+                    morphType = MmdMorphDescriptorBuilder.NormalizeMorphType(morph.type),
+                    uvOffsetCount = morph.uvOffsets?.Count ?? 0
+                })
+                .ToList();
+            return new MmdRenderingDescriptor
+            {
+                materials = materials,
+                submeshes = MmdSubmeshDescriptorBuilder.Build(materials).ToList(),
+                urpMaterialBindings = MmdUrpMaterialBindingDescriptorBuilder.Build(materials, preset).ToList(),
+                vertexMorphs = vertexMorphs,
+                uvMorphs = uvMorphs,
+                groupMorphs = groupsTask.Result,
+                materialMorphs = materialMorphsTask.Result,
+                flipMorphs = flipsTask.Result,
+                ikCount = model.ik.Count
+            };
         }
 
         private static MmdMaterialRenderingTargets[] BuildMaterialRenderingTargets(

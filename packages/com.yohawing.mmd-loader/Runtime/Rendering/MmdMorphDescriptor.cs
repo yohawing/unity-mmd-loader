@@ -136,7 +136,7 @@ namespace Mmd.Rendering
                 .ToList();
         }
 
-        private static string NormalizeMorphType(string? value)
+        internal static string NormalizeMorphType(string? value)
         {
             if (string.IsNullOrWhiteSpace(value))
             {

@@ -476,6 +476,53 @@ namespace Mmd.Tests
                 UnityEngine.Object.DestroyImmediate(reboundMesh);
             }
         }
+
+        [Test]
+        public void ExistingSkinnedModelRebindKeepsUvMorphFailClosed()
+        {
+            MmdModelDefinition model = CreateTextureUvMorphTriangleModel();
+            using var sceneScope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance rebound = MmdUnityModelFactory.CreateExistingSkinnedModelInstance(
+                sceneScope.Instance.Root,
+                model,
+                sourcePath: null);
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "uv-shift", weight = 1.0f });
+
+            NotSupportedException exception = Assert.Throws<NotSupportedException>(() =>
+                MmdUnityFrameApplier.ApplyFrame(rebound, frame))!;
+
+            Assert.That(exception.Message, Does.Contain("does not support UV morphs"));
+        }
+
+        [Test]
+        public void ExistingSkinnedModelRebindNormalizesVertexMorphType()
+        {
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.morphs.Add(new MmdMorphDefinition
+            {
+                index = 0,
+                name = "blink",
+                type = " vertex ",
+                panel = "eye",
+                vertexOffsets =
+                {
+                    new MmdVertexMorphOffsetDefinition
+                    {
+                        vertexIndex = 1,
+                        positionDelta = new[] { 0.0f, 1.0f, 0.0f }
+                    }
+                }
+            });
+            using var sceneScope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance rebound = MmdUnityModelFactory.CreateExistingSkinnedModelInstance(
+                sceneScope.Instance.Root,
+                model,
+                sourcePath: null);
+
+            Assert.That(rebound.RenderingDescriptor.vertexMorphs, Has.Count.EqualTo(1));
+            Assert.That(rebound.VertexMorphBlendShapes, Has.Count.EqualTo(1));
+        }
         [Test]
         public void ExistingSkinnedModelRebindCollectsPhysicsBodiesFromControllerRoot()
         {
