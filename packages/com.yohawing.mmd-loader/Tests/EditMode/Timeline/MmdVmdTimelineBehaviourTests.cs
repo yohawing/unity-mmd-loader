@@ -615,7 +615,8 @@ namespace Mmd.Tests
                 Assert.That(timing.motionHeaderMs, Is.GreaterThan(0.0));
                 Assert.That(timing.pmxParseMs, Is.GreaterThan(0.0));
                 Assert.That(timing.compatibilityValidationMs, Is.GreaterThanOrEqualTo(0.0));
-                Assert.That(timing.sourceCopyMs, Is.GreaterThanOrEqualTo(0.0));
+                Assert.That(timing.sourceAcquireMs, Is.GreaterThanOrEqualTo(0.0));
+                Assert.That(timing.pmxSourceBufferBorrowed, Is.True);
                 Assert.That(timing.sharedVmdContextMs, Is.GreaterThanOrEqualTo(0.0));
                 Assert.That(timing.nativeAvailabilityMs, Is.GreaterThan(0.0));
                 Assert.That(timing.sceneBindingMs, Is.GreaterThan(0.0));
@@ -659,7 +660,8 @@ namespace Mmd.Tests
                 MmdTimelineSetupTimingSummary timing = controller.LastTimelineSetupTiming!;
                 Assert.That(timing, Is.Not.Null);
                 Assert.That(timing.succeeded, Is.True);
-                Assert.That(timing.sourceCopyMs, Is.GreaterThan(0.0));
+                Assert.That(timing.sourceAcquireMs, Is.GreaterThan(0.0));
+                Assert.That(timing.pmxSourceBufferBorrowed, Is.False);
                 Assert.That(timing.pmxParseMs, Is.GreaterThan(0.0));
                 Assert.That(timing.motionHeaderMs, Is.GreaterThan(0.0));
                 Assert.That(timing.nativeAvailabilityMs, Is.GreaterThan(0.0));

@@ -127,7 +127,7 @@ namespace Mmd.UnityIntegration
             byte[] vmdBytes = File.ReadAllBytes(resolvedVmdPath);
             if (setupTiming != null)
             {
-                setupTiming.sourceCopyMs += TimelineSetupElapsedMilliseconds(phaseStart);
+                setupTiming.sourceAcquireMs += TimelineSetupElapsedMilliseconds(phaseStart);
             }
             var parser = new NativeMmdParser();
             phaseStart = Stopwatch.GetTimestamp();
@@ -321,7 +321,7 @@ namespace Mmd.UnityIntegration
             byte[] pathVmdBytes = vmdAsset.GetBytesCopy();
             if (setupTiming != null)
             {
-                setupTiming.sourceCopyMs += TimelineSetupElapsedMilliseconds(phaseStart);
+                setupTiming.sourceAcquireMs += TimelineSetupElapsedMilliseconds(phaseStart);
             }
             TryConfigureNativeFirst(
                 motion,
@@ -492,12 +492,13 @@ namespace Mmd.UnityIntegration
                 setupTiming.compatibilityValidationMs += TimelineSetupElapsedMilliseconds(phaseStart);
             }
             phaseStart = Stopwatch.GetTimestamp();
-            byte[] pmxBytes = pmxAsset.GetBytesCopy();
+            byte[] pmxBytes = pmxAsset.GetBytesForSynchronousRuntimeSetup();
             byte[] vmdBytes = motion.sourceBytes
                 ?? throw new InvalidOperationException("Native VMD motion source bytes are required.");
             if (setupTiming != null)
             {
-                setupTiming.sourceCopyMs += TimelineSetupElapsedMilliseconds(phaseStart);
+                setupTiming.sourceAcquireMs += TimelineSetupElapsedMilliseconds(phaseStart);
+                setupTiming.pmxSourceBufferBorrowed = true;
             }
             phaseStart = Stopwatch.GetTimestamp();
             vmdAsset.TryGetOrCreateNativeVmdContext(

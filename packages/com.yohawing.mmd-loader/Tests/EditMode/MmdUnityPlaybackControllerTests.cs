@@ -648,6 +648,9 @@ namespace Mmd.Tests
 
                     Assert.That(renderer.sharedMesh, Is.SameAs(authoredMesh));
                     Assert.That(renderer.sharedMaterials[0], Is.Not.SameAs(authoredMaterial));
+                    Assert.That(
+                        next.PlaybackInstance.RenderingDescriptor,
+                        Is.Not.SameAs(previewInstance.RenderingDescriptor));
                     previousPlaybackMaterial = renderer.sharedMaterials[0];
                 }
 

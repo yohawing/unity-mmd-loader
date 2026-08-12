@@ -16,6 +16,7 @@ namespace Mmd.UnityIntegration
         private readonly MmdMaterialOverrideAsset? materialOverride;
         private readonly Material[]? materialRemaps;
         private readonly Material[]? importedMaterials;
+        private readonly bool reuseRenderingDescriptor;
         private SkinnedMeshRenderer? renderer;
         private Mesh? originalMesh;
         private Material[] originalMaterials = Array.Empty<Material>();
@@ -37,12 +38,14 @@ namespace Mmd.UnityIntegration
             MmdUnityModelInstance sourceInstance,
             MmdMaterialOverrideAsset? materialOverride = null,
             Material[]? materialRemaps = null,
-            Material[]? importedMaterials = null)
+            Material[]? importedMaterials = null,
+            bool reuseRenderingDescriptor = false)
         {
             this.sourceInstance = sourceInstance ?? throw new ArgumentNullException(nameof(sourceInstance));
             this.materialOverride = materialOverride;
             this.materialRemaps = materialRemaps;
             this.importedMaterials = importedMaterials;
+            this.reuseRenderingDescriptor = reuseRenderingDescriptor;
         }
 
         internal bool IsActive => active;
@@ -67,7 +70,9 @@ namespace Mmd.UnityIntegration
             ValidateBones(bones);
             MmdUnityFrameApplier.ValidateSupportedMorphPlayback(sourceInstance);
 
-            MmdRenderingDescriptor descriptor = CloneRenderingDescriptor(sourceInstance.RenderingDescriptor);
+            MmdRenderingDescriptor descriptor = reuseRenderingDescriptor
+                ? sourceInstance.RenderingDescriptor
+                : CloneRenderingDescriptor(sourceInstance.RenderingDescriptor);
             bool[] excludedSlots = BuildMaterialOverrideExclusionSlots(materialRemaps, sourceRenderer.sharedMaterials.Length);
             MmdMaterialOverrideApplier.ApplyToRenderingDescriptor(materialOverride, descriptor, excludedSlots);
             Material[] sourceMaterials = ResolveSourceMaterials(sourceRenderer);

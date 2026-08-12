@@ -554,6 +554,16 @@ namespace Mmd
             return (byte[])data.Clone();
         }
 
+        internal byte[] GetBytesForSynchronousRuntimeSetup()
+        {
+            if (data.Length == 0)
+            {
+                throw new InvalidOperationException("PMX asset has no imported bytes.");
+            }
+
+            return data;
+        }
+
         public MmdModelDefinition LoadModel(IMmdParser? parser = null)
         {
             if (data.Length == 0)

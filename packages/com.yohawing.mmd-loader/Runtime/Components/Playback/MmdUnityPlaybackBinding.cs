@@ -452,7 +452,8 @@ namespace Mmd.UnityIntegration
                     instance,
                     materialOverride,
                     materialRemaps,
-                    importedMaterials: importedMaterials);
+                    importedMaterials: importedMaterials,
+                    reuseRenderingDescriptor: true);
                 return new MmdUnityPlaybackBinding(
                     instance,
                     session,
@@ -521,7 +522,8 @@ namespace Mmd.UnityIntegration
                     instance,
                     modelAsset.MaterialOverrideAsset,
                     modelAsset.MaterialRemaps,
-                    importedMaterials: modelAsset.ImportedMaterials);
+                    importedMaterials: modelAsset.ImportedMaterials,
+                    reuseRenderingDescriptor: true);
                 return new MmdUnityPlaybackBinding(
                     instance,
                     session,

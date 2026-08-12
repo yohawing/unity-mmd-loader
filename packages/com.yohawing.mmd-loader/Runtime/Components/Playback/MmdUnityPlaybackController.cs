@@ -32,7 +32,7 @@ namespace Mmd.UnityIntegration
         public double motionHeaderMs;
         public double pmxParseMs;
         public double compatibilityValidationMs;
-        public double sourceCopyMs;
+        public double sourceAcquireMs;
         public double sharedVmdContextMs;
         public double nativeAvailabilityMs;
         public double releasePreviousBindingMs;
@@ -42,6 +42,7 @@ namespace Mmd.UnityIntegration
         public double initialSeedMs;
         public double livePhysicsPrewarmMs;
         public bool configured;
+        public bool pmxSourceBufferBorrowed;
         public bool livePhysicsPrewarmed;
         public bool succeeded;
     }
