@@ -4,6 +4,35 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-08-12
+
+### Added
+
+- Added an optional Cinemachine camera binding for native VMD camera motion, including Timeline shot ownership and lens parity coverage without adding a core package dependency on Cinemachine.
+- Added an advanced, bounded per-chain IK iteration override with fail-closed handling for unsupported Humanoid Physics Off combinations.
+- Added opt-in phase-level Live Physics and Unity frame-apply diagnostics for attributing native, bridge, pose, morph, and material costs.
+
+### Changed
+
+- Evaluated Humanoid helper bones and Live Physics poses through the native host-pose session, preserving deterministic Timeline scrubbing and native MMD helper/IK behavior.
+- Reused Live Physics sessions and frame buffers, avoided unchanged steady-frame revalidation, and split native host-frame timing into evaluation, output-copy, and physics-step phases.
+- Replaced per-frame blend-shape bounds rebuilding with a conservative fixed renderer bound computed at import from skinning reach and acyclic group/flip morph contributions.
+- Skipped inactive material-morph evaluation while preserving all-target, add, multiply, zero-reset, and external material-edit reapplication behavior.
+
+### Fixed
+
+- Fixed Humanoid Live Physics pose evaluation so native helper-bone and after-physics results are applied to the retargeted model.
+- Fixed morph-heavy playback stalls and per-frame allocations caused by dynamic renderer-bounds rebuilding and inactive material evaluation.
+
+### Known Limitations
+
+- Runtime evaluation requires the bundled native runtime; unavailable or incompatible native paths report diagnostics and do not fall back to the removed managed evaluator.
+- macOS and Linux native binaries are not distributed in the package.
+- Timeline random access keeps physics off; Live physics is limited to Play Mode forward playback.
+- Raw VMD Timeline clips use deterministic hard-cut selection rather than weighted blending.
+- Humanoid bake does not include Live physics, facial morphs, or native MMD IK/helper behavior.
+- The Unity Toon Shader adapter remains optional and conservative; it falls back to MMD Toon when UTS is absent or its shader schema is unsupported.
+
 ## [0.4.0] - 2026-08-04
 
 ### Added
