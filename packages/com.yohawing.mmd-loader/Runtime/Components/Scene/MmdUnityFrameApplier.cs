@@ -224,10 +224,18 @@ namespace Mmd.UnityIntegration
             if (hasMaterialMorphs)
             {
                 stageStart = timing != null ? Stopwatch.GetTimestamp() : 0L;
-                ApplyMaterialMorphs(instance, descriptor, resolvedWeights);
+                long materialMorphAllocatedBefore = timing != null
+                    ? GC.GetAllocatedBytesForCurrentThread()
+                    : 0L;
+                bool materialMorphEvaluatorSkipped;
+                ApplyMaterialMorphs(instance, descriptor, resolvedWeights, out materialMorphEvaluatorSkipped);
                 if (timing != null)
                 {
                     timing.materialMorphApplyMs = ToMilliseconds(Stopwatch.GetTimestamp() - stageStart);
+                    timing.materialMorphEvaluatorSkipped = materialMorphEvaluatorSkipped;
+                    timing.materialMorphAllocatedBytes = Math.Max(
+                        0L,
+                        GC.GetAllocatedBytesForCurrentThread() - materialMorphAllocatedBefore);
                 }
             }
 
@@ -365,16 +373,46 @@ namespace Mmd.UnityIntegration
         private static void ApplyMaterialMorphs(
             MmdUnityModelInstance instance,
             MmdRenderingDescriptor descriptor,
-            IReadOnlyDictionary<string, float> resolvedWeights)
+            IReadOnlyDictionary<string, float> resolvedWeights,
+            out bool evaluatorSkipped)
         {
             IReadOnlyList<MmdMaterialDescriptor> materials = descriptor.materials
                 ?? throw new InvalidOperationException("Rendering descriptor materials are required for material morph evaluation.");
             IReadOnlyList<MmdMorphDescriptorBuilder.MmdMaterialMorphDescriptor> materialMorphs = descriptor.materialMorphs
                 ?? throw new InvalidOperationException("Rendering descriptor material morphs are required for material morph evaluation.");
-            IReadOnlyList<MmdMaterialDescriptor> modifiedDescriptors = MmdMaterialMorphEvaluator.ApplyMaterialMorphs(
-                materials,
-                materialMorphs,
-                resolvedWeights);
+            bool hasNonZeroMaterialMorphWeight = false;
+            for (int i = 0; i < materialMorphs.Count; i++)
+            {
+                MmdMorphDescriptorBuilder.MmdMaterialMorphDescriptor morph = materialMorphs[i];
+                if (morph == null || string.IsNullOrWhiteSpace(morph.morphName))
+                {
+                    continue;
+                }
+
+                if (!resolvedWeights.TryGetValue(morph.morphName, out float weight))
+                {
+                    continue;
+                }
+
+                if (!IsFinite(weight))
+                {
+                    throw new InvalidOperationException(
+                        $"Material morph weight must be finite: {morph.morphName}");
+                }
+
+                if (weight != 0.0f)
+                {
+                    hasNonZeroMaterialMorphWeight = true;
+                }
+            }
+
+            evaluatorSkipped = !hasNonZeroMaterialMorphWeight;
+            IReadOnlyList<MmdMaterialDescriptor> modifiedDescriptors = evaluatorSkipped
+                ? materials
+                : MmdMaterialMorphEvaluator.ApplyMaterialMorphs(
+                    materials,
+                    materialMorphs,
+                    resolvedWeights);
 
             for (int i = 0; i < instance.Materials.Length && i < modifiedDescriptors.Count; i++)
             {
@@ -649,6 +687,8 @@ namespace Mmd.UnityIntegration
         public double vertexMorphEvalMs;
         public double textureUvMorphEvalMs;
         public double materialMorphApplyMs;
+        public bool materialMorphEvaluatorSkipped;
+        public long materialMorphAllocatedBytes;
         public double unityBufferBuildMs;
         public double setBlendShapeWeightMs;
         public double setVerticesMs;

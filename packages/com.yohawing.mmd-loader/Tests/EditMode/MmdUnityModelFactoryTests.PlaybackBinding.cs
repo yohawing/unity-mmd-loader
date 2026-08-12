@@ -334,7 +334,9 @@ namespace Mmd.Tests
 
             MmdEvaluatedFrame active = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
             active.morphs.Add(new MmdEvaluatedMorphWeight { name = "multiply-change", weight = 1.0f });
-            MmdUnityFrameApplier.ApplyFrame(instance, active);
+            MmdUnityMorphApplyTimingSummary activeTiming = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, active);
+            Assert.That(activeTiming.materialMorphEvaluatorSkipped, Is.False);
+            Assert.That(activeTiming.materialMorphAllocatedBytes, Is.GreaterThanOrEqualTo(0));
             int writesAfterFirstApply = instance.MaterialMorphPropertyWriteCount;
             Color firstColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
 
@@ -351,7 +353,9 @@ namespace Mmd.Tests
 
             MmdEvaluatedFrame zero = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
             zero.morphs.Add(new MmdEvaluatedMorphWeight { name = "multiply-change", weight = 0.0f });
-            MmdUnityFrameApplier.ApplyFrame(instance, zero);
+            MmdUnityMorphApplyTimingSummary zeroTiming = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, zero);
+            Assert.That(zeroTiming.materialMorphEvaluatorSkipped, Is.True);
+            Assert.That(zeroTiming.materialMorphAllocatedBytes, Is.GreaterThanOrEqualTo(0));
 
             Assert.That(instance.MaterialMorphPropertyWriteCount, Is.GreaterThan(writesAfterExternalEdit),
                 "Returning to zero weight must write the base material values.");
@@ -360,6 +364,18 @@ namespace Mmd.Tests
             Assert.That(restoredColor.g, Is.EqualTo(baseColor.g).Within(0.00001f));
             Assert.That(restoredColor.b, Is.EqualTo(baseColor.b).Within(0.00001f));
             Assert.That(restoredColor.a, Is.EqualTo(baseColor.a).Within(0.00001f));
+
+            // Repeated zero-weight frames still use the base descriptors, so an external
+            // Unity Material edit is corrected even though the evaluator is skipped.
+            instance.Materials[0].SetColor("_BaseColor", Color.magenta);
+            MmdUnityMorphApplyTimingSummary repeatedZeroTiming = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, zero);
+            Assert.That(repeatedZeroTiming.materialMorphEvaluatorSkipped, Is.True);
+            Assert.That(repeatedZeroTiming.materialMorphAllocatedBytes, Is.GreaterThanOrEqualTo(0));
+            Color repeatedZeroColor = ReadMaterialColor(instance.Materials[0], "_BaseColor");
+            Assert.That(repeatedZeroColor.r, Is.EqualTo(baseColor.r).Within(0.00001f));
+            Assert.That(repeatedZeroColor.g, Is.EqualTo(baseColor.g).Within(0.00001f));
+            Assert.That(repeatedZeroColor.b, Is.EqualTo(baseColor.b).Within(0.00001f));
+            Assert.That(repeatedZeroColor.a, Is.EqualTo(baseColor.a).Within(0.00001f));
         }
         [Test]
         public void ApplyFrameExpandsFlipMorphWeightToTargetVertexMorph()
