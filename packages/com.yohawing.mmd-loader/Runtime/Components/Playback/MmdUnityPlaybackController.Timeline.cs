@@ -17,6 +17,28 @@ namespace Mmd.UnityIntegration
         private int lastTimelineDriveFrameCount = int.MinValue / 2;
 
         private int lastHumanoidRetargetTimelineDriveFrameCount = int.MinValue / 2;
+        private bool timelinePreparationSeedPending;
+        private bool timelinePreparationSeedWasLive;
+
+        internal void PrepareTimelineSeed(float sourceTime, float frameRate, bool runLivePhysics)
+        {
+            timelinePreparationSeedPending = false;
+            bool seedLivePhysics = runLivePhysics && physicsMode == MmdPhysicsMode.Live;
+            if (seedLivePhysics)
+            {
+                ApplyTimelineLivePhysicsForward(sourceTime, frameRate);
+            }
+            else
+            {
+                ApplyTimelineTime(sourceTime, frameRate);
+            }
+
+            // Setup owns this evaluation. The first clip sample may reuse it without counting a
+            // second pose evaluation, but only while its evaluation mode and Live state still match.
+            TimelinePoseEvaluationCount = 0;
+            timelinePreparationSeedPending = LastSnapshot != null;
+            timelinePreparationSeedWasLive = seedLivePhysics;
+        }
 
         public MmdHumanoidRetargeterResult ApplyHumanoidRetargetNow()
         {
@@ -163,6 +185,14 @@ namespace Mmd.UnityIntegration
             MmdPlaybackTime.ValidateFrameRate(frameRate);
             lastTimelineDriveFrameCount = Time.frameCount;
             int frame = MmdPlaybackTime.ToFrame(sourceTime, frameRate);
+            if (TryReuseTimelinePreparationSeed(
+                sourceTime,
+                runLivePhysics: false,
+                seedStateValid: true,
+                out MmdPlaybackSnapshot? cachedSnapshot))
+            {
+                return cachedSnapshot;
+            }
 
             try
             {
@@ -171,6 +201,7 @@ namespace Mmd.UnityIntegration
                     playbackFrame = frame;
                     CurrentFrame = frame;
                     LastSnapshot = binding.ApplyTimelinePreviewTime(sourceTime, frameRate);
+                    TimelinePoseEvaluationCount++;
                     return LastSnapshot;
                 });
             }
@@ -198,12 +229,20 @@ namespace Mmd.UnityIntegration
             MmdPlaybackTime.ValidateFrameRate(frameRate);
             lastTimelineDriveFrameCount = Time.frameCount;
             int frame = MmdPlaybackTime.ToFrame(sourceTime, frameRate);
-
             // The animation-only scrub path (ApplyTimelineTime) leaves the binding in Live but with a
             // reset simulation; guard against a binding that was left in Off by re-enabling Live.
             if (binding.PhysicsMode != MmdPhysicsMode.Live)
             {
                 binding.SetPhysicsMode(MmdPhysicsMode.Live);
+            }
+
+            if (TryReuseTimelinePreparationSeed(
+                sourceTime,
+                runLivePhysics: true,
+                seedStateValid: binding.CanReuseLivePhysicsSeed(frame),
+                out MmdPlaybackSnapshot? cachedSnapshot))
+            {
+                return cachedSnapshot;
             }
 
             playbackFrame = frame;
@@ -212,9 +251,39 @@ namespace Mmd.UnityIntegration
             {
                 PrepareLivePhysicsDriveSource(LivePhysicsDriveSource.VmdForward);
                 LastSnapshot = binding.ApplyLivePhysicsForwardFrame(frame, frameRate);
+                TimelinePoseEvaluationCount++;
                 lastVmdLivePhysicsFrameCount = Time.frameCount;
                 return LastSnapshot;
             });
+        }
+
+        private bool TryReuseTimelinePreparationSeed(
+            float sourceTime,
+            bool runLivePhysics,
+            bool seedStateValid,
+            out MmdPlaybackSnapshot snapshot)
+        {
+            if (!timelinePreparationSeedPending)
+            {
+                snapshot = null!;
+                return false;
+            }
+
+            timelinePreparationSeedPending = false;
+            MmdPlaybackSnapshot? candidate = LastSnapshot;
+            if (timelinePreparationSeedWasLive == runLivePhysics &&
+                seedStateValid &&
+                candidate != null &&
+                Math.Abs(candidate.frame.time - sourceTime) <= 1e-7f)
+            {
+                playbackFrame = MmdPlaybackTime.ToFrame(sourceTime, frameRate);
+                CurrentFrame = (int)playbackFrame;
+                snapshot = candidate;
+                return true;
+            }
+
+            snapshot = null!;
+            return false;
         }
 
         private static MmdHumanoidRetargeterResult CreateHumanoidRetargetNoOpResult(MmdHumanoidRetargetGate gate)

@@ -107,6 +107,12 @@ namespace Mmd.Timeline
                 Stopwatch prewarmWatch = Stopwatch.StartNew();
                 timing.livePhysicsPrewarmed = target.PrewarmTimelineLivePhysics();
                 timing.livePhysicsPrewarmMs = prewarmWatch.Elapsed.TotalMilliseconds;
+                Stopwatch seedWatch = Stopwatch.StartNew();
+                target.PrepareTimelineSeed(
+                    (float)StartOffsetSeconds,
+                    FrameRate,
+                    runLivePhysics: Application.isPlaying);
+                timing.initialSeedMs = seedWatch.Elapsed.TotalMilliseconds;
                 timing.succeeded = true;
                 return true;
             }

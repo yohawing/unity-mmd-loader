@@ -180,12 +180,6 @@ namespace Mmd.UnityIntegration
                 },
                 timelineEvaluation,
                 setupTiming: setupTiming);
-            if (setupTiming != null)
-            {
-                phaseStart = Stopwatch.GetTimestamp();
-                ApplyFrame(config.InitialFrame);
-                setupTiming.initialSeedMs += TimelineSetupElapsedMilliseconds(phaseStart);
-            }
         }
 
         public void ConfigureMotionFromProviderModelSource(MmdVmdAsset vmdAsset, MmdPlaybackConfig config)
@@ -278,7 +272,7 @@ namespace Mmd.UnityIntegration
                     motion,
                     reboundBinding => Configure(reboundBinding, playbackFrameRate, playOnStart),
                     timelineEvaluation,
-                    applyStartFrame: startFrame,
+                    applyStartFrame: timelineEvaluation ? null : startFrame,
                     setupTiming))
                 {
                     return;
@@ -338,11 +332,9 @@ namespace Mmd.UnityIntegration
                 timelineEvaluation,
                 setupTiming: setupTiming);
 
-            phaseStart = Stopwatch.GetTimestamp();
-            ApplyFrame(startFrame);
-            if (setupTiming != null)
+            if (!timelineEvaluation)
             {
-                setupTiming.initialSeedMs += TimelineSetupElapsedMilliseconds(phaseStart);
+                ApplyFrame(startFrame);
             }
         }
 

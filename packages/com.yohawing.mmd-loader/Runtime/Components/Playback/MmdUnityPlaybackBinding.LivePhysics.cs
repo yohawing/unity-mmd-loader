@@ -14,6 +14,14 @@ namespace Mmd.UnityIntegration
 {
     public sealed partial class MmdUnityPlaybackBinding
     {
+        internal bool CanReuseLivePhysicsSeed(int frame)
+        {
+            return physicsMode == MmdPhysicsMode.Live &&
+                   livePhysicsBackend != null &&
+                   lastLiveFrame == frame &&
+                   lastLiveSnapshot != null;
+        }
+
         private MmdUnityModelInstance? livePhysicsMetadataInstance;
         private IMmdLivePhysicsBackend? livePhysicsMetadataBackend;
         private LivePhysicsBodyMetadata[]? livePhysicsBodyMetadata;

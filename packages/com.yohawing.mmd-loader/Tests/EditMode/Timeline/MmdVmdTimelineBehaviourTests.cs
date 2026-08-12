@@ -607,6 +607,14 @@ namespace Mmd.Tests
                 Assert.That(controller.LastSnapshot, Is.Not.Null,
                     "Preparation must seed frame zero before the first clip frame.");
                 Assert.That(controller.LastSnapshot!.frame.frame, Is.EqualTo(0));
+                MmdPlaybackSnapshot preparedSnapshot = controller.LastSnapshot;
+                Assert.That(controller.TimelinePoseEvaluationCount, Is.Zero);
+                MmdPlaybackSnapshot firstClipSnapshot = behaviour.EvaluateAtLocalTime(controller, 0.0);
+                Assert.That(firstClipSnapshot, Is.SameAs(preparedSnapshot));
+                Assert.That(controller.TimelinePoseEvaluationCount, Is.Zero,
+                    "The first clip frame must reuse the frame-zero preparation seed.");
+                behaviour.EvaluateAtLocalTime(controller, 1.0 / 30.0);
+                Assert.That(controller.TimelinePoseEvaluationCount, Is.EqualTo(1));
                 MmdTimelineSetupTimingSummary? timing = controller.LastTimelineSetupTiming;
                 Assert.That(timing, Is.Not.Null);
                 Assert.That(timing!.configured, Is.True);
@@ -625,6 +633,13 @@ namespace Mmd.Tests
                 Assert.That(timing.initialSeedMs, Is.GreaterThan(0.0));
                 Assert.That(timing.livePhysicsPrewarmMs, Is.GreaterThanOrEqualTo(0.0));
                 Assert.That(timing.totalMs, Is.GreaterThanOrEqualTo(timing.pmxParseMs));
+
+                controller.PrepareTimelineSeed(0.0f, 30.0f, runLivePhysics: false);
+                MmdPlaybackSnapshot previewSeed = controller.LastSnapshot!;
+                MmdPlaybackSnapshot liveSeed = controller.ApplyTimelineLivePhysicsForward(0.0f, 30.0f);
+                Assert.That(liveSeed, Is.Not.SameAs(previewSeed),
+                    "An animation-only preparation seed must not bypass the first Live physics seed.");
+                Assert.That(controller.TimelinePoseEvaluationCount, Is.EqualTo(1));
                 TestContext.WriteLine("timelineSetup=" + JsonUtility.ToJson(timing));
             }
             finally

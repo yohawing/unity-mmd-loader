@@ -93,6 +93,8 @@ namespace Mmd.UnityIntegration
 
         public int ConfigurationRevision { get; private set; }
 
+        internal int TimelinePoseEvaluationCount { get; private set; }
+
         // SOURCE-OF-TRUTH: normal asset authoring keeps PMX/VMD source references on the controller.
         // RuntimeImporterComponent remains the raw-path owner.
         public bool HasModelSource => ModelAssetSource != null || !string.IsNullOrWhiteSpace(ModelSourceId);
@@ -213,6 +215,9 @@ namespace Mmd.UnityIntegration
             binding.IkMaxIterationsCap = ikMaxIterationsCap;
             binding.SetPhysicsMode(physicsMode);
             ResetLivePhysicsDriveSource();
+            TimelinePoseEvaluationCount = 0;
+            timelinePreparationSeedPending = false;
+            timelinePreparationSeedWasLive = false;
             ConfigurationRevision++;
         }
 
