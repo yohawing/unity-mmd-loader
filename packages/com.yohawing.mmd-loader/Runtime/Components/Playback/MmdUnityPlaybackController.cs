@@ -43,6 +43,7 @@ namespace Mmd.UnityIntegration
         public double livePhysicsPrewarmMs;
         public bool configured;
         public bool pmxSourceBufferBorrowed;
+        public bool pmxParseCacheHit;
         public bool livePhysicsPrewarmed;
         public bool succeeded;
     }

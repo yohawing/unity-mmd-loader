@@ -122,21 +122,18 @@ namespace Mmd.UnityIntegration
                 throw new FileNotFoundException("Runtime importer VMD file was not found.", resolvedVmdPath);
             }
 
+            MmdPmxRuntimeParseCache.Result cachedPmx = MmdPmxRuntimeParseCache.Load(resolvedPmxPath);
+            byte[] pmxBytes = cachedPmx.Bytes;
             long phaseStart = Stopwatch.GetTimestamp();
-            byte[] pmxBytes = File.ReadAllBytes(resolvedPmxPath);
             byte[] vmdBytes = File.ReadAllBytes(resolvedVmdPath);
             if (setupTiming != null)
             {
+                setupTiming.sourceAcquireMs += cachedPmx.SourceAcquireMs;
                 setupTiming.sourceAcquireMs += TimelineSetupElapsedMilliseconds(phaseStart);
+                setupTiming.pmxParseMs += cachedPmx.ParseMs;
+                setupTiming.pmxParseCacheHit = cachedPmx.CacheHit;
             }
-            var parser = new NativeMmdParser();
-            phaseStart = Stopwatch.GetTimestamp();
-            MmdModelDefinition model = parser.LoadModel(pmxBytes);
-            MmdModelValidator.ThrowIfInvalid(model);
-            if (setupTiming != null)
-            {
-                setupTiming.pmxParseMs += TimelineSetupElapsedMilliseconds(phaseStart);
-            }
+            MmdModelDefinition model = cachedPmx.Model;
             phaseStart = Stopwatch.GetTimestamp();
             MmdVmdParseSummary summary = MmdVmdNativeSummaryAdapter.Read(vmdBytes);
             MmdMotionDefinition motion = MmdVmdAsset.CreateNativeClipMotionHeader(vmdBytes, summary);
@@ -290,13 +287,13 @@ namespace Mmd.UnityIntegration
                 throw new FileNotFoundException("Provider PMX file was not found.", resolvedPmxPath);
             }
 
-            var parser = new NativeMmdParser();
-            phaseStart = Stopwatch.GetTimestamp();
-            MmdModelDefinition model = parser.LoadModel(File.ReadAllBytes(resolvedPmxPath));
-            MmdModelValidator.ThrowIfInvalid(model);
+            MmdPmxRuntimeParseCache.Result cachedPmx = MmdPmxRuntimeParseCache.Load(resolvedPmxPath);
+            MmdModelDefinition model = cachedPmx.Model;
             if (setupTiming != null)
             {
-                setupTiming.pmxParseMs += TimelineSetupElapsedMilliseconds(phaseStart);
+                setupTiming.sourceAcquireMs += cachedPmx.SourceAcquireMs;
+                setupTiming.pmxParseMs += cachedPmx.ParseMs;
+                setupTiming.pmxParseCacheHit = cachedPmx.CacheHit;
             }
 
             if (!HasExistingSceneSkinnedMeshRenderer())
@@ -311,7 +308,7 @@ namespace Mmd.UnityIntegration
                 setupTiming.compatibilityValidationMs += TimelineSetupElapsedMilliseconds(phaseStart);
             }
             phaseStart = Stopwatch.GetTimestamp();
-            byte[] pathPmxBytes = File.ReadAllBytes(resolvedPmxPath);
+            byte[] pathPmxBytes = cachedPmx.Bytes;
             byte[] pathVmdBytes = vmdAsset.GetBytesCopy();
             if (setupTiming != null)
             {
@@ -469,13 +466,17 @@ namespace Mmd.UnityIntegration
                 return false;
             }
 
-            var parser = new NativeMmdParser();
             long phaseStart = Stopwatch.GetTimestamp();
-            MmdModelDefinition model = pmxAsset.LoadModel(parser);
-            MmdModelValidator.ThrowIfInvalid(model);
+            MmdModelDefinition model = pmxAsset.LoadValidatedModelForSynchronousPlayback(
+                new NativeMmdParser(),
+                out bool pmxParseCacheHit);
             if (setupTiming != null)
             {
-                setupTiming.pmxParseMs += TimelineSetupElapsedMilliseconds(phaseStart);
+                if (!pmxParseCacheHit)
+                {
+                    setupTiming.pmxParseMs += TimelineSetupElapsedMilliseconds(phaseStart);
+                }
+                setupTiming.pmxParseCacheHit = pmxParseCacheHit;
             }
             phaseStart = Stopwatch.GetTimestamp();
             MmdUnityModelFactory.ValidateExistingSkinnedModelCompatibility(gameObject, model);

@@ -621,10 +621,13 @@ namespace Mmd.Tests
                 Assert.That(timing.succeeded, Is.True);
                 Assert.That(timing.totalMs, Is.GreaterThan(0.0));
                 Assert.That(timing.motionHeaderMs, Is.GreaterThan(0.0));
-                Assert.That(timing.pmxParseMs, Is.GreaterThan(0.0));
+                Assert.That(
+                    timing.pmxParseMs,
+                    timing.pmxParseCacheHit ? Is.EqualTo(0.0) : Is.GreaterThan(0.0));
                 Assert.That(timing.compatibilityValidationMs, Is.GreaterThanOrEqualTo(0.0));
                 Assert.That(timing.sourceAcquireMs, Is.GreaterThanOrEqualTo(0.0));
                 Assert.That(timing.pmxSourceBufferBorrowed, Is.True);
+                Assert.That(timing.pmxParseCacheHit, Is.False);
                 Assert.That(timing.sharedVmdContextMs, Is.GreaterThanOrEqualTo(0.0));
                 Assert.That(timing.nativeAvailabilityMs, Is.GreaterThan(0.0));
                 Assert.That(timing.sceneBindingMs, Is.GreaterThan(0.0));
@@ -640,6 +643,12 @@ namespace Mmd.Tests
                 Assert.That(liveSeed, Is.Not.SameAs(previewSeed),
                     "An animation-only preparation seed must not bypass the first Live physics seed.");
                 Assert.That(controller.TimelinePoseEvaluationCount, Is.EqualTo(1));
+
+                MmdModelDefinition cachedModel = pmxAsset.LoadValidatedModelForSynchronousPlayback(
+                    new NativeMmdParser(),
+                    out bool cacheHit);
+                Assert.That(cacheHit, Is.True);
+                Assert.That(cachedModel, Is.Not.Null);
                 TestContext.WriteLine("timelineSetup=" + JsonUtility.ToJson(timing));
             }
             finally
@@ -647,6 +656,34 @@ namespace Mmd.Tests
                 MmdTestInstanceScope.DestroyInstance(instance);
                 Object.DestroyImmediate(pmxAsset);
                 Object.DestroyImmediate(vmdAsset);
+            }
+        }
+
+        [Test]
+        public void RuntimePmxParseCacheReusesUnchangedPathEntry()
+        {
+            string tempPath = Path.Combine(
+                Path.GetTempPath(),
+                "mmd-pmx-cache-" + Guid.NewGuid().ToString("N") + ".pmx");
+            try
+            {
+                File.Copy(ResolvePackageFixture("test_1bone_cube.pmx"), tempPath);
+                MmdPmxRuntimeParseCache.Result first = MmdPmxRuntimeParseCache.Load(tempPath);
+                MmdPmxRuntimeParseCache.Result second = MmdPmxRuntimeParseCache.Load(tempPath);
+
+                Assert.That(first.CacheHit, Is.False);
+                Assert.That(second.CacheHit, Is.True);
+                Assert.That(second.Bytes, Is.SameAs(first.Bytes));
+                Assert.That(second.Model, Is.SameAs(first.Model));
+
+                byte[] changedBytes = new byte[first.Bytes.Length];
+                File.WriteAllBytes(tempPath, changedBytes);
+                Assert.Throws<InvalidOperationException>(() => MmdPmxRuntimeParseCache.Load(tempPath),
+                    "A same-length content change must not return the stale parsed model.");
+            }
+            finally
+            {
+                File.Delete(tempPath);
             }
         }
 
@@ -677,7 +714,9 @@ namespace Mmd.Tests
                 Assert.That(timing.succeeded, Is.True);
                 Assert.That(timing.sourceAcquireMs, Is.GreaterThan(0.0));
                 Assert.That(timing.pmxSourceBufferBorrowed, Is.False);
-                Assert.That(timing.pmxParseMs, Is.GreaterThan(0.0));
+                Assert.That(
+                    timing.pmxParseMs,
+                    timing.pmxParseCacheHit ? Is.EqualTo(0.0) : Is.GreaterThan(0.0));
                 Assert.That(timing.motionHeaderMs, Is.GreaterThan(0.0));
                 Assert.That(timing.nativeAvailabilityMs, Is.GreaterThan(0.0));
                 Assert.That(timing.sceneBindingMs, Is.GreaterThan(0.0));

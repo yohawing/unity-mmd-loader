@@ -322,6 +322,8 @@ namespace Mmd
         [SerializeField] private string hierarchyReadinessDiagnostic = string.Empty;
         [SerializeField] private string rendererReadinessDiagnostic = string.Empty;
         [SerializeField] private string boneBindingReadinessDiagnostic = string.Empty;
+        [NonSerialized] private byte[]? synchronousPlaybackCacheSource;
+        [NonSerialized] private MmdModelDefinition? synchronousPlaybackModelCache;
 
         public string SourceId => sourceId;
 
@@ -491,6 +493,8 @@ namespace Mmd
                 throw new ArgumentException("PMX asset bytes are required.", nameof(bytes));
             }
 
+            synchronousPlaybackCacheSource = null;
+            synchronousPlaybackModelCache = null;
             data = (byte[])bytes.Clone();
             sourceId = assetSourceId ?? string.Empty;
             sourcePath = assetSourcePath ?? string.Empty;
@@ -573,6 +577,31 @@ namespace Mmd
 
             parser ??= new NativeMmdParser();
             return parser.LoadModel(data);
+        }
+
+        internal MmdModelDefinition LoadValidatedModelForSynchronousPlayback(
+            IMmdParser? parser,
+            out bool cacheHit)
+        {
+            if (data.Length == 0)
+            {
+                throw new InvalidOperationException("PMX asset has no imported bytes.");
+            }
+
+            if (ReferenceEquals(synchronousPlaybackCacheSource, data) &&
+                synchronousPlaybackModelCache != null)
+            {
+                cacheHit = true;
+                return synchronousPlaybackModelCache;
+            }
+
+            parser ??= new NativeMmdParser();
+            MmdModelDefinition model = parser.LoadModel(data);
+            MmdModelValidator.ThrowIfInvalid(model);
+            synchronousPlaybackCacheSource = data;
+            synchronousPlaybackModelCache = model;
+            cacheHit = false;
+            return model;
         }
 
         private static float NormalizeImportScale(float value)
