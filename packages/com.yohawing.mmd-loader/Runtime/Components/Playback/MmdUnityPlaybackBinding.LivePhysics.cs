@@ -12,6 +12,33 @@ using UnityEngine;
 
 namespace Mmd.UnityIntegration
 {
+    internal sealed class MmdTimelineLivePhysicsTransfer : IDisposable
+    {
+        private MmdAnimPhysicsBackend? backend;
+
+        internal MmdTimelineLivePhysicsTransfer(byte[] modelSource, MmdAnimPhysicsBackend backend)
+        {
+            ModelSource = modelSource;
+            this.backend = backend;
+        }
+
+        internal byte[] ModelSource { get; }
+
+        internal MmdAnimPhysicsBackend Take()
+        {
+            MmdAnimPhysicsBackend result = backend
+                ?? throw new InvalidOperationException("Timeline physics transfer was already consumed.");
+            backend = null;
+            return result;
+        }
+
+        public void Dispose()
+        {
+            backend?.Dispose();
+            backend = null;
+        }
+    }
+
     public sealed partial class MmdUnityPlaybackBinding
     {
         internal bool CanReuseLivePhysicsSeed(int frame)
@@ -32,6 +59,60 @@ namespace Mmd.UnityIntegration
 
         internal bool NativeHumanoidHostPoseEnabled => nativeHumanoidHostPoseEnabled;
         internal bool HasLivePhysicsBackend => livePhysicsBackend != null;
+
+        internal MmdTimelineLivePhysicsTransfer? DetachTimelineLivePhysicsBackend()
+        {
+            if (physicsMode != MmdPhysicsMode.Live || nativeHumanoidHostPoseEnabled ||
+                fastSession == null || livePhysicsBackend is not MmdAnimPhysicsBackend nativeBackend ||
+                model.sourceBytes == null)
+            {
+                return null;
+            }
+
+            nativeBackend.ParkPlaybackSession(fastSession);
+            livePhysicsBackend = null;
+            ClearTransferredLivePhysicsState();
+            return new MmdTimelineLivePhysicsTransfer(model.sourceBytes, nativeBackend);
+        }
+
+        internal bool TryAttachTimelineLivePhysicsBackend(MmdTimelineLivePhysicsTransfer transfer)
+        {
+            if (transfer == null)
+                throw new ArgumentNullException(nameof(transfer));
+            if (physicsMode != MmdPhysicsMode.Live || nativeHumanoidHostPoseEnabled ||
+                fastSession == null || !ReferenceEquals(model.sourceBytes, transfer.ModelSource))
+            {
+                return false;
+            }
+
+            MmdAnimPhysicsBackend nativeBackend = transfer.Take();
+            try
+            {
+                nativeBackend.AttachPlaybackSession(fastSession, motionId);
+                livePhysicsBackend = nativeBackend;
+                ClearTransferredLivePhysicsState();
+                return true;
+            }
+            catch
+            {
+                nativeBackend.Dispose();
+                return false;
+            }
+        }
+
+        private void ClearTransferredLivePhysicsState()
+        {
+            lastLiveFrame = -1;
+            lastForwardPlaybackFrame = -1;
+            lastLiveSnapshot = null;
+            lastLivePhysicsDiagnostics = null;
+            LastDetailedApplyTiming = null;
+            livePhysicsAfterPhysicsWorldMatrices = null;
+            livePhysicsMetadataInstance = null;
+            livePhysicsMetadataBackend = null;
+            livePhysicsBodyMetadata = null;
+            ClearLivePhysicsBodyDiagnostics();
+        }
 
         internal bool PrewarmLivePhysicsBackend()
         {

@@ -724,6 +724,9 @@ namespace Mmd.Native
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_physics_world_reset", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int PhysicsWorldReset(IntPtr world, IntPtr instance, out IntPtr seededRigidbodyCount);
 
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_physics_world_rearm_bake_seed", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int PhysicsWorldRearmBakeSeed(IntPtr world);
+
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_physics_world_step_runtime", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int PhysicsWorldStepRuntime(
             IntPtr world,

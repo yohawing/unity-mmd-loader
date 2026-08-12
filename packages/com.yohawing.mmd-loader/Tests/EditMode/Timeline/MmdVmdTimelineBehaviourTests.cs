@@ -698,6 +698,64 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void TimelinePreparationReusesLivePhysicsWorldAcrossSameModelClips()
+        {
+            MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? firstVmdAsset = null;
+            MmdVmdAsset? secondVmdAsset = null;
+            MmdUnityModelInstance? instance = null;
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                pmxAsset = CreatePmxAsset(pmxPath);
+                byte[] vmdBytes = File.ReadAllBytes(vmdPath);
+                firstVmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                firstVmdAsset.Initialize(vmdBytes, "first-clip.vmd", vmdPath);
+                secondVmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                secondVmdAsset.Initialize(vmdBytes, "second-clip.vmd", vmdPath);
+                var parser = new NativeMmdParser();
+                instance = MmdUnityModelFactory.CreateSkinnedModel(
+                    parser.LoadModel(File.ReadAllBytes(pmxPath)),
+                    pmxPath);
+                MmdUnityPlaybackController controller = instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.ConfigureModelAsset(pmxAsset);
+                pmxAsset.BeginSynchronousPlaybackPreload().GetAwaiter().GetResult();
+
+                var firstBehaviour = new MmdVmdTimelineBehaviour
+                {
+                    MotionAsset = firstVmdAsset,
+                    FrameRate = 30.0f
+                };
+                var secondBehaviour = new MmdVmdTimelineBehaviour
+                {
+                    MotionAsset = secondVmdAsset,
+                    FrameRate = 30.0f
+                };
+
+                MethodInfo? prepare = typeof(MmdVmdTimelineBehaviour).GetMethod(
+                    "TryPrepareTimelinePlayback",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(prepare, Is.Not.Null);
+                Assert.That(prepare!.Invoke(firstBehaviour, new object[] { controller }), Is.EqualTo(true));
+                Assert.That(controller.LastTimelineSetupTiming!.livePhysicsPrewarmed, Is.True);
+                Assert.That(controller.LastTimelineSetupTiming.livePhysicsWorldReused, Is.False);
+
+                Assert.That(prepare.Invoke(secondBehaviour, new object[] { controller }), Is.EqualTo(true));
+                Assert.That(controller.LastTimelineSetupTiming!.livePhysicsWorldReused, Is.True);
+                Assert.That(controller.LastTimelineSetupTiming.livePhysicsPrewarmed, Is.True);
+                Assert.That(controller.IsConfiguredForMotionAsset(secondVmdAsset), Is.True);
+            }
+            finally
+            {
+                MmdTestInstanceScope.DestroyInstance(instance);
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(firstVmdAsset);
+                Object.DestroyImmediate(secondVmdAsset);
+            }
+        }
+
+        [Test]
         public void RuntimePmxParseCacheReusesUnchangedPathEntry()
         {
             string tempPath = Path.Combine(

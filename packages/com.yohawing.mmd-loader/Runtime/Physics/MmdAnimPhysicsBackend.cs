@@ -97,9 +97,9 @@ namespace Mmd.Physics
     {
         private const int TransformFloatCount = 7;
         private readonly string modelId;
-        private readonly string motionId;
-        private readonly IntPtr model;
-        private readonly IntPtr instance;
+        private string motionId;
+        private IntPtr model;
+        private IntPtr instance;
         private readonly bool ownsRuntimeHandles;
         private IntPtr world;
         private readonly int boneCount;
@@ -239,6 +239,66 @@ namespace Mmd.Physics
         public int SkippedWorldAnchorJointCount => skippedWorldAnchorJointCount;
 
         internal int WorldMatrixFloatCount => worldMatrixFloatCount;
+
+        internal void ParkPlaybackSession(MmdRuntimeFfiPlaybackSession playbackSession)
+        {
+            ThrowIfDisposed();
+            if (ownsRuntimeHandles)
+                throw new InvalidOperationException("Only a borrowed playback physics backend can be parked.");
+            if (playbackSession.GetNativeInstanceHandle() != instance)
+                throw new InvalidOperationException("Playback physics must park its borrowed runtime instance.");
+
+            int status = MmdRuntimeFfiMethods.InstanceSetPhysicsMode(
+                instance,
+                MmdRuntimeFfiMethods.PhysicsModeOff);
+            ThrowIfFailed(status, "InstanceSetPhysicsMode", modelId, motionId);
+            instance = IntPtr.Zero;
+            model = IntPtr.Zero;
+            seededSinceReset = false;
+        }
+
+        internal void AttachPlaybackSession(
+            MmdRuntimeFfiPlaybackSession playbackSession,
+            string nextMotionId)
+        {
+            ThrowIfDisposed();
+            if (ownsRuntimeHandles || instance != IntPtr.Zero || model != IntPtr.Zero)
+                throw new InvalidOperationException("Playback physics backend is not parked.");
+            if (playbackSession.BoneCount != boneCount ||
+                playbackSession.WorldMatrixFloatCount != worldMatrixFloatCount ||
+                playbackSession.MorphWeightCount != morphCount ||
+                playbackSession.IkEnabledCount != ikCount)
+            {
+                throw new InvalidOperationException(
+                    "Playback physics backend cannot be attached to a session with different native output dimensions.");
+            }
+
+            IntPtr nextModel = playbackSession.GetNativeModelHandle();
+            IntPtr nextInstance = playbackSession.GetNativeInstanceHandle();
+            if (nextModel == IntPtr.Zero || nextInstance == IntPtr.Zero)
+                throw new InvalidOperationException("Playback session native handles are unavailable.");
+
+            model = nextModel;
+            instance = nextInstance;
+            motionId = nextMotionId ?? string.Empty;
+            try
+            {
+                int status = MmdRuntimeFfiMethods.InstanceSetPhysicsMode(
+                    instance,
+                    MmdRuntimeFfiMethods.PhysicsModeLive);
+                ThrowIfFailed(status, "InstanceSetPhysicsMode", modelId, motionId);
+                status = MmdRuntimeFfiMethods.PhysicsWorldRearmBakeSeed(world);
+                ThrowIfFailed(status, "PhysicsWorldRearmBakeSeed", modelId, motionId);
+                seededSinceReset = false;
+            }
+            catch
+            {
+                MmdRuntimeFfiMethods.InstanceSetPhysicsMode(instance, MmdRuntimeFfiMethods.PhysicsModeOff);
+                instance = IntPtr.Zero;
+                model = IntPtr.Zero;
+                throw;
+            }
+        }
 
         internal static MmdPhysicsBackendAvailability ProbeAvailability()
         {

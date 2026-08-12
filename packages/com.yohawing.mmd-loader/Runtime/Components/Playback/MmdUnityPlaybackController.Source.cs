@@ -569,6 +569,9 @@ namespace Mmd.UnityIntegration
             }
             if (nativeAvailable)
             {
+                MmdTimelineLivePhysicsTransfer? livePhysicsTransfer = timelineEvaluation
+                    ? binding?.DetachTimelineLivePhysicsBackend()
+                    : null;
                 phaseStart = Stopwatch.GetTimestamp();
                 ReleaseCurrentBindingBeforeSceneRebind();
                 if (setupTiming != null)
@@ -603,6 +606,22 @@ namespace Mmd.UnityIntegration
                         {
                             setupTiming.controllerConfigureMs += TimelineSetupElapsedMilliseconds(phaseStart);
                         }
+                        if (livePhysicsTransfer != null)
+                        {
+                            try
+                            {
+                                bool reused = nativeBinding.TryAttachTimelineLivePhysicsBackend(livePhysicsTransfer);
+                                if (setupTiming != null)
+                                {
+                                    setupTiming.livePhysicsWorldReused = reused;
+                                }
+                            }
+                            finally
+                            {
+                                livePhysicsTransfer.Dispose();
+                                livePhysicsTransfer = null;
+                            }
+                        }
                         nativeBinding = null;
                         return;
                     }
@@ -613,6 +632,7 @@ namespace Mmd.UnityIntegration
                 }
                 finally
                 {
+                    livePhysicsTransfer?.Dispose();
                     if (nativeBinding != null)
                     {
                         ClearFailedBindingReference(nativeBinding);
