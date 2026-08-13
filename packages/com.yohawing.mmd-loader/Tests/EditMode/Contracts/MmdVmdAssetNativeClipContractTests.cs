@@ -1,8 +1,10 @@
 #nullable enable
 
 using System;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
+using Mmd.Native;
 using Mmd.Parser;
 
 namespace Mmd.Tests
@@ -162,6 +164,49 @@ namespace Mmd.Tests
                     Is.True,
                     secondReason);
                 Assert.That(second, Is.SameAs(first));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(asset);
+            }
+        }
+
+        [Test]
+        public void AssetRetainsNativeVmdContextWhenCleanupMustBeRetried()
+        {
+            int freeCount = 0;
+            bool failFirstFree = true;
+            var context = new MmdRuntimeFfiVmdContext(
+                new IntPtr(1),
+                _ =>
+                {
+                    freeCount++;
+                    if (failFirstFree)
+                    {
+                        failFirstFree = false;
+                        throw new InvalidOperationException("transient native cleanup failure");
+                    }
+                });
+            MmdVmdAsset asset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+            FieldInfo contextField = typeof(MmdVmdAsset).GetField(
+                "nativeVmdContext",
+                BindingFlags.Instance | BindingFlags.NonPublic)!;
+            MethodInfo dispose = typeof(MmdVmdAsset).GetMethod(
+                "DisposeNativeVmdContext",
+                BindingFlags.Instance | BindingFlags.NonPublic)!;
+            try
+            {
+                contextField.SetValue(asset, context);
+
+                TargetInvocationException firstFailure = Assert.Throws<TargetInvocationException>(
+                    () => dispose.Invoke(asset, Array.Empty<object>()))!;
+                Assert.That(firstFailure.InnerException, Is.TypeOf<InvalidOperationException>());
+                Assert.That(contextField.GetValue(asset), Is.SameAs(context));
+
+                dispose.Invoke(asset, Array.Empty<object>());
+
+                Assert.That(freeCount, Is.EqualTo(2));
+                Assert.That(contextField.GetValue(asset), Is.Null);
             }
             finally
             {

@@ -16,6 +16,7 @@ namespace Mmd.UnityIntegration
         private readonly MmdMaterialOverrideAsset? materialOverride;
         private readonly Material[]? materialRemaps;
         private readonly Material[]? importedMaterials;
+        private readonly bool reuseRenderingDescriptor;
         private SkinnedMeshRenderer? renderer;
         private Mesh? originalMesh;
         private Material[] originalMaterials = Array.Empty<Material>();
@@ -28,7 +29,6 @@ namespace Mmd.UnityIntegration
         private bool[] originalPhysicsBodyHasTransforms = Array.Empty<bool>();
         private Vector3[] originalPhysicsBodyPositions = Array.Empty<Vector3>();
         private Quaternion[] originalPhysicsBodyRotations = Array.Empty<Quaternion>();
-        private Mesh? workingMesh;
         private Material[] workingMaterials = Array.Empty<Material>();
         private MmdUnityModelInstance? workingInstance;
         private bool active;
@@ -38,12 +38,14 @@ namespace Mmd.UnityIntegration
             MmdUnityModelInstance sourceInstance,
             MmdMaterialOverrideAsset? materialOverride = null,
             Material[]? materialRemaps = null,
-            Material[]? importedMaterials = null)
+            Material[]? importedMaterials = null,
+            bool reuseRenderingDescriptor = false)
         {
             this.sourceInstance = sourceInstance ?? throw new ArgumentNullException(nameof(sourceInstance));
             this.materialOverride = materialOverride;
             this.materialRemaps = materialRemaps;
             this.importedMaterials = importedMaterials;
+            this.reuseRenderingDescriptor = reuseRenderingDescriptor;
         }
 
         internal bool IsActive => active;
@@ -66,32 +68,31 @@ namespace Mmd.UnityIntegration
                 ?? throw new InvalidOperationException("Borrowed MMD playback requires an assigned Mesh.");
             Transform[] bones = sourceInstance.BoneTransforms;
             ValidateBones(bones);
+            MmdUnityFrameApplier.ValidateSupportedMorphPlayback(sourceInstance);
 
-            MmdRenderingDescriptor descriptor = CloneRenderingDescriptor(sourceInstance.RenderingDescriptor);
+            MmdRenderingDescriptor descriptor = reuseRenderingDescriptor
+                ? sourceInstance.RenderingDescriptor
+                : CloneRenderingDescriptor(sourceInstance.RenderingDescriptor);
             bool[] excludedSlots = BuildMaterialOverrideExclusionSlots(materialRemaps, sourceRenderer.sharedMaterials.Length);
             MmdMaterialOverrideApplier.ApplyToRenderingDescriptor(materialOverride, descriptor, excludedSlots);
             Material[] sourceMaterials = ResolveSourceMaterials(sourceRenderer);
 
-            Mesh? createdMesh = null;
             Material[] createdMaterials = Array.Empty<Material>();
             bool capturedOriginalState = false;
             try
             {
-                createdMesh = Object.Instantiate(sourceMesh);
-                createdMesh.name = sourceMesh.name + " Playback";
                 createdMaterials = CloneMaterials(sourceMaterials);
                 MmdMaterialOverrideApplier.Apply(materialOverride, createdMaterials, excludedSlots);
 
                 CaptureOriginalState(sourceRenderer, sourceMesh, bones);
                 capturedOriginalState = true;
-                sourceRenderer.sharedMesh = createdMesh;
                 sourceRenderer.sharedMaterials = createdMaterials;
                 MmdShaderBindingDiagnostics shaderDiagnostics =
                     MmdUnityMaterialBuilder.BuildExistingShaderDiagnostics(sourceRenderer);
 
                 var candidate = new MmdUnityModelInstance(
                     sourceInstance.Root,
-                    createdMesh,
+                    sourceMesh,
                     createdMaterials,
                     descriptor,
                     bones,
@@ -107,7 +108,6 @@ namespace Mmd.UnityIntegration
                 CopyBindPose(sourceInstance, candidate);
 
                 renderer = sourceRenderer;
-                workingMesh = createdMesh;
                 workingMaterials = createdMaterials;
                 workingInstance = candidate;
                 active = true;
@@ -120,7 +120,7 @@ namespace Mmd.UnityIntegration
                     RestoreOriginalState(sourceRenderer);
                 }
 
-                DestroyCreatedResources(createdMesh, createdMaterials);
+                DestroyCreatedResources(createdMaterials);
                 throw;
             }
         }
@@ -144,8 +144,7 @@ namespace Mmd.UnityIntegration
                 RestoreOriginalState(renderer);
             }
 
-            DestroyCreatedResources(workingMesh, workingMaterials);
-            workingMesh = null;
+            DestroyCreatedResources(workingMaterials);
             workingMaterials = Array.Empty<Material>();
             workingInstance = null;
         }
@@ -282,7 +281,7 @@ namespace Mmd.UnityIntegration
             }
             catch
             {
-                DestroyCreatedResources(null, clones);
+                DestroyCreatedResources(clones);
                 throw;
             }
         }
@@ -361,15 +360,13 @@ namespace Mmd.UnityIntegration
             return excluded;
         }
 
-        private static void DestroyCreatedResources(Mesh? mesh, Material[] materials)
+        private static void DestroyCreatedResources(Material[] materials)
         {
             var destroyedIds = new HashSet<int>();
             foreach (Material material in materials.Where(material => material != null))
             {
                 DestroyOnce(material, destroyedIds);
             }
-
-            DestroyOnce(mesh, destroyedIds);
         }
 
         private static void DestroyOnce(Object? value, HashSet<int> destroyedIds)

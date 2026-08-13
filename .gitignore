@@ -90,6 +90,7 @@ CLAUDE.md
 /ROADMAP.md
 /PLAN.md
 docs/*
+!docs/RELEASE.md
 !docs/README.ja.md
 !docs/HOW_TO_USE.md
 !docs/HOW_TO_USE.ja.md

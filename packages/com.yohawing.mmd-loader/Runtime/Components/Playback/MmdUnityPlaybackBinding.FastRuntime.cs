@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using Mmd.Motion;
 using Mmd.Native;
 using Mmd.Parser;
+using Mmd.Physics;
 using UnityEngine;
 
 namespace Mmd.UnityIntegration
@@ -211,6 +212,10 @@ namespace Mmd.UnityIntegration
 
         private void DisposeFastRuntime()
         {
+            if (physicsMode == MmdPhysicsMode.Live && !nativeHumanoidHostPoseEnabled)
+            {
+                ResetLivePhysicsState();
+            }
             fastSession?.Dispose();
             fastSession = null;
             fastWorldMatrices = null;
@@ -249,7 +254,13 @@ namespace Mmd.UnityIntegration
 
         private MmdPlaybackSnapshot ApplyFastCore(int frame, float time)
         {
-            fastSession!.EvaluateAndCopy(frame, fastWorldMatrices!, fastMorphWeights!, fastIkEnabled!);
+            MmdUnityFrameApplier.ValidateSupportedMorphPlayback(playbackInstance);
+            fastSession!.EvaluateAndCopy(
+                frame,
+                fastWorldMatrices!,
+                fastMorphWeights!,
+                fastIkEnabled!,
+                (uint)ikMaxIterationsCap);
             MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(
                 playbackInstance,
                 fastWorldMatrices!,

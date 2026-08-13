@@ -2,12 +2,74 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Mmd.Native;
 using Mmd.Parser;
 
 namespace Mmd.Physics
 {
+    /// <summary>
+    /// Value-type timing/report data for one native host-frame evaluation. The backend does not
+    /// allocate timers or diagnostic objects on the hot path; the Unity binding copies this data
+    /// into its additive per-frame diagnostics record.
+    /// </summary>
+    internal readonly struct MmdPhysicsHostStepDiagnostics
+    {
+        internal readonly double pinMarshalMs;
+        internal readonly double nativeHostFrameMs;
+        internal readonly double playbackEvaluateBeforePhysicsMs;
+        internal readonly double playbackCopyEvaluatedOutputsMs;
+        internal readonly double physicsWorldStepRuntimeMs;
+        internal readonly bool playbackEvaluateBeforePhysicsPresent;
+        internal readonly bool playbackCopyEvaluatedOutputsPresent;
+        internal readonly bool physicsWorldStepRuntimePresent;
+        internal readonly double nativeRigidbodyCopyMs;
+        internal readonly double afterPhysicsMatrixReadbackMs;
+        internal readonly int nativeRigidbodyCount;
+        internal readonly int nativeBoneCount;
+        internal readonly int nativeSubstepCount;
+        internal readonly int nativeKinematicRigidbodiesFed;
+        internal readonly int nativeBonesWrittenBack;
+        internal readonly bool reportPresent;
+
+        internal MmdPhysicsHostStepDiagnostics(
+            double pinMarshalMs,
+            double nativeHostFrameMs,
+            double playbackEvaluateBeforePhysicsMs,
+            double playbackCopyEvaluatedOutputsMs,
+            double physicsWorldStepRuntimeMs,
+            bool playbackEvaluateBeforePhysicsPresent,
+            bool playbackCopyEvaluatedOutputsPresent,
+            bool physicsWorldStepRuntimePresent,
+            double nativeRigidbodyCopyMs,
+            double afterPhysicsMatrixReadbackMs,
+            int nativeRigidbodyCount,
+            int nativeBoneCount,
+            int nativeSubstepCount,
+            int nativeKinematicRigidbodiesFed,
+            int nativeBonesWrittenBack,
+            bool reportPresent)
+        {
+            this.pinMarshalMs = pinMarshalMs;
+            this.nativeHostFrameMs = nativeHostFrameMs;
+            this.playbackEvaluateBeforePhysicsMs = playbackEvaluateBeforePhysicsMs;
+            this.playbackCopyEvaluatedOutputsMs = playbackCopyEvaluatedOutputsMs;
+            this.physicsWorldStepRuntimeMs = physicsWorldStepRuntimeMs;
+            this.playbackEvaluateBeforePhysicsPresent = playbackEvaluateBeforePhysicsPresent;
+            this.playbackCopyEvaluatedOutputsPresent = playbackCopyEvaluatedOutputsPresent;
+            this.physicsWorldStepRuntimePresent = physicsWorldStepRuntimePresent;
+            this.nativeRigidbodyCopyMs = nativeRigidbodyCopyMs;
+            this.afterPhysicsMatrixReadbackMs = afterPhysicsMatrixReadbackMs;
+            this.nativeRigidbodyCount = nativeRigidbodyCount;
+            this.nativeBoneCount = nativeBoneCount;
+            this.nativeSubstepCount = nativeSubstepCount;
+            this.nativeKinematicRigidbodiesFed = nativeKinematicRigidbodiesFed;
+            this.nativeBonesWrittenBack = nativeBonesWrittenBack;
+            this.reportPresent = reportPresent;
+        }
+    }
+
     internal interface IMmdLivePhysicsBackend : IDisposable
     {
         string Name { get; }
@@ -35,9 +97,10 @@ namespace Mmd.Physics
     {
         private const int TransformFloatCount = 7;
         private readonly string modelId;
-        private readonly string motionId;
-        private readonly IntPtr model;
-        private readonly IntPtr instance;
+        private string motionId;
+        private IntPtr model;
+        private IntPtr instance;
+        private readonly bool ownsRuntimeHandles;
         private IntPtr world;
         private readonly int boneCount;
         private readonly int worldMatrixFloatCount;
@@ -104,6 +167,7 @@ namespace Mmd.Physics
 
                 model = createdModel;
                 instance = createdInstance;
+                ownsRuntimeHandles = true;
                 world = createdWorld;
                 rigidbodyStates = Array.Empty<float>();
                 createdModel = IntPtr.Zero;
@@ -129,11 +193,112 @@ namespace Mmd.Physics
             }
         }
 
+        private MmdAnimPhysicsBackend(
+            byte[] pmxBytes,
+            MmdRuntimeFfiPlaybackSession playbackSession,
+            string modelId,
+            string motionId)
+        {
+            this.modelId = modelId ?? string.Empty;
+            this.motionId = motionId ?? string.Empty;
+            model = playbackSession.GetNativeModelHandle();
+            instance = playbackSession.GetNativeInstanceHandle();
+            ownsRuntimeHandles = false;
+            boneCount = playbackSession.BoneCount;
+            worldMatrixFloatCount = playbackSession.WorldMatrixFloatCount;
+            morphCount = playbackSession.MorphWeightCount;
+            ikCount = playbackSession.IkEnabledCount;
+            rigidbodyStates = Array.Empty<float>();
+
+            IntPtr createdWorld = IntPtr.Zero;
+            try
+            {
+                int createStatus = MmdRuntimeFfiMethods.PhysicsWorldCreateFromPmxBytes(
+                    pmxBytes,
+                    new IntPtr(pmxBytes.Length),
+                    out createdWorld);
+                ThrowIfFailed(createStatus, "PhysicsWorldCreateFromPmxBytes", this.modelId, this.motionId);
+                if (createdWorld == IntPtr.Zero)
+                    throw CreateNativeException("PhysicsWorldCreateFromPmxBytes", 4);
+                int modeStatus = MmdRuntimeFfiMethods.InstanceSetPhysicsMode(
+                    instance,
+                    MmdRuntimeFfiMethods.PhysicsModeLive);
+                ThrowIfFailed(modeStatus, "InstanceSetPhysicsMode", this.modelId, this.motionId);
+                world = createdWorld;
+                createdWorld = IntPtr.Zero;
+            }
+            finally
+            {
+                if (createdWorld != IntPtr.Zero)
+                    MmdRuntimeFfiMethods.PhysicsWorldFree(createdWorld);
+            }
+        }
+
         public string Name => "mmd-anim-bullet-native";
 
         public int SkippedWorldAnchorJointCount => skippedWorldAnchorJointCount;
 
         internal int WorldMatrixFloatCount => worldMatrixFloatCount;
+
+        internal void ParkPlaybackSession(MmdRuntimeFfiPlaybackSession playbackSession)
+        {
+            ThrowIfDisposed();
+            if (ownsRuntimeHandles)
+                throw new InvalidOperationException("Only a borrowed playback physics backend can be parked.");
+            if (playbackSession.GetNativeInstanceHandle() != instance)
+                throw new InvalidOperationException("Playback physics must park its borrowed runtime instance.");
+
+            int status = MmdRuntimeFfiMethods.InstanceSetPhysicsMode(
+                instance,
+                MmdRuntimeFfiMethods.PhysicsModeOff);
+            ThrowIfFailed(status, "InstanceSetPhysicsMode", modelId, motionId);
+            instance = IntPtr.Zero;
+            model = IntPtr.Zero;
+            seededSinceReset = false;
+        }
+
+        internal void AttachPlaybackSession(
+            MmdRuntimeFfiPlaybackSession playbackSession,
+            string nextMotionId)
+        {
+            ThrowIfDisposed();
+            if (ownsRuntimeHandles || instance != IntPtr.Zero || model != IntPtr.Zero)
+                throw new InvalidOperationException("Playback physics backend is not parked.");
+            if (playbackSession.BoneCount != boneCount ||
+                playbackSession.WorldMatrixFloatCount != worldMatrixFloatCount ||
+                playbackSession.MorphWeightCount != morphCount ||
+                playbackSession.IkEnabledCount != ikCount)
+            {
+                throw new InvalidOperationException(
+                    "Playback physics backend cannot be attached to a session with different native output dimensions.");
+            }
+
+            IntPtr nextModel = playbackSession.GetNativeModelHandle();
+            IntPtr nextInstance = playbackSession.GetNativeInstanceHandle();
+            if (nextModel == IntPtr.Zero || nextInstance == IntPtr.Zero)
+                throw new InvalidOperationException("Playback session native handles are unavailable.");
+
+            model = nextModel;
+            instance = nextInstance;
+            motionId = nextMotionId ?? string.Empty;
+            try
+            {
+                int status = MmdRuntimeFfiMethods.InstanceSetPhysicsMode(
+                    instance,
+                    MmdRuntimeFfiMethods.PhysicsModeLive);
+                ThrowIfFailed(status, "InstanceSetPhysicsMode", modelId, motionId);
+                status = MmdRuntimeFfiMethods.PhysicsWorldRearmBakeSeed(world);
+                ThrowIfFailed(status, "PhysicsWorldRearmBakeSeed", modelId, motionId);
+                seededSinceReset = false;
+            }
+            catch
+            {
+                MmdRuntimeFfiMethods.InstanceSetPhysicsMode(instance, MmdRuntimeFfiMethods.PhysicsModeOff);
+                instance = IntPtr.Zero;
+                model = IntPtr.Zero;
+                throw;
+            }
+        }
 
         internal static MmdPhysicsBackendAvailability ProbeAvailability()
         {
@@ -238,6 +403,37 @@ namespace Mmd.Physics
                 reason = ex.Message;
             }
 
+            backend?.Dispose();
+            backend = null;
+            return false;
+        }
+
+        internal static bool TryCreateForPlaybackSession(
+            byte[]? pmxBytes,
+            MmdRuntimeFfiPlaybackSession playbackSession,
+            string modelId,
+            string motionId,
+            out MmdAnimPhysicsBackend? backend,
+            out string reason)
+        {
+            backend = null;
+            reason = string.Empty;
+            if (pmxBytes == null || pmxBytes.Length == 0)
+            {
+                reason = "Model source bytes are unavailable.";
+                return false;
+            }
+            try
+            {
+                MmdRuntimeFfiMethods.ValidateAbiVersion();
+                backend = new MmdAnimPhysicsBackend(pmxBytes, playbackSession, modelId, motionId);
+                return true;
+            }
+            catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or
+                                       BadImageFormatException or InvalidOperationException)
+            {
+                reason = ex.Message;
+            }
             backend?.Dispose();
             backend = null;
             return false;
@@ -573,7 +769,33 @@ namespace Mmd.Physics
             float[] morphWeights,
             byte[] ikEnabled,
             bool seed,
-            float deltaTime)
+            float deltaTime,
+            out MmdPhysicsHostStepDiagnostics diagnostics)
+        {
+            StepFromHostPose(
+                frame,
+                localPositionOffsets,
+                localRotations,
+                localScales,
+                morphWeights,
+                ikEnabled,
+                seed,
+                deltaTime,
+                0,
+                out diagnostics);
+        }
+
+        public void StepFromHostPose(
+            int frame,
+            float[] localPositionOffsets,
+            float[] localRotations,
+            float[] localScales,
+            float[] morphWeights,
+            byte[] ikEnabled,
+            bool seed,
+            float deltaTime,
+            uint ikMaxIterationsCap,
+            out MmdPhysicsHostStepDiagnostics diagnostics)
         {
             MmdPhysicsPolicy.ValidateLiveStepInput(frame, deltaTime);
             ThrowIfDisposed();
@@ -588,6 +810,15 @@ namespace Mmd.Physics
             GCHandle scaleHandle = default;
             GCHandle morphHandle = default;
             GCHandle ikHandle = default;
+            long pinStart = Stopwatch.GetTimestamp();
+            long pinEnd = pinStart;
+            long nativeStart = pinStart;
+            long nativeEnd = pinStart;
+            long rigidbodyCopyStart = pinStart;
+            long rigidbodyCopyEnd = pinStart;
+            long unpinStart = pinStart;
+            long unpinEnd = pinStart;
+            MmdRuntimeFfiMethods.PhysicsWorldStepReport report = default;
             try
             {
                 var pose = new MmdRuntimeFfiMethods.PhysicsHostPoseView
@@ -601,6 +832,8 @@ namespace Mmd.Physics
                     ikEnabled = Pin(ikEnabled, ref ikHandle),
                     ikCount = new IntPtr(ikCount)
                 };
+                pinEnd = Stopwatch.GetTimestamp();
+                nativeStart = pinEnd;
                 int status = MmdRuntimeFfiMethods.EvaluateHostFrame(
                     instance,
                     world,
@@ -609,21 +842,196 @@ namespace Mmd.Physics
                         ? MmdRuntimeFfiMethods.PhysicsFrameActionSeed
                         : MmdRuntimeFfiMethods.PhysicsFrameActionStep,
                     deltaTime,
-                    ikTolerance: 0.0001f,
-                    ikMaxIterationsCap: 0,
-                    out _);
+                    ikTolerance: MmdRuntimeFfiMethods.DefaultIkTolerance,
+                    ikMaxIterationsCap: ikMaxIterationsCap,
+                    out report);
+                nativeEnd = Stopwatch.GetTimestamp();
                 ThrowIfFailed(status, "EvaluateHostFrame", modelId, motionId);
+                rigidbodyCopyStart = nativeEnd;
                 CopyRigidbodyStates();
+                rigidbodyCopyEnd = Stopwatch.GetTimestamp();
                 seededSinceReset = true;
             }
             finally
             {
+                unpinStart = Stopwatch.GetTimestamp();
                 Free(ref positionHandle);
                 Free(ref rotationHandle);
                 Free(ref scaleHandle);
                 Free(ref morphHandle);
                 Free(ref ikHandle);
+                unpinEnd = Stopwatch.GetTimestamp();
             }
+
+            diagnostics = new MmdPhysicsHostStepDiagnostics(
+                pinMarshalMs: ElapsedMilliseconds(pinStart, pinEnd) + ElapsedMilliseconds(unpinStart, unpinEnd),
+                nativeHostFrameMs: ElapsedMilliseconds(nativeStart, nativeEnd),
+                playbackEvaluateBeforePhysicsMs: 0.0,
+                playbackCopyEvaluatedOutputsMs: 0.0,
+                physicsWorldStepRuntimeMs: 0.0,
+                playbackEvaluateBeforePhysicsPresent: false,
+                playbackCopyEvaluatedOutputsPresent: false,
+                physicsWorldStepRuntimePresent: false,
+                nativeRigidbodyCopyMs: ElapsedMilliseconds(rigidbodyCopyStart, rigidbodyCopyEnd),
+                afterPhysicsMatrixReadbackMs: 0.0,
+                nativeRigidbodyCount: rigidbodyStates.Length / TransformFloatCount,
+                nativeBoneCount: boneCount,
+                nativeSubstepCount: CheckedCount(report.tick.substeps, "native physics substep count"),
+                nativeKinematicRigidbodiesFed: MmdFfiMarshal.CheckedIntPtrToInt(report.kinematicRigidbodiesFed, "native kinematic rigidbody count"),
+                nativeBonesWrittenBack: MmdFfiMarshal.CheckedIntPtrToInt(report.bonesWrittenBack, "native bones written back count"),
+                reportPresent: true);
+        }
+
+        internal void StepPlaybackFrame(
+            MmdRuntimeFfiPlaybackSession playbackSession,
+            int frame,
+            bool seed,
+            float deltaTime,
+            float[] worldMatrices,
+            float[] morphWeights,
+            byte[] ikEnabled,
+            float[] afterPhysicsWorldMatrices,
+            out MmdPhysicsHostStepDiagnostics diagnostics)
+        {
+            StepPlaybackFrame(
+                playbackSession,
+                frame,
+                seed,
+                deltaTime,
+                worldMatrices,
+                morphWeights,
+                ikEnabled,
+                afterPhysicsWorldMatrices,
+                0,
+                out diagnostics);
+        }
+
+        internal void StepPlaybackFrame(
+            MmdRuntimeFfiPlaybackSession playbackSession,
+            int frame,
+            bool seed,
+            float deltaTime,
+            float[] worldMatrices,
+            float[] morphWeights,
+            byte[] ikEnabled,
+            float[] afterPhysicsWorldMatrices,
+            uint ikMaxIterationsCap,
+            out MmdPhysicsHostStepDiagnostics diagnostics)
+        {
+            MmdPhysicsPolicy.ValidateLiveStepInput(frame, deltaTime);
+            ThrowIfDisposed();
+            ValidateHostPoseArray(worldMatrices, worldMatrixFloatCount, nameof(worldMatrices));
+            ValidateHostPoseArray(morphWeights, morphCount, nameof(morphWeights));
+            ValidateHostPoseArray(ikEnabled, ikCount, nameof(ikEnabled));
+            ValidateHostPoseArray(
+                afterPhysicsWorldMatrices,
+                worldMatrixFloatCount,
+                nameof(afterPhysicsWorldMatrices));
+            if (playbackSession.GetNativeInstanceHandle() != instance)
+                throw new InvalidOperationException("Playback physics must use the borrowed runtime instance.");
+
+            long nativeStart = Stopwatch.GetTimestamp();
+            long playbackEvaluateBeforePhysicsStart = nativeStart;
+            long playbackEvaluateBeforePhysicsEnd = nativeStart;
+            long playbackCopyEvaluatedOutputsStart = nativeStart;
+            long playbackCopyEvaluatedOutputsEnd = nativeStart;
+            long physicsWorldStepRuntimeStart = nativeStart;
+            long physicsWorldStepRuntimeEnd = nativeStart;
+            bool playbackEvaluateBeforePhysicsPresent = false;
+            bool playbackCopyEvaluatedOutputsPresent = false;
+            bool physicsWorldStepRuntimePresent = false;
+            MmdRuntimeFfiMethods.PhysicsWorldStepReport report;
+            if (seed || !seededSinceReset)
+            {
+                // The existing bake ABI has no IK-options variant. Keep seed behavior
+                // unchanged; the configured before-phase cap applies from the first forward step.
+                if (seededSinceReset)
+                {
+                    int resetStatus = MmdRuntimeFfiMethods.PhysicsWorldReset(world, instance, out _);
+                    ThrowIfFailed(resetStatus, "PhysicsWorldReset", modelId, motionId);
+                }
+                int status = MmdRuntimeFfiMethods.PhysicsWorldBakeClipFrames(
+                    world,
+                    instance,
+                    playbackSession.GetNativeClipHandle(),
+                    frame,
+                    frameStep: 0.0f,
+                    deltaTime: 0.0f,
+                    frameCount: new IntPtr(1),
+                    worldMatrices,
+                    new IntPtr(worldMatrices.Length),
+                    morphWeights,
+                    new IntPtr(morphWeights.Length),
+                    out report);
+                ThrowIfFailed(status, "PhysicsWorldBakeClipFrames", modelId, motionId);
+                playbackCopyEvaluatedOutputsStart = Stopwatch.GetTimestamp();
+                playbackSession.CopyEvaluatedOutputs(worldMatrices, morphWeights, ikEnabled);
+                playbackCopyEvaluatedOutputsEnd = Stopwatch.GetTimestamp();
+                playbackCopyEvaluatedOutputsPresent = true;
+                // The bake seed initializes Bullet from the evaluated clip pose but intentionally
+                // does not read the bodies back into the runtime. A zero-delta runtime step performs
+                // that readback and after-physics evaluation without advancing the solver clock.
+                physicsWorldStepRuntimeStart = Stopwatch.GetTimestamp();
+                status = MmdRuntimeFfiMethods.PhysicsWorldStepRuntime(
+                    world,
+                    instance,
+                    0.0f,
+                    out report);
+                physicsWorldStepRuntimeEnd = Stopwatch.GetTimestamp();
+                physicsWorldStepRuntimePresent = true;
+                ThrowIfFailed(status, "PhysicsWorldStepRuntime", modelId, motionId);
+            }
+            else
+            {
+                playbackEvaluateBeforePhysicsStart = Stopwatch.GetTimestamp();
+                playbackSession.EvaluateBeforePhysics(frame, ikMaxIterationsCap);
+                playbackEvaluateBeforePhysicsEnd = Stopwatch.GetTimestamp();
+                playbackEvaluateBeforePhysicsPresent = true;
+                playbackCopyEvaluatedOutputsStart = Stopwatch.GetTimestamp();
+                playbackSession.CopyEvaluatedOutputs(worldMatrices, morphWeights, ikEnabled);
+                playbackCopyEvaluatedOutputsEnd = Stopwatch.GetTimestamp();
+                playbackCopyEvaluatedOutputsPresent = true;
+                physicsWorldStepRuntimeStart = Stopwatch.GetTimestamp();
+                int status = MmdRuntimeFfiMethods.PhysicsWorldStepRuntime(
+                    world,
+                    instance,
+                    deltaTime,
+                    out report);
+                physicsWorldStepRuntimeEnd = Stopwatch.GetTimestamp();
+                physicsWorldStepRuntimePresent = true;
+                ThrowIfFailed(status, "PhysicsWorldStepRuntime", modelId, motionId);
+            }
+            long nativeEnd = Stopwatch.GetTimestamp();
+            long matrixCopyStart = nativeEnd;
+            CopyAfterPhysicsWorldMatrices(afterPhysicsWorldMatrices);
+            long matrixCopyEnd = Stopwatch.GetTimestamp();
+            CopyRigidbodyStates();
+            long copyEnd = Stopwatch.GetTimestamp();
+            seededSinceReset = true;
+
+            diagnostics = new MmdPhysicsHostStepDiagnostics(
+                pinMarshalMs: 0.0,
+                nativeHostFrameMs: ElapsedMilliseconds(nativeStart, nativeEnd),
+                playbackEvaluateBeforePhysicsMs: playbackEvaluateBeforePhysicsPresent
+                    ? ElapsedMilliseconds(playbackEvaluateBeforePhysicsStart, playbackEvaluateBeforePhysicsEnd)
+                    : 0.0,
+                playbackCopyEvaluatedOutputsMs: playbackCopyEvaluatedOutputsPresent
+                    ? ElapsedMilliseconds(playbackCopyEvaluatedOutputsStart, playbackCopyEvaluatedOutputsEnd)
+                    : 0.0,
+                physicsWorldStepRuntimeMs: physicsWorldStepRuntimePresent
+                    ? ElapsedMilliseconds(physicsWorldStepRuntimeStart, physicsWorldStepRuntimeEnd)
+                    : 0.0,
+                playbackEvaluateBeforePhysicsPresent: playbackEvaluateBeforePhysicsPresent,
+                playbackCopyEvaluatedOutputsPresent: playbackCopyEvaluatedOutputsPresent,
+                physicsWorldStepRuntimePresent: physicsWorldStepRuntimePresent,
+                nativeRigidbodyCopyMs: ElapsedMilliseconds(matrixCopyEnd, copyEnd),
+                afterPhysicsMatrixReadbackMs: ElapsedMilliseconds(matrixCopyStart, matrixCopyEnd),
+                nativeRigidbodyCount: rigidbodyStates.Length / TransformFloatCount,
+                nativeBoneCount: boneCount,
+                nativeSubstepCount: CheckedCount(report.tick.substeps, "native physics substep count"),
+                nativeKinematicRigidbodiesFed: MmdFfiMarshal.CheckedIntPtrToInt(report.kinematicRigidbodiesFed, "native kinematic rigidbody count"),
+                nativeBonesWrittenBack: MmdFfiMarshal.CheckedIntPtrToInt(report.bonesWrittenBack, "native bones written back count"),
+                reportPresent: true);
         }
 
         /// <summary>
@@ -665,12 +1073,17 @@ namespace Mmd.Physics
                 MmdRuntimeFfiMethods.PhysicsWorldFree(world);
             }
 
-            if (instance != IntPtr.Zero)
+            if (!ownsRuntimeHandles && instance != IntPtr.Zero)
+            {
+                MmdRuntimeFfiMethods.InstanceSetPhysicsMode(instance, MmdRuntimeFfiMethods.PhysicsModeOff);
+            }
+
+            if (ownsRuntimeHandles && instance != IntPtr.Zero)
             {
                 MmdRuntimeFfiMethods.InstanceFree(instance);
             }
 
-            if (model != IntPtr.Zero)
+            if (ownsRuntimeHandles && model != IntPtr.Zero)
             {
                 MmdRuntimeFfiMethods.ModelFree(model);
             }
@@ -785,6 +1198,27 @@ namespace Mmd.Physics
         private static string LastErrorMessage()
         {
             return Marshal.PtrToStringAnsi(MmdRuntimeFfiMethods.LastErrorMessage()) ?? "Native mmd-anim physics call failed.";
+        }
+
+        private static double ElapsedMilliseconds(long startTimestamp, long endTimestamp)
+        {
+            long elapsed = endTimestamp - startTimestamp;
+            if (elapsed <= 0)
+            {
+                return 0.0;
+            }
+
+            return elapsed * 1000.0 / Stopwatch.Frequency;
+        }
+
+        private static int CheckedCount(uint value, string label)
+        {
+            if (value > int.MaxValue)
+            {
+                throw new InvalidOperationException($"{label} exceeds Int32 range: {value}.");
+            }
+
+            return (int)value;
         }
     }
 

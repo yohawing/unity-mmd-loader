@@ -11,6 +11,17 @@ namespace Mmd.Tests
 {
     public sealed class MmdSceneEnvironmentBindingTests
     {
+        private sealed class DerivedCameraBinding : MmdSceneEnvironmentBinding
+        {
+            public override MmdSceneCameraApplyStatus ApplyCameraState(
+                MmdCameraState state,
+                float minFieldOfView = MmdCameraStateToUnity.DefaultMinFieldOfView,
+                float importScale = 1.0f)
+            {
+                return SetLastCameraApplyStatus(MmdSceneCameraApplyStatus.ProceduralCameraAuthorityConflict);
+            }
+        }
+
         private static MmdCameraState State(
             float distance, float px, float py, float pz, float rx, float ry, float rz, float fov, bool perspective)
         {
@@ -131,6 +142,27 @@ namespace Mmd.Tests
             finally
             {
                 Object.DestroyImmediate(cameraGo);
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void DerivedCameraWriterCanPublishItsApplyStatus()
+        {
+            var go = new GameObject("derived binding");
+            try
+            {
+                DerivedCameraBinding binding = go.AddComponent<DerivedCameraBinding>();
+
+                MmdSceneCameraApplyStatus status = binding.ApplyCameraState(
+                    State(-45f, 1, 10, 0, 0.3f, 0.5f, 0.1f, 35f, true));
+
+                Assert.That(status, Is.EqualTo(MmdSceneCameraApplyStatus.ProceduralCameraAuthorityConflict));
+                Assert.That(binding.LastCameraApplyStatus, Is.EqualTo(status));
+                Assert.That(binding.TargetCamera, Is.Null);
+            }
+            finally
+            {
                 Object.DestroyImmediate(go);
             }
         }

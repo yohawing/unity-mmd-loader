@@ -1,8 +1,11 @@
 #nullable enable
 
 using System;
+using System.Threading.Tasks;
 using UnityEngine;
 using Mmd.Parser;
+using Mmd.Rendering;
+using Mmd.UnityIntegration;
 
 namespace Mmd
 {
@@ -322,6 +325,14 @@ namespace Mmd
         [SerializeField] private string hierarchyReadinessDiagnostic = string.Empty;
         [SerializeField] private string rendererReadinessDiagnostic = string.Empty;
         [SerializeField] private string boneBindingReadinessDiagnostic = string.Empty;
+        [NonSerialized] private byte[]? synchronousPlaybackCacheSource;
+        [NonSerialized] private MmdModelDefinition? synchronousPlaybackModelCache;
+        [NonSerialized] private object? synchronousPlaybackCacheGate;
+        [NonSerialized] private byte[]? synchronousPlaybackPreloadSource;
+        [NonSerialized] private Task<MmdModelDefinition>? synchronousPlaybackPreloadTask;
+        [NonSerialized] private MmdMaterialPreset synchronousPlaybackDescriptorPreset;
+        [NonSerialized] private MmdRenderingDescriptor? synchronousPlaybackDescriptorCache;
+        [NonSerialized] private Task<MmdRenderingDescriptor>? synchronousPlaybackDescriptorTask;
 
         public string SourceId => sourceId;
 
@@ -491,7 +502,16 @@ namespace Mmd
                 throw new ArgumentException("PMX asset bytes are required.", nameof(bytes));
             }
 
-            data = (byte[])bytes.Clone();
+            lock (SynchronousPlaybackCacheGate)
+            {
+                synchronousPlaybackCacheSource = null;
+                synchronousPlaybackModelCache = null;
+                synchronousPlaybackPreloadSource = null;
+                synchronousPlaybackPreloadTask = null;
+                synchronousPlaybackDescriptorCache = null;
+                synchronousPlaybackDescriptorTask = null;
+                data = (byte[])bytes.Clone();
+            }
             sourceId = assetSourceId ?? string.Empty;
             sourcePath = assetSourcePath ?? string.Empty;
             importScale = NormalizeImportScale(assetImportScale);
@@ -554,6 +574,16 @@ namespace Mmd
             return (byte[])data.Clone();
         }
 
+        internal byte[] GetBytesForSynchronousRuntimeSetup()
+        {
+            if (data.Length == 0)
+            {
+                throw new InvalidOperationException("PMX asset has no imported bytes.");
+            }
+
+            return data;
+        }
+
         public MmdModelDefinition LoadModel(IMmdParser? parser = null)
         {
             if (data.Length == 0)
@@ -563,6 +593,175 @@ namespace Mmd
 
             parser ??= new NativeMmdParser();
             return parser.LoadModel(data);
+        }
+
+        internal MmdModelDefinition LoadValidatedModelForSynchronousPlayback(
+            IMmdParser? parser,
+            out bool cacheHit)
+        {
+            while (true)
+            {
+                byte[] source;
+                Task<MmdModelDefinition>? preloadTask;
+                lock (SynchronousPlaybackCacheGate)
+                {
+                    if (data.Length == 0)
+                    {
+                        throw new InvalidOperationException("PMX asset has no imported bytes.");
+                    }
+
+                    if (ReferenceEquals(synchronousPlaybackCacheSource, data) &&
+                        synchronousPlaybackModelCache != null)
+                    {
+                        cacheHit = true;
+                        return synchronousPlaybackModelCache;
+                    }
+
+                    source = data;
+                    preloadTask = ReferenceEquals(synchronousPlaybackPreloadSource, source)
+                        ? synchronousPlaybackPreloadTask
+                        : null;
+                    if (preloadTask == null)
+                    {
+                        parser ??= new NativeMmdParser();
+                        preloadTask = StartSynchronousPlaybackPreloadLocked(source, parser);
+                    }
+                }
+
+                MmdModelDefinition model = preloadTask.GetAwaiter().GetResult();
+                lock (SynchronousPlaybackCacheGate)
+                {
+                    if (!ReferenceEquals(data, source))
+                    {
+                        continue;
+                    }
+
+                    synchronousPlaybackCacheSource = source;
+                    synchronousPlaybackModelCache = model;
+                    cacheHit = false;
+                    return model;
+                }
+            }
+        }
+
+        internal Task BeginSynchronousPlaybackPreload(MmdMaterialPreset preset = MmdMaterialPreset.MmdToon)
+        {
+            lock (SynchronousPlaybackCacheGate)
+            {
+                if (data.Length == 0)
+                {
+                    return Task.CompletedTask;
+                }
+
+                Task<MmdModelDefinition> modelTask;
+                if (ReferenceEquals(synchronousPlaybackCacheSource, data) &&
+                    synchronousPlaybackModelCache != null)
+                {
+                    modelTask = Task.FromResult(synchronousPlaybackModelCache);
+                }
+                else if (ReferenceEquals(synchronousPlaybackPreloadSource, data) &&
+                         synchronousPlaybackPreloadTask != null)
+                {
+                    modelTask = synchronousPlaybackPreloadTask;
+                }
+                else
+                {
+                    modelTask = StartSynchronousPlaybackPreloadLocked(data, new NativeMmdParser());
+                }
+
+                if (ReferenceEquals(synchronousPlaybackCacheSource, data) &&
+                    synchronousPlaybackDescriptorCache != null &&
+                    synchronousPlaybackDescriptorPreset == preset)
+                {
+                    return Task.CompletedTask;
+                }
+
+                if (ReferenceEquals(synchronousPlaybackPreloadSource, data) &&
+                    synchronousPlaybackDescriptorTask != null &&
+                    synchronousPlaybackDescriptorPreset == preset)
+                {
+                    return synchronousPlaybackDescriptorTask;
+                }
+
+                byte[] source = data;
+                synchronousPlaybackDescriptorPreset = preset;
+                synchronousPlaybackDescriptorTask = modelTask.ContinueWith(
+                    completed =>
+                    {
+                        MmdRenderingDescriptor descriptor =
+                            MmdUnityModelFactory.BuildRuntimePlaybackRenderingDescriptor(
+                                completed.GetAwaiter().GetResult(),
+                                preset);
+                        lock (SynchronousPlaybackCacheGate)
+                        {
+                            if (ReferenceEquals(data, source) && synchronousPlaybackDescriptorPreset == preset)
+                            {
+                                synchronousPlaybackDescriptorCache = descriptor;
+                            }
+                        }
+
+                        return descriptor;
+                    },
+                    TaskScheduler.Default);
+                return synchronousPlaybackDescriptorTask;
+            }
+        }
+
+        internal MmdRenderingDescriptor LoadSynchronousPlaybackDescriptor(
+            MmdMaterialPreset preset,
+            out bool cacheHit)
+        {
+            lock (SynchronousPlaybackCacheGate)
+            {
+                if (ReferenceEquals(synchronousPlaybackCacheSource, data) &&
+                    synchronousPlaybackDescriptorCache != null &&
+                    synchronousPlaybackDescriptorPreset == preset)
+                {
+                    cacheHit = true;
+                    return synchronousPlaybackDescriptorCache;
+                }
+            }
+
+            MmdRenderingDescriptor? completedDescriptor =
+                (BeginSynchronousPlaybackPreload(preset) as Task<MmdRenderingDescriptor>)
+                ?.GetAwaiter().GetResult();
+            lock (SynchronousPlaybackCacheGate)
+            {
+                MmdRenderingDescriptor? descriptor = synchronousPlaybackDescriptorCache ?? completedDescriptor;
+                if (descriptor == null || synchronousPlaybackDescriptorPreset != preset)
+                {
+                    throw new InvalidOperationException("PMX playback descriptor preload did not complete.");
+                }
+
+                cacheHit = false;
+                return descriptor;
+            }
+        }
+
+        private object SynchronousPlaybackCacheGate =>
+            synchronousPlaybackCacheGate ??= new object();
+
+        private Task<MmdModelDefinition> StartSynchronousPlaybackPreloadLocked(
+            byte[] source,
+            IMmdParser parser)
+        {
+            synchronousPlaybackPreloadSource = source;
+            synchronousPlaybackPreloadTask = Task.Run(() =>
+            {
+                MmdModelDefinition model = parser.LoadModel(source);
+                MmdModelValidator.ThrowIfInvalid(model);
+                lock (SynchronousPlaybackCacheGate)
+                {
+                    if (ReferenceEquals(data, source))
+                    {
+                        synchronousPlaybackCacheSource = source;
+                        synchronousPlaybackModelCache = model;
+                    }
+                }
+
+                return model;
+            });
+            return synchronousPlaybackPreloadTask;
         }
 
         private static float NormalizeImportScale(float value)

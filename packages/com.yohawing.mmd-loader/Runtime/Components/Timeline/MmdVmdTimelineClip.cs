@@ -76,6 +76,10 @@ namespace Mmd.Timeline
         {
             MmdPlaybackTime.ValidateFrameRate(frameRate);
             MmdPlaybackTime.ValidateTime(startOffsetSeconds);
+            if (motionAsset != null)
+            {
+                _ = motionAsset.BeginNativePlaybackPreload();
+            }
             ScriptPlayable<MmdVmdTimelineBehaviour> playable = ScriptPlayable<MmdVmdTimelineBehaviour>.Create(graph);
             MmdVmdTimelineBehaviour behaviour = playable.GetBehaviour();
             behaviour.Controller = controller.Resolve(graph.GetResolver());

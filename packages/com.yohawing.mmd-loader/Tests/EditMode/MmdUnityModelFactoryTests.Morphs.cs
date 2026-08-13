@@ -110,6 +110,38 @@ namespace Mmd.Tests
             // descriptor remains unscaled
             Assert.That(instance.RenderingDescriptor.vertices[1].position[1], Is.EqualTo(0.0f).Within(0.00001f));
         }
+
+        [Test]
+        public void StaticVertexMorphPlaybackRejectsCpuMeshFallback()
+        {
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.morphs.Add(new MmdMorphDefinition
+            {
+                index = 0,
+                name = "cpu-only",
+                type = "vertex",
+                panel = "other",
+                vertexOffsets =
+                {
+                    new MmdVertexMorphOffsetDefinition
+                    {
+                        vertexIndex = 1,
+                        positionDelta = new[] { 0.0f, 1.0f, 0.0f }
+                    }
+                }
+            });
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
+            Vector3[] originalVertices = instance.Mesh.vertices;
+            MmdEvaluatedFrame frame = CreateFrame();
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "cpu-only", weight = 1.0f });
+
+            NotSupportedException exception = Assert.Throws<NotSupportedException>(() =>
+                MmdUnityFrameApplier.ApplyFrame(instance, frame))!;
+
+            Assert.That(exception.Message, Does.Contain("CPU mesh vertex morph fallback is not supported"));
+            Assert.That(instance.Mesh.vertices, Is.EqualTo(originalVertices));
+        }
         [Test]
         public void CreateSkinnedModelPhysicsDebugBodyAndColliderScaleWhileDescriptorMetadataUnscaled()
         {
@@ -214,6 +246,8 @@ namespace Mmd.Tests
             MmdModelDefinition model = CreateGroupMorphTriangleModel();
             using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
             MmdUnityModelInstance instance = scope.Instance;
+            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+            Bounds initialBounds = renderer.localBounds;
 
             // Frame with both direct vertex morph weight and group morph weight.
             // Direct "smile" at 1.0 + group "happy-face" at 0.5 targeting "smile" with offset 0.5.
@@ -226,8 +260,9 @@ namespace Mmd.Tests
 
             // smile(1.0) + happy-face(0.5) * 0.5 = resolved smile 1.25 -> BlendShape 125f
             int smileIndex = instance.Mesh.GetBlendShapeIndex("smile");
-            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
             Assert.That(renderer.GetBlendShapeWeight(smileIndex), Is.EqualTo(125f).Within(0.001f));
+            Assert.That(renderer.localBounds.center, Is.EqualTo(initialBounds.center));
+            Assert.That(renderer.localBounds.size, Is.EqualTo(initialBounds.size));
             Assert.That(renderer.localBounds.Contains(new Vector3(-1.0f, 2.5f, 0.0f)), Is.True);
         }
         [Test]

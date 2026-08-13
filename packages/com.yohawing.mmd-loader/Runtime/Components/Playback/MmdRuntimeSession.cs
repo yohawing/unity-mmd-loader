@@ -20,6 +20,7 @@ namespace Mmd
         private readonly int nativeMotionSourceLength;
         private readonly ulong nativeModelSourceFingerprint;
         private readonly ulong nativeMotionSourceFingerprint;
+        private readonly bool verifyNativeSourceFingerprints;
         private MmdRuntimeFfiPlaybackSession? nativePlaybackSession;
         private float[]? nativeWorldMatrices;
         private float[]? nativeMorphWeights;
@@ -31,6 +32,16 @@ namespace Mmd
             MmdMotionDefinition motion,
             string modelId,
             string motionId)
+            : this(model, motion, modelId, motionId, validateSources: true)
+        {
+        }
+
+        private MmdRuntimeSession(
+            MmdModelDefinition model,
+            MmdMotionDefinition motion,
+            string modelId,
+            string motionId,
+            bool validateSources)
         {
             if (model == null)
             {
@@ -52,8 +63,11 @@ namespace Mmd
                 throw new ArgumentException("Motion identifier is required.", nameof(motionId));
             }
 
-            MmdModelValidator.ThrowIfInvalid(model);
-            MmdMotionValidator.ThrowIfInvalid(motion);
+            if (validateSources)
+            {
+                MmdModelValidator.ThrowIfInvalid(model);
+                MmdMotionValidator.ThrowIfInvalid(motion);
+            }
             this.model = model;
             this.motion = motion;
             this.modelId = modelId;
@@ -62,8 +76,30 @@ namespace Mmd
             nativeMotionSourceIdentity = motion.sourceBytes;
             nativeModelSourceLength = nativeModelSourceIdentity?.Length ?? 0;
             nativeMotionSourceLength = nativeMotionSourceIdentity?.Length ?? 0;
-            nativeModelSourceFingerprint = ComputeSourceFingerprint(nativeModelSourceIdentity);
-            nativeMotionSourceFingerprint = ComputeSourceFingerprint(nativeMotionSourceIdentity);
+            verifyNativeSourceFingerprints = validateSources;
+            nativeModelSourceFingerprint = validateSources
+                ? ComputeSourceFingerprint(nativeModelSourceIdentity)
+                : 0;
+            nativeMotionSourceFingerprint = validateSources
+                ? ComputeSourceFingerprint(nativeMotionSourceIdentity)
+                : 0;
+        }
+
+        internal static MmdRuntimeSession CreateFromValidatedSources(
+            MmdModelDefinition model,
+            MmdMotionDefinition motion,
+            string modelId,
+            string motionId)
+        {
+            // Playback assets keep their validated model private and create a fresh motion header.
+            // Identity and length checks still guard source replacement; avoid hashing the full PMX
+            // again on the Timeline frame that activates the binding.
+            return new MmdRuntimeSession(
+                model,
+                motion,
+                modelId,
+                motionId,
+                validateSources: false);
         }
 
         public int MotionMaxFrame => motion.maxFrame;
@@ -87,11 +123,21 @@ namespace Mmd
 
         public MmdEvaluatedFrame EvaluateFrame(int frame, float time)
         {
+            return EvaluateFrame(frame, time, 0);
+        }
+
+        public MmdEvaluatedFrame EvaluateFrame(int frame, float time, uint ikMaxIterationsCap)
+        {
             ThrowIfDisposed();
-            return EvaluateNativeFrame(frame, time);
+            return EvaluateNativeFrame(frame, time, ikMaxIterationsCap);
         }
 
         internal MmdEvaluatedFrame EvaluateBeforePhysicsFrame(int frame, float time)
+        {
+            return EvaluateBeforePhysicsFrame(frame, time, 0);
+        }
+
+        internal MmdEvaluatedFrame EvaluateBeforePhysicsFrame(int frame, float time, uint ikMaxIterationsCap)
         {
             ThrowIfDisposed();
             if (nativeModelSourceIdentity == null || nativeMotionSourceIdentity == null)
@@ -104,19 +150,66 @@ namespace Mmd
             {
                 MmdPlaybackTime.ValidateFrame(frame);
                 MmdPlaybackTime.ValidateTime(time);
-                MmdModelValidator.ThrowIfInvalid(model);
-                MmdMotionValidator.ThrowIfInvalid(motion);
                 EnsureNativeSourcesUnchangedBeforeCompilation();
-                return EvaluateNativeBeforePhysicsFrame(frame, time);
+                return EvaluateNativeBeforePhysicsFrame(frame, time, ikMaxIterationsCap);
             }
 
-            return EvaluateNativeFrame(frame, time);
+            return EvaluateNativeFrame(frame, time, ikMaxIterationsCap);
+        }
+
+        internal void GetNativeOutputBufferLengths(
+            out int worldMatrixFloatCount,
+            out int morphWeightCount,
+            out int ikEnabledCount)
+        {
+            ThrowIfDisposed();
+            EnsureNativePlaybackSession();
+            worldMatrixFloatCount = nativeWorldMatrices!.Length;
+            morphWeightCount = nativeMorphWeights!.Length;
+            ikEnabledCount = nativeIkEnabled!.Length;
+        }
+
+        internal MmdRuntimeFfiPlaybackSession NativePlaybackSession
+        {
+            get
+            {
+                ThrowIfDisposed();
+                EnsureNativePlaybackSession();
+                return nativePlaybackSession!;
+            }
+        }
+
+        internal void EvaluateBeforePhysicsFrameInto(
+            int frame,
+            float time,
+            float[] worldMatrices,
+            float[] morphWeights,
+            byte[] ikEnabled,
+            uint ikMaxIterationsCap = 0)
+        {
+            ThrowIfDisposed();
+            MmdPlaybackTime.ValidateFrame(frame);
+            MmdPlaybackTime.ValidateTime(time);
+            EnsureNativePlaybackSession();
+            ValidateNativeOutputBuffers(worldMatrices, morphWeights, ikEnabled);
+
+            if (model.HasDeformAfterPhysicsBones)
+                nativePlaybackSession!.EvaluateBeforePhysicsAndCopy(
+                    frame, worldMatrices, morphWeights, ikEnabled, ikMaxIterationsCap);
+            else
+                nativePlaybackSession!.EvaluateAndCopy(
+                    frame, worldMatrices, morphWeights, ikEnabled, ikMaxIterationsCap);
         }
 
         public MmdEvaluatedFrame EvaluateFrameAtTime(float time, float frameRate)
         {
+            return EvaluateFrameAtTime(time, frameRate, 0);
+        }
+
+        public MmdEvaluatedFrame EvaluateFrameAtTime(float time, float frameRate, uint ikMaxIterationsCap)
+        {
             MmdPlaybackTimeMapping mapping = DescribePlaybackTime(time, frameRate);
-            return EvaluateFrame(mapping.frame, time);
+            return EvaluateFrame(mapping.frame, time, ikMaxIterationsCap);
         }
 
         public MmdPlaybackSnapshot BuildSnapshotFromEvaluatedFrame(MmdEvaluatedFrame frame, MmdRenderingDescriptor rendering)
@@ -192,7 +285,7 @@ namespace Mmd
             }
         }
 
-        internal MmdEvaluatedFrame EvaluateNativeFrame(int frame, float time)
+        internal MmdEvaluatedFrame EvaluateNativeFrame(int frame, float time, uint ikMaxIterationsCap = 0)
         {
             ThrowIfDisposed();
             MmdPlaybackTime.ValidateFrame(frame);
@@ -203,7 +296,8 @@ namespace Mmd
                 frame,
                 nativeWorldMatrices!,
                 nativeMorphWeights!,
-                nativeIkEnabled!);
+                nativeIkEnabled!,
+                ikMaxIterationsCap);
             return MmdRuntimeFrameEvaluator.BuildFrameFromNative(
                 model,
                 frame,
@@ -213,7 +307,10 @@ namespace Mmd
                 includeMaterials: false);
         }
 
-        private MmdEvaluatedFrame EvaluateNativeBeforePhysicsFrame(int frame, float time)
+        private MmdEvaluatedFrame EvaluateNativeBeforePhysicsFrame(
+            int frame,
+            float time,
+            uint ikMaxIterationsCap)
         {
             ThrowIfDisposed();
             MmdPlaybackTime.ValidateFrame(frame);
@@ -224,7 +321,8 @@ namespace Mmd
                 frame,
                 nativeWorldMatrices!,
                 nativeMorphWeights!,
-                nativeIkEnabled!);
+                nativeIkEnabled!,
+                ikMaxIterationsCap);
             return MmdRuntimeFrameEvaluator.BuildFrameFromNative(
                 model,
                 frame,
@@ -232,6 +330,19 @@ namespace Mmd
                 nativeWorldMatrices!,
                 nativeMorphWeights!,
                 includeMaterials: false);
+        }
+
+        private void ValidateNativeOutputBuffers(
+            float[] worldMatrices,
+            float[] morphWeights,
+            byte[] ikEnabled)
+        {
+            if (worldMatrices == null || worldMatrices.Length != nativeWorldMatrices!.Length)
+                throw new ArgumentException("Native world matrix buffer length must match the runtime session.", nameof(worldMatrices));
+            if (morphWeights == null || morphWeights.Length != nativeMorphWeights!.Length)
+                throw new ArgumentException("Native morph weight buffer length must match the runtime session.", nameof(morphWeights));
+            if (ikEnabled == null || ikEnabled.Length != nativeIkEnabled!.Length)
+                throw new ArgumentException("Native IK enabled buffer length must match the runtime session.", nameof(ikEnabled));
         }
 
         private void EnsureNativePlaybackSession()
@@ -291,8 +402,9 @@ namespace Mmd
                     "Native runtime session source identity changed " + phase + ".");
             }
 
-            if (ComputeSourceFingerprint(model.sourceBytes) != nativeModelSourceFingerprint ||
-                ComputeSourceFingerprint(motion.sourceBytes) != nativeMotionSourceFingerprint)
+            if (verifyNativeSourceFingerprints &&
+                (ComputeSourceFingerprint(model.sourceBytes) != nativeModelSourceFingerprint ||
+                 ComputeSourceFingerprint(motion.sourceBytes) != nativeMotionSourceFingerprint))
             {
                 throw new InvalidOperationException("Native runtime source bytes changed " + phase + ".");
             }

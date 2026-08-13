@@ -1,0 +1,25 @@
+{
+  "name": "Mmd.Cinemachine",
+  "rootNamespace": "Mmd.UnityIntegration.Cinemachine",
+  "references": [
+    "Mmd.Runtime",
+    "Unity.Cinemachine"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [
+    "MMD_CINEMACHINE_3"
+  ],
+  "versionDefines": [
+    {
+      "name": "com.unity.cinemachine",
+      "expression": "[3.0.0,4.0.0)",
+      "define": "MMD_CINEMACHINE_3"
+    }
+  ],
+  "noEngineReferences": false
+}

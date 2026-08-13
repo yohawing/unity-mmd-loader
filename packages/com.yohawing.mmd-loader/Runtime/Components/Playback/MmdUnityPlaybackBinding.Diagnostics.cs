@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using System.Diagnostics;
 using UnityEngine;
 
 namespace Mmd.UnityIntegration
@@ -10,8 +11,53 @@ namespace Mmd.UnityIntegration
     {
         public int frame;
         public string backendName = string.Empty;
+        /// <summary>
+        /// Identifies which host-pose contract produced this frame. A valid zero-cost phase is
+        /// represented by a present flag and a zero duration; it must not be confused with an
+        /// unavailable phase or a missing report.
+        /// </summary>
+        public string evaluationPath = "Unavailable";
+        public bool phaseDiagnosticsPresent;
+        public bool nativeStepReportPresent;
+        public bool hostPoseCapturePresent;
+        public bool pinnedDiagnosticsPresent;
+        public bool pinMarshalPresent;
+        public bool nativeHostFramePresent;
+        public bool playbackEvaluateBeforePhysicsPresent;
+        public bool playbackCopyEvaluatedOutputsPresent;
+        public bool physicsWorldStepRuntimePresent;
+        public bool nativeRigidbodyCopyPresent;
+        public bool managedRigidbodyFanOutPresent;
+        public bool managedBodyTransformApplyPresent;
+        public bool afterPhysicsMatrixReadbackPresent;
+        public bool matrixTransformApplyPresent;
+        public bool sampledDiagnosticsPresent;
+        public bool sampledBodyDiagnosticsThisFrame;
+        public bool evaluatedFrameRefreshPresent;
+        public bool diagnosticsConstructionPresent;
+        public bool ensureBackendPresent;
+        public bool evaluateFramePresent;
+        public bool applyAnimationFramePresent;
+        public bool snapshotBuildPresent;
         public float deltaTime;
         public double totalMs;
+        public double bridgeTotalMs;
+        public double hostPoseCaptureMs;
+        public double pinnedDiagnosticsMs;
+        public double pinMarshalMs;
+        public double nativeHostFrameMs;
+        public double playbackEvaluateBeforePhysicsMs;
+        public double playbackCopyEvaluatedOutputsMs;
+        public double physicsWorldStepRuntimeMs;
+        public double nativeRigidbodyCopyMs;
+        public double managedRigidbodyFanOutMs;
+        public double managedBodyTransformApplyMs;
+        public double afterPhysicsMatrixReadbackMs;
+        public double matrixTransformApplyMs;
+        public double sampledDiagnosticsMs;
+        public double evaluatedFrameRefreshMs;
+        public double diagnosticsConstructionMs;
+        public double snapshotBuildMs;
         public double ensureBackendMs;
         public double evaluateFrameMs;
         public double applyAnimationFrameMs;
@@ -21,6 +67,11 @@ namespace Mmd.UnityIntegration
         public double refreshSnapshotFrameMs;
         public int readbackTransformCount;
         public int readbackShapeTypeCount;
+        public int nativeRigidbodyCount;
+        public int nativeBoneCount;
+        public int nativeSubstepCount;
+        public int nativeKinematicRigidbodiesFed;
+        public int nativeBonesWrittenBack;
         public int bodyDiagnosticsFrame = -1;
         public int unsupportedWorldAnchorJointCount;
         public string comparisonSpace = "runtime-forward-playback-diagnostics";
@@ -31,6 +82,28 @@ namespace Mmd.UnityIntegration
         public int appliedMorphCount;
         public MmdLivePhysicsPinnedBodyDiagnostics pinnedBodies = new();
         public MmdLivePhysicsBodyDiagnostics[] bodyDiagnostics = System.Array.Empty<MmdLivePhysicsBodyDiagnostics>();
+    }
+
+    internal static class MmdLivePhysicsDiagnosticsClock
+    {
+        internal static double Milliseconds(long startTimestamp, long endTimestamp)
+        {
+            long elapsed = endTimestamp - startTimestamp;
+            if (elapsed <= 0)
+            {
+                return 0.0;
+            }
+
+            return elapsed * 1000.0 / Stopwatch.Frequency;
+        }
+    }
+
+    [Serializable]
+    internal sealed class MmdUnityFrameApplyTimingSummary
+    {
+        public double totalMs;
+        public double bonePoseApplyMs;
+        public MmdUnityMorphApplyTimingSummary morph = new();
     }
 
     [Serializable]

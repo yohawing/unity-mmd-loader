@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using Mmd.Native;
 using Mmd.Physics;
 using UnityEngine;
 
@@ -16,6 +17,28 @@ namespace Mmd.UnityIntegration
         private int lastTimelineDriveFrameCount = int.MinValue / 2;
 
         private int lastHumanoidRetargetTimelineDriveFrameCount = int.MinValue / 2;
+        private bool timelinePreparationSeedPending;
+        private bool timelinePreparationSeedWasLive;
+
+        internal void PrepareTimelineSeed(float sourceTime, float frameRate, bool runLivePhysics)
+        {
+            timelinePreparationSeedPending = false;
+            bool seedLivePhysics = runLivePhysics && physicsMode == MmdPhysicsMode.Live;
+            if (seedLivePhysics)
+            {
+                ApplyTimelineLivePhysicsForward(sourceTime, frameRate);
+            }
+            else
+            {
+                ApplyTimelineTime(sourceTime, frameRate);
+            }
+
+            // Setup owns this evaluation. The first clip sample may reuse it without counting a
+            // second pose evaluation, but only while its evaluation mode and Live state still match.
+            TimelinePoseEvaluationCount = 0;
+            timelinePreparationSeedPending = LastSnapshot != null;
+            timelinePreparationSeedWasLive = seedLivePhysics;
+        }
 
         public MmdHumanoidRetargeterResult ApplyHumanoidRetargetNow()
         {
@@ -27,9 +50,7 @@ namespace Mmd.UnityIntegration
                 return LastHumanoidRetargetResult;
             }
 
-            LastHumanoidRetargetResult = MmdHumanoidRetargeter.RetargetPose(humanoidRetargetEntries);
-            MmdHumanoidAppendTransformApplier.Apply(humanoidAppendEntries);
-            return LastHumanoidRetargetResult;
+            return ApplyHumanoidRetargetCore(copyLocalPositions: true);
         }
 
         internal MmdHumanoidRetargeterResult ApplyHumanoidRetargetFromTimeline()
@@ -48,11 +69,26 @@ namespace Mmd.UnityIntegration
             // that translation twice. Keep the legacy position-copy path when no driver is active.
             bool copyLocalPositions =
                 !(GetComponent<MmdHumanoidRootMotionDriver>()?.IsTimelineEvaluationActive ?? false);
+            return ApplyHumanoidRetargetCore(copyLocalPositions);
+        }
+
+        private MmdHumanoidRetargeterResult ApplyHumanoidRetargetCore(bool copyLocalPositions)
+        {
+            bool nativeLivePrepared = physicsMode == MmdPhysicsMode.Live &&
+                                      TryPrepareHumanoidNativeLivePhysics();
+            RestoreHumanoidHostPoseInputIfAvailable();
             LastHumanoidRetargetResult = MmdHumanoidRetargeter.RetargetPose(
                 humanoidRetargetEntries,
                 copyLocalPositions);
-            MmdHumanoidAppendTransformApplier.Apply(humanoidAppendEntries);
-            StepHumanoidRetargetLivePhysicsIfNeeded(LastHumanoidRetargetResult);
+            bool nativePoseApplied = physicsMode == MmdPhysicsMode.Live
+                ? nativeLivePrepared && TryCaptureHumanoidNativeLivePose(LastHumanoidRetargetResult) &&
+                  StepHumanoidRetargetLivePhysicsIfNeeded(LastHumanoidRetargetResult)
+                : TryApplyHumanoidNativeHostPose(LastHumanoidRetargetResult);
+            if (!nativePoseApplied)
+            {
+                MmdHumanoidAppendTransformApplier.Apply(humanoidAppendEntries);
+            }
+
             return LastHumanoidRetargetResult;
         }
 
@@ -108,11 +144,36 @@ namespace Mmd.UnityIntegration
             return ShouldSuppressSelfTick(lastHumanoidRetargetTimelineDriveFrameCount, currentFrameCount);
         }
 
+        internal bool PrewarmTimelineLivePhysics()
+        {
+            if (binding == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                return binding.PrewarmLivePhysicsBackend();
+            }
+            catch (Exception exception) when (
+                exception is MmdPhysicsBackendException ||
+                exception is MmdRuntimeNativeUnavailableException ||
+                exception is DllNotFoundException ||
+                exception is EntryPointNotFoundException ||
+                exception is BadImageFormatException ||
+                exception is InvalidOperationException ||
+                exception is ArgumentException)
+            {
+                // Prewarm is opportunistic. Preserve the previous behaviour outside active clips;
+                // the normal Live evaluation path remains authoritative for reporting failures.
+                return false;
+            }
+        }
+
         /// <summary>
-        /// Apply time for Timeline random-access evaluation, temporarily suppressing Live physics
-        /// on the binding without modifying the controller's serialized <see cref="physicsMode"/> field.
-        /// Preserves the binding's physics mode after evaluation without the frame-reset side effects
-        /// of <see cref="SetPhysicsMode(MmdPhysicsMode)"/> followed by <see cref="ApplyFrame"/>.
+        /// Apply time for Timeline random-access evaluation without stepping Live physics.
+        /// The native physics backend is soft-reset and retained so preview/scrubbing does not rebuild
+        /// the Bullet world when forward playback resumes.
         /// </summary>
         internal MmdPlaybackSnapshot ApplyTimelineTime(float sourceTime, float frameRate)
         {
@@ -124,15 +185,13 @@ namespace Mmd.UnityIntegration
             MmdPlaybackTime.ValidateFrameRate(frameRate);
             lastTimelineDriveFrameCount = Time.frameCount;
             int frame = MmdPlaybackTime.ToFrame(sourceTime, frameRate);
-
-            // Save the binding's current physics mode; we will restore it after ApplyTime.
-            MmdPhysicsMode originalBindingMode = binding.PhysicsMode;
-
-            // Temporarily suppress Live on the binding so ApplyTime (random-access) works.
-            // We go directly to the binding to avoid changing the controller's serialized physicsMode.
-            if (originalBindingMode == MmdPhysicsMode.Live)
+            if (TryReuseTimelinePreparationSeed(
+                sourceTime,
+                runLivePhysics: false,
+                seedStateValid: true,
+                out MmdPlaybackSnapshot? cachedSnapshot))
             {
-                binding.SetPhysicsMode(MmdPhysicsMode.Off);
+                return cachedSnapshot;
             }
 
             try
@@ -141,23 +200,14 @@ namespace Mmd.UnityIntegration
                 {
                     playbackFrame = frame;
                     CurrentFrame = frame;
-                    LastSnapshot = binding.ApplyTime(sourceTime, frameRate);
+                    LastSnapshot = binding.ApplyTimelinePreviewTime(sourceTime, frameRate);
+                    TimelinePoseEvaluationCount++;
                     return LastSnapshot;
                 });
             }
             finally
             {
-                // Restore the binding's original physics mode.
-                // We use binding.SetPhysicsMode directly rather than going through the controller's
-                // ApplyPhysicsModeToBinding, which would reset playbackFrame/CurrentFrame/LastSnapshot
-                // when switching back to Live.
-                if (originalBindingMode == MmdPhysicsMode.Live)
-                {
-                    binding.SetPhysicsMode(MmdPhysicsMode.Live);
-                }
-
                 ResetLivePhysicsDriveSource();
-                // controller.physicsMode is intentionally NOT modified — preserves serialized/Inspector value.
             }
         }
 
@@ -179,12 +229,20 @@ namespace Mmd.UnityIntegration
             MmdPlaybackTime.ValidateFrameRate(frameRate);
             lastTimelineDriveFrameCount = Time.frameCount;
             int frame = MmdPlaybackTime.ToFrame(sourceTime, frameRate);
-
             // The animation-only scrub path (ApplyTimelineTime) leaves the binding in Live but with a
             // reset simulation; guard against a binding that was left in Off by re-enabling Live.
             if (binding.PhysicsMode != MmdPhysicsMode.Live)
             {
                 binding.SetPhysicsMode(MmdPhysicsMode.Live);
+            }
+
+            if (TryReuseTimelinePreparationSeed(
+                sourceTime,
+                runLivePhysics: true,
+                seedStateValid: binding.CanReuseLivePhysicsSeed(frame),
+                out MmdPlaybackSnapshot? cachedSnapshot))
+            {
+                return cachedSnapshot;
             }
 
             playbackFrame = frame;
@@ -193,9 +251,39 @@ namespace Mmd.UnityIntegration
             {
                 PrepareLivePhysicsDriveSource(LivePhysicsDriveSource.VmdForward);
                 LastSnapshot = binding.ApplyLivePhysicsForwardFrame(frame, frameRate);
+                TimelinePoseEvaluationCount++;
                 lastVmdLivePhysicsFrameCount = Time.frameCount;
                 return LastSnapshot;
             });
+        }
+
+        private bool TryReuseTimelinePreparationSeed(
+            float sourceTime,
+            bool runLivePhysics,
+            bool seedStateValid,
+            out MmdPlaybackSnapshot snapshot)
+        {
+            if (!timelinePreparationSeedPending)
+            {
+                snapshot = null!;
+                return false;
+            }
+
+            timelinePreparationSeedPending = false;
+            MmdPlaybackSnapshot? candidate = LastSnapshot;
+            if (timelinePreparationSeedWasLive == runLivePhysics &&
+                seedStateValid &&
+                candidate != null &&
+                Math.Abs(candidate.frame.time - sourceTime) <= 1e-7f)
+            {
+                playbackFrame = MmdPlaybackTime.ToFrame(sourceTime, frameRate);
+                CurrentFrame = (int)playbackFrame;
+                snapshot = candidate;
+                return true;
+            }
+
+            snapshot = null!;
+            return false;
         }
 
         private static MmdHumanoidRetargeterResult CreateHumanoidRetargetNoOpResult(MmdHumanoidRetargetGate gate)

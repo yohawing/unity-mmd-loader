@@ -19,6 +19,7 @@ namespace Mmd.Native
         internal const uint FeatureVmdSharedContext = 1u << 9;
         internal const uint FeatureVmdSummaryBytes = 1u << 11;
         internal const uint FeatureVmdSharedContextRawReadback = 1u << 12;
+        internal const uint PhysicsModeOff = 0;
         internal const uint PhysicsModeLive = 2;
         internal const uint PhysicsFrameActionSeed = 0;
         internal const uint PhysicsFrameActionStep = 1;
@@ -34,6 +35,7 @@ namespace Mmd.Native
         internal const int StatusUnsupported = 2;
         internal const int StatusBufferTooSmall = 3;
         internal const int StatusError = 4;
+        internal const float DefaultIkTolerance = 0.0001f;
         internal const uint ReductionTargetDccCubic = 2;
         internal const uint GenericCurveAbiVersionV1 = 1;
         internal const uint GenericCurveBoneLocal = 0;
@@ -722,6 +724,31 @@ namespace Mmd.Native
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_physics_world_reset", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int PhysicsWorldReset(IntPtr world, IntPtr instance, out IntPtr seededRigidbodyCount);
 
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_physics_world_rearm_bake_seed", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int PhysicsWorldRearmBakeSeed(IntPtr world);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_physics_world_step_runtime", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int PhysicsWorldStepRuntime(
+            IntPtr world,
+            IntPtr instance,
+            float deltaTime,
+            out PhysicsWorldStepReport outReport);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_physics_world_bake_clip_frames", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int PhysicsWorldBakeClipFrames(
+            IntPtr world,
+            IntPtr instance,
+            IntPtr clip,
+            float startFrame,
+            float frameStep,
+            float deltaTime,
+            IntPtr frameCount,
+            [Out] float[] outWorldMatrices,
+            IntPtr outWorldMatricesLength,
+            [Out] float[] outMorphWeights,
+            IntPtr outMorphWeightsLength,
+            out PhysicsWorldStepReport outLastReport);
+
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_evaluate_host_frame", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int EvaluateHostFrame(
             IntPtr instance,
@@ -733,6 +760,14 @@ namespace Mmd.Native
             uint ikMaxIterationsCap,
             out PhysicsWorldStepReport outReport);
 
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_apply_host_pose_and_evaluate_before_physics", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int InstanceApplyHostPoseAndEvaluateBeforePhysics(
+            IntPtr instance,
+            ref PhysicsHostPoseView pose);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_evaluate_current_pose_after_physics", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int InstanceEvaluateCurrentPoseAfterPhysics(IntPtr instance);
+
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_physics_world_rigidbody_count", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int PhysicsWorldRigidbodyCount(IntPtr world, out IntPtr rigidbodyCount);
 
@@ -742,8 +777,24 @@ namespace Mmd.Native
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_evaluate_clip_frame", CallingConvention = CallingConvention.Cdecl)]
         internal static extern byte InstanceEvaluateClipFrame(IntPtr instance, IntPtr clip, float frame);
 
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_evaluate_clip_frame_with_ik_options", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern byte InstanceEvaluateClipFrameWithIkOptions(
+            IntPtr instance,
+            IntPtr clip,
+            float frame,
+            float ikTolerance,
+            uint ikMaxIterationsCap);
+
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_evaluate_clip_frame_before_physics", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int InstanceEvaluateClipFrameBeforePhysics(IntPtr instance, IntPtr clip, float frame);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_evaluate_clip_frame_before_physics_with_ik_options", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int InstanceEvaluateClipFrameBeforePhysicsWithIkOptions(
+            IntPtr instance,
+            IntPtr clip,
+            float frame,
+            float ikTolerance,
+            uint ikMaxIterationsCap);
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_world_matrix_f32_len", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr InstanceWorldMatrixF32Len(IntPtr instance);
@@ -832,6 +883,21 @@ namespace Mmd.Native
             {
                 throw new InvalidOperationException(
                     $"mmd-runtime ABI version {abiVersion} is not supported. Expected {ExpectedAbiVersion}.");
+            }
+
+            return abiVersion;
+        }
+
+        internal static uint ValidateHostPoseCapability()
+        {
+            uint abiVersion = ValidateAbiVersion();
+            uint featureFlags = FeatureFlags();
+            const uint requiredFeatures = FeatureSplitPhysicsEvaluation | FeatureHostPoseNativeMorphs;
+            if ((featureFlags & requiredFeatures) != requiredFeatures)
+            {
+                throw new MmdRuntimeUnsupportedException(
+                    "mmd-runtime does not provide the split native host-pose evaluation contract " +
+                    $"(required feature bits 0 and 3, flags=0x{featureFlags:X8}).");
             }
 
             return abiVersion;
@@ -929,6 +995,18 @@ namespace Mmd.Native
         {
             ThrowIfDisposed();
             return model;
+        }
+
+        internal IntPtr GetNativeInstanceHandle()
+        {
+            ThrowIfDisposed();
+            return instance;
+        }
+
+        internal IntPtr GetNativeClipHandle()
+        {
+            ThrowIfDisposed();
+            return clip;
         }
 
         public static MmdRuntimeFfiPlaybackSession Create(
@@ -1100,12 +1178,29 @@ namespace Mmd.Native
 
         public void EvaluateAndCopy(float frame, float[] worldMatrices, float[] morphWeights, byte[] ikEnabled)
         {
+            EvaluateAndCopy(frame, worldMatrices, morphWeights, ikEnabled, 0);
+        }
+
+        public void EvaluateAndCopy(
+            float frame,
+            float[] worldMatrices,
+            float[] morphWeights,
+            byte[] ikEnabled,
+            uint ikMaxIterationsCap)
+        {
             if (disposed)
             {
                 throw new ObjectDisposedException(nameof(MmdRuntimeFfiPlaybackSession));
             }
 
-            byte evaluated = MmdRuntimeFfiMethods.InstanceEvaluateClipFrame(instance, clip, frame);
+            byte evaluated = ikMaxIterationsCap == 0
+                ? MmdRuntimeFfiMethods.InstanceEvaluateClipFrame(instance, clip, frame)
+                : MmdRuntimeFfiMethods.InstanceEvaluateClipFrameWithIkOptions(
+                    instance,
+                    clip,
+                    frame,
+                    ikTolerance: MmdRuntimeFfiMethods.DefaultIkTolerance,
+                    ikMaxIterationsCap: ikMaxIterationsCap);
             if (evaluated == 0)
             {
                 throw new InvalidOperationException("mmd-runtime clip frame evaluation returned false.");
@@ -1116,23 +1211,44 @@ namespace Mmd.Native
 
         public void EvaluateBeforePhysicsAndCopy(float frame, float[] worldMatrices, float[] morphWeights, byte[] ikEnabled)
         {
-            if (disposed)
-            {
-                throw new ObjectDisposedException(nameof(MmdRuntimeFfiPlaybackSession));
-            }
+            EvaluateBeforePhysicsAndCopy(frame, worldMatrices, morphWeights, ikEnabled, 0);
+        }
 
-            int status = MmdRuntimeFfiMethods.InstanceEvaluateClipFrameBeforePhysics(instance, clip, frame);
-            if (status != MmdRuntimeFfiMethods.StatusOk)
-            {
-                throw new InvalidOperationException(
-                    $"mmd-runtime before-physics clip frame evaluation failed with status {status}: " +
-                    MmdRuntimeFfiMarshal.LastErrorMessage());
-            }
-
+        public void EvaluateBeforePhysicsAndCopy(
+            float frame,
+            float[] worldMatrices,
+            float[] morphWeights,
+            byte[] ikEnabled,
+            uint ikMaxIterationsCap)
+        {
+            EvaluateBeforePhysics(frame, ikMaxIterationsCap);
             CopyEvaluatedOutputs(worldMatrices, morphWeights, ikEnabled);
         }
 
-        private void CopyEvaluatedOutputs(float[] worldMatrices, float[] morphWeights, byte[] ikEnabled)
+        internal void EvaluateBeforePhysics(float frame)
+        {
+            EvaluateBeforePhysics(frame, 0);
+        }
+
+        internal void EvaluateBeforePhysics(float frame, uint ikMaxIterationsCap)
+        {
+            ThrowIfDisposed();
+            int status = ikMaxIterationsCap == 0
+                ? MmdRuntimeFfiMethods.InstanceEvaluateClipFrameBeforePhysics(instance, clip, frame)
+                : MmdRuntimeFfiMethods.InstanceEvaluateClipFrameBeforePhysicsWithIkOptions(
+                    instance,
+                    clip,
+                    frame,
+                    ikTolerance: MmdRuntimeFfiMethods.DefaultIkTolerance,
+                    ikMaxIterationsCap: ikMaxIterationsCap);
+            if (status == MmdRuntimeFfiMethods.StatusOk)
+                return;
+            throw new InvalidOperationException(
+                $"mmd-runtime before-physics clip frame evaluation failed with status {status}: " +
+                MmdRuntimeFfiMarshal.LastErrorMessage());
+        }
+
+        internal void CopyEvaluatedOutputs(float[] worldMatrices, float[] morphWeights, byte[] ikEnabled)
         {
 
             if (worldMatrices.Length > 0 &&

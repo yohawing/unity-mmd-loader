@@ -17,6 +17,7 @@ namespace Mmd.Editor
         public const string PlayOnStartFieldName = "playOnStart";
         public const string CacheNotImplementedMessage = "Physics Cache is not implemented yet. Use Off for random access or Live for forward Play Mode playback.";
         public const string LastFastRuntimeReasonFieldName = "lastFastRuntimeReason";
+        public const string IkMaxIterationsCapFieldName = "ikMaxIterationsCap";
 
         public static readonly string[] DefaultInspectorExcludedProperties =
         {
@@ -25,8 +26,11 @@ namespace Mmd.Editor
             FrameRateFieldName,
             PlayOnStartFieldName,
             PhysicsModeFieldName,
+            IkMaxIterationsCapFieldName,
             LastFastRuntimeReasonFieldName
         };
+
+        private bool advancedLivePhysicsSettingsExpanded;
 
         private static readonly GUIContent PhysicsModeLabel = new("Physics Mode");
         private static readonly GUIContent[] PhysicsModeOptions =
@@ -72,7 +76,37 @@ namespace Mmd.Editor
             serializedObject.Update();
             DrawPropertiesExcluding(serializedObject, DefaultInspectorExcludedProperties);
             DrawPhysicsMode();
+            DrawAdvancedLivePhysicsSettings();
             serializedObject.ApplyModifiedProperties();
+        }
+
+        private void DrawAdvancedLivePhysicsSettings()
+        {
+            SerializedProperty ikCap = serializedObject.FindProperty(IkMaxIterationsCapFieldName);
+            if (ikCap == null)
+            {
+                return;
+            }
+
+            EditorGUILayout.Space();
+            advancedLivePhysicsSettingsExpanded = EditorGUILayout.Foldout(
+                advancedLivePhysicsSettingsExpanded,
+                new GUIContent(
+                    "Advanced Live Physics Settings",
+                    "Optional runtime solver tuning. Leave collapsed to preserve authored PMX behavior."),
+                toggleOnLabelClick: true);
+            if (!advancedLivePhysicsSettingsExpanded)
+            {
+                return;
+            }
+
+            EditorGUI.indentLevel++;
+            EditorGUILayout.PropertyField(
+                ikCap,
+                new GUIContent(
+                    "IK Max Iterations Cap",
+                    "Zero preserves each PMX IK chain's authored iteration count. Positive values may reduce pose quality and are currently supported only for VMD Physics Off and Humanoid Live."));
+            EditorGUI.indentLevel--;
         }
 
         private void DrawPhysicsMode()

@@ -96,6 +96,7 @@ namespace Mmd.Tests
             SkinnedMeshRenderer renderer = binding.Instance.SkinnedMeshRenderer!;
             int blinkShapeIndex = binding.Instance.Mesh.GetBlendShapeIndex("blink");
             Assert.That(blinkShapeIndex, Is.GreaterThanOrEqualTo(0));
+            Bounds initialBounds = renderer.localBounds;
 
             binding.ApplyFrame(frame: 10, frameRate: 30.0f);
             float morphedWeight = renderer.GetBlendShapeWeight(blinkShapeIndex);
@@ -106,11 +107,15 @@ namespace Mmd.Tests
 
             binding.ApplyFrame(frame: 0, frameRate: 30.0f);
             float restoredWeight = renderer.GetBlendShapeWeight(blinkShapeIndex);
+            Bounds restoredBounds = renderer.localBounds;
 
             Assert.That(morphedWeight, Is.EqualTo(100f).Within(0.001f));
-            Assert.That(morphedBounds.Contains(new Vector3(-1.0f, 2.0f, 0.0f)), Is.True);
+            Assert.That(morphedBounds.center, Is.EqualTo(initialBounds.center));
+            Assert.That(morphedBounds.size, Is.EqualTo(initialBounds.size));
             Assert.That(repeatedWeight, Is.EqualTo(morphedWeight).Within(0.001f));
             Assert.That(restoredWeight, Is.EqualTo(0f).Within(0.001f));
+            Assert.That(restoredBounds.center, Is.EqualTo(initialBounds.center));
+            Assert.That(restoredBounds.size, Is.EqualTo(initialBounds.size));
             Assert.That(binding.Instance.RenderingDescriptor.vertices[1].position[1], Is.EqualTo(0.0f).Within(0.00001f));
         }
         [Test]
@@ -181,7 +186,7 @@ namespace Mmd.Tests
             Assert.That(instance.Mesh.vertices[0], Is.EqualTo(new Vector3(0.0f, 0.0f, 0.0f)));
         }
         [Test]
-        public void BlendShapeVertexMorphWithTextureUvMorphReportsUvMeshUpload()
+        public void BlendShapeVertexMorphWithTextureUvMorphFailsClosed()
         {
 
             MmdModelDefinition model = CreateTextureUvMorphTriangleModel();
@@ -207,21 +212,21 @@ namespace Mmd.Tests
             frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "blink", weight = 1.0f });
             frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "uv-shift", weight = 1.0f });
 
-            MmdUnityMorphApplyTimingSummary timing = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame);
+            NotSupportedException exception = Assert.Throws<NotSupportedException>(() =>
+                MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame))!;
 
-            Assert.That(timing.blendShapePathUsed, Is.True);
-            Assert.That(timing.meshUploadRequired, Is.True);
-            Assert.That(timing.setVerticesMs, Is.EqualTo(0.0));
-            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
-            Assert.That(renderer.GetBlendShapeWeight(instance.BlendShapeIndexMap["blink"]), Is.EqualTo(100f).Within(0.001f));
+            Assert.That(exception.Message, Does.Contain("does not support UV morphs"));
+            Assert.That(RequireSkinnedRenderer(instance).GetBlendShapeWeight(instance.BlendShapeIndexMap["blink"]), Is.Zero);
         }
         [Test]
-        public void BlendShapeBoundsUseLocalBoundsWithoutRecalculateForResolvedWeightsAboveOne()
+        public void BlendShapeWeightsPreserveFactoryLocalBoundsForResolvedWeightsAboveOne()
         {
 
             MmdModelDefinition model = CreateGroupMorphTriangleModel();
             using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
             MmdUnityModelInstance instance = scope.Instance;
+            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+            Bounds initialBounds = renderer.localBounds;
 
             MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
             frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "smile", weight = 1.0f });
@@ -230,45 +235,52 @@ namespace Mmd.Tests
             MmdUnityMorphApplyTimingSummary timing = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame);
 
             Assert.That(timing.blendShapePathUsed, Is.True);
-            Assert.That(timing.localBoundsAssigned, Is.True);
-            Assert.That(timing.localBoundsSkipped, Is.False);
+            Assert.That(timing.localBoundsAssigned, Is.False);
+            Assert.That(timing.localBoundsSkipped, Is.True);
             Assert.That(timing.recalculateBoundsMs, Is.EqualTo(0.0));
-            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
-            Assert.That(renderer.localBounds.Contains(new Vector3(-1.0f, 2.5f, 0.0f)), Is.True);
+            Assert.That(renderer.GetBlendShapeWeight(instance.BlendShapeIndexMap["smile"]), Is.EqualTo(125f).Within(0.001f));
+            Assert.That(renderer.localBounds.center, Is.EqualTo(initialBounds.center));
+            Assert.That(renderer.localBounds.size, Is.EqualTo(initialBounds.size));
         }
         [Test]
-        public void BlendShapeLocalBoundsSkipWhenResolvedWeightsAreUnchanged()
+        public void BlendShapeLocalBoundsRemainFactoryBoundsWhenResolvedWeightsAreUnchanged()
         {
 
             MmdModelDefinition model = CreateGroupMorphTriangleModel();
             using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
             MmdUnityModelInstance instance = scope.Instance;
+            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+            Bounds initialBounds = renderer.localBounds;
 
             MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
             frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "smile", weight = 1.0f });
             frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 0.5f });
 
             MmdUnityMorphApplyTimingSummary first = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame);
-            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
             Bounds firstBounds = renderer.localBounds;
             MmdUnityMorphApplyTimingSummary second = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame);
             Bounds secondBounds = renderer.localBounds;
 
-            Assert.That(first.localBoundsAssigned, Is.True);
-            Assert.That(first.localBoundsSkipped, Is.False);
+            Assert.That(first.localBoundsAssigned, Is.False);
+            Assert.That(first.localBoundsSkipped, Is.True);
             Assert.That(second.localBoundsAssigned, Is.False);
             Assert.That(second.localBoundsSkipped, Is.True);
             Assert.That(second.localBoundsAssignMs, Is.EqualTo(0.0));
-            Assert.That(secondBounds.center, Is.EqualTo(firstBounds.center));
-            Assert.That(secondBounds.size, Is.EqualTo(firstBounds.size));
+            Assert.That(firstBounds.center, Is.EqualTo(initialBounds.center));
+            Assert.That(firstBounds.size, Is.EqualTo(initialBounds.size));
+            Assert.That(secondBounds.center, Is.EqualTo(initialBounds.center));
+            Assert.That(secondBounds.size, Is.EqualTo(initialBounds.size));
+            Assert.That(renderer.GetBlendShapeWeight(instance.BlendShapeIndexMap["smile"]), Is.EqualTo(125f).Within(0.001f));
         }
         [Test]
-        public void BlendShapeLocalBoundsRecalculateWhenResolvedWeightsChangeAfterSkip()
+        public void BlendShapeLocalBoundsRemainFactoryBoundsWhenResolvedWeightsChange()
         {
 
             MmdModelDefinition model = CreateGroupMorphTriangleModel();
             using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
             MmdUnityModelInstance instance = scope.Instance;
+            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+            Bounds initialBounds = renderer.localBounds;
 
             MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
             frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "smile", weight = 1.0f });
@@ -282,11 +294,40 @@ namespace Mmd.Tests
             changed.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 1.0f });
             MmdUnityMorphApplyTimingSummary timing = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, changed);
 
-            Assert.That(timing.localBoundsAssigned, Is.True);
-            Assert.That(timing.localBoundsSkipped, Is.False);
+            Assert.That(timing.localBoundsAssigned, Is.False);
+            Assert.That(timing.localBoundsSkipped, Is.True);
             Assert.That(timing.recalculateBoundsMs, Is.EqualTo(0.0));
-            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+            Assert.That(renderer.GetBlendShapeWeight(instance.BlendShapeIndexMap["smile"]), Is.EqualTo(150f).Within(0.001f));
+            Assert.That(renderer.localBounds.center, Is.EqualTo(initialBounds.center));
+            Assert.That(renderer.localBounds.size, Is.EqualTo(initialBounds.size));
             Assert.That(renderer.localBounds.Contains(new Vector3(-1.0f, 3.0f, 0.0f)), Is.True);
+        }
+        [Test]
+        public void FactoryLocalBoundsContainRotatedArticulatedSkinnedPose()
+        {
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.vertices[1].boneIndices = new[] { 1 };
+            model.vertices[1].boneWeights = new[] { 1.0f };
+
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
+            SkinnedMeshRenderer renderer = RequireSkinnedRenderer(instance);
+            Bounds fixedBounds = renderer.localBounds;
+
+            instance.BoneTransforms[1].localRotation = Quaternion.Euler(0.0f, 0.0f, 180.0f);
+            var baked = new Mesh();
+            try
+            {
+                renderer.BakeMesh(baked);
+                foreach (Vector3 vertex in baked.vertices)
+                {
+                    Assert.That(fixedBounds.Contains(vertex), Is.True, $"Rotated vertex escaped fixed bounds: {vertex}; bounds={fixedBounds}");
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(baked);
+            }
         }
         [Test]
         public void DuplicateNameVertexMorphsBakeDistinctBlendShapesAndShareResolvedWeight()
@@ -327,53 +368,24 @@ namespace Mmd.Tests
             Assert.That(deltaVertices[1], Is.EqualTo(new Vector3(0.0f, 1.0f, 0.0f)));
         }
         [Test]
-        public void ApplyFrameAppliesTextureUvMorphToMeshUv()
+        public void ApplyFrameRejectsTextureUvMorphWithoutMutatingMeshUv()
         {
 
             MmdModelDefinition model = CreateTextureUvMorphTriangleModel();
             using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
             MmdUnityModelInstance instance = scope.Instance;
 
-            // Step 1: Apply texture UV morph at weight 1.0.
+            Vector2[] originalUvs = instance.Mesh.uv;
             MmdEvaluatedFrame frame1 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
             frame1.morphs.Add(new MmdEvaluatedMorphWeight { name = "uv-shift", weight = 1.0f });
-            MmdUnityFrameApplier.ApplyFrame(instance, frame1);
-            Vector2[] uv1 = instance.Mesh.uv;
+            NotSupportedException exception = Assert.Throws<NotSupportedException>(() =>
+                MmdUnityFrameApplier.ApplyFrame(instance, frame1))!;
 
-            // Vertex 1 source UV moves by (0.25, 0.5), then is converted to Unity viewport UV.
-            Assert.That(uv1[1].x, Is.EqualTo(1.25f).Within(0.00001f));
-            Assert.That(uv1[1].y, Is.EqualTo(0.5f).Within(0.00001f));
-            // Unmorphed vertices keep base viewport UV.
-            Assert.That(uv1[0].x, Is.EqualTo(0.0f).Within(0.00001f));
-            Assert.That(uv1[0].y, Is.EqualTo(1.0f).Within(0.00001f));
-            Assert.That(uv1[2].x, Is.EqualTo(0.0f).Within(0.00001f));
-            Assert.That(uv1[2].y, Is.EqualTo(0.0f).Within(0.00001f));
-
-            // Step 2: Apply the same frame again; UVs must not accumulate.
-            MmdUnityFrameApplier.ApplyFrame(instance, frame1);
-            Vector2[] uv2 = instance.Mesh.uv;
-            Assert.That(uv2[1].x, Is.EqualTo(uv1[1].x).Within(0.00001f));
-            Assert.That(uv2[1].y, Is.EqualTo(uv1[1].y).Within(0.00001f));
-
-            // Step 3: Apply zero-weight frame to restore base UV.
-            MmdEvaluatedFrame frame0 = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
-            frame0.morphs.Add(new MmdEvaluatedMorphWeight { name = "uv-shift", weight = 0.0f });
-            MmdUnityFrameApplier.ApplyFrame(instance, frame0);
-            Vector2[] uv0 = instance.Mesh.uv;
-
-            Assert.That(uv0[1].x, Is.EqualTo(1.0f).Within(0.00001f));
-            Assert.That(uv0[1].y, Is.EqualTo(1.0f).Within(0.00001f));
-            Assert.That(uv0[0].x, Is.EqualTo(0.0f).Within(0.00001f));
-            Assert.That(uv0[0].y, Is.EqualTo(1.0f).Within(0.00001f));
-            Assert.That(uv0[2].x, Is.EqualTo(0.0f).Within(0.00001f));
-            Assert.That(uv0[2].y, Is.EqualTo(0.0f).Within(0.00001f));
-
-            // Step 4: Underlying descriptor base UVs are unchanged.
-            Assert.That(instance.RenderingDescriptor.vertices[1].uv[0], Is.EqualTo(1.0f).Within(0.00001f));
-            Assert.That(instance.RenderingDescriptor.vertices[1].uv[1], Is.EqualTo(0.0f).Within(0.00001f));
+            Assert.That(exception.Message, Does.Contain("does not support UV morphs"));
+            Assert.That(instance.Mesh.uv, Is.EqualTo(originalUvs));
         }
         [Test]
-        public void ApplyTextureUvMorphToSplitSkinnedModelMovesBothCopies()
+        public void SplitSkinnedModelTextureUvMorphFailsClosed()
         {
 
             MmdModelDefinition model = CreateSharedVertexTwoSubmeshTextureUvMorphModel();
@@ -387,17 +399,14 @@ namespace Mmd.Tests
                 instance.RenderingDescriptor.uvMorphs[0].offsets.Select(offset => offset.vertexIndex),
                 Is.EqualTo(new[] { 0, 3 }));
 
-            // Apply texture UV morph at weight 1.0.
+            Vector2[] originalUvs = instance.Mesh.uv;
             MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
             frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "uv-shift", weight = 1.0f });
-            MmdUnityFrameApplier.ApplyFrame(instance, frame);
-            Vector2[] uv = instance.Mesh.uv;
+            NotSupportedException exception = Assert.Throws<NotSupportedException>(() =>
+                MmdUnityFrameApplier.ApplyFrame(instance, frame))!;
 
-            // Both split copies of source vertex 0 should receive the same UV delta.
-            Assert.That(uv[0].x, Is.EqualTo(0.25f).Within(0.00001f));
-            Assert.That(uv[0].y, Is.EqualTo(0.5f).Within(0.00001f));
-            Assert.That(uv[3].x, Is.EqualTo(0.25f).Within(0.00001f));
-            Assert.That(uv[3].y, Is.EqualTo(0.5f).Within(0.00001f));
+            Assert.That(exception.Message, Does.Contain("does not support UV morphs"));
+            Assert.That(instance.Mesh.uv, Is.EqualTo(originalUvs));
         }
         [Test]
         public void ExistingSkinnedModelRebindAssignsRuntimeOwnedMeshBeforeVertexMorphApplication()
@@ -466,6 +475,53 @@ namespace Mmd.Tests
             {
                 UnityEngine.Object.DestroyImmediate(reboundMesh);
             }
+        }
+
+        [Test]
+        public void ExistingSkinnedModelRebindKeepsUvMorphFailClosed()
+        {
+            MmdModelDefinition model = CreateTextureUvMorphTriangleModel();
+            using var sceneScope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance rebound = MmdUnityModelFactory.CreateExistingSkinnedModelInstance(
+                sceneScope.Instance.Root,
+                model,
+                sourcePath: null);
+            MmdEvaluatedFrame frame = CreateFrame(CreateBonePose(0, "root", 0.0f, 0.0f, 0.0f));
+            frame.morphs.Add(new MmdEvaluatedMorphWeight { name = "uv-shift", weight = 1.0f });
+
+            NotSupportedException exception = Assert.Throws<NotSupportedException>(() =>
+                MmdUnityFrameApplier.ApplyFrame(rebound, frame))!;
+
+            Assert.That(exception.Message, Does.Contain("does not support UV morphs"));
+        }
+
+        [Test]
+        public void ExistingSkinnedModelRebindNormalizesVertexMorphType()
+        {
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.morphs.Add(new MmdMorphDefinition
+            {
+                index = 0,
+                name = "blink",
+                type = " vertex ",
+                panel = "eye",
+                vertexOffsets =
+                {
+                    new MmdVertexMorphOffsetDefinition
+                    {
+                        vertexIndex = 1,
+                        positionDelta = new[] { 0.0f, 1.0f, 0.0f }
+                    }
+                }
+            });
+            using var sceneScope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance rebound = MmdUnityModelFactory.CreateExistingSkinnedModelInstance(
+                sceneScope.Instance.Root,
+                model,
+                sourcePath: null);
+
+            Assert.That(rebound.RenderingDescriptor.vertexMorphs, Has.Count.EqualTo(1));
+            Assert.That(rebound.VertexMorphBlendShapes, Has.Count.EqualTo(1));
         }
         [Test]
         public void ExistingSkinnedModelRebindCollectsPhysicsBodiesFromControllerRoot()
