@@ -1,0 +1,75 @@
+name: Run Unity tests
+description: Run one Unity Test Framework mode and always publish its artifacts.
+
+inputs:
+  test-mode:
+    description: Unity Test Framework mode, for example editmode or playmode.
+    required: true
+  artifacts-path:
+    description: Directory emitted by the Unity test runner.
+    required: true
+  artifact-name:
+    description: Uploaded artifact name for the runner output.
+    required: true
+  project-path:
+    description: Unity project or package path passed to the test runner.
+    required: false
+    default: packages/com.yohawing.mmd-loader
+  package-mode:
+    description: Whether the test runner should create a package-mode project.
+    required: false
+    default: "true"
+  unity-license:
+    description: Base64 encoded Unity license.
+    required: true
+  unity-email:
+    description: Optional Unity account email.
+    required: false
+  unity-password:
+    description: Optional Unity account password.
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: Download Linux native runtime
+      uses: actions/download-artifact@v4
+      with:
+        name: native-ubuntu-latest
+        path: native-artifact
+
+    - name: Install Linux native runtime
+      shell: bash
+      run: |
+        set -euo pipefail
+        artifact="$(find native-artifact -type f -name 'libmmd_runtime_ffi.so' -print -quit)"
+        if [ -z "$artifact" ]; then
+          echo "::error::Linux native runtime artifact was not found"
+          exit 1
+        fi
+        plugin_dir="packages/com.yohawing.mmd-loader/Runtime/Plugins/x86_64"
+        mkdir -p "$plugin_dir"
+        cp "$artifact" "$plugin_dir/mmd_runtime_ffi.so"
+
+    - name: Run Unity tests
+      uses: game-ci/unity-test-runner@v4
+      id: tests
+      env:
+        UNITY_LICENSE: ${{ inputs.unity-license }}
+        UNITY_EMAIL: ${{ inputs.unity-email }}
+        UNITY_PASSWORD: ${{ inputs.unity-password }}
+      with:
+        packageMode: ${{ inputs.package-mode }}
+        projectPath: ${{ inputs.project-path }}
+        unityVersion: 6000.4.8f1
+        testMode: ${{ inputs.test-mode }}
+        artifactsPath: ${{ inputs.artifacts-path }}
+        githubToken: ${{ github.token }}
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ steps.tests.outputs.artifactsPath }}
+        if-no-files-found: warn
