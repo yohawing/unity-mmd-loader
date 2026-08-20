@@ -28,6 +28,34 @@ permissions:
   checks: write
 
 jobs:
+  source-style:
+    name: Source Style Guard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check C# whitespace policy
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          set +e
+          git grep -nP '[\t]|[ \t]+$' -- '*.cs'
+          grep_status=$?
+          set -e
+
+          if ((grep_status == 0)); then
+            echo "::error::Tracked C# source contains tabs or trailing whitespace."
+            exit 1
+          fi
+          if ((grep_status != 1)); then
+            echo "::error::Unable to inspect tracked C# source (git grep exit $grep_status)."
+            exit "$grep_status"
+          fi
+
+          echo "PASS source style guard: C# whitespace policy"
+
   release-submodule-latest:
     if: >-
       (github.event_name == 'pull_request' && github.head_ref == 'develop') ||
