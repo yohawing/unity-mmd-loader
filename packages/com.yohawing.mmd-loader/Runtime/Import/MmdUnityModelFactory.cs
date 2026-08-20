@@ -283,6 +283,31 @@ namespace Mmd.UnityIntegration
             MmdMaterialPreset materialPreset = MmdMaterialPreset.MmdToon,
             MmdRenderingDescriptor? existingPlaybackDescriptor = null)
         {
+            return CreateExistingSkinnedModelInstanceWithMaterialTargets(
+                root,
+                model,
+                sourcePath,
+                importScale,
+                includeSelfShadowTarget,
+                materialOverride,
+                preserveExistingSelfShadowTarget,
+                materialPreset,
+                existingPlaybackDescriptor,
+                materialRenderingTargets: null);
+        }
+
+        internal static MmdUnityModelInstance CreateExistingSkinnedModelInstanceWithMaterialTargets(
+            GameObject root,
+            MmdModelDefinition model,
+            string? sourcePath,
+            float importScale,
+            bool includeSelfShadowTarget = true,
+            MmdMaterialOverrideAsset? materialOverride = null,
+            bool preserveExistingSelfShadowTarget = false,
+            MmdMaterialPreset materialPreset = MmdMaterialPreset.MmdToon,
+            MmdRenderingDescriptor? existingPlaybackDescriptor = null,
+            MmdMaterialRenderingTargets[]? materialRenderingTargets = null)
+        {
             if (root == null)
             {
                 throw new ArgumentNullException(nameof(root));
@@ -318,8 +343,10 @@ namespace Mmd.UnityIntegration
                 throw new InvalidOperationException("Existing PMX scene SkinnedMeshRenderer material slots do not match the PMX material descriptor.");
             }
 
-            MmdMaterialRenderingTargets[] materialRenderingTargets =
-                BuildMaterialRenderingTargets(materials.Length, materialPreset);
+            MmdMaterialRenderingTargets[] resolvedMaterialRenderingTargets =
+                materialRenderingTargets != null
+                    ? NormalizeMaterialRenderingTargets(materials.Length, materialRenderingTargets)!
+                    : BuildMaterialRenderingTargets(materials.Length, materialPreset);
 
             Transform[] boneTransforms = renderer.bones;
             IReadOnlyList<MmdBoneDefinition> orderedBones = CreateOrderedBones(model.bones);
@@ -375,7 +402,7 @@ namespace Mmd.UnityIntegration
                 new MmdTextureBindingDiagnostics(),
                 shaderDiagnostics,
                 scale,
-                materialRenderingTargets);
+                resolvedMaterialRenderingTargets);
             rollback.Commit();
             return instance;
             }
@@ -568,6 +595,38 @@ namespace Mmd.UnityIntegration
             }
 
             return targets;
+        }
+
+        internal static MmdMaterialRenderingTargets[]? NormalizeMaterialRenderingTargets(
+            int materialCount,
+            MmdMaterialRenderingTargets[]? materialRenderingTargets)
+        {
+            if (materialRenderingTargets == null)
+            {
+                return null;
+            }
+
+            if (materialRenderingTargets.Length > materialCount)
+            {
+                throw new ArgumentException(
+                    "Material rendering targets cannot exceed the available material slots.",
+                    nameof(materialRenderingTargets));
+            }
+
+            if (materialRenderingTargets.Length == materialCount)
+            {
+                return materialRenderingTargets;
+            }
+
+            var expanded = new MmdMaterialRenderingTargets[materialCount];
+            for (int i = 0; i < expanded.Length; i++)
+            {
+                expanded[i] = i < materialRenderingTargets.Length
+                    ? materialRenderingTargets[i]
+                    : MmdMaterialRenderingTargets.BuiltIn;
+            }
+
+            return expanded;
         }
 
         private static MmdUnityModelInstance CreateStaticModel(
