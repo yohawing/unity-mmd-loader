@@ -23,6 +23,8 @@ namespace Mmd
         private MmdMaterialPreset descriptorPreset;
         private MmdRenderingDescriptor? descriptorCache;
         private Task<MmdRenderingDescriptor>? descriptorTask;
+        private int modelPreloadGeneration;
+        private int descriptorModelPreloadGeneration = -1;
 
         internal MmdPmxPlaybackCache(byte[] initialSource)
         {
@@ -51,6 +53,7 @@ namespace Mmd
                 preloadTask = null;
                 descriptorCache = null;
                 descriptorTask = null;
+                descriptorModelPreloadGeneration = -1;
             }
         }
 
@@ -76,7 +79,10 @@ namespace Mmd
                     }
 
                     currentSource = source;
-                    currentPreload = ReferenceEquals(preloadSource, currentSource)
+                    currentPreload = ReferenceEquals(preloadSource, currentSource) &&
+                                      preloadTask != null &&
+                                      !preloadTask.IsFaulted &&
+                                      !preloadTask.IsCanceled
                         ? preloadTask
                         : null;
                     if (currentPreload == null)
@@ -116,13 +122,9 @@ namespace Mmd
                 {
                     currentModelTask = Task.FromResult(modelCache);
                 }
-                else if (ReferenceEquals(preloadSource, source) && preloadTask != null)
-                {
-                    currentModelTask = preloadTask;
-                }
                 else
                 {
-                    currentModelTask = StartPreloadLocked(source, new NativeMmdParser());
+                    currentModelTask = GetOrStartPreloadLocked(source, new NativeMmdParser());
                 }
 
                 if (ReferenceEquals(modelCacheSource, source) &&
@@ -134,6 +136,9 @@ namespace Mmd
 
                 if (ReferenceEquals(preloadSource, source) &&
                     descriptorTask != null &&
+                    !descriptorTask.IsFaulted &&
+                    !descriptorTask.IsCanceled &&
+                    descriptorModelPreloadGeneration == modelPreloadGeneration &&
                     descriptorPreset == preset)
                 {
                     return descriptorTask;
@@ -141,6 +146,7 @@ namespace Mmd
 
                 byte[] currentSource = source;
                 descriptorPreset = preset;
+                descriptorModelPreloadGeneration = modelPreloadGeneration;
                 descriptorTask = currentModelTask.ContinueWith(
                     completed =>
                     {
@@ -198,6 +204,7 @@ namespace Mmd
             byte[] currentSource,
             IMmdParser parser)
         {
+            modelPreloadGeneration++;
             preloadSource = currentSource;
             preloadTask = Task.Run(() =>
             {
@@ -215,6 +222,21 @@ namespace Mmd
                 return model;
             });
             return preloadTask;
+        }
+
+        private Task<MmdModelDefinition> GetOrStartPreloadLocked(
+            byte[] currentSource,
+            IMmdParser parser)
+        {
+            if (ReferenceEquals(preloadSource, currentSource) &&
+                preloadTask != null &&
+                !preloadTask.IsFaulted &&
+                !preloadTask.IsCanceled)
+            {
+                return preloadTask;
+            }
+
+            return StartPreloadLocked(currentSource, parser);
         }
     }
 }
