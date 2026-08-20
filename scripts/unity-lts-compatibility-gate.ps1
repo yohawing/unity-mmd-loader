@@ -122,7 +122,35 @@ try {
         throw "Unity LTS compatibility gate failed. exitCode=$testExitCode; results=$testResults; log=$testLog; $($_.Exception.Message)"
     }
 
-    if ($testExitCode -ne 0 -or $testSummary.Total -le 0 -or $testSummary.Failed -gt 0 -or $testSummary.HasFailedResult) {
+    try {
+        $optionalUtsSkipPrefixes = @(
+            "Mmd.Tests.MmdAssetImporterTests.PmxImporterCustomProfileUsesUtsShaderAndDeclaredMaterialStates",
+            "Mmd.Tests.MmdAssetImporterTests.PmxImporterCustomProfileRendersUtsVisualSmoke"
+        )
+        $allowedSkippedTests = @(
+            foreach ($skippedTestName in @($testSummary.SkippedTestNames)) {
+                foreach ($skipPrefix in $optionalUtsSkipPrefixes) {
+                    $skipName = [string] $skippedTestName
+                    if ($skipName.Equals($skipPrefix, [System.StringComparison]::Ordinal) -or
+                        $skipName.StartsWith($skipPrefix + "(", [System.StringComparison]::Ordinal)) {
+                        [string] $skippedTestName
+                        break
+                    }
+                }
+            }
+        )
+        Assert-NUnitTestRunEvidence `
+            -Summary $testSummary `
+            -MinimumTotal 1 `
+            -MinimumPassed 1 `
+            -AllowedSkippedTests $allowedSkippedTests `
+            -Context "Unity LTS compatibility gate" | Out-Null
+    }
+    catch {
+        throw "Unity LTS compatibility gate failed. exitCode=$testExitCode; results=$testResults; log=$testLog; $($_.Exception.Message)"
+    }
+
+    if ($testExitCode -ne 0) {
         throw ("Unity LTS compatibility gate failed. exitCode={0}; result={1}; failed={2}; passed={3}; skipped={4}; total={5}; results={6}; log={7}" -f `
             $testExitCode, $testSummary.Result, $testSummary.Failed, $testSummary.Passed, $testSummary.Skipped, $testSummary.Total, $testResults, $testLog)
     }
