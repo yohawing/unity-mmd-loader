@@ -188,7 +188,12 @@ namespace Mmd.Tests
                     }
                 });
             MmdVmdAsset asset = ScriptableObject.CreateInstance<MmdVmdAsset>();
-            FieldInfo contextField = typeof(MmdVmdAsset).GetField(
+            MmdVmdNativeContextCache cache = new MmdVmdNativeContextCache();
+            FieldInfo cacheField = typeof(MmdVmdAsset).GetField(
+                "nativeVmdContextCache",
+                BindingFlags.Instance | BindingFlags.NonPublic)!;
+            cacheField.SetValue(asset, cache);
+            FieldInfo contextField = typeof(MmdVmdNativeContextCache).GetField(
                 "nativeVmdContext",
                 BindingFlags.Instance | BindingFlags.NonPublic)!;
             MethodInfo dispose = typeof(MmdVmdAsset).GetMethod(
@@ -196,17 +201,17 @@ namespace Mmd.Tests
                 BindingFlags.Instance | BindingFlags.NonPublic)!;
             try
             {
-                contextField.SetValue(asset, context);
+                contextField.SetValue(cache, context);
 
                 TargetInvocationException firstFailure = Assert.Throws<TargetInvocationException>(
                     () => dispose.Invoke(asset, Array.Empty<object>()))!;
                 Assert.That(firstFailure.InnerException, Is.TypeOf<InvalidOperationException>());
-                Assert.That(contextField.GetValue(asset), Is.SameAs(context));
+                Assert.That(contextField.GetValue(cache), Is.SameAs(context));
 
                 dispose.Invoke(asset, Array.Empty<object>());
 
                 Assert.That(freeCount, Is.EqualTo(2));
-                Assert.That(contextField.GetValue(asset), Is.Null);
+                Assert.That(contextField.GetValue(cache), Is.Null);
             }
             finally
             {
