@@ -156,9 +156,7 @@ namespace Mmd.UnityIntegration
                 setupTiming.compatibilityValidationMs += TimelineSetupElapsedMilliseconds(phaseStart);
             }
             TryConfigureNativeFirst(
-                motion,
-                pmxBytes,
-                vmdBytes,
+                new MmdNativePlaybackSetup(motion, pmxBytes, vmdBytes),
                 nativeMotion => MmdUnityPlaybackBinding.CreateSkinnedFromExistingSceneModel(
                     gameObject,
                     model,
@@ -327,9 +325,12 @@ namespace Mmd.UnityIntegration
                 setupTiming.sharedVmdContextMs += TimelineSetupElapsedMilliseconds(phaseStart);
             }
             TryConfigureNativeFirst(
-                motion,
-                pathPmxBytes,
-                pathVmdBytes,
+                new MmdNativePlaybackSetup(
+                    motion,
+                    pathPmxBytes,
+                    pathVmdBytes,
+                    sharedVmdContext,
+                    sharedVmdContextFailure),
                 nativeMotion => MmdUnityPlaybackBinding.CreateSkinnedFromExistingSceneModel(
                     gameObject,
                     model,
@@ -341,8 +342,6 @@ namespace Mmd.UnityIntegration
                     sourcesAlreadyValidated: true),
                 candidate => Configure(candidate, playbackFrameRate, playOnStart),
                 timelineEvaluation,
-                sharedVmdContext,
-                sharedVmdContextFailure,
                 setupTiming: setupTiming);
 
             if (!timelineEvaluation)
@@ -518,9 +517,12 @@ namespace Mmd.UnityIntegration
                 setupTiming.sharedVmdContextMs += TimelineSetupElapsedMilliseconds(phaseStart);
             }
             TryConfigureNativeFirst(
-                motion,
-                pmxBytes,
-                vmdBytes,
+                new MmdNativePlaybackSetup(
+                    motion,
+                    pmxBytes,
+                    vmdBytes,
+                    sharedVmdContext,
+                    sharedVmdContextFailure),
                 nativeMotion => MmdUnityPlaybackBinding.CreateSkinnedFromExistingSceneModel(
                     gameObject,
                     pmxAsset,
@@ -530,8 +532,6 @@ namespace Mmd.UnityIntegration
                     sourcesAlreadyValidated: true),
                 configure,
                 timelineEvaluation,
-                sharedVmdContext,
-                sharedVmdContextFailure,
                 setupTiming);
 
             if (applyStartFrame.HasValue)
@@ -566,20 +566,16 @@ namespace Mmd.UnityIntegration
         }
 
         private void TryConfigureNativeFirst(
-            MmdMotionDefinition nativeMotion,
-            byte[] pmxBytes,
-            byte[] vmdBytes,
+            MmdNativePlaybackSetup setup,
             Func<MmdMotionDefinition, MmdUnityPlaybackBinding> createBinding,
             Action<MmdUnityPlaybackBinding> configure,
             bool timelineEvaluation,
-            MmdRuntimeFfiVmdContext? sharedVmdContext = null,
-            string? sharedVmdContextFailure = null,
             MmdTimelineSetupTimingSummary? setupTiming = null)
         {
             long phaseStart = Stopwatch.GetTimestamp();
             bool nativeAvailable = TryCheckNativeRuntimeAvailability(
-                pmxBytes,
-                vmdBytes,
+                setup.PmxBytes,
+                setup.VmdBytes,
                 out string nativeRuntimeFailure);
             if (setupTiming != null)
             {
@@ -600,7 +596,7 @@ namespace Mmd.UnityIntegration
                 try
                 {
                     phaseStart = Stopwatch.GetTimestamp();
-                    nativeBinding = createBinding(nativeMotion);
+                    nativeBinding = createBinding(setup.Motion);
                     if (setupTiming != null)
                     {
                         setupTiming.sceneBindingMs += TimelineSetupElapsedMilliseconds(phaseStart);
@@ -608,9 +604,9 @@ namespace Mmd.UnityIntegration
                     phaseStart = Stopwatch.GetTimestamp();
                     if (TryEnableNativeRuntime(
                             nativeBinding,
-                            pmxBytes,
-                            vmdBytes,
-                            sharedVmdContext,
+                            setup.PmxBytes,
+                            setup.VmdBytes,
+                            setup.SharedVmdContext,
                             out nativeRuntimeFailure))
                     {
                         if (setupTiming != null)
@@ -660,7 +656,7 @@ namespace Mmd.UnityIntegration
             }
 
             string finalNativeRuntimeFailure = ComposeNativeRuntimeFailure(
-                sharedVmdContextFailure,
+                setup.SharedVmdContextFailure,
                 nativeRuntimeFailure);
             lastFastRuntimeReason = finalNativeRuntimeFailure;
             phaseStart = Stopwatch.GetTimestamp();
