@@ -55,7 +55,7 @@ function Read-NUnitTestRunSummary {
         throw "$Context XML has no test-run result: $Path"
     }
 
-    $skippedTestNames = @(
+    $skippedTestRecords = @(
         $testRun.SelectNodes(".//test-case[@result='Skipped']") | ForEach-Object {
             $nameAttribute = $_.Attributes["fullname"]
             if ($null -eq $nameAttribute) {
@@ -67,8 +67,17 @@ function Read-NUnitTestRunSummary {
             if ($null -eq $nameAttribute -or [string]::IsNullOrWhiteSpace([string] $nameAttribute.Value)) {
                 throw "$Context XML has a skipped test case without fullname, name, or id: $Path"
             }
-            [string] $nameAttribute.Value
+            [pscustomobject] @{
+                Name = [string] $nameAttribute.Value
+                RunState = if ($null -eq $_.Attributes["runstate"]) { "" } else { [string] $_.Attributes["runstate"].Value }
+            }
         }
+    )
+    $skippedTestNames = @($skippedTestRecords | ForEach-Object { $_.Name })
+    $explicitSkippedTestNames = @(
+        $skippedTestRecords |
+            Where-Object { $_.RunState -eq "Explicit" } |
+            ForEach-Object { $_.Name }
     )
 
     [pscustomobject]@{
@@ -81,6 +90,7 @@ function Read-NUnitTestRunSummary {
         Invalid = $counts["invalid"]
         Total = $counts["total"]
         SkippedTestNames = $skippedTestNames
+        ExplicitSkippedTestNames = $explicitSkippedTestNames
         HasFailedResult = $runResult -eq "Failed" -or $runResult -eq "Failed(Child)"
     }
 }

@@ -261,21 +261,10 @@ jobs:
           # names are allowlisted so a clean Linux runner may lack local corpus data,
           # graphics, optional parity tooling, or non-Linux native probes. Do not add
           # core importer, playback, physics, or inconclusive tests here; new names must
-          # fail the gate until reviewed.
+          # fail the gate until reviewed. Tests marked [Explicit] are admitted from the
+          # NUnit runstate below; runnable environment skips remain listed here by name.
           $editModeAllowedSkippedTests = @(
-            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampOpaqueOutline_IsDeterministicAndMatchesGolden",
-            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksAmbientShAndFogWhileLegacyStaysInvariant",
-            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksHdrEmissionWhileLegacyStaysInvariant",
-            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksReflectionProbeWhileLegacyStaysInvariant",
-            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksRimLightFollowWhileLegacyStaysInvariant",
-            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksRimLightWhileLegacyStaysInvariant",
-            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksSsaoWhileLegacyStaysInvariant",
-            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksStylizedSpecularWhileLegacyStaysInvariant",
-            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksToonBandCountWhileLegacyStaysInvariant",
-            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksToonBoundaryAndFeatherWhileLegacyStaysInvariant",
-            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksUnityMainLightWhileLegacyStaysInvariant",
             "Mmd.Tests.MmdAssetImporterTests.PmxImporterCustomProfileUsesUtsShaderAndDeclaredMaterialStates",
-            "Mmd.Tests.Contracts.MmdNativeParityTests.MmdAnimCliParityReportComparesCliWithPackagedNativeRuntime",
             "Mmd.Tests.LocalCorpusManifestContractTests.LocalThreeMmdLoaderCorpusManifestImportsPmxAndPmdWhenPresent",
             "Mmd.Tests.MmdGenericAnimationClipWriterTests.NativeUnavailableFailsClosedWithoutManagedTransformFallback",
             "Mmd.Tests.MmdNativeHandleLifetimeStressContractTests.PackagedNativePlaybackHandlesSurviveBoundedReplacementAndCleanupStress",
@@ -291,17 +280,31 @@ jobs:
             "Mmd.Tests.MmdGenericAnimationClipWriterTests.DisablingKeyReductionRetainsEverySampledFrame",
             "Mmd.Tests.MmdGenericAnimationClipWriterTests.NativeSparseBakeRemainsEnabledAtDefaultPointOneImportScale",
             "Mmd.Tests.MmdGenericAnimationClipWriterTests.NativeSparseTransformCurvesMatchFastRuntimeWithNonzeroStartAndDefaultScale",
+            "Mmd.Tests.Contracts.RuntimeTextureBindingContractTests.JunctionInsidePmxDirectoryCannotReadOutsideTrustedRoot",
+            "Mmd.Tests.MmdVmdTimelineBehaviourTests.ProviderMotionConfigurationUsesCachedNativeHeaderMetadata",
+            "Mmd.Tests.MmdVmdNativeClipPerformanceTests.GeneratedDenseVmdNativeClipBuildHasP95Under100Milliseconds",
+            "Mmd.Tests.MmdVmdImportTimelinePerformanceTests.GeneratedVmdImportTimelineFirstEvaluateHasP95Under100Milliseconds",
+            "Mmd.Tests.MmdVmdImportTimelinePerformanceTests.GeneratedVmdImportTimelineHandleLifetimeStressStaysWithinCleanupAllowance"
+          )
+          $editModeAllowedExplicitSkippedTests = @(
+            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampOpaqueOutline_IsDeterministicAndMatchesGolden",
+            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksAmbientShAndFogWhileLegacyStaysInvariant",
+            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksHdrEmissionWhileLegacyStaysInvariant",
+            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksReflectionProbeWhileLegacyStaysInvariant",
+            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksRimLightFollowWhileLegacyStaysInvariant",
+            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksRimLightWhileLegacyStaysInvariant",
+            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksSsaoWhileLegacyStaysInvariant",
+            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksStylizedSpecularWhileLegacyStaysInvariant",
+            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksToonBandCountWhileLegacyStaysInvariant",
+            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksToonBoundaryAndFeatherWhileLegacyStaysInvariant",
+            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksUnityMainLightWhileLegacyStaysInvariant",
+            "Mmd.Tests.Contracts.MmdNativeParityTests.MmdAnimCliParityReportComparesCliWithPackagedNativeRuntime",
             "Mmd.Tests.MmdRuntimeNativeUnavailableBoundaryContractTests.PhysicalAbiMismatchProbeClassifiesUnsupportedRuntime",
             "Mmd.Tests.MmdRuntimeNativeUnavailableBoundaryContractTests.PhysicalInvalidNativeBytesProbeReportsNativeLastError",
             "Mmd.Tests.MmdRuntimeNativeUnavailableBoundaryContractTests.PhysicalMissingNativeDllProbeClassifiesUnavailableRuntime",
             "Mmd.Tests.MmdRuntimeNativeUnavailableBoundaryContractTests.PhysicalMissingNativeEntryPointProbeClassifiesUnavailableRuntime",
-            "Mmd.Tests.Contracts.RuntimeTextureBindingContractTests.JunctionInsidePmxDirectoryCannotReadOutsideTrustedRoot",
-            "Mmd.Tests.MmdVmdTimelineBehaviourTests.ProviderMotionConfigurationUsesCachedNativeHeaderMetadata",
             "Mmd.Tests.MmdUnityPlaybackControllerHumanoidRetargetTests.NativeHostPoseTimelineSupportsRepeatAndReverseWithoutDrift",
-            "Mmd.Tests.MmdVmdNativeClipPerformanceTests.GeneratedDenseVmdNativeClipBuildHasP95Under100Milliseconds",
             "Mmd.Tests.MmdHumanoidAnimationTrackEditScrubTests.EditScrubPosesProxyAndRetargetsNativeViaAnimationMode",
-            "Mmd.Tests.MmdVmdImportTimelinePerformanceTests.GeneratedVmdImportTimelineFirstEvaluateHasP95Under100Milliseconds",
-            "Mmd.Tests.MmdVmdImportTimelinePerformanceTests.GeneratedVmdImportTimelineHandleLifetimeStressStaysWithinCleanupAllowance",
             "Mmd.Tests.MmdGoldenGenerationTests.GeneratePmxGoldenCandidatesForMaintainer",
             "Mmd.Tests.MmdGoldenGenerationTests.GenerateVmdGoldenCandidatesForMaintainer"
           )
@@ -315,6 +318,16 @@ jobs:
           )) {
             $summary = Read-NUnitTestRunSummary -Path $evidence.Path -Context $evidence.Context
             $allowedSkippedTests = @($evidence.AllowedSkippedTests)
+            if ($evidence.Context -eq "Release EditMode evidence") {
+              $unapprovedExplicitSkippedTests = @(
+                $summary.ExplicitSkippedTestNames |
+                    Where-Object { $editModeAllowedExplicitSkippedTests -notcontains [string] $_ }
+              )
+              if ($unapprovedExplicitSkippedTests.Count -gt 0) {
+                throw "Release EditMode evidence has unapproved explicit skipped tests: $($unapprovedExplicitSkippedTests -join ', '); path=$($summary.Path)"
+              }
+              $allowedSkippedTests += @($summary.ExplicitSkippedTestNames)
+            }
             foreach ($skippedTestName in @($summary.SkippedTestNames)) {
               foreach ($skipPrefix in @($evidence.AllowedSkippedPrefixes)) {
                 $skipName = [string] $skippedTestName
