@@ -2,6 +2,7 @@
 
 using System;
 using System.Reflection;
+using System.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
 using Mmd.Native;
@@ -215,6 +216,45 @@ namespace Mmd.Tests
             }
             finally
             {
+                UnityEngine.Object.DestroyImmediate(asset);
+            }
+        }
+
+        [Test]
+        public void FailedNativeVmdPreloadCanRetryForTheSameSource()
+        {
+            byte[] sourceBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube_motion.vmd");
+            int attempts = 0;
+            MmdVmdAsset asset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+
+            try
+            {
+                asset.Initialize(
+                    sourceBytes,
+                    "test_1bone_cube_motion.vmd",
+                    "Assets/test_1bone_cube_motion.vmd",
+                    new MmdVmdParseSummary("test", 49, 6, 0, 0, 0));
+                MmdVmdAsset.NativeVmdContextFailureReasonOverrideForTests = _ =>
+                {
+                    attempts++;
+                    return "forced VMD preload failure " + attempts;
+                };
+
+                Task firstTask = asset.BeginNativePlaybackPreload();
+                Exception firstFailure = Assert.Catch<Exception>(
+                    () => firstTask.GetAwaiter().GetResult())!;
+                Assert.That(firstFailure.Message, Does.Contain("forced VMD preload failure 1"));
+
+                Task retryTask = asset.BeginNativePlaybackPreload();
+                Exception retryFailure = Assert.Catch<Exception>(
+                    () => retryTask.GetAwaiter().GetResult())!;
+                Assert.That(retryTask, Is.Not.SameAs(firstTask));
+                Assert.That(retryFailure.Message, Does.Contain("forced VMD preload failure 2"));
+                Assert.That(attempts, Is.EqualTo(2));
+            }
+            finally
+            {
+                MmdVmdAsset.NativeVmdContextFailureReasonOverrideForTests = null;
                 UnityEngine.Object.DestroyImmediate(asset);
             }
         }

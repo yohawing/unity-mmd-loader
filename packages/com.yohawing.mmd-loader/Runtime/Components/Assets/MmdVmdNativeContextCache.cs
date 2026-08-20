@@ -142,7 +142,9 @@ namespace Mmd
             Func<byte[], string>? failureOverrideForTests)
         {
             if (ReferenceEquals(nativeVmdContextPreloadSource, sourceBytes) &&
-                nativeVmdContextPreloadTask != null)
+                nativeVmdContextPreloadTask != null &&
+                !nativeVmdContextPreloadTask.IsFaulted &&
+                !nativeVmdContextPreloadTask.IsCanceled)
             {
                 return nativeVmdContextPreloadTask;
             }
