@@ -32,6 +32,15 @@ requires a configured Unity license, successful native platform builds, and
 complete EditMode and PlayMode XML; a missing license or an unverified skip is
 an evidence failure, not a release pass.
 
+Serialized PMX/VMD assets keep source bytes, metadata, and Unity sub-assets as
+their compatibility surface. Synchronous PMX playback state is owned by
+`MmdPmxPlaybackCache`; VMD native context and raw-source readback state are
+owned by `MmdVmdNativeContextCache`. Source replacement invalidates the
+PMX cache under one synchronization boundary. The VMD cache owns its native
+cleanup/retry boundary, while `MmdVmdAsset` retains `OnDisable` as the native
+cleanup delegation point; VMD source/readback synchronization remains a
+separate follow-up contract.
+
 ## Format And Native Boundaries
 
 PMX / VMD parsing is owned by the Format layer under
