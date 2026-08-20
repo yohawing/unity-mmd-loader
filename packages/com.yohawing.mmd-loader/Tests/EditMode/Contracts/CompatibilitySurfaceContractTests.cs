@@ -77,6 +77,8 @@ namespace Mmd.Tests.Contracts
                 ["importedMaterials"] = typeof(Material[]),
                 ["materialRemaps"] = typeof(Material[]),
                 ["materialOverrideAsset"] = typeof(MmdMaterialOverrideAsset),
+                ["materialProfileAsset"] = typeof(MmdMaterialProfileAsset),
+                ["materialProfileProvenance"] = typeof(MmdMaterialProfileProvenance),
                 ["importedRoot"] = typeof(GameObject),
                 ["hierarchyReadiness"] = typeof(MmdImportReadiness),
                 ["rendererReadiness"] = typeof(MmdImportReadiness),
@@ -203,6 +205,8 @@ namespace Mmd.Tests.Contracts
             AssertPropertyType(typeof(MmdPmxAsset), "ImportScale", typeof(float));
             AssertPropertyType(typeof(MmdPmxAsset), "ImportedRoot", typeof(GameObject));
             AssertPropertyType(typeof(MmdPmxAsset), "ImportedMaterials", typeof(Material[]));
+            AssertPropertyType(typeof(MmdPmxAsset), "MaterialProfileAsset", typeof(MmdMaterialProfileAsset));
+            AssertPropertyType(typeof(MmdPmxAsset), "MaterialProfileProvenance", typeof(MmdMaterialProfileProvenance));
             AssertPropertyType(typeof(MmdVmdAsset), "MaxFrame", typeof(int));
             AssertPropertyType(typeof(MmdVmdAsset), "ImportSummaryStatus", typeof(MmdVmdImportSummaryStatus));
             AssertPropertyType(typeof(MmdUnityPlaybackController), "HasModelSource", typeof(bool));

@@ -1,5 +1,6 @@
 #nullable enable
 
+using System;
 using System.IO;
 using UnityEngine;
 using UnityEditor;
@@ -44,7 +45,7 @@ namespace Mmd.Editor
         CustomProfile = 3
     }
 
-    [ScriptedImporter(29, "pmx")]
+    [ScriptedImporter(30, "pmx")]
     public sealed class MmdPmxScriptedImporter : ScriptedImporter
     {
         [SerializeField] private float importScale = MmdPmxAsset.DefaultImportScale;
@@ -123,6 +124,10 @@ namespace Mmd.Editor
             {
                 LogCustomProfileDiagnostics(ctx, generatedAssets);
             }
+            MmdMaterialProfileProvenance? materialProfileProvenance =
+                shaderPreset == MmdPmxShaderPreset.CustomProfile && materialMappers != null
+                    ? CreateMaterialProfileProvenance(generatedAssets)
+                    : null;
             Material[] generatedMaterials = generatedAssets.Materials;
             transaction.Track(generatedAssets.Root, hierarchyRoot: true);
             transaction.Track(generatedAssets.Mesh);
@@ -180,7 +185,7 @@ namespace Mmd.Editor
                 }
             }
 
-            MmdPmxAsset asset = MmdPmxImportedAssetBuilder.CreateAndInitializeImportedAsset(
+            MmdPmxAsset asset = MmdPmxImportedAssetBuilder.CreateAndInitializeImportedAssetWithProvenance(
                 bytes,
                 ctx.assetPath,
                 resolvedSourcePath,
@@ -191,7 +196,11 @@ namespace Mmd.Editor
                 generatedAssets,
                 materialRemaps,
                 animationType.ToString(),
-                materialOverrideAsset);
+                materialOverrideAsset,
+                shaderPreset == MmdPmxShaderPreset.CustomProfile && materialMappers != null
+                    ? materialProfileAsset
+                    : null,
+                materialProfileProvenance);
             asset.name = Path.GetFileNameWithoutExtension(ctx.assetPath);
             transaction.Track(asset);
             MmdPmxImportFaultInjection.ThrowIfRequested(ctx.assetPath, MmdPmxImportStage.ImportedAssetCreated);
@@ -397,6 +406,24 @@ namespace Mmd.Editor
                         $"'{missingProperty.property}' for {missingProperty.feature}.");
                 }
             }
+        }
+
+        private MmdMaterialProfileProvenance CreateMaterialProfileProvenance(
+            MmdUnityModelInstance generatedAssets)
+        {
+            if (materialProfileAsset == null)
+            {
+                throw new InvalidOperationException("Custom material profile provenance requires a profile asset.");
+            }
+
+            string profilePath = AssetDatabase.GetAssetPath(materialProfileAsset);
+            string profileId = string.IsNullOrWhiteSpace(profilePath)
+                ? materialProfileAsset.name
+                : AssetDatabase.AssetPathToGUID(profilePath);
+            return MmdMaterialProfileProvenance.Create(
+                profileId,
+                materialProfileAsset.name,
+                generatedAssets.MaterialRenderingTargets);
         }
 
         private void ApplyMaterialOverrideAsset(

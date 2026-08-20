@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
 using Mmd.Parser;
@@ -36,6 +37,148 @@ namespace Mmd
         public string toonTexture = string.Empty;
         public bool transparent;
         public bool edgeEnabled;
+    }
+
+    /// <summary>
+    /// Resolved, data-only material mapping information persisted with an imported PMX asset.
+    /// Runtime playback uses this contract when a custom profile cannot be recreated from the
+    /// importer settings. Delegates and editor-only objects are intentionally excluded.
+    /// </summary>
+    [Serializable]
+    public sealed class MmdMaterialProfileProvenance
+    {
+        public const int CurrentSchemaVersion = 1;
+
+        public int schemaVersion = CurrentSchemaVersion;
+        public string profileId = string.Empty;
+        public string profileName = string.Empty;
+        public int materialSlotCount;
+        public MmdMaterialProfileRenderingTargets renderingTargets = new();
+
+        internal static MmdMaterialProfileProvenance Create(
+            string profileId,
+            string profileName,
+            IReadOnlyList<MmdMaterialRenderingTargets> materialRenderingTargets)
+        {
+            if (materialRenderingTargets == null)
+            {
+                throw new ArgumentNullException(nameof(materialRenderingTargets));
+            }
+
+            string resolvedProfileName = profileName ?? string.Empty;
+            string resolvedProfileId = string.IsNullOrWhiteSpace(profileId)
+                ? string.IsNullOrWhiteSpace(resolvedProfileName)
+                    ? "inline-profile"
+                    : "inline:" + resolvedProfileName
+                : profileId;
+            MmdMaterialProfileRenderingTargets renderingTargets = materialRenderingTargets.Count > 0
+                ? FromRuntime(materialRenderingTargets[0])
+                : new MmdMaterialProfileRenderingTargets();
+
+            return new MmdMaterialProfileProvenance
+            {
+                schemaVersion = CurrentSchemaVersion,
+                profileId = resolvedProfileId,
+                profileName = resolvedProfileName,
+                materialSlotCount = materialRenderingTargets.Count,
+                renderingTargets = renderingTargets
+            };
+        }
+
+        internal bool TryCreateRuntimeRenderingTargets(
+            int materialCount,
+            out MmdMaterialRenderingTargets[] resolvedTargets,
+            out string reason)
+        {
+            resolvedTargets = Array.Empty<MmdMaterialRenderingTargets>();
+            if (schemaVersion != CurrentSchemaVersion)
+            {
+                reason = $"profile-provenance-schema-version-unsupported:{schemaVersion}";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(profileId))
+            {
+                reason = "profile-provenance-identity-missing";
+                return false;
+            }
+
+            if (materialCount < 0 || materialSlotCount < 0 || materialSlotCount > materialCount || renderingTargets == null)
+            {
+                reason = $"profile-provenance-target-count-mismatch:{materialSlotCount}:{materialCount}";
+                return false;
+            }
+
+            resolvedTargets = new MmdMaterialRenderingTargets[materialCount];
+            if (materialSlotCount == 0)
+            {
+                reason = materialCount == 0
+                    ? string.Empty
+                    : "profile-provenance-target-missing:0";
+                return materialCount == 0;
+            }
+
+            MmdMaterialRenderingTargets profileTargets = renderingTargets.ToRuntimeTargets();
+            for (int i = 0; i < resolvedTargets.Length; i++)
+            {
+                resolvedTargets[i] = i < materialSlotCount
+                    ? profileTargets
+                    : MmdMaterialRenderingTargets.BuiltIn;
+            }
+
+            reason = string.Empty;
+            return true;
+        }
+
+        private static MmdMaterialProfileRenderingTargets FromRuntime(
+            MmdMaterialRenderingTargets targets)
+        {
+            if (targets == null)
+            {
+                throw new ArgumentNullException(nameof(targets));
+            }
+
+            return new MmdMaterialProfileRenderingTargets
+            {
+                baseColorProperty = targets.BaseColorProperty,
+                colorProperty = targets.ColorProperty,
+                ambientColorProperty = targets.AmbientColorProperty,
+                alphaProperty = targets.AlphaProperty,
+                alphaClipThresholdProperty = targets.AlphaClipThresholdProperty,
+                shadowAlphaClipThresholdProperty = targets.ShadowAlphaClipThresholdProperty,
+                textureAlphaOutputWeightProperty = targets.TextureAlphaOutputWeightProperty,
+                textureAlphaClipMaskProperty = targets.TextureAlphaClipMaskProperty,
+                alphaClipModeProperty = targets.AlphaClipModeProperty,
+                cullProperty = targets.CullProperty,
+                surfaceProperty = targets.SurfaceProperty,
+                blendProperty = targets.BlendProperty,
+                sourceBlendProperty = targets.SourceBlendProperty,
+                destinationBlendProperty = targets.DestinationBlendProperty,
+                zWriteProperty = targets.ZWriteProperty,
+                outlineColorProperty = targets.OutlineColorProperty,
+                outlineWidthProperty = targets.OutlineWidthProperty,
+                outlineVisibleProperty = targets.OutlineVisibleProperty,
+                outlineScreenSpaceWeightProperty = targets.OutlineScreenSpaceWeightProperty,
+                outlineZTestProperty = targets.OutlineZTestProperty,
+                supportsRenderQueue = targets.SupportsRenderQueue,
+                unsupportedFeatures = Copy(targets.UnsupportedFeatures),
+                validatePropertyPresence = targets.ValidatePropertyPresence,
+                requiredKeywords = Copy(targets.RequiredKeywords),
+                requiredPasses = Copy(targets.RequiredPasses),
+                supportsMaterialMorphs = targets.SupportsMaterialMorphs
+            };
+        }
+
+        private static string[] Copy(IReadOnlyList<string> values)
+        {
+            var copy = new string[values.Count];
+            for (int i = 0; i < copy.Length; i++)
+            {
+                copy[i] = values[i];
+            }
+
+            return copy;
+        }
     }
 
     [Serializable]
@@ -318,6 +461,8 @@ namespace Mmd
         [SerializeField] private Material[] importedMaterials = Array.Empty<Material>();
         [SerializeField] private Material[] materialRemaps = Array.Empty<Material>();
         [SerializeField] private MmdMaterialOverrideAsset? materialOverrideAsset;
+        [SerializeField] private MmdMaterialProfileAsset? materialProfileAsset;
+        [SerializeField] private MmdMaterialProfileProvenance? materialProfileProvenance;
         [SerializeField] private GameObject? importedRoot;
         [SerializeField] private MmdImportReadiness hierarchyReadiness = MmdImportReadiness.NotEvaluated;
         [SerializeField] private MmdImportReadiness rendererReadiness = MmdImportReadiness.NotEvaluated;
@@ -414,6 +559,10 @@ namespace Mmd
 
         public MmdMaterialOverrideAsset? MaterialOverrideAsset => materialOverrideAsset;
 
+        public MmdMaterialProfileAsset? MaterialProfileAsset => materialProfileAsset;
+
+        public MmdMaterialProfileProvenance? MaterialProfileProvenance => materialProfileProvenance;
+
         public MmdImportReadiness HierarchyReadiness => hierarchyReadiness;
         public MmdImportReadiness RendererReadiness => rendererReadiness;
         public MmdImportReadiness BoneBindingReadiness => boneBindingReadiness;
@@ -488,7 +637,9 @@ namespace Mmd
             string? rendererReadinessDiagnosticValue = null,
             string? boneBindingReadinessDiagnosticValue = null,
             string assetAnimationType = "Generic",
-            MmdMaterialOverrideAsset? importedMaterialOverrideAsset = null)
+            MmdMaterialOverrideAsset? importedMaterialOverrideAsset = null,
+            MmdMaterialProfileAsset? importedMaterialProfileAsset = null,
+            MmdMaterialProfileProvenance? importedMaterialProfileProvenance = null)
         {
             if (bytes == null || bytes.Length == 0)
             {
@@ -519,6 +670,8 @@ namespace Mmd
                 ? (Material[])materialRemapAssets.Clone()
                 : Array.Empty<Material>();
             materialOverrideAsset = importedMaterialOverrideAsset;
+            materialProfileAsset = importedMaterialProfileAsset;
+            materialProfileProvenance = importedMaterialProfileProvenance;
             importedRoot = importedRootAsset;
             hierarchyReadiness = hierarchyReadinessValue;
             rendererReadiness = rendererReadinessValue;
@@ -528,6 +681,46 @@ namespace Mmd
             boneBindingReadinessDiagnostic = boneBindingReadinessDiagnosticValue ?? string.Empty;
             ApplyProjectTextureBindingSummary(0, 0, string.Empty);
             ApplyParseSummary(parseSummary);
+        }
+
+        internal MmdMaterialRenderingTargets[]? ResolveMaterialRenderingTargets(int materialCount)
+        {
+            if (materialProfileProvenance == null)
+            {
+                return null;
+            }
+
+            if (!materialProfileProvenance.TryCreateRuntimeRenderingTargets(
+                    materialCount,
+                    out MmdMaterialRenderingTargets[] resolvedTargets,
+                    out string reason))
+            {
+                throw new InvalidOperationException(reason);
+            }
+
+            return resolvedTargets;
+        }
+
+        internal MmdMaterialMapperSet? ResolveMaterialMapperSet()
+        {
+            if (materialProfileAsset == null)
+            {
+                if (materialProfileProvenance != null)
+                {
+                    throw new InvalidOperationException("custom-material-profile-asset-missing");
+                }
+
+                return null;
+            }
+
+            if (!materialProfileAsset.TryCreateMapperSet(
+                    out MmdMaterialMapperSet? mapperSet,
+                    out string reason) || mapperSet == null)
+            {
+                throw new InvalidOperationException("custom-material-profile-invalid:" + reason);
+            }
+
+            return mapperSet;
         }
 
         public void ApplyHumanoidAvatarImportSummary(
