@@ -105,18 +105,22 @@ namespace Mmd.Tests
             try
             {
                 byte[] pmxBytes = File.ReadAllBytes(ResolvePackageFixture("test_1bone_cube.pmx"));
-                byte[] vmdBytes = File.ReadAllBytes(ResolvePackageFixture("test_1bone_cube_motion.vmd"));
+                byte[] firstVmdBytes = File.ReadAllBytes(ResolvePackageFixture("test_1bone_cube_motion.vmd"));
+                byte[] secondVmdBytes = File.ReadAllBytes(ResolvePackageFixture("test_append_bone.vmd"));
+                Assert.That(secondVmdBytes, Is.Not.EqualTo(firstVmdBytes));
 
                 modelAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
                 modelAsset.Initialize(pmxBytes, modelSourceId, modelSourceId);
                 firstMotionAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
-                firstMotionAsset.Initialize(vmdBytes, firstMotionSourceId, firstMotionSourceId);
+                firstMotionAsset.Initialize(firstVmdBytes, firstMotionSourceId, firstMotionSourceId);
                 secondMotionAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
-                secondMotionAsset.Initialize(vmdBytes, secondMotionSourceId, secondMotionSourceId);
+                secondMotionAsset.Initialize(secondVmdBytes, secondMotionSourceId, secondMotionSourceId);
 
                 var parser = new NativeMmdParser();
                 MmdModelDefinition model = parser.LoadModel(pmxBytes);
                 MmdMotionDefinition firstMotion = firstMotionAsset.LoadMotion(parser);
+                MmdMotionDefinition secondMotion = secondMotionAsset.LoadMotion(parser);
+                Assert.That(secondMotion.maxFrame, Is.Not.EqualTo(firstMotion.maxFrame));
                 instance = MmdUnityModelFactory.CreateSkinnedModel(model);
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
                     instance,
@@ -162,7 +166,10 @@ namespace Mmd.Tests
                 director.time = 1.5;
                 director.Evaluate();
                 Assert.That(controller.MotionSourceId, Is.EqualTo(secondMotionSourceId));
-                Assert.That(controller.CurrentFrame, Is.EqualTo(15));
+                Assert.That(controller.MotionMaxFrame, Is.EqualTo(secondMotion.maxFrame),
+                    "the second clip must expose its own motion frame range");
+                Assert.That(controller.CurrentFrame, Is.EqualTo(15),
+                    "the timeline time must remain stable while the winning motion is rebound");
                 Assert.That(controller.ConfigurationRevision, Is.EqualTo(firstConfigurationRevision + 1),
                     "crossing the real PlayableGraph clip boundary must reconfigure the winning motion once");
                 Assert.That(controller.LastTimelineSetupTiming, Is.Not.Null);
