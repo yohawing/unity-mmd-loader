@@ -347,7 +347,7 @@ namespace Mmd.UnityIntegration
 
             if (!timelineEvaluation)
             {
-                ApplyFrame(startFrame);
+                ApplyReboundStartFrameWithRollback(startFrame, setupTiming);
             }
         }
 
@@ -536,15 +536,33 @@ namespace Mmd.UnityIntegration
 
             if (applyStartFrame.HasValue)
             {
-                phaseStart = Stopwatch.GetTimestamp();
-                ApplyFrame(applyStartFrame.Value);
+                ApplyReboundStartFrameWithRollback(applyStartFrame.Value, setupTiming);
+            }
+
+            return true;
+        }
+
+        private void ApplyReboundStartFrameWithRollback(
+            int startFrame,
+            MmdTimelineSetupTimingSummary? setupTiming)
+        {
+            long phaseStart = Stopwatch.GetTimestamp();
+            try
+            {
+                ApplyFrame(startFrame);
                 if (setupTiming != null)
                 {
                     setupTiming.initialSeedMs += TimelineSetupElapsedMilliseconds(phaseStart);
                 }
             }
-
-            return true;
+            catch
+            {
+                // TryConfigureNativeFirst has already committed the candidate to the controller
+                // by this point. Keep post-seed failures on the same cleanup boundary as setup
+                // failures so scene mutation and native ownership do not outlive the exception.
+                ReleaseCurrentBindingBeforeSceneRebind();
+                throw;
+            }
         }
 
         private void TryConfigureNativeFirst(

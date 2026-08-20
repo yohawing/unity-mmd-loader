@@ -1942,6 +1942,60 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void ConfigureFromAssetsLiveInitialSeedFailureReleasesCandidateAndRestoresScene()
+        {
+            MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
+            MmdUnityModelInstance? previewInstance = null;
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                byte[] pmxBytes = File.ReadAllBytes(pmxPath);
+                var parser = new NativeMmdParser();
+                previewInstance = MmdUnityModelFactory.CreateSkinnedModel(parser.LoadModel(pmxBytes), pmxPath);
+                pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                pmxAsset.Initialize(pmxBytes, "test_1bone_cube.pmx", pmxPath, assetImportScale: 1.0f);
+                vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
+                MmdUnityPlaybackController controller = previewInstance.Root.AddComponent<MmdUnityPlaybackController>();
+                SkinnedMeshRenderer renderer = previewInstance.SkinnedMeshRenderer!;
+                Mesh authoredMesh = renderer.sharedMesh!;
+                Material[] authoredMaterials = renderer.sharedMaterials;
+                Transform? authoredRootBone = renderer.rootBone;
+                Bounds authoredBounds = renderer.localBounds;
+
+                InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+                    controller.ConfigureFromAssets(
+                        pmxAsset,
+                        vmdAsset,
+                        30.0f,
+                        startFrame: 1,
+                        playOnStart: false))!;
+
+                Assert.That(exception.Message, Is.EqualTo("Physics Live playback must start from frame 0."));
+                Assert.That(controller.IsConfigured, Is.False);
+                Assert.That(controller.LastSnapshot, Is.Null);
+                Assert.That(controller.ConfiguredInstanceRoot, Is.Null);
+                Assert.That(renderer.sharedMesh, Is.SameAs(authoredMesh));
+                Assert.That(renderer.sharedMaterials, Has.Length.EqualTo(authoredMaterials.Length));
+                for (int i = 0; i < authoredMaterials.Length; i++)
+                {
+                    Assert.That(renderer.sharedMaterials[i], Is.SameAs(authoredMaterials[i]));
+                }
+
+                Assert.That(renderer.rootBone, Is.SameAs(authoredRootBone));
+                Assert.That(renderer.localBounds, Is.EqualTo(authoredBounds));
+            }
+            finally
+            {
+                MmdTestInstanceScope.DestroyInstance(previewInstance);
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+            }
+        }
+
+        [Test]
         public void ConfigureFromAssetsCompatibilityFailurePreservesCurrentPlaybackBinding()
         {
             MmdPmxAsset? pmxAsset = null;
