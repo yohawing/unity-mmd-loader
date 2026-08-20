@@ -295,13 +295,16 @@ namespace Mmd.UnityIntegration
             }
             string mode = MmdMaterialTransparencyPolicy.ResolveMaterialTransparencyMode(
                 source.alpha, effectiveMaterialName, textureExtension, alphaValues);
+            MmdMaterialRenderingTargets effectiveTargets =
+                renderingTargets ?? MmdMaterialRenderingTargets.BuiltIn;
             ApplyMaterialRenderingPolicy(
                 material,
                 source.alpha,
                 MapTransparencyMode(mode),
                 source.cullingPolicy,
                 materialRenderOrder,
-                renderingTargets ?? MmdMaterialRenderingTargets.BuiltIn);
+                effectiveTargets);
+            ApplyMapperShaderState(material, effectiveTargets);
         }
     }
 }
