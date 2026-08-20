@@ -10,17 +10,10 @@ namespace Mmd.UnityIntegration
 {
     internal static partial class MmdUnityMaterialBuilder
     {
-        private enum MmdMaterialTransparencyMode
-        {
-            Opaque,
-            AlphaTest,
-            AlphaBlend
-        }
-
         private static void ApplyMaterialRenderingPolicy(
             Material material,
             float alpha,
-            MmdMaterialTransparencyMode transparencyMode,
+            MmdMaterialSurfaceMode transparencyMode,
             string cullingPolicy,
             int materialRenderOrder,
             MmdMaterialRenderingTargets targets)
@@ -37,107 +30,12 @@ namespace Mmd.UnityIntegration
                 material.SetFloat(targets.AlphaProperty, alpha);
             }
 
-            if (HasProperty(material, targets.AlphaClipThresholdProperty))
-            {
-                material.SetFloat(targets.AlphaClipThresholdProperty, transparencyMode == MmdMaterialTransparencyMode.AlphaTest
-                    ? AlphaClipThreshold
-                    : 0.0f);
-            }
-
-            if (HasProperty(material, targets.ShadowAlphaClipThresholdProperty))
-            {
-                material.SetFloat(targets.ShadowAlphaClipThresholdProperty, transparencyMode == MmdMaterialTransparencyMode.Opaque
-                    ? 0.0f
-                    : AlphaClipThreshold);
-            }
-
-            if (HasProperty(material, targets.TextureAlphaOutputWeightProperty))
-            {
-                material.SetFloat(targets.TextureAlphaOutputWeightProperty, transparencyMode == MmdMaterialTransparencyMode.AlphaBlend
-                    ? 1.0f
-                    : 0.0f);
-            }
-
-            if (HasProperty(material, targets.TextureAlphaClipMaskProperty))
-            {
-                material.SetFloat(targets.TextureAlphaClipMaskProperty,
-                    transparencyMode == MmdMaterialTransparencyMode.Opaque ? 0.0f : 1.0f);
-            }
-
-            if (HasProperty(material, targets.AlphaClipModeProperty))
-            {
-                material.SetFloat(targets.AlphaClipModeProperty,
-                    transparencyMode == MmdMaterialTransparencyMode.Opaque ? 0.0f : 2.0f);
-            }
-
             ApplyMaterialCullingPolicy(material, cullingPolicy, targets.CullProperty);
-
-            if (transparencyMode == MmdMaterialTransparencyMode.Opaque ||
-                transparencyMode == MmdMaterialTransparencyMode.AlphaTest)
-            {
-                if (HasProperty(material, targets.SurfaceProperty))
-                {
-                    material.SetFloat(targets.SurfaceProperty, 0.0f);
-                }
-
-                if (HasProperty(material, targets.SourceBlendProperty))
-                {
-                    material.SetFloat(targets.SourceBlendProperty, (float)BlendMode.One);
-                }
-
-                if (HasProperty(material, targets.DestinationBlendProperty))
-                {
-                    material.SetFloat(targets.DestinationBlendProperty, (float)BlendMode.Zero);
-                }
-
-                if (HasProperty(material, targets.ZWriteProperty))
-                {
-                    material.SetFloat(targets.ZWriteProperty, 1.0f);
-                }
-
-                if (transparencyMode == MmdMaterialTransparencyMode.AlphaTest)
-                {
-                    material.EnableKeyword("_ALPHATEST_ON");
-                }
-
-                if (targets.SupportsRenderQueue)
-                {
-                    material.renderQueue = OpaqueRenderQueue;
-                }
-                return;
-            }
-
-            if (HasProperty(material, targets.SurfaceProperty))
-            {
-                material.SetFloat(targets.SurfaceProperty, 1.0f);
-            }
-
-            if (HasProperty(material, targets.BlendProperty))
-            {
-                material.SetFloat(targets.BlendProperty, 0.0f);
-            }
-
-            if (HasProperty(material, targets.SourceBlendProperty))
-            {
-                material.SetFloat(targets.SourceBlendProperty, (float)BlendMode.SrcAlpha);
-            }
-
-            if (HasProperty(material, targets.DestinationBlendProperty))
-            {
-                material.SetFloat(targets.DestinationBlendProperty, (float)BlendMode.OneMinusSrcAlpha);
-            }
-
-            if (HasProperty(material, targets.ZWriteProperty))
-            {
-                material.SetFloat(targets.ZWriteProperty, 1.0f);
-            }
-
-            material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-            material.EnableKeyword("_ALPHABLEND_ON");
-            if (targets.SupportsRenderQueue)
-            {
-                material.renderQueue = TransparentRenderQueueBase + materialRenderOrder;
-            }
+            MmdMaterialSurfaceState state = MmdMaterialSurfaceState.Create(
+                transparencyMode,
+                materialRenderOrder,
+                AlphaClipThreshold);
+            MmdMaterialSurfaceApplier.Apply(material, state, targets);
         }
 
         private static void ApplyMaterialCullingPolicy(
@@ -160,7 +58,7 @@ namespace Mmd.UnityIntegration
             }
         }
 
-        private static MmdMaterialTransparencyMode ResolveMaterialTransparencyMode(
+        private static MmdMaterialSurfaceMode ResolveMaterialTransparencyMode(
             MmdRenderingDescriptor descriptor,
             MmdMaterialDescriptor source,
             MmdRuntimeTextureResolution textureResolution)
@@ -365,13 +263,13 @@ namespace Mmd.UnityIntegration
             return value;
         }
 
-        private static MmdMaterialTransparencyMode MapTransparencyMode(string mode)
+        private static MmdMaterialSurfaceMode MapTransparencyMode(string mode)
         {
             return mode switch
             {
-                MmdMaterialTransparencyPolicy.ModeAlphaBlend => MmdMaterialTransparencyMode.AlphaBlend,
-                MmdMaterialTransparencyPolicy.ModeAlphaTest => MmdMaterialTransparencyMode.AlphaTest,
-                _ => MmdMaterialTransparencyMode.Opaque
+                MmdMaterialTransparencyPolicy.ModeAlphaBlend => MmdMaterialSurfaceMode.AlphaBlend,
+                MmdMaterialTransparencyPolicy.ModeAlphaTest => MmdMaterialSurfaceMode.AlphaTest,
+                _ => MmdMaterialSurfaceMode.Opaque
             };
         }
 

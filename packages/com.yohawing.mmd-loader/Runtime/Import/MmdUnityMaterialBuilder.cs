@@ -12,8 +12,6 @@ namespace Mmd.UnityIntegration
         internal const HideFlags RuntimeGeneratedAssetHideFlags = HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild;
 
         private const string UrpLitShaderName = "Universal Render Pipeline/Lit";
-        private const int OpaqueRenderQueue = (int)RenderQueue.Geometry;
-        private const int TransparentRenderQueueBase = (int)RenderQueue.Transparent;
         private const float AlphaClipThreshold = 0.01f;
         private const int OutlineZTest = (int)CompareFunction.Less;
         // MMD's edge is a screen-space, constant-pixel silhouette (saba and babylon-mmd both expand
@@ -94,7 +92,7 @@ namespace Mmd.UnityIntegration
                         : source.name;
                     materials[i] = material;
                     ApplyMaterialColors(material, source, mapper.RenderingTargets);
-                    MmdMaterialTransparencyMode transparencyMode = ResolveMaterialTransparencyMode(descriptor, source, textureResolution);
+                    MmdMaterialSurfaceMode transparencyMode = ResolveMaterialTransparencyMode(descriptor, source, textureResolution);
                     ApplyMaterialRenderingPolicy(
                         material,
                         source.alpha,
