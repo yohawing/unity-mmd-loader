@@ -42,6 +42,7 @@ namespace Mmd.Tests.Contracts
         }
 
         [Test]
+        [Explicit("Requires the mmd-anim CLI parity environment gate; run on demand.")]
         public void MmdAnimCliParityReportComparesCliWithPackagedNativeRuntime()
         {
             if (!string.Equals(

@@ -55,6 +55,7 @@ namespace Mmd.Tests
         }
 
         [Test]
+        [Explicit("Requires an isolated missing-DLL native gate; run on demand.")]
         public void PhysicalMissingNativeDllProbeClassifiesUnavailableRuntime()
         {
             string nativeDllPath = GetPhysicalNativeDllPath(MissingDllMode);
@@ -75,6 +76,7 @@ namespace Mmd.Tests
         }
 
         [Test]
+        [Explicit("Requires an isolated missing-entry-point native gate; run on demand.")]
         public void PhysicalMissingNativeEntryPointProbeClassifiesUnavailableRuntime()
         {
             string nativeDllPath = GetPhysicalNativeDllPath(MissingEntryPointMode);
@@ -90,6 +92,7 @@ namespace Mmd.Tests
         }
 
         [Test]
+        [Explicit("Requires an isolated ABI-mismatch native gate; run on demand.")]
         public void PhysicalAbiMismatchProbeClassifiesUnsupportedRuntime()
         {
             string nativeDllPath = GetPhysicalNativeDllPath(AbiMismatchMode);
@@ -109,6 +112,7 @@ namespace Mmd.Tests
         }
 
         [Test]
+        [Explicit("Requires an isolated invalid-bytes native gate; run on demand.")]
         public void PhysicalInvalidNativeBytesProbeReportsNativeLastError()
         {
             string nativeDllPath = GetPhysicalNativeDllPath(InvalidBytesMode);
