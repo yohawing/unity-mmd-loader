@@ -60,6 +60,10 @@ evidence:
   clean consumer import.
 - The native candidate bundle below is incomplete, ABI-incompatible, or lacks
   passing packaged-native parity evidence.
+- Any required NUnit XML is missing, malformed, empty, internally inconsistent,
+  below its minimum counts, failed, inconclusive, invalid, or contains a skip
+  outside the exact reviewed allowlist. A skipped Unity job caused by a missing
+  license is not release evidence.
 
 The following remain non-blocking unless new evidence shows that they break the
 golden path: SelfShadow visual polish, reference screenshot/SDEF/QDEF/sphere
@@ -67,6 +71,13 @@ parity, Physics Cache, weighted raw-VMD blending, optional Unity Toon Shader
 polish, RuntimeVerification recents/seek polish, and macOS/Linux binaries.
 The former raw-bone sampling API wait is resolved in the current native runtime;
 do not carry it forward as a release blocker or a reason to defer this runbook.
+
+The compatibility surface is checked by
+`CompatibilitySurfaceContractTests` before merge. This test pins serialized
+asset fields and types, selected public API signatures, diagnostics, assembly
+definitions, and native entry-point names. A refactor that changes one of these
+surfaces must include an explicit migration decision and updated consumer
+evidence; passing only a compile check is insufficient.
 
 ## Candidate and evidence bundle
 
@@ -316,6 +327,13 @@ matrix, and uses Unity 6000.4.8f1 for package tests when a license is available.
 It does not select a candidate for this runbook. If that moving-ref check reports
 a mismatch with the explicitly selected candidate, stop for owner direction
 instead of silently adopting a newer remote commit.
+
+The release evidence summary intentionally fails closed when `UNITY_LICENSE` is
+absent, when the macOS/Windows native matrix is not successful, or when either
+Unity test job is skipped or lacks exactly one strict NUnit XML result. Its
+EditMode skip policy is an explicit name list (plus the reviewed UTS parameter
+prefix); PlayMode has no allowlisted skips. New skip names, inconclusive tests,
+zero-test XML, and hidden/malformed results must fail until reviewed.
 
 ## Public-surface and manual visual checks
 
