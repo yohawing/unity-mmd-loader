@@ -23,23 +23,34 @@ namespace Mmd
 
         internal byte[] ReadSourceBytes(byte[]? serializedData, TextAsset? rawSource)
         {
-            if (rawSource == null)
+            lock (gate)
             {
-                return serializedData ?? Array.Empty<byte>();
-            }
-
-            if (!ReferenceEquals(sourceReadbackAsset, rawSource) || sourceReadback == null)
-            {
-                if (sourceReadbackAsset != null && !ReferenceEquals(sourceReadbackAsset, rawSource))
+                if (rawSource == null)
                 {
-                    DisposeNativeContext();
+                    if (sourceReadback != null || !ReferenceEquals(sourceReadbackAsset, null))
+                    {
+                        DisposeNativeContextLocked();
+                        sourceReadbackAsset = null;
+                        sourceReadback = null;
+                    }
+
+                    return serializedData ?? Array.Empty<byte>();
                 }
 
-                sourceReadbackAsset = rawSource;
-                sourceReadback = rawSource.bytes;
-            }
+                if (!ReferenceEquals(sourceReadbackAsset, rawSource) || sourceReadback == null)
+                {
+                    if ((sourceReadback != null || !ReferenceEquals(sourceReadbackAsset, null)) &&
+                        !ReferenceEquals(sourceReadbackAsset, rawSource))
+                    {
+                        DisposeNativeContextLocked();
+                    }
 
-            return sourceReadback;
+                    sourceReadbackAsset = rawSource;
+                    sourceReadback = rawSource.bytes;
+                }
+
+                return sourceReadback!;
+            }
         }
 
         internal bool TryGetOrCreateNativeVmdContext(
@@ -118,9 +129,12 @@ namespace Mmd
         /// </summary>
         internal void Dispose()
         {
-            DisposeNativeContext();
-            sourceReadbackAsset = null;
-            sourceReadback = null;
+            lock (gate)
+            {
+                DisposeNativeContextLocked();
+                sourceReadbackAsset = null;
+                sourceReadback = null;
+            }
         }
 
         private Task<MmdRuntimeFfiVmdContext> GetOrStartPreloadLocked(
@@ -149,35 +163,32 @@ namespace Mmd
             return nativeVmdContextPreloadTask;
         }
 
-        private void DisposeNativeContext()
+        private void DisposeNativeContextLocked()
         {
-            lock (gate)
+            MmdRuntimeFfiVmdContext? context = nativeVmdContext;
+            if (context == null && nativeVmdContextPreloadTask != null)
             {
-                MmdRuntimeFfiVmdContext? context = nativeVmdContext;
-                if (context == null && nativeVmdContextPreloadTask != null)
+                try
                 {
-                    try
-                    {
-                        context = nativeVmdContextPreloadTask.GetAwaiter().GetResult();
-                    }
-                    catch
-                    {
-                        // A failed creation owns no native handle. Its diagnostic was already
-                        // observed by the preload continuation or the playback caller.
-                        nativeVmdContextPreloadTask = null;
-                        nativeVmdContextPreloadSource = null;
-                        return;
-                    }
+                    context = nativeVmdContextPreloadTask.GetAwaiter().GetResult();
                 }
-
-                // Dispose deliberately happens before clearing the references. If native cleanup
-                // is unavailable, the context retains its handle and a later lifecycle call can retry.
-                context?.Dispose();
-                nativeVmdContext = null;
-                nativeVmdContextSource = null;
-                nativeVmdContextPreloadTask = null;
-                nativeVmdContextPreloadSource = null;
+                catch
+                {
+                    // A failed creation owns no native handle. Its diagnostic was already
+                    // observed by the preload continuation or the playback caller.
+                    nativeVmdContextPreloadTask = null;
+                    nativeVmdContextPreloadSource = null;
+                    return;
+                }
             }
+
+            // Dispose deliberately happens before clearing the references. If native cleanup
+            // is unavailable, the context retains its handle and a later lifecycle call can retry.
+            context?.Dispose();
+            nativeVmdContext = null;
+            nativeVmdContextSource = null;
+            nativeVmdContextPreloadTask = null;
+            nativeVmdContextPreloadSource = null;
         }
 
         private sealed class NativeVmdContextPreloadException : Exception

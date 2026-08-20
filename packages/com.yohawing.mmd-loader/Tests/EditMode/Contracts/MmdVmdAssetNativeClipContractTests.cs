@@ -218,5 +218,57 @@ namespace Mmd.Tests
                 UnityEngine.Object.DestroyImmediate(asset);
             }
         }
+
+        [Test]
+        public void RawSourceToSerializedBytesTransitionDisposesContextOnceAndReturnsSerializedSource()
+        {
+            int freeCount = 0;
+            var context = new MmdRuntimeFfiVmdContext(
+                new IntPtr(1),
+                _ => freeCount++);
+            var cache = new MmdVmdNativeContextCache();
+            TextAsset? rawSource = null;
+            byte[] serializedBytes = { 0x56, 0x4D, 0x44, 0x00 };
+            FieldInfo contextField = typeof(MmdVmdNativeContextCache).GetField(
+                "nativeVmdContext",
+                BindingFlags.Instance | BindingFlags.NonPublic)!;
+            FieldInfo contextSourceField = typeof(MmdVmdNativeContextCache).GetField(
+                "nativeVmdContextSource",
+                BindingFlags.Instance | BindingFlags.NonPublic)!;
+            FieldInfo readbackAssetField = typeof(MmdVmdNativeContextCache).GetField(
+                "sourceReadbackAsset",
+                BindingFlags.Instance | BindingFlags.NonPublic)!;
+            FieldInfo readbackField = typeof(MmdVmdNativeContextCache).GetField(
+                "sourceReadback",
+                BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+            try
+            {
+                rawSource = new TextAsset("raw-source");
+                byte[] rawBytes = cache.ReadSourceBytes(serializedBytes, rawSource);
+                contextField.SetValue(cache, context);
+                contextSourceField.SetValue(cache, rawBytes);
+                UnityEngine.Object.DestroyImmediate(rawSource);
+                rawSource = null;
+
+                byte[] result = cache.ReadSourceBytes(serializedBytes, rawSource: null);
+
+                Assert.That(result, Is.SameAs(serializedBytes));
+                Assert.That(freeCount, Is.EqualTo(1));
+                Assert.That(readbackAssetField.GetValue(cache), Is.Null);
+                Assert.That(readbackField.GetValue(cache), Is.Null);
+
+                cache.Dispose();
+                Assert.That(freeCount, Is.EqualTo(1));
+            }
+            finally
+            {
+                cache.Dispose();
+                if (rawSource != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(rawSource);
+                }
+            }
+        }
     }
 }
