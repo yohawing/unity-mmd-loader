@@ -18,6 +18,7 @@ using Mmd.Parser;
 using Mmd.Physics;
 using Mmd.Timeline;
 using Mmd.UnityIntegration;
+using Object = UnityEngine.Object;
 
 namespace Mmd.Tests
 {
@@ -85,6 +86,140 @@ namespace Mmd.Tests
             {
                 MmdPlayModeTestInstanceScope.DestroyInstance(binding?.Instance);
             }
+        }
+
+        [UnityTest]
+        public IEnumerator PlayableDirectorTwoVmdClipsRebindsMotionAtBoundary()
+        {
+            const string modelSourceId = "playmode-model.pmx";
+            const string firstMotionSourceId = "playmode-first.vmd";
+            const string secondMotionSourceId = "playmode-second.vmd";
+
+            MmdPmxAsset? modelAsset = null;
+            MmdVmdAsset? firstMotionAsset = null;
+            MmdVmdAsset? secondMotionAsset = null;
+            MmdUnityModelInstance? instance = null;
+            MmdUnityPlaybackBinding? binding = null;
+            GameObject? directorObject = null;
+            TimelineAsset? timelineAsset = null;
+            try
+            {
+                byte[] pmxBytes = File.ReadAllBytes(ResolvePackageFixture("test_1bone_cube.pmx"));
+                byte[] vmdBytes = File.ReadAllBytes(ResolvePackageFixture("test_1bone_cube_motion.vmd"));
+
+                modelAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                modelAsset.Initialize(pmxBytes, modelSourceId, modelSourceId);
+                firstMotionAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                firstMotionAsset.Initialize(vmdBytes, firstMotionSourceId, firstMotionSourceId);
+                secondMotionAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                secondMotionAsset.Initialize(vmdBytes, secondMotionSourceId, secondMotionSourceId);
+
+                var parser = new NativeMmdParser();
+                MmdModelDefinition model = parser.LoadModel(pmxBytes);
+                MmdMotionDefinition firstMotion = firstMotionAsset.LoadMotion(parser);
+                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
+                binding = MmdUnityPlaybackBinding.CreateSkinned(
+                    instance,
+                    modelAsset,
+                    firstMotionAsset,
+                    firstMotion);
+                MmdUnityPlaybackController controller = instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+                controller.ConfigureModelAsset(modelAsset);
+                controller.Configure(binding, 30.0f, playOnStart: false);
+
+                timelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
+                MmdVmdTimelineTrack track = timelineAsset.CreateTrack<MmdVmdTimelineTrack>(null, "MMD VMD");
+                TimelineClip firstClip = track.CreateClip<MmdVmdTimelineClip>();
+                firstClip.start = 0.0;
+                firstClip.duration = 1.0;
+                var firstClipAsset = (MmdVmdTimelineClip)firstClip.asset;
+                firstClipAsset.MotionAsset = firstMotionAsset;
+                firstClipAsset.ModelSourceId = modelSourceId;
+                firstClipAsset.MotionSourceId = firstMotionSourceId;
+                firstClipAsset.FrameRate = 30.0f;
+
+                TimelineClip secondClip = track.CreateClip<MmdVmdTimelineClip>();
+                secondClip.start = 1.0;
+                secondClip.duration = 1.0;
+                var secondClipAsset = (MmdVmdTimelineClip)secondClip.asset;
+                secondClipAsset.MotionAsset = secondMotionAsset;
+                secondClipAsset.ModelSourceId = modelSourceId;
+                secondClipAsset.MotionSourceId = secondMotionSourceId;
+                secondClipAsset.FrameRate = 30.0f;
+
+                directorObject = new GameObject("playmode-two-clip-director");
+                PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
+                director.playableAsset = timelineAsset;
+                director.SetGenericBinding(track, controller);
+
+                director.time = 0.5;
+                director.Evaluate();
+                Assert.That(controller.MotionSourceId, Is.EqualTo(firstMotionSourceId));
+                Assert.That(controller.CurrentFrame, Is.EqualTo(15));
+                int firstConfigurationRevision = controller.ConfigurationRevision;
+
+                director.time = 1.5;
+                director.Evaluate();
+                Assert.That(controller.MotionSourceId, Is.EqualTo(secondMotionSourceId));
+                Assert.That(controller.CurrentFrame, Is.EqualTo(15));
+                Assert.That(controller.ConfigurationRevision, Is.EqualTo(firstConfigurationRevision + 1),
+                    "crossing the real PlayableGraph clip boundary must reconfigure the winning motion once");
+                Assert.That(controller.LastTimelineSetupTiming, Is.Not.Null);
+                Assert.That(controller.LastTimelineSetupTiming!.succeeded, Is.True);
+                int secondConfigurationRevision = controller.ConfigurationRevision;
+
+                director.Evaluate();
+                Assert.That(controller.ConfigurationRevision, Is.EqualTo(secondConfigurationRevision),
+                    "re-evaluating the same timeline time must not reconfigure the winning motion again");
+
+                director.time = 0.5;
+                director.Evaluate();
+                Assert.That(controller.MotionSourceId, Is.EqualTo(firstMotionSourceId));
+                Assert.That(controller.ConfigurationRevision, Is.EqualTo(secondConfigurationRevision + 1),
+                    "seeking back across the boundary must select the first clip again once");
+                int thirdConfigurationRevision = controller.ConfigurationRevision;
+
+                director.Evaluate();
+                Assert.That(controller.ConfigurationRevision, Is.EqualTo(thirdConfigurationRevision),
+                    "re-evaluating the same backward-seek time must not reconfigure the winning motion again");
+            }
+            finally
+            {
+                if (directorObject != null)
+                {
+                    directorObject.GetComponent<PlayableDirector>()?.Stop();
+                    Object.Destroy(directorObject);
+                }
+
+                if (timelineAsset != null)
+                {
+                    Object.Destroy(timelineAsset);
+                }
+
+                binding?.Dispose();
+                if (instance != null)
+                {
+                    MmdPlayModeTestInstanceScope.DestroyInstance(instance);
+                }
+
+                if (modelAsset != null)
+                {
+                    Object.Destroy(modelAsset);
+                }
+
+                if (firstMotionAsset != null)
+                {
+                    Object.Destroy(firstMotionAsset);
+                }
+
+                if (secondMotionAsset != null)
+                {
+                    Object.Destroy(secondMotionAsset);
+                }
+            }
+
+            yield return null;
         }
 
         [UnityTest]
