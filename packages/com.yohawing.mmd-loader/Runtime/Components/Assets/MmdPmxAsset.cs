@@ -54,6 +54,7 @@ namespace Mmd
         public string profileName = string.Empty;
         public int materialSlotCount;
         public MmdMaterialProfileRenderingTargets renderingTargets = new();
+        [SerializeField] private bool initialized;
 
         internal static MmdMaterialProfileProvenance Create(
             string profileId,
@@ -81,7 +82,8 @@ namespace Mmd
                 profileId = resolvedProfileId,
                 profileName = resolvedProfileName,
                 materialSlotCount = materialRenderingTargets.Count,
-                renderingTargets = renderingTargets
+                renderingTargets = renderingTargets,
+                initialized = true
             };
         }
 
@@ -129,6 +131,12 @@ namespace Mmd
             reason = string.Empty;
             return true;
         }
+
+        internal bool IsEmptyLegacyMarker =>
+            !initialized &&
+            string.IsNullOrWhiteSpace(profileId) &&
+            string.IsNullOrWhiteSpace(profileName) &&
+            materialSlotCount == 0;
 
         private static MmdMaterialProfileRenderingTargets FromRuntime(
             MmdMaterialRenderingTargets targets)
@@ -685,7 +693,8 @@ namespace Mmd
 
         internal MmdMaterialRenderingTargets[]? ResolveMaterialRenderingTargets(int materialCount)
         {
-            if (materialProfileProvenance == null)
+            if (materialProfileProvenance == null ||
+                (materialProfileAsset == null && materialProfileProvenance.IsEmptyLegacyMarker))
             {
                 return null;
             }
@@ -705,12 +714,17 @@ namespace Mmd
         {
             if (materialProfileAsset == null)
             {
-                if (materialProfileProvenance != null)
+                if (materialProfileProvenance != null && !materialProfileProvenance.IsEmptyLegacyMarker)
                 {
                     throw new InvalidOperationException("custom-material-profile-asset-missing");
                 }
 
                 return null;
+            }
+
+            if (materialProfileProvenance?.IsEmptyLegacyMarker == true)
+            {
+                throw new InvalidOperationException("custom-material-profile-provenance-missing");
             }
 
             if (!materialProfileAsset.TryCreateMapperSet(
