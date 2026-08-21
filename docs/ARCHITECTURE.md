@@ -48,10 +48,14 @@ The controller's raw importer, provider-model, and direct asset routes share
 the immutable `MmdNativePlaybackSetup` and the final native-first transaction,
 but they intentionally keep source acquisition separate. PMX bytes may be
 borrowed from an asset cache while VMD bytes and a shared native context have
-different owners. Do not introduce a generic prepared-source or generation
-token until its buffer lifetime, stale-result disposal owner, and native-free
-thread contract are covered by deterministic tests. VMD source/readback
-synchronization remains a separate follow-up contract.
+different owners. `MmdVmdNativeContextCache.SourceSnapshot` now carries a
+monotonic generation so a caller that crossed a source invalidation is rejected
+before it starts a new native task. This does not remove the existing
+synchronous cleanup wait or prove disposal of every in-flight source swap.
+Do not introduce a generic prepared-source abstraction or move native cleanup
+off the current owner boundary until buffer lifetime, stale-result disposal,
+and native-free thread contract are covered by deterministic tests.
+VMD source/readback synchronization remains a separate follow-up contract.
 
 ## Format And Native Boundaries
 
