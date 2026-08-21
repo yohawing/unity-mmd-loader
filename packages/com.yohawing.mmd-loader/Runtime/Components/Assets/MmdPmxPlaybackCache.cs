@@ -26,6 +26,7 @@ namespace Mmd
         private int modelPreloadGeneration;
         private int descriptorModelPreloadGeneration = -1;
         private readonly Func<IMmdParser>? preloadParserFactory;
+        private readonly Action<TaskStatus>? descriptorPreloadFaultObservedForTests;
 
         internal MmdPmxPlaybackCache(byte[] initialSource)
             : this(initialSource, preloadParserFactory: null)
@@ -34,10 +35,12 @@ namespace Mmd
 
         internal MmdPmxPlaybackCache(
             byte[] initialSource,
-            Func<IMmdParser>? preloadParserFactory)
+            Func<IMmdParser>? preloadParserFactory,
+            Action<TaskStatus>? descriptorPreloadFaultObservedForTests = null)
         {
             source = initialSource;
             this.preloadParserFactory = preloadParserFactory;
+            this.descriptorPreloadFaultObservedForTests = descriptorPreloadFaultObservedForTests;
         }
 
         internal void ReplaceSource(byte[] nextSource, Action assignSerializedSource)
@@ -156,7 +159,7 @@ namespace Mmd
                 byte[] currentSource = source;
                 descriptorPreset = preset;
                 descriptorModelPreloadGeneration = modelPreloadGeneration;
-                descriptorTask = currentModelTask.ContinueWith(
+                Task<MmdRenderingDescriptor> currentDescriptorTask = currentModelTask.ContinueWith(
                     completed =>
                     {
                         MmdRenderingDescriptor descriptor =
@@ -174,7 +177,9 @@ namespace Mmd
                         return descriptor;
                     },
                     TaskScheduler.Default);
-                return descriptorTask;
+                descriptorTask = currentDescriptorTask;
+                ObserveDescriptorPreload(currentDescriptorTask);
+                return currentDescriptorTask;
             }
         }
 
@@ -262,6 +267,18 @@ namespace Mmd
         private IMmdParser CreatePreloadParser()
         {
             return preloadParserFactory?.Invoke() ?? new NativeMmdParser();
+        }
+
+        private void ObserveDescriptorPreload(Task<MmdRenderingDescriptor> descriptorTask)
+        {
+            _ = descriptorTask.ContinueWith(
+                completed =>
+                {
+                    _ = completed.Exception;
+                    descriptorPreloadFaultObservedForTests?.Invoke(completed.Status);
+                },
+                TaskContinuationOptions.ExecuteSynchronously |
+                TaskContinuationOptions.OnlyOnFaulted);
         }
     }
 }

@@ -98,6 +98,50 @@ namespace Mmd.Tests
             }
         }
 
+        [Test]
+        public void AdvisoryDescriptorPreloadFailurePropagatesAndRetriesForSameSource()
+        {
+            int loadCount = 0;
+            var failure = new InvalidOperationException("advisory PMX descriptor preload failure");
+            var parser = new RetryParser(() =>
+            {
+                loadCount++;
+                if (loadCount <= 2)
+                {
+                    throw failure;
+                }
+
+                return CreateModelWithIkCount(1);
+            });
+            byte[] source = { 0x01, 0x02, 0x03 };
+            var observed = new TaskCompletionSource<TaskStatus>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            var cache = new MmdPmxPlaybackCache(
+                source,
+                () => parser,
+                status => observed.TrySetResult(status));
+
+            Task advisoryPreload = cache.BeginPreload();
+
+            Assert.That(
+                observed.Task.Wait(TimeSpan.FromSeconds(5)),
+                Is.True);
+            Assert.That(advisoryPreload.IsFaulted, Is.True);
+            Assert.That(observed.Task.GetAwaiter().GetResult(), Is.EqualTo(TaskStatus.Faulted));
+
+            InvalidOperationException propagatedFailure = Assert.Throws<InvalidOperationException>(
+                () => cache.LoadDescriptor(MmdMaterialPreset.MmdToon, out _))!;
+
+            Assert.That(propagatedFailure, Is.SameAs(failure));
+
+            MmdRenderingDescriptor descriptor =
+                cache.LoadDescriptor(MmdMaterialPreset.MmdToon, out bool cacheHit);
+
+            Assert.That(descriptor, Is.Not.Null);
+            Assert.That(cacheHit, Is.False);
+            Assert.That(loadCount, Is.EqualTo(3));
+        }
+
         private static MmdModelDefinition CreateModelWithIkCount(int ikCount)
         {
             var model = new MmdModelDefinition();
