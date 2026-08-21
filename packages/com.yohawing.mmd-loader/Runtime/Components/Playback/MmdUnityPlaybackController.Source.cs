@@ -140,7 +140,7 @@ namespace Mmd.UnityIntegration
                 throw CreateMissingSceneModelException(resolvedPmxPath, timelineEvaluation);
             }
 
-            TryConfigureNativeFirst(
+            ConfigureNativePlaybackSetup(
                 new MmdNativePlaybackSetup(motion, pmxBytes, vmdBytes),
                 nativeMotion => MmdUnityPlaybackBinding.CreateSkinnedFromExistingSceneModel(
                     gameObject,
@@ -163,6 +163,7 @@ namespace Mmd.UnityIntegration
                     }
                 },
                 timelineEvaluation,
+                applyStartFrame: null,
                 setupTiming: setupTiming);
         }
 
@@ -303,7 +304,7 @@ namespace Mmd.UnityIntegration
             {
                 setupTiming.sharedVmdContextMs += TimelineSetupElapsedMilliseconds(phaseStart);
             }
-            TryConfigureNativeFirst(
+            ConfigureNativePlaybackSetup(
                 new MmdNativePlaybackSetup(
                     motion,
                     pathPmxBytes,
@@ -321,12 +322,8 @@ namespace Mmd.UnityIntegration
                     sourcesAlreadyValidated: true),
                 candidate => Configure(candidate, playbackFrameRate, playOnStart),
                 timelineEvaluation,
+                applyStartFrame: timelineEvaluation ? null : startFrame,
                 setupTiming: setupTiming);
-
-            if (!timelineEvaluation)
-            {
-                ApplyReboundStartFrameWithRollback(startFrame, setupTiming);
-            }
         }
 
         public bool IsConfiguredForMotionAsset(MmdVmdAsset motion)
@@ -492,7 +489,7 @@ namespace Mmd.UnityIntegration
             {
                 setupTiming.sharedVmdContextMs += TimelineSetupElapsedMilliseconds(phaseStart);
             }
-            TryConfigureNativeFirst(
+            ConfigureNativePlaybackSetup(
                 new MmdNativePlaybackSetup(
                     motion,
                     pmxBytes,
@@ -508,14 +505,31 @@ namespace Mmd.UnityIntegration
                     sourcesAlreadyValidated: true),
                 configure,
                 timelineEvaluation,
+                applyStartFrame,
+                setupTiming);
+
+            return true;
+        }
+
+        private void ConfigureNativePlaybackSetup(
+            MmdNativePlaybackSetup setup,
+            Func<MmdMotionDefinition, MmdUnityPlaybackBinding> createBinding,
+            Action<MmdUnityPlaybackBinding> configure,
+            bool timelineEvaluation,
+            int? applyStartFrame,
+            MmdTimelineSetupTimingSummary? setupTiming = null)
+        {
+            TryConfigureNativeFirst(
+                setup,
+                createBinding,
+                configure,
+                timelineEvaluation,
                 setupTiming);
 
             if (applyStartFrame.HasValue)
             {
                 ApplyReboundStartFrameWithRollback(applyStartFrame.Value, setupTiming);
             }
-
-            return true;
         }
 
         private static string ResolveAssetSourceId(MmdVmdAsset asset)
