@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
+using Mmd.IO;
 using UnityEditor;
 using UnityEngine;
 
@@ -93,21 +94,29 @@ namespace Mmd.Editor
             }
 
             string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-            string assetsRoot = Path.GetFullPath(Application.dataPath) + Path.DirectorySeparatorChar;
+            string assetsRoot = Path.GetFullPath(Application.dataPath);
             string fxAbsolutePath = Path.GetFullPath(Path.Combine(
                 projectRoot,
                 normalizedFxAssetPath.Replace('/', Path.DirectorySeparatorChar)));
             string? fxDirectory = Path.GetDirectoryName(fxAbsolutePath);
-            if (string.IsNullOrWhiteSpace(fxDirectory) || !File.Exists(fxAbsolutePath))
+            if (string.IsNullOrWhiteSpace(fxDirectory) ||
+                !File.Exists(fxAbsolutePath) ||
+                !MmdSafeRelativePath.TryResolve(
+                    assetsRoot,
+                    fxAbsolutePath,
+                    out _,
+                    out _,
+                    allowRoot: false))
             {
                 return Array.Empty<string>();
             }
 
             var result = new List<string>();
-            foreach (string candidatePath in ReadExplicitNormalMapPaths(fxDirectory, fxAbsolutePath))
+            foreach (string candidatePath in ReadExplicitNormalMapPaths(
+                         normalizedFxAssetPath,
+                         fxAbsolutePath))
             {
-                if (!candidatePath.StartsWith(assetsRoot, StringComparison.OrdinalIgnoreCase) ||
-                    !File.Exists(candidatePath))
+                if (!File.Exists(candidatePath))
                 {
                     continue;
                 }
@@ -136,9 +145,20 @@ namespace Mmd.Editor
             }
 
             string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            string assetsRoot = Path.GetFullPath(Application.dataPath);
             string textureAbsolutePath = Path.GetFullPath(Path.Combine(
                 projectRoot,
                 normalizedAssetPath.Replace('/', Path.DirectorySeparatorChar)));
+            if (!MmdSafeRelativePath.TryResolve(
+                    assetsRoot,
+                    textureAbsolutePath,
+                    out _,
+                    out _,
+                    allowRoot: false))
+            {
+                return false;
+            }
+
             string? textureDirectory = Path.GetDirectoryName(textureAbsolutePath);
             if (string.IsNullOrWhiteSpace(textureDirectory) || !Directory.Exists(textureDirectory))
             {
@@ -158,7 +178,20 @@ namespace Mmd.Editor
 
             for (int i = 0; i < fxFiles.Length; i++)
             {
-                if (ReferencesNormalMap(textureDirectory, fxFiles[i], textureAbsolutePath))
+                string fxAssetPath;
+                try
+                {
+                    fxAssetPath = Path.GetRelativePath(projectRoot, fxFiles[i]).Replace('\\', '/');
+                }
+                catch (Exception ex) when (ex is ArgumentException || ex is IOException)
+                {
+                    continue;
+                }
+
+                if (ReferencesNormalMap(
+                        fxAssetPath,
+                        fxFiles[i],
+                        textureAbsolutePath))
                 {
                     return true;
                 }
@@ -168,11 +201,22 @@ namespace Mmd.Editor
         }
 
         private static bool ReferencesNormalMap(
-            string fxDirectory,
+            string fxAssetPath,
             string fxPath,
             string textureAbsolutePath)
         {
-            foreach (string candidatePath in ReadExplicitNormalMapPaths(fxDirectory, fxPath))
+            string assetsRoot = Path.GetFullPath(Application.dataPath);
+            if (!MmdSafeRelativePath.TryResolve(
+                    assetsRoot,
+                    fxPath,
+                    out _,
+                    out _,
+                    allowRoot: false))
+            {
+                return false;
+            }
+
+            foreach (string candidatePath in ReadExplicitNormalMapPaths(fxAssetPath, fxPath))
             {
                 if (string.Equals(candidatePath, textureAbsolutePath, StringComparison.OrdinalIgnoreCase))
                 {
@@ -183,7 +227,9 @@ namespace Mmd.Editor
             return false;
         }
 
-        private static IEnumerable<string> ReadExplicitNormalMapPaths(string fxDirectory, string fxPath)
+        private static IEnumerable<string> ReadExplicitNormalMapPaths(
+            string fxAssetPath,
+            string fxPath)
         {
             string content;
             try
@@ -195,6 +241,7 @@ namespace Mmd.Editor
                 yield break;
             }
 
+            string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
             foreach (Match match in ExplicitNormalMapDefineRegex.Matches(content))
             {
                 string reference = match.Groups[1].Value.Trim();
@@ -203,16 +250,22 @@ namespace Mmd.Editor
                     continue;
                 }
 
+                if (!MmdAssetPathUtility.TryResolveProjectRelativeAssetPathCandidate(
+                        fxAssetPath,
+                        reference,
+                        out string candidateAssetPath))
+                {
+                    continue;
+                }
+
                 string candidatePath;
                 try
                 {
-                    candidatePath = Path.IsPathRooted(reference)
-                        ? Path.GetFullPath(reference)
-                        : Path.GetFullPath(Path.Combine(
-                            fxDirectory,
-                            reference.Replace('/', Path.DirectorySeparatorChar)));
+                    candidatePath = Path.GetFullPath(Path.Combine(
+                        projectRoot,
+                        candidateAssetPath.Replace('/', Path.DirectorySeparatorChar)));
                 }
-                catch (ArgumentException)
+                catch (Exception ex) when (ex is ArgumentException || ex is IOException)
                 {
                     continue;
                 }
