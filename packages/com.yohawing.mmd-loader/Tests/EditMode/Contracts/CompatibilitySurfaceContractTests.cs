@@ -211,6 +211,7 @@ namespace Mmd.Tests.Contracts
             AssertPropertyType(typeof(MmdVmdAsset), "ImportSummaryStatus", typeof(MmdVmdImportSummaryStatus));
             AssertPropertyType(typeof(MmdUnityPlaybackController), "HasModelSource", typeof(bool));
             AssertPropertyType(typeof(MmdUnityPlaybackController), "ModelSourceId", typeof(string));
+            AssertPropertyType(typeof(MmdUnityPlaybackController), "HumanoidPhysicsBindingFailureReason", typeof(string));
 
             AssertMethodSignature(typeof(MmdPmxAsset), "Initialize", typeof(void),
                 typeof(byte[]), typeof(string), typeof(string), typeof(float), typeof(string), typeof(string),

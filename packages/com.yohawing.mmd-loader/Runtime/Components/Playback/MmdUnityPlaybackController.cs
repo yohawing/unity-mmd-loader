@@ -25,6 +25,13 @@ namespace Mmd.UnityIntegration
         HumanoidRetarget = 2
     }
 
+    internal enum MmdHumanoidPhysicsBindingFailureReason
+    {
+        None = 0,
+        MissingComponent = 1,
+        InvalidOperation = 2
+    }
+
     [Serializable]
     public sealed class MmdTimelineSetupTimingSummary
     {
@@ -55,6 +62,9 @@ namespace Mmd.UnityIntegration
         private const string HumanoidPhysicsOffIkCapNotSupportedMessage =
             "A positive IK iteration cap is not supported for Humanoid retargeting while Physics Mode is Off. " +
             "Use the compatibility default 0 or Physics Mode Live.";
+        private const string HumanoidPhysicsBindingMissingComponentReason = "MissingComponent";
+        private const string HumanoidPhysicsBindingInvalidOperationReason = "InvalidOperation";
+        private const string HumanoidPhysicsBindingUnknownReason = "Unknown";
 
         private MmdUnityPlaybackBinding? binding;
         private MmdUnityPlaybackBinding? humanoidPhysicsBinding;
@@ -156,6 +166,22 @@ namespace Mmd.UnityIntegration
 
         public MmdHumanoidRetargeterResult? LastHumanoidRetargetResult { get; private set; }
 
+        /// <summary>
+        /// Stable diagnostic name for the last model-only Humanoid physics binding failure.
+        /// An empty value means no binding failure has been recorded since the last source or
+        /// retarget configuration change.
+        /// </summary>
+        public string HumanoidPhysicsBindingFailureReason =>
+            humanoidPhysicsBindingFailureReason switch
+            {
+                MmdHumanoidPhysicsBindingFailureReason.None => string.Empty,
+                MmdHumanoidPhysicsBindingFailureReason.MissingComponent =>
+                    HumanoidPhysicsBindingMissingComponentReason,
+                MmdHumanoidPhysicsBindingFailureReason.InvalidOperation =>
+                    HumanoidPhysicsBindingInvalidOperationReason,
+                _ => HumanoidPhysicsBindingUnknownReason
+            };
+
         public void ConfigureHumanoidRetarget(
             Transform? proxyRoot,
             IReadOnlyList<MmdHumanoidRetargetBinding>? entries,
@@ -180,6 +206,7 @@ namespace Mmd.UnityIntegration
             DisposeHumanoidPhysicsBinding();
             DisposeHumanoidHostPoseSession();
             ResetHumanoidHostPoseFailureLatch();
+            ResetHumanoidPhysicsBindingFailureReason();
         }
 
         public void Configure(MmdUnityPlaybackBinding playbackBinding, MmdPlaybackConfig config)
@@ -206,6 +233,7 @@ namespace Mmd.UnityIntegration
 
             DisposeHumanoidPhysicsBinding();
             ResetHumanoidHostPoseFailureLatch();
+            ResetHumanoidPhysicsBindingFailureReason();
             binding = playbackBinding;
             frameRate = playbackFrameRate;
             playbackFrame = 0.0f;
