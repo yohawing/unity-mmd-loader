@@ -14,12 +14,24 @@ namespace Mmd
     internal sealed class MmdVmdNativeContextCache
     {
         private readonly object gate = new object();
+        private readonly Func<byte[], Task<MmdRuntimeFfiVmdContext>> preloadFactory;
         private MmdRuntimeFfiVmdContext? nativeVmdContext;
         private byte[]? nativeVmdContextSource;
         private Task<MmdRuntimeFfiVmdContext>? nativeVmdContextPreloadTask;
         private byte[]? nativeVmdContextPreloadSource;
         private TextAsset? sourceReadbackAsset;
         private byte[]? sourceReadback;
+
+        internal MmdVmdNativeContextCache()
+            : this(sourceBytes => Task.Run(() => MmdRuntimeFfiVmdContext.Create(sourceBytes)))
+        {
+        }
+
+        internal MmdVmdNativeContextCache(
+            Func<byte[], Task<MmdRuntimeFfiVmdContext>> preloadFactory)
+        {
+            this.preloadFactory = preloadFactory ?? throw new ArgumentNullException(nameof(preloadFactory));
+        }
 
         internal byte[] ReadSourceBytes(byte[]? serializedData, TextAsset? rawSource)
         {
@@ -150,15 +162,18 @@ namespace Mmd
             }
 
             nativeVmdContextPreloadSource = sourceBytes;
-            nativeVmdContextPreloadTask = Task.Run(() =>
+            if (failureOverrideForTests != null)
             {
-                if (failureOverrideForTests != null)
-                {
-                    throw new NativeVmdContextPreloadException(failureOverrideForTests(sourceBytes));
-                }
-
-                return MmdRuntimeFfiVmdContext.Create(sourceBytes);
-            });
+                nativeVmdContextPreloadTask = Task.Run(
+                    (Func<MmdRuntimeFfiVmdContext>)(() =>
+                    {
+                        throw new NativeVmdContextPreloadException(failureOverrideForTests(sourceBytes));
+                    }));
+            }
+            else
+            {
+                nativeVmdContextPreloadTask = preloadFactory(sourceBytes);
+            }
             _ = nativeVmdContextPreloadTask.ContinueWith(
                 completed => _ = completed.Exception,
                 TaskContinuationOptions.OnlyOnFaulted);

@@ -260,6 +260,88 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void NativeVmdPreloadSharesInFlightFactoryForTheSameSource()
+        {
+            byte[] sourceBytes = { 0x56, 0x4D, 0x44, 0x00 };
+            int attempts = 0;
+            int freeCount = 0;
+            var pending = new TaskCompletionSource<MmdRuntimeFfiVmdContext>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            var context = new MmdRuntimeFfiVmdContext(
+                new IntPtr(1),
+                _ => freeCount++);
+            var cache = new MmdVmdNativeContextCache(
+                _ =>
+                {
+                    attempts++;
+                    return pending.Task;
+                });
+
+            try
+            {
+                Task first = cache.BeginNativePlaybackPreload(sourceBytes, failureOverrideForTests: null);
+                Task second = cache.BeginNativePlaybackPreload(sourceBytes, failureOverrideForTests: null);
+
+                Assert.That(second, Is.SameAs(first));
+                Assert.That(attempts, Is.EqualTo(1));
+                Assert.That(pending.TrySetResult(context), Is.True);
+                Assert.DoesNotThrow(() => first.GetAwaiter().GetResult());
+            }
+            finally
+            {
+                pending.TrySetCanceled();
+                cache.Dispose();
+            }
+
+            Assert.That(freeCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void CanceledNativeVmdPreloadStartsANewFactoryAttemptForTheSameSource()
+        {
+            byte[] sourceBytes = { 0x56, 0x4D, 0x44, 0x00 };
+            int attempts = 0;
+            int freeCount = 0;
+            var firstPending = new TaskCompletionSource<MmdRuntimeFfiVmdContext>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            var retryPending = new TaskCompletionSource<MmdRuntimeFfiVmdContext>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            var context = new MmdRuntimeFfiVmdContext(
+                new IntPtr(1),
+                _ => freeCount++);
+            var cache = new MmdVmdNativeContextCache(
+                _ =>
+                {
+                    attempts++;
+                    return attempts == 1 ? firstPending.Task : retryPending.Task;
+                });
+
+            try
+            {
+                Task first = cache.BeginNativePlaybackPreload(sourceBytes, failureOverrideForTests: null);
+                Assert.That(attempts, Is.EqualTo(1));
+                Assert.That(firstPending.TrySetCanceled(), Is.True);
+                Assert.Catch<OperationCanceledException>(
+                    () => first.GetAwaiter().GetResult());
+
+                Task retry = cache.BeginNativePlaybackPreload(sourceBytes, failureOverrideForTests: null);
+
+                Assert.That(retry, Is.Not.SameAs(first));
+                Assert.That(attempts, Is.EqualTo(2));
+                Assert.That(retryPending.TrySetResult(context), Is.True);
+                Assert.DoesNotThrow(() => retry.GetAwaiter().GetResult());
+            }
+            finally
+            {
+                firstPending.TrySetCanceled();
+                retryPending.TrySetCanceled();
+                cache.Dispose();
+            }
+
+            Assert.That(freeCount, Is.EqualTo(1));
+        }
+
+        [Test]
         public void RawSourceToSerializedBytesTransitionDisposesContextOnceAndReturnsSerializedSource()
         {
             int freeCount = 0;
