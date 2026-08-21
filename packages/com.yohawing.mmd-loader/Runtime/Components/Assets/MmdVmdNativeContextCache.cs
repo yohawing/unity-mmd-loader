@@ -31,6 +31,7 @@ namespace Mmd
 
         private readonly object gate = new object();
         private readonly Func<byte[], Task<MmdRuntimeFfiVmdContext>> preloadFactory;
+        private readonly Action? preloadWaitEnteredForTests;
         private long sourceGeneration;
         private MmdRuntimeFfiVmdContext? nativeVmdContext;
         private byte[]? nativeVmdContextSource;
@@ -47,9 +48,11 @@ namespace Mmd
         }
 
         internal MmdVmdNativeContextCache(
-            Func<byte[], Task<MmdRuntimeFfiVmdContext>> preloadFactory)
+            Func<byte[], Task<MmdRuntimeFfiVmdContext>> preloadFactory,
+            Action? preloadWaitEnteredForTests = null)
         {
             this.preloadFactory = preloadFactory ?? throw new ArgumentNullException(nameof(preloadFactory));
+            this.preloadWaitEnteredForTests = preloadWaitEnteredForTests;
         }
 
         internal SourceSnapshot ReadSourceSnapshot(byte[]? serializedData, TextAsset? rawSource)
@@ -250,6 +253,7 @@ namespace Mmd
             MmdRuntimeFfiVmdContext? context = nativeVmdContext;
             if (context == null && nativeVmdContextPreloadTask != null)
             {
+                preloadWaitEnteredForTests?.Invoke();
                 try
                 {
                     context = nativeVmdContextPreloadTask.GetAwaiter().GetResult();

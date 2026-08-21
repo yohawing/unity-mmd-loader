@@ -470,6 +470,100 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void InFlightVmdPreloadSourceReplacementDisposesStaleContextExactlyOnce()
+        {
+            byte[] sourceBytes = { 0x56, 0x4D, 0x44, 0x00 };
+            int freeCount = 0;
+            var factoryStarted = new TaskCompletionSource<bool>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            var preloadWaitEntered = new TaskCompletionSource<bool>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            var pending = new TaskCompletionSource<MmdRuntimeFfiVmdContext>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            var context = new MmdRuntimeFfiVmdContext(
+                new IntPtr(1),
+                _ => freeCount++);
+            var cache = new MmdVmdNativeContextCache(
+                _ =>
+                {
+                    factoryStarted.TrySetResult(true);
+                    return pending.Task;
+                },
+                preloadWaitEnteredForTests: () =>
+                {
+                    preloadWaitEntered.TrySetResult(true);
+                    pending.TrySetResult(context);
+                });
+            TextAsset? firstRawSource = null;
+            TextAsset? secondRawSource = null;
+            Task? firstCaller = null;
+            MmdVmdNativeContextCache.SourceSnapshot secondSnapshot = default;
+            bool firstSucceeded = true;
+            MmdRuntimeFfiVmdContext? firstContext = null;
+            string firstReason = string.Empty;
+
+            try
+            {
+                firstRawSource = new TextAsset("raw-source-a");
+                secondRawSource = new TextAsset("raw-source-b");
+                MmdVmdNativeContextCache.SourceSnapshot firstSnapshot =
+                    cache.ReadSourceSnapshot(Array.Empty<byte>(), firstRawSource);
+
+                firstCaller = Task.Run(() =>
+                {
+                    firstSucceeded = cache.TryGetOrCreateNativeVmdContext(
+                        firstSnapshot,
+                        failureOverrideForTests: null,
+                        out firstContext,
+                        out firstReason);
+                });
+                Assert.That(factoryStarted.Task.Wait(TimeSpan.FromSeconds(5)), Is.True);
+
+                // Unity TextAsset readback is main-thread-only. The callback proves that the
+                // main-thread source transition entered the pending cleanup wait before it
+                // releases the TCS and returns the replacement snapshot.
+                secondSnapshot = cache.ReadSourceSnapshot(Array.Empty<byte>(), secondRawSource);
+                Assert.That(preloadWaitEntered.Task.IsCompleted, Is.True);
+                firstCaller.GetAwaiter().GetResult();
+
+                Assert.That(secondSnapshot.Generation, Is.GreaterThan(firstSnapshot.Generation));
+                Assert.That(firstSucceeded, Is.False);
+                Assert.That(firstContext, Is.Null);
+                Assert.That(
+                    firstReason,
+                    Is.EqualTo("VMD source changed while its native playback context was being prepared."));
+                Assert.That(freeCount, Is.EqualTo(1));
+                cache.Dispose();
+                Assert.That(freeCount, Is.EqualTo(1));
+            }
+            finally
+            {
+                pending.TrySetCanceled();
+                if (firstCaller != null)
+                {
+                    try
+                    {
+                        firstCaller.GetAwaiter().GetResult();
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                cache.Dispose();
+                if (firstRawSource != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(firstRawSource);
+                }
+
+                if (secondRawSource != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(secondRawSource);
+                }
+            }
+        }
+
+        [Test]
         public void RawSourceToSerializedBytesTransitionDisposesContextOnceAndReturnsSerializedSource()
         {
             int freeCount = 0;
