@@ -25,10 +25,19 @@ namespace Mmd
         private Task<MmdRenderingDescriptor>? descriptorTask;
         private int modelPreloadGeneration;
         private int descriptorModelPreloadGeneration = -1;
+        private readonly Func<IMmdParser>? preloadParserFactory;
 
         internal MmdPmxPlaybackCache(byte[] initialSource)
+            : this(initialSource, preloadParserFactory: null)
+        {
+        }
+
+        internal MmdPmxPlaybackCache(
+            byte[] initialSource,
+            Func<IMmdParser>? preloadParserFactory)
         {
             source = initialSource;
+            this.preloadParserFactory = preloadParserFactory;
         }
 
         internal void ReplaceSource(byte[] nextSource, Action assignSerializedSource)
@@ -124,7 +133,7 @@ namespace Mmd
                 }
                 else
                 {
-                    currentModelTask = GetOrStartPreloadLocked(source, new NativeMmdParser());
+                    currentModelTask = GetOrStartPreloadLocked(source, CreatePreloadParser());
                 }
 
                 if (ReferenceEquals(modelCacheSource, source) &&
@@ -173,30 +182,41 @@ namespace Mmd
             MmdMaterialPreset preset,
             out bool cacheHit)
         {
-            lock (gate)
+            while (true)
             {
-                if (ReferenceEquals(modelCacheSource, source) &&
-                    descriptorCache != null &&
-                    descriptorPreset == preset)
+                byte[] currentSource;
+                lock (gate)
                 {
-                    cacheHit = true;
-                    return descriptorCache;
-                }
-            }
+                    if (ReferenceEquals(modelCacheSource, source) &&
+                        descriptorCache != null &&
+                        descriptorPreset == preset)
+                    {
+                        cacheHit = true;
+                        return descriptorCache;
+                    }
 
-            MmdRenderingDescriptor? completedDescriptor =
-                (BeginPreload(preset) as Task<MmdRenderingDescriptor>)
-                ?.GetAwaiter().GetResult();
-            lock (gate)
-            {
-                MmdRenderingDescriptor? descriptor = descriptorCache ?? completedDescriptor;
-                if (descriptor == null || descriptorPreset != preset)
-                {
-                    throw new InvalidOperationException("PMX playback descriptor preload did not complete.");
+                    currentSource = source;
                 }
 
-                cacheHit = false;
-                return descriptor;
+                MmdRenderingDescriptor? completedDescriptor =
+                    (BeginPreload(preset) as Task<MmdRenderingDescriptor>)
+                    ?.GetAwaiter().GetResult();
+                lock (gate)
+                {
+                    if (!ReferenceEquals(source, currentSource))
+                    {
+                        continue;
+                    }
+
+                    MmdRenderingDescriptor? descriptor = descriptorCache ?? completedDescriptor;
+                    if (descriptor == null || descriptorPreset != preset)
+                    {
+                        throw new InvalidOperationException("PMX playback descriptor preload did not complete.");
+                    }
+
+                    cacheHit = false;
+                    return descriptor;
+                }
             }
         }
 
@@ -237,6 +257,11 @@ namespace Mmd
             }
 
             return StartPreloadLocked(currentSource, parser);
+        }
+
+        private IMmdParser CreatePreloadParser()
+        {
+            return preloadParserFactory?.Invoke() ?? new NativeMmdParser();
         }
     }
 }
