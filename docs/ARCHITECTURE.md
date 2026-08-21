@@ -38,8 +38,20 @@ their compatibility surface. Synchronous PMX playback state is owned by
 owned by `MmdVmdNativeContextCache`. Source replacement invalidates the
 PMX cache under one synchronization boundary. The VMD cache owns its native
 cleanup/retry boundary, while `MmdVmdAsset` retains `OnDisable` as the native
-cleanup delegation point; VMD source/readback synchronization remains a
-separate follow-up contract.
+cleanup delegation point. A same-source faulted or canceled VMD preload is
+evicted before a later preload attempt; a successful task remains coalesced.
+`BeginNativePlaybackPreload` is an advisory, fire-and-forget latency
+optimization; synchronous `TryGetOrCreateNativeVmdContext` remains the
+playback authority.
+
+The controller's raw importer, provider-model, and direct asset routes share
+the immutable `MmdNativePlaybackSetup` and the final native-first transaction,
+but they intentionally keep source acquisition separate. PMX bytes may be
+borrowed from an asset cache while VMD bytes and a shared native context have
+different owners. Do not introduce a generic prepared-source or generation
+token until its buffer lifetime, stale-result disposal owner, and native-free
+thread contract are covered by deterministic tests. VMD source/readback
+synchronization remains a separate follow-up contract.
 
 ## Format And Native Boundaries
 
