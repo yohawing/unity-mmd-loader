@@ -693,9 +693,13 @@ namespace Mmd
 
         internal MmdMaterialRenderingTargets[]? ResolveMaterialRenderingTargets(int materialCount)
         {
-            if (materialProfileProvenance == null ||
-                (materialProfileAsset == null && materialProfileProvenance.IsEmptyLegacyMarker))
+            if (materialProfileProvenance == null || materialProfileProvenance.IsEmptyLegacyMarker)
             {
+                if (materialProfileAsset != null)
+                {
+                    throw new InvalidOperationException("custom-material-profile-provenance-missing");
+                }
+
                 return null;
             }
 
@@ -722,7 +726,7 @@ namespace Mmd
                 return null;
             }
 
-            if (materialProfileProvenance?.IsEmptyLegacyMarker == true)
+            if (materialProfileProvenance == null || materialProfileProvenance.IsEmptyLegacyMarker)
             {
                 throw new InvalidOperationException("custom-material-profile-provenance-missing");
             }
