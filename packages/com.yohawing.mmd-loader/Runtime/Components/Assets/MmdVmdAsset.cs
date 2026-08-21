@@ -238,9 +238,9 @@ namespace Mmd
             out string reason)
         {
             ValidateNativeClipHeaderSource();
-            byte[] sourceBytes = ReadSourceBytes();
+            MmdVmdNativeContextCache.SourceSnapshot sourceSnapshot = ReadSourceSnapshot();
             return NativeVmdContextCache.TryGetOrCreateNativeVmdContext(
-                sourceBytes,
+                sourceSnapshot,
                 NativeVmdContextFailureReasonOverrideForTests,
                 out context,
                 out reason);
@@ -249,9 +249,9 @@ namespace Mmd
         internal Task BeginNativePlaybackPreload()
         {
             ValidateNativeClipHeaderSource();
-            byte[] sourceBytes = ReadSourceBytes();
+            MmdVmdNativeContextCache.SourceSnapshot sourceSnapshot = ReadSourceSnapshot();
             return NativeVmdContextCache.BeginNativePlaybackPreload(
-                sourceBytes,
+                sourceSnapshot,
                 NativeVmdContextFailureReasonOverrideForTests);
         }
 
@@ -334,6 +334,11 @@ namespace Mmd
         private byte[] ReadSourceBytes()
         {
             return NativeVmdContextCache.ReadSourceBytes(data, rawSource);
+        }
+
+        private MmdVmdNativeContextCache.SourceSnapshot ReadSourceSnapshot()
+        {
+            return NativeVmdContextCache.ReadSourceSnapshot(data, rawSource);
         }
 
         private void ApplyVmdParseSummary(MmdVmdParseSummary? parseSummary, IReadOnlyList<string>? diagnostics)

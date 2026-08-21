@@ -13,12 +13,31 @@ namespace Mmd
     /// </summary>
     internal sealed class MmdVmdNativeContextCache
     {
+        internal readonly struct SourceSnapshot
+        {
+            internal SourceSnapshot(byte[] bytes, long generation)
+            {
+                Bytes = bytes ?? throw new ArgumentNullException(nameof(bytes));
+                Generation = generation;
+            }
+
+            internal byte[] Bytes { get; }
+
+            internal long Generation { get; }
+        }
+
+        internal const string StaleSourceSnapshotReason =
+            "VMD source snapshot is stale; its native playback context was not started.";
+
         private readonly object gate = new object();
         private readonly Func<byte[], Task<MmdRuntimeFfiVmdContext>> preloadFactory;
+        private long sourceGeneration;
         private MmdRuntimeFfiVmdContext? nativeVmdContext;
         private byte[]? nativeVmdContextSource;
+        private long nativeVmdContextGeneration;
         private Task<MmdRuntimeFfiVmdContext>? nativeVmdContextPreloadTask;
         private byte[]? nativeVmdContextPreloadSource;
+        private long nativeVmdContextPreloadGeneration;
         private TextAsset? sourceReadbackAsset;
         private byte[]? sourceReadback;
 
@@ -33,7 +52,7 @@ namespace Mmd
             this.preloadFactory = preloadFactory ?? throw new ArgumentNullException(nameof(preloadFactory));
         }
 
-        internal byte[] ReadSourceBytes(byte[]? serializedData, TextAsset? rawSource)
+        internal SourceSnapshot ReadSourceSnapshot(byte[]? serializedData, TextAsset? rawSource)
         {
             lock (gate)
             {
@@ -42,11 +61,12 @@ namespace Mmd
                     if (sourceReadback != null || !ReferenceEquals(sourceReadbackAsset, null))
                     {
                         DisposeNativeContextLocked();
+                        sourceGeneration++;
                         sourceReadbackAsset = null;
                         sourceReadback = null;
                     }
 
-                    return serializedData ?? Array.Empty<byte>();
+                    return new SourceSnapshot(serializedData ?? Array.Empty<byte>(), sourceGeneration);
                 }
 
                 if (!ReferenceEquals(sourceReadbackAsset, rawSource) || sourceReadback == null)
@@ -55,18 +75,24 @@ namespace Mmd
                         !ReferenceEquals(sourceReadbackAsset, rawSource))
                     {
                         DisposeNativeContextLocked();
+                        sourceGeneration++;
                     }
 
                     sourceReadbackAsset = rawSource;
                     sourceReadback = rawSource.bytes;
                 }
 
-                return sourceReadback!;
+                return new SourceSnapshot(sourceReadback!, sourceGeneration);
             }
         }
 
+        internal byte[] ReadSourceBytes(byte[]? serializedData, TextAsset? rawSource)
+        {
+            return ReadSourceSnapshot(serializedData, rawSource).Bytes;
+        }
+
         internal bool TryGetOrCreateNativeVmdContext(
-            byte[] sourceBytes,
+            SourceSnapshot sourceSnapshot,
             Func<byte[], string>? failureOverrideForTests,
             out MmdRuntimeFfiVmdContext? context,
             out string reason)
@@ -75,13 +101,22 @@ namespace Mmd
             Task<MmdRuntimeFfiVmdContext> preloadTask;
             lock (gate)
             {
-                if (nativeVmdContext != null && ReferenceEquals(nativeVmdContextSource, sourceBytes))
+                if (sourceSnapshot.Generation != sourceGeneration)
+                {
+                    context = null;
+                    reason = StaleSourceSnapshotReason;
+                    return false;
+                }
+
+                if (nativeVmdContext != null &&
+                    ReferenceEquals(nativeVmdContextSource, sourceSnapshot.Bytes) &&
+                    nativeVmdContextGeneration == sourceSnapshot.Generation)
                 {
                     context = nativeVmdContext;
                     return true;
                 }
 
-                preloadTask = GetOrStartPreloadLocked(sourceBytes, failureOverrideForTests);
+                preloadTask = GetOrStartPreloadLocked(sourceSnapshot, failureOverrideForTests);
             }
 
             try
@@ -89,10 +124,13 @@ namespace Mmd
                 MmdRuntimeFfiVmdContext created = preloadTask.GetAwaiter().GetResult();
                 lock (gate)
                 {
-                    if (ReferenceEquals(nativeVmdContextPreloadSource, sourceBytes))
+                    if (sourceSnapshot.Generation == sourceGeneration &&
+                        ReferenceEquals(nativeVmdContextPreloadSource, sourceSnapshot.Bytes) &&
+                        nativeVmdContextPreloadGeneration == sourceSnapshot.Generation)
                     {
                         nativeVmdContext = created;
-                        nativeVmdContextSource = sourceBytes;
+                        nativeVmdContextSource = sourceSnapshot.Bytes;
+                        nativeVmdContextGeneration = sourceSnapshot.Generation;
                         context = created;
                         return true;
                     }
@@ -120,17 +158,24 @@ namespace Mmd
         }
 
         internal Task BeginNativePlaybackPreload(
-            byte[] sourceBytes,
+            SourceSnapshot sourceSnapshot,
             Func<byte[], string>? failureOverrideForTests)
         {
             lock (gate)
             {
-                if (nativeVmdContext != null && ReferenceEquals(nativeVmdContextSource, sourceBytes))
+                if (sourceSnapshot.Generation != sourceGeneration)
+                {
+                    return CreateStalePreloadTaskLocked();
+                }
+
+                if (nativeVmdContext != null &&
+                    ReferenceEquals(nativeVmdContextSource, sourceSnapshot.Bytes) &&
+                    nativeVmdContextGeneration == sourceSnapshot.Generation)
                 {
                     return Task.CompletedTask;
                 }
 
-                return GetOrStartPreloadLocked(sourceBytes, failureOverrideForTests);
+                return GetOrStartPreloadLocked(sourceSnapshot, failureOverrideForTests);
             }
         }
 
@@ -144,16 +189,18 @@ namespace Mmd
             lock (gate)
             {
                 DisposeNativeContextLocked();
+                sourceGeneration++;
                 sourceReadbackAsset = null;
                 sourceReadback = null;
             }
         }
 
         private Task<MmdRuntimeFfiVmdContext> GetOrStartPreloadLocked(
-            byte[] sourceBytes,
+            SourceSnapshot sourceSnapshot,
             Func<byte[], string>? failureOverrideForTests)
         {
-            if (ReferenceEquals(nativeVmdContextPreloadSource, sourceBytes) &&
+            if (ReferenceEquals(nativeVmdContextPreloadSource, sourceSnapshot.Bytes) &&
+                nativeVmdContextPreloadGeneration == sourceSnapshot.Generation &&
                 nativeVmdContextPreloadTask != null &&
                 !nativeVmdContextPreloadTask.IsFaulted &&
                 !nativeVmdContextPreloadTask.IsCanceled)
@@ -161,23 +208,41 @@ namespace Mmd
                 return nativeVmdContextPreloadTask;
             }
 
-            nativeVmdContextPreloadSource = sourceBytes;
+            nativeVmdContextPreloadSource = sourceSnapshot.Bytes;
+            nativeVmdContextPreloadGeneration = sourceSnapshot.Generation;
+            Task<MmdRuntimeFfiVmdContext> preloadTask;
             if (failureOverrideForTests != null)
             {
-                nativeVmdContextPreloadTask = Task.Run(
+                preloadTask = Task.Run(
                     (Func<MmdRuntimeFfiVmdContext>)(() =>
                     {
-                        throw new NativeVmdContextPreloadException(failureOverrideForTests(sourceBytes));
+                        throw new NativeVmdContextPreloadException(failureOverrideForTests(sourceSnapshot.Bytes));
                     }));
             }
             else
             {
-                nativeVmdContextPreloadTask = preloadFactory(sourceBytes);
+                preloadTask = preloadFactory(sourceSnapshot.Bytes)
+                    ?? throw new InvalidOperationException(
+                        "VMD preload factory returned a null task.");
             }
-            _ = nativeVmdContextPreloadTask.ContinueWith(
+            nativeVmdContextPreloadTask = preloadTask;
+            ObserveFaultedPreload(preloadTask);
+            return preloadTask;
+        }
+
+        private Task<MmdRuntimeFfiVmdContext> CreateStalePreloadTaskLocked()
+        {
+            Task<MmdRuntimeFfiVmdContext> staleTask = Task.FromException<MmdRuntimeFfiVmdContext>(
+                new NativeVmdContextPreloadException(StaleSourceSnapshotReason));
+            ObserveFaultedPreload(staleTask);
+            return staleTask;
+        }
+
+        private static void ObserveFaultedPreload(Task<MmdRuntimeFfiVmdContext> preloadTask)
+        {
+            _ = preloadTask.ContinueWith(
                 completed => _ = completed.Exception,
                 TaskContinuationOptions.OnlyOnFaulted);
-            return nativeVmdContextPreloadTask;
         }
 
         private void DisposeNativeContextLocked()
@@ -204,8 +269,10 @@ namespace Mmd
             context?.Dispose();
             nativeVmdContext = null;
             nativeVmdContextSource = null;
+            nativeVmdContextGeneration = 0;
             nativeVmdContextPreloadTask = null;
             nativeVmdContextPreloadSource = null;
+            nativeVmdContextPreloadGeneration = 0;
         }
 
         private sealed class NativeVmdContextPreloadException : Exception

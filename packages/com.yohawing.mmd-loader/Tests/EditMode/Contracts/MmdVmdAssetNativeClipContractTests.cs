@@ -276,11 +276,13 @@ namespace Mmd.Tests
                     attempts++;
                     return pending.Task;
                 });
+            MmdVmdNativeContextCache.SourceSnapshot sourceSnapshot =
+                cache.ReadSourceSnapshot(sourceBytes, rawSource: null);
 
             try
             {
-                Task first = cache.BeginNativePlaybackPreload(sourceBytes, failureOverrideForTests: null);
-                Task second = cache.BeginNativePlaybackPreload(sourceBytes, failureOverrideForTests: null);
+                Task first = cache.BeginNativePlaybackPreload(sourceSnapshot, failureOverrideForTests: null);
+                Task second = cache.BeginNativePlaybackPreload(sourceSnapshot, failureOverrideForTests: null);
 
                 Assert.That(second, Is.SameAs(first));
                 Assert.That(attempts, Is.EqualTo(1));
@@ -315,16 +317,18 @@ namespace Mmd.Tests
                     attempts++;
                     return attempts == 1 ? firstPending.Task : retryPending.Task;
                 });
+            MmdVmdNativeContextCache.SourceSnapshot sourceSnapshot =
+                cache.ReadSourceSnapshot(sourceBytes, rawSource: null);
 
             try
             {
-                Task first = cache.BeginNativePlaybackPreload(sourceBytes, failureOverrideForTests: null);
+                Task first = cache.BeginNativePlaybackPreload(sourceSnapshot, failureOverrideForTests: null);
                 Assert.That(attempts, Is.EqualTo(1));
                 Assert.That(firstPending.TrySetCanceled(), Is.True);
                 Assert.Catch<OperationCanceledException>(
                     () => first.GetAwaiter().GetResult());
 
-                Task retry = cache.BeginNativePlaybackPreload(sourceBytes, failureOverrideForTests: null);
+                Task retry = cache.BeginNativePlaybackPreload(sourceSnapshot, failureOverrideForTests: null);
 
                 Assert.That(retry, Is.Not.SameAs(first));
                 Assert.That(attempts, Is.EqualTo(2));
@@ -339,6 +343,83 @@ namespace Mmd.Tests
             }
 
             Assert.That(freeCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void StaleVmdSourceSnapshotIsRejectedWithoutStartingFactory()
+        {
+            byte[] sourceBytes = { 0x56, 0x4D, 0x44, 0x00 };
+            int attempts = 0;
+            var cache = new MmdVmdNativeContextCache(
+                _ =>
+                {
+                    attempts++;
+                    throw new AssertionException("A stale source snapshot must not start the factory.");
+                });
+
+            try
+            {
+                MmdVmdNativeContextCache.SourceSnapshot snapshot =
+                    cache.ReadSourceSnapshot(sourceBytes, rawSource: null);
+                cache.Dispose();
+
+                Assert.That(
+                    cache.TryGetOrCreateNativeVmdContext(
+                        snapshot,
+                        failureOverrideForTests: null,
+                        out MmdRuntimeFfiVmdContext? context,
+                        out string reason),
+                    Is.False);
+                Assert.That(context, Is.Null);
+                Assert.That(reason, Is.EqualTo(MmdVmdNativeContextCache.StaleSourceSnapshotReason));
+
+                Task staleTask = cache.BeginNativePlaybackPreload(
+                    snapshot,
+                    failureOverrideForTests: null);
+
+                Assert.That(staleTask.IsFaulted, Is.True);
+                Exception staleFailure = Assert.Catch<Exception>(
+                    () => staleTask.GetAwaiter().GetResult())!;
+                Assert.That(staleFailure.Message, Is.EqualTo(MmdVmdNativeContextCache.StaleSourceSnapshotReason));
+                Assert.That(attempts, Is.EqualTo(0));
+            }
+            finally
+            {
+                cache.Dispose();
+            }
+        }
+
+        [Test]
+        public void RawVmdSourceReplacementAdvancesSnapshotGeneration()
+        {
+            var cache = new MmdVmdNativeContextCache();
+            TextAsset? firstRawSource = null;
+            TextAsset? secondRawSource = null;
+            try
+            {
+                firstRawSource = new TextAsset("raw-source-a");
+                secondRawSource = new TextAsset("raw-source-b");
+
+                MmdVmdNativeContextCache.SourceSnapshot first =
+                    cache.ReadSourceSnapshot(Array.Empty<byte>(), firstRawSource);
+                MmdVmdNativeContextCache.SourceSnapshot second =
+                    cache.ReadSourceSnapshot(Array.Empty<byte>(), secondRawSource);
+
+                Assert.That(second.Generation, Is.GreaterThan(first.Generation));
+            }
+            finally
+            {
+                cache.Dispose();
+                if (firstRawSource != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(firstRawSource);
+                }
+
+                if (secondRawSource != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(secondRawSource);
+                }
+            }
         }
 
         [Test]
