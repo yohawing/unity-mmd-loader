@@ -115,16 +115,13 @@ namespace Mmd.UnityIntegration
                 throw new FileNotFoundException("Runtime importer VMD file was not found.", resolvedVmdPath);
             }
 
-            MmdPmxRuntimeParseCache.Result cachedPmx = MmdPmxRuntimeParseCache.Load(resolvedPmxPath);
+            MmdPmxRuntimeParseCache.Result cachedPmx = LoadRuntimePmxSource(resolvedPmxPath, setupTiming);
             byte[] pmxBytes = cachedPmx.Bytes;
             long phaseStart = Stopwatch.GetTimestamp();
             byte[] vmdBytes = File.ReadAllBytes(resolvedVmdPath);
             if (setupTiming != null)
             {
-                setupTiming.sourceAcquireMs += cachedPmx.SourceAcquireMs;
                 setupTiming.sourceAcquireMs += TimelineSetupElapsedMilliseconds(phaseStart);
-                setupTiming.pmxParseMs += cachedPmx.ParseMs;
-                setupTiming.pmxParseCacheHit = cachedPmx.CacheHit;
             }
             MmdModelDefinition model = cachedPmx.Model;
             phaseStart = Stopwatch.GetTimestamp();
@@ -275,14 +272,8 @@ namespace Mmd.UnityIntegration
                 throw new FileNotFoundException("Provider PMX file was not found.", resolvedPmxPath);
             }
 
-            MmdPmxRuntimeParseCache.Result cachedPmx = MmdPmxRuntimeParseCache.Load(resolvedPmxPath);
+            MmdPmxRuntimeParseCache.Result cachedPmx = LoadRuntimePmxSource(resolvedPmxPath, setupTiming);
             MmdModelDefinition model = cachedPmx.Model;
-            if (setupTiming != null)
-            {
-                setupTiming.sourceAcquireMs += cachedPmx.SourceAcquireMs;
-                setupTiming.pmxParseMs += cachedPmx.ParseMs;
-                setupTiming.pmxParseCacheHit = cachedPmx.CacheHit;
-            }
 
             if (!TryValidateExistingSceneModelCompatibility(model, setupTiming))
             {
@@ -535,6 +526,21 @@ namespace Mmd.UnityIntegration
         private static string ResolveAssetSourceId(MmdVmdAsset asset)
         {
             return string.IsNullOrWhiteSpace(asset.SourceId) ? asset.name : asset.SourceId;
+        }
+
+        private static MmdPmxRuntimeParseCache.Result LoadRuntimePmxSource(
+            string resolvedPmxPath,
+            MmdTimelineSetupTimingSummary? setupTiming)
+        {
+            MmdPmxRuntimeParseCache.Result cachedPmx = MmdPmxRuntimeParseCache.Load(resolvedPmxPath);
+            if (setupTiming != null)
+            {
+                setupTiming.sourceAcquireMs += cachedPmx.SourceAcquireMs;
+                setupTiming.pmxParseMs += cachedPmx.ParseMs;
+                setupTiming.pmxParseCacheHit = cachedPmx.CacheHit;
+            }
+
+            return cachedPmx;
         }
 
         private static string ResolveAssetSourceId(MmdPmxAsset asset)
