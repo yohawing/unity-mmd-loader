@@ -3,6 +3,7 @@
 using System;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEditor;
 using UnityEngine.Playables;
 using UnityEngine.Timeline;
 using Mmd.Editor.Timeline;
@@ -354,6 +355,211 @@ namespace Mmd.Tests
                 if (muscleClip != null)
                 {
                     Object.DestroyImmediate(muscleClip);
+                }
+
+                if (root != null)
+                {
+                    Object.DestroyImmediate(root);
+                }
+            }
+        }
+
+        [Test]
+        [Explicit("Uses UnityEditor.AnimationMode; run in an isolated process to avoid polluting later Editor tests.")]
+        public void DestroyedHumanoidEditModeTargetReleasesOwnedAnimationModeOnGraphCleanup()
+        {
+            GameObject? root = null;
+            AnimationClip? animationClip = null;
+            PlayableGraph graph = default;
+            MmdHumanoidEditModeSampleBehaviour? behaviour = null;
+            bool animationModeWasInactive = !AnimationMode.InAnimationMode();
+            try
+            {
+                Assume.That(animationModeWasInactive, Is.True,
+                    "this lifecycle test must not interfere with an existing AnimationMode session");
+
+                root = new GameObject("workflow-destroyed-edit-target");
+                Animator animator = root.AddComponent<Animator>();
+                animationClip = new AnimationClip();
+
+                graph = PlayableGraph.Create("workflow-destroyed-edit-target-graph");
+                ScriptPlayable<MmdHumanoidEditModeSampleBehaviour> samplePlayable =
+                    ScriptPlayable<MmdHumanoidEditModeSampleBehaviour>.Create(graph);
+                MmdHumanoidEditModeSampleBehaviour sampleBehaviour = samplePlayable.GetBehaviour();
+                behaviour = sampleBehaviour;
+                sampleBehaviour.Initialize(animator, animationClip);
+                ScriptPlayableOutput output = ScriptPlayableOutput.Create(graph, "workflow-destroyed-edit-target-output");
+                output.SetSourcePlayable(samplePlayable);
+
+                graph.Play();
+                graph.Evaluate();
+                Assert.That(AnimationMode.InAnimationMode(), Is.True,
+                    "the edit-mode sampler must own AnimationMode while it is active");
+
+                root.SetActive(false);
+                graph.Evaluate();
+                Assert.That(AnimationMode.InAnimationMode(), Is.False,
+                    "disabling the target must release package-owned AnimationMode");
+
+                root.SetActive(true);
+                graph.Evaluate();
+                Assert.That(AnimationMode.InAnimationMode(), Is.True,
+                    "reenabling the target while the graph is active must resume sampling");
+
+                Object.DestroyImmediate(root);
+                graph.Evaluate();
+                Assert.That(AnimationMode.InAnimationMode(), Is.False,
+                    "the next graph evaluation must release package-owned AnimationMode for a destroyed target");
+                graph.Stop();
+                graph.Evaluate();
+                graph.Destroy();
+                Assert.That(AnimationMode.InAnimationMode(), Is.False,
+                    "destroying the graph must release package-owned AnimationMode after its target was destroyed");
+            }
+            finally
+            {
+                if (graph.IsValid())
+                {
+                    graph.Destroy();
+                }
+
+                behaviour?.OnPlayableDestroy(Playable.Null);
+                if (animationModeWasInactive && AnimationMode.InAnimationMode())
+                {
+                    AnimationMode.StopAnimationMode();
+                }
+
+                if (animationClip != null)
+                {
+                    Object.DestroyImmediate(animationClip);
+                }
+
+                if (root != null)
+                {
+                    Object.DestroyImmediate(root);
+                }
+            }
+        }
+
+        [Test]
+        public void DestroyedHumanoidRuntimeTargetRemovesRootMotionGuardWhenGraphDestroyedBeforeFirstEvaluation()
+        {
+            GameObject? root = null;
+            GameObject? directorObject = null;
+            PlayableGraph graph = default;
+            MmdHumanoidAnimationRootMotionGuardBehaviour? behaviour = null;
+            try
+            {
+                root = new GameObject("workflow-destroyed-runtime-before-evaluation-target");
+                Animator animator = root.AddComponent<Animator>();
+                animator.applyRootMotion = true;
+                directorObject = new GameObject("workflow-destroyed-runtime-before-evaluation-director");
+                PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
+
+                graph = PlayableGraph.Create("workflow-destroyed-runtime-before-evaluation-graph");
+                ScriptPlayable<MmdHumanoidAnimationRootMotionGuardBehaviour> guardPlayable =
+                    ScriptPlayable<MmdHumanoidAnimationRootMotionGuardBehaviour>.Create(graph);
+                MmdHumanoidAnimationRootMotionGuardBehaviour guardBehaviour = guardPlayable.GetBehaviour();
+                behaviour = guardBehaviour;
+                guardBehaviour.Initialize(animator, director);
+                ScriptPlayableOutput output = ScriptPlayableOutput.Create(
+                    graph,
+                    "workflow-destroyed-runtime-before-evaluation-output");
+                output.SetSourcePlayable(guardPlayable);
+
+                Assert.That(MmdHumanoidAnimationRootMotionGuardBehaviour.GuardStateCount, Is.Zero,
+                    "initialization must not acquire a guard before the graph is evaluated");
+                Assert.That(animator.applyRootMotion, Is.True);
+
+                Object.DestroyImmediate(root);
+                graph.Destroy();
+
+                Assert.That(MmdHumanoidAnimationRootMotionGuardBehaviour.GuardStateCount, Is.Zero,
+                    "graph destruction before first evaluation must remove the guard for a destroyed Animator");
+            }
+            finally
+            {
+                if (graph.IsValid())
+                {
+                    graph.Destroy();
+                }
+
+                behaviour?.OnPlayableDestroy(Playable.Null);
+                if (directorObject != null)
+                {
+                    Object.DestroyImmediate(directorObject);
+                }
+
+                if (root != null)
+                {
+                    Object.DestroyImmediate(root);
+                }
+            }
+        }
+
+        [Test]
+        public void DisabledAndDestroyedHumanoidRuntimeTargetReleasesRootMotionGuardOnEvaluation()
+        {
+            GameObject? root = null;
+            GameObject? directorObject = null;
+            PlayableGraph graph = default;
+            MmdHumanoidAnimationRootMotionGuardBehaviour? behaviour = null;
+            try
+            {
+                root = new GameObject("workflow-destroyed-runtime-target");
+                Animator animator = root.AddComponent<Animator>();
+                animator.applyRootMotion = true;
+                directorObject = new GameObject("workflow-destroyed-runtime-director");
+                PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
+
+                graph = PlayableGraph.Create("workflow-destroyed-runtime-target-graph");
+                ScriptPlayable<MmdHumanoidAnimationRootMotionGuardBehaviour> guardPlayable =
+                    ScriptPlayable<MmdHumanoidAnimationRootMotionGuardBehaviour>.Create(graph);
+                MmdHumanoidAnimationRootMotionGuardBehaviour guardBehaviour = guardPlayable.GetBehaviour();
+                behaviour = guardBehaviour;
+                guardBehaviour.Initialize(animator, director);
+                ScriptPlayableOutput output = ScriptPlayableOutput.Create(graph, "workflow-destroyed-runtime-target-output");
+                output.SetSourcePlayable(guardPlayable);
+
+                Assert.That(MmdHumanoidAnimationRootMotionGuardBehaviour.GuardStateCount, Is.Zero,
+                    "initialization must defer guard acquisition until playback is evaluated");
+                Assert.That(animator.applyRootMotion, Is.True);
+
+                graph.Play();
+                graph.Evaluate();
+                Assert.That(MmdHumanoidAnimationRootMotionGuardBehaviour.GuardStateCount, Is.EqualTo(1));
+                Assert.That(animator.applyRootMotion, Is.False);
+                root.SetActive(false);
+                graph.Evaluate();
+                Assert.That(MmdHumanoidAnimationRootMotionGuardBehaviour.GuardStateCount, Is.Zero,
+                    "the next graph evaluation must release the guard for a disabled target");
+
+                root.SetActive(true);
+                graph.Evaluate();
+                Assert.That(MmdHumanoidAnimationRootMotionGuardBehaviour.GuardStateCount, Is.EqualTo(1),
+                    "reenabling the target while the graph is active must reacquire the guard");
+
+                Object.DestroyImmediate(root);
+                graph.Evaluate();
+                Assert.That(MmdHumanoidAnimationRootMotionGuardBehaviour.GuardStateCount, Is.Zero,
+                    "the next graph evaluation must release the guard for a destroyed target");
+                graph.Stop();
+                graph.Evaluate();
+                graph.Destroy();
+                Assert.That(MmdHumanoidAnimationRootMotionGuardBehaviour.GuardStateCount, Is.Zero,
+                    "graph destruction must remove the guard even when its Animator is Unity-destroyed fake-null");
+            }
+            finally
+            {
+                if (graph.IsValid())
+                {
+                    graph.Destroy();
+                }
+
+                behaviour?.OnPlayableDestroy(Playable.Null);
+                if (directorObject != null)
+                {
+                    Object.DestroyImmediate(directorObject);
                 }
 
                 if (root != null)

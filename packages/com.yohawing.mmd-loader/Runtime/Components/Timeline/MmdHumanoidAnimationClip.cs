@@ -122,8 +122,20 @@ namespace Mmd.Timeline
 
         public override void PrepareFrame(Playable playable, FrameData info)
         {
+            if (!initialized)
+            {
+                return;
+            }
+
             if (animator == null || clip == null)
             {
+                RestoreBaseline();
+                return;
+            }
+
+            if (!animator.gameObject.activeInHierarchy)
+            {
+                RestoreBaseline(clearInitialization: false);
                 return;
             }
 
@@ -144,12 +156,12 @@ namespace Mmd.Timeline
 
         public override void OnGraphStop(Playable playable)
         {
-            RestoreBaseline();
+            RestoreBaseline(clearInitialization: false);
         }
 
         public override void OnBehaviourPause(Playable playable, FrameData info)
         {
-            RestoreBaseline();
+            RestoreBaseline(clearInitialization: false);
         }
 
         public override void OnPlayableDestroy(Playable playable)
@@ -157,9 +169,9 @@ namespace Mmd.Timeline
             RestoreBaseline();
         }
 
-        private void RestoreBaseline()
+        private void RestoreBaseline(bool clearInitialization = true)
         {
-            if (!initialized || animator == null)
+            if (!initialized)
             {
                 return;
             }
@@ -171,8 +183,14 @@ namespace Mmd.Timeline
             }
             ownsAnimationMode = false;
 #endif
-            initialized = false;
-            animator.transform.SetPositionAndRotation(baselinePosition, baselineRotation);
+            if (clearInitialization)
+            {
+                initialized = false;
+            }
+            if (animator != null)
+            {
+                animator.transform.SetPositionAndRotation(baselinePosition, baselineRotation);
+            }
         }
     }
 
@@ -195,9 +213,13 @@ namespace Mmd.Timeline
 
         private static readonly Dictionary<Animator, GuardState> GuardStates = new Dictionary<Animator, GuardState>();
 
+        internal static int GuardStateCount => GuardStates.Count;
+
         private Animator? guardedAnimator;
         private PlayableDirector? guardedDirector;
         private bool initialized;
+        private bool canActivate;
+        private GuardState? guardState;
 
         public void Initialize(
             Animator animator,
@@ -205,12 +227,33 @@ namespace Mmd.Timeline
         {
             guardedAnimator = animator;
             guardedDirector = director;
-            Activate();
+            canActivate = true;
         }
 
         public override void OnBehaviourPlay(Playable playable, FrameData info)
         {
+            canActivate = true;
             Activate();
+        }
+
+        public override void OnGraphStart(Playable playable)
+        {
+            canActivate = true;
+            Activate();
+        }
+
+        public override void PrepareFrame(Playable playable, FrameData info)
+        {
+            if (guardedAnimator == null || !guardedAnimator.isActiveAndEnabled)
+            {
+                Restore();
+                return;
+            }
+
+            if (canActivate)
+            {
+                Activate();
+            }
         }
 
         private void Activate()
@@ -232,6 +275,7 @@ namespace Mmd.Timeline
                 GuardStates.Add(guardedAnimator, state);
             }
 
+            guardState = state;
             state.ReferenceCount++;
             guardedAnimator.applyRootMotion = false;
             if (state.ReferenceCount == 1)
@@ -242,11 +286,13 @@ namespace Mmd.Timeline
 
         public override void OnGraphStop(Playable playable)
         {
+            canActivate = false;
             Restore();
         }
 
         public override void OnPlayableDestroy(Playable playable)
         {
+            canActivate = false;
             Restore();
             guardedAnimator = null;
             guardedDirector = null;
@@ -256,6 +302,7 @@ namespace Mmd.Timeline
         {
             if (stoppedDirector == guardedDirector)
             {
+                canActivate = false;
                 Restore();
             }
         }
@@ -273,8 +320,16 @@ namespace Mmd.Timeline
             }
 
             initialized = false;
-            if (guardedAnimator == null || !GuardStates.TryGetValue(guardedAnimator, out GuardState state))
+            GuardState? state = guardState;
+            guardState = null;
+            if (state == null)
             {
+                return;
+            }
+
+            if (state.ReferenceCount <= 0)
+            {
+                RemoveGuardState(state);
                 return;
             }
 
@@ -284,11 +339,37 @@ namespace Mmd.Timeline
                 return;
             }
 
-            GuardStates.Remove(guardedAnimator);
+            RemoveGuardState(state);
             if (state.Animator != null)
             {
                 state.Animator.GetComponent<MmdHumanoidRootMotionDriver>()?.EndTimelineEvaluation();
                 state.Animator.applyRootMotion = state.OriginalApplyRootMotion;
+            }
+        }
+
+        private static void RemoveGuardState(GuardState state)
+        {
+            if (state.Animator != null)
+            {
+                GuardStates.Remove(state.Animator);
+                return;
+            }
+
+            Animator? keyToRemove = null;
+            bool found = false;
+            foreach (KeyValuePair<Animator, GuardState> entry in GuardStates)
+            {
+                if (ReferenceEquals(entry.Value, state))
+                {
+                    keyToRemove = entry.Key;
+                    found = true;
+                    break;
+                }
+            }
+
+            if (found)
+            {
+                GuardStates.Remove(keyToRemove!);
             }
         }
     }
