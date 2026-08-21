@@ -564,6 +564,118 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void PendingVmdPreloadCleanupFailureRetainsOwnershipForSourceReplacementRetry()
+        {
+            var factoryStarted = new TaskCompletionSource<bool>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            var preloadWaitEntered = new TaskCompletionSource<bool>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            var pending = new TaskCompletionSource<MmdRuntimeFfiVmdContext>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            int freeCount = 0;
+            bool failFirstFree = true;
+            var context = new MmdRuntimeFfiVmdContext(
+                new IntPtr(1),
+                _ =>
+                {
+                    freeCount++;
+                    if (failFirstFree)
+                    {
+                        failFirstFree = false;
+                        throw new InvalidOperationException("transient pending cleanup failure");
+                    }
+                });
+            var cache = new MmdVmdNativeContextCache(
+                _ =>
+                {
+                    factoryStarted.TrySetResult(true);
+                    return pending.Task;
+                },
+                preloadWaitEnteredForTests: () =>
+                {
+                    preloadWaitEntered.TrySetResult(true);
+                    pending.TrySetResult(context);
+                });
+            TextAsset? firstRawSource = null;
+            TextAsset? secondRawSource = null;
+            Task? firstCaller = null;
+            bool firstSucceeded = false;
+            MmdRuntimeFfiVmdContext? firstContext = null;
+            string firstReason = string.Empty;
+
+            try
+            {
+                firstRawSource = new TextAsset("raw-source-a");
+                secondRawSource = new TextAsset("raw-source-b");
+                MmdVmdNativeContextCache.SourceSnapshot firstSnapshot =
+                    cache.ReadSourceSnapshot(Array.Empty<byte>(), firstRawSource);
+
+                firstCaller = Task.Run(() =>
+                {
+                    firstSucceeded = cache.TryGetOrCreateNativeVmdContext(
+                        firstSnapshot,
+                        failureOverrideForTests: null,
+                        out firstContext,
+                        out firstReason);
+                });
+                Assert.That(factoryStarted.Task.Wait(TimeSpan.FromSeconds(5)), Is.True);
+
+                Assert.Throws<InvalidOperationException>(
+                    () => cache.ReadSourceSnapshot(Array.Empty<byte>(), secondRawSource));
+                Assert.That(preloadWaitEntered.Task.IsCompleted, Is.True);
+
+                Assert.That(firstCaller.Wait(TimeSpan.FromSeconds(5)), Is.True);
+                firstCaller.GetAwaiter().GetResult();
+                Assert.That(firstSucceeded, Is.True);
+                Assert.That(firstContext, Is.SameAs(context));
+                Assert.That(firstReason, Is.Empty);
+
+                MmdVmdNativeContextCache.SourceSnapshot retained =
+                    cache.ReadSourceSnapshot(Array.Empty<byte>(), firstRawSource);
+                Assert.That(retained.Generation, Is.EqualTo(firstSnapshot.Generation));
+                Assert.That(retained.Bytes, Is.SameAs(firstSnapshot.Bytes));
+
+                MmdVmdNativeContextCache.SourceSnapshot secondSnapshot =
+                    cache.ReadSourceSnapshot(Array.Empty<byte>(), secondRawSource);
+
+                Assert.That(secondSnapshot.Generation, Is.GreaterThan(firstSnapshot.Generation));
+                Assert.That(freeCount, Is.EqualTo(2));
+                cache.Dispose();
+                Assert.That(freeCount, Is.EqualTo(2));
+            }
+            finally
+            {
+                pending.TrySetCanceled();
+                bool firstCallerCompleted = firstCaller == null ||
+                    firstCaller.Wait(TimeSpan.FromSeconds(5));
+                if (firstCallerCompleted && firstCaller != null)
+                {
+                    try
+                    {
+                        firstCaller.GetAwaiter().GetResult();
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                if (firstCallerCompleted)
+                {
+                    cache.Dispose();
+                }
+                if (firstRawSource != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(firstRawSource);
+                }
+
+                if (secondRawSource != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(secondRawSource);
+                }
+            }
+        }
+
+        [Test]
         public void RawSourceToSerializedBytesTransitionDisposesContextOnceAndReturnsSerializedSource()
         {
             int freeCount = 0;
