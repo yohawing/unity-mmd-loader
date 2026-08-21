@@ -423,6 +423,53 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void CompletedVmdPreloadIsDisposedOnceWhenRawSourceIsReplaced()
+        {
+            int freeCount = 0;
+            var context = new MmdRuntimeFfiVmdContext(
+                new IntPtr(1),
+                _ => freeCount++);
+            var cache = new MmdVmdNativeContextCache(
+                _ => Task.FromResult(context));
+            TextAsset? firstRawSource = null;
+            TextAsset? secondRawSource = null;
+
+            try
+            {
+                firstRawSource = new TextAsset("raw-source-a");
+                secondRawSource = new TextAsset("raw-source-b");
+                MmdVmdNativeContextCache.SourceSnapshot first =
+                    cache.ReadSourceSnapshot(Array.Empty<byte>(), firstRawSource);
+
+                Task preload = cache.BeginNativePlaybackPreload(
+                    first,
+                    failureOverrideForTests: null);
+                Assert.DoesNotThrow(() => preload.GetAwaiter().GetResult());
+
+                MmdVmdNativeContextCache.SourceSnapshot second =
+                    cache.ReadSourceSnapshot(Array.Empty<byte>(), secondRawSource);
+
+                Assert.That(second.Generation, Is.GreaterThan(first.Generation));
+                Assert.That(freeCount, Is.EqualTo(1));
+            }
+            finally
+            {
+                cache.Dispose();
+                if (firstRawSource != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(firstRawSource);
+                }
+
+                if (secondRawSource != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(secondRawSource);
+                }
+            }
+
+            Assert.That(freeCount, Is.EqualTo(1));
+        }
+
+        [Test]
         public void RawSourceToSerializedBytesTransitionDisposesContextOnceAndReturnsSerializedSource()
         {
             int freeCount = 0;
