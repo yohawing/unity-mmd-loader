@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using Mmd.IO;
 
 namespace Mmd.Mme
 {
@@ -242,26 +243,17 @@ namespace Mmd.Mme
                 return false;
             }
 
-            string root = Path.GetFullPath(directory);
-            string relativePath = effectPath
-                .Replace('\\', Path.DirectorySeparatorChar)
-                .Replace('/', Path.DirectorySeparatorChar);
-            string candidate = Path.GetFullPath(Path.Combine(root, relativePath));
-            if (!IsUnderDirectory(root, candidate) || !File.Exists(candidate))
+            if (!MmdSafeRelativePath.TryResolve(
+                    directory,
+                    effectPath,
+                    out fxFile,
+                    out _)
+                || !File.Exists(fxFile))
             {
                 return false;
             }
 
-            fxFile = candidate;
             return true;
-        }
-
-        private static bool IsUnderDirectory(string root, string candidate)
-        {
-            string normalizedRoot = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) +
-                                    Path.DirectorySeparatorChar;
-            string normalizedCandidate = candidate.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            return normalizedCandidate.StartsWith(normalizedRoot, StringComparison.Ordinal);
         }
     }
 }
