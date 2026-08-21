@@ -145,17 +145,11 @@ namespace Mmd.UnityIntegration
             {
                 setupTiming.motionHeaderMs += TimelineSetupElapsedMilliseconds(phaseStart);
             }
-            if (!HasExistingSceneSkinnedMeshRenderer())
+            if (!TryValidateExistingSceneModelCompatibility(model, setupTiming))
             {
                 throw CreateMissingSceneModelException(resolvedPmxPath, timelineEvaluation);
             }
 
-            phaseStart = Stopwatch.GetTimestamp();
-            MmdUnityModelFactory.ValidateExistingSkinnedModelCompatibility(gameObject, model);
-            if (setupTiming != null)
-            {
-                setupTiming.compatibilityValidationMs += TimelineSetupElapsedMilliseconds(phaseStart);
-            }
             TryConfigureNativeFirst(
                 new MmdNativePlaybackSetup(motion, pmxBytes, vmdBytes),
                 nativeMotion => MmdUnityPlaybackBinding.CreateSkinnedFromExistingSceneModel(
@@ -299,17 +293,11 @@ namespace Mmd.UnityIntegration
                 setupTiming.pmxParseCacheHit = cachedPmx.CacheHit;
             }
 
-            if (!HasExistingSceneSkinnedMeshRenderer())
+            if (!TryValidateExistingSceneModelCompatibility(model, setupTiming))
             {
                 throw CreateMissingSceneModelException(resolvedPmxPath, timelineEvaluation);
             }
 
-            phaseStart = Stopwatch.GetTimestamp();
-            MmdUnityModelFactory.ValidateExistingSkinnedModelCompatibility(gameObject, model);
-            if (setupTiming != null)
-            {
-                setupTiming.compatibilityValidationMs += TimelineSetupElapsedMilliseconds(phaseStart);
-            }
             phaseStart = Stopwatch.GetTimestamp();
             byte[] pathPmxBytes = cachedPmx.Bytes;
             byte[] pathVmdBytes = vmdAsset.GetBytesCopy();
@@ -494,12 +482,7 @@ namespace Mmd.UnityIntegration
                 }
                 setupTiming.pmxParseCacheHit = pmxParseCacheHit;
             }
-            phaseStart = Stopwatch.GetTimestamp();
-            MmdUnityModelFactory.ValidateExistingSkinnedModelCompatibility(gameObject, model);
-            if (setupTiming != null)
-            {
-                setupTiming.compatibilityValidationMs += TimelineSetupElapsedMilliseconds(phaseStart);
-            }
+            ValidateExistingSceneModelCompatibility(model, setupTiming);
             phaseStart = Stopwatch.GetTimestamp();
             byte[] pmxBytes = pmxAsset.GetBytesForSynchronousRuntimeSetup();
             byte[] vmdBytes = motion.sourceBytes
@@ -718,6 +701,31 @@ namespace Mmd.UnityIntegration
             return new InvalidOperationException(
                 prefix + " requires an existing scene PMX model with a SkinnedMeshRenderer to bind motion. " +
                 "No matching SkinnedMeshRenderer was found for provider model source (" + sourceId + ").");
+        }
+
+        private bool TryValidateExistingSceneModelCompatibility(
+            MmdModelDefinition model,
+            MmdTimelineSetupTimingSummary? setupTiming)
+        {
+            if (!HasExistingSceneSkinnedMeshRenderer())
+            {
+                return false;
+            }
+
+            ValidateExistingSceneModelCompatibility(model, setupTiming);
+            return true;
+        }
+
+        private void ValidateExistingSceneModelCompatibility(
+            MmdModelDefinition model,
+            MmdTimelineSetupTimingSummary? setupTiming)
+        {
+            long phaseStart = Stopwatch.GetTimestamp();
+            MmdUnityModelFactory.ValidateExistingSkinnedModelCompatibility(gameObject, model);
+            if (setupTiming != null)
+            {
+                setupTiming.compatibilityValidationMs += TimelineSetupElapsedMilliseconds(phaseStart);
+            }
         }
 
         private static string ResolveAssetSourceId(MmdVmdAsset asset)
