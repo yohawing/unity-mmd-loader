@@ -55,22 +55,12 @@ namespace Mmd.UnityIntegration
             }
 
             config.Validate();
-            ConfigureModelAsset(pmxAsset);
-            ConfigureMotionAsset(vmdAsset);
-            MmdMotionDefinition motion = vmdAsset.CreateNativeClipMotionHeader();
-            MmdMotionValidator.ThrowIfInvalid(motion);
-            if (TryConfigureReboundAssetBinding(
+            ConfigureFromAssetSourceCore(
                 pmxAsset,
                 vmdAsset,
-                motion,
                 reboundBinding => Configure(reboundBinding, config),
                 timelineEvaluation: false,
-                applyStartFrame: null))
-            {
-                return;
-            }
-
-            throw CreateMissingSceneModelException(ResolveAssetSourceId(pmxAsset), timelineEvaluation: false);
+                applyStartFrame: null);
         }
 
         public void ConfigureFromRuntimeImporterPaths(
@@ -364,6 +354,21 @@ namespace Mmd.UnityIntegration
                 throw new ArgumentOutOfRangeException(nameof(startFrame), "Initial frame must not be negative.");
             }
 
+            ConfigureFromAssetSourceCore(
+                pmxAsset,
+                vmdAsset,
+                reboundBinding => Configure(reboundBinding, playbackFrameRate, playOnStart),
+                timelineEvaluation: false,
+                applyStartFrame: startFrame);
+        }
+
+        private void ConfigureFromAssetSourceCore(
+            MmdPmxAsset pmxAsset,
+            MmdVmdAsset vmdAsset,
+            Action<MmdUnityPlaybackBinding> configure,
+            bool timelineEvaluation,
+            int? applyStartFrame)
+        {
             ConfigureModelAsset(pmxAsset);
             ConfigureMotionAsset(vmdAsset);
             MmdMotionDefinition motion = vmdAsset.CreateNativeClipMotionHeader();
@@ -373,14 +378,16 @@ namespace Mmd.UnityIntegration
                 pmxAsset,
                 vmdAsset,
                 motion,
-                reboundBinding => Configure(reboundBinding, playbackFrameRate, playOnStart),
-                timelineEvaluation: false,
-                applyStartFrame: startFrame))
+                configure,
+                timelineEvaluation,
+                applyStartFrame))
             {
                 return;
             }
 
-            throw CreateMissingSceneModelException(ResolveAssetSourceId(pmxAsset), timelineEvaluation: false);
+            throw CreateMissingSceneModelException(
+                ResolveAssetSourceId(pmxAsset),
+                timelineEvaluation);
         }
 
         public bool ConfigureFromPlaybackSourceIfAvailable()
