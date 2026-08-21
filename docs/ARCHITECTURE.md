@@ -50,8 +50,11 @@ but they intentionally keep source acquisition separate. PMX bytes may be
 borrowed from an asset cache while VMD bytes and a shared native context have
 different owners. `MmdVmdNativeContextCache.SourceSnapshot` now carries a
 monotonic generation so a caller that crossed a source invalidation is rejected
-before it starts a new native task. This does not remove the existing
-synchronous cleanup wait or prove disposal of every in-flight source swap.
+before it starts a new native task. A deterministic EditMode contract also
+drives a pending preload through a main-thread raw-source replacement and
+checks stale-caller rejection plus exactly-once cleanup. This does not remove
+the existing synchronous cleanup wait, cover cleanup-failure ownership, or
+establish the native-free thread-affinity contract.
 Do not introduce a generic prepared-source abstraction or move native cleanup
 off the current owner boundary until buffer lifetime, stale-result disposal,
 and native-free thread contract are covered by deterministic tests.
