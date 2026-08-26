@@ -2,6 +2,7 @@
 
 using System;
 using Mmd;
+using Mmd.Parser;
 
 namespace Mmd.UnityIntegration
 {
@@ -16,6 +17,8 @@ namespace Mmd.UnityIntegration
             proxyRoot != null && humanoidRetargetEntries != null && humanoidRetargetEntries.Count > 0;
 
         internal MmdMultiCharacterPlaybackGroup? MultiCharacterGroup => multiCharacterGroup;
+
+        internal MmdModelDefinition? MultiCharacterModelDefinition => binding?.ManagedModelDefinition;
 
         internal bool TryClaimMultiCharacterGroup(
             MmdMultiCharacterPlaybackGroup group,
@@ -62,7 +65,8 @@ namespace Mmd.UnityIntegration
 
         internal void ThrowIfMultiCharacterPoolOwnsController(string operation)
         {
-            if (multiCharacterClaimed && multiCharacterGroup?.HasWorkerPool == true)
+            if (multiCharacterClaimed && multiCharacterGroup?.HasWorkerPool == true &&
+                operation != nameof(Play) && operation != nameof(Pause))
             {
                 throw new InvalidOperationException(
                     operation + " is not supported while a multi-character playback group owns this controller.");
@@ -108,9 +112,9 @@ namespace Mmd.UnityIntegration
                 return false;
             }
 
-            if (PhysicsMode != Mmd.Physics.MmdPhysicsMode.Off)
+            if (PhysicsMode != Mmd.Physics.MmdPhysicsMode.Off && PhysicsMode != Mmd.Physics.MmdPhysicsMode.Live)
             {
-                reason = "Multi-character playback requires Physics Mode Off.";
+                reason = "Multi-character playback requires Physics Mode Off or Live.";
                 return false;
             }
 
@@ -184,6 +188,20 @@ namespace Mmd.UnityIntegration
             }
         }
 
+        internal bool TryPrepareMultiCharacterLivePhysicsWorker(out string reason)
+        {
+            if (PhysicsMode != Mmd.Physics.MmdPhysicsMode.Live || binding == null ||
+                binding.NativeHumanoidHostPoseEnabled)
+            {
+                reason = "Multi-character Live physics requires a configured non-Humanoid Live binding.";
+                return false;
+            }
+
+            binding.ResetLivePhysicsForDriveSource();
+            reason = string.Empty;
+            return true;
+        }
+
         internal bool TryValidateMultiCharacterPreparedApply(
             MmdMultiCharacterWorkerResult result,
             out string reason)
@@ -199,10 +217,12 @@ namespace Mmd.UnityIntegration
                 return false;
             }
 
-            if (!binding!.TryValidatePreparedFastFrame(
-                    result.WorldMatrices,
-                    result.MorphWeights,
-                    out reason))
+            if (PhysicsMode == Mmd.Physics.MmdPhysicsMode.Live)
+            {
+                return binding!.TryValidatePreparedMultiCharacterLiveFrame(CurrentFrame, frameRate, result, out reason);
+            }
+
+            if (!binding!.TryValidatePreparedFastFrame(result.WorldMatrices, result.MorphWeights, out reason))
             {
                 return false;
             }
@@ -225,9 +245,9 @@ namespace Mmd.UnityIntegration
                 return false;
             }
 
-            if (PhysicsMode != Mmd.Physics.MmdPhysicsMode.Off)
+            if (PhysicsMode != Mmd.Physics.MmdPhysicsMode.Off && PhysicsMode != Mmd.Physics.MmdPhysicsMode.Live)
             {
-                reason = "Multi-character playback requires Physics Mode Off.";
+                reason = "Multi-character playback requires Physics Mode Off or Live.";
                 return false;
             }
 
@@ -260,11 +280,9 @@ namespace Mmd.UnityIntegration
             CurrentFrame = frame;
             return ApplyPlaybackPose(() =>
             {
-                LastSnapshot = binding.ApplyPreparedFastFrame(
-                    frame,
-                    frameRate,
-                    result.WorldMatrices,
-                    result.MorphWeights);
+                LastSnapshot = PhysicsMode == Mmd.Physics.MmdPhysicsMode.Live
+                    ? binding.ApplyPreparedMultiCharacterLiveFrame(frame, frameRate, result)
+                    : binding.ApplyPreparedFastFrame(frame, frameRate, result.WorldMatrices, result.MorphWeights);
                 return LastSnapshot;
             });
         }

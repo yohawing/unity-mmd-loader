@@ -21,6 +21,7 @@ namespace Mmd.UnityIntegration
         private MmdUnityPlaybackController.MmdMultiCharacterClockState[]? previousClocks;
         private int[]? configurationRevisions;
         private MmdMultiCharacterWorkerPool? workerPool;
+        private bool workerPoolNeedsInitialLiveApply;
         private bool claimsHeld;
         private string lastFailureReason = string.Empty;
 
@@ -85,20 +86,24 @@ namespace Mmd.UnityIntegration
             int advancedCount = 0;
             try
             {
-                for (int i = 0; i < active.Length; i++)
+                bool initialLiveApply = workerPoolNeedsInitialLiveApply;
+                if (!initialLiveApply)
                 {
-                    clocks[i] = active[i].AdvanceMultiCharacterClock(Time.deltaTime);
-                    advancedCount++;
-                }
-
-                frame = active[0].CurrentFrame;
-                for (int i = 1; i < active.Length; i++)
-                {
-                    if (active[i].CurrentFrame != frame)
+                    for (int i = 0; i < active.Length; i++)
                     {
-                        RestoreClocks(active, clocks, advancedCount);
-                        FailClosed("Controllers do not share one logical frame after clock advance.");
-                        return;
+                        clocks[i] = active[i].AdvanceMultiCharacterClock(Time.deltaTime);
+                        advancedCount++;
+                    }
+
+                    frame = active[0].CurrentFrame;
+                    for (int i = 1; i < active.Length; i++)
+                    {
+                        if (active[i].CurrentFrame != frame)
+                        {
+                            RestoreClocks(active, clocks, advancedCount);
+                            FailClosed("Controllers do not share one logical frame after clock advance.");
+                            return;
+                        }
                     }
                 }
 
@@ -122,6 +127,8 @@ namespace Mmd.UnityIntegration
                         frameRate,
                         workerPool.GetResult(i));
                 }
+
+                workerPoolNeedsInitialLiveApply = false;
             }
             catch (Exception exception)
             {
@@ -173,6 +180,7 @@ namespace Mmd.UnityIntegration
             }
 
             var ids = new HashSet<int>();
+            Mmd.Physics.MmdPhysicsMode? sharedPhysicsMode = null;
             for (int i = 0; i < candidate.Length; i++)
             {
                 MmdUnityPlaybackController controller = candidate[i];
@@ -189,11 +197,20 @@ namespace Mmd.UnityIntegration
                     return;
                 }
 
-                if (controller.PhysicsMode != Mmd.Physics.MmdPhysicsMode.Off)
+                if (controller.PhysicsMode != Mmd.Physics.MmdPhysicsMode.Off &&
+                    controller.PhysicsMode != Mmd.Physics.MmdPhysicsMode.Live)
                 {
-                    lastFailureReason = "Multi-character playback requires Physics Mode Off.";
+                    lastFailureReason = "Multi-character playback supports only Physics Mode Off or Live.";
                     return;
                 }
+
+                if (sharedPhysicsMode.HasValue && sharedPhysicsMode.Value != controller.PhysicsMode)
+                {
+                    lastFailureReason = "All multi-character controllers must use the same Physics Mode.";
+                    return;
+                }
+
+                sharedPhysicsMode = controller.PhysicsMode;
             }
 
             for (int i = 0; i < candidate.Length; i++)
@@ -231,15 +248,6 @@ namespace Mmd.UnityIntegration
             MmdUnityPlaybackController[] active = resolvedControllers!;
             if (workerPool != null)
             {
-                for (int i = 0; i < active.Length; i++)
-                {
-                    if (configurationRevisions![i] != active[i].ConfigurationRevision)
-                    {
-                        FailClosed("Playback configuration changed while the group was active.");
-                        return false;
-                    }
-                }
-
                 return true;
             }
 
@@ -277,10 +285,33 @@ namespace Mmd.UnityIntegration
                         return false;
                     }
 
-                    evaluators.Add(new MmdNativeMultiCharacterWorker(
-                        pmxBytes,
-                        vmdBytes,
-                        (uint)controller.IkMaxIterationsCap));
+                    if (controller.PhysicsMode == Mmd.Physics.MmdPhysicsMode.Live)
+                    {
+                        if (controller.MultiCharacterModelDefinition == null || controller.IkMaxIterationsCap != 0)
+                        {
+                            FailClosed("Multi-character Live physics requires a managed model and compatibility IK cap 0.");
+                            return false;
+                        }
+
+                        if (!controller.TryPrepareMultiCharacterLivePhysicsWorker(out reason))
+                        {
+                            FailClosed(reason);
+                            return false;
+                        }
+
+                        evaluators.Add(new MmdNativeLivePhysicsMultiCharacterWorker(
+                            pmxBytes,
+                            vmdBytes,
+                            controller.MultiCharacterModelDefinition,
+                            ikMaxIterationsCap: 0));
+                    }
+                    else
+                    {
+                        evaluators.Add(new MmdNativeMultiCharacterWorker(
+                            pmxBytes,
+                            vmdBytes,
+                            (uint)controller.IkMaxIterationsCap));
+                    }
                 }
 
                 ownershipTransferred = true;
@@ -292,6 +323,7 @@ namespace Mmd.UnityIntegration
                 }
 
                 workerPool = createdPool;
+                workerPoolNeedsInitialLiveApply = active[0].PhysicsMode == Mmd.Physics.MmdPhysicsMode.Live;
                 configurationRevisions = revisions;
                 createdPool = null;
                 return true;
@@ -324,6 +356,9 @@ namespace Mmd.UnityIntegration
         {
             frame = active[0].CurrentFrame;
             frameRate = active[0].FrameRate;
+            bool anyPlaying = false;
+            bool anyPaused = false;
+            Mmd.Physics.MmdPhysicsMode? sharedPhysicsMode = null;
             for (int i = 0; i < active.Length; i++)
             {
                 MmdUnityPlaybackController controller = active[i];
@@ -333,11 +368,14 @@ namespace Mmd.UnityIntegration
                     return false;
                 }
 
-                if (!controller.IsPlaying)
+                if (workerPool != null && configurationRevisions![i] != controller.ConfigurationRevision)
                 {
-                    FailClosed("Multi-character playback requires every claimed controller to be playing.");
+                    FailClosed("Playback configuration changed while the group was active.");
                     return false;
                 }
+
+                anyPlaying |= controller.IsPlaying;
+                anyPaused |= !controller.IsPlaying;
 
                 if (!controller.TryValidateMultiCharacterState(out string applyReason))
                 {
@@ -351,11 +389,30 @@ namespace Mmd.UnityIntegration
                     return false;
                 }
 
+                if (sharedPhysicsMode.HasValue && sharedPhysicsMode.Value != controller.PhysicsMode)
+                {
+                    FailClosed("All multi-character controllers must use the same Physics Mode.");
+                    return false;
+                }
+
+                sharedPhysicsMode = controller.PhysicsMode;
+
                 if (controller.CurrentFrame != frame || controller.FrameRate != frameRate)
                 {
                     FailClosed("Controllers do not share one logical frame.");
                     return false;
                 }
+            }
+
+            if (anyPlaying && anyPaused)
+            {
+                FailClosed("Multi-character playback requires all claimed controllers to be playing or paused together.");
+                return false;
+            }
+
+            if (anyPaused)
+            {
+                return false;
             }
 
             return true;
@@ -404,6 +461,7 @@ namespace Mmd.UnityIntegration
             finally
             {
                 workerPool = null;
+                workerPoolNeedsInitialLiveApply = false;
                 configurationRevisions = null;
 
                 if (claimsHeld && resolvedControllers != null)

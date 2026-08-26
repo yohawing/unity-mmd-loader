@@ -6,6 +6,8 @@ using System.IO;
 using System.Reflection;
 using System.Threading;
 using Mmd.Native;
+using Mmd.Parser;
+using Mmd.Physics;
 using Mmd.UnityIntegration;
 using NUnit.Framework;
 using UnityEngine;
@@ -306,6 +308,205 @@ namespace Mmd.Tests.Contracts
                 new[] { 0, 12, 0 });
         }
 
+        [Test]
+        public void LiveWorkersMatchSerialPhysicsAcrossForwardAndSameFrameTransitions()
+        {
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
+            if (!availability.backendAvailable)
+            {
+                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
+            }
+
+            string pmxPath = ResolveFixture("test_hair_physics.pmx");
+            string vmdPath = ResolveFixture("test_1bone_cube_motion.vmd");
+            byte[] pmxBytes = File.ReadAllBytes(pmxPath);
+            byte[] vmdBytes = File.ReadAllBytes(vmdPath);
+            MmdModelDefinition model = new NativeMmdParser().LoadModel(pmxBytes);
+            model.physics.joints.RemoveAll(joint =>
+                joint.rigidbodyAIndex < 0 && joint.rigidbodyBIndex < 0);
+
+            using MmdRuntimeFfiPlaybackSession serialSession =
+                MmdRuntimeFfiPlaybackSession.Create(pmxBytes, vmdBytes);
+            var serialBefore = new float[serialSession.WorldMatrixFloatCount];
+            var serialMorph = new float[serialSession.MorphWeightCount];
+            var serialIk = new byte[serialSession.IkEnabledCount];
+            serialSession.EvaluateAndCopy(0, serialBefore, serialMorph, serialIk);
+            Assert.That(
+                MmdAnimPhysicsBackend.TryCreateForPlaybackSession(
+                    pmxBytes,
+                    serialSession,
+                    model.name ?? string.Empty,
+                    string.Empty,
+                    out MmdAnimPhysicsBackend? serialBackend,
+                    out string reason),
+                Is.True,
+                reason);
+            using (serialBackend!)
+            {
+                serialBackend.InitializeWorld(model);
+                serialBackend.Reset();
+                var expectedShapeTypes = new string[model.physics.rigidbodies.Count];
+                for (int i = 0; i < expectedShapeTypes.Length; i++)
+                {
+                    expectedShapeTypes[i] = serialBackend.GetRigidbodyShapeType(i);
+                }
+                var evaluators = new List<MmdMultiCharacterWorkerPool.IEvaluator>
+                {
+                    new MmdNativeLivePhysicsMultiCharacterWorker(
+                        (byte[])pmxBytes.Clone(),
+                        (byte[])vmdBytes.Clone(),
+                        model,
+                        0),
+                    new MmdNativeLivePhysicsMultiCharacterWorker(
+                        (byte[])pmxBytes.Clone(),
+                        (byte[])vmdBytes.Clone(),
+                        model,
+                        0)
+                };
+                using var pool = new MmdMultiCharacterWorkerPool(evaluators);
+
+                var serialAfter = new float[serialSession.WorldMatrixFloatCount];
+                var serialRigidbodyPositions = new float[model.physics.rigidbodies.Count * 3];
+                var serialRigidbodyRotations = new float[model.physics.rigidbodies.Count * 4];
+                int serialLastFrame = -1;
+                float serialLastTime = 0.0f;
+                foreach (int frame in new[] { 0, 1, 2, 3 })
+                {
+                    float time = frame / 30.0f;
+                    MmdPhysicsHostStepDiagnostics serialDiagnostics;
+                    pool.Evaluate(frame, 30.0f);
+                    StepSerialLivePhysics(
+                        serialBackend,
+                        serialSession,
+                        frame,
+                        time,
+                        ref serialLastFrame,
+                        ref serialLastTime,
+                        serialBefore,
+                        serialMorph,
+                        serialIk,
+                        serialAfter,
+                        serialRigidbodyPositions,
+                        serialRigidbodyRotations,
+                        out serialDiagnostics);
+                    AssertLiveWorkerResults(
+                        pool,
+                        serialBefore,
+                        serialMorph,
+                        serialIk,
+                        serialAfter,
+                        serialRigidbodyPositions,
+                        serialRigidbodyRotations,
+                        serialDiagnostics,
+                        expectedShapeTypes,
+                        frame);
+                }
+
+                MmdMultiCharacterWorkerResult sameFrameResult = pool.GetResult(0);
+                var sameFrameAfter = (float[])sameFrameResult.AfterPhysicsWorldMatrices.Clone();
+                MmdPhysicsHostStepDiagnostics sameFrameDiagnostics = sameFrameResult.LastPhysicsDiagnostics!.Value;
+                float sameFrameTime = sameFrameResult.EvaluatedTime;
+                float sameFrameDeltaTime = sameFrameResult.DeltaTime;
+                bool sameFrameWasSeed = sameFrameResult.WasSeed;
+                pool.Evaluate(3, 30.0f);
+                MmdMultiCharacterWorkerResult repeatedFrameResult = pool.GetResult(0);
+                AssertFloatBitsEqual(sameFrameAfter, repeatedFrameResult.AfterPhysicsWorldMatrices, "same-frame after-physics matrix", 3, 0);
+                Assert.That(repeatedFrameResult.EvaluatedFrame, Is.EqualTo(sameFrameResult.EvaluatedFrame));
+                Assert.That(BitConverter.SingleToInt32Bits(repeatedFrameResult.EvaluatedTime), Is.EqualTo(BitConverter.SingleToInt32Bits(sameFrameTime)));
+                Assert.That(repeatedFrameResult.WasSeed, Is.EqualTo(sameFrameWasSeed));
+                Assert.That(BitConverter.SingleToInt32Bits(repeatedFrameResult.DeltaTime), Is.EqualTo(BitConverter.SingleToInt32Bits(sameFrameDeltaTime)));
+                Assert.That(repeatedFrameResult.LastPhysicsDiagnostics, Is.EqualTo(sameFrameDiagnostics));
+                Assert.That(repeatedFrameResult.LivePhysicsBackendName, Is.EqualTo("mmd-anim-bullet-native"));
+                Assert.That(repeatedFrameResult.SkippedWorldAnchorJointCount, Is.EqualTo(serialBackend.SkippedWorldAnchorJointCount));
+                CollectionAssert.AreEqual(expectedShapeTypes, repeatedFrameResult.RigidbodyShapeTypes);
+                Assert.Throws<InvalidOperationException>(() => pool.Evaluate(2, 30.0f));
+
+            }
+        }
+
+        private static void StepSerialLivePhysics(
+            MmdAnimPhysicsBackend backend,
+            MmdRuntimeFfiPlaybackSession session,
+            int frame,
+            float time,
+            ref int lastFrame,
+            ref float lastTime,
+            float[] before,
+            float[] morph,
+            byte[] ik,
+            float[] after,
+            float[] rigidbodyPositions,
+            float[] rigidbodyRotations,
+            out MmdPhysicsHostStepDiagnostics diagnostics)
+        {
+            bool seed = lastFrame < 0;
+            backend.StepPlaybackFrame(
+                session,
+                frame,
+                seed,
+                seed ? 0.0f : time - lastTime,
+                before,
+                morph,
+                ik,
+                after,
+                0,
+                out diagnostics);
+            var position = new float[3];
+            var rotation = new float[4];
+            for (int body = 0; body < rigidbodyPositions.Length / 3; body++)
+            {
+                backend.CopyRigidbodyTransform(body, position, rotation);
+                Array.Copy(position, 0, rigidbodyPositions, body * 3, 3);
+                Array.Copy(rotation, 0, rigidbodyRotations, body * 4, 4);
+            }
+            lastFrame = frame;
+            lastTime = time;
+        }
+
+        private static void AssertLiveWorkerResults(
+            MmdMultiCharacterWorkerPool pool,
+            float[] expectedBefore,
+            float[] expectedMorph,
+            byte[] expectedIk,
+            float[] expectedAfter,
+            float[] expectedRigidbodyPositions,
+            float[] expectedRigidbodyRotations,
+            MmdPhysicsHostStepDiagnostics expectedDiagnostics,
+            string[] expectedShapeTypes,
+            int frame)
+        {
+            for (int worker = 0; worker < 2; worker++)
+            {
+                MmdMultiCharacterWorkerResult actual = pool.GetResult(worker);
+                AssertFloatBitsEqual(expectedBefore, actual.BeforePhysicsWorldMatrices, "live before-physics matrix", frame, worker);
+                AssertFloatBitsEqual(expectedMorph, actual.MorphWeights, "live morph", frame, worker);
+                CollectionAssert.AreEqual(expectedIk, actual.IkEnabled, $"live IK mismatch at frame={frame}, worker={worker}");
+                AssertFloatBitsEqual(expectedAfter, actual.AfterPhysicsWorldMatrices, "live after-physics matrix", frame, worker);
+                AssertFloatBitsEqual(expectedRigidbodyPositions, actual.RigidbodyPositions, "live rigidbody position", frame, worker);
+                AssertFloatBitsEqual(expectedRigidbodyRotations, actual.RigidbodyRotations, "live rigidbody rotation", frame, worker);
+                Assert.That(actual.HasLivePhysicsEvaluation, Is.True);
+                Assert.That(actual.EvaluatedFrame, Is.EqualTo(frame));
+                Assert.That(
+                    BitConverter.SingleToInt32Bits(actual.EvaluatedTime),
+                    Is.EqualTo(BitConverter.SingleToInt32Bits(frame / 30.0f)));
+                Assert.That(actual.WasSeed, Is.EqualTo(frame == 0));
+                float expectedDeltaTime = frame == 0 ? 0.0f : 1.0f / 30.0f;
+                Assert.That(
+                    BitConverter.SingleToInt32Bits(actual.DeltaTime),
+                    Is.EqualTo(BitConverter.SingleToInt32Bits(expectedDeltaTime)));
+                Assert.That(actual.LivePhysicsBackendName, Is.EqualTo("mmd-anim-bullet-native"));
+                CollectionAssert.AreEqual(expectedShapeTypes, actual.RigidbodyShapeTypes);
+                Assert.That(actual.LastPhysicsDiagnostics.HasValue, Is.True);
+                MmdPhysicsHostStepDiagnostics diagnostics = actual.LastPhysicsDiagnostics!.Value;
+                Assert.That(diagnostics.reportPresent, Is.EqualTo(expectedDiagnostics.reportPresent));
+                Assert.That(diagnostics.nativeRigidbodyCount, Is.EqualTo(expectedDiagnostics.nativeRigidbodyCount));
+                Assert.That(diagnostics.nativeBoneCount, Is.EqualTo(expectedDiagnostics.nativeBoneCount));
+                Assert.That(diagnostics.nativeSubstepCount, Is.EqualTo(expectedDiagnostics.nativeSubstepCount));
+                Assert.That(diagnostics.nativeKinematicRigidbodiesFed, Is.EqualTo(expectedDiagnostics.nativeKinematicRigidbodiesFed));
+                Assert.That(diagnostics.nativeBonesWrittenBack, Is.EqualTo(expectedDiagnostics.nativeBonesWrittenBack));
+            }
+        }
+
         private static void AssertNativeWorkerParity(
             string pmxPath,
             string vmdPath,
@@ -445,8 +646,9 @@ namespace Mmd.Tests.Contracts
                     Array.Empty<byte>());
             }
 
-            public void Evaluate(int frame, float time, MmdMultiCharacterWorkerResult result)
+            public void Evaluate(int frame, float time, float frameRate, MmdMultiCharacterWorkerResult result)
             {
+                _ = frameRate;
                 _ = time;
                 Interlocked.Increment(ref evaluationCount);
                 int current = Interlocked.Increment(ref currentConcurrency);
