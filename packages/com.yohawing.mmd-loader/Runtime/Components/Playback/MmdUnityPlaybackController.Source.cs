@@ -14,6 +14,7 @@ namespace Mmd.UnityIntegration
     {
         public void ConfigureModelAsset(MmdPmxAsset pmxAsset)
         {
+            ThrowIfMultiCharacterPoolOwnsController(nameof(ConfigureModelAsset));
             if (pmxAsset == null)
             {
                 throw new ArgumentNullException(nameof(pmxAsset));
@@ -34,6 +35,7 @@ namespace Mmd.UnityIntegration
 
         public void ConfigureMotionAsset(MmdVmdAsset vmdAsset)
         {
+            ThrowIfMultiCharacterPoolOwnsController(nameof(ConfigureMotionAsset));
             if (vmdAsset == null)
             {
                 throw new ArgumentNullException(nameof(vmdAsset));
