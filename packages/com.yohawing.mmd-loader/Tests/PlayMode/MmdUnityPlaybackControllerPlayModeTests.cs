@@ -18,6 +18,7 @@ using Mmd.Parser;
 using Mmd.Physics;
 using Mmd.Timeline;
 using Mmd.UnityIntegration;
+using Object = UnityEngine.Object;
 
 namespace Mmd.Tests
 {
@@ -88,6 +89,147 @@ namespace Mmd.Tests
         }
 
         [UnityTest]
+        public IEnumerator PlayableDirectorTwoVmdClipsRebindsMotionAtBoundary()
+        {
+            const string modelSourceId = "playmode-model.pmx";
+            const string firstMotionSourceId = "playmode-first.vmd";
+            const string secondMotionSourceId = "playmode-second.vmd";
+
+            MmdPmxAsset? modelAsset = null;
+            MmdVmdAsset? firstMotionAsset = null;
+            MmdVmdAsset? secondMotionAsset = null;
+            MmdUnityModelInstance? instance = null;
+            MmdUnityPlaybackBinding? binding = null;
+            GameObject? directorObject = null;
+            TimelineAsset? timelineAsset = null;
+            try
+            {
+                byte[] pmxBytes = File.ReadAllBytes(ResolvePackageFixture("test_1bone_cube.pmx"));
+                byte[] firstVmdBytes = File.ReadAllBytes(ResolvePackageFixture("test_1bone_cube_motion.vmd"));
+                byte[] secondVmdBytes = File.ReadAllBytes(ResolvePackageFixture("test_append_bone.vmd"));
+                Assert.That(secondVmdBytes, Is.Not.EqualTo(firstVmdBytes));
+
+                modelAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                modelAsset.Initialize(pmxBytes, modelSourceId, modelSourceId);
+                firstMotionAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                firstMotionAsset.Initialize(firstVmdBytes, firstMotionSourceId, firstMotionSourceId);
+                secondMotionAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                secondMotionAsset.Initialize(secondVmdBytes, secondMotionSourceId, secondMotionSourceId);
+
+                var parser = new NativeMmdParser();
+                MmdModelDefinition model = parser.LoadModel(pmxBytes);
+                MmdMotionDefinition firstMotion = firstMotionAsset.LoadMotion(parser);
+                MmdMotionDefinition secondMotion = secondMotionAsset.LoadMotion(parser);
+                Assert.That(secondMotion.maxFrame, Is.Not.EqualTo(firstMotion.maxFrame));
+                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
+                binding = MmdUnityPlaybackBinding.CreateSkinned(
+                    instance,
+                    modelAsset,
+                    firstMotionAsset,
+                    firstMotion);
+                MmdUnityPlaybackController controller = instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+                controller.ConfigureModelAsset(modelAsset);
+                controller.Configure(binding, 30.0f, playOnStart: false);
+
+                timelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
+                MmdVmdTimelineTrack track = timelineAsset.CreateTrack<MmdVmdTimelineTrack>(null, "MMD VMD");
+                TimelineClip firstClip = track.CreateClip<MmdVmdTimelineClip>();
+                firstClip.start = 0.0;
+                firstClip.duration = 1.0;
+                var firstClipAsset = (MmdVmdTimelineClip)firstClip.asset;
+                firstClipAsset.MotionAsset = firstMotionAsset;
+                firstClipAsset.ModelSourceId = modelSourceId;
+                firstClipAsset.MotionSourceId = firstMotionSourceId;
+                firstClipAsset.FrameRate = 30.0f;
+
+                TimelineClip secondClip = track.CreateClip<MmdVmdTimelineClip>();
+                secondClip.start = 1.0;
+                secondClip.duration = 1.0;
+                var secondClipAsset = (MmdVmdTimelineClip)secondClip.asset;
+                secondClipAsset.MotionAsset = secondMotionAsset;
+                secondClipAsset.ModelSourceId = modelSourceId;
+                secondClipAsset.MotionSourceId = secondMotionSourceId;
+                secondClipAsset.FrameRate = 30.0f;
+
+                directorObject = new GameObject("playmode-two-clip-director");
+                PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
+                director.playableAsset = timelineAsset;
+                director.SetGenericBinding(track, controller);
+
+                director.time = 0.5;
+                director.Evaluate();
+                Assert.That(controller.MotionSourceId, Is.EqualTo(firstMotionSourceId));
+                Assert.That(controller.CurrentFrame, Is.EqualTo(15));
+                int firstConfigurationRevision = controller.ConfigurationRevision;
+
+                director.time = 1.5;
+                director.Evaluate();
+                Assert.That(controller.MotionSourceId, Is.EqualTo(secondMotionSourceId));
+                Assert.That(controller.MotionMaxFrame, Is.EqualTo(secondMotion.maxFrame),
+                    "the second clip must expose its own motion frame range");
+                Assert.That(controller.CurrentFrame, Is.EqualTo(15),
+                    "the timeline time must remain stable while the winning motion is rebound");
+                Assert.That(controller.ConfigurationRevision, Is.EqualTo(firstConfigurationRevision + 1),
+                    "crossing the real PlayableGraph clip boundary must reconfigure the winning motion once");
+                Assert.That(controller.LastTimelineSetupTiming, Is.Not.Null);
+                Assert.That(controller.LastTimelineSetupTiming!.succeeded, Is.True);
+                int secondConfigurationRevision = controller.ConfigurationRevision;
+
+                director.Evaluate();
+                Assert.That(controller.ConfigurationRevision, Is.EqualTo(secondConfigurationRevision),
+                    "re-evaluating the same timeline time must not reconfigure the winning motion again");
+
+                director.time = 0.5;
+                director.Evaluate();
+                Assert.That(controller.MotionSourceId, Is.EqualTo(firstMotionSourceId));
+                Assert.That(controller.ConfigurationRevision, Is.EqualTo(secondConfigurationRevision + 1),
+                    "seeking back across the boundary must select the first clip again once");
+                int thirdConfigurationRevision = controller.ConfigurationRevision;
+
+                director.Evaluate();
+                Assert.That(controller.ConfigurationRevision, Is.EqualTo(thirdConfigurationRevision),
+                    "re-evaluating the same backward-seek time must not reconfigure the winning motion again");
+            }
+            finally
+            {
+                if (directorObject != null)
+                {
+                    directorObject.GetComponent<PlayableDirector>()?.Stop();
+                    Object.Destroy(directorObject);
+                }
+
+                if (timelineAsset != null)
+                {
+                    Object.Destroy(timelineAsset);
+                }
+
+                binding?.Dispose();
+                if (instance != null)
+                {
+                    MmdPlayModeTestInstanceScope.DestroyInstance(instance);
+                }
+
+                if (modelAsset != null)
+                {
+                    Object.Destroy(modelAsset);
+                }
+
+                if (firstMotionAsset != null)
+                {
+                    Object.Destroy(firstMotionAsset);
+                }
+
+                if (secondMotionAsset != null)
+                {
+                    Object.Destroy(secondMotionAsset);
+                }
+            }
+
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator TickRejectsInvalidDeltaTimeInPlayMode()
         {
             MmdUnityPlaybackBinding? binding = null;
@@ -154,7 +296,7 @@ namespace Mmd.Tests
             Assert.That(controller.PlayOnStart, Is.True);
 
             // Domain reload slice: verify that after scene load, the scene SMR preserves
-            // importer-owned Mesh/Material/bone references instead of rebuilding with "Split Runtime".
+            // importer-owned Mesh/bone references while cloning only mutable Material state.
             SkinnedMeshRenderer? foundSceneSMR = controller.ConfiguredInstanceRoot != null
                 ? controller.ConfiguredInstanceRoot.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true)
                 : GameObject.Find("Native Playback")?.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true);
@@ -169,9 +311,8 @@ namespace Mmd.Tests
                 "scene SMR bone count must match pmxAsset.BoneCount");
             Assert.That(sceneSMR.rootBone, Is.Not.Null,
                 "scene SMR must have a valid rootBone");
-            Assert.That(sharedMesh, Is.Not.SameAs(modelAsset.ImportedMesh),
-                "active playback must isolate mesh mutation from the importer-owned Mesh sub-asset");
-            Assert.That(sharedMesh.name, Does.StartWith(modelAsset.ImportedMesh.name));
+            Assert.That(sharedMesh, Is.SameAs(modelAsset.ImportedMesh),
+                "blend-shape playback must reuse the importer-owned Mesh sub-asset");
             if (modelAsset.ImportedMaterials is { Length: > 0 } mats)
             {
                 Material[] smrMats = sceneSMR.sharedMaterials;
@@ -536,6 +677,7 @@ namespace Mmd.Tests
 
                 MmdUnityPlaybackController controller = instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.IkMaxIterationsCap = 64;
+                controller.LivePhysicsBodyDiagnosticsSampleInterval = 1;
                 controller.ConfigureModelAsset(pmxAsset);
                 controller.SetPhysicsMode(MmdPhysicsMode.Live);
 
@@ -559,6 +701,9 @@ namespace Mmd.Tests
                 Transform drivenBone = instance.BoneTransforms[drivenBoneIndex];
                 Vector3 proxyBindPosition = proxyHips.localPosition;
                 Vector3 drivenBindPosition = drivenBone.localPosition;
+                HashSet<int> hairBoneSlots = CollectNonStaticPhysicsBoneSlots(model, instance);
+                Assert.That(hairBoneSlots.Count, Is.GreaterThan(0),
+                    "Expected at least one non-static rigidbody linked to a hair bone");
                 controller.ConfigureHumanoidRetarget(
                     proxyRig.ProxyRoot.transform,
                     new[]
@@ -578,8 +723,27 @@ namespace Mmd.Tests
                     },
                     Array.Empty<MmdHumanoidAppendTransformBinding>());
 
+                // Prove the retarget contract with a deterministic, physics-free write before
+                // the Live loop: the native final-matrix diagnostics below are meaningful only
+                // when the preceding host pose actually reached the Unity bone transform.
+                int configuredIkMaxIterationsCap = controller.IkMaxIterationsCap;
+                controller.IkMaxIterationsCap = 0;
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+                Vector3 directRetargetDelta = new Vector3(0.03f, 0.0f, 0.0f);
+                proxyHips.localPosition = proxyBindPosition + directRetargetDelta;
+                MmdHumanoidRetargeterResult directRetargetResult = controller.ApplyHumanoidRetargetNow();
+                Assert.That(directRetargetResult.CopiedBoneCount, Is.EqualTo(1));
+                Assert.That(directRetargetResult.CopiedTranslationCount, Is.EqualTo(1));
+                Assert.That(
+                    Vector3.Distance(drivenBone.localPosition, drivenBindPosition + directRetargetDelta),
+                    Is.LessThanOrEqualTo(1.0e-5f),
+                    "retarget must write the requested host translation to the Unity bone before Live physics");
+                controller.SetPhysicsMode(MmdPhysicsMode.Live);
+                controller.IkMaxIterationsCap = configuredIkMaxIterationsCap;
+
                 proxyHips.localPosition = proxyBindPosition + new Vector3(0.05f, 0.0f, 0.0f);
                 proxyHips.localRotation = Quaternion.Euler(0.0f, 4.0f, 0.0f);
+                Vector3 liveStartWorldPosition = drivenBone.position;
                 yield return null;
 
                 Assert.That(controller.LastHumanoidRetargetGate, Is.EqualTo(MmdHumanoidRetargetGate.Ready));
@@ -587,6 +751,10 @@ namespace Mmd.Tests
                     "Self-tick humanoid Live physics must not configure the VMD playback binding.");
                 Assert.That(controller.LastLivePhysicsDiagnostics, Is.Not.Null);
                 Assert.That(controller.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(0));
+                MmdLivePhysicsBodyDiagnostics[] initialHairDiagnostics = controller.LastLivePhysicsDiagnostics.bodyDiagnostics
+                    .Where(body => hairBoneSlots.Contains(body.boneIndex))
+                    .ToArray();
+                Assert.That(initialHairDiagnostics, Is.Not.Empty);
                 Assert.That(controller.IkMaxIterationsCap, Is.EqualTo(64));
                 Assert.That(controller.LastLivePhysicsDiagnostics.deltaTime, Is.EqualTo(0.0f));
                 Assert.That(controller.LastLivePhysicsDiagnostics.evaluationPath, Is.EqualTo("HumanoidNativeFinal"));
@@ -614,47 +782,39 @@ namespace Mmd.Tests
                 Assert.That(controller.LastSnapshot, Is.Null,
                     "Humanoid-driven live physics must not overwrite the VMD playback snapshot surface.");
 
-                HashSet<int> hairBoneSlots = CollectNonStaticPhysicsBoneSlots(model, instance);
-                Assert.That(hairBoneSlots.Count, Is.GreaterThan(0),
-                    "Expected at least one non-static rigidbody linked to a hair bone");
-                var frameZeroPositions = new Dictionary<int, Vector3>();
-                var frameZeroRotations = new Dictionary<int, Quaternion>();
-                foreach (int slot in hairBoneSlots)
-                {
-                    frameZeroPositions[slot] = instance.BoneTransforms[slot].localPosition;
-                    frameZeroRotations[slot] = instance.BoneTransforms[slot].localRotation;
-                }
-
+                // This redistributable fixture intentionally exercises static + dynamicBone bodies;
+                // its rest pose is already at equilibrium, so this case verifies host-pose routing
+                // and complete native readback rather than inventing a motion oracle for the hair.
                 for (int i = 1; i <= 5; i++)
                 {
                     proxyHips.localPosition = proxyBindPosition + new Vector3(0.05f + 0.01f * i, 0.0f, 0.0f);
                     proxyHips.localRotation = Quaternion.Euler(0.0f, 4.0f + i, 0.0f);
                     yield return null;
                 }
-
                 Assert.That(controller.LastLivePhysicsDiagnostics, Is.Not.Null);
                 Assert.That(controller.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(5));
                 Assert.That(controller.LastLivePhysicsDiagnostics.deltaTime, Is.GreaterThan(0.0f));
                 Assert.That(controller.LastLivePhysicsDiagnostics.stepPhysicsMs, Is.GreaterThan(0.0));
-
-                bool anyHairBoneChanged = false;
-                foreach (int slot in hairBoneSlots)
-                {
-                    Transform bone = instance.BoneTransforms[slot];
-                    if ((bone.localPosition - frameZeroPositions[slot]).sqrMagnitude > 0.0001f ||
-                        Quaternion.Angle(frameZeroRotations[slot], bone.localRotation) > 0.01f)
-                    {
-                        anyHairBoneChanged = true;
-                    }
-
-                    Assert.That(
-                        Vector3.Distance(instance.Root.transform.position, bone.position),
-                        Is.LessThan(1000.0f),
-                        "Humanoid-driven live physics hair bone must remain near the model root");
-                }
-
-                Assert.That(anyHairBoneChanged, Is.True,
-                    "Expected humanoid-retargeted body motion to drive live physics feedback into at least one non-static hair bone");
+                Assert.That(controller.LastLivePhysicsDiagnostics.sampledBodyDiagnosticsThisFrame, Is.True);
+                Assert.That(controller.LastLivePhysicsDiagnostics.bodyDiagnosticsFrame, Is.EqualTo(5));
+                Assert.That(
+                    controller.LastLivePhysicsDiagnostics.bodyDiagnostics,
+                    Has.Length.EqualTo(model.physics.rigidbodies.Count),
+                    "the real hair fixture must expose a complete native readback sample");
+                Assert.That(controller.LastLivePhysicsDiagnostics.managedBodyTransformApplyPresent, Is.False,
+                    "Humanoid Live applies the native final matrix pose once");
+                Assert.That(controller.LastLivePhysicsDiagnostics.matrixTransformApplyPresent, Is.True);
+                Assert.That(controller.LastLivePhysicsDiagnostics.nativeBonesWrittenBack, Is.GreaterThan(0));
+                Assert.That(
+                    Vector3.Distance(drivenBone.position, liveStartWorldPosition),
+                    Is.GreaterThan(0.001f),
+                    "Humanoid Live must apply a changed native final pose to the configured Unity bone");
+                Assert.That(
+                    HasNativeHairBodyReadbackChanged(
+                        initialHairDiagnostics,
+                        controller.LastLivePhysicsDiagnostics.bodyDiagnostics),
+                    Is.True,
+                    "Humanoid Live must advance at least one non-static hair body's native readback");
 
                 Mesh humanoidPlaybackMesh = renderer.sharedMesh;
                 FieldInfo? physicsModeField = typeof(MmdUnityPlaybackController).GetField(
@@ -667,14 +827,14 @@ namespace Mmd.Tests
                 Assert.That(controller.IsConfigured, Is.True);
                 Assert.That(controller.LastLivePhysicsDiagnostics, Is.Null,
                     "VMD rebind with physics Off must release the previous Humanoid physics binding.");
-                Assert.That(humanoidPlaybackMesh == null, Is.True,
-                    "VMD rebind must release the previous Humanoid physics Mesh clone before capturing Scene state");
+                Assert.That(humanoidPlaybackMesh, Is.SameAs(authoredMesh),
+                    "model-only Humanoid physics reuses the authored blend-shape Mesh");
                 Mesh vmdPlaybackMesh = renderer.sharedMesh;
-                Assert.That(vmdPlaybackMesh, Is.Not.SameAs(authoredMesh));
+                Assert.That(vmdPlaybackMesh, Is.SameAs(authoredMesh));
 
                 controller.ReleasePlaybackResources();
                 yield return null;
-                Assert.That(vmdPlaybackMesh == null, Is.True);
+                Assert.That(vmdPlaybackMesh, Is.SameAs(authoredMesh));
                 Assert.That(renderer.sharedMesh, Is.SameAs(authoredMesh));
                 Assert.That(renderer.sharedMaterials[0], Is.SameAs(authoredMaterial));
             }
@@ -744,6 +904,7 @@ namespace Mmd.Tests
                 MmdUnityPlaybackController controller = instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.ConfigureModelAsset(pmxAsset);
                 controller.SetPhysicsMode(MmdPhysicsMode.Live);
+                controller.LivePhysicsBodyDiagnosticsSampleInterval = 1;
 
                 int drivenBoneIndex = FindFirstValidStaticPhysicsBone(model, instance);
                 Assert.That(drivenBoneIndex, Is.GreaterThanOrEqualTo(0),
@@ -765,6 +926,9 @@ namespace Mmd.Tests
                 Transform drivenBone = instance.BoneTransforms[drivenBoneIndex];
                 Vector3 proxyBindPosition = proxyHips.localPosition;
                 Vector3 drivenBindPosition = drivenBone.localPosition;
+                HashSet<int> hairBoneSlots = CollectNonStaticPhysicsBoneSlots(model, instance);
+                Assert.That(hairBoneSlots.Count, Is.GreaterThan(0),
+                    "Expected at least one non-static rigidbody linked to a hair bone");
                 controller.ConfigureHumanoidRetarget(
                     proxyRig.ProxyRoot.transform,
                     new[]
@@ -787,8 +951,24 @@ namespace Mmd.Tests
                 Assert.That(controller.IsConfigured, Is.False,
                     "The regression must start with no manually injected playback binding.");
 
+                // Keep the host-pose precondition observable independently from the rest-pose
+                // physics fixture: Live diagnostics cannot distinguish a stale Unity Transform
+                // from a stable dynamicBone equilibrium on their own.
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+                Vector3 directRetargetDelta = new Vector3(0.03f, 0.0f, 0.0f);
+                proxyHips.localPosition = proxyBindPosition + directRetargetDelta;
+                MmdHumanoidRetargeterResult directRetargetResult = controller.ApplyHumanoidRetargetNow();
+                Assert.That(directRetargetResult.CopiedBoneCount, Is.EqualTo(1));
+                Assert.That(directRetargetResult.CopiedTranslationCount, Is.EqualTo(1));
+                Assert.That(
+                    Vector3.Distance(drivenBone.localPosition, drivenBindPosition + directRetargetDelta),
+                    Is.LessThanOrEqualTo(1.0e-5f),
+                    "retarget must write the requested host translation to the Unity bone before Live physics");
+                controller.SetPhysicsMode(MmdPhysicsMode.Live);
+
                 proxyHips.localPosition = proxyBindPosition + new Vector3(0.05f, 0.0f, 0.0f);
                 proxyHips.localRotation = Quaternion.Euler(0.0f, 4.0f, 0.0f);
+                Vector3 liveStartWorldPosition = drivenBone.position;
                 yield return null;
 
                 Assert.That(controller.LastHumanoidRetargetGate, Is.EqualTo(MmdHumanoidRetargetGate.Ready));
@@ -798,17 +978,13 @@ namespace Mmd.Tests
                 Assert.That(controller.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(0));
                 Assert.That(controller.LastSnapshot, Is.Null,
                     "Model-only humanoid physics binding must not create a VMD playback snapshot.");
+                MmdLivePhysicsBodyDiagnostics[] initialHairDiagnostics = controller.LastLivePhysicsDiagnostics.bodyDiagnostics
+                    .Where(body => hairBoneSlots.Contains(body.boneIndex))
+                    .ToArray();
+                Assert.That(initialHairDiagnostics, Is.Not.Empty);
 
-                HashSet<int> hairBoneSlots = CollectNonStaticPhysicsBoneSlots(model, instance);
-                Assert.That(hairBoneSlots.Count, Is.GreaterThan(0),
-                    "Expected at least one non-static rigidbody linked to a hair bone");
-                var frameZeroPositions = new Dictionary<int, Vector3>();
-                var frameZeroRotations = new Dictionary<int, Quaternion>();
-                foreach (int slot in hairBoneSlots)
-                {
-                    frameZeroPositions[slot] = instance.BoneTransforms[slot].localPosition;
-                    frameZeroRotations[slot] = instance.BoneTransforms[slot].localRotation;
-                }
+                // The real fixture is the graph/binding probe here; deterministic mode-1 movement
+                // is covered by the synthetic two-bone Timeline regression in EditMode.
 
                 for (int i = 1; i <= 5; i++)
                 {
@@ -816,24 +992,30 @@ namespace Mmd.Tests
                     proxyHips.localRotation = Quaternion.Euler(0.0f, 4.0f + i, 0.0f);
                     yield return null;
                 }
-
                 Assert.That(controller.LastLivePhysicsDiagnostics, Is.Not.Null);
                 Assert.That(controller.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(5));
                 Assert.That(controller.LastLivePhysicsDiagnostics.deltaTime, Is.GreaterThan(0.0f));
-
-                bool anyHairBoneChanged = false;
-                foreach (int slot in hairBoneSlots)
-                {
-                    Transform bone = instance.BoneTransforms[slot];
-                    if ((bone.localPosition - frameZeroPositions[slot]).sqrMagnitude > 0.0001f ||
-                        Quaternion.Angle(frameZeroRotations[slot], bone.localRotation) > 0.01f)
-                    {
-                        anyHairBoneChanged = true;
-                    }
-                }
-
-                Assert.That(anyHairBoneChanged, Is.True,
-                    "Expected model-only humanoid live physics to feed Bullet readback into at least one non-static hair bone");
+                Assert.That(controller.LastLivePhysicsDiagnostics.stepPhysicsMs, Is.GreaterThan(0.0));
+                Assert.That(controller.LastLivePhysicsDiagnostics.sampledBodyDiagnosticsThisFrame, Is.True);
+                Assert.That(controller.LastLivePhysicsDiagnostics.bodyDiagnosticsFrame, Is.EqualTo(5));
+                Assert.That(
+                    controller.LastLivePhysicsDiagnostics.bodyDiagnostics,
+                    Has.Length.EqualTo(model.physics.rigidbodies.Count),
+                    "the real hair fixture must expose a complete native readback sample");
+                Assert.That(controller.LastLivePhysicsDiagnostics.managedBodyTransformApplyPresent, Is.False,
+                    "Humanoid Live applies the native final matrix pose once");
+                Assert.That(controller.LastLivePhysicsDiagnostics.matrixTransformApplyPresent, Is.True);
+                Assert.That(controller.LastLivePhysicsDiagnostics.nativeBonesWrittenBack, Is.GreaterThan(0));
+                Assert.That(
+                    Vector3.Distance(drivenBone.position, liveStartWorldPosition),
+                    Is.GreaterThan(0.001f),
+                    "Humanoid Live must apply a changed native final pose to the configured Unity bone");
+                Assert.That(
+                    HasNativeHairBodyReadbackChanged(
+                        initialHairDiagnostics,
+                        controller.LastLivePhysicsDiagnostics.bodyDiagnostics),
+                    Is.True,
+                    "Humanoid Live must advance at least one non-static hair body's native readback");
             }
             finally
             {
@@ -2256,6 +2438,29 @@ namespace Mmd.Tests
             }
 
             return slots;
+        }
+
+        private static bool HasNativeHairBodyReadbackChanged(
+            IReadOnlyList<MmdLivePhysicsBodyDiagnostics> initial,
+            IReadOnlyList<MmdLivePhysicsBodyDiagnostics> final)
+        {
+            foreach (MmdLivePhysicsBodyDiagnostics initialBody in initial)
+            {
+                MmdLivePhysicsBodyDiagnostics? finalBody = final.FirstOrDefault(
+                    body => body.bodyIndex == initialBody.bodyIndex);
+                if (finalBody == null)
+                {
+                    continue;
+                }
+
+                if ((finalBody.readbackMmdPosition - initialBody.readbackMmdPosition).sqrMagnitude > 1.0e-6f ||
+                    Quaternion.Angle(finalBody.readbackMmdRotation, initialBody.readbackMmdRotation) > 0.01f)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static PlayableGraph CreateBoundAnimatorGraph(Animator animator)

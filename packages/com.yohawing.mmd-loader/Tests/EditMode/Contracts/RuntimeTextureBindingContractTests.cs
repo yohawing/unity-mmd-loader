@@ -57,6 +57,49 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void RelativeTexturePathUsesOperatingSystemCasePolicy()
+        {
+            string tempRoot = CreateTempDirectory();
+            MmdRuntimeTextureResolution? resolution = null;
+            try
+            {
+                string pmxPath = Path.Combine(tempRoot, "model.pmx");
+                string textureDirectory = Path.Combine(tempRoot, "Textures");
+                Directory.CreateDirectory(textureDirectory);
+                File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
+                WritePng(Path.Combine(textureDirectory, "Diffuse.PNG"), Color.red);
+
+                MmdModelDefinition model = CreateMinimalTriangleModel();
+                model.materials[0].texture = @"textures\diffuse.png";
+                resolution = MmdRuntimeTextureResolver.ResolveDiffuseTextures(
+                    MmdRenderingDescriptorBuilder.Build(model),
+                    MmdUnityModelSourceContext.FromOptionalPath(pmxPath));
+
+                if (Path.DirectorySeparatorChar == '\\')
+                {
+                    Assert.That(resolution.DiffuseTextures, Has.Count.EqualTo(1));
+                    Assert.That(resolution.Diagnostics.MissingTextureReferenceCount, Is.Zero);
+                }
+                else
+                {
+                    Assert.That(resolution.DiffuseTextures, Is.Empty);
+                    Assert.That(resolution.Diagnostics.MissingTextureReferenceCount, Is.EqualTo(1));
+                }
+            }
+            finally
+            {
+                if (resolution != null)
+                {
+                    foreach (Texture2D texture in resolution.DiffuseTextures.Select(item => item.Texture).Distinct())
+                    {
+                        Object.DestroyImmediate(texture);
+                    }
+                }
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+
+        [Test]
         public void RepeatedDiffusePathSharesDecodeAndOwnedTexture()
         {
             MmdUnityModelInstance? instance = null;

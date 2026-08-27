@@ -235,23 +235,30 @@ function Invoke-VisualTierRun {
     $failed = $testSummary.Failed
     $passed = $testSummary.Passed
 
-    # A clean exit with an empty/no-op test-run (0 matched, 0 passed, 0 failed) is not a
-    # green result -- it means -testFilter matched nothing and the gate never ran. Positively
-    # require at least one test case to have executed on either side of the A/B/A proof.
-    if ($passed -eq 0 -and $failed -eq 0) {
-        throw "$Name matched zero test cases (passed=0, failed=0) -- the gate did not actually run. results=$results log=$log"
-    }
     if ($ExpectFailure) {
+        # The perturbation proof is intentionally red, so it cannot satisfy the normal
+        # Passed-only assertion. It still must not hide an unavailable test behind a skip.
+        if ($passed -eq 0 -and $failed -eq 0) {
+            throw "$Name matched zero test cases (passed=0, failed=0) -- the gate did not actually run. results=$results log=$log"
+        }
+        if ($testSummary.Skipped -ne 0) {
+            throw "$Name unexpectedly skipped tests during the perturbation proof. skipped=$($testSummary.Skipped); results=$results log=$log"
+        }
         if ($failed -eq 0) {
             throw "$Name was expected to fail after shader-output perturbation, but stayed green. results=$results"
         }
     }
     else {
-        if ($failed -ne 0) {
-            throw "$Name failed. results=$results log=$log"
+        try {
+            Assert-NUnitTestRunEvidence `
+                -Summary $testSummary `
+                -MinimumTotal 1 `
+                -MinimumPassed 1 `
+                -AllowedSkippedTests @() `
+                -Context "$Name results" | Out-Null
         }
-        if ($passed -eq 0) {
-            throw "$Name reported passed=0 with failed=0; refusing to treat as green. results=$results"
+        catch {
+            throw "$Name failed NUnit evidence policy: $($_.Exception.Message). results=$results log=$log"
         }
         $captureDir = Join-Path $captureRoot $Name
         $capturedPngs = @()

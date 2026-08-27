@@ -3,8 +3,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Security;
 using UnityEngine;
+using Mmd.IO;
 using Mmd.Rendering;
 
 namespace Mmd.UnityIntegration
@@ -555,39 +555,26 @@ namespace Mmd.UnityIntegration
                 return false;
             }
 
-            try
-            {
-                string platformReference = textureReference
-                    .Replace('\\', Path.DirectorySeparatorChar)
-                    .Replace('/', Path.DirectorySeparatorChar);
-                resolvedPath = Path.GetFullPath(Path.Combine(sourceContext.SourceDirectory, platformReference));
-            }
-            catch (Exception ex) when (ex is ArgumentException
-                || ex is NotSupportedException
-                || ex is PathTooLongException
-                || ex is SecurityException)
+            if (!MmdSafeRelativePath.TryResolve(
+                    sourceContext.SourceDirectory,
+                    textureReference,
+                    out resolvedPath,
+                    out MmdSafeRelativePathFailure pathFailure))
             {
                 resolvedPath = string.Empty;
-                failure = "texture reference is not a valid relative path";
-                return false;
-            }
-
-            if (!IsUnderDirectory(resolvedPath, sourceContext.SourceDirectory))
-            {
-                resolvedPath = string.Empty;
-                failure = "relative texture path escapes the PMX source directory";
+                diagnosticPath = string.Empty;
+                failure = pathFailure switch
+                {
+                    MmdSafeRelativePathFailure.OutsideRoot =>
+                        "relative texture path escapes the PMX source directory",
+                    MmdSafeRelativePathFailure.ReparsePoint =>
+                        "texture reference crosses a symbolic link or junction outside the trusted path boundary",
+                    _ => "texture reference is not a valid relative path"
+                };
                 return false;
             }
 
             diagnosticPath = Path.GetRelativePath(sourceContext.SourceDirectory, resolvedPath).Replace('\\', '/');
-            if (ContainsReparsePoint(sourceContext.SourceDirectory, resolvedPath))
-            {
-                resolvedPath = string.Empty;
-                diagnosticPath = string.Empty;
-                failure = "texture reference crosses a symbolic link or junction outside the trusted path boundary";
-                return false;
-            }
-
             return true;
         }
 
@@ -659,55 +646,5 @@ namespace Mmd.UnityIntegration
                 && value[3] <= '9';
         }
 
-        private static bool ContainsReparsePoint(string rootDirectory, string path)
-        {
-            string relativePath = Path.GetRelativePath(rootDirectory, path);
-            string current = rootDirectory;
-            foreach (string component in relativePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
-            {
-                if (component.Length == 0 || component == ".")
-                {
-                    continue;
-                }
-
-                current = Path.Combine(current, component);
-                if (!File.Exists(current) && !Directory.Exists(current))
-                {
-                    break;
-                }
-
-                try
-                {
-                    if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
-                    {
-                        return true;
-                    }
-                }
-                catch (Exception ex) when (ex is IOException
-                    || ex is UnauthorizedAccessException
-                    || ex is SecurityException)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool IsUnderDirectory(string path, string directory)
-        {
-            string fullPath = Path.GetFullPath(path);
-            string fullDirectory = Path.GetFullPath(directory);
-            if (!fullDirectory.EndsWith(Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal)
-                && !fullDirectory.EndsWith(Path.AltDirectorySeparatorChar.ToString(), StringComparison.Ordinal))
-            {
-                fullDirectory += Path.DirectorySeparatorChar;
-            }
-
-            StringComparison comparison = Path.DirectorySeparatorChar == '\\'
-                ? StringComparison.OrdinalIgnoreCase
-                : StringComparison.Ordinal;
-            return fullPath.StartsWith(fullDirectory, comparison);
-        }
     }
 }

@@ -185,15 +185,32 @@ namespace Mmd.UnityIntegration
             MmdMotionDefinition motion = motionAsset.CreateNativeClipMotionHeader();
             MmdMotionValidator.ThrowIfInvalid(motion);
             float importScale = modelAsset.ImportScale;
-            return CreateSkinned(
+            MmdMaterialPreset materialPreset = ResolveMaterialPreset(modelAsset);
+            string modelId = string.IsNullOrWhiteSpace(modelAsset.SourceId) ? modelAsset.name : modelAsset.SourceId;
+            string motionId = string.IsNullOrWhiteSpace(motionAsset.SourceId) ? motionAsset.name : motionAsset.SourceId;
+            string? sourcePath = string.IsNullOrWhiteSpace(modelAsset.SourcePath) ? null : modelAsset.SourcePath;
+            MmdMaterialMapperSet? materialMappers = modelAsset.ResolveMaterialMapperSet();
+            if (materialMappers == null)
+            {
+                return CreateSkinned(
+                    model,
+                    motion,
+                    modelId,
+                    motionId,
+                    sourcePath,
+                    importScale,
+                    materialPreset,
+                    modelAsset.MaterialOverrideAsset);
+            }
+
+            MmdUnityModelInstance instance = MmdUnityModelFactory.CreateSkinnedModel(
                 model,
-                motion,
-                string.IsNullOrWhiteSpace(modelAsset.SourceId) ? modelAsset.name : modelAsset.SourceId,
-                string.IsNullOrWhiteSpace(motionAsset.SourceId) ? motionAsset.name : motionAsset.SourceId,
-                string.IsNullOrWhiteSpace(modelAsset.SourcePath) ? null : modelAsset.SourcePath,
+                sourcePath,
                 importScale,
-                ResolveMaterialPreset(modelAsset),
-                modelAsset.MaterialOverrideAsset);
+                materialPreset,
+                modelAsset.MaterialOverrideAsset,
+                materialMappers);
+            return CreateOwnedBinding(instance, model, motion, modelId, motionId);
         }
 
         public static MmdUnityPlaybackBinding CreateSkinned(
@@ -398,6 +415,8 @@ namespace Mmd.UnityIntegration
             }
 
             MmdMaterialPreset materialPreset = ResolveMaterialPreset(modelAsset);
+            MmdMaterialRenderingTargets[]? materialRenderingTargets =
+                modelAsset.ResolveMaterialRenderingTargets(model.materials.Count);
             MmdRenderingDescriptor? playbackDescriptor =
                 modelAsset.MaterialOverrideAsset == null &&
                 (modelAsset.MaterialRemaps == null || modelAsset.MaterialRemaps.Length == 0)
@@ -417,7 +436,8 @@ namespace Mmd.UnityIntegration
                 materialPreset,
                 modelAsset.ImportedMaterials,
                 playbackDescriptor,
-                sourcesAlreadyValidated);
+                sourcesAlreadyValidated,
+                materialRenderingTargets);
         }
 
         internal static MmdUnityPlaybackBinding CreateSkinnedFromExistingSceneModel(
@@ -434,7 +454,8 @@ namespace Mmd.UnityIntegration
             MmdMaterialPreset materialPreset = MmdMaterialPreset.MmdToon,
             Material[]? importedMaterials = null,
             MmdRenderingDescriptor? playbackDescriptor = null,
-            bool sourcesAlreadyValidated = false)
+            bool sourcesAlreadyValidated = false,
+            MmdMaterialRenderingTargets[]? materialRenderingTargets = null)
         {
             if (root == null)
             {
@@ -452,7 +473,7 @@ namespace Mmd.UnityIntegration
             MmdUnityModelInstance? instance = null;
             try
             {
-                instance = MmdUnityModelFactory.CreateExistingSkinnedModelInstance(
+                instance = MmdUnityModelFactory.CreateExistingSkinnedModelInstanceWithMaterialTargets(
                     root,
                     model,
                     sourcePath,
@@ -461,7 +482,8 @@ namespace Mmd.UnityIntegration
                     materialOverride: null,
                     preserveExistingSelfShadowTarget: true,
                     materialPreset: materialPreset,
-                    existingPlaybackDescriptor: playbackDescriptor);
+                    existingPlaybackDescriptor: playbackDescriptor,
+                    materialRenderingTargets: materialRenderingTargets);
                 sourceMutation.AdoptFactoryResult(instance);
                 MmdRuntimeSession session = sourcesAlreadyValidated
                     ? MmdRuntimeSession.CreateFromValidatedSources(
@@ -523,13 +545,16 @@ namespace Mmd.UnityIntegration
             MmdMotionDefinition restMotion = CreateModelOnlyRestMotion(model);
             MmdMotionValidator.ThrowIfInvalid(restMotion);
             float importScale = modelAsset.ImportScale;
+            MmdMaterialPreset materialPreset = ResolveMaterialPreset(modelAsset);
+            MmdMaterialRenderingTargets[]? materialRenderingTargets =
+                modelAsset.ResolveMaterialRenderingTargets(model.materials.Count);
             string resolvedModelId = string.IsNullOrWhiteSpace(modelAsset.SourceId) ? modelAsset.name : modelAsset.SourceId;
             string resolvedMotionId = string.IsNullOrWhiteSpace(motionId) ? "humanoid-physics" : motionId;
             var sourceMutation = new MmdExistingSceneRebindLease(root);
             MmdUnityModelInstance? instance = null;
             try
             {
-                instance = MmdUnityModelFactory.CreateExistingSkinnedModelInstance(
+                instance = MmdUnityModelFactory.CreateExistingSkinnedModelInstanceWithMaterialTargets(
                     root,
                     model,
                     string.IsNullOrWhiteSpace(modelAsset.SourcePath) ? null : modelAsset.SourcePath,
@@ -537,7 +562,8 @@ namespace Mmd.UnityIntegration
                     MmdPmxModelPresetPolicy.AllowsAutomaticSelfShadowTarget(modelAsset.ModelPreset),
                     materialOverride: null,
                     preserveExistingSelfShadowTarget: true,
-                    materialPreset: ResolveMaterialPreset(modelAsset));
+                    materialPreset: materialPreset,
+                    materialRenderingTargets: materialRenderingTargets);
                 sourceMutation.AdoptFactoryResult(instance);
                 var session = new MmdRuntimeSession(model, restMotion, resolvedModelId, resolvedMotionId);
                 var playbackMutation = new MmdBorrowedSceneMutationLease(

@@ -23,7 +23,7 @@ namespace Mmd.Tests
             {
                 Assert.That(fixture.id, Is.Not.Empty, "fixture id");
                 Assert.That(fixture.ModelPath, Does.Exist, fixture.Context("model path"));
-                Assert.That(Path.IsPathRooted(fixture.GoldenPath), Is.True, fixture.Context("golden path rooted"));
+                Assert.That(Path.IsPathRooted(fixture.RequireGoldenPath()), Is.True, fixture.Context("golden path rooted"));
                 Assert.That(fixture.expected, Is.Not.Null, fixture.Context("expected coverage"));
             }
         }
@@ -44,13 +44,29 @@ namespace Mmd.Tests
         [TestCaseSource(nameof(ModelFixtures))]
         public void ModelFixtureMatchesGoldenPmxIr(ModelFixtureEntry fixture)
         {
-            MmdTestFixtures.GenerateModelGoldenIfMissing(fixture);
+            if (!fixture.IsLocalCorpus)
+            {
+                string goldenPath = fixture.RequireGoldenPath();
+                Assert.That(
+                    File.Exists(goldenPath),
+                    Is.True,
+                    fixture.Context(
+                        "Missing committed PMX golden: " + goldenPath
+                        + ". Normal tests are read-only. Set YMU_GENERATE_GOLDENS=1 and run "
+                        + ".\\scripts\\unity-editmode-tests.ps1 -Filter \"Mmd.Tests.MmdGoldenGenerationTests.GeneratePmxGoldenCandidatesForMaintainer\"; review artifacts\\golden-candidates, intentionally promote a reviewed candidate if needed, then rerun this contract test."));
+            }
 
             MmdModelDefinition actual = MmdTestFixtures.ParseModel(fixture);
-            MmdModelDefinition golden = MmdTestFixtures.LoadModelGolden(fixture);
 
             Assert.That(MmdModelValidator.ValidateStructuralModel(actual), Is.Empty);
             AssertExpectedCoverage(fixture, actual);
+
+            if (fixture.IsLocalCorpus)
+            {
+                return;
+            }
+
+            MmdModelDefinition golden = MmdTestFixtures.LoadModelGolden(fixture);
             AssertModelMatchesGolden(fixture, actual, golden);
         }
 
@@ -345,6 +361,32 @@ namespace Mmd.Tests
         private static void AssertHasErrorContaining(IReadOnlyList<string> errors, string expected)
         {
             Assert.That(errors.Any(error => error.Contains(expected, StringComparison.Ordinal)), Is.True, expected);
+        }
+    }
+
+    [TestFixture]
+    public sealed class MmdGoldenGenerationTests
+    {
+        [Test]
+        [Explicit("Maintainer-only: writes PMX golden candidates under artifacts after explicit opt-in.")]
+        public void GeneratePmxGoldenCandidatesForMaintainer()
+        {
+            MmdTestFixtures.RequireGoldenGenerationOptIn();
+            foreach (ModelFixtureEntry fixture in MmdTestFixtures.LoadPackageModelFixtures())
+            {
+                MmdTestFixtures.GenerateModelGoldenCandidate(fixture);
+            }
+        }
+
+        [Test]
+        [Explicit("Maintainer-only: writes VMD golden candidates under artifacts after explicit opt-in.")]
+        public void GenerateVmdGoldenCandidatesForMaintainer()
+        {
+            MmdTestFixtures.RequireGoldenGenerationOptIn();
+            foreach (string baseName in MmdTestFixtures.MotionFixtureBaseNames())
+            {
+                MmdTestFixtures.GenerateMotionGoldenCandidate(baseName);
+            }
         }
     }
 }

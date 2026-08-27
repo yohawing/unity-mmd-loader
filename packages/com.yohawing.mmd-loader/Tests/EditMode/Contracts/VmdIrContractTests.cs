@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using NUnit.Framework;
 using Mmd.Parser;
@@ -22,7 +23,13 @@ namespace Mmd.Tests
         [TestCaseSource(nameof(MotionFixtures))]
         public void MotionFixtureMatchesGoldenVmdIr(string baseName)
         {
-            MmdTestFixtures.GenerateMotionGoldenIfMissing(baseName);
+            string goldenPath = MmdTestFixtures.MotionGoldenPath(baseName);
+            Assert.That(
+                File.Exists(goldenPath),
+                Is.True,
+                "Missing committed VMD golden: " + goldenPath
+                + ". Normal tests are read-only. Set YMU_GENERATE_GOLDENS=1 and run "
+                + ".\\scripts\\unity-editmode-tests.ps1 -Filter \"Mmd.Tests.MmdGoldenGenerationTests.GenerateVmdGoldenCandidatesForMaintainer\"; review artifacts\\golden-candidates, intentionally promote a reviewed candidate if needed, then rerun this contract test.");
 
             MmdMotionDefinition actual = MmdTestFixtures.ParseMotionFile(MmdTestFixtures.MotionFixtureFileName(baseName));
             MmdMotionDefinition golden = MmdTestFixtures.LoadMotionGolden(baseName);

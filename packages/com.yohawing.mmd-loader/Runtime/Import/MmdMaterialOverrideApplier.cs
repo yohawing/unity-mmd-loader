@@ -12,11 +12,6 @@ namespace Mmd.UnityIntegration
         private const string UrpNormalMapKeyword = "_NORMALMAP";
         private const string UrpMetallicGlossMapKeyword = "_METALLICSPECGLOSSMAP";
         private const string UrpOcclusionMapKeyword = "_OCCLUSIONMAP";
-        private const string SurfaceTypeTransparentKeyword = "_SURFACE_TYPE_TRANSPARENT";
-        private const string AlphaBlendKeyword = "_ALPHABLEND_ON";
-        private const string AlphaTestKeyword = "_ALPHATEST_ON";
-        private const int OpaqueRenderQueue = (int)RenderQueue.Geometry;
-        private const int TransparentRenderQueueBase = (int)RenderQueue.Transparent;
 
         internal static void Apply(
             MmdMaterialOverrideAsset? overrideAsset,
@@ -861,72 +856,18 @@ namespace Mmd.UnityIntegration
             int materialSlot,
             float alphaClipThreshold)
         {
-            switch (surfaceMode)
+            MmdMaterialSurfaceMode mode = surfaceMode switch
             {
-                case MmdMaterialOverrideSurfaceMode.Opaque:
-                    SetOpaqueSurface(material);
-                    SetAlphaPolicy(material, MmdMaterialOverrideSurfaceMode.Opaque, 0.0f);
-                    material.renderQueue = OpaqueRenderQueue;
-                    break;
-                case MmdMaterialOverrideSurfaceMode.AlphaTest:
-                    SetOpaqueSurface(material);
-                    SetAlphaPolicy(material, MmdMaterialOverrideSurfaceMode.AlphaTest, alphaClipThreshold);
-                    material.EnableKeyword(AlphaTestKeyword);
-                    material.renderQueue = OpaqueRenderQueue;
-                    break;
-                case MmdMaterialOverrideSurfaceMode.AlphaBlend:
-                    SetAlphaPolicy(material, MmdMaterialOverrideSurfaceMode.AlphaBlend, alphaClipThreshold);
-                    SetFloatIfPresent(material, "_Surface", 1.0f);
-                    SetFloatIfPresent(material, "_Blend", 0.0f);
-                    SetFloatIfPresent(material, "_SrcBlend", (float)BlendMode.SrcAlpha);
-                    SetFloatIfPresent(material, "_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
-                    SetFloatIfPresent(material, "_ZWrite", 1.0f);
-                    material.DisableKeyword(AlphaTestKeyword);
-                    material.EnableKeyword(SurfaceTypeTransparentKeyword);
-                    material.EnableKeyword(AlphaBlendKeyword);
-                    material.renderQueue = TransparentRenderQueueBase + Math.Max(0, materialSlot);
-                    break;
-            }
-        }
-
-        private static void SetOpaqueSurface(Material material)
-        {
-            SetFloatIfPresent(material, "_Surface", 0.0f);
-            SetFloatIfPresent(material, "_SrcBlend", (float)BlendMode.One);
-            SetFloatIfPresent(material, "_DstBlend", (float)BlendMode.Zero);
-            SetFloatIfPresent(material, "_ZWrite", 1.0f);
-            material.DisableKeyword(SurfaceTypeTransparentKeyword);
-            material.DisableKeyword(AlphaBlendKeyword);
-            material.DisableKeyword(AlphaTestKeyword);
-        }
-
-        private static void SetAlphaPolicy(
-            Material material,
-            MmdMaterialOverrideSurfaceMode surfaceMode,
-            float alphaClipThreshold)
-        {
-            float clamped = Clamp01(alphaClipThreshold);
-            switch (surfaceMode)
-            {
-                case MmdMaterialOverrideSurfaceMode.AlphaTest:
-                    SetFloatIfPresent(material, MmdMaterialPropertyNames.AlphaClipThreshold, clamped);
-                    SetFloatIfPresent(material, MmdMaterialPropertyNames.ShadowAlphaClipThreshold, clamped);
-                    SetFloatIfPresent(material, MmdMaterialPropertyNames.Cutoff, clamped);
-                    SetFloatIfPresent(material, MmdMaterialPropertyNames.TextureAlphaOutputWeight, 0.0f);
-                    break;
-                case MmdMaterialOverrideSurfaceMode.AlphaBlend:
-                    SetFloatIfPresent(material, MmdMaterialPropertyNames.AlphaClipThreshold, 0.0f);
-                    SetFloatIfPresent(material, MmdMaterialPropertyNames.ShadowAlphaClipThreshold, clamped);
-                    SetFloatIfPresent(material, MmdMaterialPropertyNames.Cutoff, 0.0f);
-                    SetFloatIfPresent(material, MmdMaterialPropertyNames.TextureAlphaOutputWeight, 1.0f);
-                    break;
-                default:
-                    SetFloatIfPresent(material, MmdMaterialPropertyNames.AlphaClipThreshold, 0.0f);
-                    SetFloatIfPresent(material, MmdMaterialPropertyNames.ShadowAlphaClipThreshold, 0.0f);
-                    SetFloatIfPresent(material, MmdMaterialPropertyNames.Cutoff, 0.0f);
-                    SetFloatIfPresent(material, MmdMaterialPropertyNames.TextureAlphaOutputWeight, 0.0f);
-                    break;
-            }
+                MmdMaterialOverrideSurfaceMode.AlphaTest => MmdMaterialSurfaceMode.AlphaTest,
+                MmdMaterialOverrideSurfaceMode.AlphaBlend => MmdMaterialSurfaceMode.AlphaBlend,
+                _ => MmdMaterialSurfaceMode.Opaque
+            };
+            MmdMaterialSurfaceState state = MmdMaterialSurfaceState.Create(mode, materialSlot, alphaClipThreshold);
+            MmdMaterialSurfaceApplier.Apply(material, state, MmdMaterialRenderingTargets.BuiltIn);
+            SetFloatIfPresent(
+                material,
+                MmdMaterialPropertyNames.Cutoff,
+                mode == MmdMaterialSurfaceMode.AlphaTest ? state.AlphaClipThreshold : 0.0f);
         }
 
         private static void ApplyBindingSurfaceMode(

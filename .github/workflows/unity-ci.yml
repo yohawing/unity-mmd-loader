@@ -28,6 +28,34 @@ permissions:
   checks: write
 
 jobs:
+  source-style:
+    name: Source Style Guard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check C# whitespace policy
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          set +e
+          git grep -nP '[\t]|[ \t]+$' -- '*.cs'
+          grep_status=$?
+          set -e
+
+          if ((grep_status == 0)); then
+            echo "::error::Tracked C# source contains tabs or trailing whitespace."
+            exit 1
+          fi
+          if ((grep_status != 1)); then
+            echo "::error::Unable to inspect tracked C# source (git grep exit $grep_status)."
+            exit "$grep_status"
+          fi
+
+          echo "PASS source style guard: C# whitespace policy"
+
   release-submodule-latest:
     if: >-
       (github.event_name == 'pull_request' && github.head_ref == 'develop') ||
@@ -65,12 +93,35 @@ jobs:
           fi
 
   native-build:
+    name: Native Build (ubuntu-latest)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build mmd-anim FFI
+        run: cargo build -p mmd-anim-ffi --release --manifest-path native/mmd-anim/Cargo.toml
+
+      - name: Upload native artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-ubuntu-latest
+          path: native/mmd-anim/target/release/libmmd_runtime_ffi.so
+          if-no-files-found: warn
+
+  native-build-platform:
     name: Native Build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [macos-latest, windows-latest]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -122,49 +173,207 @@ jobs:
     name: Package Edit Mode Tests
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout workflow action and sources
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Download Linux native runtime
-        uses: actions/download-artifact@v4
-        with:
-          name: native-ubuntu-latest
-          path: native-artifact
-
-      - name: Install Linux native runtime
-        shell: bash
-        run: |
-          set -euo pipefail
-          artifact="$(find native-artifact -type f -name 'libmmd_runtime_ffi.so' -print -quit)"
-          if [ -z "$artifact" ]; then
-            echo "::error::Linux native runtime artifact was not found"
-            exit 1
-          fi
-          plugin_dir="packages/com.yohawing.mmd-loader/Runtime/Plugins/x86_64"
-          mkdir -p "$plugin_dir"
-          cp "$artifact" "$plugin_dir/mmd_runtime_ffi.so"
-
       - name: Run Edit Mode tests
-        uses: game-ci/unity-test-runner@v4
-        id: tests
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        uses: ./.github/actions/package-unity-tests
         with:
-          packageMode: true
-          projectPath: packages/com.yohawing.mmd-loader
-          unityVersion: 6000.4.8f1
-          testMode: editmode
-          artifactsPath: test-artifacts
-          githubToken: ${{ secrets.GITHUB_TOKEN }}
+          test-mode: editmode
+          artifacts-path: test-artifacts
+          artifact-name: unity-editmode-results
+          unity-license: ${{ secrets.UNITY_LICENSE }}
+          unity-email: ${{ secrets.UNITY_EMAIL }}
+          unity-password: ${{ secrets.UNITY_PASSWORD }}
 
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
+  project-playmode-tests:
+    needs: [license-check, native-build]
+    if: needs.license-check.outputs.has-license == 'true'
+    name: Unity Project Play Mode Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout workflow action and sources
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Run Play Mode tests
+        uses: ./.github/actions/package-unity-tests
+        with:
+          test-mode: playmode
+          project-path: unity-mmd
+          package-mode: "false"
+          artifacts-path: playmode-test-artifacts
+          artifact-name: unity-playmode-results
+          unity-license: ${{ secrets.UNITY_LICENSE }}
+          unity-email: ${{ secrets.UNITY_EMAIL }}
+          unity-password: ${{ secrets.UNITY_PASSWORD }}
+
+  unity-release-evidence-summary:
+    name: Unity Release Evidence Summary
+    needs: [license-check, native-build-platform, package-editmode-tests, project-playmode-tests]
+    if: >-
+      ${{
+        always() &&
+        ((github.event_name == 'pull_request' && github.head_ref == 'develop') ||
+         (github.event_name == 'workflow_dispatch' && inputs.release_gate == true))
+      }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download EditMode evidence
+        uses: actions/download-artifact@v4
         if: always()
+        continue-on-error: true
         with:
           name: unity-editmode-results
-          path: ${{ steps.tests.outputs.artifactsPath }}
-          if-no-files-found: warn
+          path: evidence/editmode
+
+      - name: Download PlayMode evidence
+        uses: actions/download-artifact@v4
+        if: always()
+        continue-on-error: true
+        with:
+          name: unity-playmode-results
+          path: evidence/playmode
+
+      - name: Verify release evidence
+        shell: pwsh
+        env:
+          LICENSE_PRESENT: ${{ needs.license-check.outputs.has-license }}
+          NATIVE_PLATFORM_RESULT: ${{ needs.native-build-platform.result }}
+          EDITMODE_RESULT: ${{ needs.package-editmode-tests.result }}
+          PLAYMODE_RESULT: ${{ needs.project-playmode-tests.result }}
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          if ($env:LICENSE_PRESENT -ne "true") {
+            throw "Release evidence is unavailable: UNITY_LICENSE is not configured."
+          }
+          if ($env:NATIVE_PLATFORM_RESULT -ne "success") {
+            throw "Release evidence is unavailable: macOS/Windows native build result is $env:NATIVE_PLATFORM_RESULT."
+          }
+          if ($env:EDITMODE_RESULT -ne "success") {
+            throw "Release evidence is unavailable: EditMode job result is $env:EDITMODE_RESULT."
+          }
+          if ($env:PLAYMODE_RESULT -ne "success") {
+            throw "Release evidence is unavailable: PlayMode job result is $env:PLAYMODE_RESULT."
+          }
+
+          . "$env:GITHUB_WORKSPACE/scripts/read-nunit-test-result.ps1"
+
+          function Get-SingleNUnitResult {
+            param(
+              [Parameter(Mandatory = $true)][string] $Directory,
+              [Parameter(Mandatory = $true)][string] $Context
+            )
+
+            $files = @()
+            if (Test-Path -LiteralPath $Directory -PathType Container) {
+              $files = @(Get-ChildItem -LiteralPath $Directory -Recurse -File -Filter "*.xml")
+            }
+            if ($files.Count -ne 1) {
+              throw "$Context must contain exactly one NUnit XML result; found $($files.Count): $Directory"
+            }
+            return $files[0].FullName
+          }
+
+          $editModePath = Get-SingleNUnitResult -Directory "$env:GITHUB_WORKSPACE/evidence/editmode" -Context "EditMode evidence"
+          $playModePath = Get-SingleNUnitResult -Directory "$env:GITHUB_WORKSPACE/evidence/playmode" -Context "PlayMode evidence"
+
+          # These tests are intentionally environment-dependent diagnostics. Their exact
+          # names are allowlisted so a clean Linux runner may lack local corpus data,
+          # graphics, optional parity tooling, or non-Linux native probes. Do not add
+          # core importer, playback, physics, or inconclusive tests here; new names must
+          # fail the gate until reviewed. Tests marked [Explicit] are admitted from the
+          # NUnit runstate below; runnable environment skips remain listed here by name.
+          $editModeAllowedSkippedTests = @(
+            "Mmd.Tests.MmdAssetImporterTests.PmxImporterCustomProfileUsesUtsShaderAndDeclaredMaterialStates",
+            "Mmd.Tests.LocalCorpusManifestContractTests.LocalThreeMmdLoaderCorpusManifestImportsPmxAndPmdWhenPresent",
+            "Mmd.Tests.MmdGenericAnimationClipWriterTests.NativeUnavailableFailsClosedWithoutManagedTransformFallback",
+            "Mmd.Tests.MmdNativeHandleLifetimeStressContractTests.PackagedNativePlaybackHandlesSurviveBoundedReplacementAndCleanupStress",
+            "Mmd.Tests.MmdNativeHandleLifetimeStressContractTests.PackagedNativeSceneTrackSamplersSurviveBoundedReplacementAndCleanupStress",
+            "Mmd.Tests.Contracts.NativeInteropContractTests.RuntimeFfiClipFrameBatchMatchesSequentialEvaluation",
+            "Mmd.Tests.Contracts.NativeInteropContractTests.ReducedPoseEnumeratesSparseKeysAfterSourceSessionIsDisposed",
+            "Mmd.Tests.Contracts.MmdRuntimeFfiHostPoseSessionTests.SemiBasicBoneHostPoseRoundTripIsDeterministicWithoutPhysicsWorld",
+            "Mmd.Tests.MmdGenericAnimationClipWriterTests.BakeUsesNativeSparseTranslationAndEulerCurvesWithPhysicsOff",
+            "Mmd.Tests.MmdGenericAnimationClipWriterTests.DenseBakeIsRepeatableForSameInputs",
+            "Mmd.Tests.MmdGenericAnimationClipWriterTests.VertexMorphBakeWritesBlendShapeCurveInPercentUnits",
+            "Mmd.Tests.MmdGenericAnimationClipWriterTests.BatchMorphCurveMatchesFastRuntimeApplication",
+            "Mmd.Tests.MmdGenericAnimationClipWriterTests.ExplicitAssetPersistenceUsesValidatedAnimPathAndCanBeCleanedUp",
+            "Mmd.Tests.MmdGenericAnimationClipWriterTests.DisablingKeyReductionRetainsEverySampledFrame",
+            "Mmd.Tests.MmdGenericAnimationClipWriterTests.NativeSparseBakeRemainsEnabledAtDefaultPointOneImportScale",
+            "Mmd.Tests.MmdGenericAnimationClipWriterTests.NativeSparseTransformCurvesMatchFastRuntimeWithNonzeroStartAndDefaultScale",
+            "Mmd.Tests.Contracts.RuntimeTextureBindingContractTests.JunctionInsidePmxDirectoryCannotReadOutsideTrustedRoot",
+            "Mmd.Tests.MmdVmdTimelineBehaviourTests.ProviderMotionConfigurationUsesCachedNativeHeaderMetadata",
+            "Mmd.Tests.MmdVmdNativeClipPerformanceTests.GeneratedDenseVmdNativeClipBuildHasP95Under100Milliseconds",
+            "Mmd.Tests.MmdVmdImportTimelinePerformanceTests.GeneratedVmdImportTimelineFirstEvaluateHasP95Under100Milliseconds",
+            "Mmd.Tests.MmdVmdImportTimelinePerformanceTests.GeneratedVmdImportTimelineHandleLifetimeStressStaysWithinCleanupAllowance"
+          )
+          $editModeAllowedExplicitSkippedTests = @(
+            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampOpaqueOutline_IsDeterministicAndMatchesGolden",
+            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksAmbientShAndFogWhileLegacyStaysInvariant",
+            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksHdrEmissionWhileLegacyStaysInvariant",
+            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksReflectionProbeWhileLegacyStaysInvariant",
+            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksRimLightFollowWhileLegacyStaysInvariant",
+            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksRimLightWhileLegacyStaysInvariant",
+            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksSsaoWhileLegacyStaysInvariant",
+            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksStylizedSpecularWhileLegacyStaysInvariant",
+            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksToonBandCountWhileLegacyStaysInvariant",
+            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksToonBoundaryAndFeatherWhileLegacyStaysInvariant",
+            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksUnityMainLightWhileLegacyStaysInvariant",
+            "Mmd.Tests.Contracts.MmdNativeParityTests.MmdAnimCliParityReportComparesCliWithPackagedNativeRuntime",
+            "Mmd.Tests.MmdRuntimeNativeUnavailableBoundaryContractTests.PhysicalAbiMismatchProbeClassifiesUnsupportedRuntime",
+            "Mmd.Tests.MmdRuntimeNativeUnavailableBoundaryContractTests.PhysicalInvalidNativeBytesProbeReportsNativeLastError",
+            "Mmd.Tests.MmdRuntimeNativeUnavailableBoundaryContractTests.PhysicalMissingNativeDllProbeClassifiesUnavailableRuntime",
+            "Mmd.Tests.MmdRuntimeNativeUnavailableBoundaryContractTests.PhysicalMissingNativeEntryPointProbeClassifiesUnavailableRuntime",
+            "Mmd.Tests.MmdUnityPlaybackControllerHumanoidRetargetTests.NativeHostPoseTimelineSupportsRepeatAndReverseWithoutDrift",
+            "Mmd.Tests.MmdHumanoidAnimationTrackEditScrubTests.EditScrubPosesProxyAndRetargetsNativeViaAnimationMode",
+            "Mmd.Tests.MmdGoldenGenerationTests.GeneratePmxGoldenCandidatesForMaintainer",
+            "Mmd.Tests.MmdGoldenGenerationTests.GenerateVmdGoldenCandidatesForMaintainer"
+          )
+          $editModeAllowedSkippedPrefixes = @(
+            "Mmd.Tests.MmdAssetImporterTests.PmxImporterCustomProfileRendersUtsVisualSmoke"
+          )
+
+          foreach ($evidence in @(
+            @{ Path = $editModePath; Context = "Release EditMode evidence"; AllowedSkippedTests = $editModeAllowedSkippedTests; AllowedSkippedPrefixes = $editModeAllowedSkippedPrefixes },
+            @{ Path = $playModePath; Context = "Release PlayMode evidence"; AllowedSkippedTests = @(); AllowedSkippedPrefixes = @() }
+          )) {
+            $summary = Read-NUnitTestRunSummary -Path $evidence.Path -Context $evidence.Context
+            $allowedSkippedTests = @($evidence.AllowedSkippedTests)
+            if ($evidence.Context -eq "Release EditMode evidence") {
+              $unapprovedExplicitSkippedTests = @(
+                $summary.ExplicitSkippedTestNames |
+                    Where-Object { $editModeAllowedExplicitSkippedTests -notcontains [string] $_ }
+              )
+              if ($unapprovedExplicitSkippedTests.Count -gt 0) {
+                throw "Release EditMode evidence has unapproved explicit skipped tests: $($unapprovedExplicitSkippedTests -join ', '); path=$($summary.Path)"
+              }
+              $allowedSkippedTests += @($summary.ExplicitSkippedTestNames)
+            }
+            foreach ($skippedTestName in @($summary.SkippedTestNames)) {
+              foreach ($skipPrefix in @($evidence.AllowedSkippedPrefixes)) {
+                $skipName = [string] $skippedTestName
+                $skipPrefixText = [string] $skipPrefix
+                if ($skipName.Equals($skipPrefixText, [System.StringComparison]::Ordinal) -or
+                    $skipName.StartsWith($skipPrefixText + "(", [System.StringComparison]::Ordinal)) {
+                  $allowedSkippedTests += $skipName
+                  break
+                }
+              }
+            }
+            Assert-NUnitTestRunEvidence `
+              -Summary $summary `
+              -MinimumTotal 1 `
+              -MinimumPassed 1 `
+              -AllowedSkippedTests $allowedSkippedTests `
+              -Context $evidence.Context | Out-Null
+            Write-Host ("PASS {0}: total={1}, passed={2}" -f $evidence.Context, $summary.Total, $summary.Passed)
+          }
+
+          Write-Host "PASS release evidence: native platforms, EditMode, and PlayMode are complete"

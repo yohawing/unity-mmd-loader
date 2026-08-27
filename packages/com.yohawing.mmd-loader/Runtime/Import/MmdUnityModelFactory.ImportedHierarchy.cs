@@ -32,7 +32,8 @@ namespace Mmd.UnityIntegration
             string? sourcePath,
             float importScale,
             bool includeSelfShadowTarget,
-            MmdMaterialOverrideAsset? materialOverride = null)
+            MmdMaterialOverrideAsset? materialOverride = null,
+            MmdMaterialRenderingTargets[]? materialRenderingTargets = null)
         {
             if (importedRoot == null)
             {
@@ -59,7 +60,8 @@ namespace Mmd.UnityIntegration
                 sourcePath,
                 importScale,
                 includeSelfShadowTarget,
-                materialOverride);
+                materialOverride,
+                materialRenderingTargets);
         }
 
         internal static MmdUnityModelInstance CreateFromInstantiatedImportedHierarchy(
@@ -68,7 +70,8 @@ namespace Mmd.UnityIntegration
             string? sourcePath,
             float importScale,
             bool includeSelfShadowTarget = true,
-            MmdMaterialOverrideAsset? materialOverride = null)
+            MmdMaterialOverrideAsset? materialOverride = null,
+            MmdMaterialRenderingTargets[]? materialRenderingTargets = null)
         {
             if (instanceRoot == null)
             {
@@ -96,7 +99,8 @@ namespace Mmd.UnityIntegration
                     sourcePath,
                     scale,
                     includeSelfShadowTarget,
-                    materialOverride);
+                    materialOverride,
+                    materialRenderingTargets);
             }
 
             return CreateFromImportedStaticHierarchy(
@@ -106,7 +110,8 @@ namespace Mmd.UnityIntegration
                 sourcePath,
                 scale,
                 includeSelfShadowTarget,
-                materialOverride);
+                materialOverride,
+                materialRenderingTargets);
         }
 
         private static MmdUnityModelInstance CreateFromImportedSkinnedHierarchy(
@@ -116,7 +121,8 @@ namespace Mmd.UnityIntegration
             string? sourcePath,
             float scale,
             bool includeSelfShadowTarget,
-            MmdMaterialOverrideAsset? materialOverride)
+            MmdMaterialOverrideAsset? materialOverride,
+            MmdMaterialRenderingTargets[]? materialRenderingTargets)
         {
             Transform modelRoot = FindModelRoot(instanceRoot.transform);
             SkinnedMeshRenderer renderer = modelRoot.GetComponent<SkinnedMeshRenderer>()
@@ -167,7 +173,8 @@ namespace Mmd.UnityIntegration
                 Array.Empty<Texture2D>(),
                 new MmdTextureBindingDiagnostics(),
                 shaderDiagnostics,
-                scale);
+                scale,
+                NormalizeMaterialRenderingTargets(materials.Length, materialRenderingTargets));
         }
 
         private static MmdUnityModelInstance CreateFromImportedStaticHierarchy(
@@ -177,7 +184,8 @@ namespace Mmd.UnityIntegration
             string? sourcePath,
             float scale,
             bool includeSelfShadowTarget,
-            MmdMaterialOverrideAsset? materialOverride)
+            MmdMaterialOverrideAsset? materialOverride,
+            MmdMaterialRenderingTargets[]? materialRenderingTargets)
         {
             Transform modelRoot = FindModelRoot(instanceRoot.transform);
             MeshRenderer meshRenderer = modelRoot.GetComponent<MeshRenderer>()
@@ -217,7 +225,8 @@ namespace Mmd.UnityIntegration
                 Array.Empty<Texture2D>(),
                 new MmdTextureBindingDiagnostics(),
                 shaderDiagnostics,
-                scale);
+                scale,
+                NormalizeMaterialRenderingTargets(materials.Length, materialRenderingTargets));
         }
 
         private static MmdShaderBindingDiagnostics BuildMeshRendererShaderDiagnostics(MeshRenderer renderer)

@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using System.Diagnostics;
 using System.IO;
 using Mmd.Editor;
 using Mmd.Mme;
@@ -225,6 +226,104 @@ namespace Mmd.Tests
             Assert.That(normalizedImporter, Is.Not.Null);
             Assert.That(normalizedImporter!.textureType, Is.EqualTo(TextureImporterType.NormalMap));
             Assert.That(normalizedImporter.sRGBTexture, Is.False);
+        }
+
+        [Test]
+        public void MmeNormalMapPostprocessor_RejectsRelativeTraversalAndMissingReferences()
+        {
+            string effectDirectory = Path.Combine(ToAbsolutePath(TempDirectory), "path_policy");
+            Directory.CreateDirectory(effectDirectory);
+
+            string traversalEffectAssetPath = TempDirectory + "/path_policy/traversal.fx";
+            string missingEffectAssetPath = TempDirectory + "/path_policy/missing.fx";
+            File.WriteAllText(
+                ToAbsolutePath(traversalEffectAssetPath),
+                "#define TEXTURE_NORMALMAP \"../../../outside.png\"");
+            File.WriteAllText(
+                ToAbsolutePath(missingEffectAssetPath),
+                "#define TEXTURE_NORMALMAP \"missing.png\"");
+
+            Assert.That(
+                MmdMmeNormalMapTexturePostprocessor.GetExplicitNormalMapAssetPaths(
+                    traversalEffectAssetPath),
+                Is.Empty);
+            Assert.That(
+                MmdMmeNormalMapTexturePostprocessor.GetExplicitNormalMapAssetPaths(
+                    missingEffectAssetPath),
+                Is.Empty);
+        }
+
+        [Test]
+        public void MmeNormalMapPostprocessor_RejectsNormalMapReferenceThroughJunction()
+        {
+            if (Path.DirectorySeparatorChar != '\\')
+            {
+                Assert.Ignore("Windows junction contract.");
+            }
+
+            string pathPolicyDirectory = Path.Combine(ToAbsolutePath(TempDirectory), "junction_policy");
+            string effectDirectory = Path.Combine(pathPolicyDirectory, "effects");
+            string junctionPath = Path.Combine(effectDirectory, "linked");
+            string targetDirectory = Path.Combine(pathPolicyDirectory, "target");
+            Directory.CreateDirectory(effectDirectory);
+            Directory.CreateDirectory(targetDirectory);
+
+            string effectAssetPath = TempDirectory + "/junction_policy/effects/body.fx";
+            string targetTexturePath = Path.Combine(targetDirectory, "normal.png");
+            File.WriteAllText(
+                ToAbsolutePath(effectAssetPath),
+                "#define TEXTURE_NORMALMAP \"linked/normal.png\"");
+            WriteNormalMapTexture(targetTexturePath);
+
+            try
+            {
+                using (Process? process = Process.Start(new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = $"/d /c mklink /J \"{junctionPath}\" \"{targetDirectory}\"",
+                    CreateNoWindow = true,
+                    UseShellExecute = false
+                }))
+                {
+                    Assert.That(process, Is.Not.Null, "Could not start junction creation.");
+                    Assert.That(process!.WaitForExit(10000), Is.True, "Junction creation timed out.");
+                    Assert.That(process.ExitCode, Is.EqualTo(0), "Junction creation failed.");
+                }
+
+                Assert.That(
+                    MmdMmeNormalMapTexturePostprocessor.GetExplicitNormalMapAssetPaths(effectAssetPath),
+                    Is.Empty);
+            }
+            finally
+            {
+                if (Directory.Exists(junctionPath))
+                {
+                    Directory.Delete(junctionPath, recursive: false);
+                }
+            }
+        }
+
+        [Test]
+        public void MmeNormalMapPostprocessor_PreservesRootedProjectAssetReference()
+        {
+            if (Path.DirectorySeparatorChar != '\\')
+            {
+                Assert.Ignore("Windows rooted-path compatibility contract.");
+            }
+
+            string effectDirectory = Path.Combine(ToAbsolutePath(TempDirectory), "rooted_policy");
+            Directory.CreateDirectory(effectDirectory);
+            string effectAssetPath = TempDirectory + "/rooted_policy/body.fx";
+            string normalMapAssetPath = TempDirectory + "/rooted_policy/normal.png";
+            string normalMapAbsolutePath = ToAbsolutePath(normalMapAssetPath);
+            WriteNormalMapTexture(normalMapAbsolutePath);
+            File.WriteAllText(
+                ToAbsolutePath(effectAssetPath),
+                $"#define TEXTURE_NORMALMAP \"{normalMapAbsolutePath}\"");
+
+            Assert.That(
+                MmdMmeNormalMapTexturePostprocessor.GetExplicitNormalMapAssetPaths(effectAssetPath),
+                Is.EqualTo(new[] { normalMapAssetPath }));
         }
 
         [Test]
