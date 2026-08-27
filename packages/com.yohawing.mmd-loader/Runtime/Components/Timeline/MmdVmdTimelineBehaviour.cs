@@ -92,6 +92,10 @@ namespace Mmd.Timeline
                 return false;
             }
 
+            MmdMultiCharacterPlaybackGroup.ReleaseForSerialPlayback(
+                target,
+                nameof(TryPrepareTimelinePlayback));
+
             var timing = new MmdTimelineSetupTimingSummary();
             target.LastTimelineSetupTiming = timing;
             Stopwatch totalWatch = Stopwatch.StartNew();
@@ -136,6 +140,10 @@ namespace Mmd.Timeline
             {
                 throw new ArgumentNullException(nameof(target));
             }
+
+            MmdMultiCharacterPlaybackGroup.ReleaseForSerialPlayback(
+                target,
+                nameof(EvaluateAtLocalTime));
 
             if (double.IsNaN(localTime) || double.IsInfinity(localTime) || localTime < 0.0)
             {

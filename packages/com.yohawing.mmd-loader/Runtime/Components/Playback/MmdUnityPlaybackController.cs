@@ -127,6 +127,13 @@ namespace Mmd.UnityIntegration
 
         public MmdPlaybackSnapshot? LastSnapshot { get; private set; }
 
+        /// <summary>
+        /// Raised on the main thread immediately after a playback pose is successfully applied.
+        /// Automatic serial and worker-group playback both invoke the callback during Update.
+        /// Subscriber exceptions are logged and do not stop playback.
+        /// </summary>
+        public event Action<MmdPlaybackSnapshot>? PoseApplied;
+
         public MmdTimelineSetupTimingSummary? LastTimelineSetupTiming { get; internal set; }
 
         public MmdLivePhysicsFrameDiagnostics? LastLivePhysicsDiagnostics =>
@@ -187,6 +194,7 @@ namespace Mmd.UnityIntegration
             IReadOnlyList<MmdHumanoidRetargetBinding>? entries,
             IReadOnlyList<MmdHumanoidAppendTransformBinding>? appendEntries)
         {
+            ThrowIfMultiCharacterPoolOwnsController(nameof(ConfigureHumanoidRetarget));
             if (physicsMode == MmdPhysicsMode.Off && ikMaxIterationsCap > 0 &&
                 proxyRoot != null && entries != null && entries.Count > 0)
             {
@@ -211,6 +219,7 @@ namespace Mmd.UnityIntegration
 
         public void Configure(MmdUnityPlaybackBinding playbackBinding, MmdPlaybackConfig config)
         {
+            ThrowIfMultiCharacterPoolOwnsController(nameof(Configure));
             config.Validate();
             Configure(playbackBinding, config.FrameRate, config.PlayOnStart);
             ApplyFrame(config.InitialFrame);
@@ -218,6 +227,7 @@ namespace Mmd.UnityIntegration
 
         public void Configure(MmdUnityPlaybackBinding playbackBinding, float playbackFrameRate, bool playOnStart = true)
         {
+            ThrowIfMultiCharacterPoolOwnsController(nameof(Configure));
             if (playbackBinding == null)
             {
                 throw new ArgumentNullException(nameof(playbackBinding));
@@ -253,11 +263,13 @@ namespace Mmd.UnityIntegration
 
         public void SetPlayOnStart(bool value)
         {
+            ThrowIfMultiCharacterPoolOwnsController(nameof(SetPlayOnStart));
             playOnStart = value;
         }
 
         public void SetPhysicsMode(MmdPhysicsMode mode)
         {
+            ThrowIfMultiCharacterPoolOwnsController(nameof(SetPhysicsMode));
             ApplyPhysicsMode(mode);
         }
 
@@ -271,6 +283,7 @@ namespace Mmd.UnityIntegration
             get => ikMaxIterationsCap;
             set
             {
+                ThrowIfMultiCharacterPoolOwnsController(nameof(IkMaxIterationsCap));
                 ValidateIkMaxIterationsCap(value);
                 ValidateHumanoidPhysicsOffIkCap(value);
                 ikMaxIterationsCap = value;
@@ -320,6 +333,7 @@ namespace Mmd.UnityIntegration
 
         public MmdPlaybackSnapshot ApplyFrame(int frame)
         {
+            ThrowIfMultiCharacterPoolOwnsController(nameof(ApplyFrame));
             if (binding == null)
             {
                 throw new InvalidOperationException("Playback controller must be configured before applying frames.");
@@ -332,11 +346,12 @@ namespace Mmd.UnityIntegration
 
             playbackFrame = frame;
             CurrentFrame = frame;
-            return ApplyPlaybackPose(() => ApplyCurrentFrame());
+            return ApplyCurrentFramePose();
         }
 
         public MmdPlaybackSnapshot SeekFrame(int frame)
         {
+            ThrowIfMultiCharacterPoolOwnsController(nameof(SeekFrame));
             if (binding == null)
             {
                 throw new InvalidOperationException("Playback controller must be configured before seeking.");
@@ -377,11 +392,13 @@ namespace Mmd.UnityIntegration
 
         public MmdPlaybackSnapshot ApplyTime(float time)
         {
+            ThrowIfMultiCharacterPoolOwnsController(nameof(ApplyTime));
             return ApplyTime(time, frameRate);
         }
 
         public MmdPlaybackSnapshot ApplyTime(float time, float playbackFrameRate)
         {
+            ThrowIfMultiCharacterPoolOwnsController(nameof(ApplyTime));
             if (binding == null)
             {
                 throw new InvalidOperationException("Playback controller must be configured before applying time.");
@@ -400,17 +417,20 @@ namespace Mmd.UnityIntegration
 
         public void Play()
         {
+            ThrowIfMultiCharacterPoolOwnsController(nameof(Play));
             EnsureConfigured();
             IsPlaying = true;
         }
 
         public void Pause()
         {
+            ThrowIfMultiCharacterPoolOwnsController(nameof(Pause));
             IsPlaying = false;
         }
 
         public void Stop()
         {
+            ThrowIfMultiCharacterPoolOwnsController(nameof(Stop));
             IsPlaying = false;
             pendingSeekReseed = false;
             if (binding != null)
@@ -427,6 +447,7 @@ namespace Mmd.UnityIntegration
 
         public void Tick(float deltaTime)
         {
+            ThrowIfMultiCharacterPoolOwnsController(nameof(Tick));
             if (!IsPlaying)
             {
                 return;
@@ -439,11 +460,16 @@ namespace Mmd.UnityIntegration
 
             playbackFrame += deltaTime * frameRate;
             CurrentFrame = MmdPlaybackTime.ToFrame(playbackFrame / frameRate, frameRate);
-            ApplyPlaybackPose(() => ApplyCurrentFrame());
+            ApplyCurrentFramePose();
         }
 
         private void Update()
         {
+            if (IsMultiCharacterClaimed)
+            {
+                return;
+            }
+
             SyncSerializedPhysicsModeToBinding();
             if (ShouldSuppressSelfTick(lastTimelineDriveFrameCount, Time.frameCount))
             {
@@ -458,6 +484,11 @@ namespace Mmd.UnityIntegration
 
         private void LateUpdate()
         {
+            if (IsMultiCharacterClaimed)
+            {
+                return;
+            }
+
             if (!HasHumanoidRetargetInputsForLateUpdate())
             {
                 return;
@@ -573,6 +604,12 @@ namespace Mmd.UnityIntegration
 
         private void OnDestroy()
         {
+            MmdMultiCharacterPlaybackGroup.NotifyControllerUnavailable(this);
+            if (multiCharacterGroup != null)
+            {
+                ReleaseMultiCharacterGroup(multiCharacterGroup);
+            }
+
             ReleasePlaybackResources();
         }
 
@@ -588,6 +625,7 @@ namespace Mmd.UnityIntegration
 
         private void OnDisable()
         {
+            MmdMultiCharacterPlaybackGroup.NotifyControllerUnavailable(this);
             DisposeHumanoidPhysicsBinding();
             DisposeHumanoidHostPoseSession();
         }
@@ -758,17 +796,43 @@ namespace Mmd.UnityIntegration
             return LastSnapshot;
         }
 
-        private MmdPlaybackSnapshot ApplyPlaybackPose(Func<MmdPlaybackSnapshot> apply)
+        private MmdPlaybackSnapshot ApplyCurrentFramePose()
         {
+            bool poseWillBeApplied = binding?.PhysicsMode != MmdPhysicsMode.Live ||
+                !binding.CanReuseLivePhysicsSeed(CurrentFrame);
+            return ApplyPlaybackPose(() => ApplyCurrentFrame(), poseWillBeApplied);
+        }
+
+        private MmdPlaybackSnapshot ApplyPlaybackPose(
+            Func<MmdPlaybackSnapshot> apply,
+            bool poseWillBeApplied = true)
+        {
+            MmdPlaybackSnapshot snapshot;
             isApplyingPlaybackPose = true;
             try
             {
-                return apply();
+                snapshot = apply();
             }
             finally
             {
                 isApplyingPlaybackPose = false;
             }
+
+            if (!poseWillBeApplied)
+            {
+                return snapshot;
+            }
+
+            try
+            {
+                PoseApplied?.Invoke(snapshot);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception, this);
+            }
+
+            return snapshot;
         }
     }
 }

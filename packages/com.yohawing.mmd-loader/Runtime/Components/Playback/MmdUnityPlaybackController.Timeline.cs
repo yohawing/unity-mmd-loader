@@ -22,6 +22,9 @@ namespace Mmd.UnityIntegration
 
         internal void PrepareTimelineSeed(float sourceTime, float frameRate, bool runLivePhysics)
         {
+            MmdMultiCharacterPlaybackGroup.ReleaseForSerialPlayback(
+                this,
+                nameof(PrepareTimelineSeed));
             timelinePreparationSeedPending = false;
             bool seedLivePhysics = runLivePhysics && physicsMode == MmdPhysicsMode.Live;
             if (seedLivePhysics)
@@ -42,6 +45,7 @@ namespace Mmd.UnityIntegration
 
         public MmdHumanoidRetargeterResult ApplyHumanoidRetargetNow()
         {
+            ThrowIfMultiCharacterPoolOwnsController(nameof(ApplyHumanoidRetargetNow));
             MmdHumanoidRetargetGate gate = EvaluateHumanoidRetargetGate(requireAnimatorDriver: true);
             LastHumanoidRetargetGate = gate;
             if (gate != MmdHumanoidRetargetGate.Ready)
@@ -55,6 +59,9 @@ namespace Mmd.UnityIntegration
 
         internal MmdHumanoidRetargeterResult ApplyHumanoidRetargetFromTimeline()
         {
+            MmdMultiCharacterPlaybackGroup.ReleaseForSerialPlayback(
+                this,
+                nameof(ApplyHumanoidRetargetFromTimeline));
             lastHumanoidRetargetTimelineDriveFrameCount = Time.frameCount;
             MmdHumanoidRetargetGate gate = EvaluateHumanoidRetargetGate(requireAnimatorDriver: false);
             LastHumanoidRetargetGate = gate;
@@ -146,6 +153,9 @@ namespace Mmd.UnityIntegration
 
         internal bool PrewarmTimelineLivePhysics()
         {
+            MmdMultiCharacterPlaybackGroup.ReleaseForSerialPlayback(
+                this,
+                nameof(PrewarmTimelineLivePhysics));
             if (binding == null)
             {
                 return false;
@@ -177,6 +187,9 @@ namespace Mmd.UnityIntegration
         /// </summary>
         internal MmdPlaybackSnapshot ApplyTimelineTime(float sourceTime, float frameRate)
         {
+            MmdMultiCharacterPlaybackGroup.ReleaseForSerialPlayback(
+                this,
+                nameof(ApplyTimelineTime));
             if (binding == null)
             {
                 throw new InvalidOperationException("Playback controller must be configured before applying timeline time.");
@@ -221,6 +234,9 @@ namespace Mmd.UnityIntegration
         /// </summary>
         internal MmdPlaybackSnapshot ApplyTimelineLivePhysicsForward(float sourceTime, float frameRate)
         {
+            MmdMultiCharacterPlaybackGroup.ReleaseForSerialPlayback(
+                this,
+                nameof(ApplyTimelineLivePhysicsForward));
             if (binding == null)
             {
                 throw new InvalidOperationException("Playback controller must be configured before applying timeline time.");
@@ -247,6 +263,7 @@ namespace Mmd.UnityIntegration
 
             playbackFrame = frame;
             CurrentFrame = frame;
+            bool poseWillBeApplied = !binding.CanReuseLivePhysicsSeed(frame);
             return ApplyPlaybackPose(() =>
             {
                 PrepareLivePhysicsDriveSource(LivePhysicsDriveSource.VmdForward);
@@ -254,7 +271,7 @@ namespace Mmd.UnityIntegration
                 TimelinePoseEvaluationCount++;
                 lastVmdLivePhysicsFrameCount = Time.frameCount;
                 return LastSnapshot;
-            });
+            }, poseWillBeApplied);
         }
 
         private bool TryReuseTimelinePreparationSeed(

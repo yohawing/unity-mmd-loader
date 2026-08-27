@@ -103,6 +103,15 @@ namespace Mmd.Tests
                 binding = CreatePlaybackBinding();
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 24.0f);
+                int poseAppliedCount = 0;
+                bool snapshotPublishedBeforeCallback = true;
+                MmdPlaybackSnapshot? poseAppliedSnapshot = null;
+                controller.PoseApplied += snapshot =>
+                {
+                    poseAppliedCount++;
+                    poseAppliedSnapshot = snapshot;
+                    snapshotPublishedBeforeCallback &= ReferenceEquals(controller.LastSnapshot, snapshot);
+                };
                 var behaviour = new MmdVmdTimelineBehaviour
                 {
                     ModelSourceId = PlaybackPmxId,
@@ -124,6 +133,9 @@ namespace Mmd.Tests
                 Assert.That(frameNine.frame.frame, Is.EqualTo(9));
                 Assert.That(repeatedFrameNine.frame.frame, Is.EqualTo(9));
                 Assert.That(frameZero.frame.frame, Is.EqualTo(0));
+                Assert.That(poseAppliedCount, Is.EqualTo(3));
+                Assert.That(poseAppliedSnapshot, Is.SameAs(frameZero));
+                Assert.That(snapshotPublishedBeforeCallback, Is.True);
                 Assert.That(Quaternion.Angle(repeatedFrameNineRotation, frameNineRotation), Is.LessThan(0.001f));
                 Assert.That(controller.CurrentFrame, Is.EqualTo(0));
                 Assert.That(controller.LastSnapshot, Is.Not.Null);

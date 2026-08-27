@@ -210,6 +210,25 @@ namespace Mmd.UnityIntegration
                 morphWeights);
         }
 
+        internal bool TryValidatePreparedFastFrame(
+            float[] worldMatrices,
+            float[] morphWeights,
+            out string reason)
+        {
+            try
+            {
+                ValidatePreparedFastFrame(worldMatrices, morphWeights);
+            }
+            catch (Exception exception)
+            {
+                reason = exception.GetType().Name + ": " + exception.Message;
+                return false;
+            }
+
+            reason = string.Empty;
+            return true;
+        }
+
         private void DisposeFastRuntime()
         {
             if (physicsMode == MmdPhysicsMode.Live && !nativeHumanoidHostPoseEnabled)
@@ -261,11 +280,77 @@ namespace Mmd.UnityIntegration
                 fastMorphWeights!,
                 fastIkEnabled!,
                 (uint)ikMaxIterationsCap);
+            return ApplyPreparedFastCore(frame, time, fastWorldMatrices!, fastMorphWeights!);
+        }
+
+        /// <summary>
+        /// Applies a frame evaluated by a worker-owned native session. The caller must be on
+        /// Unity's main thread; this method only applies managed Unity state and never evaluates
+        /// the binding's native session.
+        /// </summary>
+        internal MmdPlaybackSnapshot ApplyPreparedFastFrame(
+            int frame,
+            float frameRate,
+            float[] worldMatrices,
+            float[] morphWeights)
+        {
+            MmdPlaybackTime.ValidateFrame(frame);
+            MmdPlaybackTime.ValidateFrameRate(frameRate);
+            EnsureBorrowedMutationActive();
+            ValidatePreparedFastFrame(worldMatrices, morphWeights);
+
+            float time = MmdPlaybackTime.ToTime(frame, frameRate);
+            return ApplyPreparedFastCore(frame, time, worldMatrices, morphWeights);
+        }
+
+        private void ValidatePreparedFastFrame(
+            float[] worldMatrices,
+            float[] morphWeights)
+        {
+            if (physicsMode != MmdPhysicsMode.Off)
+            {
+                throw new InvalidOperationException(
+                    "Prepared multi-character frames require Physics Mode Off.");
+            }
+
+            if (fastSession == null)
+            {
+                throw new InvalidOperationException(
+                    "Prepared multi-character frames require an enabled fast runtime binding.");
+            }
+
+            if (worldMatrices == null || worldMatrices.Length < fastSession.WorldMatrixFloatCount)
+            {
+                throw new ArgumentException(
+                    "Prepared world matrix buffer is smaller than the configured runtime output.",
+                    nameof(worldMatrices));
+            }
+
+            if (morphWeights == null || morphWeights.Length < fastSession.MorphWeightCount)
+            {
+                throw new ArgumentException(
+                    "Prepared morph weight buffer is smaller than the configured runtime output.",
+                    nameof(morphWeights));
+            }
+
+            MmdUnityFrameApplier.ValidateSupportedMorphPlayback(playbackInstance);
+            MmdUnityWorldMatrixFrameApplier.ValidateColumnMajorWorldMatrices(
+                playbackInstance,
+                worldMatrices,
+                fastPoseBoneIndices);
+        }
+
+        private MmdPlaybackSnapshot ApplyPreparedFastCore(
+            int frame,
+            float time,
+            float[] worldMatrices,
+            float[] morphWeights)
+        {
             MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(
                 playbackInstance,
-                fastWorldMatrices!,
+                worldMatrices,
                 fastPoseBoneIndices);
-            ApplyFastMorphWeights();
+            ApplyFastMorphWeights(morphWeights);
             // Lightweight snapshot: no managed session.EvaluateFrame call.
             // fastMorphFrame is reused in-place; frame/time are updated each call.
             // bones is empty because world matrices are applied directly to Unity transforms.
@@ -284,20 +369,20 @@ namespace Mmd.UnityIntegration
             return fastSnapshot;
         }
 
-        private void ApplyFastMorphWeights()
+        private void ApplyFastMorphWeights(float[] morphWeights)
         {
-            bool hasNonZero = HasAnyNonZeroMorphWeight(fastMorphWeights!);
+            bool hasNonZero = HasAnyNonZeroMorphWeight(morphWeights);
             if (fastMorphCacheValid && !hasNonZero && !fastMorphApplied)
             {
                 return;
             }
 
-            if (fastMorphCacheValid && hasNonZero && MorphWeightsEqual(fastMorphWeights!, fastLastAppliedMorphWeights!))
+            if (fastMorphCacheValid && hasNonZero && MorphWeightsEqual(morphWeights, fastLastAppliedMorphWeights!))
             {
                 return;
             }
 
-            RefreshFastMorphFrame(fastMorphWeights!);
+            RefreshFastMorphFrame(morphWeights);
             // The native mmd-runtime (RuntimeInstance::expand_group_morphs) has already expanded group
             // morph weights into their member morphs, while leaving each group morph's own weight in the
             // array. Re-running group resolution here would distribute that residual group weight a SECOND
@@ -306,7 +391,7 @@ namespace Mmd.UnityIntegration
             MmdUnityFrameApplier.ApplyMorphs(playbackInstance, fastMorphFrame!, groupMorphsResolvedExternally: true);
             for (int i = 0; i < fastMorphIndices.Length; i++)
             {
-                fastLastAppliedMorphWeights![i] = fastMorphWeights![fastMorphIndices[i]];
+                fastLastAppliedMorphWeights![i] = morphWeights[fastMorphIndices[i]];
             }
             fastMorphApplied = hasNonZero;
             fastMorphCacheValid = true;

@@ -84,6 +84,7 @@ namespace Mmd.UnityIntegration
 
         public bool TryEnableFastRuntime(byte[] pmxBytes, byte[] vmdBytes, out string reason)
         {
+            ThrowIfMultiCharacterPoolOwnsController(nameof(TryEnableFastRuntime));
             if (binding == null)
             {
                 reason = "Playback controller must be configured before enabling fast runtime.";
@@ -95,6 +96,7 @@ namespace Mmd.UnityIntegration
 
         public bool TryEnableFastRuntimeFromConfiguredSource(out string reason)
         {
+            ThrowIfMultiCharacterPoolOwnsController(nameof(TryEnableFastRuntimeFromConfiguredSource));
             if (binding == null)
             {
                 reason = "Playback controller must be configured before enabling fast runtime.";
@@ -150,6 +152,7 @@ namespace Mmd.UnityIntegration
 
         public void DisableFastRuntime()
         {
+            ThrowIfMultiCharacterPoolOwnsController(nameof(DisableFastRuntime));
             binding?.DisableFastRuntime();
             lastFastRuntimeReason = string.Empty;
         }
