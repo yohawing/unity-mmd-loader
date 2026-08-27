@@ -129,9 +129,8 @@ namespace Mmd.UnityIntegration
 
         /// <summary>
         /// Raised on the main thread immediately after a playback pose is successfully applied.
-        /// The callback runs in the route's apply phase: Update for serial playback and
-        /// LateUpdate for worker-group playback. Subscriber exceptions are logged and do not
-        /// stop playback.
+        /// Automatic serial and worker-group playback both invoke the callback during Update.
+        /// Subscriber exceptions are logged and do not stop playback.
         /// </summary>
         public event Action<MmdPlaybackSnapshot>? PoseApplied;
 

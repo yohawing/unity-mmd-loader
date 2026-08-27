@@ -16,7 +16,7 @@ namespace Mmd.UnityIntegration
     /// </summary>
     internal sealed class MmdMultiCharacterWorkerPool : IDisposable
     {
-        private const int MinimumEvaluatorCount = 1;
+        private const int MinimumEvaluatorCount = 2;
         private const int MaximumEvaluatorCount = 4;
 
         internal interface IEvaluator : IDisposable

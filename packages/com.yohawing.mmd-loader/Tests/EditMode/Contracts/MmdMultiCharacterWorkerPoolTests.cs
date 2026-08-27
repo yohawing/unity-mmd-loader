@@ -38,20 +38,11 @@ namespace Mmd.Tests.Contracts
         }
 
         [Test]
-        public void OneWorkerKeepsEvaluatorOwnershipOnOneDedicatedThread()
+        public void WorkerPoolRejectsSingleEvaluator()
         {
             var evaluators = CreateEvaluators(1);
-            int callerThreadId = Thread.CurrentThread.ManagedThreadId;
-            using (var pool = new MmdMultiCharacterWorkerPool(evaluators))
-            {
-                pool.Evaluate(12, 30.0f);
-                Assert.That(pool.WorkerManagedThreadIds, Has.Length.EqualTo(1));
-                Assert.That(evaluators[0].InitializeThreadId, Is.Not.EqualTo(callerThreadId));
-                Assert.That(evaluators[0].DisposedThreadId, Is.EqualTo(0));
-            }
-
-            Assert.That(evaluators[0].EvaluationCount, Is.EqualTo(1));
-            Assert.That(evaluators[0].DisposedThreadId, Is.EqualTo(evaluators[0].InitializeThreadId));
+            Assert.Throws<ArgumentException>(() =>
+                new MmdMultiCharacterWorkerPool(evaluators));
         }
 
         [Test]
@@ -74,7 +65,7 @@ namespace Mmd.Tests.Contracts
         [Test]
         public void BeginAndCompleteRejectOverlapAndProtectInFlightResults()
         {
-            var evaluators = CreateEvaluators(1);
+            var evaluators = CreateEvaluators(2);
             using var entered = new ManualResetEventSlim(false);
             evaluators[0].Entered = entered;
             using var pool = new MmdMultiCharacterWorkerPool(evaluators);
@@ -195,15 +186,14 @@ namespace Mmd.Tests.Contracts
         }
 
         [Test]
-        public void GroupDispatchRunsBeforeDefaultPlaybackUpdates()
+        public void GroupUsesDefaultPlaybackUpdateExecutionOrder()
         {
             DefaultExecutionOrder? executionOrder = (DefaultExecutionOrder?)
                 Attribute.GetCustomAttribute(
                     typeof(MmdMultiCharacterPlaybackGroup),
                     typeof(DefaultExecutionOrder));
 
-            Assert.That(executionOrder, Is.Not.Null);
-            Assert.That(executionOrder!.order, Is.EqualTo(-1000));
+            Assert.That(executionOrder, Is.Null);
         }
 
         [Test]

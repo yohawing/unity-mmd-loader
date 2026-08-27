@@ -7,10 +7,10 @@ using UnityEngine;
 namespace Mmd.UnityIntegration
 {
     /// <summary>
-    /// Opt-in worker playback group. Native evaluation is pinned one character per
-    /// long-lived worker; Unity object and transform mutation remains on the main thread.
+    /// Opt-in worker playback group for two to four controllers. Native evaluation is pinned
+    /// one character per long-lived worker; completion and Unity pose mutation happen
+    /// synchronously in this component's Update on the main thread.
     /// </summary>
-    [DefaultExecutionOrder(-1000)]
     [DisallowMultipleComponent]
     public sealed class MmdMultiCharacterPlaybackGroup : MonoBehaviour
     {
@@ -23,10 +23,6 @@ namespace Mmd.UnityIntegration
         private int[]? configurationRevisions;
         private MmdMultiCharacterWorkerPool? workerPool;
         private bool workerPoolNeedsInitialLiveApply;
-        private bool evaluationInFlight;
-        private int pendingFrame;
-        private float pendingFrameRate;
-        private int pendingAdvancedCount;
         private bool claimsHeld;
         private string lastFailureReason = string.Empty;
 
@@ -76,11 +72,6 @@ namespace Mmd.UnityIntegration
                 return;
             }
 
-            if (evaluationInFlight)
-            {
-                return;
-            }
-
             MmdUnityPlaybackController[] active = resolvedControllers!;
             if (!TryGetSharedFrame(active, out int frame, out float frameRate))
             {
@@ -117,41 +108,12 @@ namespace Mmd.UnityIntegration
                     }
                 }
 
-                workerPool!.BeginEvaluate(frame, frameRate);
-                pendingFrame = frame;
-                pendingFrameRate = frameRate;
-                pendingAdvancedCount = advancedCount;
-                evaluationInFlight = true;
-            }
-            catch (Exception exception)
-            {
-                RestoreClocks(active, clocks, advancedCount);
-                FailClosed("Multi-character evaluation failed: " + exception.Message);
-            }
-        }
-
-        private void LateUpdate()
-        {
-            if (!Application.isPlaying || !isActiveAndEnabled || !evaluationInFlight)
-            {
-                return;
-            }
-
-            MmdUnityPlaybackController[]? active = resolvedControllers;
-            MmdMultiCharacterWorkerPool? pool = workerPool;
-            if (active == null || pool == null || previousClocks == null)
-            {
-                evaluationInFlight = false;
-                pendingAdvancedCount = 0;
-                return;
-            }
-
-            int advancedCount = pendingAdvancedCount;
-            int frame = pendingFrame;
-            float frameRate = pendingFrameRate;
-            try
-            {
+                MmdMultiCharacterWorkerPool pool = workerPool!;
+                pool.BeginEvaluate(frame, frameRate);
                 pool.CompleteEvaluate();
+
+                // Keep the all-or-nothing boundary: every native result is validated before
+                // any Unity transform or physics state is mutated.
                 for (int i = 0; i < active.Length; i++)
                 {
                     MmdMultiCharacterWorkerResult result = pool.GetResult(i);
@@ -172,14 +134,10 @@ namespace Mmd.UnityIntegration
                 }
 
                 workerPoolNeedsInitialLiveApply = false;
-                pendingAdvancedCount = 0;
-                evaluationInFlight = false;
             }
             catch (Exception exception)
             {
-                RestoreClocks(active, previousClocks, advancedCount);
-                pendingAdvancedCount = 0;
-                evaluationInFlight = false;
+                RestoreClocks(active, clocks, advancedCount);
                 FailClosed("Multi-character evaluation failed: " + exception.Message);
             }
         }
@@ -216,6 +174,16 @@ namespace Mmd.UnityIntegration
             if (candidate.Length < 1)
             {
                 lastFailureReason = "At least one playback controller is required.";
+                return;
+            }
+
+            if (candidate.Length == 1)
+            {
+                // A single controller stays on its normal serial Update path. The group is
+                // intentionally inert so adding it cannot create a worker pool or claim the
+                // controller just to evaluate one character synchronously.
+                lastFailureReason =
+                    "A worker group requires at least two playback controllers; single controllers use serial playback.";
                 return;
             }
 
@@ -497,9 +465,6 @@ namespace Mmd.UnityIntegration
         private void ReleaseGroup()
         {
             Exception? cleanupError = null;
-            MmdUnityPlaybackController[]? pendingActive = resolvedControllers;
-            MmdUnityPlaybackController.MmdMultiCharacterClockState[]? pendingClocks = previousClocks;
-            int pendingCount = pendingAdvancedCount;
             try
             {
                 workerPool?.Dispose();
@@ -510,13 +475,6 @@ namespace Mmd.UnityIntegration
             }
             finally
             {
-                if (evaluationInFlight && pendingActive != null && pendingClocks != null)
-                {
-                    RestoreClocks(pendingActive, pendingClocks, pendingCount);
-                }
-
-                evaluationInFlight = false;
-                pendingAdvancedCount = 0;
                 workerPool = null;
                 workerPoolNeedsInitialLiveApply = false;
                 configurationRevisions = null;

@@ -4,12 +4,12 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
 using Mmd.Parser;
 using Mmd.Physics;
 using Mmd.UnityIntegration;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.Animations;
 using UnityEngine.TestTools;
 using Object = UnityEngine.Object;
 
@@ -63,12 +63,33 @@ namespace Mmd.Tests.PlayMode
 
                         MmdMultiCharacterPlaybackGroup group =
                             groupRoot.AddComponent<MmdMultiCharacterPlaybackGroup>();
+                        UpdateObservation observation = groupRoot.AddComponent<UpdateObservation>();
+                        observation.Track(grouped[0].Controller, livePhysics: false);
+                        var poseAppliedCounts = new int[characterCount];
+                        var poseAppliedFrames = new int[characterCount];
+                        for (int i = 0; i < characterCount; i++)
+                        {
+                            int index = i;
+                            grouped[i].Controller.PoseApplied += snapshot =>
+                            {
+                                poseAppliedCounts[index]++;
+                                poseAppliedFrames[index] = snapshot.frame.frame;
+                            };
+                        }
                         for (int frame = 0; frame < 5; frame++)
                         {
                             yield return null;
                         }
 
                         Assert.That(group.IsPlaybackActive, Is.True, group.LastFailureReason);
+                        AssertAfterUpdate(observation);
+                        for (int i = 0; i < characterCount; i++)
+                        {
+                            Assert.That(poseAppliedCounts[i], Is.GreaterThan(0));
+                            Assert.That(
+                                poseAppliedFrames[i],
+                                Is.EqualTo(grouped[i].Controller.LastSnapshot!.frame.frame));
+                        }
                         int evaluatedFrame = grouped[0].Controller.LastSnapshot?.frame.frame ??
                             grouped[0].Controller.CurrentFrame;
                         Assert.That(evaluatedFrame, Is.GreaterThanOrEqualTo(InitialFrame));
@@ -108,16 +129,17 @@ namespace Mmd.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator OneCharacterWorkerSupportsPhysicsOffAndLiveParityAndLifecycle()
+        public IEnumerator OneCharacterGroupLeavesControllerOnSerialUpdatePath()
         {
-            string pmxPath = ResolveFixture("test_hair_physics.pmx");
+            string pmxPath = ResolveFixture("test_1bone_cube.pmx");
             string vmdPath = ResolveFixture("test_1bone_cube_motion.vmd");
-            byte[] pmxBytes = File.ReadAllBytes(pmxPath);
-            byte[] vmdBytes = File.ReadAllBytes(vmdPath);
             MmdPmxAsset pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
             MmdVmdAsset vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
-            pmxAsset.Initialize(pmxBytes, Path.GetFileName(pmxPath), pmxPath);
-            vmdAsset.Initialize(vmdBytes, Path.GetFileName(vmdPath), vmdPath);
+            pmxAsset.Initialize(File.ReadAllBytes(pmxPath), Path.GetFileName(pmxPath), pmxPath);
+            vmdAsset.Initialize(File.ReadAllBytes(vmdPath), Path.GetFileName(vmdPath), vmdPath);
+            PlaybackFixture fixture = CreateFixture(pmxAsset, vmdAsset, "single-character");
+            var groupRoot = new GameObject("single-character-group");
+            MmdMultiCharacterPlaybackGroup? group = null;
             float previousCaptureDeltaTime = Time.captureDeltaTime;
             float previousTimeScale = Time.timeScale;
             Time.captureDeltaTime = 1.0f / FrameRate;
@@ -125,188 +147,127 @@ namespace Mmd.Tests.PlayMode
 
             try
             {
-                var offSerial = CreateFixture(pmxAsset, vmdAsset, "single-off-serial");
-                var offGrouped = CreateFixture(pmxAsset, vmdAsset, "single-off-grouped");
-                var offRoot = new GameObject("single-off-group");
-                MmdMultiCharacterPlaybackGroup? offGroup = null;
-                LateUpdateObservation? offObservation = null;
-                try
-                {
-                    offGrouped.Root.transform.SetParent(offRoot.transform, worldPositionStays: false);
-                    yield return null;
-                    AttachSources(offSerial, pmxAsset, vmdAsset);
-                    AttachSources(offGrouped, pmxAsset, vmdAsset);
-                    int mainThreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
-                    int poseAppliedCount = 0;
-                    int poseAppliedThreadId = -1;
-                    MmdPlaybackSnapshot? poseAppliedSnapshot = null;
-                    offGrouped.Controller.PoseApplied += snapshot =>
-                    {
-                        poseAppliedCount++;
-                        poseAppliedThreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
-                        poseAppliedSnapshot = snapshot;
-                    };
-                    offSerial.Controller.Play();
-                    offGrouped.Controller.Play();
-                    offGroup = offRoot.AddComponent<MmdMultiCharacterPlaybackGroup>();
-                    offObservation = offRoot.AddComponent<LateUpdateObservation>();
-                    offObservation.Track(offGrouped.Controller, livePhysics: false);
+                fixture.Root.transform.SetParent(groupRoot.transform, worldPositionStays: false);
+                yield return null;
+                AttachSources(fixture, pmxAsset, vmdAsset, initialFrame: 0);
+                int poseAppliedCount = 0;
+                fixture.Controller.PoseApplied += _ => poseAppliedCount++;
+                fixture.Controller.Play();
+                group = groupRoot.AddComponent<MmdMultiCharacterPlaybackGroup>();
+                UpdateObservation observation = groupRoot.AddComponent<UpdateObservation>();
+                observation.Track(fixture.Controller, livePhysics: false);
 
-                    for (int step = 0; step < 4; step++)
-                    {
-                        int previousPoseAppliedCount = poseAppliedCount;
-                        yield return WaitForPostLateUpdate(
-                            offObservation,
-                            () => poseAppliedCount > previousPoseAppliedCount);
-                        Assert.That(
-                            poseAppliedCount,
-                            Is.GreaterThan(previousPoseAppliedCount),
-                            "The worker group did not publish an applied pose.");
-                        int frame = offObservation.AppliedFrame;
-                        offSerial.Controller.ApplyFrame(frame);
-                        Assert.That(offGroup.IsPlaybackActive, Is.True, offGroup.LastFailureReason);
-                        Assert.That(offGroup.HasWorkerPool, Is.True);
-                        AssertAfterLateUpdate(offObservation);
-                        Assert.That(poseAppliedThreadId, Is.EqualTo(mainThreadId));
-                        Assert.That(poseAppliedSnapshot, Is.SameAs(offGrouped.Controller.LastSnapshot));
-                        Assert.That(poseAppliedSnapshot!.frame.frame, Is.EqualTo(frame));
-                        AssertPoseEqual(offSerial.Instance, offGrouped.Instance);
-                    }
+                yield return WaitForPostUpdate(
+                    observation,
+                    () => poseAppliedCount > 0 && fixture.Controller.CurrentFrame > 0);
 
-                    offGrouped.Controller.Pause();
-                    yield return null;
-                    int preDiscardFrame = offGrouped.Controller.CurrentFrame;
-                    int preDiscardPlaybackFrameBits = BitConverter.SingleToInt32Bits(
-                        GetPlaybackFrame(offGrouped.Controller));
-                    int preDiscardSnapshotFrame = offGrouped.Controller.LastSnapshot!.frame.frame;
-                    offGrouped.Controller.Play();
-                    typeof(MmdMultiCharacterPlaybackGroup)
-                        .GetMethod("Update", BindingFlags.Instance | BindingFlags.NonPublic)!
-                        .Invoke(offGroup, null);
-                    Assert.That(offGrouped.Controller.CurrentFrame, Is.GreaterThan(preDiscardFrame));
-                    offGroup.enabled = false;
-                    offGrouped.Controller.Pause();
-
-                    Assert.That(offGroup.enabled, Is.False);
-                    Assert.That(offGroup.HasWorkerPool, Is.False);
-                    Assert.That(offGrouped.Controller.IsMultiCharacterClaimed, Is.False);
-                    Assert.That(offGrouped.Controller.CurrentFrame, Is.EqualTo(preDiscardFrame));
-                    Assert.That(
-                        BitConverter.SingleToInt32Bits(GetPlaybackFrame(offGrouped.Controller)),
-                        Is.EqualTo(preDiscardPlaybackFrameBits));
-                    Assert.That(
-                        offGrouped.Controller.LastSnapshot!.frame.frame,
-                        Is.EqualTo(preDiscardSnapshotFrame));
-                }
-                finally
-                {
-                    if (offGroup != null)
-                    {
-                        Object.DestroyImmediate(offGroup);
-                    }
-
-                    DestroyFixtures(new List<PlaybackFixture> { offSerial, offGrouped });
-                    Object.DestroyImmediate(offRoot);
-                }
-
-                MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-                if (!availability.backendAvailable)
-                {
-                    TestContext.WriteLine(
-                        "Live Physics branch skipped because Bullet is unavailable: " +
-                        availability.unsupportedReason);
-                    yield break;
-                }
-
-                var liveSerial = CreateLiveFixture(pmxBytes, vmdBytes, pmxPath, "single-live-serial");
-                var liveGrouped = CreateLiveFixture(pmxBytes, vmdBytes, pmxPath, "single-live-grouped");
-                var liveRoot = new GameObject("single-live-group");
-                MmdMultiCharacterPlaybackGroup? liveGroup = null;
-                LateUpdateObservation? liveObservation = null;
-                try
-                {
-                    liveGrouped.Root.transform.SetParent(liveRoot.transform, worldPositionStays: false);
-                    yield return null;
-                    AttachSources(liveSerial, pmxAsset, vmdAsset, initialFrame: 0);
-                    AttachSources(liveGrouped, pmxAsset, vmdAsset, initialFrame: 0);
-                    liveSerial.Controller.SetPhysicsMode(MmdPhysicsMode.Live);
-                    liveGrouped.Controller.SetPhysicsMode(MmdPhysicsMode.Live);
-                    liveGrouped.Controller.Play();
-                    liveGroup = liveRoot.AddComponent<MmdMultiCharacterPlaybackGroup>();
-                    liveObservation = liveRoot.AddComponent<LateUpdateObservation>();
-                    liveObservation.Track(liveGrouped.Controller, livePhysics: true);
-
-                    for (int step = 0; step < 4; step++)
-                    {
-                        yield return WaitForPostLateUpdate(liveObservation);
-                        int frame = liveObservation.AppliedFrame;
-                        liveSerial.Controller.ApplyFrame(frame);
-                        Assert.That(liveGroup.IsPlaybackActive, Is.True, liveGroup.LastFailureReason);
-                        Assert.That(liveGroup.HasWorkerPool, Is.True);
-                        AssertAfterLateUpdate(liveObservation);
-                        AssertPhysicsBodiesEqual(liveSerial.Instance, liveGrouped.Instance);
-                        AssertPoseEqual(liveSerial.Instance, liveGrouped.Instance);
-                    }
-
-                    int heldFrame = liveGrouped.Controller.CurrentFrame;
-                    liveSerial.Controller.Pause();
-                    liveGrouped.Controller.Pause();
-                    yield return null;
-                    Assert.That(liveGrouped.Controller.CurrentFrame, Is.EqualTo(heldFrame));
-                    Assert.That(liveGroup.IsPlaybackActive, Is.True);
-
-                    liveGrouped.Controller.Play();
-                    for (int wait = 0; wait < 120 && liveObservation.AppliedFrame <= heldFrame; wait++)
-                    {
-                        yield return WaitForPostLateUpdate(liveObservation);
-                    }
-                    int resumedCurrentFrame = liveGrouped.Controller.CurrentFrame;
-                    int resumedFrame = liveObservation.AppliedFrame;
-                    Assert.That(resumedCurrentFrame, Is.GreaterThanOrEqualTo(heldFrame));
-                    Assert.That(resumedFrame, Is.GreaterThan(heldFrame));
-                    AssertAfterLateUpdate(liveObservation);
-
-                    liveGroup.enabled = false;
-                    Assert.That(liveGroup.HasWorkerPool, Is.False);
-                    Assert.That(liveGrouped.Controller.IsMultiCharacterClaimed, Is.False);
-
-                    liveGroup.enabled = true;
-                    yield return WaitForPostLateUpdate(liveObservation);
-                    Assert.That(liveGroup.IsPlaybackActive, Is.True, liveGroup.LastFailureReason);
-                    Assert.That(liveGroup.HasWorkerPool, Is.True);
-
-                    Object.DestroyImmediate(liveGroup);
-                    liveGroup = null;
-                    Assert.That(liveGrouped.Controller.IsMultiCharacterClaimed, Is.False);
-
-                    liveGroup = liveRoot.AddComponent<MmdMultiCharacterPlaybackGroup>();
-                    yield return WaitForPostLateUpdate(liveObservation);
-                    Assert.That(liveGroup.IsPlaybackActive, Is.True, liveGroup.LastFailureReason);
-                    int timelineFrame = liveGrouped.Controller.CurrentFrame + 2;
-                    MmdPlaybackSnapshot timelineSnapshot = liveGrouped.Controller.ApplyTimelineTime(
-                        timelineFrame / FrameRate,
-                        FrameRate);
-                    Assert.That(timelineSnapshot.frame.frame, Is.EqualTo(timelineFrame));
-                    Assert.That(liveGroup.enabled, Is.False);
-                    Assert.That(liveGroup.HasWorkerPool, Is.False);
-                    Assert.That(liveGrouped.Controller.IsMultiCharacterClaimed, Is.False);
-                    Assert.That(liveGroup.LastFailureReason, Does.Contain("serial playback"));
-                }
-                finally
-                {
-                    if (liveGroup != null)
-                    {
-                        Object.DestroyImmediate(liveGroup);
-                    }
-
-                    DestroyFixtures(new List<PlaybackFixture> { liveSerial, liveGrouped });
-                    Object.DestroyImmediate(liveRoot);
-                }
+                Assert.That(fixture.Controller.CurrentFrame, Is.GreaterThan(0));
+                Assert.That(poseAppliedCount, Is.GreaterThan(0));
+                AssertAfterUpdate(observation);
+                Assert.That(group.IsPlaybackActive, Is.False);
+                Assert.That(group.HasWorkerPool, Is.False);
+                Assert.That(fixture.Controller.IsMultiCharacterClaimed, Is.False);
+                Assert.That(group.LastFailureReason, Does.Contain("serial playback"));
             }
             finally
             {
                 Time.captureDeltaTime = previousCaptureDeltaTime;
                 Time.timeScale = previousTimeScale;
+                if (group != null)
+                {
+                    Object.DestroyImmediate(group);
+                }
+
+                DestroyFixtures(new List<PlaybackFixture> { fixture });
+                Object.DestroyImmediate(groupRoot);
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator TwoCharacterWorkerAppliesBeforeParentConstraintEvaluates()
+        {
+            string pmxPath = ResolveFixture("test_1bone_cube.pmx");
+            string vmdPath = ResolveFixture("test_1bone_cube_motion.vmd");
+            MmdPmxAsset pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+            MmdVmdAsset vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+            pmxAsset.Initialize(File.ReadAllBytes(pmxPath), Path.GetFileName(pmxPath), pmxPath);
+            vmdAsset.Initialize(File.ReadAllBytes(vmdPath), Path.GetFileName(vmdPath), vmdPath);
+            var fixtures = new List<PlaybackFixture>(2);
+            var groupRoot = new GameObject("parent-constraint-worker-group");
+            GameObject? constraintSource = null;
+            GameObject? constrainedObject = null;
+            MmdMultiCharacterPlaybackGroup? group = null;
+            ParentConstraintObservation? observation = null;
+
+            try
+            {
+                for (int i = 0; i < 2; i++)
+                {
+                    PlaybackFixture fixture = CreateFixture(pmxAsset, vmdAsset, $"constraint-grouped-{i}");
+                    fixture.Root.transform.SetParent(groupRoot.transform, worldPositionStays: false);
+                    fixtures.Add(fixture);
+                }
+
+                yield return null;
+                for (int i = 0; i < fixtures.Count; i++)
+                {
+                    AttachSources(fixtures[i], pmxAsset, vmdAsset, initialFrame: 0);
+                    fixtures[i].Controller.Play();
+                }
+
+                constraintSource = new GameObject("parent-constraint-source");
+                constraintSource.transform.SetParent(groupRoot.transform, worldPositionStays: false);
+                Transform source = constraintSource.transform;
+                constrainedObject = new GameObject("parent-constraint-target");
+                constrainedObject.transform.SetParent(groupRoot.transform, worldPositionStays: false);
+                constrainedObject.transform.SetPositionAndRotation(source.position, source.rotation);
+                ParentConstraint constraint = constrainedObject.AddComponent<ParentConstraint>();
+                constraint.AddSource(new ConstraintSource { sourceTransform = source, weight = 1.0f });
+                constraint.SetTranslationOffset(0, Vector3.zero);
+                constraint.SetRotationOffset(0, Vector3.zero);
+                constraint.constraintActive = true;
+                constraint.locked = true;
+                observation = constrainedObject.AddComponent<ParentConstraintObservation>();
+                observation.Track(source, constrainedObject.transform);
+                fixtures[0].Controller.PoseApplied += _ =>
+                    source.localPosition += new Vector3(0.01f, 0.0f, 0.0f);
+                group = groupRoot.AddComponent<MmdMultiCharacterPlaybackGroup>();
+
+                for (int step = 0; step < 120 && !observation.ObservedTravel; step++)
+                {
+                    yield return null;
+                }
+
+                Assert.That(observation.TotalTravel, Is.GreaterThan(1.0e-5f));
+                Assert.That(observation.ObservedTravel, Is.True, "The motion fixture did not provide a travel frame.");
+                Assert.That(
+                    observation.MaximumGapOnTravel,
+                    Is.LessThanOrEqualTo(1.0e-4f),
+                    "ParentConstraint did not consume the worker-applied pose in the same frame.");
+                Assert.That(group.IsPlaybackActive, Is.True, group.LastFailureReason);
+                Assert.That(group.HasWorkerPool, Is.True);
+            }
+            finally
+            {
+                if (group != null)
+                {
+                    Object.DestroyImmediate(group);
+                }
+
+                if (constrainedObject != null)
+                {
+                    Object.DestroyImmediate(constrainedObject);
+                }
+
+                if (constraintSource != null)
+                {
+                    Object.DestroyImmediate(constraintSource);
+                }
+
+                DestroyFixtures(fixtures);
+                Object.DestroyImmediate(groupRoot);
                 Object.DestroyImmediate(pmxAsset);
                 Object.DestroyImmediate(vmdAsset);
             }
@@ -376,7 +337,7 @@ namespace Mmd.Tests.PlayMode
                         for (int step = 0; step < 4; step++)
                         {
                             yield return null;
-                            int currentFrame = System.Math.Max(0, grouped[0].Controller.CurrentFrame - 1);
+                            int currentFrame = grouped[0].Controller.CurrentFrame;
                             for (int i = 0; i < characterCount; i++)
                             {
                                 serial[i].Controller.ApplyFrame(currentFrame);
@@ -388,13 +349,13 @@ namespace Mmd.Tests.PlayMode
                         Assert.That(group.IsPlaybackActive, Is.True, group.LastFailureReason);
                         Assert.That(group.HasWorkerPool, Is.True);
                         int evaluatedFrame = grouped[0].Controller.LastLivePhysicsDiagnostics?.frame ??
-                            System.Math.Max(0, grouped[0].Controller.CurrentFrame - 1);
+                            grouped[0].Controller.CurrentFrame;
                         Assert.That(evaluatedFrame, Is.GreaterThanOrEqualTo(2));
                         for (int i = 0; i < characterCount; i++)
                         {
                             Assert.That(
                                 grouped[i].Controller.CurrentFrame,
-                                Is.GreaterThanOrEqualTo(evaluatedFrame));
+                                Is.EqualTo(evaluatedFrame));
                             Assert.That(grouped[i].Controller.LastLivePhysicsDiagnostics, Is.Not.Null);
                             Assert.That(
                                 grouped[i].Controller.LastLivePhysicsDiagnostics!.frame,
@@ -634,8 +595,8 @@ namespace Mmd.Tests.PlayMode
             }
         }
 
-        private static IEnumerator WaitForPostLateUpdate(
-            LateUpdateObservation observation,
+        private static IEnumerator WaitForPostUpdate(
+            UpdateObservation observation,
             Func<bool>? additionalCondition = null)
         {
             observation.Clear();
@@ -656,25 +617,17 @@ namespace Mmd.Tests.PlayMode
                 }
             }
 
-            Assert.Fail("The group did not satisfy its post-LateUpdate observation within 120 frames.");
+            Assert.Fail("The group did not satisfy its post-Update observation within 120 frames.");
         }
 
-        private static void AssertAfterLateUpdate(LateUpdateObservation observation)
+        private static void AssertAfterUpdate(UpdateObservation observation)
         {
             Assert.That(observation.HasObservation, Is.True);
-            Assert.That(observation.AppliedFrame, Is.EqualTo(observation.CurrentFrameAtLate));
-        }
-
-        private static float GetPlaybackFrame(MmdUnityPlaybackController controller)
-        {
-            FieldInfo field = typeof(MmdUnityPlaybackController).GetField(
-                "playbackFrame",
-                BindingFlags.Instance | BindingFlags.NonPublic)!;
-            return (float)field.GetValue(controller)!;
+            Assert.That(observation.AppliedFrame, Is.EqualTo(observation.CurrentFrameAtUpdate));
         }
 
         [DefaultExecutionOrder(1000)]
-        private sealed class LateUpdateObservation : MonoBehaviour
+        private sealed class UpdateObservation : MonoBehaviour
         {
             private MmdUnityPlaybackController? controller;
             private bool livePhysics;
@@ -683,7 +636,7 @@ namespace Mmd.Tests.PlayMode
 
             internal int AppliedFrame { get; private set; } = -1;
 
-            internal int CurrentFrameAtLate { get; private set; } = -1;
+            internal int CurrentFrameAtUpdate { get; private set; } = -1;
 
             internal void Track(MmdUnityPlaybackController target, bool livePhysics)
             {
@@ -695,10 +648,10 @@ namespace Mmd.Tests.PlayMode
             {
                 HasObservation = false;
                 AppliedFrame = -1;
-                CurrentFrameAtLate = -1;
+                CurrentFrameAtUpdate = -1;
             }
 
-            private void LateUpdate()
+            private void Update()
             {
                 if (controller == null)
                 {
@@ -714,8 +667,50 @@ namespace Mmd.Tests.PlayMode
                 }
 
                 AppliedFrame = appliedFrame.Value;
-                CurrentFrameAtLate = controller.CurrentFrame;
+                CurrentFrameAtUpdate = controller.CurrentFrame;
                 HasObservation = true;
+            }
+        }
+
+        [DefaultExecutionOrder(1000)]
+        private sealed class ParentConstraintObservation : MonoBehaviour
+        {
+            private Transform? source;
+            private Transform? target;
+            private Vector3 previousSourcePosition;
+
+            internal bool ObservedTravel { get; private set; }
+
+            internal float TotalTravel { get; private set; }
+
+            internal float MaximumGapOnTravel { get; private set; }
+
+            internal void Track(Transform sourceTransform, Transform targetTransform)
+            {
+                source = sourceTransform ?? throw new ArgumentNullException(nameof(sourceTransform));
+                target = targetTransform ?? throw new ArgumentNullException(nameof(targetTransform));
+                previousSourcePosition = source.position;
+            }
+
+            private void LateUpdate()
+            {
+                if (source == null || target == null)
+                {
+                    return;
+                }
+
+                float travel = Vector3.Distance(source.position, previousSourcePosition);
+                previousSourcePosition = source.position;
+                TotalTravel += travel;
+                if (travel <= 1.0e-5f)
+                {
+                    return;
+                }
+
+                ObservedTravel = true;
+                MaximumGapOnTravel = Mathf.Max(
+                    MaximumGapOnTravel,
+                    Vector3.Distance(source.position, target.position));
             }
         }
 
