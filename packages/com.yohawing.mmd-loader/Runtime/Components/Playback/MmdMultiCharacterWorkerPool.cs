@@ -16,6 +16,9 @@ namespace Mmd.UnityIntegration
     /// </summary>
     internal sealed class MmdMultiCharacterWorkerPool : IDisposable
     {
+        private const int MinimumEvaluatorCount = 1;
+        private const int MaximumEvaluatorCount = 4;
+
         internal interface IEvaluator : IDisposable
         {
             MmdMultiCharacterWorkerResult Initialize();
@@ -266,7 +269,7 @@ namespace Mmd.UnityIntegration
 
         private readonly Worker[] workers;
         private readonly object lifecycleLock = new();
-        private int evaluationInFlight;
+        private bool evaluationInFlight;
         private bool disposed;
 
         internal MmdMultiCharacterWorkerPool(IReadOnlyList<IEvaluator> evaluators)
@@ -276,10 +279,10 @@ namespace Mmd.UnityIntegration
                 throw new ArgumentNullException(nameof(evaluators));
             }
 
-            if (evaluators.Count < 2)
+            if (evaluators.Count < MinimumEvaluatorCount || evaluators.Count > MaximumEvaluatorCount)
             {
                 throw new ArgumentException(
-                    "At least two evaluators are required for multi-character playback.",
+                    $"Between {MinimumEvaluatorCount} and {MaximumEvaluatorCount} evaluators are required for worker playback.",
                     nameof(evaluators));
             }
 
@@ -349,7 +352,7 @@ namespace Mmd.UnityIntegration
             }
         }
 
-        internal void Evaluate(int frame, float frameRate)
+        internal void BeginEvaluate(int frame, float frameRate)
         {
             if (frame < 0)
             {
@@ -361,50 +364,87 @@ namespace Mmd.UnityIntegration
                 throw new ArgumentOutOfRangeException(nameof(frameRate));
             }
 
-            if (Interlocked.Exchange(ref evaluationInFlight, 1) != 0)
+            lock (lifecycleLock)
             {
-                throw new InvalidOperationException(
-                    "Multi-character worker evaluation cannot overlap for one pool.");
-            }
-
-            try
-            {
-                lock (lifecycleLock)
+                if (disposed)
                 {
-                    if (disposed)
-                    {
-                        throw new ObjectDisposedException(nameof(MmdMultiCharacterWorkerPool));
-                    }
+                    throw new ObjectDisposedException(nameof(MmdMultiCharacterWorkerPool));
+                }
 
-                    float time = frame / frameRate;
+                if (evaluationInFlight)
+                {
+                    throw new InvalidOperationException(
+                        "Multi-character worker evaluation cannot overlap for one pool.");
+                }
+
+                evaluationInFlight = true;
+                float time = frame / frameRate;
+                try
+                {
                     for (int i = 0; i < workers.Length; i++)
                     {
                         workers[i].Prepare(frame, time, frameRate);
                     }
-
-                    Exception? firstError = null;
-                    for (int i = 0; i < workers.Length; i++)
-                    {
-                        try
-                        {
-                            workers[i].WaitForCompletion();
-                        }
-                        catch (Exception exception)
-                        {
-                            firstError ??= exception;
-                        }
-                    }
-
-                    if (firstError != null)
-                    {
-                        throw firstError;
-                    }
+                }
+                catch
+                {
+                    evaluationInFlight = false;
+                    throw;
                 }
             }
-            finally
+        }
+
+        internal void CompleteEvaluate()
+        {
+            lock (lifecycleLock)
             {
-                Volatile.Write(ref evaluationInFlight, 0);
+                if (disposed)
+                {
+                    throw new ObjectDisposedException(nameof(MmdMultiCharacterWorkerPool));
+                }
+
+                if (!evaluationInFlight)
+                {
+                    throw new InvalidOperationException(
+                        "Multi-character worker evaluation has not been started.");
+                }
+
+                Exception? firstError = DrainEvaluation();
+                if (firstError != null)
+                {
+                    throw firstError;
+                }
             }
+        }
+
+        private Exception? DrainEvaluation()
+        {
+            if (!evaluationInFlight)
+            {
+                return null;
+            }
+
+            Exception? firstError = null;
+            for (int i = 0; i < workers.Length; i++)
+            {
+                try
+                {
+                    workers[i].WaitForCompletion();
+                }
+                catch (Exception exception)
+                {
+                    firstError ??= exception;
+                }
+            }
+
+            evaluationInFlight = false;
+            return firstError;
+        }
+
+        internal void Evaluate(int frame, float frameRate)
+        {
+            BeginEvaluate(frame, frameRate);
+            CompleteEvaluate();
         }
 
         internal MmdMultiCharacterWorkerResult GetResult(int index)
@@ -414,6 +454,12 @@ namespace Mmd.UnityIntegration
                 if (disposed)
                 {
                     throw new ObjectDisposedException(nameof(MmdMultiCharacterWorkerPool));
+                }
+
+                if (evaluationInFlight)
+                {
+                    throw new InvalidOperationException(
+                        "Multi-character worker results are not available before evaluation completes.");
                 }
 
                 if (index < 0 || index >= workers.Length)
@@ -435,7 +481,8 @@ namespace Mmd.UnityIntegration
                 }
 
                 disposed = true;
-                Exception? firstError = null;
+                Exception? evaluationError = DrainEvaluation();
+                Exception? cleanupError = null;
                 for (int i = workers.Length - 1; i >= 0; i--)
                 {
                     try
@@ -444,13 +491,26 @@ namespace Mmd.UnityIntegration
                     }
                     catch (Exception exception)
                     {
-                        firstError ??= exception;
+                        cleanupError ??= exception;
                     }
                 }
 
-                if (firstError != null)
+                if (evaluationError != null && cleanupError != null)
                 {
-                    throw firstError;
+                    throw new AggregateException(
+                        "Multi-character worker evaluation and cleanup failed.",
+                        evaluationError,
+                        cleanupError);
+                }
+
+                if (evaluationError != null)
+                {
+                    throw evaluationError;
+                }
+
+                if (cleanupError != null)
+                {
+                    throw cleanupError;
                 }
             }
         }

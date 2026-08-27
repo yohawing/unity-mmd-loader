@@ -38,9 +38,26 @@ namespace Mmd.Tests.Contracts
         }
 
         [Test]
-        public void TwoAndFourWorkersOverlapWithoutOverlappingOneWorkerState()
+        public void OneWorkerKeepsEvaluatorOwnershipOnOneDedicatedThread()
         {
-            foreach (int count in new[] { 2, 4 })
+            var evaluators = CreateEvaluators(1);
+            int callerThreadId = Thread.CurrentThread.ManagedThreadId;
+            using (var pool = new MmdMultiCharacterWorkerPool(evaluators))
+            {
+                pool.Evaluate(12, 30.0f);
+                Assert.That(pool.WorkerManagedThreadIds, Has.Length.EqualTo(1));
+                Assert.That(evaluators[0].InitializeThreadId, Is.Not.EqualTo(callerThreadId));
+                Assert.That(evaluators[0].DisposedThreadId, Is.EqualTo(0));
+            }
+
+            Assert.That(evaluators[0].EvaluationCount, Is.EqualTo(1));
+            Assert.That(evaluators[0].DisposedThreadId, Is.EqualTo(evaluators[0].InitializeThreadId));
+        }
+
+        [Test]
+        public void TwoToFourWorkersOverlapWithoutOverlappingOneWorkerState()
+        {
+            foreach (int count in new[] { 2, 3, 4 })
             {
                 using var overlap = new Barrier(count);
                 var evaluators = CreateEvaluators(count, overlap);
@@ -55,6 +72,25 @@ namespace Mmd.Tests.Contracts
         }
 
         [Test]
+        public void BeginAndCompleteRejectOverlapAndProtectInFlightResults()
+        {
+            var evaluators = CreateEvaluators(1);
+            using var entered = new ManualResetEventSlim(false);
+            evaluators[0].Entered = entered;
+            using var pool = new MmdMultiCharacterWorkerPool(evaluators);
+
+            pool.BeginEvaluate(1, 30.0f);
+            Assert.That(entered.Wait(TimeSpan.FromSeconds(5)), Is.True);
+            Assert.Throws<InvalidOperationException>(() => pool.BeginEvaluate(2, 30.0f));
+            Assert.Throws<InvalidOperationException>(() => pool.GetResult(0));
+
+            evaluators[0].Release = true;
+            pool.CompleteEvaluate();
+            Assert.That(pool.GetResult(0).WorldMatrices[0], Is.EqualTo(1.0f));
+            Assert.Throws<InvalidOperationException>(() => pool.CompleteEvaluate());
+        }
+
+        [Test]
         public void EvaluationExceptionIsReturnedAfterAllWorkersReachBarrier()
         {
             using var overlap = new Barrier(3);
@@ -62,38 +98,40 @@ namespace Mmd.Tests.Contracts
             evaluators[1].ThrowOnEvaluate = true;
             using var pool = new MmdMultiCharacterWorkerPool(evaluators);
 
-            Assert.Throws<InvalidOperationException>(() => pool.Evaluate(7, 30.0f));
+            pool.BeginEvaluate(7, 30.0f);
+            Assert.Throws<InvalidOperationException>(() => pool.CompleteEvaluate());
             Assert.That(evaluators[0].EvaluationCount, Is.EqualTo(1));
             Assert.That(evaluators[1].EvaluationCount, Is.EqualTo(1));
             Assert.That(evaluators[2].EvaluationCount, Is.EqualTo(1));
         }
 
         [Test]
-        public void ConcurrentEvaluationOnOnePoolFailsClosed()
+        public void ConcurrentBeginOnOnePoolFailsClosed()
         {
             var evaluators = CreateEvaluators(2);
             using var pool = new MmdMultiCharacterWorkerPool(evaluators);
-            Exception? backgroundError = null;
             using var entered = new ManualResetEventSlim(false);
             evaluators[0].Entered = entered;
 
-            var thread = new Thread(() =>
+            pool.BeginEvaluate(1, 30.0f);
+            Assert.That(entered.Wait(TimeSpan.FromSeconds(5)), Is.True);
+            Exception? beginError = null;
+            var beginThread = new Thread(() =>
             {
                 try
                 {
-                    pool.Evaluate(1, 30.0f);
+                    pool.BeginEvaluate(2, 30.0f);
                 }
                 catch (Exception exception)
                 {
-                    backgroundError = exception;
+                    beginError = exception;
                 }
             });
-            thread.Start();
-            Assert.That(entered.Wait(TimeSpan.FromSeconds(5)), Is.True);
-            Assert.Throws<InvalidOperationException>(() => pool.Evaluate(2, 30.0f));
+            beginThread.Start();
+            Assert.That(beginThread.Join(TimeSpan.FromSeconds(5)), Is.True);
+            Assert.That(beginError, Is.TypeOf<InvalidOperationException>());
             evaluators[0].Release = true;
-            Assert.That(thread.Join(TimeSpan.FromSeconds(5)), Is.True);
-            Assert.That(backgroundError, Is.Null);
+            Assert.DoesNotThrow(() => pool.CompleteEvaluate());
         }
 
         [Test]
@@ -104,20 +142,7 @@ namespace Mmd.Tests.Contracts
             using var disposeCompleted = new ManualResetEventSlim(false);
             evaluators[0].Entered = entered;
             var pool = new MmdMultiCharacterWorkerPool(evaluators);
-            Exception? evaluationError = null;
             Exception? disposeError = null;
-
-            var evaluationThread = new Thread(() =>
-            {
-                try
-                {
-                    pool.Evaluate(1, 30.0f);
-                }
-                catch (Exception exception)
-                {
-                    evaluationError = exception;
-                }
-            });
             var disposeThread = new Thread(() =>
             {
                 try
@@ -134,15 +159,17 @@ namespace Mmd.Tests.Contracts
                 }
             });
 
-            evaluationThread.Start();
+            pool.BeginEvaluate(1, 30.0f);
             Assert.That(entered.Wait(TimeSpan.FromSeconds(5)), Is.True);
             disposeThread.Start();
             Assert.That(disposeCompleted.Wait(TimeSpan.FromMilliseconds(100)), Is.False);
             evaluators[0].Release = true;
-            Assert.That(evaluationThread.Join(TimeSpan.FromSeconds(5)), Is.True);
             Assert.That(disposeThread.Join(TimeSpan.FromSeconds(5)), Is.True);
-            Assert.That(evaluationError, Is.Null);
             Assert.That(disposeError, Is.Null);
+            Assert.That(evaluators[0].EvaluationCount, Is.EqualTo(1));
+            Assert.That(evaluators[1].EvaluationCount, Is.EqualTo(1));
+            Assert.That(evaluators[0].DisposedThreadId, Is.EqualTo(evaluators[0].InitializeThreadId));
+            Assert.That(evaluators[1].DisposedThreadId, Is.EqualTo(evaluators[1].InitializeThreadId));
         }
 
         [Test]
@@ -168,7 +195,19 @@ namespace Mmd.Tests.Contracts
         }
 
         [Test]
-        public void GroupWithoutTwoControllersFailsClosed()
+        public void GroupDispatchRunsBeforeDefaultPlaybackUpdates()
+        {
+            DefaultExecutionOrder? executionOrder = (DefaultExecutionOrder?)
+                Attribute.GetCustomAttribute(
+                    typeof(MmdMultiCharacterPlaybackGroup),
+                    typeof(DefaultExecutionOrder));
+
+            Assert.That(executionOrder, Is.Not.Null);
+            Assert.That(executionOrder!.order, Is.EqualTo(-1000));
+        }
+
+        [Test]
+        public void GroupWithoutControllersFailsClosed()
         {
             var root = new GameObject("empty-multi-character-group");
             try
@@ -178,7 +217,7 @@ namespace Mmd.Tests.Contracts
                     .GetMethod("TryClaimControllers", BindingFlags.Instance | BindingFlags.NonPublic)!
                     .Invoke(group, null);
                 Assert.That(group.IsPlaybackActive, Is.False);
-                Assert.That(group.LastFailureReason, Does.Contain("At least two"));
+                Assert.That(group.LastFailureReason, Does.Contain("At least one"));
             }
             finally
             {

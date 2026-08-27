@@ -7,9 +7,10 @@ using UnityEngine;
 namespace Mmd.UnityIntegration
 {
     /// <summary>
-    /// Opt-in animation-only playback group. Native evaluation is pinned one character per
+    /// Opt-in worker playback group. Native evaluation is pinned one character per
     /// long-lived worker; Unity object and transform mutation remains on the main thread.
     /// </summary>
+    [DefaultExecutionOrder(-1000)]
     [DisallowMultipleComponent]
     public sealed class MmdMultiCharacterPlaybackGroup : MonoBehaviour
     {
@@ -22,6 +23,10 @@ namespace Mmd.UnityIntegration
         private int[]? configurationRevisions;
         private MmdMultiCharacterWorkerPool? workerPool;
         private bool workerPoolNeedsInitialLiveApply;
+        private bool evaluationInFlight;
+        private int pendingFrame;
+        private float pendingFrameRate;
+        private int pendingAdvancedCount;
         private bool claimsHeld;
         private string lastFailureReason = string.Empty;
 
@@ -71,6 +76,11 @@ namespace Mmd.UnityIntegration
                 return;
             }
 
+            if (evaluationInFlight)
+            {
+                return;
+            }
+
             MmdUnityPlaybackController[] active = resolvedControllers!;
             if (!TryGetSharedFrame(active, out int frame, out float frameRate))
             {
@@ -107,16 +117,49 @@ namespace Mmd.UnityIntegration
                     }
                 }
 
-                workerPool!.Evaluate(frame, frameRate);
+                workerPool!.BeginEvaluate(frame, frameRate);
+                pendingFrame = frame;
+                pendingFrameRate = frameRate;
+                pendingAdvancedCount = advancedCount;
+                evaluationInFlight = true;
+            }
+            catch (Exception exception)
+            {
+                RestoreClocks(active, clocks, advancedCount);
+                FailClosed("Multi-character evaluation failed: " + exception.Message);
+            }
+        }
+
+        private void LateUpdate()
+        {
+            if (!Application.isPlaying || !isActiveAndEnabled || !evaluationInFlight)
+            {
+                return;
+            }
+
+            MmdUnityPlaybackController[]? active = resolvedControllers;
+            MmdMultiCharacterWorkerPool? pool = workerPool;
+            if (active == null || pool == null || previousClocks == null)
+            {
+                evaluationInFlight = false;
+                pendingAdvancedCount = 0;
+                return;
+            }
+
+            int advancedCount = pendingAdvancedCount;
+            int frame = pendingFrame;
+            float frameRate = pendingFrameRate;
+            try
+            {
+                pool.CompleteEvaluate();
                 for (int i = 0; i < active.Length; i++)
                 {
+                    MmdMultiCharacterWorkerResult result = pool.GetResult(i);
                     if (!active[i].TryValidateMultiCharacterPreparedApply(
-                            workerPool.GetResult(i),
+                            result,
                             out string applyReason))
                     {
-                        RestoreClocks(active, clocks, advancedCount);
-                        FailClosed(applyReason);
-                        return;
+                        throw new InvalidOperationException(applyReason);
                     }
                 }
 
@@ -125,14 +168,18 @@ namespace Mmd.UnityIntegration
                     active[i].ApplyPreparedMultiCharacterFrame(
                         frame,
                         frameRate,
-                        workerPool.GetResult(i));
+                        pool.GetResult(i));
                 }
 
                 workerPoolNeedsInitialLiveApply = false;
+                pendingAdvancedCount = 0;
+                evaluationInFlight = false;
             }
             catch (Exception exception)
             {
-                RestoreClocks(active, clocks, advancedCount);
+                RestoreClocks(active, previousClocks, advancedCount);
+                pendingAdvancedCount = 0;
+                evaluationInFlight = false;
                 FailClosed("Multi-character evaluation failed: " + exception.Message);
             }
         }
@@ -166,9 +213,9 @@ namespace Mmd.UnityIntegration
             }
 
             MmdUnityPlaybackController[] candidate = ResolveControllers();
-            if (candidate.Length < 2)
+            if (candidate.Length < 1)
             {
-                lastFailureReason = "At least two playback controllers are required.";
+                lastFailureReason = "At least one playback controller is required.";
                 return;
             }
 
@@ -450,6 +497,9 @@ namespace Mmd.UnityIntegration
         private void ReleaseGroup()
         {
             Exception? cleanupError = null;
+            MmdUnityPlaybackController[]? pendingActive = resolvedControllers;
+            MmdUnityPlaybackController.MmdMultiCharacterClockState[]? pendingClocks = previousClocks;
+            int pendingCount = pendingAdvancedCount;
             try
             {
                 workerPool?.Dispose();
@@ -460,6 +510,13 @@ namespace Mmd.UnityIntegration
             }
             finally
             {
+                if (evaluationInFlight && pendingActive != null && pendingClocks != null)
+                {
+                    RestoreClocks(pendingActive, pendingClocks, pendingCount);
+                }
+
+                evaluationInFlight = false;
+                pendingAdvancedCount = 0;
                 workerPool = null;
                 workerPoolNeedsInitialLiveApply = false;
                 configurationRevisions = null;
