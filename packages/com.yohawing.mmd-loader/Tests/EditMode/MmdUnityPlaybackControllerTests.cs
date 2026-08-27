@@ -7,6 +7,7 @@ using System.Linq;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.TestTools;
 using Mmd.Editor;
 using Mmd.Parser;
 using Mmd.Physics;
@@ -30,6 +31,59 @@ namespace Mmd.Tests
         private const string PlaybackPmxId = "test_1bone_cube.pmx";
         private const string PlaybackVmdId = "test_1bone_cube_motion.vmd";
         private const int LivePhysicsPlaybackFrame = 10;
+
+        [Test]
+        public void PoseAppliedPublishesSuccessfulPoseAndIsolatesSubscriberFailure()
+        {
+            MmdUnityPlaybackBinding? binding = null;
+            try
+            {
+                binding = CreatePlaybackBinding();
+                MmdUnityPlaybackController controller =
+                    binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.Configure(binding, 30.0f, playOnStart: false);
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+                int mainThreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
+                int callbackCount = 0;
+                int callbackThreadId = -1;
+                bool snapshotWasPublished = false;
+                MmdPlaybackSnapshot? callbackSnapshot = null;
+                controller.PoseApplied += snapshot =>
+                {
+                    callbackCount++;
+                    callbackThreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
+                    callbackSnapshot = snapshot;
+                    snapshotWasPublished = ReferenceEquals(controller.LastSnapshot, snapshot);
+                };
+
+                MmdPlaybackSnapshot applied = controller.ApplyFrame(1);
+
+                Assert.That(callbackCount, Is.EqualTo(1));
+                Assert.That(callbackThreadId, Is.EqualTo(mainThreadId));
+                Assert.That(callbackSnapshot, Is.SameAs(applied));
+                Assert.That(snapshotWasPublished, Is.True);
+
+                controller.SetPhysicsMode(MmdPhysicsMode.Live);
+                int countAfterLiveSeed = callbackCount;
+                controller.ApplyFrame(0);
+                Assert.That(
+                    callbackCount,
+                    Is.EqualTo(countAfterLiveSeed),
+                    "A cached Live pose must not be published as a new application.");
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+
+                controller.PoseApplied += _ => throw new InvalidOperationException("pose hook failure");
+                LogAssert.Expect(
+                    LogType.Exception,
+                    new System.Text.RegularExpressions.Regex("InvalidOperationException: pose hook failure"));
+                Assert.DoesNotThrow(() => controller.ApplyFrame(2));
+                Assert.That(controller.LastSnapshot!.frame.frame, Is.EqualTo(2));
+            }
+            finally
+            {
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
+            }
+        }
 
         [Test]
         public void IkIterationCapDefaultsToCompatibilityAndPropagatesToPhysicsOffVmdEvaluation()

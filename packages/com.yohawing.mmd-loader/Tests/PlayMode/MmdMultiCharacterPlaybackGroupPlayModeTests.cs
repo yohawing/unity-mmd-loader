@@ -136,6 +136,16 @@ namespace Mmd.Tests.PlayMode
                     yield return null;
                     AttachSources(offSerial, pmxAsset, vmdAsset);
                     AttachSources(offGrouped, pmxAsset, vmdAsset);
+                    int mainThreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
+                    int poseAppliedCount = 0;
+                    int poseAppliedThreadId = -1;
+                    MmdPlaybackSnapshot? poseAppliedSnapshot = null;
+                    offGrouped.Controller.PoseApplied += snapshot =>
+                    {
+                        poseAppliedCount++;
+                        poseAppliedThreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
+                        poseAppliedSnapshot = snapshot;
+                    };
                     offSerial.Controller.Play();
                     offGrouped.Controller.Play();
                     offGroup = offRoot.AddComponent<MmdMultiCharacterPlaybackGroup>();
@@ -144,12 +154,22 @@ namespace Mmd.Tests.PlayMode
 
                     for (int step = 0; step < 4; step++)
                     {
-                        yield return WaitForPostLateUpdate(offObservation);
+                        int previousPoseAppliedCount = poseAppliedCount;
+                        yield return WaitForPostLateUpdate(
+                            offObservation,
+                            () => poseAppliedCount > previousPoseAppliedCount);
+                        Assert.That(
+                            poseAppliedCount,
+                            Is.GreaterThan(previousPoseAppliedCount),
+                            "The worker group did not publish an applied pose.");
                         int frame = offObservation.AppliedFrame;
                         offSerial.Controller.ApplyFrame(frame);
                         Assert.That(offGroup.IsPlaybackActive, Is.True, offGroup.LastFailureReason);
                         Assert.That(offGroup.HasWorkerPool, Is.True);
                         AssertAfterLateUpdate(offObservation);
+                        Assert.That(poseAppliedThreadId, Is.EqualTo(mainThreadId));
+                        Assert.That(poseAppliedSnapshot, Is.SameAs(offGrouped.Controller.LastSnapshot));
+                        Assert.That(poseAppliedSnapshot!.frame.frame, Is.EqualTo(frame));
                         AssertPoseEqual(offSerial.Instance, offGrouped.Instance);
                     }
 
@@ -614,21 +634,29 @@ namespace Mmd.Tests.PlayMode
             }
         }
 
-        private static IEnumerator WaitForPostLateUpdate(LateUpdateObservation observation)
+        private static IEnumerator WaitForPostLateUpdate(
+            LateUpdateObservation observation,
+            Func<bool>? additionalCondition = null)
         {
             observation.Clear();
-            if (!Application.isBatchMode)
+            for (int frame = 0; frame < 120; frame++)
             {
-                yield return new WaitForEndOfFrame();
-                yield break;
+                if (Application.isBatchMode)
+                {
+                    yield return null;
+                }
+                else
+                {
+                    yield return new WaitForEndOfFrame();
+                }
+
+                if (observation.HasObservation && (additionalCondition?.Invoke() ?? true))
+                {
+                    yield break;
+                }
             }
 
-            for (int frame = 0; frame < 120 && !observation.HasObservation; frame++)
-            {
-                yield return null;
-            }
-
-            Assert.That(observation.HasObservation, Is.True, "The group did not apply a frame in LateUpdate.");
+            Assert.Fail("The group did not satisfy its post-LateUpdate observation within 120 frames.");
         }
 
         private static void AssertAfterLateUpdate(LateUpdateObservation observation)

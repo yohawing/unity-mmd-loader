@@ -278,13 +278,15 @@ namespace Mmd.UnityIntegration
             }
 
             CurrentFrame = frame;
+            bool poseWillBeApplied = PhysicsMode != Mmd.Physics.MmdPhysicsMode.Live ||
+                !binding.CanReuseLivePhysicsSeed(frame);
             return ApplyPlaybackPose(() =>
             {
                 LastSnapshot = PhysicsMode == Mmd.Physics.MmdPhysicsMode.Live
                     ? binding.ApplyPreparedMultiCharacterLiveFrame(frame, frameRate, result)
                     : binding.ApplyPreparedFastFrame(frame, frameRate, result.WorldMatrices, result.MorphWeights);
                 return LastSnapshot;
-            });
+            }, poseWillBeApplied);
         }
     }
 }

@@ -263,6 +263,7 @@ namespace Mmd.UnityIntegration
 
             playbackFrame = frame;
             CurrentFrame = frame;
+            bool poseWillBeApplied = !binding.CanReuseLivePhysicsSeed(frame);
             return ApplyPlaybackPose(() =>
             {
                 PrepareLivePhysicsDriveSource(LivePhysicsDriveSource.VmdForward);
@@ -270,7 +271,7 @@ namespace Mmd.UnityIntegration
                 TimelinePoseEvaluationCount++;
                 lastVmdLivePhysicsFrameCount = Time.frameCount;
                 return LastSnapshot;
-            });
+            }, poseWillBeApplied);
         }
 
         private bool TryReuseTimelinePreparationSeed(

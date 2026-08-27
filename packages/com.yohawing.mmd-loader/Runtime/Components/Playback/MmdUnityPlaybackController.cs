@@ -127,6 +127,14 @@ namespace Mmd.UnityIntegration
 
         public MmdPlaybackSnapshot? LastSnapshot { get; private set; }
 
+        /// <summary>
+        /// Raised on the main thread immediately after a playback pose is successfully applied.
+        /// The callback runs in the route's apply phase: Update for serial playback and
+        /// LateUpdate for worker-group playback. Subscriber exceptions are logged and do not
+        /// stop playback.
+        /// </summary>
+        public event Action<MmdPlaybackSnapshot>? PoseApplied;
+
         public MmdTimelineSetupTimingSummary? LastTimelineSetupTiming { get; internal set; }
 
         public MmdLivePhysicsFrameDiagnostics? LastLivePhysicsDiagnostics =>
@@ -339,7 +347,7 @@ namespace Mmd.UnityIntegration
 
             playbackFrame = frame;
             CurrentFrame = frame;
-            return ApplyPlaybackPose(() => ApplyCurrentFrame());
+            return ApplyCurrentFramePose();
         }
 
         public MmdPlaybackSnapshot SeekFrame(int frame)
@@ -453,7 +461,7 @@ namespace Mmd.UnityIntegration
 
             playbackFrame += deltaTime * frameRate;
             CurrentFrame = MmdPlaybackTime.ToFrame(playbackFrame / frameRate, frameRate);
-            ApplyPlaybackPose(() => ApplyCurrentFrame());
+            ApplyCurrentFramePose();
         }
 
         private void Update()
@@ -789,17 +797,43 @@ namespace Mmd.UnityIntegration
             return LastSnapshot;
         }
 
-        private MmdPlaybackSnapshot ApplyPlaybackPose(Func<MmdPlaybackSnapshot> apply)
+        private MmdPlaybackSnapshot ApplyCurrentFramePose()
         {
+            bool poseWillBeApplied = binding?.PhysicsMode != MmdPhysicsMode.Live ||
+                !binding.CanReuseLivePhysicsSeed(CurrentFrame);
+            return ApplyPlaybackPose(() => ApplyCurrentFrame(), poseWillBeApplied);
+        }
+
+        private MmdPlaybackSnapshot ApplyPlaybackPose(
+            Func<MmdPlaybackSnapshot> apply,
+            bool poseWillBeApplied = true)
+        {
+            MmdPlaybackSnapshot snapshot;
             isApplyingPlaybackPose = true;
             try
             {
-                return apply();
+                snapshot = apply();
             }
             finally
             {
                 isApplyingPlaybackPose = false;
             }
+
+            if (!poseWillBeApplied)
+            {
+                return snapshot;
+            }
+
+            try
+            {
+                PoseApplied?.Invoke(snapshot);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception, this);
+            }
+
+            return snapshot;
         }
     }
 }
