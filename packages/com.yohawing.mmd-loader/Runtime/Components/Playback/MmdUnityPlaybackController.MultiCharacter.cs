@@ -84,7 +84,11 @@ namespace Mmd.UnityIntegration
 
             var previous = new MmdMultiCharacterClockState(playbackFrame, CurrentFrame);
             playbackFrame += deltaTime * frameRate;
-            CurrentFrame = MmdPlaybackTime.ToFrame(playbackFrame / frameRate, frameRate);
+            // playbackFrame is already expressed in frame-position units. Converting it to
+            // seconds and back introduces enough float error at 30 fps to skip a frame after
+            // roughly two seconds of multi-character playback.
+            MmdPlaybackTime.ValidateTime(playbackFrame);
+            CurrentFrame = (int)MathF.Floor(playbackFrame);
             return previous;
         }
 
