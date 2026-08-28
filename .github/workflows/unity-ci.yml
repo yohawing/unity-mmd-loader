@@ -35,7 +35,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Check C# whitespace policy
+      - name: Setup pinned .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Verify C# whitespace formatting
+        shell: bash
+        run: dotnet format whitespace --folder packages/com.yohawing.mmd-loader --verify-no-changes
+
+      - name: Check repository C# tabs and trailing whitespace
         shell: bash
         run: |
           set -euo pipefail
@@ -54,7 +63,7 @@ jobs:
             exit "$grep_status"
           fi
 
-          echo "PASS source style guard: C# whitespace policy"
+          echo "PASS repository C# tabs and trailing whitespace guard"
 
   release-submodule-latest:
     if: >-
