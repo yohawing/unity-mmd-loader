@@ -554,26 +554,56 @@ namespace Mmd.Tests
 
             model.physics.rigidbodies.Add(new MmdRigidbodyDefinition
             {
-                index = 0, name = "anchor", boneIndex = rootIndex, boneName = rootName, shapeType = "sphere",
-                size = new[] { 0.3f, 0.3f, 0.3f }, position = ToArray(rootOrigin),
-                rotation = new[] { 0.0f, 0.0f, 0.0f }, mass = 0.0f, linearDamping = 0.0f, angularDamping = 0.0f,
-                friction = 0.5f, restitution = 0.0f, group = 0, mask = 0xffff, physicsKind = "static"
+                index = 0,
+                name = "anchor",
+                boneIndex = rootIndex,
+                boneName = rootName,
+                shapeType = "sphere",
+                size = new[] { 0.3f, 0.3f, 0.3f },
+                position = ToArray(rootOrigin),
+                rotation = new[] { 0.0f, 0.0f, 0.0f },
+                mass = 0.0f,
+                linearDamping = 0.0f,
+                angularDamping = 0.0f,
+                friction = 0.5f,
+                restitution = 0.0f,
+                group = 0,
+                mask = 0xffff,
+                physicsKind = "static"
             });
             model.physics.rigidbodies.Add(new MmdRigidbodyDefinition
             {
-                index = 1, name = "hairBody", boneIndex = hairIndex, boneName = hairName, shapeType = "sphere",
-                size = new[] { 0.3f, 0.3f, 0.3f }, position = ToArray(hairOrigin),
-                rotation = new[] { 0.0f, 0.0f, 0.0f }, mass = 1.0f, linearDamping = 0.0f, angularDamping = 0.0f,
-                friction = 0.5f, restitution = 0.0f, group = 0, mask = 0xffff, physicsKind = "dynamic"
+                index = 1,
+                name = "hairBody",
+                boneIndex = hairIndex,
+                boneName = hairName,
+                shapeType = "sphere",
+                size = new[] { 0.3f, 0.3f, 0.3f },
+                position = ToArray(hairOrigin),
+                rotation = new[] { 0.0f, 0.0f, 0.0f },
+                mass = 1.0f,
+                linearDamping = 0.0f,
+                angularDamping = 0.0f,
+                friction = 0.5f,
+                restitution = 0.0f,
+                group = 0,
+                mask = 0xffff,
+                physicsKind = "dynamic"
             });
             model.physics.joints.Add(new MmdJointDefinition
             {
-                index = 0, name = "anchor-hair", rigidbodyAIndex = 0, rigidbodyBIndex = 1,
-                position = ToArray(jointOrigin), rotation = new[] { 0.0f, 0.0f, 0.0f },
-                linearLowerLimit = new[] { 0.0f, 0.0f, 0.0f }, linearUpperLimit = new[] { 0.0f, 0.0f, 0.0f },
+                index = 0,
+                name = "anchor-hair",
+                rigidbodyAIndex = 0,
+                rigidbodyBIndex = 1,
+                position = ToArray(jointOrigin),
+                rotation = new[] { 0.0f, 0.0f, 0.0f },
+                linearLowerLimit = new[] { 0.0f, 0.0f, 0.0f },
+                linearUpperLimit = new[] { 0.0f, 0.0f, 0.0f },
                 angularLowerLimit = new[] { -3.1415927f, -3.1415927f, -3.1415927f },
                 angularUpperLimit = new[] { 3.1415927f, 3.1415927f, 3.1415927f },
-                linearSpring = new[] { 0.0f, 0.0f, 0.0f }, angularSpring = new[] { 0.0f, 0.0f, 0.0f }
+                linearSpring = new[] { 0.0f, 0.0f, 0.0f },
+                angularSpring = new[] { 0.0f, 0.0f, 0.0f }
             });
             return model;
         }
