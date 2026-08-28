@@ -908,7 +908,7 @@ namespace Mmd.UnityIntegration
             DestroyOwnedObjectOnce(instance.Root, destroyedIds);
         }
 
-        private static void DestroyOwnedObjectOnce(UnityEngine.Object? value, HashSet<int> destroyedIds)
+        internal static void DestroyOwnedObjectOnce(UnityEngine.Object? value, HashSet<int> destroyedIds)
         {
             if (value == null || !destroyedIds.Add(value.GetInstanceID()))
             {
