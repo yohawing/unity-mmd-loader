@@ -10,9 +10,11 @@ namespace Mmd
     public sealed class MmdHumanoidBoneMappingDiagnosticSummary
     {
         [SerializeField] private string readiness = MmdHumanoidMappingReadiness.NotEvaluated;
-        [SerializeField] private MmdHumanoidBoneMappingDiagnosticEntry[] mappedEntries =
+        [SerializeField]
+        private MmdHumanoidBoneMappingDiagnosticEntry[] mappedEntries =
             Array.Empty<MmdHumanoidBoneMappingDiagnosticEntry>();
-        [SerializeField] private MmdHumanoidMissingRequiredBone[] missingRequiredBones =
+        [SerializeField]
+        private MmdHumanoidMissingRequiredBone[] missingRequiredBones =
             Array.Empty<MmdHumanoidMissingRequiredBone>();
         [SerializeField] private string[] conflictDiagnostics = Array.Empty<string>();
 

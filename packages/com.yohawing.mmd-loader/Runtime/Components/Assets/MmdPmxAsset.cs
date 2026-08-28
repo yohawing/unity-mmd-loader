@@ -438,7 +438,8 @@ namespace Mmd
         [SerializeField] private Avatar? importedAvatar;
         [SerializeField] private string humanoidAvatarReadiness = MmdHumanoidMappingReadiness.NotEvaluated;
         [SerializeField] private string humanoidAvatarDiagnostic = string.Empty;
-        [SerializeField] private MmdHumanoidBoneMappingDiagnosticSummary humanoidBoneMappingDiagnostics =
+        [SerializeField]
+        private MmdHumanoidBoneMappingDiagnosticSummary humanoidBoneMappingDiagnostics =
             MmdHumanoidBoneMappingDiagnosticSummary.Empty;
         [SerializeField] private MmdPmxImportSummaryStatus importSummaryStatus = MmdPmxImportSummaryStatus.NotParsed;
         [SerializeField] private string modelName = string.Empty;

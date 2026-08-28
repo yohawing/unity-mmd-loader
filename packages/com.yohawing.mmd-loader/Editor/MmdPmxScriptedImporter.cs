@@ -61,7 +61,8 @@ namespace Mmd.Editor
         [SerializeField] private MmdMaterialProfileAsset? materialProfileAsset;
         [SerializeField] private MmdMaterialOverrideAsset? materialOverrideAsset;
         [SerializeField] private Material[] materialRemaps = System.Array.Empty<Material>();
-        [SerializeField] private MmdHumanoidBoneMappingOverride[] humanoidBoneMappingOverrides =
+        [SerializeField]
+        private MmdHumanoidBoneMappingOverride[] humanoidBoneMappingOverrides =
             System.Array.Empty<MmdHumanoidBoneMappingOverride>();
         [SerializeField] private float upperArmTwist = MmdHumanoidRetargetQualitySettings.DefaultUpperArmTwist;
         [SerializeField] private float lowerArmTwist = MmdHumanoidRetargetQualitySettings.DefaultLowerArmTwist;
