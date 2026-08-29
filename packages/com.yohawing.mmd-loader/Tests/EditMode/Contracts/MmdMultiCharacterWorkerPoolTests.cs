@@ -266,6 +266,31 @@ namespace Mmd.Tests.Contracts
         }
 
         [Test]
+        public void MultiCharacterClockAdvanceAtThirtyFpsKeepsEveryFrameFor120Steps()
+        {
+            var root = new GameObject("multi-character-clock-thirty-fps");
+            try
+            {
+                var controller = root.AddComponent<MmdUnityPlaybackController>();
+                const float deltaTime = 1.0f / 30.0f;
+
+                for (int iteration = 0; iteration < 120; iteration++)
+                {
+                    int expectedFrame = iteration + 1;
+                    controller.AdvanceMultiCharacterClock(deltaTime);
+                    Assert.That(
+                        controller.CurrentFrame,
+                        Is.EqualTo(expectedFrame),
+                        $"Clock frame advanced incorrectly at iteration={iteration}.");
+                }
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
         public void GroupWithInsufficientSourceConfigurationFailsClosed()
         {
             var root = new GameObject("source-gated-group");
