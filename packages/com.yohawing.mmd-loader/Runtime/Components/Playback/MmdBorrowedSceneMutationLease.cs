@@ -6,7 +6,6 @@ using System.Linq;
 using Mmd;
 using Mmd.Rendering;
 using UnityEngine;
-using Object = UnityEngine.Object;
 
 namespace Mmd.UnityIntegration
 {
@@ -365,24 +364,7 @@ namespace Mmd.UnityIntegration
             var destroyedIds = new HashSet<int>();
             foreach (Material material in materials.Where(material => material != null))
             {
-                DestroyOnce(material, destroyedIds);
-            }
-        }
-
-        private static void DestroyOnce(Object? value, HashSet<int> destroyedIds)
-        {
-            if (value == null || !destroyedIds.Add(value.GetInstanceID()))
-            {
-                return;
-            }
-
-            if (Application.isPlaying)
-            {
-                Object.Destroy(value);
-            }
-            else
-            {
-                Object.DestroyImmediate(value);
+                MmdUnityPlaybackBinding.DestroyOwnedObjectOnce(material, destroyedIds);
             }
         }
     }

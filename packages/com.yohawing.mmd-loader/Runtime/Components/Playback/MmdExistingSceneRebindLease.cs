@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using System.Linq;
 using Mmd.Motion;
 using UnityEngine;
-using Object = UnityEngine.Object;
 
 namespace Mmd.UnityIntegration
 {
@@ -155,7 +154,7 @@ namespace Mmd.UnityIntegration
             MmdSelfShadowTarget? current = root != null ? root.GetComponent<MmdSelfShadowTarget>() : null;
             if (originalSelfShadowTarget == null)
             {
-                DestroyOnce(current, new HashSet<int>());
+                MmdUnityPlaybackBinding.DestroyOwnedObjectOnce(current, new HashSet<int>());
                 return;
             }
 
@@ -203,10 +202,10 @@ namespace Mmd.UnityIntegration
             var destroyedIds = new HashSet<int>();
             foreach (Material material in ownedMaterials)
             {
-                DestroyOnce(material, destroyedIds);
+                MmdUnityPlaybackBinding.DestroyOwnedObjectOnce(material, destroyedIds);
             }
 
-            DestroyOnce(ownedMesh, destroyedIds);
+            MmdUnityPlaybackBinding.DestroyOwnedObjectOnce(ownedMesh, destroyedIds);
             ownedMaterials = Array.Empty<Material>();
             ownedMesh = null;
         }
@@ -214,23 +213,6 @@ namespace Mmd.UnityIntegration
         private static bool ContainsReference(Material[] materials, Material candidate)
         {
             return materials.Any(material => ReferenceEquals(material, candidate));
-        }
-
-        private static void DestroyOnce(Object? value, HashSet<int> destroyedIds)
-        {
-            if (value == null || !destroyedIds.Add(value.GetInstanceID()))
-            {
-                return;
-            }
-
-            if (Application.isPlaying)
-            {
-                Object.Destroy(value);
-            }
-            else
-            {
-                Object.DestroyImmediate(value);
-            }
         }
     }
 }
