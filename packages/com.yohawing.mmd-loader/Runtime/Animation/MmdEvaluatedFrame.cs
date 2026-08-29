@@ -282,8 +282,8 @@ namespace Mmd
         private static void TransposeMatrix4x4(float[] src, int so, float[] dst, int doff)
         {
             for (int r = 0; r < 4; r++)
-            for (int c = 0; c < 4; c++)
-                dst[doff + r * 4 + c] = src[so + c * 4 + r];
+                for (int c = 0; c < 4; c++)
+                    dst[doff + r * 4 + c] = src[so + c * 4 + r];
         }
 
         private static void MultiplyInverseRigidRowMajorInto(

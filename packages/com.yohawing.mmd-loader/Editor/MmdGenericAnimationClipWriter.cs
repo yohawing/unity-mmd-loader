@@ -257,123 +257,123 @@ namespace Mmd.Editor
 
             try
             {
-            compactedCurveCount = 0;
-            usedNativeSparse = false;
-            string[] bonePaths = CalculateUniqueBonePaths(instance.BoneTransforms, instance.Root.transform);
-            IReadOnlyList<MmdUnityVertexMorphBlendShapeBinding> morphs = instance.VertexMorphBlendShapes;
-            if (options.ReduceKeys)
-            {
-                compactedCurveCount = BakeSparseNativeCurves(
-                    binding,
-                    instance,
-                    pmxAsset,
-                    vmdAsset,
-                    frameRate,
-                    startFrame,
-                    frameCount,
-                    bonePaths,
-                    morphs,
-                    clip,
-                    options.HighPrecision);
-                usedNativeSparse = true;
+                compactedCurveCount = 0;
+                usedNativeSparse = false;
+                string[] bonePaths = CalculateUniqueBonePaths(instance.BoneTransforms, instance.Root.transform);
+                IReadOnlyList<MmdUnityVertexMorphBlendShapeBinding> morphs = instance.VertexMorphBlendShapes;
+                if (options.ReduceKeys)
+                {
+                    compactedCurveCount = BakeSparseNativeCurves(
+                        binding,
+                        instance,
+                        pmxAsset,
+                        vmdAsset,
+                        frameRate,
+                        startFrame,
+                        frameCount,
+                        bonePaths,
+                        morphs,
+                        clip,
+                        options.HighPrecision);
+                    usedNativeSparse = true;
+                    return clip;
+                }
+
+                // Native batch evaluation is used for dense curves only when key
+                // reduction was explicitly disabled.
+                if (!MmdAnimationClipBakeBudget.TryValidateGeneric(
+                        frameCount,
+                        instance.BoneTransforms.Length,
+                        morphs.Count,
+                        out _,
+                        out string budgetDiagnostic))
+                {
+                    throw new InvalidOperationException(budgetDiagnostic);
+                }
+
+                var positionKeys = new Keyframe[instance.BoneTransforms.Length, 3][];
+                var rotationKeys = new Keyframe[instance.BoneTransforms.Length, 4][];
+                for (int bone = 0; bone < instance.BoneTransforms.Length; bone++)
+                {
+                    for (int axis = 0; axis < 3; axis++) positionKeys[bone, axis] = new Keyframe[frameCount];
+                    for (int axis = 0; axis < 4; axis++) rotationKeys[bone, axis] = new Keyframe[frameCount];
+                }
+
+                var morphKeys = new Keyframe[morphs.Count][];
+                for (int morph = 0; morph < morphs.Count; morph++) morphKeys[morph] = new Keyframe[frameCount];
+
+                if (!CanUseNativeBatch(
+                        binding,
+                        instance,
+                        out int[] parentBoneIndices,
+                        out Vector3[] staticParentPositions,
+                        out Quaternion[] staticParentRotations))
+                {
+                    throw new InvalidOperationException(
+                        "native Generic AnimationClip batch evaluation is unavailable or the Unity hierarchy is unsupported.");
+                }
+
+                try
+                {
+                    FillDenseKeysFromNativeBatch(
+                        binding,
+                        instance,
+                        parentBoneIndices,
+                        staticParentPositions,
+                        staticParentRotations,
+                        morphs,
+                        frameRate,
+                        startFrame,
+                        frameCount,
+                        positionKeys,
+                        rotationKeys,
+                        morphKeys);
+                }
+                catch (EntryPointNotFoundException ex)
+                {
+                    throw new InvalidOperationException(
+                        "native Generic AnimationClip batch evaluation failed because the required native entry point is unavailable.",
+                        ex);
+                }
+
+                string[] positionProperties = { "m_LocalPosition.x", "m_LocalPosition.y", "m_LocalPosition.z" };
+                string[] rotationProperties = { "m_LocalRotation.x", "m_LocalRotation.y", "m_LocalRotation.z", "m_LocalRotation.w" };
+                var curveBindings = new List<EditorCurveBinding>(instance.BoneTransforms.Length * 7 + morphs.Count);
+                var curves = new List<AnimationCurve>(curveBindings.Capacity);
+                for (int bone = 0; bone < instance.BoneTransforms.Length; bone++)
+                {
+                    string path = bonePaths[bone];
+                    for (int axis = 0; axis < 3; axis++)
+                    {
+                        curveBindings.Add(EditorCurveBinding.FloatCurve(path, typeof(Transform), positionProperties[axis]));
+                        curves.Add(CreateBakedCurve(
+                            positionKeys[bone, axis], options.ReduceKeys, ref compactedCurveCount));
+                    }
+                    for (int axis = 0; axis < 4; axis++)
+                    {
+                        curveBindings.Add(EditorCurveBinding.FloatCurve(path, typeof(Transform), rotationProperties[axis]));
+                        curves.Add(CreateBakedCurve(
+                            rotationKeys[bone, axis], options.ReduceKeys, ref compactedCurveCount));
+                    }
+                }
+
+                if (instance.SkinnedMeshRenderer != null)
+                {
+                    string rendererPath = AnimationUtility.CalculateTransformPath(instance.SkinnedMeshRenderer.transform, instance.Root.transform);
+                    for (int morph = 0; morph < morphs.Count; morph++)
+                    {
+                        curveBindings.Add(EditorCurveBinding.FloatCurve(
+                            rendererPath,
+                            typeof(SkinnedMeshRenderer),
+                            "blendShape." + morphs[morph].BlendShapeName));
+                        curves.Add(CreateBakedCurve(
+                            morphKeys[morph], options.ReduceKeys, ref compactedCurveCount));
+                    }
+                }
+
+                AnimationUtility.SetEditorCurves(clip, curveBindings.ToArray(), curves.ToArray());
+                clip.EnsureQuaternionContinuity();
                 return clip;
-            }
-
-            // Native batch evaluation is used for dense curves only when key
-            // reduction was explicitly disabled.
-            if (!MmdAnimationClipBakeBudget.TryValidateGeneric(
-                    frameCount,
-                    instance.BoneTransforms.Length,
-                    morphs.Count,
-                    out _,
-                    out string budgetDiagnostic))
-            {
-                throw new InvalidOperationException(budgetDiagnostic);
-            }
-
-            var positionKeys = new Keyframe[instance.BoneTransforms.Length, 3][];
-            var rotationKeys = new Keyframe[instance.BoneTransforms.Length, 4][];
-            for (int bone = 0; bone < instance.BoneTransforms.Length; bone++)
-            {
-                for (int axis = 0; axis < 3; axis++) positionKeys[bone, axis] = new Keyframe[frameCount];
-                for (int axis = 0; axis < 4; axis++) rotationKeys[bone, axis] = new Keyframe[frameCount];
-            }
-
-            var morphKeys = new Keyframe[morphs.Count][];
-            for (int morph = 0; morph < morphs.Count; morph++) morphKeys[morph] = new Keyframe[frameCount];
-
-            if (!CanUseNativeBatch(
-                    binding,
-                    instance,
-                    out int[] parentBoneIndices,
-                    out Vector3[] staticParentPositions,
-                    out Quaternion[] staticParentRotations))
-            {
-                throw new InvalidOperationException(
-                    "native Generic AnimationClip batch evaluation is unavailable or the Unity hierarchy is unsupported.");
-            }
-
-            try
-            {
-                FillDenseKeysFromNativeBatch(
-                    binding,
-                    instance,
-                    parentBoneIndices,
-                    staticParentPositions,
-                    staticParentRotations,
-                    morphs,
-                    frameRate,
-                    startFrame,
-                    frameCount,
-                    positionKeys,
-                    rotationKeys,
-                    morphKeys);
-            }
-            catch (EntryPointNotFoundException ex)
-            {
-                throw new InvalidOperationException(
-                    "native Generic AnimationClip batch evaluation failed because the required native entry point is unavailable.",
-                    ex);
-            }
-
-            string[] positionProperties = { "m_LocalPosition.x", "m_LocalPosition.y", "m_LocalPosition.z" };
-            string[] rotationProperties = { "m_LocalRotation.x", "m_LocalRotation.y", "m_LocalRotation.z", "m_LocalRotation.w" };
-            var curveBindings = new List<EditorCurveBinding>(instance.BoneTransforms.Length * 7 + morphs.Count);
-            var curves = new List<AnimationCurve>(curveBindings.Capacity);
-            for (int bone = 0; bone < instance.BoneTransforms.Length; bone++)
-            {
-                string path = bonePaths[bone];
-                for (int axis = 0; axis < 3; axis++)
-                {
-                    curveBindings.Add(EditorCurveBinding.FloatCurve(path, typeof(Transform), positionProperties[axis]));
-                    curves.Add(CreateBakedCurve(
-                        positionKeys[bone, axis], options.ReduceKeys, ref compactedCurveCount));
-                }
-                for (int axis = 0; axis < 4; axis++)
-                {
-                    curveBindings.Add(EditorCurveBinding.FloatCurve(path, typeof(Transform), rotationProperties[axis]));
-                    curves.Add(CreateBakedCurve(
-                        rotationKeys[bone, axis], options.ReduceKeys, ref compactedCurveCount));
-                }
-            }
-
-            if (instance.SkinnedMeshRenderer != null)
-            {
-                string rendererPath = AnimationUtility.CalculateTransformPath(instance.SkinnedMeshRenderer.transform, instance.Root.transform);
-                for (int morph = 0; morph < morphs.Count; morph++)
-                {
-                    curveBindings.Add(EditorCurveBinding.FloatCurve(
-                        rendererPath,
-                        typeof(SkinnedMeshRenderer),
-                        "blendShape." + morphs[morph].BlendShapeName));
-                    curves.Add(CreateBakedCurve(
-                        morphKeys[morph], options.ReduceKeys, ref compactedCurveCount));
-                }
-            }
-
-            AnimationUtility.SetEditorCurves(clip, curveBindings.ToArray(), curves.ToArray());
-            clip.EnsureQuaternionContinuity();
-            return clip;
             }
             catch
             {
