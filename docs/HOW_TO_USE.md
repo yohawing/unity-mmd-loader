@@ -8,6 +8,7 @@ This guide is for users who have added `com.yohawing.mmd-loader` to a Unity proj
 - [Import a PMX](#import-a-pmx)
 - [Place it in the Scene](#place-it-in-the-scene)
 - [Import a VMD](#import-a-vmd)
+- [Play two to four models with worker playback](#play-two-to-four-models-with-worker-playback)
 - [Set up Humanoid](#set-up-humanoid)
 - [Set up rendering in URP](#set-up-rendering-in-urp)
 - [Set up camera and light motion](#set-up-camera-and-light-motion)
@@ -56,6 +57,17 @@ The available editor actions may change between package versions, but the basic 
 - A PMX asset creates the scene's playback controller.
 - A VMD asset is referenced from a Timeline clip.
 - A Timeline clip does not immediately convert the VMD into an AnimationClip. It passes the playback time to the MMD runtime, which calculates the pose at that time.
+
+## Play two to four models with worker playback
+
+Use `MmdMultiCharacterPlaybackGroup` for opt-in standalone playback when two to four models must advance on the same logical frame.
+
+1. Configure each scene playback controller with its own PMX and VMD assets.
+2. Set every controller to **Physics Mode Off** or set every controller to **Physics Mode Live**. Do not mix the modes.
+3. Add `MmdMultiCharacterPlaybackGroup` to an empty GameObject and assign the controllers to its **Controllers** list.
+4. Enable **Play On Start** on every assigned controller, then enter Play Mode.
+
+The group evaluates each controller on a long-lived worker and applies the completed poses to Unity during `Update`. Timeline playback and Humanoid retarget input are not supported by this route. If a controller becomes incompatible or unavailable, the group stops without partially applying a frame; `LastFailureReason` exposes the reason to code.
 
 ## Set up Humanoid
 

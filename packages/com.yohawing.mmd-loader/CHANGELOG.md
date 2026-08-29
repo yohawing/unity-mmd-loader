@@ -4,6 +4,38 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-29
+
+### Added
+
+- Added opt-in worker playback for two to four controllers, with long-lived native evaluation workers for Physics Off and Live while Unity object and transform mutation remains on the main thread.
+- Added a main-thread `PoseApplied` event after a playback route successfully applies a new pose.
+
+### Changed
+
+- Parallelized multi-character Live Physics evaluation behind an all-or-nothing validation boundary, with controller claims and worker cleanup failing closed when configuration or ownership changes.
+- Consolidated PMX/VMD playback caches, source transactions, native setup, retry, and cleanup ownership so stale preload results are rejected and failed preloads remain retryable.
+- Hardened project-relative model, texture, and MME normal-map resolution against escaped or junction-based paths while preserving custom material targets, mapper keywords, and compatible legacy material fallback.
+- Updated the packaged Windows native runtime and `native/mmd-anim` pin to `mmd-anim` remote `main` commit `4a6334b` (v0.4.3 plus tooling-only follow-up commits), retaining runtime ABI version 3 and adopting the MMD-compatible IK rollback and bounded extreme-PMX effective-mass fixes.
+- Strengthened local and GitHub release evidence to reject zero-test, incomplete, or unapproved skipped-test results, and pinned a deterministic C# whitespace baseline.
+
+### Fixed
+
+- Fixed worker playback clocks so fixed-step playback advances through consecutive logical frames without duplicate/compensating-skip transitions.
+- Fixed worker poses being applied after the expected Unity `Update` phase, preserving same-frame consumers and pose notifications.
+- Fixed stale PMX descriptors and VMD snapshots after source replacement, pending cleanup retry, playback-frame seed rollback, and Humanoid Timeline target cleanup.
+- Fixed material-profile provenance and custom material state propagation across playback setup and material reapplication.
+
+### Known Limitations
+
+- Runtime evaluation requires the bundled native runtime; unavailable or incompatible native paths report diagnostics and do not fall back to the removed managed evaluator.
+- macOS and Linux native binaries are not distributed in the package.
+- Timeline random access keeps physics off; Live physics is limited to Play Mode forward playback.
+- Raw VMD Timeline clips use deterministic hard-cut selection rather than weighted blending.
+- Humanoid bake does not include Live physics, facial morphs, or native MMD IK/helper behavior.
+- Worker-group playback supports two to four controller-owned PMX/VMD sources in Physics Off or Live; Timeline and Humanoid retarget input remain unsupported for this route.
+- The Unity Toon Shader adapter remains optional and conservative; it falls back to MMD Toon when UTS is absent or its shader schema is unsupported.
+
 ## [0.4.1] - 2026-08-12
 
 ### Added

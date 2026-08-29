@@ -8,6 +8,7 @@
 - [PMXを読み込む](#pmxを読み込む)
 - [Sceneに配置する](#sceneに配置する)
 - [VMDを読み込む](#vmdを読み込む)
+- [ワーカー再生で2〜4体を再生する](#ワーカー再生で24体を再生する)
 - [Humanoidを設定する](#humanoidを設定する)
 - [URPの描画を設定する](#urpの描画を設定する)
 - [カメラとライトのモーションを設定する](#カメラとライトのモーションを設定する)
@@ -56,6 +57,17 @@ SceneにあるMMD再生オブジェクトをTimelineへバインドし、VMD用�
 - PMXアセットをSceneへ配置すると、再生コントローラーが作られます。
 - VMDアセットはTimelineクリップから参照します。
 - Timelineクリップは、VMDをすぐにAnimationClipへ変換しません。Timelineの再生時刻をMMDランタイムへ渡して、その時刻のポーズを計算します。
+
+## ワーカー再生で2〜4体を再生する
+
+Timelineを使わず、2〜4体のモデルを同じ論理フレームで進める場合は、`MmdMultiCharacterPlaybackGroup`を使います。この再生方法はオプトインです。
+
+1. Scene内の各再生コントローラーへ、それぞれのPMXアセットとVMDアセットを設定します。
+2. すべてのコントローラーを**Physics Mode Off**または**Physics Mode Live**に揃えます。異なるモードは混在できません。
+3. 空のGameObjectへ`MmdMultiCharacterPlaybackGroup`を追加し、**Controllers**リストへ再生コントローラーを設定します。
+4. 設定したすべてのコントローラーで**Play On Start**を有効にし、Play Modeへ入ります。
+
+グループは各コントローラーを長寿命ワーカーで評価し、完了したポーズをUnityの`Update`中に反映します。この再生経路ではTimeline再生とHumanoidリターゲット入力を使用できません。コントローラーが利用できない状態になった場合は、フレームを部分適用せずに停止します。停止理由はコードから`LastFailureReason`で確認できます。
 
 ## Humanoidを設定する
 
