@@ -407,6 +407,8 @@ namespace Mmd.Tests
                     name = "remapped_body"
                 };
                 remapMaterial.SetFloat(MmdMaterialPropertyNames.Alpha, 0.8f);
+                remapMaterial.SetFloat("_OutlineWidth", 0.4f);
+                remapMaterial.SetFloat("_OutlineScreenSpaceWeight", 0.0f);
                 previewInstance.Materials[0] = remapMaterial;
                 previewInstance.SkinnedMeshRenderer!.sharedMaterials = previewInstance.Materials;
 
@@ -441,6 +443,8 @@ namespace Mmd.Tests
                 Assert.That(binding.PlaybackInstance.SkinnedMeshRenderer!.sharedMaterials[0], Is.SameAs(binding.PlaybackInstance.Materials[0]));
                 Assert.That(ReadMaterialFloat(binding.PlaybackInstance.Materials[0], MmdMaterialPropertyNames.Alpha), Is.EqualTo(0.8f).Within(0.00001f));
                 Assert.That(ReadMaterialFloat(remapMaterial, MmdMaterialPropertyNames.Alpha), Is.EqualTo(0.8f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(binding.PlaybackInstance.Materials[0], "_OutlineScreenSpaceWeight"), Is.EqualTo(0.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(remapMaterial, "_OutlineScreenSpaceWeight"), Is.EqualTo(0.0f).Within(0.00001f));
 
                 binding.Dispose();
                 Assert.That(binding.Instance, Is.SameAs(previewInstance));
@@ -563,6 +567,119 @@ namespace Mmd.Tests
                 MmdTestInstanceScope.DestroyInstance(previewInstance);
                 Object.DestroyImmediate(pmxAsset);
                 Object.DestroyImmediate(vmdAsset);
+                Object.DestroyImmediate(importedMaterial);
+            }
+        }
+
+        [Test]
+        public void BorrowedPlaybackNormalizesBuiltInOutlineOnActivationWithoutMutatingSource()
+        {
+            MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
+            MmdUnityModelInstance? previewInstance = null;
+            MmdUnityPlaybackBinding? binding = null;
+            Material? importedMaterial = null;
+
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                byte[] pmxBytes = File.ReadAllBytes(pmxPath);
+                byte[] vmdBytes = File.ReadAllBytes(vmdPath);
+                var parser = new NativeMmdParser();
+                previewInstance = MmdUnityModelFactory.CreateSkinnedModel(parser.LoadModel(pmxBytes), pmxPath);
+                Material authoredMaterial = previewInstance.Materials[0];
+                Shader importedShader = Shader.Find("MMD URP Toon")
+                    ?? throw new InvalidOperationException("MMD URP Toon shader is required for the playback material source test.");
+                importedMaterial = new Material(importedShader)
+                {
+                    name = "Stale Imported Material"
+                };
+                importedMaterial.SetFloat("_OutlineWidth", 0.4f);
+                importedMaterial.SetFloat("_OutlineScreenSpaceWeight", 0.0f);
+
+                pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                pmxAsset.Initialize(
+                    pmxBytes,
+                    "test_1bone_cube.pmx",
+                    pmxPath,
+                    assetShaderPreset: "MMD URP Toon",
+                    importedMaterialAssets: new[] { importedMaterial });
+                vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                vmdAsset.Initialize(vmdBytes, "test_1bone_cube_motion.vmd", vmdPath);
+
+                binding = MmdUnityPlaybackBinding.CreateSkinned(previewInstance, pmxAsset, vmdAsset);
+                binding.SetPhysicsMode(MmdPhysicsMode.Off);
+
+                Material playbackMaterial = binding.PlaybackInstance.Materials[0];
+                Assert.That(playbackMaterial, Is.Not.SameAs(importedMaterial));
+                Assert.That(playbackMaterial.GetFloat("_OutlineWidth"), Is.EqualTo(0.4f).Within(0.00001f));
+                Assert.That(playbackMaterial.GetFloat("_OutlineScreenSpaceWeight"), Is.EqualTo(1.0f).Within(0.00001f));
+                Assert.That(importedMaterial.GetFloat("_OutlineScreenSpaceWeight"), Is.EqualTo(0.0f).Within(0.00001f));
+                Assert.That(previewInstance.SkinnedMeshRenderer!.sharedMaterials[0], Is.SameAs(playbackMaterial));
+
+                binding.Dispose();
+                binding = null;
+                Assert.That(previewInstance.SkinnedMeshRenderer!.sharedMaterials[0], Is.SameAs(authoredMaterial));
+            }
+            finally
+            {
+                binding?.Dispose();
+                MmdTestInstanceScope.DestroyInstance(previewInstance);
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+                Object.DestroyImmediate(importedMaterial);
+            }
+        }
+
+        [Test]
+        public void BorrowedPlaybackPreservesCustomOutlineTargetOnActivation()
+        {
+            MmdUnityModelInstance? previewInstance = null;
+            MmdUnityPlaybackBinding? binding = null;
+            Material? importedMaterial = null;
+
+            try
+            {
+                string pmxPath = ResolvePackageFixture(PlaybackPmxId);
+                string vmdPath = ResolvePackageFixture(PlaybackVmdId);
+                byte[] pmxBytes = File.ReadAllBytes(pmxPath);
+                byte[] vmdBytes = File.ReadAllBytes(vmdPath);
+                var parser = new NativeMmdParser();
+                MmdModelDefinition model = parser.LoadModel(pmxBytes);
+                MmdMotionDefinition motion = parser.LoadMotion(vmdBytes);
+                previewInstance = MmdUnityModelFactory.CreateSkinnedModel(model, pmxPath);
+                Shader importedShader = Shader.Find("MMD URP Toon")
+                    ?? throw new InvalidOperationException("MMD URP Toon shader is required for the playback material source test.");
+                importedMaterial = new Material(importedShader)
+                {
+                    name = "Custom Target Material"
+                };
+                importedMaterial.SetFloat("_OutlineWidth", 0.4f);
+                importedMaterial.SetFloat("_OutlineScreenSpaceWeight", 0.0f);
+                var customTargets = new MmdMaterialRenderingTargets(
+                    outlineScreenSpaceWeightProperty: "_OutlineScreenSpaceWeight",
+                    unsupportedFeatures: new[] { "custom-outline" });
+
+                binding = MmdUnityPlaybackBinding.CreateSkinnedFromExistingSceneModel(
+                    previewInstance.Root,
+                    model,
+                    motion,
+                    PlaybackPmxId,
+                    PlaybackVmdId,
+                    sourcePath: pmxPath,
+                    importedMaterials: new[] { importedMaterial },
+                    materialRenderingTargets: new[] { customTargets });
+                binding.SetPhysicsMode(MmdPhysicsMode.Off);
+
+                Material playbackMaterial = binding.PlaybackInstance.Materials[0];
+                Assert.That(playbackMaterial.GetFloat("_OutlineScreenSpaceWeight"), Is.EqualTo(0.0f).Within(0.00001f));
+                Assert.That(importedMaterial.GetFloat("_OutlineScreenSpaceWeight"), Is.EqualTo(0.0f).Within(0.00001f));
+            }
+            finally
+            {
+                binding?.Dispose();
+                MmdTestInstanceScope.DestroyInstance(previewInstance);
                 Object.DestroyImmediate(importedMaterial);
             }
         }
