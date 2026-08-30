@@ -2115,6 +2115,7 @@ namespace Mmd.Tests
             GameObject? directorObject = null;
             TimelineWorkerLateUpdateObservation? firstObservation = null;
             TimelineWorkerLateUpdateObservation? secondObservation = null;
+            MmdMultiCharacterWorkerPool? firstTimelinePool = null;
             int processFrameCount = 0;
             Action<double> processFrameObserver = _ => processFrameCount++;
             try
@@ -2143,6 +2144,12 @@ namespace Mmd.Tests
                 yield return null;
                 ConfigureTimelineWorkerController(firstController, firstBinding, modelAsset, motionAsset);
                 ConfigureTimelineWorkerController(secondController, secondBinding, modelAsset, motionAsset);
+                Assert.That(
+                    firstController.TryGetOrCreateTimelineWorkerPool(
+                        out firstTimelinePool,
+                        out string firstPoolReason),
+                    Is.True,
+                    firstPoolReason);
                 firstObservation = firstBinding.Instance.Root.AddComponent<TimelineWorkerLateUpdateObservation>();
                 secondObservation = secondBinding.Instance.Root.AddComponent<TimelineWorkerLateUpdateObservation>();
                 firstObservation.Track(firstController, firstBinding.Instance.BoneTransforms[0]);
@@ -2172,6 +2179,11 @@ namespace Mmd.Tests
                 Assert.That(firstController.LastSnapshot, Is.Not.Null);
                 Assert.That(secondController.LastSnapshot, Is.Not.Null);
 
+                // Keep the controllers eligible for standalone playback while Timeline is active.
+                // The Timeline ownership marker must suppress the standalone boundary for the same
+                // frame, otherwise the shared Off worker would be driven twice.
+                firstController.Play();
+                secondController.Play();
                 director.Play();
                 director.DeferredEvaluate();
                 for (int frame = 0; frame < 30 &&
@@ -2199,6 +2211,31 @@ namespace Mmd.Tests
                 Assert.That(firstObservation.ObservedPlayerLoopFrame, Is.EqualTo(firstController.LastTimelineDriveFrameCount));
                 Assert.That(secondObservation.ObservedPlayerLoopFrame, Is.EqualTo(secondController.LastTimelineDriveFrameCount));
                 Assert.That(firstObservation.ObservedPosition, Is.EqualTo(secondObservation.ObservedPosition));
+                Assert.That(
+                    MmdStandaloneWorkerScheduler.LastBatchSize,
+                    Is.EqualTo(0),
+                    "Timeline-owned controllers must not be double-driven by standalone workers.");
+
+                director.Stop();
+                for (int frame = 0; frame < 5 && MmdStandaloneWorkerScheduler.LastBatchSize != 2; frame++)
+                {
+                    yield return null;
+                }
+
+                Assert.That(
+                    MmdStandaloneWorkerScheduler.LastBatchSize,
+                    Is.EqualTo(2),
+                    "Standalone playback must resume after Timeline stops.");
+                Assert.That(
+                    firstController.TryGetOrCreateStandaloneWorkerPool(
+                        out MmdMultiCharacterWorkerPool standalonePool,
+                        out string standalonePoolReason),
+                    Is.True,
+                    standalonePoolReason);
+                Assert.That(
+                    standalonePool,
+                    Is.SameAs(firstTimelinePool),
+                    "Timeline and standalone Physics Off playback must reuse the same worker slot.");
             }
             finally
             {

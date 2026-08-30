@@ -129,7 +129,7 @@ namespace Mmd.UnityIntegration
 
         /// <summary>
         /// Raised on the main thread immediately after a playback pose is successfully applied.
-        /// Automatic serial and worker-group playback both invoke the callback during Update.
+        /// Automatic serial and standalone worker playback both invoke the callback during Update.
         /// Subscriber exceptions are logged and do not stop playback.
         /// </summary>
         public event Action<MmdPlaybackSnapshot>? PoseApplied;
@@ -194,7 +194,7 @@ namespace Mmd.UnityIntegration
             IReadOnlyList<MmdHumanoidRetargetBinding>? entries,
             IReadOnlyList<MmdHumanoidAppendTransformBinding>? appendEntries)
         {
-            ThrowIfMultiCharacterPoolOwnsController(nameof(ConfigureHumanoidRetarget));
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             if (physicsMode == MmdPhysicsMode.Off && ikMaxIterationsCap > 0 &&
                 proxyRoot != null && entries != null && entries.Count > 0)
             {
@@ -219,7 +219,7 @@ namespace Mmd.UnityIntegration
 
         public void Configure(MmdUnityPlaybackBinding playbackBinding, MmdPlaybackConfig config)
         {
-            ThrowIfMultiCharacterPoolOwnsController(nameof(Configure));
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             config.Validate();
             Configure(playbackBinding, config.FrameRate, config.PlayOnStart);
             ApplyFrame(config.InitialFrame);
@@ -227,7 +227,7 @@ namespace Mmd.UnityIntegration
 
         public void Configure(MmdUnityPlaybackBinding playbackBinding, float playbackFrameRate, bool playOnStart = true)
         {
-            ThrowIfMultiCharacterPoolOwnsController(nameof(Configure));
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             if (playbackBinding == null)
             {
                 throw new ArgumentNullException(nameof(playbackBinding));
@@ -235,7 +235,8 @@ namespace Mmd.UnityIntegration
 
             MmdPlaybackTime.ValidateFrameRate(playbackFrameRate);
             ValidatePhysicsModeForSerialization();
-            ReleaseTimelineWorkerPool();
+            ReleasePlaybackWorkerPool();
+            standaloneWorkerFaulted = false;
             DisposeHumanoidHostPoseSession();
             if (binding != null && !ReferenceEquals(binding, playbackBinding))
             {
@@ -264,13 +265,13 @@ namespace Mmd.UnityIntegration
 
         public void SetPlayOnStart(bool value)
         {
-            ThrowIfMultiCharacterPoolOwnsController(nameof(SetPlayOnStart));
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             playOnStart = value;
         }
 
         public void SetPhysicsMode(MmdPhysicsMode mode)
         {
-            ThrowIfMultiCharacterPoolOwnsController(nameof(SetPhysicsMode));
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             ApplyPhysicsMode(mode);
         }
 
@@ -284,12 +285,12 @@ namespace Mmd.UnityIntegration
             get => ikMaxIterationsCap;
             set
             {
-                ThrowIfMultiCharacterPoolOwnsController(nameof(IkMaxIterationsCap));
+                ReleaseAutomaticWorkerForSynchronousPlayback();
                 ValidateIkMaxIterationsCap(value);
                 ValidateHumanoidPhysicsOffIkCap(value);
                 if (ikMaxIterationsCap != value)
                 {
-                    ReleaseTimelineWorkerPool();
+                    ReleasePlaybackWorkerPool();
                 }
                 ikMaxIterationsCap = value;
                 PropagateIkMaxIterationsCap();
@@ -306,7 +307,8 @@ namespace Mmd.UnityIntegration
             MmdPhysicsMode previousMode = physicsMode;
             if (mode != previousMode)
             {
-                ReleaseTimelineWorkerPool();
+                ReleasePlaybackWorkerPool();
+                standaloneWorkerFaulted = false;
             }
             if (mode != MmdPhysicsMode.Off)
             {
@@ -342,7 +344,7 @@ namespace Mmd.UnityIntegration
 
         public MmdPlaybackSnapshot ApplyFrame(int frame)
         {
-            ThrowIfMultiCharacterPoolOwnsController(nameof(ApplyFrame));
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             if (binding == null)
             {
                 throw new InvalidOperationException("Playback controller must be configured before applying frames.");
@@ -360,7 +362,7 @@ namespace Mmd.UnityIntegration
 
         public MmdPlaybackSnapshot SeekFrame(int frame)
         {
-            ThrowIfMultiCharacterPoolOwnsController(nameof(SeekFrame));
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             if (binding == null)
             {
                 throw new InvalidOperationException("Playback controller must be configured before seeking.");
@@ -401,13 +403,13 @@ namespace Mmd.UnityIntegration
 
         public MmdPlaybackSnapshot ApplyTime(float time)
         {
-            ThrowIfMultiCharacterPoolOwnsController(nameof(ApplyTime));
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             return ApplyTime(time, frameRate);
         }
 
         public MmdPlaybackSnapshot ApplyTime(float time, float playbackFrameRate)
         {
-            ThrowIfMultiCharacterPoolOwnsController(nameof(ApplyTime));
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             if (binding == null)
             {
                 throw new InvalidOperationException("Playback controller must be configured before applying time.");
@@ -426,20 +428,18 @@ namespace Mmd.UnityIntegration
 
         public void Play()
         {
-            ThrowIfMultiCharacterPoolOwnsController(nameof(Play));
             EnsureConfigured();
             IsPlaying = true;
         }
 
         public void Pause()
         {
-            ThrowIfMultiCharacterPoolOwnsController(nameof(Pause));
             IsPlaying = false;
         }
 
         public void Stop()
         {
-            ThrowIfMultiCharacterPoolOwnsController(nameof(Stop));
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             IsPlaying = false;
             pendingSeekReseed = false;
             if (binding != null)
@@ -456,7 +456,7 @@ namespace Mmd.UnityIntegration
 
         public void Tick(float deltaTime)
         {
-            ThrowIfMultiCharacterPoolOwnsController(nameof(Tick));
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             if (!IsPlaying)
             {
                 return;
@@ -474,12 +474,17 @@ namespace Mmd.UnityIntegration
 
         private void Update()
         {
-            if (IsMultiCharacterClaimed)
+            SyncSerializedPhysicsModeToBinding();
+            if (WasStandaloneWorkerDrivenThisFrame)
             {
                 return;
             }
 
-            SyncSerializedPhysicsModeToBinding();
+            if (IsStandaloneWorkerFaulted)
+            {
+                return;
+            }
+
             if (ShouldSuppressSelfTick(lastTimelineDriveFrameCount, Time.frameCount))
             {
                 // A Timeline/PlayableDirector evaluated this controller on this or the previous frame.
@@ -493,11 +498,6 @@ namespace Mmd.UnityIntegration
 
         private void LateUpdate()
         {
-            if (IsMultiCharacterClaimed)
-            {
-                return;
-            }
-
             if (!HasHumanoidRetargetInputsForLateUpdate())
             {
                 return;
@@ -613,19 +613,14 @@ namespace Mmd.UnityIntegration
 
         private void OnDestroy()
         {
-            MmdMultiCharacterPlaybackGroup.NotifyControllerUnavailable(this);
-            if (multiCharacterGroup != null)
-            {
-                ReleaseMultiCharacterGroup(multiCharacterGroup);
-            }
-
-            ReleaseTimelineWorkerPool();
+            MmdStandaloneWorkerScheduler.Unregister(this);
+            ReleasePlaybackWorkerPool();
             ReleasePlaybackResources();
         }
 
         internal void ReleasePlaybackResources()
         {
-            ReleaseTimelineWorkerPool();
+            ReleasePlaybackWorkerPool();
             DisposeHumanoidPhysicsBinding();
             DisposeHumanoidHostPoseSession();
             binding?.Dispose();
@@ -636,14 +631,19 @@ namespace Mmd.UnityIntegration
 
         private void OnDisable()
         {
-            MmdMultiCharacterPlaybackGroup.NotifyControllerUnavailable(this);
-            ReleaseTimelineWorkerPool();
+            MmdStandaloneWorkerScheduler.Unregister(this);
+            ReleasePlaybackWorkerPool();
             DisposeHumanoidPhysicsBinding();
             DisposeHumanoidHostPoseSession();
         }
 
         private void OnEnable()
         {
+            standaloneWorkerFaulted = false;
+            if (Application.isPlaying)
+            {
+                MmdStandaloneWorkerScheduler.Register(this);
+            }
             if (modelAsset != null)
             {
                 _ = modelAsset.BeginSynchronousPlaybackPreload(

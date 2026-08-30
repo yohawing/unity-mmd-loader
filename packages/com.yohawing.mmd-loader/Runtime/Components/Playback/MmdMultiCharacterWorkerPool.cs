@@ -430,6 +430,12 @@ namespace Mmd.UnityIntegration
             BeginEvaluateCore(requests, default);
         }
 
+        internal void BeginEvaluate(MmdMultiCharacterWorkerRequest request)
+        {
+            request.Validate();
+            BeginEvaluateCore(null, request);
+        }
+
         private void BeginEvaluateCore(
             IReadOnlyList<MmdMultiCharacterWorkerRequest>? requests,
             MmdMultiCharacterWorkerRequest uniformRequest)
@@ -884,7 +890,7 @@ namespace Mmd.UnityIntegration
             long fanOutEnd = Stopwatch.GetTimestamp();
             result.RecordLivePhysicsEvaluation(
                 frame,
-                time,
+                MmdPlaybackTime.ToTime(frame, frameRate),
                 seed,
                 deltaTime,
                 diagnostics,

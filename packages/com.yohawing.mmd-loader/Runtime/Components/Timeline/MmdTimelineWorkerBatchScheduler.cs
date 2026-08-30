@@ -39,6 +39,7 @@ namespace Mmd.Timeline
                 MmdMultiCharacterWorkerPool pool,
                 MmdMultiCharacterWorkerRequest request,
                 int configurationRevision,
+                long fastRuntimeSourceRevision,
                 ulong generation)
             {
                 Controller = controller;
@@ -46,6 +47,7 @@ namespace Mmd.Timeline
                 Requests = new[] { request };
                 Request = request;
                 ConfigurationRevision = configurationRevision;
+                FastRuntimeSourceRevision = fastRuntimeSourceRevision;
                 Generation = generation;
             }
 
@@ -58,6 +60,8 @@ namespace Mmd.Timeline
             internal MmdMultiCharacterWorkerRequest Request { get; }
 
             internal int ConfigurationRevision { get; }
+
+            internal long FastRuntimeSourceRevision { get; }
 
             internal ulong Generation { get; }
 
@@ -179,8 +183,12 @@ namespace Mmd.Timeline
                 request,
                 configurationRevision,
                 out reason);
-            if (result == MmdTimelineWorkerQueueResult.Queued)
+            if (result == MmdTimelineWorkerQueueResult.Queued ||
+                result == MmdTimelineWorkerQueueResult.Rejected)
             {
+                // A rejected request still means Timeline owned this controller for the current
+                // Director evaluation. Keep standalone playback from immediately double-driving
+                // the controller while the rejection is diagnosed at the drain boundary.
                 controller.MarkTimelineDriveForWorker();
             }
 
@@ -241,6 +249,7 @@ namespace Mmd.Timeline
                 pool,
                 request,
                 configurationRevision,
+                controller.TimelineWorkerFastRuntimeSourceRevision,
                 generation);
             pending.Add(entry);
             try
@@ -434,9 +443,11 @@ namespace Mmd.Timeline
                     if (!entry.Controller.TryValidateTimelineWorkerApply(
                             entry.Request.Frame,
                             entry.Request.Time,
-                            entry.Request.FrameRate,
-                            entry.ConfigurationRevision,
-                            entry.Pool.GetResult(0),
+                        entry.Request.FrameRate,
+                        entry.ConfigurationRevision,
+                        entry.FastRuntimeSourceRevision,
+                        entry.Pool,
+                        entry.Pool.GetResult(0),
                             out string reason))
                     {
                         entry.DispatchError = new InvalidOperationException(reason);

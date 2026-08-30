@@ -165,6 +165,12 @@ namespace Mmd.Tests
                         out string duplicateReason),
                     Is.EqualTo(MmdTimelineWorkerQueueResult.Rejected));
                 Assert.That(duplicateReason, Does.Contain("duplicate Timeline worker requests"));
+                Assert.That(
+                    MmdUnityPlaybackController.ShouldSuppressSelfTick(
+                        controller.LastTimelineDriveFrameCount,
+                        Time.frameCount),
+                    Is.True,
+                    "Rejected Timeline ownership must suppress standalone self-drive for this frame.");
 
                 LogAssert.Expect(
                     LogType.Warning,

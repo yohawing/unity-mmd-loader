@@ -22,9 +22,13 @@ namespace Mmd.UnityIntegration
 
         internal void PrepareTimelineSeed(float sourceTime, float frameRate, bool runLivePhysics)
         {
-            MmdMultiCharacterPlaybackGroup.ReleaseForSerialPlayback(
-                this,
-                nameof(PrepareTimelineSeed));
+            // A Timeline Off evaluation can reuse the same controller slot as standalone Off
+            // playback. Live setup is a different evaluator/session and must replace any slot
+            // before mutating the binding synchronously.
+            if (runLivePhysics || physicsMode == MmdPhysicsMode.Live)
+            {
+                ReleasePlaybackWorkerPoolForTimelineSync();
+            }
             timelinePreparationSeedPending = false;
             bool seedLivePhysics = runLivePhysics && physicsMode == MmdPhysicsMode.Live;
             if (seedLivePhysics)
@@ -45,7 +49,7 @@ namespace Mmd.UnityIntegration
 
         public MmdHumanoidRetargeterResult ApplyHumanoidRetargetNow()
         {
-            ThrowIfMultiCharacterPoolOwnsController(nameof(ApplyHumanoidRetargetNow));
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             MmdHumanoidRetargetGate gate = EvaluateHumanoidRetargetGate(requireAnimatorDriver: true);
             LastHumanoidRetargetGate = gate;
             if (gate != MmdHumanoidRetargetGate.Ready)
@@ -59,9 +63,6 @@ namespace Mmd.UnityIntegration
 
         internal MmdHumanoidRetargeterResult ApplyHumanoidRetargetFromTimeline()
         {
-            MmdMultiCharacterPlaybackGroup.ReleaseForSerialPlayback(
-                this,
-                nameof(ApplyHumanoidRetargetFromTimeline));
             lastHumanoidRetargetTimelineDriveFrameCount = Time.frameCount;
             MmdHumanoidRetargetGate gate = EvaluateHumanoidRetargetGate(requireAnimatorDriver: false);
             LastHumanoidRetargetGate = gate;
@@ -158,9 +159,6 @@ namespace Mmd.UnityIntegration
 
         internal bool PrewarmTimelineLivePhysics()
         {
-            MmdMultiCharacterPlaybackGroup.ReleaseForSerialPlayback(
-                this,
-                nameof(PrewarmTimelineLivePhysics));
             if (binding == null)
             {
                 return false;
@@ -192,9 +190,7 @@ namespace Mmd.UnityIntegration
         /// </summary>
         internal MmdPlaybackSnapshot ApplyTimelineTime(float sourceTime, float frameRate)
         {
-            MmdMultiCharacterPlaybackGroup.ReleaseForSerialPlayback(
-                this,
-                nameof(ApplyTimelineTime));
+            ReleasePlaybackWorkerPoolForTimelineSync();
             if (binding == null)
             {
                 throw new InvalidOperationException("Playback controller must be configured before applying timeline time.");
@@ -239,9 +235,7 @@ namespace Mmd.UnityIntegration
         /// </summary>
         internal MmdPlaybackSnapshot ApplyTimelineLivePhysicsForward(float sourceTime, float frameRate)
         {
-            MmdMultiCharacterPlaybackGroup.ReleaseForSerialPlayback(
-                this,
-                nameof(ApplyTimelineLivePhysicsForward));
+            ReleasePlaybackWorkerPool();
             if (binding == null)
             {
                 throw new InvalidOperationException("Playback controller must be configured before applying timeline time.");

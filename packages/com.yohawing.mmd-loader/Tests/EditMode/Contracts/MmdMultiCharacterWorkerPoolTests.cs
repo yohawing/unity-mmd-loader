@@ -243,75 +243,6 @@ namespace Mmd.Tests.Contracts
         }
 
         [Test]
-        public void GroupDoesNotClaimControllersFromAwake()
-        {
-            Assert.That(
-                typeof(MmdMultiCharacterPlaybackGroup).GetMethod(
-                    "Awake",
-                    BindingFlags.Instance | BindingFlags.NonPublic),
-                Is.Null);
-        }
-
-        [Test]
-        public void GroupUsesDefaultPlaybackUpdateExecutionOrder()
-        {
-            DefaultExecutionOrder? executionOrder = (DefaultExecutionOrder?)
-                Attribute.GetCustomAttribute(
-                    typeof(MmdMultiCharacterPlaybackGroup),
-                    typeof(DefaultExecutionOrder));
-
-            Assert.That(executionOrder, Is.Null);
-        }
-
-        [Test]
-        public void GroupWithoutControllersFailsClosed()
-        {
-            var root = new GameObject("empty-multi-character-group");
-            try
-            {
-                var group = root.AddComponent<MmdMultiCharacterPlaybackGroup>();
-                typeof(MmdMultiCharacterPlaybackGroup)
-                    .GetMethod("TryClaimControllers", BindingFlags.Instance | BindingFlags.NonPublic)!
-                    .Invoke(group, null);
-                Assert.That(group.IsPlaybackActive, Is.False);
-                Assert.That(group.LastFailureReason, Does.Contain("At least one"));
-            }
-            finally
-            {
-                Object.DestroyImmediate(root);
-            }
-        }
-
-        [Test]
-        public void ControllerCannotBeClaimedBySecondGroup()
-        {
-            var controllerRoot = new GameObject("claimed-controller");
-            var firstGroupRoot = new GameObject("first-group");
-            var secondGroupRoot = new GameObject("second-group");
-            try
-            {
-                var controller = controllerRoot.AddComponent<MmdUnityPlaybackController>();
-                var firstGroup = firstGroupRoot.AddComponent<MmdMultiCharacterPlaybackGroup>();
-                var secondGroup = secondGroupRoot.AddComponent<MmdMultiCharacterPlaybackGroup>();
-                controller.AssignMultiCharacterGroup(firstGroup);
-
-                Assert.That(
-                    controller.TryClaimMultiCharacterGroup(secondGroup, out string reason),
-                    Is.False);
-                Assert.That(reason, Does.Contain("another group"));
-                Assert.That(controller.IsMultiCharacterClaimed, Is.True);
-                controller.ReleaseMultiCharacterGroup(firstGroup);
-                Assert.That(controller.IsMultiCharacterClaimed, Is.False);
-            }
-            finally
-            {
-                Object.DestroyImmediate(controllerRoot);
-                Object.DestroyImmediate(firstGroupRoot);
-                Object.DestroyImmediate(secondGroupRoot);
-            }
-        }
-
-        [Test]
         public void MultiCharacterClockAdvanceCanBeRolledBackWithoutLosingFractionalState()
         {
             var root = new GameObject("multi-character-clock");
@@ -350,32 +281,6 @@ namespace Mmd.Tests.Contracts
                         Is.EqualTo(expectedFrame),
                         $"Clock frame advanced incorrectly at iteration={iteration}.");
                 }
-            }
-            finally
-            {
-                Object.DestroyImmediate(root);
-            }
-        }
-
-        [Test]
-        public void GroupWithInsufficientSourceConfigurationFailsClosed()
-        {
-            var root = new GameObject("source-gated-group");
-            var first = new GameObject("first-controller");
-            var second = new GameObject("second-controller");
-            first.transform.SetParent(root.transform);
-            second.transform.SetParent(root.transform);
-            try
-            {
-                first.AddComponent<MmdUnityPlaybackController>();
-                second.AddComponent<MmdUnityPlaybackController>();
-                var group = root.AddComponent<MmdMultiCharacterPlaybackGroup>();
-                typeof(MmdMultiCharacterPlaybackGroup)
-                    .GetMethod("TryClaimControllers", BindingFlags.Instance | BindingFlags.NonPublic)!
-                    .Invoke(group, null);
-
-                Assert.That(group.IsPlaybackActive, Is.False);
-                Assert.That(group.LastFailureReason, Does.Contain("controller-owned PMX and VMD"));
             }
             finally
             {

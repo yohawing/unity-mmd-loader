@@ -457,6 +457,16 @@ namespace Mmd.Tests
                     Is.True,
                     providerWorkerReason);
                 Assert.That(providerPool, Is.Not.Null);
+                Assert.That(
+                    controller.TryGetOrCreateStandaloneWorkerPool(
+                        out MmdMultiCharacterWorkerPool standalonePool,
+                        out string standaloneWorkerReason),
+                    Is.True,
+                    standaloneWorkerReason);
+                Assert.That(
+                    standalonePool,
+                    Is.SameAs(providerPool),
+                    "Timeline and standalone Physics Off playback must reuse the controller-owned worker slot.");
                 controller.ReleaseTimelineWorkerPool();
             }
             finally
