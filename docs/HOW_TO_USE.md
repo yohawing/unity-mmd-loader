@@ -8,7 +8,6 @@ This guide is for users who have added `com.yohawing.mmd-loader` to a Unity proj
 - [Import a PMX](#import-a-pmx)
 - [Place it in the Scene](#place-it-in-the-scene)
 - [Import a VMD](#import-a-vmd)
-- [Play a VMD without Timeline](#play-a-vmd-without-timeline)
 - [Set up Humanoid](#set-up-humanoid)
 - [Set up rendering in URP](#set-up-rendering-in-urp)
 - [Set up camera and light motion](#set-up-camera-and-light-motion)
@@ -57,14 +56,6 @@ The available editor actions may change between package versions, but the basic 
 - A PMX asset creates the scene's playback controller.
 - A VMD asset is referenced from a Timeline clip.
 - A Timeline clip does not immediately convert the VMD into an AnimationClip. It passes the playback time to the MMD runtime, which calculates the pose at that time.
-
-## Play a VMD without Timeline
-
-1. Assign the PMX and VMD assets to each scene playback controller.
-2. Select **Physics Mode Off** or **Physics Mode Live**.
-3. Enable **Play On Start**, then enter Play Mode.
-
-With this normal asset-based setup, Play Mode playback is optimized automatically for one or more models. Physics Off Timeline playback is also optimized across multiple tracks and Playable Directors. No additional performance settings are required.
 
 ## Set up Humanoid
 

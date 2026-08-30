@@ -8,7 +8,6 @@
 - [PMXを読み込む](#pmxを読み込む)
 - [Sceneに配置する](#sceneに配置する)
 - [VMDを読み込む](#vmdを読み込む)
-- [Timelineを使わずにVMDを再生する](#timelineを使わずにvmdを再生する)
 - [Humanoidを設定する](#humanoidを設定する)
 - [URPの描画を設定する](#urpの描画を設定する)
 - [カメラとライトのモーションを設定する](#カメラとライトのモーションを設定する)
@@ -57,14 +56,6 @@ SceneにあるMMD再生オブジェクトをTimelineへバインドし、VMD用�
 - PMXアセットをSceneへ配置すると、再生コントローラーが作られます。
 - VMDアセットはTimelineクリップから参照します。
 - Timelineクリップは、VMDをすぐにAnimationClipへ変換しません。Timelineの再生時刻をMMDランタイムへ渡して、その時刻のポーズを計算します。
-
-## Timelineを使わずにVMDを再生する
-
-1. Scene内の各再生コントローラーへ、PMXアセットとVMDアセットを設定します。
-2. **Physics Mode Off**または**Physics Mode Live**を選びます。
-3. **Play On Start**を有効にし、Play Modeへ入ります。
-
-この通常のアセット構成では、Play Modeの再生はモデルが1体でも複数体でも自動で最適化されます。Physics Mode OffのTimeline再生も、複数トラックや複数のPlayable Directorに対して自動で最適化されます。パフォーマンスのための追加設定は不要です。
 
 ## Humanoidを設定する
 
