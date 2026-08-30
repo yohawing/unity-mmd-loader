@@ -29,8 +29,8 @@ namespace Mmd.Tests.Contracts
         {
             "Mmd.Cinemachine", "Mmd.CinemachineEditModeTests", "Mmd.CinemachinePlayModeTests",
             "Mmd.EditModeTestKit", "Mmd.EditModeTests", "Mmd.Editor", "Mmd.Editor.Timeline",
-            "Mmd.PlayModeTests", "Mmd.Rendering.Universal", "Mmd.Runtime", "Mmd.RuntimeVerification.PlayModeTests",
-            "Mmd.Timeline", "Mmd.TimelineEditModeTests", "Mmd.UnityToonShaderAdapter.Sample",
+            "Mmd.PlayModeTests", "Mmd.Rendering.Universal", "Mmd.Runtime", "Mmd.Timeline",
+            "Mmd.TimelineEditModeTests", "Mmd.UnityToonShaderAdapter.Sample",
             "Mmd.UnityToonShaderAdapter.Sample.Tests"
         };
 
@@ -326,7 +326,10 @@ namespace Mmd.Tests.Contracts
         private static string[] ReadAssemblyDefinitionNames()
         {
             string packageRoot = MmdTestFixtures.PackageRoot;
+            string localRuntimeVerificationRoot =
+                Path.Combine(packageRoot, "Samples~", "RuntimeVerification") + Path.DirectorySeparatorChar;
             return Directory.GetFiles(packageRoot, "*.asmdef", SearchOption.AllDirectories)
+                .Where(path => !path.StartsWith(localRuntimeVerificationRoot, StringComparison.OrdinalIgnoreCase))
                 .Select(path => JsonUtility.FromJson<AssemblyDefinitionIdentity>(File.ReadAllText(path))?.name)
                 .Where(name => !string.IsNullOrWhiteSpace(name))
                 .Select(name => name!)
