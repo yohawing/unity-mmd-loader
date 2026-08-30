@@ -8,6 +8,12 @@ using Mmd.Rendering;
 
 namespace Mmd
 {
+    public enum MmdIkCompatibilityProfile
+    {
+        Mmd = 0,
+        WebV081 = 1
+    }
+
     public sealed class MmdRuntimeSession : IDisposable
     {
         private readonly MmdModelDefinition model;
@@ -26,6 +32,7 @@ namespace Mmd
         private float[]? nativeMorphWeights;
         private byte[]? nativeIkEnabled;
         private bool disposed;
+        private MmdIkCompatibilityProfile ikCompatibilityProfile;
 
         public MmdRuntimeSession(
             MmdModelDefinition model,
@@ -103,6 +110,26 @@ namespace Mmd
         }
 
         public int MotionMaxFrame => motion.maxFrame;
+
+        public MmdIkCompatibilityProfile IkCompatibilityProfile
+        {
+            get => ikCompatibilityProfile;
+            set
+            {
+                ThrowIfDisposed();
+                ValidateIkCompatibilityProfile(value);
+                nativePlaybackSession?.SetIkCompatibilityProfile(value);
+                ikCompatibilityProfile = value;
+            }
+        }
+
+        internal static void ValidateIkCompatibilityProfile(MmdIkCompatibilityProfile value)
+        {
+            if (value != MmdIkCompatibilityProfile.Mmd && value != MmdIkCompatibilityProfile.WebV081)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), value, "Unknown IK compatibility profile.");
+            }
+        }
 
         ~MmdRuntimeSession()
         {
@@ -376,6 +403,7 @@ namespace Mmd
             MmdRuntimeFfiPlaybackSession created = MmdRuntimeFfiPlaybackSession.Create(modelSource, motionSource);
             try
             {
+                created.SetIkCompatibilityProfile(ikCompatibilityProfile);
                 nativeWorldMatrices = new float[created.WorldMatrixFloatCount];
                 nativeMorphWeights = new float[created.MorphWeightCount];
                 nativeIkEnabled = new byte[created.IkEnabledCount];

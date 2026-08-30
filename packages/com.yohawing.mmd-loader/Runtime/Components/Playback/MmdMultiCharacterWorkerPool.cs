@@ -711,12 +711,14 @@ namespace Mmd.UnityIntegration
         private readonly byte[] pmxBytes;
         private readonly byte[] vmdBytes;
         private readonly uint ikMaxIterationsCap;
+        private readonly MmdIkCompatibilityProfile ikCompatibilityProfile;
         private MmdRuntimeFfiPlaybackSession? session;
 
         internal MmdNativeMultiCharacterWorker(
             byte[] pmxBytes,
             byte[] vmdBytes,
-            uint ikMaxIterationsCap)
+            uint ikMaxIterationsCap,
+            MmdIkCompatibilityProfile ikCompatibilityProfile = MmdIkCompatibilityProfile.Mmd)
         {
             if (pmxBytes == null || pmxBytes.Length == 0)
             {
@@ -731,15 +733,27 @@ namespace Mmd.UnityIntegration
             this.pmxBytes = pmxBytes;
             this.vmdBytes = vmdBytes;
             this.ikMaxIterationsCap = ikMaxIterationsCap;
+            MmdRuntimeSession.ValidateIkCompatibilityProfile(ikCompatibilityProfile);
+            this.ikCompatibilityProfile = ikCompatibilityProfile;
         }
 
         public MmdMultiCharacterWorkerResult Initialize()
         {
-            session = MmdRuntimeFfiPlaybackSession.Create(pmxBytes, vmdBytes);
-            return new MmdMultiCharacterWorkerResult(
-                new float[session.WorldMatrixFloatCount],
-                new float[session.MorphWeightCount],
-                new byte[session.IkEnabledCount]);
+            MmdRuntimeFfiPlaybackSession created = MmdRuntimeFfiPlaybackSession.Create(pmxBytes, vmdBytes);
+            try
+            {
+                created.SetIkCompatibilityProfile(ikCompatibilityProfile);
+                session = created;
+                return new MmdMultiCharacterWorkerResult(
+                    new float[created.WorldMatrixFloatCount],
+                    new float[created.MorphWeightCount],
+                    new byte[created.IkEnabledCount]);
+            }
+            catch
+            {
+                created.Dispose();
+                throw;
+            }
         }
 
         public void Evaluate(int frame, float time, float frameRate, MmdMultiCharacterWorkerResult result)
@@ -769,6 +783,7 @@ namespace Mmd.UnityIntegration
         private readonly byte[] vmdBytes;
         private readonly MmdModelDefinition model;
         private readonly uint ikMaxIterationsCap;
+        private readonly MmdIkCompatibilityProfile ikCompatibilityProfile;
         private MmdRuntimeFfiPlaybackSession? session;
         private MmdAnimPhysicsBackend? backend;
         private int lastFrame = -1;
@@ -779,7 +794,8 @@ namespace Mmd.UnityIntegration
             byte[] pmxBytes,
             byte[] vmdBytes,
             MmdModelDefinition model,
-            uint ikMaxIterationsCap)
+            uint ikMaxIterationsCap,
+            MmdIkCompatibilityProfile ikCompatibilityProfile = MmdIkCompatibilityProfile.Mmd)
         {
             if (pmxBytes == null || pmxBytes.Length == 0)
             {
@@ -802,19 +818,31 @@ namespace Mmd.UnityIntegration
             this.pmxBytes = pmxBytes;
             this.vmdBytes = vmdBytes;
             this.ikMaxIterationsCap = ikMaxIterationsCap;
+            MmdRuntimeSession.ValidateIkCompatibilityProfile(ikCompatibilityProfile);
+            this.ikCompatibilityProfile = ikCompatibilityProfile;
         }
 
         public MmdMultiCharacterWorkerResult Initialize()
         {
-            session = MmdRuntimeFfiPlaybackSession.Create(pmxBytes, vmdBytes);
-            int rigidbodyCount = model.physics?.rigidbodies?.Count ?? 0;
-            return new MmdMultiCharacterWorkerResult(
-                new float[session.WorldMatrixFloatCount],
-                new float[session.MorphWeightCount],
-                new byte[session.IkEnabledCount],
-                new float[session.WorldMatrixFloatCount],
-                new float[checked(rigidbodyCount * 3)],
-                new float[checked(rigidbodyCount * 4)]);
+            MmdRuntimeFfiPlaybackSession created = MmdRuntimeFfiPlaybackSession.Create(pmxBytes, vmdBytes);
+            try
+            {
+                created.SetIkCompatibilityProfile(ikCompatibilityProfile);
+                session = created;
+                int rigidbodyCount = model.physics?.rigidbodies?.Count ?? 0;
+                return new MmdMultiCharacterWorkerResult(
+                    new float[created.WorldMatrixFloatCount],
+                    new float[created.MorphWeightCount],
+                    new byte[created.IkEnabledCount],
+                    new float[created.WorldMatrixFloatCount],
+                    new float[checked(rigidbodyCount * 3)],
+                    new float[checked(rigidbodyCount * 4)]);
+            }
+            catch
+            {
+                created.Dispose();
+                throw;
+            }
         }
 
         public void Evaluate(int frame, float time, float frameRate, MmdMultiCharacterWorkerResult result)

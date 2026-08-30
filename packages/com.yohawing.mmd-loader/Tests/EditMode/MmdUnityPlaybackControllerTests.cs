@@ -572,6 +572,35 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void WebV081IkCompatibilityProfilePropagatesToNativePlayback()
+        {
+            MmdUnityPlaybackBinding? binding = null;
+            try
+            {
+                binding = CreatePlaybackBinding();
+                MmdUnityPlaybackController controller =
+                    binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+
+                Assert.That(controller.IkCompatibilityProfile, Is.EqualTo(MmdIkCompatibilityProfile.Mmd));
+                Assert.That(binding.IkCompatibilityProfile, Is.EqualTo(MmdIkCompatibilityProfile.Mmd));
+                Assert.That(
+                    () => controller.IkCompatibilityProfile = (MmdIkCompatibilityProfile)99,
+                    Throws.TypeOf<ArgumentOutOfRangeException>());
+
+                controller.IkCompatibilityProfile = MmdIkCompatibilityProfile.WebV081;
+                controller.Configure(binding, 30.0f);
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+
+                Assert.That(binding.IkCompatibilityProfile, Is.EqualTo(MmdIkCompatibilityProfile.WebV081));
+                Assert.DoesNotThrow(() => controller.ApplyFrame(1));
+            }
+            finally
+            {
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
+            }
+        }
+
+        [Test]
         public void BorrowedPlaybackNormalizesBuiltInOutlineOnActivationWithoutMutatingSource()
         {
             MmdPmxAsset? pmxAsset = null;

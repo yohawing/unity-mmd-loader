@@ -74,6 +74,7 @@ namespace Mmd.UnityIntegration
         [SerializeField] private MmdPhysicsMode physicsMode = MmdPhysicsMode.Live;
         [SerializeField] private int livePhysicsBodyDiagnosticsSampleInterval;
         [SerializeField] private int ikMaxIterationsCap;
+        [SerializeField] private MmdIkCompatibilityProfile ikCompatibilityProfile;
         [SerializeField] private MmdPmxAsset? modelAsset;
         [SerializeField] private MmdVmdAsset? motionAsset;
         [SerializeField] private string lastFastRuntimeReason = string.Empty;
@@ -255,6 +256,7 @@ namespace Mmd.UnityIntegration
             this.playOnStart = playOnStart;
             binding.LivePhysicsBodyDiagnosticsSampleInterval = livePhysicsBodyDiagnosticsSampleInterval;
             binding.IkMaxIterationsCap = ikMaxIterationsCap;
+            binding.IkCompatibilityProfile = ikCompatibilityProfile;
             binding.SetPhysicsMode(physicsMode);
             ResetLivePhysicsDriveSource();
             TimelinePoseEvaluationCount = 0;
@@ -432,6 +434,21 @@ namespace Mmd.UnityIntegration
             IsPlaying = true;
         }
 
+        public MmdIkCompatibilityProfile IkCompatibilityProfile
+        {
+            get => ikCompatibilityProfile;
+            set
+            {
+                MmdRuntimeSession.ValidateIkCompatibilityProfile(value);
+                if (ikCompatibilityProfile != value)
+                {
+                    ReleasePlaybackWorkerPool();
+                }
+                PropagateIkCompatibilityProfile(value);
+                ikCompatibilityProfile = value;
+            }
+        }
+
         public void Pause()
         {
             IsPlaying = false;
@@ -533,6 +550,14 @@ namespace Mmd.UnityIntegration
         {
             livePhysicsBodyDiagnosticsSampleInterval = Math.Max(0, livePhysicsBodyDiagnosticsSampleInterval);
             ikMaxIterationsCap = Math.Max(0, ikMaxIterationsCap);
+            try
+            {
+                MmdRuntimeSession.ValidateIkCompatibilityProfile(ikCompatibilityProfile);
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                ikCompatibilityProfile = MmdIkCompatibilityProfile.Mmd;
+            }
             if (IsHumanoidPhysicsOffIkCapUnsupported(ikMaxIterationsCap))
             {
                 Debug.LogError(
@@ -545,12 +570,14 @@ namespace Mmd.UnityIntegration
             {
                 binding.LivePhysicsBodyDiagnosticsSampleInterval = livePhysicsBodyDiagnosticsSampleInterval;
                 binding.IkMaxIterationsCap = ikMaxIterationsCap;
+                binding.IkCompatibilityProfile = ikCompatibilityProfile;
             }
 
             if (humanoidPhysicsBinding != null)
             {
                 humanoidPhysicsBinding.LivePhysicsBodyDiagnosticsSampleInterval = livePhysicsBodyDiagnosticsSampleInterval;
                 humanoidPhysicsBinding.IkMaxIterationsCap = ikMaxIterationsCap;
+                humanoidPhysicsBinding.IkCompatibilityProfile = ikCompatibilityProfile;
             }
 
             if (binding == null)
@@ -717,6 +744,19 @@ namespace Mmd.UnityIntegration
             if (humanoidPhysicsBinding != null)
             {
                 humanoidPhysicsBinding.IkMaxIterationsCap = ikMaxIterationsCap;
+            }
+        }
+
+        private void PropagateIkCompatibilityProfile(MmdIkCompatibilityProfile value)
+        {
+            if (binding != null)
+            {
+                binding.IkCompatibilityProfile = value;
+            }
+
+            if (humanoidPhysicsBinding != null)
+            {
+                humanoidPhysicsBinding.IkCompatibilityProfile = value;
             }
         }
 

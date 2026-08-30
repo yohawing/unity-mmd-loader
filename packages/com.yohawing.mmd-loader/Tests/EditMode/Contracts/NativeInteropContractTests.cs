@@ -1043,6 +1043,20 @@ namespace Mmd.Tests
             Assert.That(values[8], Is.EqualTo(1.0f).Within(0.0001f), "perspective");
         }
 
+        [Test]
+        public void RuntimeFfiCanSwitchIkCompatibilityProfiles()
+        {
+#if !UNITY_EDITOR_WIN
+            Assert.Ignore("mmd-runtime IK compatibility profiles are only distributed for the Windows Editor.");
+#endif
+            byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube.pmx");
+            byte[] vmdBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube_motion.vmd");
+            using var session = MmdRuntimeFfiPlaybackSession.Create(pmxBytes, vmdBytes);
+
+            Assert.DoesNotThrow(() => session.SetIkCompatibilityProfile(MmdIkCompatibilityProfile.WebV081));
+            Assert.DoesNotThrow(() => session.SetIkCompatibilityProfile(MmdIkCompatibilityProfile.Mmd));
+        }
+
         private static void AssertFramesAreSorted(System.Collections.Generic.IEnumerable<int> frames, string label)
         {
             int[] actual = frames.ToArray();
