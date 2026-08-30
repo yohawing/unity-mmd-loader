@@ -744,10 +744,8 @@ namespace Mmd.UnityIntegration
 
         public void Evaluate(int frame, float time, float frameRate, MmdMultiCharacterWorkerResult result)
         {
-            _ = time;
-            _ = frameRate;
             session!.EvaluateAndCopy(
-                frame,
+                time * frameRate,
                 result.WorldMatrices,
                 result.MorphWeights,
                 result.IkEnabled,

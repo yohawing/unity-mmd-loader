@@ -19,6 +19,15 @@ namespace Mmd.UnityIntegration
         private byte[]? fastRuntimePmxSourceDigest;
         private byte[]? fastRuntimeVmdSourceDigest;
         private long fastRuntimeSourceRevision;
+        private ReadOnlyMemory<float>? borrowedSourceWorldMatrices;
+
+        internal ReadOnlyMemory<float>? BorrowedSourceWorldMatrices =>
+            borrowedSourceWorldMatrices;
+
+        internal void ClearBorrowedSourceWorldMatrices()
+        {
+            borrowedSourceWorldMatrices = null;
+        }
 
         /// <summary>
         /// Opt-in fast runtime using the native mmd-runtime FFI library.
@@ -350,20 +359,23 @@ namespace Mmd.UnityIntegration
         private MmdPlaybackSnapshot ApplyFastFrame(int frame, float frameRate)
         {
             float time = MmdPlaybackTime.ToTime(frame, frameRate);
-            return ApplyFastCore(frame, time);
+            return ApplyFastCore(frame, time, frame);
         }
 
         private MmdPlaybackSnapshot ApplyFastTime(float time, float frameRate)
         {
             int frame = MmdPlaybackTime.ToFrame(time, frameRate);
-            return ApplyFastCore(frame, time);
+            return ApplyFastCore(frame, time, time * frameRate);
         }
 
-        private MmdPlaybackSnapshot ApplyFastCore(int frame, float time)
+        private MmdPlaybackSnapshot ApplyFastCore(
+            int frame,
+            float time,
+            float evaluationFrame)
         {
             MmdUnityFrameApplier.ValidateSupportedMorphPlayback(playbackInstance);
             fastSession!.EvaluateAndCopy(
-                frame,
+                evaluationFrame,
                 fastWorldMatrices!,
                 fastMorphWeights!,
                 fastIkEnabled!,
@@ -449,6 +461,7 @@ namespace Mmd.UnityIntegration
             float[] worldMatrices,
             float[] morphWeights)
         {
+            borrowedSourceWorldMatrices = worldMatrices;
             MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(
                 playbackInstance,
                 worldMatrices,

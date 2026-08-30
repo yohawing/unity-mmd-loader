@@ -134,6 +134,14 @@ namespace Mmd.UnityIntegration
         /// </summary>
         public event Action<MmdPlaybackSnapshot>? PoseApplied;
 
+        /// <summary>
+        /// Publishes the source-coordinate, column-major world-matrix buffer
+        /// after a background-evaluated pose is applied. The memory is reused
+        /// by the playback worker and is valid only for the duration of the
+        /// callback; consumers that retain it must copy it.
+        /// </summary>
+        public event Action<MmdPlaybackSnapshot, ReadOnlyMemory<float>>? SourcePoseApplied;
+
         public MmdTimelineSetupTimingSummary? LastTimelineSetupTiming { get; internal set; }
 
         public MmdLivePhysicsFrameDiagnostics? LastLivePhysicsDiagnostics =>
@@ -820,6 +828,7 @@ namespace Mmd.UnityIntegration
             bool poseWillBeApplied = true)
         {
             MmdPlaybackSnapshot snapshot;
+            binding?.ClearBorrowedSourceWorldMatrices();
             isApplyingPlaybackPose = true;
             try
             {
@@ -833,6 +842,20 @@ namespace Mmd.UnityIntegration
             if (!poseWillBeApplied)
             {
                 return snapshot;
+            }
+
+            ReadOnlyMemory<float>? sourceWorldMatrices =
+                binding?.BorrowedSourceWorldMatrices;
+            if (sourceWorldMatrices.HasValue)
+            {
+                try
+                {
+                    SourcePoseApplied?.Invoke(snapshot, sourceWorldMatrices.Value);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception, this);
+                }
             }
 
             try

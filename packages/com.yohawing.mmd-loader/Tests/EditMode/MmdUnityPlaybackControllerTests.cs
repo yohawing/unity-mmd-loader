@@ -9,6 +9,7 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.TestTools;
 using Mmd.Editor;
+using Mmd.Native;
 using Mmd.Parser;
 using Mmd.Physics;
 using Mmd.Rendering;
@@ -2444,6 +2445,10 @@ namespace Mmd.Tests
                 // ApplyTime random access requires explicit Off (Live does not support); arbitrary EditMode evaluation for fast snapshot test
                 controller.SetPhysicsMode(MmdPhysicsMode.Off);
 
+                float[]? sourcePose = null;
+                controller.SourcePoseApplied += (_, matrices) =>
+                    sourcePose = matrices.ToArray();
+
                 MmdPlaybackSnapshot snapshot = controller.ApplyTime(inputTime, frameRate);
 
                 Assert.That(snapshot.frame.frame, Is.EqualTo(10));
@@ -2454,6 +2459,21 @@ namespace Mmd.Tests
                 Assert.That(controller.LastFastRuntimeReason, Is.Empty);
                 // random-access ApplyTime forces Off; the native path returns a lightweight snapshot.
                 Assert.That(snapshot.frame.bones, Is.Empty);
+                Assert.That(sourcePose, Is.Not.Null);
+                using (var expectedSession = MmdRuntimeFfiPlaybackSession.Create(
+                    File.ReadAllBytes(pmxPath),
+                    File.ReadAllBytes(vmdPath)))
+                {
+                    var expectedWorld = new float[expectedSession.WorldMatrixFloatCount];
+                    var expectedMorphs = new float[expectedSession.MorphWeightCount];
+                    var expectedIk = new byte[expectedSession.IkEnabledCount];
+                    expectedSession.EvaluateAndCopy(
+                        inputTime * frameRate,
+                        expectedWorld,
+                        expectedMorphs,
+                        expectedIk);
+                    Assert.That(sourcePose, Is.EqualTo(expectedWorld));
+                }
             }
             finally
             {
