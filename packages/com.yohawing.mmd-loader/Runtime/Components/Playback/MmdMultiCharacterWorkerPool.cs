@@ -11,12 +11,49 @@ using Mmd.Physics;
 namespace Mmd.UnityIntegration
 {
     /// <summary>
+    /// The absolute evaluation request assigned to one fixed worker in a batch.
+    /// </summary>
+    internal readonly struct MmdMultiCharacterWorkerRequest
+    {
+        internal MmdMultiCharacterWorkerRequest(int frame, float time, float frameRate)
+        {
+            Frame = frame;
+            Time = time;
+            FrameRate = frameRate;
+        }
+
+        internal int Frame { get; }
+
+        internal float Time { get; }
+
+        internal float FrameRate { get; }
+
+        internal void Validate()
+        {
+            if (Frame < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(Frame));
+            }
+
+            if (!float.IsFinite(Time) || Time < 0.0f)
+            {
+                throw new ArgumentOutOfRangeException(nameof(Time));
+            }
+
+            if (!float.IsFinite(FrameRate) || FrameRate <= 0.0f)
+            {
+                throw new ArgumentOutOfRangeException(nameof(FrameRate));
+            }
+        }
+    }
+
+    /// <summary>
     /// A fixed set of long-lived workers. Each evaluator, its native session, and its output buffers
     /// belong to exactly one worker for the whole lifetime of the pool.
     /// </summary>
     internal sealed class MmdMultiCharacterWorkerPool : IDisposable
     {
-        private const int MinimumEvaluatorCount = 2;
+        private const int MinimumEvaluatorCount = 1;
         private const int MaximumEvaluatorCount = 4;
 
         internal interface IEvaluator : IDisposable
@@ -364,6 +401,45 @@ namespace Mmd.UnityIntegration
                 throw new ArgumentOutOfRangeException(nameof(frameRate));
             }
 
+            BeginEvaluateCore(
+                null,
+                new MmdMultiCharacterWorkerRequest(frame, frame / frameRate, frameRate));
+        }
+
+        internal void BeginEvaluate(IReadOnlyList<MmdMultiCharacterWorkerRequest> requests)
+        {
+            if (requests == null)
+            {
+                throw new ArgumentNullException(nameof(requests));
+            }
+
+            if (requests.Count != workers.Length)
+            {
+                throw new ArgumentException(
+                    $"Exactly {workers.Length} worker requests are required for this pool.",
+                    nameof(requests));
+            }
+
+            // Validate the complete batch before taking the lifecycle lock or signaling any
+            // worker. An invalid request therefore cannot leave a partial evaluation in flight.
+            for (int i = 0; i < requests.Count; i++)
+            {
+                requests[i].Validate();
+            }
+
+            BeginEvaluateCore(requests, default);
+        }
+
+        internal void BeginEvaluate(MmdMultiCharacterWorkerRequest request)
+        {
+            request.Validate();
+            BeginEvaluateCore(null, request);
+        }
+
+        private void BeginEvaluateCore(
+            IReadOnlyList<MmdMultiCharacterWorkerRequest>? requests,
+            MmdMultiCharacterWorkerRequest uniformRequest)
+        {
             lock (lifecycleLock)
             {
                 if (disposed)
@@ -378,12 +454,13 @@ namespace Mmd.UnityIntegration
                 }
 
                 evaluationInFlight = true;
-                float time = frame / frameRate;
                 try
                 {
                     for (int i = 0; i < workers.Length; i++)
                     {
-                        workers[i].Prepare(frame, time, frameRate);
+                        MmdMultiCharacterWorkerRequest request =
+                            requests == null ? uniformRequest : requests[i];
+                        workers[i].Prepare(request.Frame, request.Time, request.FrameRate);
                     }
                 }
                 catch
@@ -444,6 +521,12 @@ namespace Mmd.UnityIntegration
         internal void Evaluate(int frame, float frameRate)
         {
             BeginEvaluate(frame, frameRate);
+            CompleteEvaluate();
+        }
+
+        internal void Evaluate(IReadOnlyList<MmdMultiCharacterWorkerRequest> requests)
+        {
+            BeginEvaluate(requests);
             CompleteEvaluate();
         }
 
@@ -807,7 +890,7 @@ namespace Mmd.UnityIntegration
             long fanOutEnd = Stopwatch.GetTimestamp();
             result.RecordLivePhysicsEvaluation(
                 frame,
-                time,
+                MmdPlaybackTime.ToTime(frame, frameRate),
                 seed,
                 deltaTime,
                 diagnostics,

@@ -38,17 +38,26 @@ namespace Mmd.Tests.Contracts
         }
 
         [Test]
-        public void WorkerPoolRejectsSingleEvaluator()
+        public void SingleEvaluatorInitializesEvaluatesAndDisposesOnOwnerThread()
         {
             var evaluators = CreateEvaluators(1);
-            Assert.Throws<ArgumentException>(() =>
-                new MmdMultiCharacterWorkerPool(evaluators));
+            using (var pool = new MmdMultiCharacterWorkerPool(evaluators))
+            {
+                int[] workerIds = pool.WorkerManagedThreadIds;
+                Assert.That(workerIds, Has.Length.EqualTo(1));
+                Assert.That(workerIds[0], Is.EqualTo(evaluators[0].InitializeThreadId));
+
+                pool.Evaluate(12, 30.0f);
+                Assert.That(pool.GetResult(0).WorldMatrices[0], Is.EqualTo(12.0f));
+            }
+
+            Assert.That(evaluators[0].DisposedThreadId, Is.EqualTo(evaluators[0].InitializeThreadId));
         }
 
         [Test]
-        public void TwoToFourWorkersOverlapWithoutOverlappingOneWorkerState()
+        public void OneToFourWorkersOverlapWithoutOverlappingOneWorkerState()
         {
-            foreach (int count in new[] { 2, 3, 4 })
+            foreach (int count in new[] { 1, 2, 3, 4 })
             {
                 using var overlap = new Barrier(count);
                 var evaluators = CreateEvaluators(count, overlap);
@@ -60,6 +69,64 @@ namespace Mmd.Tests.Contracts
                 Assert.That(Maximum(evaluators, evaluator => evaluator.MaximumConcurrency), Is.EqualTo(1));
                 Assert.That(Maximum(evaluators, evaluator => evaluator.ObservedConcurrentWorkers), Is.EqualTo(count));
             }
+        }
+
+        [Test]
+        public void BatchRequestsDeliverDistinctAbsoluteFrameTimeAndRateValues()
+        {
+            using var overlap = new Barrier(3);
+            var evaluators = CreateEvaluators(3, overlap);
+            var requests = new[]
+            {
+                new MmdMultiCharacterWorkerRequest(3, 0.25f, 12.0f),
+                new MmdMultiCharacterWorkerRequest(17, 1.5f, 24.0f),
+                new MmdMultiCharacterWorkerRequest(5, 0.125f, 40.0f)
+            };
+
+            using (var pool = new MmdMultiCharacterWorkerPool(evaluators))
+            {
+                pool.BeginEvaluate(requests);
+                pool.CompleteEvaluate();
+
+                for (int i = 0; i < requests.Length; i++)
+                {
+                    Assert.That(evaluators[i].LastFrame, Is.EqualTo(requests[i].Frame));
+                    Assert.That(evaluators[i].LastTime, Is.EqualTo(requests[i].Time));
+                    Assert.That(evaluators[i].LastFrameRate, Is.EqualTo(requests[i].FrameRate));
+                    Assert.That(pool.GetResult(i).WorldMatrices[0], Is.EqualTo(requests[i].Frame));
+                }
+            }
+
+            Assert.That(Maximum(evaluators, evaluator => evaluator.ObservedConcurrentWorkers), Is.EqualTo(3));
+        }
+
+        [Test]
+        public void BatchRequestValidationFailsBeforeDispatchAndLeavesNoEvaluationInFlight()
+        {
+            var evaluators = CreateEvaluators(2);
+            using var pool = new MmdMultiCharacterWorkerPool(evaluators);
+
+            Assert.Throws<ArgumentException>(() => pool.BeginEvaluate(new[]
+            {
+                new MmdMultiCharacterWorkerRequest(1, 1.0f / 30.0f, 30.0f)
+            }));
+            Assert.That(evaluators[0].EvaluationCount, Is.EqualTo(0));
+            Assert.That(evaluators[1].EvaluationCount, Is.EqualTo(0));
+            Assert.Throws<InvalidOperationException>(() => pool.CompleteEvaluate());
+
+            var invalidRequests = new[]
+            {
+                new MmdMultiCharacterWorkerRequest(1, float.NaN, 30.0f),
+                new MmdMultiCharacterWorkerRequest(1, 1.0f / 30.0f, float.PositiveInfinity)
+            };
+            Assert.Throws<ArgumentOutOfRangeException>(() => pool.BeginEvaluate(invalidRequests));
+            Assert.That(evaluators[0].EvaluationCount, Is.EqualTo(0));
+            Assert.That(evaluators[1].EvaluationCount, Is.EqualTo(0));
+            Assert.Throws<InvalidOperationException>(() => pool.CompleteEvaluate());
+
+            Assert.DoesNotThrow(() => pool.Evaluate(2, 30.0f));
+            Assert.That(evaluators[0].EvaluationCount, Is.EqualTo(1));
+            Assert.That(evaluators[1].EvaluationCount, Is.EqualTo(1));
         }
 
         [Test]
@@ -176,75 +243,6 @@ namespace Mmd.Tests.Contracts
         }
 
         [Test]
-        public void GroupDoesNotClaimControllersFromAwake()
-        {
-            Assert.That(
-                typeof(MmdMultiCharacterPlaybackGroup).GetMethod(
-                    "Awake",
-                    BindingFlags.Instance | BindingFlags.NonPublic),
-                Is.Null);
-        }
-
-        [Test]
-        public void GroupUsesDefaultPlaybackUpdateExecutionOrder()
-        {
-            DefaultExecutionOrder? executionOrder = (DefaultExecutionOrder?)
-                Attribute.GetCustomAttribute(
-                    typeof(MmdMultiCharacterPlaybackGroup),
-                    typeof(DefaultExecutionOrder));
-
-            Assert.That(executionOrder, Is.Null);
-        }
-
-        [Test]
-        public void GroupWithoutControllersFailsClosed()
-        {
-            var root = new GameObject("empty-multi-character-group");
-            try
-            {
-                var group = root.AddComponent<MmdMultiCharacterPlaybackGroup>();
-                typeof(MmdMultiCharacterPlaybackGroup)
-                    .GetMethod("TryClaimControllers", BindingFlags.Instance | BindingFlags.NonPublic)!
-                    .Invoke(group, null);
-                Assert.That(group.IsPlaybackActive, Is.False);
-                Assert.That(group.LastFailureReason, Does.Contain("At least one"));
-            }
-            finally
-            {
-                Object.DestroyImmediate(root);
-            }
-        }
-
-        [Test]
-        public void ControllerCannotBeClaimedBySecondGroup()
-        {
-            var controllerRoot = new GameObject("claimed-controller");
-            var firstGroupRoot = new GameObject("first-group");
-            var secondGroupRoot = new GameObject("second-group");
-            try
-            {
-                var controller = controllerRoot.AddComponent<MmdUnityPlaybackController>();
-                var firstGroup = firstGroupRoot.AddComponent<MmdMultiCharacterPlaybackGroup>();
-                var secondGroup = secondGroupRoot.AddComponent<MmdMultiCharacterPlaybackGroup>();
-                controller.AssignMultiCharacterGroup(firstGroup);
-
-                Assert.That(
-                    controller.TryClaimMultiCharacterGroup(secondGroup, out string reason),
-                    Is.False);
-                Assert.That(reason, Does.Contain("another group"));
-                Assert.That(controller.IsMultiCharacterClaimed, Is.True);
-                controller.ReleaseMultiCharacterGroup(firstGroup);
-                Assert.That(controller.IsMultiCharacterClaimed, Is.False);
-            }
-            finally
-            {
-                Object.DestroyImmediate(controllerRoot);
-                Object.DestroyImmediate(firstGroupRoot);
-                Object.DestroyImmediate(secondGroupRoot);
-            }
-        }
-
-        [Test]
         public void MultiCharacterClockAdvanceCanBeRolledBackWithoutLosingFractionalState()
         {
             var root = new GameObject("multi-character-clock");
@@ -283,32 +281,6 @@ namespace Mmd.Tests.Contracts
                         Is.EqualTo(expectedFrame),
                         $"Clock frame advanced incorrectly at iteration={iteration}.");
                 }
-            }
-            finally
-            {
-                Object.DestroyImmediate(root);
-            }
-        }
-
-        [Test]
-        public void GroupWithInsufficientSourceConfigurationFailsClosed()
-        {
-            var root = new GameObject("source-gated-group");
-            var first = new GameObject("first-controller");
-            var second = new GameObject("second-controller");
-            first.transform.SetParent(root.transform);
-            second.transform.SetParent(root.transform);
-            try
-            {
-                first.AddComponent<MmdUnityPlaybackController>();
-                second.AddComponent<MmdUnityPlaybackController>();
-                var group = root.AddComponent<MmdMultiCharacterPlaybackGroup>();
-                typeof(MmdMultiCharacterPlaybackGroup)
-                    .GetMethod("TryClaimControllers", BindingFlags.Instance | BindingFlags.NonPublic)!
-                    .Invoke(group, null);
-
-                Assert.That(group.IsPlaybackActive, Is.False);
-                Assert.That(group.LastFailureReason, Does.Contain("controller-owned PMX and VMD"));
             }
             finally
             {
@@ -677,6 +649,12 @@ namespace Mmd.Tests.Contracts
 
             internal int EvaluationCount => Volatile.Read(ref evaluationCount);
 
+            internal int LastFrame { get; private set; } = -1;
+
+            internal float LastTime { get; private set; }
+
+            internal float LastFrameRate { get; private set; }
+
             internal bool ThrowOnEvaluate { get; set; }
 
             internal bool ThrowOnDispose { get; set; }
@@ -702,8 +680,9 @@ namespace Mmd.Tests.Contracts
 
             public void Evaluate(int frame, float time, float frameRate, MmdMultiCharacterWorkerResult result)
             {
-                _ = frameRate;
-                _ = time;
+                LastFrame = frame;
+                LastTime = time;
+                LastFrameRate = frameRate;
                 Interlocked.Increment(ref evaluationCount);
                 int current = Interlocked.Increment(ref currentConcurrency);
                 MaximumConcurrency = Math.Max(MaximumConcurrency, current);

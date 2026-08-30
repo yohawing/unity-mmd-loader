@@ -4,6 +4,41 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-29
+
+### Added
+
+- Added a main-thread `PoseApplied` event after a playback route successfully applies a new pose.
+
+### Changed
+
+- Improved standalone Physics Off and Live performance in Play Mode, including scenes with multiple models.
+- Improved Physics Off Timeline performance across multiple tracks and Playable Directors.
+- Removed the manual `MmdMultiCharacterPlaybackGroup` setup; multi-model playback is now optimized automatically.
+- Isolated background evaluation failures per controller, with clock rollback and retry on PMX/VMD reassignment, controller reconfiguration, explicit fast-runtime re-enable, or component re-enable.
+- Consolidated PMX/VMD playback caches, source transactions, native setup, retry, and cleanup ownership so stale preload results are rejected and failed preloads remain retryable.
+- Hardened project-relative model, texture, and MME normal-map resolution against escaped or junction-based paths while preserving custom material targets, mapper keywords, and compatible legacy material fallback.
+- Updated the packaged Windows native runtime and `native/mmd-anim` pin to `mmd-anim` remote `main` commit `4a6334b` (v0.4.3 plus tooling-only follow-up commits), retaining runtime ABI version 3 and adopting the MMD-compatible IK rollback and bounded extreme-PMX effective-mass fixes.
+- Strengthened local and GitHub release evidence to reject zero-test, incomplete, or unapproved skipped-test results, and pinned a deterministic C# whitespace baseline.
+
+### Fixed
+
+- Fixed parallel playback clocks so fixed-step playback advances through consecutive logical frames without duplicate/compensating-skip transitions.
+- Fixed fractional standalone playback time being truncated after background evaluation, preserving 30 fps motion under 60 Hz updates.
+- Fixed parallel playback poses being applied after the expected Unity `Update` phase, preserving same-frame consumers and pose notifications.
+- Fixed stale PMX descriptors and VMD snapshots after source replacement, pending cleanup retry, playback-frame seed rollback, and Humanoid Timeline target cleanup.
+- Fixed material-profile provenance and custom material state propagation across playback setup and material reapplication.
+
+### Known Limitations
+
+- Runtime evaluation requires the bundled native runtime; unavailable or incompatible native paths report diagnostics and do not fall back to the removed managed evaluator.
+- macOS and Linux native binaries are not distributed in the package.
+- Timeline random access keeps physics off; Live physics is limited to Play Mode forward playback.
+- Raw VMD Timeline clips use deterministic hard-cut selection rather than weighted blending.
+- Humanoid bake does not include Live physics, facial morphs, or native MMD IK/helper behavior.
+- Automatic multi-model optimization requires controller-owned PMX/VMD sources. The Timeline performance improvement currently applies to Physics Off; Timeline Live Physics and Humanoid retarget input retain their existing behavior.
+- The Unity Toon Shader adapter remains optional and conservative; it falls back to MMD Toon when UTS is absent or its shader schema is unsupported.
+
 ## [0.4.1] - 2026-08-12
 
 ### Added

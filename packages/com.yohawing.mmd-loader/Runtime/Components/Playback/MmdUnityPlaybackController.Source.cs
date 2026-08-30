@@ -14,7 +14,7 @@ namespace Mmd.UnityIntegration
     {
         public void ConfigureModelAsset(MmdPmxAsset pmxAsset)
         {
-            ThrowIfMultiCharacterPoolOwnsController(nameof(ConfigureModelAsset));
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             if (pmxAsset == null)
             {
                 throw new ArgumentNullException(nameof(pmxAsset));
@@ -29,19 +29,21 @@ namespace Mmd.UnityIntegration
             }
 
             modelAsset = pmxAsset;
+            standaloneWorkerFaulted = false;
             _ = pmxAsset.BeginSynchronousPlaybackPreload(
                 MmdUnityPlaybackBinding.ResolveMaterialPreset(pmxAsset));
         }
 
         public void ConfigureMotionAsset(MmdVmdAsset vmdAsset)
         {
-            ThrowIfMultiCharacterPoolOwnsController(nameof(ConfigureMotionAsset));
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             if (vmdAsset == null)
             {
                 throw new ArgumentNullException(nameof(vmdAsset));
             }
 
             motionAsset = vmdAsset;
+            standaloneWorkerFaulted = false;
         }
 
         public void ConfigureFromPlaybackSource(MmdPmxAsset pmxAsset, MmdVmdAsset vmdAsset, MmdPlaybackConfig config)

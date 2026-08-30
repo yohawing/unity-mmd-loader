@@ -2272,8 +2272,19 @@ namespace Mmd.Tests
                 Assert.That(controller.ModelAssetSource, Is.SameAs(pmxAssetForSource));
                 Assert.That(controller.MotionAssetSource, Is.SameAs(vmdAsset));
 
-                // Exercise the split path in TryEnableFastRuntimeFromConfiguredSource.
-                _ = controller.TryEnableFastRuntimeFromConfiguredSource(out _);
+                LogAssert.Expect(
+                    LogType.Warning,
+                    "Standalone native worker playback faulted and was disabled for this controller: forced test fault");
+                controller.HandleStandaloneWorkerPreparationFailure("forced test fault");
+                Assert.That(controller.IsStandaloneWorkerFaulted, Is.True);
+
+                // Exercise the asset-source branch and prove an explicit successful re-enable is
+                // also the retry boundary for a faulted automatic worker.
+                Assert.That(
+                    controller.TryEnableFastRuntimeFromConfiguredSource(out string retryReason),
+                    Is.True,
+                    retryReason);
+                Assert.That(controller.IsStandaloneWorkerFaulted, Is.False);
             }
             finally
             {

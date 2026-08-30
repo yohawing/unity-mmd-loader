@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Security.Cryptography;
 using Mmd.Motion;
 using Mmd.Native;
 using Mmd.Parser;
@@ -12,6 +13,13 @@ namespace Mmd.UnityIntegration
 {
     public sealed partial class MmdUnityPlaybackBinding
     {
+        // Keep only digests for the bytes that built the active native session. The
+        // caller-owned source arrays must not be retained: Timeline worker creation can
+        // compare the provider source without making the binding a second source owner.
+        private byte[]? fastRuntimePmxSourceDigest;
+        private byte[]? fastRuntimeVmdSourceDigest;
+        private long fastRuntimeSourceRevision;
+
         /// <summary>
         /// Opt-in fast runtime using the native mmd-runtime FFI library.
         /// Affects <see cref="ApplyFrame"/> in animation-only playback and the animation pose stage of Live physics playback.
@@ -121,11 +129,15 @@ namespace Mmd.UnityIntegration
                 byte[] ikEnabled = new byte[created.IkEnabledCount];
                 float[] lastAppliedMorphWeights = new float[fastMorphIndices.Length];
                 MmdEvaluatedFrame? morphFrame = BuildFastMorphFrame(morphWeights);
+                byte[] pmxSourceDigest = ComputeFastRuntimeSourceDigest(pmxBytes);
+                byte[] vmdSourceDigest = ComputeFastRuntimeSourceDigest(vmdBytes);
 
                 fastSession = created;
                 fastWorldMatrices = worldMatrices;
                 fastMorphWeights = morphWeights;
                 fastIkEnabled = ikEnabled;
+                fastRuntimePmxSourceDigest = pmxSourceDigest;
+                fastRuntimeVmdSourceDigest = vmdSourceDigest;
                 fastLastAppliedMorphWeights = lastAppliedMorphWeights;
                 fastMorphFrame = morphFrame;
                 fastMorphApplied = false;
@@ -184,6 +196,54 @@ namespace Mmd.UnityIntegration
 
         internal bool HasFastRuntimeBatch => fastSession != null;
 
+        internal long FastRuntimeSourceRevision => fastRuntimeSourceRevision;
+
+        /// <summary>
+        /// Confirms that the active native session was created from the exact provider bytes.
+        /// This is intentionally internal: arbitrary public fast-runtime replacement remains
+        /// supported, while Timeline worker reuse must fail closed for a different source.
+        /// </summary>
+        internal bool TryMatchFastRuntimeSources(
+            byte[] pmxBytes,
+            byte[] vmdBytes,
+            out string reason)
+        {
+            if (pmxBytes == null || pmxBytes.Length == 0)
+            {
+                reason = "Provider PMX source bytes are empty.";
+                return false;
+            }
+
+            if (vmdBytes == null || vmdBytes.Length == 0)
+            {
+                reason = "Provider VMD source bytes are empty.";
+                return false;
+            }
+
+            if (fastSession == null ||
+                fastRuntimePmxSourceDigest == null ||
+                fastRuntimeVmdSourceDigest == null)
+            {
+                reason = "The active fast-runtime binding has no tracked source identity.";
+                return false;
+            }
+
+            if (!FastRuntimeSourceDigestEquals(fastRuntimePmxSourceDigest, pmxBytes))
+            {
+                reason = "The active fast-runtime PMX source differs from the provider source.";
+                return false;
+            }
+
+            if (!FastRuntimeSourceDigestEquals(fastRuntimeVmdSourceDigest, vmdBytes))
+            {
+                reason = "The active fast-runtime VMD source differs from the provider source.";
+                return false;
+            }
+
+            reason = string.Empty;
+            return true;
+        }
+
         internal int FastRuntimeWorldMatrixFloatCount => fastSession?.WorldMatrixFloatCount ?? 0;
 
         internal int FastRuntimeMorphWeightCount => fastSession?.MorphWeightCount ?? 0;
@@ -231,6 +291,9 @@ namespace Mmd.UnityIntegration
 
         private void DisposeFastRuntime()
         {
+            fastRuntimeSourceRevision++;
+            fastRuntimePmxSourceDigest = null;
+            fastRuntimeVmdSourceDigest = null;
             if (physicsMode == MmdPhysicsMode.Live && !nativeHumanoidHostPoseEnabled)
             {
                 ResetLivePhysicsState();
@@ -246,6 +309,31 @@ namespace Mmd.UnityIntegration
             fastMorphApplied = false;
             fastMorphCacheValid = false;
             fastSnapshot = null;
+        }
+
+        private static byte[] ComputeFastRuntimeSourceDigest(byte[] sourceBytes)
+        {
+            using SHA256 sha256 = SHA256.Create();
+            return sha256.ComputeHash(sourceBytes);
+        }
+
+        private static bool FastRuntimeSourceDigestEquals(byte[] expectedDigest, byte[] sourceBytes)
+        {
+            byte[] actualDigest = ComputeFastRuntimeSourceDigest(sourceBytes);
+            if (expectedDigest.Length != actualDigest.Length)
+            {
+                return false;
+            }
+
+            for (int index = 0; index < expectedDigest.Length; index++)
+            {
+                if (expectedDigest[index] != actualDigest[index])
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private void InvalidateFastMorphCache()
@@ -294,13 +382,28 @@ namespace Mmd.UnityIntegration
             float[] worldMatrices,
             float[] morphWeights)
         {
+            return ApplyPreparedFastFrame(
+                frame,
+                frameRate,
+                MmdPlaybackTime.ToTime(frame, frameRate),
+                worldMatrices,
+                morphWeights);
+        }
+
+        internal MmdPlaybackSnapshot ApplyPreparedFastFrame(
+            int frame,
+            float frameRate,
+            float sourceTime,
+            float[] worldMatrices,
+            float[] morphWeights)
+        {
             MmdPlaybackTime.ValidateFrame(frame);
             MmdPlaybackTime.ValidateFrameRate(frameRate);
+            MmdPlaybackTime.ValidateTime(sourceTime);
             EnsureBorrowedMutationActive();
             ValidatePreparedFastFrame(worldMatrices, morphWeights);
 
-            float time = MmdPlaybackTime.ToTime(frame, frameRate);
-            return ApplyPreparedFastCore(frame, time, worldMatrices, morphWeights);
+            return ApplyPreparedFastCore(frame, sourceTime, worldMatrices, morphWeights);
         }
 
         private void ValidatePreparedFastFrame(
