@@ -350,20 +350,23 @@ namespace Mmd.UnityIntegration
         private MmdPlaybackSnapshot ApplyFastFrame(int frame, float frameRate)
         {
             float time = MmdPlaybackTime.ToTime(frame, frameRate);
-            return ApplyFastCore(frame, time);
+            return ApplyFastCore(frame, time, frame);
         }
 
         private MmdPlaybackSnapshot ApplyFastTime(float time, float frameRate)
         {
             int frame = MmdPlaybackTime.ToFrame(time, frameRate);
-            return ApplyFastCore(frame, time);
+            return ApplyFastCore(frame, time, time * frameRate);
         }
 
-        private MmdPlaybackSnapshot ApplyFastCore(int frame, float time)
+        private MmdPlaybackSnapshot ApplyFastCore(
+            int frame,
+            float time,
+            float evaluationFrame)
         {
             MmdUnityFrameApplier.ValidateSupportedMorphPlayback(playbackInstance);
             fastSession!.EvaluateAndCopy(
-                frame,
+                evaluationFrame,
                 fastWorldMatrices!,
                 fastMorphWeights!,
                 fastIkEnabled!,

@@ -9,6 +9,7 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.TestTools;
 using Mmd.Editor;
+using Mmd.Native;
 using Mmd.Parser;
 using Mmd.Physics;
 using Mmd.Rendering;
@@ -2445,6 +2446,8 @@ namespace Mmd.Tests
                 controller.SetPhysicsMode(MmdPhysicsMode.Off);
 
                 MmdPlaybackSnapshot snapshot = controller.ApplyTime(inputTime, frameRate);
+                Vector3 actualPosition = instance.BoneTransforms[0].position;
+                Quaternion actualRotation = instance.BoneTransforms[0].rotation;
 
                 Assert.That(snapshot.frame.frame, Is.EqualTo(10));
                 Assert.That(snapshot.frame.time, Is.EqualTo(inputTime).Within(0.00001f));
@@ -2454,6 +2457,44 @@ namespace Mmd.Tests
                 Assert.That(controller.LastFastRuntimeReason, Is.Empty);
                 // random-access ApplyTime forces Off; the native path returns a lightweight snapshot.
                 Assert.That(snapshot.frame.bones, Is.Empty);
+                using (var expectedSession = MmdRuntimeFfiPlaybackSession.Create(
+                    File.ReadAllBytes(pmxPath),
+                    File.ReadAllBytes(vmdPath)))
+                {
+                    var expectedWorld = new float[expectedSession.WorldMatrixFloatCount];
+                    var expectedMorphs = new float[expectedSession.MorphWeightCount];
+                    var expectedIk = new byte[expectedSession.IkEnabledCount];
+                    expectedSession.EvaluateAndCopy(
+                        inputTime * frameRate,
+                        expectedWorld,
+                        expectedMorphs,
+                        expectedIk);
+                    MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(
+                        instance,
+                        expectedWorld);
+                    Vector3 expectedPosition = instance.BoneTransforms[0].position;
+                    Quaternion expectedRotation = instance.BoneTransforms[0].rotation;
+
+                    expectedSession.EvaluateAndCopy(
+                        snapshot.frame.frame,
+                        expectedWorld,
+                        expectedMorphs,
+                        expectedIk);
+                    MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(
+                        instance,
+                        expectedWorld);
+                    float integerFrameDifference =
+                        Vector3.Distance(expectedPosition, instance.BoneTransforms[0].position) +
+                        Quaternion.Angle(expectedRotation, instance.BoneTransforms[0].rotation);
+
+                    Assert.That(integerFrameDifference, Is.GreaterThan(0.0001f));
+                    Assert.That(
+                        Vector3.Distance(actualPosition, expectedPosition),
+                        Is.LessThan(0.0001f));
+                    Assert.That(
+                        Quaternion.Angle(actualRotation, expectedRotation),
+                        Is.LessThan(0.0001f));
+                }
             }
             finally
             {

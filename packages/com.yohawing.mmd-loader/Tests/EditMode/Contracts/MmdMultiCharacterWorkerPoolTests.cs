@@ -101,6 +101,54 @@ namespace Mmd.Tests.Contracts
         }
 
         [Test]
+        public void NativeWorkerEvaluatesFractionalBatchTime()
+        {
+            byte[] pmxBytes = File.ReadAllBytes(ResolveFixture("test_1bone_cube.pmx"));
+            byte[] vmdBytes = File.ReadAllBytes(ResolveFixture("test_1bone_cube_motion.vmd"));
+            const float frameRate = 30.0f;
+            const float evaluationFrame = 10.25f;
+            var request = new MmdMultiCharacterWorkerRequest(
+                frame: 10,
+                time: evaluationFrame / frameRate,
+                frameRate: frameRate);
+
+            using var serial = MmdRuntimeFfiPlaybackSession.Create(pmxBytes, vmdBytes);
+            var expectedWorld = new float[serial.WorldMatrixFloatCount];
+            var expectedMorphs = new float[serial.MorphWeightCount];
+            var expectedIk = new byte[serial.IkEnabledCount];
+            serial.EvaluateAndCopy(
+                evaluationFrame,
+                expectedWorld,
+                expectedMorphs,
+                expectedIk);
+
+            var integerWorld = new float[serial.WorldMatrixFloatCount];
+            var integerMorphs = new float[serial.MorphWeightCount];
+            var integerIk = new byte[serial.IkEnabledCount];
+            serial.EvaluateAndCopy(
+                request.Frame,
+                integerWorld,
+                integerMorphs,
+                integerIk);
+            CollectionAssert.AreNotEqual(expectedWorld, integerWorld);
+
+            var evaluators = new List<MmdMultiCharacterWorkerPool.IEvaluator>
+            {
+                new MmdNativeMultiCharacterWorker(
+                    (byte[])pmxBytes.Clone(),
+                    (byte[])vmdBytes.Clone(),
+                    0)
+            };
+            using var pool = new MmdMultiCharacterWorkerPool(evaluators);
+            pool.Evaluate(new[] { request });
+
+            MmdMultiCharacterWorkerResult actual = pool.GetResult(0);
+            AssertFloatBitsEqual(expectedWorld, actual.WorldMatrices, "world matrix", request.Frame, 0);
+            AssertFloatBitsEqual(expectedMorphs, actual.MorphWeights, "morph", request.Frame, 0);
+            CollectionAssert.AreEqual(expectedIk, actual.IkEnabled);
+        }
+
+        [Test]
         public void BatchRequestValidationFailsBeforeDispatchAndLeavesNoEvaluationInFlight()
         {
             var evaluators = CreateEvaluators(2);
