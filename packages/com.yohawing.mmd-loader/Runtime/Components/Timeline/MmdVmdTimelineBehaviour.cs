@@ -81,7 +81,74 @@ namespace Mmd.Timeline
             // boundary is the contract. Held/paused frames are a no-op because ApplyLivePhysicsForwardFrame
             // returns the cached snapshot when the frame does not advance.
             bool runLivePhysics = Application.isPlaying;
+            if (runLivePhysics && TryQueueTimelineWorkerEvaluation(target, playable.GetTime()))
+            {
+                return;
+            }
+
             EvaluateAtLocalTime(target, playable.GetTime(), runLivePhysics);
+        }
+
+        private bool TryQueueTimelineWorkerEvaluation(
+            MmdUnityPlaybackController target,
+            double localTime)
+        {
+            if (!MmdTimelineWorkerBatchScheduler.IsCollectionWindowActive ||
+                target.PhysicsMode != MmdPhysicsMode.Off)
+            {
+                return false;
+            }
+
+            if (double.IsNaN(localTime) || double.IsInfinity(localTime) || localTime < 0.0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(localTime),
+                    "Timeline local time must be a non-negative finite value.");
+            }
+
+            MmdPlaybackTime.ValidateFrameRate(FrameRate);
+            MmdPlaybackTime.ValidateTime(StartOffsetSeconds);
+            if (MotionAsset != null && string.IsNullOrWhiteSpace(MotionSourceId))
+            {
+                MotionSourceId = string.IsNullOrWhiteSpace(MotionAsset.SourceId) ? MotionAsset.name : MotionAsset.SourceId;
+            }
+
+            double sourceTime = localTime + StartOffsetSeconds;
+            if (sourceTime > float.MaxValue)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(localTime),
+                    "Timeline local time is too large for playback evaluation.");
+            }
+
+            if (!TryConfigureTimelineTarget(target, setupTiming: null))
+            {
+                throw new InvalidOperationException(
+                    "Timeline target playback controller is not configured and has no provider-owned PMX/VMD source.");
+            }
+
+            if (!target.TryGetOrCreateTimelineWorkerPool(
+                    out MmdMultiCharacterWorkerPool pool,
+                    out _))
+            {
+                // Native fast runtime or controller compatibility may be unavailable. Preserve
+                // the existing synchronous path in that case.
+                return false;
+            }
+
+            float sourceTimeValue = (float)sourceTime;
+            var request = new MmdMultiCharacterWorkerRequest(
+                MmdPlaybackTime.ToFrame(sourceTimeValue, FrameRate),
+                sourceTimeValue,
+                FrameRate);
+            MmdTimelineWorkerQueueResult queueResult = MmdTimelineWorkerBatchScheduler.TryEnqueue(
+                target,
+                pool,
+                request,
+                target.ConfigurationRevision,
+                out _);
+            return queueResult == MmdTimelineWorkerQueueResult.Queued ||
+                   queueResult == MmdTimelineWorkerQueueResult.Rejected;
         }
 
         internal bool TryPrepareTimelinePlayback(object playerData)

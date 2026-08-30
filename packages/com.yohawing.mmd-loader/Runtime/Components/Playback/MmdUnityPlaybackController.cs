@@ -235,6 +235,7 @@ namespace Mmd.UnityIntegration
 
             MmdPlaybackTime.ValidateFrameRate(playbackFrameRate);
             ValidatePhysicsModeForSerialization();
+            ReleaseTimelineWorkerPool();
             DisposeHumanoidHostPoseSession();
             if (binding != null && !ReferenceEquals(binding, playbackBinding))
             {
@@ -286,6 +287,10 @@ namespace Mmd.UnityIntegration
                 ThrowIfMultiCharacterPoolOwnsController(nameof(IkMaxIterationsCap));
                 ValidateIkMaxIterationsCap(value);
                 ValidateHumanoidPhysicsOffIkCap(value);
+                if (ikMaxIterationsCap != value)
+                {
+                    ReleaseTimelineWorkerPool();
+                }
                 ikMaxIterationsCap = value;
                 PropagateIkMaxIterationsCap();
             }
@@ -299,6 +304,10 @@ namespace Mmd.UnityIntegration
                 ValidateHumanoidPhysicsOffIkCap(ikMaxIterationsCap, mode);
             }
             MmdPhysicsMode previousMode = physicsMode;
+            if (mode != previousMode)
+            {
+                ReleaseTimelineWorkerPool();
+            }
             if (mode != MmdPhysicsMode.Off)
             {
                 DisposeHumanoidHostPoseSession();
@@ -610,11 +619,13 @@ namespace Mmd.UnityIntegration
                 ReleaseMultiCharacterGroup(multiCharacterGroup);
             }
 
+            ReleaseTimelineWorkerPool();
             ReleasePlaybackResources();
         }
 
         internal void ReleasePlaybackResources()
         {
+            ReleaseTimelineWorkerPool();
             DisposeHumanoidPhysicsBinding();
             DisposeHumanoidHostPoseSession();
             binding?.Dispose();
@@ -626,6 +637,7 @@ namespace Mmd.UnityIntegration
         private void OnDisable()
         {
             MmdMultiCharacterPlaybackGroup.NotifyControllerUnavailable(this);
+            ReleaseTimelineWorkerPool();
             DisposeHumanoidPhysicsBinding();
             DisposeHumanoidHostPoseSession();
         }

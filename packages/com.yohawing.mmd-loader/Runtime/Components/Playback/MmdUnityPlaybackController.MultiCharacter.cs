@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using System.Collections.Generic;
 using Mmd;
 using Mmd.Parser;
 
@@ -10,6 +11,9 @@ namespace Mmd.UnityIntegration
     {
         private MmdMultiCharacterPlaybackGroup? multiCharacterGroup;
         private bool multiCharacterClaimed;
+        private MmdMultiCharacterWorkerPool? timelineWorkerPool;
+        private int timelineWorkerPoolConfigurationRevision = -1;
+        private long timelineWorkerPoolFastRuntimeSourceRevision = -1;
 
         internal bool IsMultiCharacterClaimed => multiCharacterClaimed;
 
@@ -17,6 +21,79 @@ namespace Mmd.UnityIntegration
             proxyRoot != null && humanoidRetargetEntries != null && humanoidRetargetEntries.Count > 0;
 
         internal MmdMultiCharacterPlaybackGroup? MultiCharacterGroup => multiCharacterGroup;
+
+        internal bool TryGetOrCreateTimelineWorkerPool(
+            out MmdMultiCharacterWorkerPool pool,
+            out string reason)
+        {
+            pool = null!;
+            if (PhysicsMode != Mmd.Physics.MmdPhysicsMode.Off)
+            {
+                reason = "Timeline worker playback requires Physics Mode Off.";
+                return false;
+            }
+
+            if (!TryValidateMultiCharacterState(out reason))
+            {
+                return false;
+            }
+
+            if (timelineWorkerPool != null &&
+                timelineWorkerPoolConfigurationRevision == ConfigurationRevision &&
+                binding != null &&
+                timelineWorkerPoolFastRuntimeSourceRevision == binding.FastRuntimeSourceRevision)
+            {
+                pool = timelineWorkerPool;
+                return true;
+            }
+
+            ReleaseTimelineWorkerPool();
+            if (!TryGetMultiCharacterSource(out byte[] pmxBytes, out byte[] vmdBytes, out reason))
+            {
+                return false;
+            }
+
+            string sourceReason = string.Empty;
+            if (binding == null || !binding.TryMatchFastRuntimeSources(pmxBytes, vmdBytes, out sourceReason))
+            {
+                reason = string.IsNullOrEmpty(sourceReason)
+                    ? "Timeline worker source does not match the active fast-runtime binding source."
+                    : "Timeline worker source does not match the active fast-runtime binding source: " + sourceReason;
+                return false;
+            }
+
+            try
+            {
+                var evaluators = new List<MmdMultiCharacterWorkerPool.IEvaluator>(1)
+                {
+                    new MmdNativeMultiCharacterWorker(
+                        pmxBytes,
+                        vmdBytes,
+                        (uint)ikMaxIterationsCap)
+                };
+                timelineWorkerPool = new MmdMultiCharacterWorkerPool(evaluators);
+                timelineWorkerPoolConfigurationRevision = ConfigurationRevision;
+                timelineWorkerPoolFastRuntimeSourceRevision = binding.FastRuntimeSourceRevision;
+                pool = timelineWorkerPool;
+                reason = string.Empty;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                reason = exception.GetType().Name + ": " + exception.Message;
+                ReleaseTimelineWorkerPool();
+                return false;
+            }
+        }
+
+        internal void ReleaseTimelineWorkerPool()
+        {
+            MmdMultiCharacterWorkerPool? pool = timelineWorkerPool;
+            timelineWorkerPool = null;
+            timelineWorkerPoolConfigurationRevision = -1;
+            timelineWorkerPoolFastRuntimeSourceRevision = -1;
+            pool?.Dispose();
+        }
 
         internal MmdModelDefinition? MultiCharacterModelDefinition => binding?.ManagedModelDefinition;
 
@@ -235,6 +312,47 @@ namespace Mmd.UnityIntegration
             return true;
         }
 
+        internal bool TryValidateTimelineWorkerApply(
+            int frame,
+            float sourceTime,
+            float frameRate,
+            int expectedConfigurationRevision,
+            MmdMultiCharacterWorkerResult result,
+            out string reason)
+        {
+            if (!isActiveAndEnabled)
+            {
+                reason = "Timeline worker result target is disabled.";
+                return false;
+            }
+
+            if (ConfigurationRevision != expectedConfigurationRevision)
+            {
+                reason = "Timeline worker result belongs to an older controller configuration.";
+                return false;
+            }
+
+            if (PhysicsMode != Mmd.Physics.MmdPhysicsMode.Off)
+            {
+                reason = "Timeline worker result requires Physics Mode Off.";
+                return false;
+            }
+
+            try
+            {
+                MmdPlaybackTime.ValidateFrame(frame);
+                MmdPlaybackTime.ValidateTime(sourceTime);
+                MmdPlaybackTime.ValidateFrameRate(frameRate);
+            }
+            catch (Exception exception)
+            {
+                reason = exception.GetType().Name + ": " + exception.Message;
+                return false;
+            }
+
+            return TryValidateMultiCharacterPreparedApply(result, out reason);
+        }
+
         internal bool TryValidateMultiCharacterState(out string reason)
         {
             if (HasMultiCharacterHumanoidInputs)
@@ -270,6 +388,19 @@ namespace Mmd.UnityIntegration
             float frameRate,
             MmdMultiCharacterWorkerResult result)
         {
+            return ApplyPreparedMultiCharacterFrame(
+                frame,
+                MmdPlaybackTime.ToTime(frame, frameRate),
+                frameRate,
+                result);
+        }
+
+        internal MmdPlaybackSnapshot ApplyPreparedMultiCharacterFrame(
+            int frame,
+            float sourceTime,
+            float frameRate,
+            MmdMultiCharacterWorkerResult result)
+        {
             if (result == null)
             {
                 throw new ArgumentNullException(nameof(result));
@@ -281,6 +412,10 @@ namespace Mmd.UnityIntegration
                     "Playback controller must be configured before applying a prepared frame.");
             }
 
+            MmdPlaybackTime.ValidateFrame(frame);
+            MmdPlaybackTime.ValidateTime(sourceTime);
+            MmdPlaybackTime.ValidateFrameRate(frameRate);
+            playbackFrame = sourceTime * frameRate;
             CurrentFrame = frame;
             bool poseWillBeApplied = PhysicsMode != Mmd.Physics.MmdPhysicsMode.Live ||
                 !binding.CanReuseLivePhysicsSeed(frame);
@@ -288,7 +423,12 @@ namespace Mmd.UnityIntegration
             {
                 LastSnapshot = PhysicsMode == Mmd.Physics.MmdPhysicsMode.Live
                     ? binding.ApplyPreparedMultiCharacterLiveFrame(frame, frameRate, result)
-                    : binding.ApplyPreparedFastFrame(frame, frameRate, result.WorldMatrices, result.MorphWeights);
+                    : binding.ApplyPreparedFastFrame(
+                        frame,
+                        frameRate,
+                        sourceTime,
+                        result.WorldMatrices,
+                        result.MorphWeights);
                 return LastSnapshot;
             }, poseWillBeApplied);
         }

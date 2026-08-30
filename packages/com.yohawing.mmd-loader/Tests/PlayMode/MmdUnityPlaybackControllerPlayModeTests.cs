@@ -2105,6 +2105,344 @@ namespace Mmd.Tests
         }
 
         [UnityTest]
+        public IEnumerator AutomaticTimelineWorkerBatchAppliesTwoControllersBeforeLateUpdate()
+        {
+            MmdPmxAsset? modelAsset = null;
+            MmdVmdAsset? motionAsset = null;
+            MmdUnityPlaybackBinding? firstBinding = null;
+            MmdUnityPlaybackBinding? secondBinding = null;
+            TimelineAsset? timelineAsset = null;
+            GameObject? directorObject = null;
+            TimelineWorkerLateUpdateObservation? firstObservation = null;
+            TimelineWorkerLateUpdateObservation? secondObservation = null;
+            int processFrameCount = 0;
+            Action<double> processFrameObserver = _ => processFrameCount++;
+            try
+            {
+                MmdVmdTimelineBehaviour.ProcessFrameEvaluated += processFrameObserver;
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                modelAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                motionAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                modelAsset.Initialize(File.ReadAllBytes(pmxPath), Path.GetFileName(pmxPath), pmxPath);
+                motionAsset.Initialize(File.ReadAllBytes(vmdPath), Path.GetFileName(vmdPath), vmdPath);
+
+                firstBinding = MmdUnityPlaybackBinding.CreateSkinned(modelAsset, motionAsset);
+                secondBinding = MmdUnityPlaybackBinding.CreateSkinned(modelAsset, motionAsset);
+                MmdUnityPlaybackController firstController =
+                    firstBinding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                MmdUnityPlaybackController secondController =
+                    secondBinding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                firstController.SetPhysicsMode(MmdPhysicsMode.Off);
+                firstController.Configure(firstBinding, 30.0f, playOnStart: false);
+                secondController.SetPhysicsMode(MmdPhysicsMode.Off);
+                secondController.Configure(secondBinding, 30.0f, playOnStart: false);
+
+                // Let controller Start() complete before attaching provider assets. This preserves
+                // the existing runtime setup contract used by the PlayMode fixture helpers.
+                yield return null;
+                ConfigureTimelineWorkerController(firstController, firstBinding, modelAsset, motionAsset);
+                ConfigureTimelineWorkerController(secondController, secondBinding, modelAsset, motionAsset);
+                firstObservation = firstBinding.Instance.Root.AddComponent<TimelineWorkerLateUpdateObservation>();
+                secondObservation = secondBinding.Instance.Root.AddComponent<TimelineWorkerLateUpdateObservation>();
+                firstObservation.Track(firstController, firstBinding.Instance.BoneTransforms[0]);
+                secondObservation.Track(secondController, secondBinding.Instance.BoneTransforms[0]);
+
+                timelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
+                MmdVmdTimelineTrack firstTrack = timelineAsset.CreateTrack<MmdVmdTimelineTrack>(null, "MMD VMD First");
+                MmdVmdTimelineTrack secondTrack = timelineAsset.CreateTrack<MmdVmdTimelineTrack>(null, "MMD VMD Second");
+                ConfigureTimelineWorkerClip(firstTrack.CreateClip<MmdVmdTimelineClip>(), modelAsset, motionAsset);
+                ConfigureTimelineWorkerClip(secondTrack.CreateClip<MmdVmdTimelineClip>(), modelAsset, motionAsset);
+
+                directorObject = new GameObject("timeline-worker-batch-director");
+                PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
+                director.playOnAwake = false;
+                director.timeUpdateMode = DirectorUpdateMode.GameTime;
+                director.playableAsset = timelineAsset;
+                director.SetGenericBinding(firstTrack, firstController);
+                director.SetGenericBinding(secondTrack, secondController);
+                Assert.That(EnsureTimelineWorkerSchedulerInstalled(), Is.True);
+
+                director.time = 10.0 / 30.0;
+                // The explicit Evaluate call is outside the collection boundary and must remain
+                // synchronous for programmatic seeks/preview-style callers.
+                director.Evaluate();
+                Assert.That(firstController.CurrentFrame, Is.EqualTo(10));
+                Assert.That(secondController.CurrentFrame, Is.EqualTo(10));
+                Assert.That(firstController.LastSnapshot, Is.Not.Null);
+                Assert.That(secondController.LastSnapshot, Is.Not.Null);
+
+                director.Play();
+                director.DeferredEvaluate();
+                for (int frame = 0; frame < 30 &&
+                     (firstObservation.ObservedBatchSize != 2 || secondObservation.ObservedBatchSize != 2); frame++)
+                {
+                    yield return null;
+                }
+
+                Assert.That(processFrameCount, Is.GreaterThanOrEqualTo(2),
+                    "The PlayableDirector did not evaluate both Timeline tracks in PlayMode.");
+                Assert.That(
+                    GetTimelineWorkerSchedulerMetric<int>("LastCompletedBatchSize"),
+                    Is.EqualTo(2),
+                    $"processFrameCount={processFrameCount}, " +
+                    $"lastDrainFrame={GetTimelineWorkerSchedulerMetric<int>("LastDrainFrameCount")}, " +
+                    $"firstObservedBatch={firstObservation.ObservedBatchSize}, " +
+                    $"secondObservedBatch={secondObservation.ObservedBatchSize}");
+                Assert.That(GetTimelineWorkerSchedulerMetric<ulong>("LastCompletedGeneration"), Is.GreaterThan(0UL));
+                Assert.That(firstObservation.ObservedBatchSize, Is.EqualTo(2));
+                Assert.That(secondObservation.ObservedBatchSize, Is.EqualTo(2));
+                Assert.That(firstObservation.ObservedGeneration, Is.EqualTo(secondObservation.ObservedGeneration));
+                Assert.That(firstObservation.ObservedPlayerLoopFrame, Is.EqualTo(secondObservation.ObservedPlayerLoopFrame));
+                Assert.That(firstObservation.ObservedAppliedFrame, Is.EqualTo(firstController.CurrentFrame));
+                Assert.That(secondObservation.ObservedAppliedFrame, Is.EqualTo(secondController.CurrentFrame));
+                Assert.That(firstObservation.ObservedPlayerLoopFrame, Is.EqualTo(firstController.LastTimelineDriveFrameCount));
+                Assert.That(secondObservation.ObservedPlayerLoopFrame, Is.EqualTo(secondController.LastTimelineDriveFrameCount));
+                Assert.That(firstObservation.ObservedPosition, Is.EqualTo(secondObservation.ObservedPosition));
+            }
+            finally
+            {
+                MmdVmdTimelineBehaviour.ProcessFrameEvaluated -= processFrameObserver;
+                if (directorObject != null)
+                {
+                    directorObject.GetComponent<PlayableDirector>()?.Stop();
+                    Object.DestroyImmediate(directorObject);
+                }
+
+                if (timelineAsset != null)
+                {
+                    Object.DestroyImmediate(timelineAsset);
+                }
+
+                MmdPlayModeTestInstanceScope.DestroyInstance(firstBinding?.Instance);
+                MmdPlayModeTestInstanceScope.DestroyInstance(secondBinding?.Instance);
+                if (modelAsset != null)
+                {
+                    Object.DestroyImmediate(modelAsset);
+                }
+
+                if (motionAsset != null)
+                {
+                    Object.DestroyImmediate(motionAsset);
+                }
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator AutomaticTimelineWorkerBatchCombinesTwoDirectors()
+        {
+            MmdPmxAsset? modelAsset = null;
+            MmdVmdAsset? motionAsset = null;
+            MmdUnityPlaybackBinding? firstBinding = null;
+            MmdUnityPlaybackBinding? secondBinding = null;
+            TimelineAsset? firstTimelineAsset = null;
+            TimelineAsset? secondTimelineAsset = null;
+            GameObject? firstDirectorObject = null;
+            GameObject? secondDirectorObject = null;
+            TimelineWorkerLateUpdateObservation? firstObservation = null;
+            TimelineWorkerLateUpdateObservation? secondObservation = null;
+            int processFrameCount = 0;
+            Action<double> processFrameObserver = _ => processFrameCount++;
+            try
+            {
+                MmdVmdTimelineBehaviour.ProcessFrameEvaluated += processFrameObserver;
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                modelAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                motionAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                modelAsset.Initialize(File.ReadAllBytes(pmxPath), Path.GetFileName(pmxPath), pmxPath);
+                motionAsset.Initialize(File.ReadAllBytes(vmdPath), Path.GetFileName(vmdPath), vmdPath);
+
+                firstBinding = MmdUnityPlaybackBinding.CreateSkinned(modelAsset, motionAsset);
+                secondBinding = MmdUnityPlaybackBinding.CreateSkinned(modelAsset, motionAsset);
+                MmdUnityPlaybackController firstController =
+                    firstBinding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                MmdUnityPlaybackController secondController =
+                    secondBinding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                firstController.SetPhysicsMode(MmdPhysicsMode.Off);
+                firstController.Configure(firstBinding, 30.0f, playOnStart: false);
+                secondController.SetPhysicsMode(MmdPhysicsMode.Off);
+                secondController.Configure(secondBinding, 30.0f, playOnStart: false);
+
+                yield return null;
+                ConfigureTimelineWorkerController(firstController, firstBinding, modelAsset, motionAsset);
+                ConfigureTimelineWorkerController(secondController, secondBinding, modelAsset, motionAsset);
+                firstObservation = firstBinding.Instance.Root.AddComponent<TimelineWorkerLateUpdateObservation>();
+                secondObservation = secondBinding.Instance.Root.AddComponent<TimelineWorkerLateUpdateObservation>();
+                firstObservation.Track(firstController, firstBinding.Instance.BoneTransforms[0]);
+                secondObservation.Track(secondController, secondBinding.Instance.BoneTransforms[0]);
+
+                firstTimelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
+                MmdVmdTimelineTrack firstTrack = firstTimelineAsset.CreateTrack<MmdVmdTimelineTrack>(null, "MMD VMD First");
+                ConfigureTimelineWorkerClip(firstTrack.CreateClip<MmdVmdTimelineClip>(), modelAsset, motionAsset);
+                firstDirectorObject = new GameObject("timeline-worker-batch-first-director");
+                PlayableDirector firstDirector = firstDirectorObject.AddComponent<PlayableDirector>();
+                firstDirector.playOnAwake = false;
+                firstDirector.timeUpdateMode = DirectorUpdateMode.GameTime;
+                firstDirector.playableAsset = firstTimelineAsset;
+                firstDirector.SetGenericBinding(firstTrack, firstController);
+
+                secondTimelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
+                MmdVmdTimelineTrack secondTrack = secondTimelineAsset.CreateTrack<MmdVmdTimelineTrack>(null, "MMD VMD Second");
+                ConfigureTimelineWorkerClip(secondTrack.CreateClip<MmdVmdTimelineClip>(), modelAsset, motionAsset);
+                secondDirectorObject = new GameObject("timeline-worker-batch-second-director");
+                PlayableDirector secondDirector = secondDirectorObject.AddComponent<PlayableDirector>();
+                secondDirector.playOnAwake = false;
+                secondDirector.timeUpdateMode = DirectorUpdateMode.GameTime;
+                secondDirector.playableAsset = secondTimelineAsset;
+                secondDirector.SetGenericBinding(secondTrack, secondController);
+                Assert.That(EnsureTimelineWorkerSchedulerInstalled(), Is.True);
+
+                firstDirector.Play();
+                secondDirector.Play();
+                firstDirector.DeferredEvaluate();
+                secondDirector.DeferredEvaluate();
+                for (int frame = 0; frame < 30 &&
+                     (firstObservation.ObservedBatchSize != 2 || secondObservation.ObservedBatchSize != 2); frame++)
+                {
+                    yield return null;
+                }
+
+                Assert.That(processFrameCount, Is.GreaterThanOrEqualTo(2));
+                Assert.That(GetTimelineWorkerSchedulerMetric<int>("LastCompletedBatchSize"), Is.EqualTo(2));
+                Assert.That(firstObservation.ObservedBatchSize, Is.EqualTo(2));
+                Assert.That(secondObservation.ObservedBatchSize, Is.EqualTo(2));
+                Assert.That(firstObservation.ObservedGeneration, Is.EqualTo(secondObservation.ObservedGeneration));
+                Assert.That(firstObservation.ObservedPlayerLoopFrame, Is.EqualTo(secondObservation.ObservedPlayerLoopFrame));
+                Assert.That(firstObservation.ObservedAppliedFrame, Is.EqualTo(firstController.CurrentFrame));
+                Assert.That(secondObservation.ObservedAppliedFrame, Is.EqualTo(secondController.CurrentFrame));
+            }
+            finally
+            {
+                MmdVmdTimelineBehaviour.ProcessFrameEvaluated -= processFrameObserver;
+                if (firstDirectorObject != null)
+                {
+                    firstDirectorObject.GetComponent<PlayableDirector>()?.Stop();
+                    Object.DestroyImmediate(firstDirectorObject);
+                }
+
+                if (secondDirectorObject != null)
+                {
+                    secondDirectorObject.GetComponent<PlayableDirector>()?.Stop();
+                    Object.DestroyImmediate(secondDirectorObject);
+                }
+
+                if (firstTimelineAsset != null)
+                {
+                    Object.DestroyImmediate(firstTimelineAsset);
+                }
+
+                if (secondTimelineAsset != null)
+                {
+                    Object.DestroyImmediate(secondTimelineAsset);
+                }
+
+                MmdPlayModeTestInstanceScope.DestroyInstance(firstBinding?.Instance);
+                MmdPlayModeTestInstanceScope.DestroyInstance(secondBinding?.Instance);
+                if (modelAsset != null)
+                {
+                    Object.DestroyImmediate(modelAsset);
+                }
+
+                if (motionAsset != null)
+                {
+                    Object.DestroyImmediate(motionAsset);
+                }
+            }
+        }
+
+        private static bool EnsureTimelineWorkerSchedulerInstalled()
+        {
+            Type schedulerType = ResolveTimelineWorkerSchedulerType();
+            MethodInfo method = schedulerType.GetMethod(
+                "EnsureInstalled",
+                BindingFlags.NonPublic | BindingFlags.Static)!;
+            return (bool)method.Invoke(null, null)!;
+        }
+
+        private static T GetTimelineWorkerSchedulerMetric<T>(string propertyName)
+        {
+            Type schedulerType = ResolveTimelineWorkerSchedulerType();
+            PropertyInfo property = schedulerType.GetProperty(
+                propertyName,
+                BindingFlags.NonPublic | BindingFlags.Static)!;
+            return (T)property.GetValue(null)!;
+        }
+
+        private static Type ResolveTimelineWorkerSchedulerType()
+        {
+            return AppDomain.CurrentDomain.GetAssemblies()
+                .Select(assembly => assembly.GetType("Mmd.Timeline.MmdTimelineWorkerBatchScheduler"))
+                .First(type => type != null)!;
+        }
+
+        private static void ConfigureTimelineWorkerController(
+            MmdUnityPlaybackController controller,
+            MmdUnityPlaybackBinding binding,
+            MmdPmxAsset modelAsset,
+            MmdVmdAsset motionAsset)
+        {
+            controller.ConfigureModelAsset(modelAsset);
+            controller.ConfigureMotionAsset(motionAsset);
+            Assert.That(
+                controller.TryEnableFastRuntimeFromConfiguredSource(out string reason),
+                Is.True,
+                reason);
+            controller.SeekFrame(0);
+        }
+
+        private static void ConfigureTimelineWorkerClip(
+            TimelineClip clip,
+            MmdPmxAsset modelAsset,
+            MmdVmdAsset motionAsset)
+        {
+            clip.start = 0.0;
+            clip.duration = 1.0;
+            var asset = (MmdVmdTimelineClip)clip.asset;
+            asset.ModelSourceId = modelAsset.SourceId;
+            asset.MotionSourceId = motionAsset.SourceId;
+            asset.MotionAsset = motionAsset;
+            asset.FrameRate = 30.0f;
+        }
+
+        [DefaultExecutionOrder(1000)]
+        private sealed class TimelineWorkerLateUpdateObservation : MonoBehaviour
+        {
+            private MmdUnityPlaybackController? controller;
+            private Transform? observedTransform;
+
+            internal int ObservedBatchSize { get; private set; } = -1;
+
+            internal ulong ObservedGeneration { get; private set; }
+
+            internal int ObservedPlayerLoopFrame { get; private set; } = -1;
+
+            internal int ObservedAppliedFrame { get; private set; } = -1;
+
+            internal Vector3 ObservedPosition { get; private set; }
+
+            internal void Track(MmdUnityPlaybackController target, Transform transform)
+            {
+                controller = target ?? throw new ArgumentNullException(nameof(target));
+                observedTransform = transform ?? throw new ArgumentNullException(nameof(transform));
+            }
+
+            private void LateUpdate()
+            {
+                if (controller == null || observedTransform == null || controller.LastSnapshot == null)
+                {
+                    return;
+                }
+
+                ObservedBatchSize = GetTimelineWorkerSchedulerMetric<int>("LastCompletedBatchSize");
+                ObservedGeneration = GetTimelineWorkerSchedulerMetric<ulong>("LastCompletedGeneration");
+                ObservedPlayerLoopFrame = Time.frameCount;
+                ObservedAppliedFrame = controller.LastSnapshot.frame.frame;
+                ObservedPosition = observedTransform.localPosition;
+            }
+        }
+
+        [UnityTest]
         public IEnumerator TimelineForwardPlaybackEvaluationStepsLivePhysics()
         {
             MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();

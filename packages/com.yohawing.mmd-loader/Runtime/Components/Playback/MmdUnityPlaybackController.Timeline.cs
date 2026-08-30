@@ -134,6 +134,11 @@ namespace Mmd.UnityIntegration
 
         internal int LastTimelineDriveFrameCount => lastTimelineDriveFrameCount;
 
+        internal void MarkTimelineDriveForWorker()
+        {
+            lastTimelineDriveFrameCount = Time.frameCount;
+        }
+
         // Update() runs in the Update phase, before the PlayableDirector evaluates in PreLateUpdate,
         // so a controller driven by a Timeline sees the previous frame's drive (delta == 1) on the
         // current frame's Update. Suppress for delta 0 and 1; resume self-Tick once the Timeline stops
