@@ -8,7 +8,7 @@ This guide is for users who have added `com.yohawing.mmd-loader` to a Unity proj
 - [Import a PMX](#import-a-pmx)
 - [Place it in the Scene](#place-it-in-the-scene)
 - [Import a VMD](#import-a-vmd)
-- [Play two to four models with worker playback](#play-two-to-four-models-with-worker-playback)
+- [Play models with automatic worker playback](#play-models-with-automatic-worker-playback)
 - [Set up Humanoid](#set-up-humanoid)
 - [Set up rendering in URP](#set-up-rendering-in-urp)
 - [Set up camera and light motion](#set-up-camera-and-light-motion)
@@ -58,16 +58,19 @@ The available editor actions may change between package versions, but the basic 
 - A VMD asset is referenced from a Timeline clip.
 - A Timeline clip does not immediately convert the VMD into an AnimationClip. It passes the playback time to the MMD runtime, which calculates the pose at that time.
 
-## Play two to four models with worker playback
+## Play models with automatic worker playback
 
-Use `MmdMultiCharacterPlaybackGroup` for opt-in standalone playback when two to four models must advance on the same logical frame.
+Native playback uses long-lived workers automatically from the first eligible model. No worker component or controller list is required.
 
-1. Configure each scene playback controller with its own PMX and VMD assets.
-2. Set every controller to **Physics Mode Off** or set every controller to **Physics Mode Live**. Do not mix the modes.
-3. Add `MmdMultiCharacterPlaybackGroup` to an empty GameObject and assign the controllers to its **Controllers** list.
-4. Enable **Play On Start** on every assigned controller, then enter Play Mode.
+1. Configure each scene playback controller with its PMX and VMD assets.
+2. Select **Physics Mode Off** or **Physics Mode Live** on each controller.
+3. Enable **Play On Start**, then enter Play Mode.
 
-The group evaluates each controller on a long-lived worker and applies the completed poses to Unity during `Update`. Timeline playback and Humanoid retarget input are not supported by this route. If a controller becomes incompatible or unavailable, the group stops without partially applying a frame; `LastFailureReason` exposes the reason to code.
+Eligible standalone controllers dispatch their evaluations before any controller waits for a result. Completed poses are applied on the main thread before the normal `Update` callbacks, so multiple models can evaluate concurrently without moving Unity object access off the main thread. Controllers may use different frame rates or mix the supported physics modes.
+
+Normal VMD Timeline clips in **Physics Mode Off** use the same automatic worker path. Tracks and Playable Directors evaluated in the same frame are dispatched as one batch, then applied before `LateUpdate`. Timeline Live Physics and Humanoid retarget input continue to use their synchronous compatibility paths.
+
+A single eligible model also uses a worker. This removes the separate one-model and multi-model setup, but one-model playback may cost more than the former serial path. If native worker setup is unavailable, standalone playback keeps the synchronous path. A worker execution fault is isolated to that controller and logs a warning. Reassign its PMX/VMD source, reconfigure the controller, explicitly re-enable fast runtime, or re-enable the component to retry.
 
 ## Set up Humanoid
 

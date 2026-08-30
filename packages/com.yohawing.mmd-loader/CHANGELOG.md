@@ -8,12 +8,14 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 
 ### Added
 
-- Added opt-in worker playback for two to four controllers, with long-lived native evaluation workers for Physics Off and Live while Unity object and transform mutation remains on the main thread.
+- Added automatic long-lived native worker playback from one controller upward for standalone Physics Off and Live, while Unity object and transform mutation remains on the main thread.
+- Added same-frame Timeline worker batching for Physics Off VMD clips across multiple tracks and Playable Directors.
 - Added a main-thread `PoseApplied` event after a playback route successfully applies a new pose.
 
 ### Changed
 
-- Parallelized multi-character Live Physics evaluation behind an all-or-nothing validation boundary, with controller claims and worker cleanup failing closed when configuration or ownership changes.
+- Replaced manual `MmdMultiCharacterPlaybackGroup` setup with controller-owned worker slots and automatic same-frame dispatch-before-wait scheduling.
+- Isolated automatic worker failures per controller, with clock rollback and retry on PMX/VMD reassignment, controller reconfiguration, explicit fast-runtime re-enable, or component re-enable.
 - Consolidated PMX/VMD playback caches, source transactions, native setup, retry, and cleanup ownership so stale preload results are rejected and failed preloads remain retryable.
 - Hardened project-relative model, texture, and MME normal-map resolution against escaped or junction-based paths while preserving custom material targets, mapper keywords, and compatible legacy material fallback.
 - Updated the packaged Windows native runtime and `native/mmd-anim` pin to `mmd-anim` remote `main` commit `4a6334b` (v0.4.3 plus tooling-only follow-up commits), retaining runtime ABI version 3 and adopting the MMD-compatible IK rollback and bounded extreme-PMX effective-mass fixes.
@@ -22,6 +24,7 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 ### Fixed
 
 - Fixed worker playback clocks so fixed-step playback advances through consecutive logical frames without duplicate/compensating-skip transitions.
+- Fixed fractional standalone playback time being truncated after worker apply, preserving 30 fps motion under 60 Hz updates.
 - Fixed worker poses being applied after the expected Unity `Update` phase, preserving same-frame consumers and pose notifications.
 - Fixed stale PMX descriptors and VMD snapshots after source replacement, pending cleanup retry, playback-frame seed rollback, and Humanoid Timeline target cleanup.
 - Fixed material-profile provenance and custom material state propagation across playback setup and material reapplication.
@@ -33,7 +36,8 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 - Timeline random access keeps physics off; Live physics is limited to Play Mode forward playback.
 - Raw VMD Timeline clips use deterministic hard-cut selection rather than weighted blending.
 - Humanoid bake does not include Live physics, facial morphs, or native MMD IK/helper behavior.
-- Worker-group playback supports two to four controller-owned PMX/VMD sources in Physics Off or Live; Timeline and Humanoid retarget input remain unsupported for this route.
+- Automatic worker playback requires controller-owned PMX/VMD sources. Timeline Live Physics and Humanoid retarget input continue to use synchronous compatibility paths.
+- One-controller playback also uses a worker and may have more overhead than the former serial path.
 - The Unity Toon Shader adapter remains optional and conservative; it falls back to MMD Toon when UTS is absent or its shader schema is unsupported.
 
 ## [0.4.1] - 2026-08-12
