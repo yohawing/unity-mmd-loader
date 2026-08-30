@@ -8,7 +8,7 @@ This guide is for users who have added `com.yohawing.mmd-loader` to a Unity proj
 - [Import a PMX](#import-a-pmx)
 - [Place it in the Scene](#place-it-in-the-scene)
 - [Import a VMD](#import-a-vmd)
-- [Play models with automatic worker playback](#play-models-with-automatic-worker-playback)
+- [Play a VMD without Timeline](#play-a-vmd-without-timeline)
 - [Set up Humanoid](#set-up-humanoid)
 - [Set up rendering in URP](#set-up-rendering-in-urp)
 - [Set up camera and light motion](#set-up-camera-and-light-motion)
@@ -58,19 +58,13 @@ The available editor actions may change between package versions, but the basic 
 - A VMD asset is referenced from a Timeline clip.
 - A Timeline clip does not immediately convert the VMD into an AnimationClip. It passes the playback time to the MMD runtime, which calculates the pose at that time.
 
-## Play models with automatic worker playback
+## Play a VMD without Timeline
 
-Native playback uses long-lived workers automatically from the first eligible model. No worker component or controller list is required.
-
-1. Configure each scene playback controller with its PMX and VMD assets.
-2. Select **Physics Mode Off** or **Physics Mode Live** on each controller.
+1. Assign the PMX and VMD assets to each scene playback controller.
+2. Select **Physics Mode Off** or **Physics Mode Live**.
 3. Enable **Play On Start**, then enter Play Mode.
 
-Eligible standalone controllers dispatch their evaluations before any controller waits for a result. Completed poses are applied on the main thread before the normal `Update` callbacks, so multiple models can evaluate concurrently without moving Unity object access off the main thread. Controllers may use different frame rates or mix the supported physics modes.
-
-Normal VMD Timeline clips in **Physics Mode Off** use the same automatic worker path. Tracks and Playable Directors evaluated in the same frame are dispatched as one batch, then applied before `LateUpdate`. Timeline Live Physics and Humanoid retarget input continue to use their synchronous compatibility paths.
-
-A single eligible model also uses a worker. This removes the separate one-model and multi-model setup, but one-model playback may cost more than the former serial path. If native worker setup is unavailable, standalone playback keeps the synchronous path. A worker execution fault is isolated to that controller and logs a warning. Reassign its PMX/VMD source, reconfigure the controller, explicitly re-enable fast runtime, or re-enable the component to retry.
+With this normal asset-based setup, Play Mode playback is optimized automatically for one or more models. Physics Off Timeline playback is also optimized across multiple tracks and Playable Directors. No additional performance settings are required.
 
 ## Set up Humanoid
 
