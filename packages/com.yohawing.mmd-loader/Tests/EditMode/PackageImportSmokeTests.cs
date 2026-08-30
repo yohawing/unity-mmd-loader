@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
+using Mmd.Native;
 using Mmd.Parser;
 using Mmd.Physics;
 using Mmd.Rendering;
@@ -276,6 +277,59 @@ namespace Mmd.Tests
             Assert.That(snapshot.rendering.indices, Has.Count.GreaterThan(0));
             Assert.That(snapshot.frame.bones, Has.Count.GreaterThan(0));
             Assert.That(snapshot.frame.bones[0].worldMatrix, Has.Length.EqualTo(16));
+        }
+
+        [Test]
+        public void RuntimeSessionEvaluatesFractionalPlaybackTime()
+        {
+            const float frameRate = 30.0f;
+            const float evaluationFrame = 10.25f;
+            float time = evaluationFrame / frameRate;
+            byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube.pmx");
+            byte[] vmdBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube_motion.vmd");
+            var parser = new NativeMmdParser();
+            MmdModelDefinition model = parser.LoadModel(pmxBytes);
+            MmdMotionDefinition motion = parser.LoadMotion(vmdBytes);
+
+            using var session = new MmdRuntimeSession(
+                model,
+                motion,
+                "test_1bone_cube.pmx",
+                "test_1bone_cube_motion.vmd");
+            MmdEvaluatedFrame actual = session.EvaluateFrameAtTime(time, frameRate);
+
+            using var native = MmdRuntimeFfiPlaybackSession.Create(pmxBytes, vmdBytes);
+            var expectedWorld = new float[native.WorldMatrixFloatCount];
+            var expectedMorphs = new float[native.MorphWeightCount];
+            var expectedIk = new byte[native.IkEnabledCount];
+            native.EvaluateAndCopy(
+                evaluationFrame,
+                expectedWorld,
+                expectedMorphs,
+                expectedIk);
+
+            var integerWorld = new float[native.WorldMatrixFloatCount];
+            var integerMorphs = new float[native.MorphWeightCount];
+            var integerIk = new byte[native.IkEnabledCount];
+            native.EvaluateAndCopy(
+                actual.frame,
+                integerWorld,
+                integerMorphs,
+                integerIk);
+            CollectionAssert.AreNotEqual(expectedWorld, integerWorld);
+
+            MmdEvaluatedFrame expected = MmdRuntimeFrameEvaluator.BuildFrameFromNative(
+                model,
+                frame: 10,
+                time: time,
+                nativeWorldMatrices: expectedWorld,
+                nativeMorphWeights: expectedMorphs,
+                includeMaterials: false);
+            Assert.That(actual.frame, Is.EqualTo(10));
+            Assert.That(actual.time, Is.EqualTo(time).Within(0.00001f));
+            CollectionAssert.AreEqual(
+                expected.bones[0].worldMatrix,
+                actual.bones[0].worldMatrix);
         }
 
         [Test]

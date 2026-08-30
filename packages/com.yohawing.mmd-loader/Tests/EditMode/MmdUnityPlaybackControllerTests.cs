@@ -2445,11 +2445,9 @@ namespace Mmd.Tests
                 // ApplyTime random access requires explicit Off (Live does not support); arbitrary EditMode evaluation for fast snapshot test
                 controller.SetPhysicsMode(MmdPhysicsMode.Off);
 
-                float[]? sourcePose = null;
-                controller.SourcePoseApplied += (_, matrices) =>
-                    sourcePose = matrices.ToArray();
-
                 MmdPlaybackSnapshot snapshot = controller.ApplyTime(inputTime, frameRate);
+                Vector3 actualPosition = instance.BoneTransforms[0].position;
+                Quaternion actualRotation = instance.BoneTransforms[0].rotation;
 
                 Assert.That(snapshot.frame.frame, Is.EqualTo(10));
                 Assert.That(snapshot.frame.time, Is.EqualTo(inputTime).Within(0.00001f));
@@ -2459,7 +2457,6 @@ namespace Mmd.Tests
                 Assert.That(controller.LastFastRuntimeReason, Is.Empty);
                 // random-access ApplyTime forces Off; the native path returns a lightweight snapshot.
                 Assert.That(snapshot.frame.bones, Is.Empty);
-                Assert.That(sourcePose, Is.Not.Null);
                 using (var expectedSession = MmdRuntimeFfiPlaybackSession.Create(
                     File.ReadAllBytes(pmxPath),
                     File.ReadAllBytes(vmdPath)))
@@ -2472,7 +2469,31 @@ namespace Mmd.Tests
                         expectedWorld,
                         expectedMorphs,
                         expectedIk);
-                    Assert.That(sourcePose, Is.EqualTo(expectedWorld));
+                    MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(
+                        instance,
+                        expectedWorld);
+                    Vector3 expectedPosition = instance.BoneTransforms[0].position;
+                    Quaternion expectedRotation = instance.BoneTransforms[0].rotation;
+
+                    expectedSession.EvaluateAndCopy(
+                        snapshot.frame.frame,
+                        expectedWorld,
+                        expectedMorphs,
+                        expectedIk);
+                    MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(
+                        instance,
+                        expectedWorld);
+                    float integerFrameDifference =
+                        Vector3.Distance(expectedPosition, instance.BoneTransforms[0].position) +
+                        Quaternion.Angle(expectedRotation, instance.BoneTransforms[0].rotation);
+
+                    Assert.That(integerFrameDifference, Is.GreaterThan(0.0001f));
+                    Assert.That(
+                        Vector3.Distance(actualPosition, expectedPosition),
+                        Is.LessThan(0.0001f));
+                    Assert.That(
+                        Quaternion.Angle(actualRotation, expectedRotation),
+                        Is.LessThan(0.0001f));
                 }
             }
             finally
