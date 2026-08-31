@@ -28,6 +28,10 @@ namespace Mmd.Editor
 
     public static class MmdGenericAnimationClipWriter
     {
+        // Test-only seam for deterministic native-unavailable bake coverage. Production code
+        // leaves this null and calls the real binding setup below.
+        internal static Func<byte[], byte[], bool>? NativeRuntimeAvailabilityOverrideForTests { get; set; }
+
         public static MmdGenericAnimationClipWriterResult CreateInMemoryClip(
             MmdPmxAsset pmxAsset,
             MmdVmdAsset vmdAsset,
@@ -101,7 +105,9 @@ namespace Mmd.Editor
                 }
 
                 binding.SetPhysicsMode(MmdPhysicsMode.Off);
-                if (binding.TryEnableFastRuntime(pmxAsset.GetBytesCopy(), vmdAsset.GetBytesCopy(), out string fastRuntimeReason))
+                byte[] pmxBytes = pmxAsset.GetBytesCopy();
+                byte[] vmdBytes = vmdAsset.GetBytesCopy();
+                if (TryEnableNativeRuntimeForBake(binding, pmxBytes, vmdBytes, out string fastRuntimeReason))
                 {
                     diagnostics.Add("writer: enabled persistent native evaluation for Generic bake.");
                 }
@@ -149,6 +155,26 @@ namespace Mmd.Editor
                     DestroyTemporaryBinding(binding);
                 }
             }
+        }
+
+        private static bool TryEnableNativeRuntimeForBake(
+            MmdUnityPlaybackBinding binding,
+            byte[] pmxBytes,
+            byte[] vmdBytes,
+            out string reason)
+        {
+            Func<byte[], byte[], bool>? overrideForTests = NativeRuntimeAvailabilityOverrideForTests;
+            if (overrideForTests != null)
+            {
+                bool available = overrideForTests(pmxBytes, vmdBytes);
+                reason = available ? string.Empty : "native runtime unavailable (forced by test).";
+                if (!available)
+                {
+                    return false;
+                }
+            }
+
+            return binding.TryEnableFastRuntime(pmxBytes, vmdBytes, out reason);
         }
 
         public static MmdGenericAnimationClipWriterResult CreateAnimationClipAsset(

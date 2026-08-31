@@ -95,7 +95,7 @@ namespace Mmd.Editor
                 return false;
             }
 
-            if (Path.IsPathRooted(outputPath))
+            if (IsPathRootedAcrossPlatforms(outputPath))
             {
                 error = MmdOutputPathError.Rooted;
                 return false;
@@ -138,6 +138,25 @@ namespace Mmd.Editor
             normalizedOutputPath = normalized;
             error = MmdOutputPathError.None;
             return true;
+        }
+
+        private static bool IsPathRootedAcrossPlatforms(string path)
+        {
+            if (Path.IsPathRooted(path))
+            {
+                return true;
+            }
+
+            // Unity asset paths are exchanged as strings, so a Windows-authored rooted path
+            // must remain rooted even when the package tests run on a POSIX host.
+            if (path.Length > 0 && (path[0] == '\\' || path[0] == '/'))
+            {
+                return true;
+            }
+
+            return path.Length >= 2 &&
+                path[1] == ':' &&
+                ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z'));
         }
 
         private static bool TryResolveProjectRelativeAssetPath(

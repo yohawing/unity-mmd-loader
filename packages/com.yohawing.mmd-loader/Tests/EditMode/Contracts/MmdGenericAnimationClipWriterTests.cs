@@ -15,10 +15,10 @@ namespace Mmd.Tests
 {
     public sealed class MmdGenericAnimationClipWriterTests
     {
-        private const string CubePmx = "Packages/com.yohawing.mmd-loader/Tests/Fixtures/Assets/test_1bone_cube.pmx";
-        private const string CubeVmd = "Packages/com.yohawing.mmd-loader/Tests/Fixtures/Assets/test_1bone_cube_motion.vmd";
-        private const string MorphPmx = "Packages/com.yohawing.mmd-loader/Tests/Fixtures/Assets/test_vertex_morph.pmx";
-        private const string MorphVmd = "Packages/com.yohawing.mmd-loader/Tests/Fixtures/Assets/test_vertex_morph_motion.vmd";
+        private static string CubePmx => MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
+        private static string CubeVmd => MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
+        private static string MorphPmx => MmdTestFixtures.FixtureAssetPath("test_vertex_morph.pmx");
+        private static string MorphVmd => MmdTestFixtures.FixtureAssetPath("test_vertex_morph_motion.vmd");
 
         [Test]
         public void DenseBakeBudgetAcceptsExactBoundaryAndRejectsNextKeyEquivalent()
@@ -417,12 +417,10 @@ namespace Mmd.Tests
         [Test]
         public void NativeUnavailableFailsClosedWithoutManagedTransformFallback()
         {
-#if UNITY_EDITOR_WIN
-            Assert.Ignore("mmd-runtime native generic bake is available in the Windows Editor.");
-#endif
             CreateAssets(CubePmx, CubeVmd, out MmdPmxAsset pmx, out MmdVmdAsset vmd);
             try
             {
+                MmdGenericAnimationClipWriter.NativeRuntimeAvailabilityOverrideForTests = (_, _) => false;
                 MmdGenericAnimationClipWriterResult result =
                     MmdGenericAnimationClipWriter.CreateInMemoryClip(pmx, vmd, 30.0f, 0, 9);
 
@@ -432,6 +430,7 @@ namespace Mmd.Tests
             }
             finally
             {
+                MmdGenericAnimationClipWriter.NativeRuntimeAvailabilityOverrideForTests = null;
                 DestroyAssets(pmx, vmd);
             }
         }
