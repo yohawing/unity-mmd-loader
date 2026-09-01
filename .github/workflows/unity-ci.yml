@@ -342,6 +342,7 @@ jobs:
             "Mmd.Tests.MmdRuntimeNativeUnavailableBoundaryContractTests.PhysicalMissingNativeEntryPointProbeClassifiesUnavailableRuntime",
             "Mmd.Tests.MmdUnityPlaybackControllerHumanoidRetargetTests.NativeHostPoseTimelineSupportsRepeatAndReverseWithoutDrift",
             "Mmd.Tests.MmdHumanoidAnimationTrackEditScrubTests.EditScrubPosesProxyAndRetargetsNativeViaAnimationMode",
+            "Mmd.Tests.MmdHumanoidAnimationTrackWorkflowTests.DestroyedHumanoidEditModeTargetReleasesOwnedAnimationModeOnGraphCleanup",
             "Mmd.Tests.MmdGoldenGenerationTests.GeneratePmxGoldenCandidatesForMaintainer",
             "Mmd.Tests.MmdGoldenGenerationTests.GenerateVmdGoldenCandidatesForMaintainer"
           )
