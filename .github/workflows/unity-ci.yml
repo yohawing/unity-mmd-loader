@@ -212,7 +212,7 @@ jobs:
         uses: ./.github/actions/package-unity-tests
         with:
           test-mode: playmode
-          project-path: unity-mmd
+          project-path: ci/unity-playmode
           package-mode: "false"
           artifacts-path: playmode-test-artifacts
           artifact-name: unity-playmode-results

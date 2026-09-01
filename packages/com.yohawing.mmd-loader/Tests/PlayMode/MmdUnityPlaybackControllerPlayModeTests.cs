@@ -11,7 +11,6 @@ using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.Animations;
 using UnityEngine.Playables;
-using UnityEngine.SceneManagement;
 using UnityEngine.Timeline;
 using UnityEngine.TestTools;
 using Mmd.Parser;
@@ -263,75 +262,73 @@ namespace Mmd.Tests
         }
 
         [UnityTest]
-        public IEnumerator NativePlaybackSceneLoadsAndEvaluatesPackageFixture()
+        public IEnumerator NativePlaybackControllerRunsWithPackageFixtureWithoutConsumerScene()
         {
-            AsyncOperation loadOperation = SceneManager.LoadSceneAsync("NativePlayback", LoadSceneMode.Single);
-            Assert.That(loadOperation, Is.Not.Null);
-            while (!loadOperation.isDone)
+            const string modelSourceId = "package-fixture-model.pmx";
+            const string motionSourceId = "package-fixture-motion.vmd";
+            MmdPmxAsset? modelAsset = null;
+            MmdVmdAsset? motionAsset = null;
+            MmdUnityPlaybackBinding? binding = null;
+            try
             {
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                modelAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                modelAsset.Initialize(File.ReadAllBytes(pmxPath), modelSourceId, pmxPath);
+                motionAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                motionAsset.Initialize(File.ReadAllBytes(vmdPath), motionSourceId, vmdPath);
+
+                binding = MmdUnityPlaybackBinding.CreateSkinned(modelAsset, motionAsset);
+                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+                controller.ConfigureModelAsset(modelAsset);
+                controller.Configure(binding, 30.0f, playOnStart: true);
+
                 yield return null;
+
+                // Set the motion source after Start has run. Otherwise the controller would
+                // treat both serialized sources as a request to rebind an existing scene model,
+                // which is intentionally not part of this package-only fixture.
+                controller.ConfigureMotionAsset(motionAsset);
+
+                Assert.That(controller, Is.Not.Null);
+                Assert.That(controller.IsConfigured, Is.True);
+                Assert.That(controller.IsPlaying, Is.True);
+                Assert.That(controller.PlayOnStart, Is.True);
+                Assert.That(controller.ModelAssetSource, Is.SameAs(modelAsset));
+                Assert.That(controller.MotionAssetSource, Is.SameAs(motionAsset));
+
+                MmdUnityModelInstance instance = binding.Instance;
+                SkinnedMeshRenderer? sceneSmr = instance.SkinnedMeshRenderer;
+                Assert.That(sceneSmr, Is.Not.Null, "the package fixture must create a skinned playback hierarchy");
+                Assert.That(sceneSmr!.sharedMesh, Is.SameAs(instance.Mesh));
+                Assert.That(sceneSmr.bones, Is.Not.Null.And.Not.Empty);
+                Assert.That(instance.BoneTransforms, Is.Not.Null.And.Not.Empty);
+                Assert.That(sceneSmr.bones.Length, Is.EqualTo(instance.BoneTransforms.Length));
+                Assert.That(sceneSmr.rootBone, Is.Not.Null);
+
+                controller.Pause();
+                MmdPlaybackSnapshot frameZero = controller.ApplyFrame(0);
+                MmdPlaybackSnapshot frameTen = controller.ApplyFrame(10);
+
+                Assert.That(frameZero.frame.frame, Is.EqualTo(0));
+                Assert.That(frameTen.frame.frame, Is.EqualTo(10));
+                Assert.That(controller.CurrentFrame, Is.EqualTo(10));
+                Assert.That(controller.LastSnapshot, Is.SameAs(frameTen));
             }
-
-            yield return null;
-
-            // The NativePlayback scene contains the configured "Native Playback" holder controller
-            // AND a second controller on the instantiated imported model hierarchy, because the
-            // importer attaches a MmdUnityPlaybackController to every imported model (Slice 7) and the
-            // scene builder Instantiates that hierarchy as a child. FindAnyObjectByType returns an
-            // arbitrary one of the two, so the holder must be selected deterministically by name.
-            MmdUnityPlaybackController[] sceneControllers =
-                UnityEngine.Object.FindObjectsByType<MmdUnityPlaybackController>(FindObjectsSortMode.None);
-            MmdUnityPlaybackController? foundController = sceneControllers
-                .FirstOrDefault(c => string.Equals(c.gameObject.name, "Native Playback", StringComparison.Ordinal));
-            Assert.That(foundController, Is.Not.Null,
-                $"scene must contain the 'Native Playback' holder controller (found {sceneControllers.Length} controller(s))");
-            MmdUnityPlaybackController controller = foundController!;
-            MmdPmxAsset modelAsset = controller.ModelAssetSource!;
-            MmdVmdAsset motionAsset = controller.MotionAssetSource!;
-            Assert.That(controller, Is.Not.Null);
-            Assert.That(modelAsset, Is.Not.Null);
-            Assert.That(motionAsset, Is.Not.Null);
-            Assert.That(controller.IsConfigured, Is.True);
-            Assert.That(controller.IsPlaying, Is.True);
-            Assert.That(controller.PlayOnStart, Is.True);
-
-            // Domain reload slice: verify that after scene load, the scene SMR preserves
-            // importer-owned Mesh/bone references while cloning only mutable Material state.
-            SkinnedMeshRenderer? foundSceneSMR = controller.ConfiguredInstanceRoot != null
-                ? controller.ConfiguredInstanceRoot.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true)
-                : GameObject.Find("Native Playback")?.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true);
-            Assert.That(foundSceneSMR, Is.Not.Null, "scene must have an SMR (imported hierarchy) for domain reload rebind");
-            SkinnedMeshRenderer sceneSMR = foundSceneSMR!;
-            Mesh sharedMesh = sceneSMR.sharedMesh;
-            Assert.That(sharedMesh, Is.Not.Null);
-            Assert.That(sharedMesh.name, Does.Not.Contain("Split Runtime"),
-                "scene SMR must use importer-owned Mesh, not a Split Runtime rebuild");
-            Assert.That(sceneSMR.bones, Is.Not.Null.And.Not.Empty);
-            Assert.That(sceneSMR.bones.Length, Is.EqualTo(modelAsset.BoneCount),
-                "scene SMR bone count must match pmxAsset.BoneCount");
-            Assert.That(sceneSMR.rootBone, Is.Not.Null,
-                "scene SMR must have a valid rootBone");
-            Assert.That(sharedMesh, Is.SameAs(modelAsset.ImportedMesh),
-                "blend-shape playback must reuse the importer-owned Mesh sub-asset");
-            if (modelAsset.ImportedMaterials is { Length: > 0 } mats)
+            finally
             {
-                Material[] smrMats = sceneSMR.sharedMaterials;
-                Assert.That(smrMats, Is.Not.Null.And.Not.Empty);
-                Assert.That(smrMats[0], Is.Not.SameAs(mats[0]),
-                    "active playback must isolate material mutation from the importer-owned Material sub-asset");
-                Assert.That(smrMats[0].name, Does.StartWith(mats[0].name));
+                MmdPlayModeTestInstanceScope.DestroyInstance(binding?.Instance);
+                if (modelAsset != null)
+                {
+                    Object.Destroy(modelAsset);
+                }
+
+                if (motionAsset != null)
+                {
+                    Object.Destroy(motionAsset);
+                }
             }
-
-            controller.Pause();
-            controller.SetPhysicsMode(MmdPhysicsMode.Off);
-            MmdPlaybackSnapshot frameZero = controller.ApplyFrame(0);
-            int frameZeroNumber = frameZero.frame.frame;
-            MmdPlaybackSnapshot frameTen = controller.ApplyFrame(10);
-            int frameTenNumber = frameTen.frame.frame;
-
-            Assert.That(frameZeroNumber, Is.EqualTo(0));
-            Assert.That(frameTenNumber, Is.EqualTo(10));
-            Assert.That(controller.CurrentFrame, Is.EqualTo(10));
         }
 
         private static void AddPinnedRootRigidbody(MmdModelDefinition model)
@@ -2704,26 +2701,12 @@ namespace Mmd.Tests
         // in MmdVmdTimelineBehaviour.ProcessFrame and was verified via Editor.log instrumentation.
         private static string ResolvePackageFixture(string fileName)
         {
-            string? projectRoot = Path.GetDirectoryName(Application.dataPath);
-            if (string.IsNullOrWhiteSpace(projectRoot))
-            {
-                throw new InvalidOperationException("Unity project root could not be resolved from Application.dataPath.");
-            }
-
-            string packageRoot = Path.GetFullPath(Path.Combine(projectRoot, "..", "packages", "com.yohawing.mmd-loader"));
-            return Path.Combine(packageRoot, "Tests", "Fixtures", "Assets", fileName);
+            return MmdPlayModeTestFixtures.ResolvePackageFixture(fileName);
         }
 
         private static string ResolveBasicPlaybackSampleAsset(string fileName)
         {
-            string? projectRoot = Path.GetDirectoryName(Application.dataPath);
-            if (string.IsNullOrWhiteSpace(projectRoot))
-            {
-                throw new InvalidOperationException("Unity project root could not be resolved from Application.dataPath.");
-            }
-
-            string packageRoot = Path.GetFullPath(Path.Combine(projectRoot, "..", "packages", "com.yohawing.mmd-loader"));
-            return Path.Combine(packageRoot, "Samples~", "BasicPlayback", "Assets", fileName);
+            return MmdPlayModeTestFixtures.ResolveBasicPlaybackSampleAsset(fileName);
         }
 
         private static HairPhysicsScaleSample RunHairPhysicsForwardPlayback(float importScale)

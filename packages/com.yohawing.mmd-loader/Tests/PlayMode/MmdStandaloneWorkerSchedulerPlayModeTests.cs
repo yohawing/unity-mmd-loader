@@ -458,18 +458,7 @@ namespace Mmd.Tests
 
         private static string ResolvePackageFixture(string fileName)
         {
-            string? projectRoot = Path.GetDirectoryName(Application.dataPath);
-            if (string.IsNullOrWhiteSpace(projectRoot))
-            {
-                throw new InvalidOperationException("Unity project root could not be resolved from Application.dataPath.");
-            }
-
-            return Path.Combine(
-                Path.GetFullPath(Path.Combine(projectRoot, "..", "packages", "com.yohawing.mmd-loader")),
-                "Tests",
-                "Fixtures",
-                "Assets",
-                fileName);
+            return MmdPlayModeTestFixtures.ResolvePackageFixture(fileName);
         }
 
         private static GameObject CreateParentConstraintConsumer(string name, Transform source)
