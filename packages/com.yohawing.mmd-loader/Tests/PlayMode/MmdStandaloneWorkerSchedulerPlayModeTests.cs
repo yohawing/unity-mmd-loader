@@ -348,8 +348,11 @@ namespace Mmd.Tests
                 Assert.That(automatic.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(automatic.CurrentFrame));
                 Assert.That(automatic.LastLivePhysicsDiagnostics.deltaTime, Is.EqualTo(0.0f),
                     "The first automatic Live evaluation must be a zero-delta seed.");
+                int seedFrame = automatic.LastLivePhysicsDiagnostics!.frame;
+                serial.SeekFrame(seedFrame);
                 Assert.That(serial.LastSnapshot, Is.Not.Null);
-                Assert.That(automatic.LastSnapshot!.frame.frame, Is.EqualTo(serial.LastSnapshot!.frame.frame));
+                Assert.That(automatic.LastSnapshot!.frame.frame, Is.EqualTo(seedFrame));
+                Assert.That(serial.LastSnapshot!.frame.frame, Is.EqualTo(seedFrame));
                 Assert.That(
                     Vector3.Distance(
                         automaticBinding.Instance.BoneTransforms[0].localPosition,
