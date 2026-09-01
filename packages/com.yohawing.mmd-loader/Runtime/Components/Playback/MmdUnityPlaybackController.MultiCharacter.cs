@@ -220,16 +220,14 @@ namespace Mmd.UnityIntegration
                         pmxBytes,
                         vmdBytes,
                         MultiCharacterModelDefinition,
-                        ikMaxIterationsCap: 0,
-                        ikCompatibilityProfile: ikCompatibilityProfile);
+                        ikMaxIterationsCap: 0);
                 }
                 else
                 {
                     evaluator = new MmdNativeMultiCharacterWorker(
                         pmxBytes,
                         vmdBytes,
-                        (uint)IkMaxIterationsCap,
-                        ikCompatibilityProfile);
+                        (uint)IkMaxIterationsCap);
                 }
 
                 playbackWorkerPool = new MmdMultiCharacterWorkerPool(new[] { evaluator });

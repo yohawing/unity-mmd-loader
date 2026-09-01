@@ -116,7 +116,6 @@ namespace Mmd.Tests.Contracts
                 ["frameRate"] = typeof(float),
                 ["physicsMode"] = typeof(MmdPhysicsMode),
                 ["livePhysicsBodyDiagnosticsSampleInterval"] = typeof(int),
-                ["ikCompatibilityProfile"] = typeof(MmdIkCompatibilityProfile),
                 ["ikMaxIterationsCap"] = typeof(int),
                 ["modelAsset"] = typeof(MmdPmxAsset),
                 ["motionAsset"] = typeof(MmdVmdAsset),
@@ -212,7 +211,6 @@ namespace Mmd.Tests.Contracts
             AssertPropertyType(typeof(MmdVmdAsset), "ImportSummaryStatus", typeof(MmdVmdImportSummaryStatus));
             AssertPropertyType(typeof(MmdUnityPlaybackController), "HasModelSource", typeof(bool));
             AssertPropertyType(typeof(MmdUnityPlaybackController), "ModelSourceId", typeof(string));
-            AssertPropertyType(typeof(MmdUnityPlaybackController), "IkCompatibilityProfile", typeof(MmdIkCompatibilityProfile));
             AssertPropertyType(typeof(MmdUnityPlaybackController), "HumanoidPhysicsBindingFailureReason", typeof(string));
 
             AssertMethodSignature(typeof(MmdPmxAsset), "Initialize", typeof(void),

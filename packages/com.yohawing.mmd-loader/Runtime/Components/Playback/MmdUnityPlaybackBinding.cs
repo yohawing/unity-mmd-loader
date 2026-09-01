@@ -39,7 +39,6 @@ namespace Mmd.UnityIntegration
         private int livePhysicsReadbackShapeTypeCount;
         private MmdPhysicsMode physicsMode = MmdPhysicsMode.Off;
         private int ikMaxIterationsCap;
-        private MmdIkCompatibilityProfile ikCompatibilityProfile;
         private MmdRuntimeFfiPlaybackSession? fastSession;
         private float[]? fastWorldMatrices;
         private float[]? fastMorphWeights;
@@ -126,28 +125,6 @@ namespace Mmd.UnityIntegration
                 }
 
                 ikMaxIterationsCap = value;
-            }
-        }
-
-        /// <summary>
-        /// Selects the native IK behavior. Mmd is the current default; WebV081
-        /// reproduces the legacy local-axis knee behavior used by the 0.8.1 Web runtime.
-        /// </summary>
-        public MmdIkCompatibilityProfile IkCompatibilityProfile
-        {
-            get => ikCompatibilityProfile;
-            set
-            {
-                MmdRuntimeSession.ValidateIkCompatibilityProfile(value);
-                if (ikCompatibilityProfile == value)
-                {
-                    return;
-                }
-
-                fastSession?.SetIkCompatibilityProfile(value);
-                session.IkCompatibilityProfile = value;
-                ikCompatibilityProfile = value;
-                ResetLivePhysics();
             }
         }
 

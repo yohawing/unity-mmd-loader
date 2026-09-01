@@ -19,7 +19,6 @@ namespace Mmd.Native
         internal const uint FeatureVmdSharedContext = 1u << 9;
         internal const uint FeatureVmdSummaryBytes = 1u << 11;
         internal const uint FeatureVmdSharedContextRawReadback = 1u << 12;
-        internal const uint FeatureIkCompatibilityProfile = 1u << 13;
         internal const uint PhysicsModeOff = 0;
         internal const uint PhysicsModeLive = 2;
         internal const uint PhysicsFrameActionSeed = 0;
@@ -708,9 +707,6 @@ namespace Mmd.Native
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_set_physics_mode", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int InstanceSetPhysicsMode(IntPtr instance, uint mode);
 
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_set_ik_compatibility_profile", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern int InstanceSetIkCompatibilityProfile(IntPtr instance, uint profile);
-
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_physics_world_create_from_pmx_bytes", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int PhysicsWorldCreateFromPmxBytes(byte[] data, IntPtr len, out IntPtr world);
 
@@ -963,18 +959,6 @@ namespace Mmd.Native
             return VmdSharedContextRawReadbackAbiVersionV1;
         }
 
-        internal static void ValidateIkCompatibilityProfileCapability()
-        {
-            ValidateAbiVersion();
-            uint featureFlags = FeatureFlags();
-            if ((featureFlags & FeatureIkCompatibilityProfile) == 0)
-            {
-                throw new MmdRuntimeUnsupportedException(
-                    "mmd-runtime does not provide selectable IK compatibility profiles " +
-                    $"(required feature bit 13, flags=0x{featureFlags:X8}).");
-            }
-        }
-
     }
     internal sealed partial class MmdRuntimeFfiPlaybackSession : IDisposable
     {
@@ -984,7 +968,6 @@ namespace Mmd.Native
         private IntPtr clip;
         private IntPtr instance;
         private bool disposed;
-        private MmdIkCompatibilityProfile ikCompatibilityProfile;
 
         private MmdRuntimeFfiPlaybackSession(IntPtr model, IntPtr clip, IntPtr instance)
         {
@@ -1024,30 +1007,6 @@ namespace Mmd.Native
         {
             ThrowIfDisposed();
             return clip;
-        }
-
-        internal void SetIkCompatibilityProfile(MmdIkCompatibilityProfile profile)
-        {
-            ThrowIfDisposed();
-            MmdRuntimeSession.ValidateIkCompatibilityProfile(profile);
-            if (profile == ikCompatibilityProfile)
-            {
-                return;
-            }
-
-            MmdRuntimeFfiMethods.ValidateIkCompatibilityProfileCapability();
-            int status = MmdRuntimeFfiMethods.InstanceSetIkCompatibilityProfile(
-                instance,
-                (uint)profile);
-            if (status == MmdRuntimeFfiMethods.StatusOk)
-            {
-                ikCompatibilityProfile = profile;
-                return;
-            }
-
-            throw new InvalidOperationException(
-                $"mmd-runtime IK compatibility profile update failed with status {status}: " +
-                MmdRuntimeFfiMarshal.LastErrorMessage());
         }
 
         public static MmdRuntimeFfiPlaybackSession Create(

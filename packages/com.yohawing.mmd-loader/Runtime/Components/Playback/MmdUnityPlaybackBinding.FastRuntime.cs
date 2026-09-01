@@ -91,7 +91,6 @@ namespace Mmd.UnityIntegration
                         sharedVmdContext,
                         abiAlreadyValidated);
                 candidate = created;
-                created.SetIkCompatibilityProfile(ikCompatibilityProfile);
                 int candidateBoneCount = created.BoneCount;
                 int candidateMorphCount = created.MorphCount;
                 if (candidateBoneCount != model.bones.Count)
