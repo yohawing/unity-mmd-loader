@@ -14,6 +14,7 @@ namespace Mmd.UnityIntegration
         private uint lastHumanoidNativeHostPoseInputFingerprint;
         private bool hasLastHumanoidNativeHostPoseInputFingerprint;
         private LivePhysicsDriveSource livePhysicsDriveSource = LivePhysicsDriveSource.None;
+        private MmdHumanoidPhysicsBindingFailureReason humanoidPhysicsBindingFailureReason;
 
         private bool StepHumanoidRetargetLivePhysicsIfNeeded(MmdHumanoidRetargeterResult result)
         {
@@ -101,10 +102,19 @@ namespace Mmd.UnityIntegration
             }
             catch (MissingComponentException)
             {
+                humanoidPhysicsBindingFailureReason =
+                    MmdHumanoidPhysicsBindingFailureReason.MissingComponent;
             }
             catch (InvalidOperationException)
             {
+                humanoidPhysicsBindingFailureReason =
+                    MmdHumanoidPhysicsBindingFailureReason.InvalidOperation;
             }
+        }
+
+        private void ResetHumanoidPhysicsBindingFailureReason()
+        {
+            humanoidPhysicsBindingFailureReason = MmdHumanoidPhysicsBindingFailureReason.None;
         }
 
         private bool TryPrepareHumanoidNativeLivePhysicsBinding()

@@ -67,6 +67,36 @@ namespace Mmd.UnityIntegration
             string animationType,
             MmdMaterialOverrideAsset? materialOverrideAsset = null)
         {
+            return CreateAndInitializeImportedAssetWithProvenance(
+                bytes,
+                assetPath,
+                resolvedSourcePath,
+                importScale,
+                modelPreset,
+                shaderPreset,
+                parseSummary,
+                generatedAssets,
+                materialRemaps,
+                animationType,
+                materialOverrideAsset,
+                materialProfileProvenance: null);
+        }
+
+        internal static MmdPmxAsset CreateAndInitializeImportedAssetWithProvenance(
+            byte[] bytes,
+            string assetPath,
+            string resolvedSourcePath,
+            float importScale,
+            string modelPreset,
+            string shaderPreset,
+            MmdPmxParseSummary parseSummary,
+            MmdUnityModelInstance generatedAssets,
+            Material[] materialRemaps,
+            string animationType,
+            MmdMaterialOverrideAsset? materialOverrideAsset = null,
+            MmdMaterialProfileAsset? materialProfileAsset = null,
+            MmdMaterialProfileProvenance? materialProfileProvenance = null)
+        {
             if (bytes == null || bytes.Length == 0)
             {
                 throw new System.ArgumentException("PMX asset bytes are required.", nameof(bytes));
@@ -110,7 +140,9 @@ namespace Mmd.UnityIntegration
                     rendererDiagnostic,
                     boneBindingDiagnostic,
                     animationType,
-                    materialOverrideAsset);
+                    materialOverrideAsset,
+                    materialProfileAsset,
+                    materialProfileProvenance);
 
                 return asset;
             }

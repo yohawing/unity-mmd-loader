@@ -44,133 +44,133 @@ namespace Mmd.Editor
                         continue;
                     }
 
-                MmdMaterialTextureTargets textureTargets = MmdMaterialTextureTargets.BuiltIn;
-                MmdMaterialRenderingTargets renderingTargets = MmdMaterialRenderingTargets.BuiltIn;
-                if (materialMappers != null)
-                {
-                    MmdMaterialMapperRegistration mapper = materialMappers.Resolve(matDef.index);
-                    textureTargets = mapper.TextureTargets;
-                    renderingTargets = mapper.RenderingTargets;
-                }
-
-                TextureReferenceBindStatus diffuseStatus = BindOneTextureReference(
-                    matDef.texture,
-                    pmxAssetPath,
-                    mat,
-                    ctx,
-                    out bool diffuseBound,
-                    textureTargets.DiffuseTextureProperties.ToArray());
-                summary.Record(i, "diffuse", matDef.texture, diffuseStatus);
-                if (diffuseBound &&
-                    !string.IsNullOrWhiteSpace(textureTargets.DiffuseTextureBoundProperty) &&
-                    mat.HasProperty(textureTargets.DiffuseTextureBoundProperty))
-                {
-                    mat.SetFloat(textureTargets.DiffuseTextureBoundProperty, 1.0f);
-                }
-
-                TextureReferenceBindStatus sphereStatus = BindOneTextureReference(
-                    matDef.sphereTexture,
-                    pmxAssetPath,
-                    mat,
-                    ctx,
-                    out bool sphereBound,
-                    OptionalTextureProperty(textureTargets.SphereTextureProperty));
-                summary.Record(i, "sphere", matDef.sphereTexture, sphereStatus);
-                if (sphereBound &&
-                    !string.IsNullOrWhiteSpace(textureTargets.SphereTextureBoundProperty) &&
-                    mat.HasProperty(textureTargets.SphereTextureBoundProperty))
-                {
-                    mat.SetFloat(textureTargets.SphereTextureBoundProperty, 1.0f);
-                }
-
-                TextureReferenceBindStatus toonStatus = BindOneTextureReference(
-                    matDef.toonTexture,
-                    pmxAssetPath,
-                    mat,
-                    ctx,
-                    out bool toonBound,
-                    OptionalTextureProperty(textureTargets.ToonTextureProperty));
-                if (!toonBound &&
-                    !string.IsNullOrWhiteSpace(textureTargets.ToonTextureProperty) &&
-                    mat.HasProperty(textureTargets.ToonTextureProperty) &&
-                    ctx != null &&
-                    matDef.toonShared &&
-                    MmdSharedToonTextures.IsSharedToonIndex(matDef.sharedToonIndex))
-                {
-                    // MMD shared toon (toon01..toon10) carries only an index, not a path, so the
-                    // path-based bind above never resolves it. Persist the built-in GoldenOracle
-                    // ramp as a sub-asset so the imported material shades through the toon ramp
-                    // instead of falling back to flat lighting.
-                    Texture2D? sharedToon = GetOrCreateSharedToonSubAsset(
-                        matDef.sharedToonIndex,
-                        sharedToonSubAssets,
-                        ownedSubAssets);
-                    if (sharedToon != null)
+                    MmdMaterialTextureTargets textureTargets = MmdMaterialTextureTargets.BuiltIn;
+                    MmdMaterialRenderingTargets renderingTargets = MmdMaterialRenderingTargets.BuiltIn;
+                    if (materialMappers != null)
                     {
-                        mat.SetTexture(textureTargets.ToonTextureProperty, sharedToon);
-                        toonBound = true;
+                        MmdMaterialMapperRegistration mapper = materialMappers.Resolve(matDef.index);
+                        textureTargets = mapper.TextureTargets;
+                        renderingTargets = mapper.RenderingTargets;
                     }
-                }
 
-                summary.Record(i, "toon", matDef.toonTexture, toonBound ? TextureReferenceBindStatus.Resolved : toonStatus);
-
-                if (toonBound &&
-                    !string.IsNullOrWhiteSpace(textureTargets.ToonTextureBoundProperty) &&
-                    mat.HasProperty(textureTargets.ToonTextureBoundProperty))
-                {
-                    // The runtime builder sets this when it binds a toon texture; the importer's
-                    // separate project-texture bind must do the same or the shader treats the
-                    // material as having no toon ramp (flat lighting).
-                    mat.SetFloat(textureTargets.ToonTextureBoundProperty, 1.0f);
-                }
-
-                // Re-run transparency classification using the on-disk diffuse texture alpha, so
-                // that texture-alpha-driven transparency (alphaTest/alphaBlend) is preserved on
-                // imported models even though sourcePath:null suppressed it during initial build.
-                if (descriptor != null && i < descriptor.materials.Count)
-                {
-                    MmdMaterialDescriptor source = descriptor.materials[i];
-                    string? diffuseAssetPath = null;
-                    Texture2D? decodedAlphaTexture = null;
-                    if (!string.IsNullOrWhiteSpace(matDef.texture) &&
-                        MmdAssetPathUtility.TryResolveProjectRelativeAssetPathCandidate(pmxAssetPath, matDef.texture, out string resolvedAssetPath) &&
-                        System.IO.File.Exists(resolvedAssetPath))
+                    TextureReferenceBindStatus diffuseStatus = BindOneTextureReference(
+                        matDef.texture,
+                        pmxAssetPath,
+                        mat,
+                        ctx,
+                        out bool diffuseBound,
+                        textureTargets.DiffuseTextureProperties.ToArray());
+                    summary.Record(i, "diffuse", matDef.texture, diffuseStatus);
+                    if (diffuseBound &&
+                        !string.IsNullOrWhiteSpace(textureTargets.DiffuseTextureBoundProperty) &&
+                        mat.HasProperty(textureTargets.DiffuseTextureBoundProperty))
                     {
-                        diffuseAssetPath = resolvedAssetPath;
+                        mat.SetFloat(textureTargets.DiffuseTextureBoundProperty, 1.0f);
+                    }
+
+                    TextureReferenceBindStatus sphereStatus = BindOneTextureReference(
+                        matDef.sphereTexture,
+                        pmxAssetPath,
+                        mat,
+                        ctx,
+                        out bool sphereBound,
+                        OptionalTextureProperty(textureTargets.SphereTextureProperty));
+                    summary.Record(i, "sphere", matDef.sphereTexture, sphereStatus);
+                    if (sphereBound &&
+                        !string.IsNullOrWhiteSpace(textureTargets.SphereTextureBoundProperty) &&
+                        mat.HasProperty(textureTargets.SphereTextureBoundProperty))
+                    {
+                        mat.SetFloat(textureTargets.SphereTextureBoundProperty, 1.0f);
+                    }
+
+                    TextureReferenceBindStatus toonStatus = BindOneTextureReference(
+                        matDef.toonTexture,
+                        pmxAssetPath,
+                        mat,
+                        ctx,
+                        out bool toonBound,
+                        OptionalTextureProperty(textureTargets.ToonTextureProperty));
+                    if (!toonBound &&
+                        !string.IsNullOrWhiteSpace(textureTargets.ToonTextureProperty) &&
+                        mat.HasProperty(textureTargets.ToonTextureProperty) &&
+                        ctx != null &&
+                        matDef.toonShared &&
+                        MmdSharedToonTextures.IsSharedToonIndex(matDef.sharedToonIndex))
+                    {
+                        // MMD shared toon (toon01..toon10) carries only an index, not a path, so the
+                        // path-based bind above never resolves it. Persist the built-in GoldenOracle
+                        // ramp as a sub-asset so the imported material shades through the toon ramp
+                        // instead of falling back to flat lighting.
+                        Texture2D? sharedToon = GetOrCreateSharedToonSubAsset(
+                            matDef.sharedToonIndex,
+                            sharedToonSubAssets,
+                            ownedSubAssets);
+                        if (sharedToon != null)
+                        {
+                            mat.SetTexture(textureTargets.ToonTextureProperty, sharedToon);
+                            toonBound = true;
+                        }
+                    }
+
+                    summary.Record(i, "toon", matDef.toonTexture, toonBound ? TextureReferenceBindStatus.Resolved : toonStatus);
+
+                    if (toonBound &&
+                        !string.IsNullOrWhiteSpace(textureTargets.ToonTextureBoundProperty) &&
+                        mat.HasProperty(textureTargets.ToonTextureBoundProperty))
+                    {
+                        // The runtime builder sets this when it binds a toon texture; the importer's
+                        // separate project-texture bind must do the same or the shader treats the
+                        // material as having no toon ramp (flat lighting).
+                        mat.SetFloat(textureTargets.ToonTextureBoundProperty, 1.0f);
+                    }
+
+                    // Re-run transparency classification using the on-disk diffuse texture alpha, so
+                    // that texture-alpha-driven transparency (alphaTest/alphaBlend) is preserved on
+                    // imported models even though sourcePath:null suppressed it during initial build.
+                    if (descriptor != null && i < descriptor.materials.Count)
+                    {
+                        MmdMaterialDescriptor source = descriptor.materials[i];
+                        string? diffuseAssetPath = null;
+                        Texture2D? decodedAlphaTexture = null;
+                        if (!string.IsNullOrWhiteSpace(matDef.texture) &&
+                            MmdAssetPathUtility.TryResolveProjectRelativeAssetPathCandidate(pmxAssetPath, matDef.texture, out string resolvedAssetPath) &&
+                            System.IO.File.Exists(resolvedAssetPath))
+                        {
+                            diffuseAssetPath = resolvedAssetPath;
+                            try
+                            {
+                                byte[] texBytes = MmdTextureDecodeBudget.Default.ReadFileBytes(resolvedAssetPath);
+                                decodedAlphaTexture = MmdRuntimeTextureResolver.DecodeTextureBytes(
+                                    texBytes,
+                                    System.IO.Path.GetExtension(resolvedAssetPath),
+                                    System.IO.Path.GetFileNameWithoutExtension(resolvedAssetPath));
+                            }
+                            catch (System.Exception ex) when (ex is System.IO.IOException || ex is System.ArgumentException)
+                            {
+                                decodedAlphaTexture = null;
+                            }
+                        }
+
                         try
                         {
-                            byte[] texBytes = MmdTextureDecodeBudget.Default.ReadFileBytes(resolvedAssetPath);
-                            decodedAlphaTexture = MmdRuntimeTextureResolver.DecodeTextureBytes(
-                                texBytes,
-                                System.IO.Path.GetExtension(resolvedAssetPath),
-                                System.IO.Path.GetFileNameWithoutExtension(resolvedAssetPath));
+                            MmdUnityMaterialBuilder.ReapplyImportedMaterialTransparency(
+                                mat,
+                                descriptor,
+                                source,
+                                i,
+                                matDef.texture,
+                                diffuseAssetPath,
+                                decodedAlphaTexture,
+                                renderingTargets);
                         }
-                        catch (System.Exception ex) when (ex is System.IO.IOException || ex is System.ArgumentException)
+                        finally
                         {
-                            decodedAlphaTexture = null;
+                            if (decodedAlphaTexture != null)
+                            {
+                                UnityEngine.Object.DestroyImmediate(decodedAlphaTexture);
+                            }
                         }
                     }
-
-                    try
-                    {
-                        MmdUnityMaterialBuilder.ReapplyImportedMaterialTransparency(
-                            mat,
-                            descriptor,
-                            source,
-                            i,
-                            matDef.texture,
-                            diffuseAssetPath,
-                            decodedAlphaTexture,
-                            renderingTargets);
-                    }
-                    finally
-                    {
-                        if (decodedAlphaTexture != null)
-                        {
-                            UnityEngine.Object.DestroyImmediate(decodedAlphaTexture);
-                        }
-                    }
-                }
                 }
 
                 return summary.Build(ownedSubAssets);

@@ -1,7 +1,6 @@
 #nullable enable
 
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using NUnit.Framework;
@@ -21,9 +20,9 @@ namespace Mmd.Tests
     /// re-seeds, so it cannot catch a simulation that dies after a backward seek or after
     /// the controller's own forward Tick fights the Timeline clock.
     ///
-    /// These tests use the real hair physics fixture with a rest-pose motion: gravity is
-    /// the live-physics signal. After a reset+reseed the hair must sag again; if it stays
-    /// pinned at the seeded (bind-relative) pose, the simulation has frozen.
+    /// The movement-sensitive cases use a checked-in two-bone mode-1 fixture where the body
+    /// translation is deliberately observable. After a reset+reseed the hair must follow again;
+    /// if it stays pinned at the seeded (bind-relative) pose, the simulation has frozen.
     /// </summary>
     public sealed class MmdLivePhysicsScrubResumeRegressionTests
     {
@@ -522,108 +521,6 @@ namespace Mmd.Tests
             Assert.That(scalePointOne.hairBoneLocalPosition.z, Is.EqualTo(scaleOne.hairBoneLocalPosition.z * 0.1f).Within(0.001f));
         }
 
-        [Test]
-        public void ForwardPlaybackWithMovingModelKeepsHairAttachedToBody()
-        {
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-            }
-
-            MmdUnityPlaybackBinding? binding = null;
-            try
-            {
-                MmdModelDefinition model = LoadHairPhysicsModel(out string pmxPath);
-
-                // Anchor = a bone driven by a bone-follow (static) body; it moves rigidly with the
-                // animated skeleton. Hair = a bone driven by a PMX mode-1 (pure "dynamic") body whose
-                // position comes entirely from the Bullet simulation (model space). If the simulation
-                // does not get dragged along when the body translates, the mode-1 hair bone stays at
-                // its model-space bind position and visibly lags/freezes while the body moves away.
-                int anchorBoneIndex = FirstBodyBoneIndex(model, binding: null, kind => string.Equals(kind, "static", StringComparison.Ordinal));
-                int hairBoneIndex = FirstBodyBoneIndex(model, binding: null, kind => string.Equals(kind, "dynamic", StringComparison.Ordinal));
-                Assert.That(anchorBoneIndex, Is.GreaterThanOrEqualTo(0), "test_hair_physics.pmx must have a static (bone-follow) body");
-                if (hairBoneIndex < 0)
-                {
-                    // This fixture only has static + PMX mode-2 (dynamic-orientation) bodies, whose
-                    // bone position is pinned to the (hierarchically animated) bone every frame, so a
-                    // world-position follow check cannot distinguish a frozen simulation. The position-
-                    // driven mode-1 drag is covered at the backend layer by
-                    // The host-pose backend must preserve the translated anchor across a scrub/resume.
-                    Assert.Inconclusive("test_hair_physics.pmx has no PMX mode-1 (pure dynamic) body to measure world-position follow.");
-                }
-
-                string rootBoneName = model.bones[0].name;
-                MmdMotionDefinition motion = CreateBoneTranslationMotion(model, rootBoneName, frames: 30, endTranslationX: 30.0f);
-
-                binding = MmdUnityPlaybackBinding.CreateSkinned(
-                    model, motion, "test_hair_physics.pmx", "translate-root", pmxPath);
-                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
-                controller.Configure(binding, 30.0f, playOnStart: false);
-                controller.SetPhysicsMode(MmdPhysicsMode.Live);
-                var behaviour = new MmdVmdTimelineBehaviour { FrameRate = 30.0f };
-
-                Assert.That(anchorBoneIndex, Is.LessThan(binding.Instance.BoneTransforms.Length));
-                Assert.That(hairBoneIndex, Is.LessThan(binding.Instance.BoneTransforms.Length));
-
-                behaviour.EvaluateAtLocalTime(controller, 0.0, runLivePhysics: true);
-                Vector3 anchorStart = binding.Instance.BoneTransforms[anchorBoneIndex].position;
-                Vector3 hairStart = binding.Instance.BoneTransforms[hairBoneIndex].position;
-
-                for (int frame = 1; frame <= 30; frame++)
-                {
-                    behaviour.EvaluateAtLocalTime(controller, frame / 30.0, runLivePhysics: true);
-                }
-
-                Vector3 anchorEnd = binding.Instance.BoneTransforms[anchorBoneIndex].position;
-                Vector3 hairEnd = binding.Instance.BoneTransforms[hairBoneIndex].position;
-                float anchorDisplacement = (anchorEnd - anchorStart).magnitude;
-                float hairDisplacement = (hairEnd - hairStart).magnitude;
-
-                if (anchorDisplacement < 1.0f)
-                {
-                    Assert.Inconclusive(
-                        $"The model did not translate (anchor bone moved only {anchorDisplacement}); bone 0 " +
-                        $"'{rootBoneName}' may not be movable, so the moving-body follow cannot be measured.");
-                }
-
-                Assert.That(
-                    hairDisplacement,
-                    Is.GreaterThanOrEqualTo(anchorDisplacement * 0.5f),
-                    $"The mode-1 hair bone did not follow the moving body: the anchor moved {anchorDisplacement} " +
-                    $"but the hair moved only {hairDisplacement}. The 揺れもの is frozen near the bind pose while " +
-                    "the body animates away (live physics is not being dragged along with the model).");
-            }
-            finally
-            {
-                DestroyBinding(binding);
-            }
-        }
-
-        private static int FirstBodyBoneIndex(MmdModelDefinition model, MmdUnityPlaybackBinding? binding, Func<string, bool> kindMatches)
-        {
-            foreach (MmdRigidbodyDefinition body in model.physics.rigidbodies)
-            {
-                if (body.boneIndex < 0)
-                {
-                    continue;
-                }
-
-                if (binding != null && body.boneIndex >= binding.Instance.BoneTransforms.Length)
-                {
-                    continue;
-                }
-
-                if (kindMatches(body.physicsKind ?? string.Empty))
-                {
-                    return body.boneIndex;
-                }
-            }
-
-            return -1;
-        }
-
         private static MmdMotionDefinition CreateBoneTranslationMotion(
             MmdModelDefinition model, string boneName, int frames, float endTranslationX)
         {
@@ -657,26 +554,56 @@ namespace Mmd.Tests
 
             model.physics.rigidbodies.Add(new MmdRigidbodyDefinition
             {
-                index = 0, name = "anchor", boneIndex = rootIndex, boneName = rootName, shapeType = "sphere",
-                size = new[] { 0.3f, 0.3f, 0.3f }, position = ToArray(rootOrigin),
-                rotation = new[] { 0.0f, 0.0f, 0.0f }, mass = 0.0f, linearDamping = 0.0f, angularDamping = 0.0f,
-                friction = 0.5f, restitution = 0.0f, group = 0, mask = 0xffff, physicsKind = "static"
+                index = 0,
+                name = "anchor",
+                boneIndex = rootIndex,
+                boneName = rootName,
+                shapeType = "sphere",
+                size = new[] { 0.3f, 0.3f, 0.3f },
+                position = ToArray(rootOrigin),
+                rotation = new[] { 0.0f, 0.0f, 0.0f },
+                mass = 0.0f,
+                linearDamping = 0.0f,
+                angularDamping = 0.0f,
+                friction = 0.5f,
+                restitution = 0.0f,
+                group = 0,
+                mask = 0xffff,
+                physicsKind = "static"
             });
             model.physics.rigidbodies.Add(new MmdRigidbodyDefinition
             {
-                index = 1, name = "hairBody", boneIndex = hairIndex, boneName = hairName, shapeType = "sphere",
-                size = new[] { 0.3f, 0.3f, 0.3f }, position = ToArray(hairOrigin),
-                rotation = new[] { 0.0f, 0.0f, 0.0f }, mass = 1.0f, linearDamping = 0.0f, angularDamping = 0.0f,
-                friction = 0.5f, restitution = 0.0f, group = 0, mask = 0xffff, physicsKind = "dynamic"
+                index = 1,
+                name = "hairBody",
+                boneIndex = hairIndex,
+                boneName = hairName,
+                shapeType = "sphere",
+                size = new[] { 0.3f, 0.3f, 0.3f },
+                position = ToArray(hairOrigin),
+                rotation = new[] { 0.0f, 0.0f, 0.0f },
+                mass = 1.0f,
+                linearDamping = 0.0f,
+                angularDamping = 0.0f,
+                friction = 0.5f,
+                restitution = 0.0f,
+                group = 0,
+                mask = 0xffff,
+                physicsKind = "dynamic"
             });
             model.physics.joints.Add(new MmdJointDefinition
             {
-                index = 0, name = "anchor-hair", rigidbodyAIndex = 0, rigidbodyBIndex = 1,
-                position = ToArray(jointOrigin), rotation = new[] { 0.0f, 0.0f, 0.0f },
-                linearLowerLimit = new[] { 0.0f, 0.0f, 0.0f }, linearUpperLimit = new[] { 0.0f, 0.0f, 0.0f },
+                index = 0,
+                name = "anchor-hair",
+                rigidbodyAIndex = 0,
+                rigidbodyBIndex = 1,
+                position = ToArray(jointOrigin),
+                rotation = new[] { 0.0f, 0.0f, 0.0f },
+                linearLowerLimit = new[] { 0.0f, 0.0f, 0.0f },
+                linearUpperLimit = new[] { 0.0f, 0.0f, 0.0f },
                 angularLowerLimit = new[] { -3.1415927f, -3.1415927f, -3.1415927f },
                 angularUpperLimit = new[] { 3.1415927f, 3.1415927f, 3.1415927f },
-                linearSpring = new[] { 0.0f, 0.0f, 0.0f }, angularSpring = new[] { 0.0f, 0.0f, 0.0f }
+                linearSpring = new[] { 0.0f, 0.0f, 0.0f },
+                angularSpring = new[] { 0.0f, 0.0f, 0.0f }
             });
             return model;
         }

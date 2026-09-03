@@ -14,6 +14,7 @@ namespace Mmd.UnityIntegration
     {
         public void ConfigureModelAsset(MmdPmxAsset pmxAsset)
         {
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             if (pmxAsset == null)
             {
                 throw new ArgumentNullException(nameof(pmxAsset));
@@ -24,21 +25,25 @@ namespace Mmd.UnityIntegration
                 DisposeHumanoidPhysicsBinding();
                 DisposeHumanoidHostPoseSession();
                 ResetHumanoidHostPoseFailureLatch();
+                ResetHumanoidPhysicsBindingFailureReason();
             }
 
             modelAsset = pmxAsset;
+            standaloneWorkerFaulted = false;
             _ = pmxAsset.BeginSynchronousPlaybackPreload(
                 MmdUnityPlaybackBinding.ResolveMaterialPreset(pmxAsset));
         }
 
         public void ConfigureMotionAsset(MmdVmdAsset vmdAsset)
         {
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             if (vmdAsset == null)
             {
                 throw new ArgumentNullException(nameof(vmdAsset));
             }
 
             motionAsset = vmdAsset;
+            standaloneWorkerFaulted = false;
         }
 
         public void ConfigureFromPlaybackSource(MmdPmxAsset pmxAsset, MmdVmdAsset vmdAsset, MmdPlaybackConfig config)
@@ -54,22 +59,12 @@ namespace Mmd.UnityIntegration
             }
 
             config.Validate();
-            ConfigureModelAsset(pmxAsset);
-            ConfigureMotionAsset(vmdAsset);
-            MmdMotionDefinition motion = vmdAsset.CreateNativeClipMotionHeader();
-            MmdMotionValidator.ThrowIfInvalid(motion);
-            if (TryConfigureReboundAssetBinding(
+            ConfigureFromAssetSourceCore(
                 pmxAsset,
                 vmdAsset,
-                motion,
                 reboundBinding => Configure(reboundBinding, config),
                 timelineEvaluation: false,
-                applyStartFrame: null))
-            {
-                return;
-            }
-
-            throw CreateMissingSceneModelException(ResolveAssetSourceId(pmxAsset), timelineEvaluation: false);
+                applyStartFrame: null);
         }
 
         public void ConfigureFromRuntimeImporterPaths(
@@ -124,16 +119,13 @@ namespace Mmd.UnityIntegration
                 throw new FileNotFoundException("Runtime importer VMD file was not found.", resolvedVmdPath);
             }
 
-            MmdPmxRuntimeParseCache.Result cachedPmx = MmdPmxRuntimeParseCache.Load(resolvedPmxPath);
+            MmdPmxRuntimeParseCache.Result cachedPmx = LoadRuntimePmxSource(resolvedPmxPath, setupTiming);
             byte[] pmxBytes = cachedPmx.Bytes;
             long phaseStart = Stopwatch.GetTimestamp();
             byte[] vmdBytes = File.ReadAllBytes(resolvedVmdPath);
             if (setupTiming != null)
             {
-                setupTiming.sourceAcquireMs += cachedPmx.SourceAcquireMs;
                 setupTiming.sourceAcquireMs += TimelineSetupElapsedMilliseconds(phaseStart);
-                setupTiming.pmxParseMs += cachedPmx.ParseMs;
-                setupTiming.pmxParseCacheHit = cachedPmx.CacheHit;
             }
             MmdModelDefinition model = cachedPmx.Model;
             phaseStart = Stopwatch.GetTimestamp();
@@ -144,21 +136,13 @@ namespace Mmd.UnityIntegration
             {
                 setupTiming.motionHeaderMs += TimelineSetupElapsedMilliseconds(phaseStart);
             }
-            if (!HasExistingSceneSkinnedMeshRenderer())
+            if (!TryValidateExistingSceneModelCompatibility(model, setupTiming))
             {
                 throw CreateMissingSceneModelException(resolvedPmxPath, timelineEvaluation);
             }
 
-            phaseStart = Stopwatch.GetTimestamp();
-            MmdUnityModelFactory.ValidateExistingSkinnedModelCompatibility(gameObject, model);
-            if (setupTiming != null)
-            {
-                setupTiming.compatibilityValidationMs += TimelineSetupElapsedMilliseconds(phaseStart);
-            }
-            TryConfigureNativeFirst(
-                motion,
-                pmxBytes,
-                vmdBytes,
+            ConfigureNativePlaybackSetup(
+                new MmdNativePlaybackSetup(motion, pmxBytes, vmdBytes),
                 nativeMotion => MmdUnityPlaybackBinding.CreateSkinnedFromExistingSceneModel(
                     gameObject,
                     model,
@@ -180,6 +164,7 @@ namespace Mmd.UnityIntegration
                     }
                 },
                 timelineEvaluation,
+                applyStartFrame: null,
                 setupTiming: setupTiming);
         }
 
@@ -291,26 +276,14 @@ namespace Mmd.UnityIntegration
                 throw new FileNotFoundException("Provider PMX file was not found.", resolvedPmxPath);
             }
 
-            MmdPmxRuntimeParseCache.Result cachedPmx = MmdPmxRuntimeParseCache.Load(resolvedPmxPath);
+            MmdPmxRuntimeParseCache.Result cachedPmx = LoadRuntimePmxSource(resolvedPmxPath, setupTiming);
             MmdModelDefinition model = cachedPmx.Model;
-            if (setupTiming != null)
-            {
-                setupTiming.sourceAcquireMs += cachedPmx.SourceAcquireMs;
-                setupTiming.pmxParseMs += cachedPmx.ParseMs;
-                setupTiming.pmxParseCacheHit = cachedPmx.CacheHit;
-            }
 
-            if (!HasExistingSceneSkinnedMeshRenderer())
+            if (!TryValidateExistingSceneModelCompatibility(model, setupTiming))
             {
                 throw CreateMissingSceneModelException(resolvedPmxPath, timelineEvaluation);
             }
 
-            phaseStart = Stopwatch.GetTimestamp();
-            MmdUnityModelFactory.ValidateExistingSkinnedModelCompatibility(gameObject, model);
-            if (setupTiming != null)
-            {
-                setupTiming.compatibilityValidationMs += TimelineSetupElapsedMilliseconds(phaseStart);
-            }
             phaseStart = Stopwatch.GetTimestamp();
             byte[] pathPmxBytes = cachedPmx.Bytes;
             byte[] pathVmdBytes = vmdAsset.GetBytesCopy();
@@ -326,10 +299,13 @@ namespace Mmd.UnityIntegration
             {
                 setupTiming.sharedVmdContextMs += TimelineSetupElapsedMilliseconds(phaseStart);
             }
-            TryConfigureNativeFirst(
-                motion,
-                pathPmxBytes,
-                pathVmdBytes,
+            ConfigureNativePlaybackSetup(
+                new MmdNativePlaybackSetup(
+                    motion,
+                    pathPmxBytes,
+                    pathVmdBytes,
+                    sharedVmdContext,
+                    sharedVmdContextFailure),
                 nativeMotion => MmdUnityPlaybackBinding.CreateSkinnedFromExistingSceneModel(
                     gameObject,
                     model,
@@ -341,14 +317,8 @@ namespace Mmd.UnityIntegration
                     sourcesAlreadyValidated: true),
                 candidate => Configure(candidate, playbackFrameRate, playOnStart),
                 timelineEvaluation,
-                sharedVmdContext,
-                sharedVmdContextFailure,
+                applyStartFrame: timelineEvaluation ? null : startFrame,
                 setupTiming: setupTiming);
-
-            if (!timelineEvaluation)
-            {
-                ApplyFrame(startFrame);
-            }
         }
 
         public bool IsConfiguredForMotionAsset(MmdVmdAsset motion)
@@ -376,6 +346,21 @@ namespace Mmd.UnityIntegration
                 throw new ArgumentOutOfRangeException(nameof(startFrame), "Initial frame must not be negative.");
             }
 
+            ConfigureFromAssetSourceCore(
+                pmxAsset,
+                vmdAsset,
+                reboundBinding => Configure(reboundBinding, playbackFrameRate, playOnStart),
+                timelineEvaluation: false,
+                applyStartFrame: startFrame);
+        }
+
+        private void ConfigureFromAssetSourceCore(
+            MmdPmxAsset pmxAsset,
+            MmdVmdAsset vmdAsset,
+            Action<MmdUnityPlaybackBinding> configure,
+            bool timelineEvaluation,
+            int? applyStartFrame)
+        {
             ConfigureModelAsset(pmxAsset);
             ConfigureMotionAsset(vmdAsset);
             MmdMotionDefinition motion = vmdAsset.CreateNativeClipMotionHeader();
@@ -385,14 +370,16 @@ namespace Mmd.UnityIntegration
                 pmxAsset,
                 vmdAsset,
                 motion,
-                reboundBinding => Configure(reboundBinding, playbackFrameRate, playOnStart),
-                timelineEvaluation: false,
-                applyStartFrame: startFrame))
+                configure,
+                timelineEvaluation,
+                applyStartFrame))
             {
                 return;
             }
 
-            throw CreateMissingSceneModelException(ResolveAssetSourceId(pmxAsset), timelineEvaluation: false);
+            throw CreateMissingSceneModelException(
+                ResolveAssetSourceId(pmxAsset),
+                timelineEvaluation);
         }
 
         public bool ConfigureFromPlaybackSourceIfAvailable()
@@ -453,21 +440,6 @@ namespace Mmd.UnityIntegration
             return GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true) != null;
         }
 
-        private void ReleaseCurrentBindingBeforeSceneRebind()
-        {
-            DisposeHumanoidPhysicsBinding();
-            if (binding == null)
-            {
-                return;
-            }
-
-            binding.Dispose();
-            binding = null;
-            LastSnapshot = null;
-            IsPlaying = false;
-            ResetLivePhysicsDriveSource();
-        }
-
         private bool TryConfigureReboundAssetBinding(
             MmdPmxAsset pmxAsset,
             MmdVmdAsset vmdAsset,
@@ -494,12 +466,7 @@ namespace Mmd.UnityIntegration
                 }
                 setupTiming.pmxParseCacheHit = pmxParseCacheHit;
             }
-            phaseStart = Stopwatch.GetTimestamp();
-            MmdUnityModelFactory.ValidateExistingSkinnedModelCompatibility(gameObject, model);
-            if (setupTiming != null)
-            {
-                setupTiming.compatibilityValidationMs += TimelineSetupElapsedMilliseconds(phaseStart);
-            }
+            ValidateExistingSceneModelCompatibility(model, setupTiming);
             phaseStart = Stopwatch.GetTimestamp();
             byte[] pmxBytes = pmxAsset.GetBytesForSynchronousRuntimeSetup();
             byte[] vmdBytes = motion.sourceBytes
@@ -517,10 +484,13 @@ namespace Mmd.UnityIntegration
             {
                 setupTiming.sharedVmdContextMs += TimelineSetupElapsedMilliseconds(phaseStart);
             }
-            TryConfigureNativeFirst(
-                motion,
-                pmxBytes,
-                vmdBytes,
+            ConfigureNativePlaybackSetup(
+                new MmdNativePlaybackSetup(
+                    motion,
+                    pmxBytes,
+                    vmdBytes,
+                    sharedVmdContext,
+                    sharedVmdContextFailure),
                 nativeMotion => MmdUnityPlaybackBinding.CreateSkinnedFromExistingSceneModel(
                     gameObject,
                     pmxAsset,
@@ -530,184 +500,51 @@ namespace Mmd.UnityIntegration
                     sourcesAlreadyValidated: true),
                 configure,
                 timelineEvaluation,
-                sharedVmdContext,
-                sharedVmdContextFailure,
+                applyStartFrame,
                 setupTiming);
-
-            if (applyStartFrame.HasValue)
-            {
-                phaseStart = Stopwatch.GetTimestamp();
-                ApplyFrame(applyStartFrame.Value);
-                if (setupTiming != null)
-                {
-                    setupTiming.initialSeedMs += TimelineSetupElapsedMilliseconds(phaseStart);
-                }
-            }
 
             return true;
         }
 
-        private void TryConfigureNativeFirst(
-            MmdMotionDefinition nativeMotion,
-            byte[] pmxBytes,
-            byte[] vmdBytes,
+        private void ConfigureNativePlaybackSetup(
+            MmdNativePlaybackSetup setup,
             Func<MmdMotionDefinition, MmdUnityPlaybackBinding> createBinding,
             Action<MmdUnityPlaybackBinding> configure,
             bool timelineEvaluation,
-            MmdRuntimeFfiVmdContext? sharedVmdContext = null,
-            string? sharedVmdContextFailure = null,
+            int? applyStartFrame,
             MmdTimelineSetupTimingSummary? setupTiming = null)
         {
-            long phaseStart = Stopwatch.GetTimestamp();
-            bool nativeAvailable = TryCheckNativeRuntimeAvailability(
-                pmxBytes,
-                vmdBytes,
-                out string nativeRuntimeFailure);
-            if (setupTiming != null)
+            TryConfigureNativeFirst(
+                setup,
+                createBinding,
+                configure,
+                timelineEvaluation,
+                setupTiming);
+
+            if (applyStartFrame.HasValue)
             {
-                setupTiming.nativeAvailabilityMs += TimelineSetupElapsedMilliseconds(phaseStart);
+                ApplyReboundStartFrameWithRollback(applyStartFrame.Value, setupTiming);
             }
-            if (nativeAvailable)
-            {
-                MmdTimelineLivePhysicsTransfer? livePhysicsTransfer = timelineEvaluation
-                    ? binding?.DetachTimelineLivePhysicsBackend()
-                    : null;
-                phaseStart = Stopwatch.GetTimestamp();
-                ReleaseCurrentBindingBeforeSceneRebind();
-                if (setupTiming != null)
-                {
-                    setupTiming.releasePreviousBindingMs += TimelineSetupElapsedMilliseconds(phaseStart);
-                }
-                MmdUnityPlaybackBinding? nativeBinding = null;
-                try
-                {
-                    phaseStart = Stopwatch.GetTimestamp();
-                    nativeBinding = createBinding(nativeMotion);
-                    if (setupTiming != null)
-                    {
-                        setupTiming.sceneBindingMs += TimelineSetupElapsedMilliseconds(phaseStart);
-                    }
-                    phaseStart = Stopwatch.GetTimestamp();
-                    if (TryEnableNativeRuntime(
-                            nativeBinding,
-                            pmxBytes,
-                            vmdBytes,
-                            sharedVmdContext,
-                            out nativeRuntimeFailure))
-                    {
-                        if (setupTiming != null)
-                        {
-                            setupTiming.nativeSessionMs += TimelineSetupElapsedMilliseconds(phaseStart);
-                        }
-                        lastFastRuntimeReason = string.Empty;
-                        phaseStart = Stopwatch.GetTimestamp();
-                        configure(nativeBinding);
-                        if (setupTiming != null)
-                        {
-                            setupTiming.controllerConfigureMs += TimelineSetupElapsedMilliseconds(phaseStart);
-                        }
-                        if (livePhysicsTransfer != null)
-                        {
-                            try
-                            {
-                                bool reused = nativeBinding.TryAttachTimelineLivePhysicsBackend(livePhysicsTransfer);
-                                if (setupTiming != null)
-                                {
-                                    setupTiming.livePhysicsWorldReused = reused;
-                                }
-                            }
-                            finally
-                            {
-                                livePhysicsTransfer.Dispose();
-                                livePhysicsTransfer = null;
-                            }
-                        }
-                        nativeBinding = null;
-                        return;
-                    }
-                    if (setupTiming != null)
-                    {
-                        setupTiming.nativeSessionMs += TimelineSetupElapsedMilliseconds(phaseStart);
-                    }
-                }
-                finally
-                {
-                    livePhysicsTransfer?.Dispose();
-                    if (nativeBinding != null)
-                    {
-                        ClearFailedBindingReference(nativeBinding);
-                    }
-                    nativeBinding?.Dispose();
-                }
-            }
-
-            string finalNativeRuntimeFailure = ComposeNativeRuntimeFailure(
-                sharedVmdContextFailure,
-                nativeRuntimeFailure);
-            lastFastRuntimeReason = finalNativeRuntimeFailure;
-            phaseStart = Stopwatch.GetTimestamp();
-            ReleaseCurrentBindingBeforeSceneRebind();
-            if (setupTiming != null)
-            {
-                setupTiming.releasePreviousBindingMs += TimelineSetupElapsedMilliseconds(phaseStart);
-            }
-            throw CreateNativeClipPlaybackUnavailableException(finalNativeRuntimeFailure, timelineEvaluation);
-        }
-
-        private static double TimelineSetupElapsedMilliseconds(long startTimestamp)
-        {
-            return (Stopwatch.GetTimestamp() - startTimestamp) * 1000.0 / Stopwatch.Frequency;
-        }
-
-        private static string ComposeNativeRuntimeFailure(
-            string? sharedVmdContextFailure,
-            string nativeRuntimeFailure)
-        {
-            if (string.IsNullOrWhiteSpace(sharedVmdContextFailure))
-            {
-                return nativeRuntimeFailure;
-            }
-
-            return "Shared VMD context setup failed: " + sharedVmdContextFailure +
-                   "; standalone native setup failed: " + nativeRuntimeFailure;
-        }
-
-        private void ClearFailedBindingReference(MmdUnityPlaybackBinding failedBinding)
-        {
-            if (!ReferenceEquals(binding, failedBinding))
-            {
-                return;
-            }
-
-            binding = null;
-            LastSnapshot = null;
-            IsPlaying = false;
-            ResetLivePhysicsDriveSource();
-        }
-
-        private static InvalidOperationException CreateNativeClipPlaybackUnavailableException(
-            string reason,
-            bool timelineEvaluation)
-        {
-            string prefix = timelineEvaluation ? "Timeline evaluation" : "Normal playback";
-            return new InvalidOperationException(
-                prefix + " requires mmd-anim native clip playback for VMD asset evaluation. " +
-                "Fast runtime unavailable: " + reason);
-        }
-
-        private static InvalidOperationException CreateMissingSceneModelException(
-            string sourceId,
-            bool timelineEvaluation)
-        {
-            string prefix = timelineEvaluation ? "Timeline evaluation" : "MMD playback";
-            return new InvalidOperationException(
-                prefix + " requires an existing scene PMX model with a SkinnedMeshRenderer to bind motion. " +
-                "No matching SkinnedMeshRenderer was found for provider model source (" + sourceId + ").");
         }
 
         private static string ResolveAssetSourceId(MmdVmdAsset asset)
         {
             return string.IsNullOrWhiteSpace(asset.SourceId) ? asset.name : asset.SourceId;
+        }
+
+        private static MmdPmxRuntimeParseCache.Result LoadRuntimePmxSource(
+            string resolvedPmxPath,
+            MmdTimelineSetupTimingSummary? setupTiming)
+        {
+            MmdPmxRuntimeParseCache.Result cachedPmx = MmdPmxRuntimeParseCache.Load(resolvedPmxPath);
+            if (setupTiming != null)
+            {
+                setupTiming.sourceAcquireMs += cachedPmx.SourceAcquireMs;
+                setupTiming.pmxParseMs += cachedPmx.ParseMs;
+                setupTiming.pmxParseCacheHit = cachedPmx.CacheHit;
+            }
+
+            return cachedPmx;
         }
 
         private static string ResolveAssetSourceId(MmdPmxAsset asset)

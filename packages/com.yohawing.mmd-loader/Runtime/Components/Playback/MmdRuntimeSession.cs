@@ -209,7 +209,11 @@ namespace Mmd
         public MmdEvaluatedFrame EvaluateFrameAtTime(float time, float frameRate, uint ikMaxIterationsCap)
         {
             MmdPlaybackTimeMapping mapping = DescribePlaybackTime(time, frameRate);
-            return EvaluateFrame(mapping.frame, time, ikMaxIterationsCap);
+            return EvaluateNativeFrame(
+                mapping.frame,
+                time,
+                ikMaxIterationsCap,
+                time * frameRate);
         }
 
         public MmdPlaybackSnapshot BuildSnapshotFromEvaluatedFrame(MmdEvaluatedFrame frame, MmdRenderingDescriptor rendering)
@@ -287,13 +291,22 @@ namespace Mmd
 
         internal MmdEvaluatedFrame EvaluateNativeFrame(int frame, float time, uint ikMaxIterationsCap = 0)
         {
+            return EvaluateNativeFrame(frame, time, ikMaxIterationsCap, frame);
+        }
+
+        private MmdEvaluatedFrame EvaluateNativeFrame(
+            int frame,
+            float time,
+            uint ikMaxIterationsCap,
+            float evaluationFrame)
+        {
             ThrowIfDisposed();
             MmdPlaybackTime.ValidateFrame(frame);
             MmdPlaybackTime.ValidateTime(time);
             EnsureNativePlaybackSession();
 
             nativePlaybackSession!.EvaluateAndCopy(
-                frame,
+                evaluationFrame,
                 nativeWorldMatrices!,
                 nativeMorphWeights!,
                 nativeIkEnabled!,

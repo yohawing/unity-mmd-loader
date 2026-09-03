@@ -41,6 +41,7 @@ namespace Mmd.UnityIntegration
 
     public sealed partial class MmdUnityPlaybackBinding
     {
+        internal MmdModelDefinition ManagedModelDefinition => model;
         internal bool CanReuseLivePhysicsSeed(int frame)
         {
             return physicsMode == MmdPhysicsMode.Live &&
@@ -395,6 +396,53 @@ namespace Mmd.UnityIntegration
             return lastLiveSnapshot;
         }
 
+        private readonly struct PreparedLivePhysicsFrame
+        {
+            internal PreparedLivePhysicsFrame(
+                int frame,
+                float time,
+                bool seed,
+                float deltaTime,
+                float[] beforePhysicsWorldMatrices,
+                float[] beforePhysicsMorphWeights,
+                float[] afterPhysicsWorldMatrices,
+                MmdPhysicsBodyTransform[] rigidbodyTransforms,
+                MmdPhysicsHostStepDiagnostics nativeStepDiagnostics,
+                string backendName,
+                int skippedWorldAnchorJointCount,
+                bool sampleBodyDiagnostics,
+                LivePhysicsBodyMetadata[]? bodyMetadata)
+            {
+                this.frame = frame;
+                this.time = time;
+                this.seed = seed;
+                this.deltaTime = deltaTime;
+                this.beforePhysicsWorldMatrices = beforePhysicsWorldMatrices;
+                this.beforePhysicsMorphWeights = beforePhysicsMorphWeights;
+                this.afterPhysicsWorldMatrices = afterPhysicsWorldMatrices;
+                this.rigidbodyTransforms = rigidbodyTransforms;
+                this.nativeStepDiagnostics = nativeStepDiagnostics;
+                this.backendName = backendName;
+                this.skippedWorldAnchorJointCount = skippedWorldAnchorJointCount;
+                this.sampleBodyDiagnostics = sampleBodyDiagnostics;
+                this.bodyMetadata = bodyMetadata;
+            }
+
+            internal readonly int frame;
+            internal readonly float time;
+            internal readonly bool seed;
+            internal readonly float deltaTime;
+            internal readonly float[] beforePhysicsWorldMatrices;
+            internal readonly float[] beforePhysicsMorphWeights;
+            internal readonly float[] afterPhysicsWorldMatrices;
+            internal readonly MmdPhysicsBodyTransform[] rigidbodyTransforms;
+            internal readonly MmdPhysicsHostStepDiagnostics nativeStepDiagnostics;
+            internal readonly string backendName;
+            internal readonly int skippedWorldAnchorJointCount;
+            internal readonly bool sampleBodyDiagnostics;
+            internal readonly LivePhysicsBodyMetadata[]? bodyMetadata;
+        }
+
         private MmdPlaybackSnapshot ApplyVmdNativePhysicsFrame(int frame, float frameRate)
         {
             if (ikMaxIterationsCap > 0)
@@ -438,12 +486,57 @@ namespace Mmd.UnityIntegration
             double evaluateFrameMs = stageWatch.Elapsed.TotalMilliseconds;
 
             long frameConstructionStart = Stopwatch.GetTimestamp();
-            MmdEvaluatedFrame evaluatedFrame = MmdRuntimeFrameEvaluator.BuildFrameFromNativeInPlace(
-                model,
+            long fanOutStart = Stopwatch.GetTimestamp();
+            CaptureLivePhysicsReadback(backend);
+            long fanOutEnd = Stopwatch.GetTimestamp();
+            bool sampled = ShouldSampleLivePhysicsBodyDiagnostics(frame);
+            LivePhysicsBodyMetadata[]? bodyMetadata = sampled
+                ? GetLivePhysicsBodyMetadata(backend)
+                : null;
+            var prepared = new PreparedLivePhysicsFrame(
                 frame,
                 MmdPlaybackTime.ToTime(frame, frameRate),
+                seed,
+                deltaTime,
                 livePhysicsNativeWorldMatrices!,
                 livePhysicsNativeMorphWeights!,
+                livePhysicsAfterPhysicsWorldMatrices,
+                livePhysicsReadbackTransforms!,
+                nativeStepDiagnostics,
+                backend.Name,
+                backend.SkippedWorldAnchorJointCount,
+                sampled,
+                bodyMetadata);
+            return ApplyPreparedLivePhysicsFrame(
+                prepared,
+                totalWatch,
+                ensureBackendMs,
+                evaluateFrameMs,
+                MmdLivePhysicsDiagnosticsClock.Milliseconds(fanOutStart, fanOutEnd),
+                frameConstructionStart,
+                hasEnsureBackendMeasurement: true,
+                hasManagedRigidbodyFanOutMeasurement: true,
+                completedWorkerMs: 0.0);
+        }
+
+        private MmdPlaybackSnapshot ApplyPreparedLivePhysicsFrame(
+            in PreparedLivePhysicsFrame prepared,
+            Stopwatch totalWatch,
+            double ensureBackendMs,
+            double evaluateFrameMs,
+            double managedRigidbodyFanOutMs,
+            long frameConstructionStart,
+            bool hasEnsureBackendMeasurement,
+            bool hasManagedRigidbodyFanOutMeasurement,
+            double completedWorkerMs)
+        {
+            var stageWatch = Stopwatch.StartNew();
+            MmdEvaluatedFrame evaluatedFrame = MmdRuntimeFrameEvaluator.BuildFrameFromNativeInPlace(
+                model,
+                prepared.frame,
+                prepared.time,
+                prepared.beforePhysicsWorldMatrices,
+                prepared.beforePhysicsMorphWeights,
                 EnsureLivePhysicsFrame(),
                 livePhysicsRowMajorMatrices!,
                 livePhysicsLocalMatrixScratch!,
@@ -451,34 +544,30 @@ namespace Mmd.UnityIntegration
                 livePhysicsMorphEntries!,
                 livePhysicsMorphOrder!,
                 includeMaterials: false);
-            long frameConstructionEnd = Stopwatch.GetTimestamp();
             stageWatch.Restart();
             ApplyLiveAnimationFrame(evaluatedFrame);
             double applyAnimationFrameMs = stageWatch.Elapsed.TotalMilliseconds;
 
-            long fanOutStart = Stopwatch.GetTimestamp();
-            CaptureLivePhysicsReadback(backend);
-            long fanOutEnd = Stopwatch.GetTimestamp();
-
             long managedApplyStart = Stopwatch.GetTimestamp();
-            ApplyPhysicsBodyTransforms();
+            ApplyPhysicsBodyTransforms(prepared.rigidbodyTransforms);
             long managedApplyEnd = Stopwatch.GetTimestamp();
 
             bool afterPhysicsMatrixWorkPerformed = model.HasDeformAfterPhysicsBones;
             long matrixApplyStart = Stopwatch.GetTimestamp();
             if (afterPhysicsMatrixWorkPerformed)
             {
-                ApplyAfterPhysicsWorldMatrices();
+                ApplyAfterPhysicsWorldMatrices(prepared.afterPhysicsWorldMatrices);
             }
             long matrixApplyEnd = Stopwatch.GetTimestamp();
 
-            bool sampled = ShouldSampleLivePhysicsBodyDiagnostics(frame);
             long sampledStart = Stopwatch.GetTimestamp();
-            if (sampled)
+            if (prepared.sampleBodyDiagnostics)
             {
-                ApplyPhysicsBodyDebugTransforms(backend);
-                lastLivePhysicsBodyDiagnostics = BuildBodyDiagnostics(backend);
-                lastLivePhysicsBodyDiagnosticsFrame = frame;
+                ApplyPhysicsBodyDebugTransforms(prepared.bodyMetadata!, prepared.rigidbodyTransforms);
+                lastLivePhysicsBodyDiagnostics = BuildBodyDiagnostics(
+                    prepared.bodyMetadata!,
+                    prepared.rigidbodyTransforms);
+                lastLivePhysicsBodyDiagnosticsFrame = prepared.frame;
             }
             long sampledEnd = Stopwatch.GetTimestamp();
 
@@ -486,17 +575,18 @@ namespace Mmd.UnityIntegration
             RefreshEvaluatedFrameFromUnityTransforms(evaluatedFrame);
             long frameRefreshEnd = Stopwatch.GetTimestamp();
             long pinnedStart = Stopwatch.GetTimestamp();
-            MmdLivePhysicsPinnedBodyDiagnostics pinned = BuildHostPosePinnedBodyDiagnostics(seed);
+            MmdLivePhysicsPinnedBodyDiagnostics pinned = BuildHostPosePinnedBodyDiagnostics(prepared.seed);
             long pinnedEnd = Stopwatch.GetTimestamp();
-            lastLiveFrame = frame;
+            lastLiveFrame = prepared.frame;
             long snapshotStart = Stopwatch.GetTimestamp();
             lastLiveSnapshot = BuildOrUpdateLiveSnapshot(evaluatedFrame);
             long snapshotEnd = Stopwatch.GetTimestamp();
             long diagnosticsStart = Stopwatch.GetTimestamp();
+            MmdPhysicsHostStepDiagnostics nativeStepDiagnostics = prepared.nativeStepDiagnostics;
             var diagnostics = new MmdLivePhysicsFrameDiagnostics
             {
-                frame = frame,
-                backendName = backend.Name,
+                frame = prepared.frame,
+                backendName = prepared.backendName,
                 evaluationPath = "VmdNativePhysicsBridge",
                 phaseDiagnosticsPresent = true,
                 nativeStepReportPresent = nativeStepDiagnostics.reportPresent,
@@ -508,19 +598,19 @@ namespace Mmd.UnityIntegration
                 playbackCopyEvaluatedOutputsPresent = nativeStepDiagnostics.playbackCopyEvaluatedOutputsPresent,
                 physicsWorldStepRuntimePresent = nativeStepDiagnostics.physicsWorldStepRuntimePresent,
                 nativeRigidbodyCopyPresent = true,
-                managedRigidbodyFanOutPresent = true,
+                managedRigidbodyFanOutPresent = hasManagedRigidbodyFanOutMeasurement,
                 managedBodyTransformApplyPresent = true,
                 afterPhysicsMatrixReadbackPresent = true,
                 matrixTransformApplyPresent = true,
                 sampledDiagnosticsPresent = true,
-                sampledBodyDiagnosticsThisFrame = sampled,
+                sampledBodyDiagnosticsThisFrame = prepared.sampleBodyDiagnostics,
                 evaluatedFrameRefreshPresent = true,
                 diagnosticsConstructionPresent = true,
-                ensureBackendPresent = true,
+                ensureBackendPresent = hasEnsureBackendMeasurement,
                 evaluateFramePresent = true,
                 applyAnimationFramePresent = true,
                 snapshotBuildPresent = true,
-                deltaTime = deltaTime,
+                deltaTime = prepared.deltaTime,
                 hostPoseCaptureMs = 0.0,
                 pinnedDiagnosticsMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(pinnedStart, pinnedEnd),
                 pinMarshalMs = 0.0,
@@ -529,17 +619,18 @@ namespace Mmd.UnityIntegration
                 playbackCopyEvaluatedOutputsMs = nativeStepDiagnostics.playbackCopyEvaluatedOutputsMs,
                 physicsWorldStepRuntimeMs = nativeStepDiagnostics.physicsWorldStepRuntimeMs,
                 nativeRigidbodyCopyMs = nativeStepDiagnostics.nativeRigidbodyCopyMs,
-                managedRigidbodyFanOutMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(fanOutStart, fanOutEnd),
+                managedRigidbodyFanOutMs = hasManagedRigidbodyFanOutMeasurement
+                    ? managedRigidbodyFanOutMs : 0.0,
                 managedBodyTransformApplyMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(managedApplyStart, managedApplyEnd),
                 afterPhysicsMatrixReadbackMs = nativeStepDiagnostics.afterPhysicsMatrixReadbackMs,
                 matrixTransformApplyMs = afterPhysicsMatrixWorkPerformed
                     ? MmdLivePhysicsDiagnosticsClock.Milliseconds(matrixApplyStart, matrixApplyEnd)
                     : 0.0,
-                sampledDiagnosticsMs = sampled
+                sampledDiagnosticsMs = prepared.sampleBodyDiagnostics
                     ? MmdLivePhysicsDiagnosticsClock.Milliseconds(sampledStart, sampledEnd)
                     : 0.0,
                 evaluatedFrameRefreshMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(frameRefreshStart, frameRefreshEnd),
-                ensureBackendMs = ensureBackendMs,
+                ensureBackendMs = hasEnsureBackendMeasurement ? ensureBackendMs : 0.0,
                 evaluateFrameMs = evaluateFrameMs,
                 applyAnimationFrameMs = applyAnimationFrameMs,
                 snapshotBuildMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(snapshotStart, snapshotEnd),
@@ -555,7 +646,7 @@ namespace Mmd.UnityIntegration
                 nativeKinematicRigidbodiesFed = nativeStepDiagnostics.nativeKinematicRigidbodiesFed,
                 nativeBonesWrittenBack = nativeStepDiagnostics.nativeBonesWrittenBack,
                 pinnedBodies = pinned,
-                unsupportedWorldAnchorJointCount = backend.SkippedWorldAnchorJointCount,
+                unsupportedWorldAnchorJointCount = prepared.skippedWorldAnchorJointCount,
                 comparisonSpace = "runtime-forward-playback-diagnostics",
                 importScale = playbackInstance.ImportScale,
                 modelBoneCount = model.bones.Count,
@@ -573,9 +664,137 @@ namespace Mmd.UnityIntegration
                 frameConstructionStart,
                 diagnosticsEnd);
             totalWatch.Stop();
-            diagnostics.totalMs = totalWatch.Elapsed.TotalMilliseconds;
+            diagnostics.totalMs = totalWatch.Elapsed.TotalMilliseconds + completedWorkerMs;
             lastLivePhysicsDiagnostics = diagnostics;
-            return lastLiveSnapshot;
+            return lastLiveSnapshot!;
+        }
+
+        internal bool TryValidatePreparedMultiCharacterLiveFrame(
+            int frame,
+            float frameRate,
+            MmdMultiCharacterWorkerResult result,
+            out string reason)
+        {
+            if (lastLiveFrame == frame && lastLiveSnapshot != null)
+            {
+                reason = string.Empty;
+                return true;
+            }
+
+            if (physicsMode != MmdPhysicsMode.Live || nativeHumanoidHostPoseEnabled)
+            {
+                reason = "Prepared Live physics requires non-Humanoid Live physics mode.";
+                return false;
+            }
+
+            if (result == null || !result.HasLivePhysicsEvaluation || result.LastPhysicsDiagnostics == null)
+            {
+                reason = "Prepared Live physics result has no completed worker evaluation.";
+                return false;
+            }
+
+            float expectedTime = MmdPlaybackTime.ToTime(frame, frameRate);
+            bool expectedSeed = lastLiveFrame < 0;
+            float expectedDeltaTime = expectedSeed ? 0.0f : (frame - lastLiveFrame) / frameRate;
+            if (result.EvaluatedFrame != frame || result.EvaluatedTime != expectedTime ||
+                result.WasSeed != expectedSeed || result.DeltaTime != expectedDeltaTime)
+            {
+                reason = $"Prepared Live physics result metadata is incompatible: " +
+                    $"frame={result.EvaluatedFrame}/{frame}, time={result.EvaluatedTime:R}/{expectedTime:R}, " +
+                    $"seed={result.WasSeed}/{expectedSeed}, deltaTime={result.DeltaTime:R}/{expectedDeltaTime:R}.";
+                return false;
+            }
+
+            int matrixCount = checked(model.bones.Count * 16);
+            int bodyCount = model.physics.rigidbodies.Count;
+            if (result.BeforePhysicsWorldMatrices.Length < matrixCount ||
+                result.AfterPhysicsWorldMatrices.Length < matrixCount ||
+                result.MorphWeights.Length != model.morphs.Count || result.IkEnabled.Length != model.ik.Count ||
+                result.RigidbodyPositions.Length != bodyCount * 3 || result.RigidbodyRotations.Length != bodyCount * 4 ||
+                result.RigidbodyShapeTypes.Length != bodyCount || string.IsNullOrEmpty(result.LivePhysicsBackendName) ||
+                result.SkippedWorldAnchorJointCount < 0)
+            {
+                reason = "Prepared Live physics result buffers or backend metadata are incompatible.";
+                return false;
+            }
+
+            for (int i = 0; i < result.RigidbodyPositions.Length; i++)
+            {
+                if (!float.IsFinite(result.RigidbodyPositions[i]))
+                {
+                    reason = "Prepared Live physics rigidbody position is non-finite.";
+                    return false;
+                }
+            }
+
+            for (int i = 0; i < result.RigidbodyRotations.Length; i++)
+            {
+                if (!float.IsFinite(result.RigidbodyRotations[i]))
+                {
+                    reason = "Prepared Live physics rigidbody rotation is non-finite.";
+                    return false;
+                }
+            }
+
+            reason = string.Empty;
+            return true;
+        }
+
+        internal MmdPlaybackSnapshot ApplyPreparedMultiCharacterLiveFrame(
+            int frame,
+            float frameRate,
+            MmdMultiCharacterWorkerResult result)
+        {
+            if (lastLiveFrame == frame && lastLiveSnapshot != null)
+            {
+                return lastLiveSnapshot;
+            }
+
+            if (!TryValidatePreparedMultiCharacterLiveFrame(frame, frameRate, result, out string reason))
+            {
+                throw new InvalidOperationException(reason);
+            }
+
+            EnsureLivePhysicsNativeOutputBuffers();
+            int bodyCount = model.physics.rigidbodies.Count;
+            livePhysicsReadbackTransformCount = bodyCount;
+            livePhysicsReadbackShapeTypeCount = 0;
+            EnsureLivePhysicsReadbackTransforms(bodyCount);
+
+            for (int i = 0; i < bodyCount; i++)
+            {
+                Array.Copy(result.RigidbodyPositions, i * 3, livePhysicsReadbackTransforms![i].position, 0, 3);
+                Array.Copy(result.RigidbodyRotations, i * 4, livePhysicsReadbackTransforms[i].rotation, 0, 4);
+            }
+
+            bool sampled = ShouldSampleLivePhysicsBodyDiagnostics(frame);
+            LivePhysicsBodyMetadata[]? bodyMetadata = sampled
+                ? GetLivePhysicsBodyMetadata(result.RigidbodyShapeTypes)
+                : null;
+            var prepared = new PreparedLivePhysicsFrame(
+                frame,
+                result.EvaluatedTime,
+                result.WasSeed,
+                result.DeltaTime,
+                result.BeforePhysicsWorldMatrices,
+                result.MorphWeights,
+                result.AfterPhysicsWorldMatrices,
+                livePhysicsReadbackTransforms!,
+                result.LastPhysicsDiagnostics!.Value,
+                result.LivePhysicsBackendName,
+                result.SkippedWorldAnchorJointCount,
+                sampled,
+                bodyMetadata);
+            return ApplyPreparedLivePhysicsFrame(
+                prepared,
+                Stopwatch.StartNew(),
+                ensureBackendMs: 0.0,
+                evaluateFrameMs: result.StepPlaybackFrameMs,
+                managedRigidbodyFanOutMs: result.RigidbodyFanOutMs,
+                frameConstructionStart: Stopwatch.GetTimestamp(),
+                hasEnsureBackendMeasurement: false,
+                hasManagedRigidbodyFanOutMeasurement: true,
+                completedWorkerMs: result.StepPlaybackFrameMs + result.RigidbodyFanOutMs);
         }
 
         private MmdEvaluatedFrame EvaluateLiveAnimationFrame(int frame, float time)
@@ -971,6 +1190,11 @@ namespace Mmd.UnityIntegration
                 return;
             }
 
+            ApplyAfterPhysicsWorldMatrices(livePhysicsAfterPhysicsWorldMatrices);
+        }
+
+        private void ApplyAfterPhysicsWorldMatrices(float[] worldMatrices)
+        {
             if (nativeHumanoidHostPoseEnabled)
             {
                 // Humanoid Live intentionally applies the complete native post-physics pose once:
@@ -978,13 +1202,13 @@ namespace Mmd.UnityIntegration
                 // dynamic-orientation, and after-physics ownership in the native runtime.
                 MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(
                     playbackInstance,
-                    livePhysicsAfterPhysicsWorldMatrices);
+                    worldMatrices);
                 return;
             }
 
             MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(
                 playbackInstance,
-                livePhysicsAfterPhysicsWorldMatrices,
+                worldMatrices,
                 fastAfterPhysicsBoneIndices);
         }
 
@@ -1190,6 +1414,18 @@ namespace Mmd.UnityIntegration
         private void CaptureLivePhysicsReadback(IMmdLivePhysicsBackend backend)
         {
             int count = model.physics.rigidbodies.Count;
+            EnsureLivePhysicsReadbackTransforms(count);
+
+            for (int i = 0; i < count; i++)
+            {
+                MmdPhysicsBodyTransform destination = livePhysicsReadbackTransforms![i];
+                backend.CopyRigidbodyTransform(i, destination.position, destination.rotation);
+                livePhysicsReadbackTransformCount++;
+            }
+        }
+
+        private void EnsureLivePhysicsReadbackTransforms(int count)
+        {
             if (livePhysicsReadbackTransforms == null || livePhysicsReadbackTransforms.Length != count)
             {
                 livePhysicsReadbackTransforms = new MmdPhysicsBodyTransform[count];
@@ -1202,19 +1438,17 @@ namespace Mmd.UnityIntegration
                     };
                 }
             }
-
-            for (int i = 0; i < count; i++)
-            {
-                MmdPhysicsBodyTransform destination = livePhysicsReadbackTransforms[i];
-                backend.CopyRigidbodyTransform(i, destination.position, destination.rotation);
-                livePhysicsReadbackTransformCount++;
-            }
         }
 
         private void ApplyPhysicsBodyTransforms()
         {
-            float importScale = NormalizeImportScale(playbackInstance.ImportScale);
             MmdPhysicsBodyTransform[] readbackTransforms = GetLivePhysicsReadbackTransforms();
+            ApplyPhysicsBodyTransforms(readbackTransforms);
+        }
+
+        private void ApplyPhysicsBodyTransforms(MmdPhysicsBodyTransform[] readbackTransforms)
+        {
+            float importScale = NormalizeImportScale(playbackInstance.ImportScale);
             for (int i = 0; i < model.physics.rigidbodies.Count; i++)
             {
                 MmdRigidbodyDefinition body = model.physics.rigidbodies[i];
@@ -1248,6 +1482,13 @@ namespace Mmd.UnityIntegration
         private void ApplyPhysicsBodyDebugTransforms(IMmdLivePhysicsBackend backend)
         {
             LivePhysicsBodyMetadata[] metadata = GetLivePhysicsBodyMetadata(backend);
+            ApplyPhysicsBodyDebugTransforms(metadata, GetLivePhysicsReadbackTransforms());
+        }
+
+        private void ApplyPhysicsBodyDebugTransforms(
+            LivePhysicsBodyMetadata[] metadata,
+            MmdPhysicsBodyTransform[] readbackTransforms)
+        {
             if (metadata.Length == 0)
             {
                 return;
@@ -1255,7 +1496,6 @@ namespace Mmd.UnityIntegration
 
             Transform root = playbackInstance.Root.transform;
             float importScale = NormalizeImportScale(playbackInstance.ImportScale);
-            MmdPhysicsBodyTransform[] readbackTransforms = GetLivePhysicsReadbackTransforms();
             for (int i = 0; i < model.physics.rigidbodies.Count; i++)
             {
                 MmdUnityPhysicsBody? physicsBody = metadata[i].physicsBody;
@@ -1273,11 +1513,16 @@ namespace Mmd.UnityIntegration
 
         private MmdLivePhysicsBodyDiagnostics[] BuildBodyDiagnostics(IMmdLivePhysicsBackend backend)
         {
+            return BuildBodyDiagnostics(GetLivePhysicsBodyMetadata(backend), GetLivePhysicsReadbackTransforms());
+        }
+
+        private MmdLivePhysicsBodyDiagnostics[] BuildBodyDiagnostics(
+            LivePhysicsBodyMetadata[] metadata,
+            MmdPhysicsBodyTransform[] readbackTransforms)
+        {
             Transform root = playbackInstance.Root.transform;
             float importScale = NormalizeImportScale(playbackInstance.ImportScale);
             int count = model.physics.rigidbodies.Count;
-            LivePhysicsBodyMetadata[] metadata = GetLivePhysicsBodyMetadata(backend);
-            MmdPhysicsBodyTransform[] readbackTransforms = GetLivePhysicsReadbackTransforms();
             var result = new MmdLivePhysicsBodyDiagnostics[count];
             for (int i = 0; i < count; i++)
             {
@@ -1369,6 +1614,37 @@ namespace Mmd.UnityIntegration
                 return livePhysicsBodyMetadata;
             }
 
+            LivePhysicsBodyMetadata[] metadata = BuildLivePhysicsBodyMetadata(backend.GetRigidbodyShapeType);
+            livePhysicsMetadataInstance = playbackInstance;
+            livePhysicsMetadataBackend = backend;
+            livePhysicsBodyMetadata = metadata;
+            return metadata;
+        }
+
+        private LivePhysicsBodyMetadata[] GetLivePhysicsBodyMetadata(string[] rigidbodyShapeTypes)
+        {
+            if (rigidbodyShapeTypes == null || rigidbodyShapeTypes.Length != model.physics.rigidbodies.Count)
+            {
+                throw new ArgumentException("Prepared Live physics rigidbody shape metadata is invalid.", nameof(rigidbodyShapeTypes));
+            }
+
+            if (ReferenceEquals(livePhysicsMetadataInstance, playbackInstance) &&
+                livePhysicsMetadataBackend == null &&
+                livePhysicsBodyMetadata != null)
+            {
+                return livePhysicsBodyMetadata;
+            }
+
+            LivePhysicsBodyMetadata[] metadata = BuildLivePhysicsBodyMetadata(
+                index => rigidbodyShapeTypes[index] ?? string.Empty);
+            livePhysicsMetadataInstance = playbackInstance;
+            livePhysicsMetadataBackend = null;
+            livePhysicsBodyMetadata = metadata;
+            return metadata;
+        }
+
+        private LivePhysicsBodyMetadata[] BuildLivePhysicsBodyMetadata(Func<int, string> getNativeShapeType)
+        {
             MmdUnityPhysicsBody[] physicsBodies = playbackInstance.PhysicsBodies;
             var physicsBodiesByIndex = new Dictionary<int, MmdUnityPhysicsBody>(physicsBodies.Length);
             foreach (MmdUnityPhysicsBody physicsBody in physicsBodies)
@@ -1379,22 +1655,18 @@ namespace Mmd.UnityIntegration
                 }
             }
 
-            int count = model.physics.rigidbodies.Count;
-            var metadata = new LivePhysicsBodyMetadata[count];
-            for (int i = 0; i < count; i++)
+            var metadata = new LivePhysicsBodyMetadata[model.physics.rigidbodies.Count];
+            for (int i = 0; i < metadata.Length; i++)
             {
                 physicsBodiesByIndex.TryGetValue(model.physics.rigidbodies[i].index, out MmdUnityPhysicsBody? physicsBody);
                 metadata[i] = new LivePhysicsBodyMetadata(
                     physicsBody,
-                    backend.GetRigidbodyShapeType(i),
+                    getNativeShapeType(i),
                     ResolveColliderType(physicsBody),
                     ResolveColliderSize(physicsBody));
                 livePhysicsReadbackShapeTypeCount++;
             }
 
-            livePhysicsMetadataInstance = playbackInstance;
-            livePhysicsMetadataBackend = backend;
-            livePhysicsBodyMetadata = metadata;
             return metadata;
         }
 

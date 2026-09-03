@@ -47,7 +47,8 @@ namespace Mmd
         [SerializeField, HideInInspector] private int ignoredHelperBoneCount;
         [SerializeField, HideInInspector] private string[] mappingDiagnostics = Array.Empty<string>();
         [SerializeField, HideInInspector] private string nativePlaybackImpact = NoNativePlaybackImpact;
-        [SerializeField, HideInInspector] private MmdSerializableBoneMappingEntry[] mappingEntries =
+        [SerializeField, HideInInspector]
+        private MmdSerializableBoneMappingEntry[] mappingEntries =
             Array.Empty<MmdSerializableBoneMappingEntry>();
 
         public MmdPmxAsset? PmxAsset => pmxAsset;

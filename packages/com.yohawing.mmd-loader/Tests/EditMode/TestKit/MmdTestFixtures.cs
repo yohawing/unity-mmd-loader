@@ -49,38 +49,48 @@ namespace Mmd.Tests
         internal static byte[] ReadFixtureAssetBytes(string fileName) =>
             File.ReadAllBytes(FixtureAssetPath(fileName));
 
-        internal static void GenerateModelGoldenIfMissing(ModelFixtureEntry fixture)
+        internal static void RequireGoldenGenerationOptIn()
         {
-            string goldenPath = fixture.GoldenPath;
-            if (File.Exists(goldenPath) && !fixture.id.StartsWith("local-", StringComparison.Ordinal))
-            {
-                return;
-            }
-
-            Assume.That(fixture.ModelPath, Does.Exist, "Model asset not found: " + fixture.ModelPath);
-
-            MmdModelDefinition model = ParseModel(fixture);
-            File.WriteAllText(goldenPath, JsonUtility.ToJson(model, prettyPrint: true));
+            Assert.That(
+                Environment.GetEnvironmentVariable("YMU_GENERATE_GOLDENS"),
+                Is.EqualTo("1"),
+                "Golden generation is maintainer-only. Set YMU_GENERATE_GOLDENS=1 before selecting the explicit generation test.");
         }
 
-        internal static void GenerateMotionGoldenIfMissing(string baseName)
+        internal static string GenerateModelGoldenCandidate(ModelFixtureEntry fixture)
+        {
+            Assert.That(fixture.IsLocalCorpus, Is.False, fixture.Context("local corpus goldens are never committed"));
+            Assert.That(fixture.ModelPath, Does.Exist, "Model asset not found: " + fixture.ModelPath);
+
+            MmdModelDefinition model = ParseModel(fixture);
+            string candidatePath = GoldenCandidatePath(fixture.RequireGoldenPath());
+            File.WriteAllText(candidatePath, JsonUtility.ToJson(model, prettyPrint: true));
+            return candidatePath;
+        }
+
+        internal static string GenerateMotionGoldenCandidate(string baseName)
         {
             string goldenPath = MotionGoldenPath(baseName);
-            if (File.Exists(goldenPath))
-            {
-                return;
-            }
-
             string vmdPath = FixtureAssetPath(MotionFixtureFileName(baseName));
-            Assume.That(vmdPath, Does.Exist, "VMD asset not found: " + vmdPath);
+            Assert.That(vmdPath, Does.Exist, "VMD asset not found: " + vmdPath);
 
             MmdMotionDefinition motion = ParseMotionFile(MotionFixtureFileName(baseName));
-            File.WriteAllText(goldenPath, JsonUtility.ToJson(motion, prettyPrint: true));
+            string candidatePath = GoldenCandidatePath(goldenPath);
+            File.WriteAllText(candidatePath, JsonUtility.ToJson(motion, prettyPrint: true));
+            return candidatePath;
+        }
+
+        private static string GoldenCandidatePath(string goldenPath)
+        {
+            string relativePath = Path.GetRelativePath(GoldenRoot, goldenPath);
+            string candidatePath = Path.Combine(GoldenCandidateRoot, relativePath);
+            Directory.CreateDirectory(Path.GetDirectoryName(candidatePath)!);
+            return candidatePath;
         }
 
         internal static MmdModelDefinition LoadModelGolden(ModelFixtureEntry fixture)
         {
-            string json = File.ReadAllText(fixture.GoldenPath);
+            string json = File.ReadAllText(fixture.RequireGoldenPath());
             return JsonUtility.FromJson<MmdModelDefinition>(json);
         }
 
@@ -181,6 +191,9 @@ namespace Mmd.Tests
         internal static string MotionGoldenPath(string baseName) =>
             Path.Combine(GoldenRoot, baseName + "_motion.json");
 
+        internal static string GoldenCandidateRoot =>
+            Path.Combine(RepositoryRoot, "artifacts", "golden-candidates");
+
         internal static IEnumerable<ModelFixtureEntry> LoadPackageModelFixtures()
         {
             string json = File.ReadAllText(PackageModelManifestPath);
@@ -207,9 +220,6 @@ namespace Mmd.Tests
 
             string json = File.ReadAllText(LocalCorpusManifestPath);
             string basePath = MatchRequiredString(json, "basePath");
-            string localGoldenDir = Path.Combine(Path.GetTempPath(), "ymu-local-model-golden");
-            Directory.CreateDirectory(localGoldenDir);
-
             foreach (string format in new[] { "pmx", "pmd" })
             {
                 KeyValuePair<string, string>? item = ExtractFirstReleaseSmokePath(json, format);
@@ -235,9 +245,10 @@ namespace Mmd.Tests
                     "local-" + item.Value.Key + "-" + format,
                     format,
                     modelPath,
-                    Path.Combine(localGoldenDir, item.Value.Key + "_" + format + "_model.json"),
-                    expected,
-                    "Imported from optional local corpus manifest.");
+                    goldenPath: null,
+                    expected: expected,
+                    notes: "Imported from optional local corpus manifest.",
+                    isLocalCorpus: true);
             }
         }
 
@@ -574,11 +585,19 @@ namespace Mmd.Tests
         public readonly string id;
         public readonly string format;
         public readonly string ModelPath;
-        public readonly string GoldenPath;
+        public readonly string? GoldenPath;
         public readonly ModelFixtureExpected expected;
         public readonly string notes;
+        public readonly bool IsLocalCorpus;
 
-        public ModelFixtureEntry(string id, string format, string modelPath, string goldenPath, ModelFixtureExpected expected, string notes)
+        public ModelFixtureEntry(
+            string id,
+            string format,
+            string modelPath,
+            string? goldenPath,
+            ModelFixtureExpected expected,
+            string notes,
+            bool isLocalCorpus = false)
         {
             this.id = id;
             this.format = format;
@@ -586,6 +605,7 @@ namespace Mmd.Tests
             GoldenPath = goldenPath;
             this.expected = expected;
             this.notes = notes;
+            IsLocalCorpus = isLocalCorpus;
         }
 
         public static ModelFixtureEntry FromManifest(ModelFixtureRecord record, string modelPath, string goldenPath)
@@ -596,6 +616,12 @@ namespace Mmd.Tests
         public string Context(string field)
         {
             return id + " (" + format + ") " + field + "; model=" + ModelPath;
+        }
+
+        public string RequireGoldenPath()
+        {
+            Assert.That(GoldenPath, Is.Not.Null.And.Not.Empty, Context("committed golden path"));
+            return GoldenPath!;
         }
 
         public override string ToString()

@@ -1,0 +1,13 @@
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+/Assets/*
+!/Assets/README.md
+/Packages/packages-lock.json
+/ProjectSettings/*
+!/ProjectSettings/ProjectSettings.asset
+!/ProjectSettings/ProjectVersion.txt

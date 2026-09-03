@@ -22,6 +22,13 @@ namespace Mmd.UnityIntegration
 
         internal void PrepareTimelineSeed(float sourceTime, float frameRate, bool runLivePhysics)
         {
+            // A Timeline Off evaluation can reuse the same controller slot as standalone Off
+            // playback. Live setup is a different evaluator/session and must replace any slot
+            // before mutating the binding synchronously.
+            if (runLivePhysics || physicsMode == MmdPhysicsMode.Live)
+            {
+                ReleasePlaybackWorkerPoolForTimelineSync();
+            }
             timelinePreparationSeedPending = false;
             bool seedLivePhysics = runLivePhysics && physicsMode == MmdPhysicsMode.Live;
             if (seedLivePhysics)
@@ -42,6 +49,7 @@ namespace Mmd.UnityIntegration
 
         public MmdHumanoidRetargeterResult ApplyHumanoidRetargetNow()
         {
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             MmdHumanoidRetargetGate gate = EvaluateHumanoidRetargetGate(requireAnimatorDriver: true);
             LastHumanoidRetargetGate = gate;
             if (gate != MmdHumanoidRetargetGate.Ready)
@@ -127,6 +135,11 @@ namespace Mmd.UnityIntegration
 
         internal int LastTimelineDriveFrameCount => lastTimelineDriveFrameCount;
 
+        internal void MarkTimelineDriveForWorker()
+        {
+            lastTimelineDriveFrameCount = Time.frameCount;
+        }
+
         // Update() runs in the Update phase, before the PlayableDirector evaluates in PreLateUpdate,
         // so a controller driven by a Timeline sees the previous frame's drive (delta == 1) on the
         // current frame's Update. Suppress for delta 0 and 1; resume self-Tick once the Timeline stops
@@ -177,6 +190,7 @@ namespace Mmd.UnityIntegration
         /// </summary>
         internal MmdPlaybackSnapshot ApplyTimelineTime(float sourceTime, float frameRate)
         {
+            ReleasePlaybackWorkerPoolForTimelineSync();
             if (binding == null)
             {
                 throw new InvalidOperationException("Playback controller must be configured before applying timeline time.");
@@ -221,6 +235,7 @@ namespace Mmd.UnityIntegration
         /// </summary>
         internal MmdPlaybackSnapshot ApplyTimelineLivePhysicsForward(float sourceTime, float frameRate)
         {
+            ReleasePlaybackWorkerPool();
             if (binding == null)
             {
                 throw new InvalidOperationException("Playback controller must be configured before applying timeline time.");
@@ -247,6 +262,7 @@ namespace Mmd.UnityIntegration
 
             playbackFrame = frame;
             CurrentFrame = frame;
+            bool poseWillBeApplied = !binding.CanReuseLivePhysicsSeed(frame);
             return ApplyPlaybackPose(() =>
             {
                 PrepareLivePhysicsDriveSource(LivePhysicsDriveSource.VmdForward);
@@ -254,7 +270,7 @@ namespace Mmd.UnityIntegration
                 TimelinePoseEvaluationCount++;
                 lastVmdLivePhysicsFrameCount = Time.frameCount;
                 return LastSnapshot;
-            });
+            }, poseWillBeApplied);
         }
 
         private bool TryReuseTimelinePreparationSeed(

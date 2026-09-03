@@ -8,6 +8,51 @@ namespace Mmd.UnityIntegration
 {
     internal static class MmdUnityWorldMatrixFrameApplier
     {
+        internal static void ValidateColumnMajorWorldMatrices(
+            MmdUnityModelInstance instance,
+            float[] worldMatrices,
+            IReadOnlyList<int>? boneIndices = null)
+        {
+            if (instance == null || instance.Root == null)
+            {
+                throw new ArgumentNullException(nameof(instance));
+            }
+
+            Transform[] bones = instance.BoneTransforms;
+            if (bones == null)
+            {
+                throw new ArgumentNullException(nameof(instance.BoneTransforms));
+            }
+
+            if (worldMatrices == null)
+            {
+                throw new ArgumentNullException(nameof(worldMatrices));
+            }
+
+            int required = bones.Length * 16;
+            if (worldMatrices.Length < required)
+            {
+                throw new ArgumentException(
+                    $"World matrix buffer must contain at least {required} float values.",
+                    nameof(worldMatrices));
+            }
+
+            if (boneIndices == null)
+            {
+                for (int boneIndex = 0; boneIndex < bones.Length; boneIndex++)
+                {
+                    ValidateBone(bones, boneIndex, nameof(bones));
+                }
+
+                return;
+            }
+
+            for (int i = 0; i < boneIndices.Count; i++)
+            {
+                ValidateBone(bones, boneIndices[i], nameof(boneIndices));
+            }
+        }
+
         public static void ApplyColumnMajorWorldMatrices(
             MmdUnityModelInstance instance,
             float[] worldMatrices,
@@ -105,6 +150,23 @@ namespace Mmd.UnityIntegration
             if (bone.localScale != Vector3.one)
             {
                 bone.localScale = Vector3.one;
+            }
+        }
+
+        private static void ValidateBone(Transform[] bones, int boneIndex, string parameterName)
+        {
+            if (boneIndex < 0 || boneIndex >= bones.Length)
+            {
+                throw new ArgumentException(
+                    $"World matrix bone index {boneIndex} is outside the Unity bone array.",
+                    parameterName);
+            }
+
+            if (bones[boneIndex] == null)
+            {
+                throw new ArgumentException(
+                    $"Unity bone transform {boneIndex} is missing.",
+                    parameterName);
             }
         }
 

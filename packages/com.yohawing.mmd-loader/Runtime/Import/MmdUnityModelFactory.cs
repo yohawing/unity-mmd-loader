@@ -283,6 +283,31 @@ namespace Mmd.UnityIntegration
             MmdMaterialPreset materialPreset = MmdMaterialPreset.MmdToon,
             MmdRenderingDescriptor? existingPlaybackDescriptor = null)
         {
+            return CreateExistingSkinnedModelInstanceWithMaterialTargets(
+                root,
+                model,
+                sourcePath,
+                importScale,
+                includeSelfShadowTarget,
+                materialOverride,
+                preserveExistingSelfShadowTarget,
+                materialPreset,
+                existingPlaybackDescriptor,
+                materialRenderingTargets: null);
+        }
+
+        internal static MmdUnityModelInstance CreateExistingSkinnedModelInstanceWithMaterialTargets(
+            GameObject root,
+            MmdModelDefinition model,
+            string? sourcePath,
+            float importScale,
+            bool includeSelfShadowTarget = true,
+            MmdMaterialOverrideAsset? materialOverride = null,
+            bool preserveExistingSelfShadowTarget = false,
+            MmdMaterialPreset materialPreset = MmdMaterialPreset.MmdToon,
+            MmdRenderingDescriptor? existingPlaybackDescriptor = null,
+            MmdMaterialRenderingTargets[]? materialRenderingTargets = null)
+        {
             if (root == null)
             {
                 throw new ArgumentNullException(nameof(root));
@@ -318,8 +343,10 @@ namespace Mmd.UnityIntegration
                 throw new InvalidOperationException("Existing PMX scene SkinnedMeshRenderer material slots do not match the PMX material descriptor.");
             }
 
-            MmdMaterialRenderingTargets[] materialRenderingTargets =
-                BuildMaterialRenderingTargets(materials.Length, materialPreset);
+            MmdMaterialRenderingTargets[] resolvedMaterialRenderingTargets =
+                materialRenderingTargets != null
+                    ? NormalizeMaterialRenderingTargets(materials.Length, materialRenderingTargets)!
+                    : BuildMaterialRenderingTargets(materials.Length, materialPreset);
 
             Transform[] boneTransforms = renderer.bones;
             IReadOnlyList<MmdBoneDefinition> orderedBones = CreateOrderedBones(model.bones);
@@ -328,56 +355,56 @@ namespace Mmd.UnityIntegration
             try
             {
 
-            materials = CloneMaterialsForOverride(materials, materialOverride);
-            rollback.AdoptGeneratedMaterials(materials);
-            MmdMaterialOverrideApplier.Apply(materialOverride, materials);
-            renderer.sharedMaterials = materials;
+                materials = CloneMaterialsForOverride(materials, materialOverride);
+                rollback.AdoptGeneratedMaterials(materials);
+                MmdMaterialOverrideApplier.Apply(materialOverride, materials);
+                renderer.sharedMaterials = materials;
 
-            ResetExistingBoneTransformsToBindPose(orderedBones, boneTransforms, scale);
-            renderer.rootBone = boneTransforms.Length > 0 ? boneTransforms[0] : modelRoot;
+                ResetExistingBoneTransformsToBindPose(orderedBones, boneTransforms, scale);
+                renderer.rootBone = boneTransforms.Length > 0 ? boneTransforms[0] : modelRoot;
 
-            // When the existing scene model is an imported hierarchy instance (Slice B),
-            // the SMR already carries the importer-owned Mesh sub-asset. Preserve it instead
-            // of rebuilding with "Split Runtime" naming, which would break the importer
-            // ownership chain across PlayMode domain reloads.
-            Mesh mesh;
-            if (useExistingMesh)
-            {
-                mesh = sharedMesh!;
-            }
-            else
-            {
-                mesh = BuildMesh(descriptor, scale);
-                rollback.AdoptGeneratedMesh(mesh);
-                ApplySkinning(mesh, descriptor, orderedBones, boneTransforms, modelRoot);
-                Bounds localBounds = BakeVertexMorphBlendShapes(mesh, descriptor, scale, orderedBones);
-                mesh.name = sharedMesh == null || string.IsNullOrWhiteSpace(sharedMesh.name)
-                    ? "MMD Rebound Mesh"
-                    : sharedMesh.name + " Split Runtime";
-                renderer.sharedMesh = mesh;
-                renderer.localBounds = localBounds;
-            }
-            MmdShaderBindingDiagnostics shaderDiagnostics = MmdUnityMaterialBuilder.BuildExistingShaderDiagnostics(renderer);
-            ApplySelfShadowTargetPolicy(root, modelRoot, includeSelfShadowTarget, preserveExistingSelfShadowTarget);
+                // When the existing scene model is an imported hierarchy instance (Slice B),
+                // the SMR already carries the importer-owned Mesh sub-asset. Preserve it instead
+                // of rebuilding with "Split Runtime" naming, which would break the importer
+                // ownership chain across PlayMode domain reloads.
+                Mesh mesh;
+                if (useExistingMesh)
+                {
+                    mesh = sharedMesh!;
+                }
+                else
+                {
+                    mesh = BuildMesh(descriptor, scale);
+                    rollback.AdoptGeneratedMesh(mesh);
+                    ApplySkinning(mesh, descriptor, orderedBones, boneTransforms, modelRoot);
+                    Bounds localBounds = BakeVertexMorphBlendShapes(mesh, descriptor, scale, orderedBones);
+                    mesh.name = sharedMesh == null || string.IsNullOrWhiteSpace(sharedMesh.name)
+                        ? "MMD Rebound Mesh"
+                        : sharedMesh.name + " Split Runtime";
+                    renderer.sharedMesh = mesh;
+                    renderer.localBounds = localBounds;
+                }
+                MmdShaderBindingDiagnostics shaderDiagnostics = MmdUnityMaterialBuilder.BuildExistingShaderDiagnostics(renderer);
+                ApplySelfShadowTargetPolicy(root, modelRoot, includeSelfShadowTarget, preserveExistingSelfShadowTarget);
 
-            MmdUnityPhysicsBody[] physicsBodies = root.GetComponentsInChildren<MmdUnityPhysicsBody>(includeInactive: true);
-            var instance = new MmdUnityModelInstance(
-                root,
-                mesh,
-                materials,
-                descriptor,
-                boneTransforms,
-                physicsBodies,
-                meshRenderer: null,
-                renderer,
-                MmdUnityModelSourceContext.FromOptionalPath(sourcePath),
-                Array.Empty<Texture2D>(),
-                new MmdTextureBindingDiagnostics(),
-                shaderDiagnostics,
-                scale,
-                materialRenderingTargets);
-            rollback.Commit();
-            return instance;
+                MmdUnityPhysicsBody[] physicsBodies = root.GetComponentsInChildren<MmdUnityPhysicsBody>(includeInactive: true);
+                var instance = new MmdUnityModelInstance(
+                    root,
+                    mesh,
+                    materials,
+                    descriptor,
+                    boneTransforms,
+                    physicsBodies,
+                    meshRenderer: null,
+                    renderer,
+                    MmdUnityModelSourceContext.FromOptionalPath(sourcePath),
+                    Array.Empty<Texture2D>(),
+                    new MmdTextureBindingDiagnostics(),
+                    shaderDiagnostics,
+                    scale,
+                    resolvedMaterialRenderingTargets);
+                rollback.Commit();
+                return instance;
             }
             catch
             {
@@ -568,6 +595,38 @@ namespace Mmd.UnityIntegration
             }
 
             return targets;
+        }
+
+        internal static MmdMaterialRenderingTargets[]? NormalizeMaterialRenderingTargets(
+            int materialCount,
+            MmdMaterialRenderingTargets[]? materialRenderingTargets)
+        {
+            if (materialRenderingTargets == null)
+            {
+                return null;
+            }
+
+            if (materialRenderingTargets.Length > materialCount)
+            {
+                throw new ArgumentException(
+                    "Material rendering targets cannot exceed the available material slots.",
+                    nameof(materialRenderingTargets));
+            }
+
+            if (materialRenderingTargets.Length == materialCount)
+            {
+                return materialRenderingTargets;
+            }
+
+            var expanded = new MmdMaterialRenderingTargets[materialCount];
+            for (int i = 0; i < expanded.Length; i++)
+            {
+                expanded[i] = i < materialRenderingTargets.Length
+                    ? materialRenderingTargets[i]
+                    : MmdMaterialRenderingTargets.BuiltIn;
+            }
+
+            return expanded;
         }
 
         private static MmdUnityModelInstance CreateStaticModel(

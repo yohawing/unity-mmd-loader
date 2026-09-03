@@ -67,7 +67,8 @@ namespace Mmd.Editor
                         sourcePath,
                         importScale,
                         MmdPmxModelPresetPolicy.AllowsAutomaticSelfShadowTarget(pmxAsset.ModelPreset),
-                        pmxAsset.MaterialOverrideAsset));
+                        pmxAsset.MaterialOverrideAsset,
+                        pmxAsset.ResolveMaterialRenderingTargets(model.materials.Count)));
                 // Apply material remaps on the Slice B path (consistent with UseImportedPmxAssetReferences).
                 instance = ApplyMaterialRemapsToInstance(instance, pmxAsset);
             }
@@ -82,7 +83,8 @@ namespace Mmd.Editor
                             sourcePath,
                             importScale,
                             MmdPmxModelPresetPolicy.AllowsAutomaticSelfShadowTarget(pmxAsset.ModelPreset)),
-                        pmxAsset));
+                        pmxAsset,
+                        pmxAsset.ResolveMaterialRenderingTargets(model.materials.Count)));
             }
             return new MmdEditorPmxSceneLoadResult(
                 model,
@@ -221,7 +223,10 @@ namespace Mmd.Editor
                         MmdPmxModelPresetPolicy.AllowsAutomaticSelfShadowTarget(pmxAsset.ModelPreset)));
                 placedInstance = RunStage(
                     UnityInstantiationStage,
-                    () => UseImportedPmxAssetReferences(transient, pmxAsset));
+                    () => UseImportedPmxAssetReferences(
+                        transient,
+                        pmxAsset,
+                        pmxAsset.ResolveMaterialRenderingTargets(model.materials.Count)));
 
                 binding = RunStage(
                     UnityInstantiationStage,
@@ -389,7 +394,8 @@ namespace Mmd.Editor
 
         private static MmdUnityModelInstance UseImportedPmxAssetReferences(
             MmdUnityModelInstance instance,
-            MmdPmxAsset pmxAsset)
+            MmdPmxAsset pmxAsset,
+            MmdMaterialRenderingTargets[]? materialRenderingTargets)
         {
             Mesh? importedMesh = pmxAsset.ImportedMesh;
             if (importedMesh == null)
@@ -424,6 +430,11 @@ namespace Mmd.Editor
                 meshRenderer.sharedMaterials = sceneMaterials;
             }
 
+            MmdMaterialRenderingTargets[] resolvedMaterialRenderingTargets =
+                MmdUnityModelFactory.NormalizeMaterialRenderingTargets(
+                    sceneMaterials.Length,
+                    materialRenderingTargets) ?? instance.MaterialRenderingTargets;
+
             var rebound = new MmdUnityModelInstance(
                 instance.Root,
                 importedMesh,
@@ -437,7 +448,8 @@ namespace Mmd.Editor
                 retainedRuntimeTextures,
                 instance.TextureDiagnostics,
                 instance.ShaderDiagnostics,
-                instance.ImportScale);
+                instance.ImportScale,
+                resolvedMaterialRenderingTargets);
 
             DestroyGeneratedObject(transientMesh);
             DestroyReplacedRuntimeMaterials(instance.Materials, sceneMaterials);

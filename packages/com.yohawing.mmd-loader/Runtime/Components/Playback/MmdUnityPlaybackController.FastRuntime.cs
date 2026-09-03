@@ -84,17 +84,25 @@ namespace Mmd.UnityIntegration
 
         public bool TryEnableFastRuntime(byte[] pmxBytes, byte[] vmdBytes, out string reason)
         {
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             if (binding == null)
             {
                 reason = "Playback controller must be configured before enabling fast runtime.";
                 return false;
             }
 
-            return binding.TryEnableFastRuntime(pmxBytes, vmdBytes, out reason);
+            bool enabled = binding.TryEnableFastRuntime(pmxBytes, vmdBytes, out reason);
+            if (enabled)
+            {
+                standaloneWorkerFaulted = false;
+            }
+
+            return enabled;
         }
 
         public bool TryEnableFastRuntimeFromConfiguredSource(out string reason)
         {
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             if (binding == null)
             {
                 reason = "Playback controller must be configured before enabling fast runtime.";
@@ -108,7 +116,7 @@ namespace Mmd.UnityIntegration
                 MmdVmdAsset? motionAsset = MotionAssetSource;
                 if (modelAsset != null && motionAsset != null)
                 {
-                    return binding.TryEnableFastRuntime(
+                    return TryEnableFastRuntime(
                         modelAsset.GetBytesCopy(),
                         motionAsset.GetBytesCopy(),
                         out reason);
@@ -132,7 +140,7 @@ namespace Mmd.UnityIntegration
                         return false;
                     }
 
-                    return binding.TryEnableFastRuntime(
+                    return TryEnableFastRuntime(
                         File.ReadAllBytes(pmxFull),
                         File.ReadAllBytes(vmdFull),
                         out reason);
@@ -150,7 +158,9 @@ namespace Mmd.UnityIntegration
 
         public void DisableFastRuntime()
         {
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             binding?.DisableFastRuntime();
+            standaloneWorkerFaulted = false;
             lastFastRuntimeReason = string.Empty;
         }
 

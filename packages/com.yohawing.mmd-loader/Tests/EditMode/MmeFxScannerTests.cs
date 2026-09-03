@@ -104,5 +104,31 @@ Obj[2] = fx\other.fx
             Assert.That(japanesePathDescriptors[0].sourcePath, Is.EqualTo(japaneseFxPath));
             Assert.That(basenameFallbackDescriptors, Is.Empty);
         }
+
+        [Test]
+        public void ScanFromModelPath_RejectsEffectPathTraversal()
+        {
+            tempDirectory = Path.Combine(Path.GetTempPath(), "mmd-mme-fx-scanner-" + Guid.NewGuid().ToString("N"));
+            string modelDirectory = Path.Combine(tempDirectory, "model");
+            Directory.CreateDirectory(modelDirectory);
+
+            string pmxPath = Path.Combine(modelDirectory, "model.pmx");
+            File.WriteAllBytes(pmxPath, Array.Empty<byte>());
+            File.WriteAllText(
+                Path.Combine(tempDirectory, "outside.fx"),
+                @"#define USE_NORMALMAP
+#include ""AlternativeFull.fxsub""
+");
+            File.WriteAllText(
+                Path.Combine(modelDirectory, "model.emd"),
+                @"[Effect]
+Obj[0] = ..\outside.fx
+");
+
+            IReadOnlyList<MmeFxEffectDescriptor> descriptors =
+                MmeFxScanner.ScanFromModelPath(pmxPath, materialCount: 1);
+
+            Assert.That(descriptors, Is.Empty);
+        }
     }
 }

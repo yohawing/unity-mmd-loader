@@ -74,6 +74,19 @@ namespace Mmd.Tests
             AssertInvalid(outputPath, ".anim", MmdOutputPathError.Empty);
         }
 
+        [TestCase("../outside.png")]
+        [TestCase(@"..\outside.png")]
+        public void ProjectRelativeAssetPathCandidateRejectsOwnerTraversal(string relativeReference)
+        {
+            bool valid = MmdAssetPathUtility.TryResolveProjectRelativeAssetPathCandidate(
+                "Assets/Models/model.pmx",
+                relativeReference,
+                out string resolved);
+
+            Assert.That(valid, Is.False);
+            Assert.That(resolved, Is.Empty);
+        }
+
         private static void AssertInvalid(
             string outputPath,
             string requiredExtension,

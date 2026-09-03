@@ -103,6 +103,15 @@ namespace Mmd.Tests
                 binding = CreatePlaybackBinding();
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 24.0f);
+                int poseAppliedCount = 0;
+                bool snapshotPublishedBeforeCallback = true;
+                MmdPlaybackSnapshot? poseAppliedSnapshot = null;
+                controller.PoseApplied += snapshot =>
+                {
+                    poseAppliedCount++;
+                    poseAppliedSnapshot = snapshot;
+                    snapshotPublishedBeforeCallback &= ReferenceEquals(controller.LastSnapshot, snapshot);
+                };
                 var behaviour = new MmdVmdTimelineBehaviour
                 {
                     ModelSourceId = PlaybackPmxId,
@@ -124,6 +133,9 @@ namespace Mmd.Tests
                 Assert.That(frameNine.frame.frame, Is.EqualTo(9));
                 Assert.That(repeatedFrameNine.frame.frame, Is.EqualTo(9));
                 Assert.That(frameZero.frame.frame, Is.EqualTo(0));
+                Assert.That(poseAppliedCount, Is.EqualTo(3));
+                Assert.That(poseAppliedSnapshot, Is.SameAs(frameZero));
+                Assert.That(snapshotPublishedBeforeCallback, Is.True);
                 Assert.That(Quaternion.Angle(repeatedFrameNineRotation, frameNineRotation), Is.LessThan(0.001f));
                 Assert.That(controller.CurrentFrame, Is.EqualTo(0));
                 Assert.That(controller.LastSnapshot, Is.Not.Null);
@@ -347,6 +359,115 @@ namespace Mmd.Tests
                     Assert.That(controller.LastFastRuntimeReason, Is.Not.Empty);
                     Assert.That(snapshot.frame.bones, Is.Not.Empty);
                 }
+            }
+            finally
+            {
+                MmdTestInstanceScope.DestroyInstance(instance);
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+            }
+        }
+
+        [Test]
+        public void TimelineWorkerRejectsDifferentSameSizedMotionAndSynchronousPathUsesActiveSource()
+        {
+            IgnoreIfNativeRuntimeUnavailable();
+            MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
+            MmdUnityModelInstance? instance = null;
+            try
+            {
+                const float frameRate = 30.0f;
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                byte[] pmxBytes = File.ReadAllBytes(pmxPath);
+                byte[] providerVmdBytes = File.ReadAllBytes(vmdPath);
+                MmdModelDefinition model = new NativeMmdParser().LoadModel(pmxBytes);
+                byte[] customVmdBytes = MmdTestFixtures.CreateDenseVmdBytes(
+                    model.name,
+                    model.bones[0].name,
+                    boneKeyframeCount: 6,
+                    frameSpan: 30);
+
+                // Keep the custom motion byte-for-byte the same size while making a valid,
+                // visibly distinct final translation. The binding must track content, not size.
+                const int vmdHeaderByteCount = 50;
+                const int vmdBoneFrameCountByteCount = 4;
+                const int vmdBoneFrameByteCount = 111;
+                const int vmdBoneNameByteCount = 15;
+                const int vmdFrameNumberByteCount = 4;
+                int finalTranslationXOffset = vmdHeaderByteCount +
+                    vmdBoneFrameCountByteCount +
+                    (5 * vmdBoneFrameByteCount) +
+                    vmdBoneNameByteCount +
+                    vmdFrameNumberByteCount;
+                Array.Copy(
+                    BitConverter.GetBytes(5.0f),
+                    0,
+                    customVmdBytes,
+                    finalTranslationXOffset,
+                    sizeof(float));
+
+                Assert.That(customVmdBytes.Length, Is.EqualTo(providerVmdBytes.Length));
+                Assert.That(customVmdBytes, Is.Not.EqualTo(providerVmdBytes));
+
+                pmxAsset = CreatePmxAsset(pmxPath);
+                vmdAsset = CreateVmdAsset(vmdPath);
+                instance = MmdUnityModelFactory.CreateSkinnedModel(model, pmxPath);
+                MmdUnityPlaybackController controller = instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.ConfigureFromAssets(pmxAsset, vmdAsset, frameRate, startFrame: 0, playOnStart: false);
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+
+                Assert.That(
+                    controller.TryEnableFastRuntime(pmxBytes, customVmdBytes, out string customReason),
+                    Is.True,
+                    customReason);
+                Assert.That(
+                    controller.TryGetOrCreateTimelineWorkerPool(
+                        out MmdMultiCharacterWorkerPool _,
+                        out string workerReason),
+                    Is.False);
+                Assert.That(workerReason, Does.Contain("VMD source differs"));
+
+                // Outside the active PlayerLoop collection window this remains synchronous,
+                // and therefore must apply the custom binding session immediately.
+                var behaviour = new MmdVmdTimelineBehaviour
+                {
+                    MotionAsset = vmdAsset,
+                    FrameRate = frameRate,
+                    LoopPolicy = MmdVmdTimelineLoopPolicy.None
+                };
+                MmdPlaybackSnapshot customSnapshot = behaviour.EvaluateAtLocalTime(controller, 5.0 / frameRate);
+                Vector3 expectedCustomPosition = instance.BindLocalPositions[0] +
+                    new Vector3(-5.0f, -0.005f, -0.01f) * instance.ImportScale;
+                Assert.That(customSnapshot.frame.frame, Is.EqualTo(5));
+                Assert.That(
+                    Vector3.Distance(instance.BoneTransforms[0].localPosition, expectedCustomPosition),
+                    Is.LessThan(0.001f));
+
+                // Restoring provider bytes makes the worker source eligible again.
+                Assert.That(
+                    controller.TryEnableFastRuntime(pmxBytes, providerVmdBytes, out string providerReason),
+                    Is.True,
+                    providerReason);
+                Assert.That(
+                    controller.TryGetOrCreateTimelineWorkerPool(
+                        out MmdMultiCharacterWorkerPool providerPool,
+                        out string providerWorkerReason),
+                    Is.True,
+                    providerWorkerReason);
+                Assert.That(providerPool, Is.Not.Null);
+                Assert.That(
+                    controller.TryGetOrCreateStandaloneWorkerPool(
+                        out MmdMultiCharacterWorkerPool standalonePool,
+                        out string standaloneWorkerReason),
+                    Is.True,
+                    standaloneWorkerReason);
+                Assert.That(
+                    standalonePool,
+                    Is.SameAs(providerPool),
+                    "Timeline and standalone Physics Off playback must reuse the controller-owned worker slot.");
+                controller.ReleaseTimelineWorkerPool();
             }
             finally
             {

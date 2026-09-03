@@ -25,6 +25,13 @@ namespace Mmd.UnityIntegration
         HumanoidRetarget = 2
     }
 
+    internal enum MmdHumanoidPhysicsBindingFailureReason
+    {
+        None = 0,
+        MissingComponent = 1,
+        InvalidOperation = 2
+    }
+
     [Serializable]
     public sealed class MmdTimelineSetupTimingSummary
     {
@@ -55,6 +62,9 @@ namespace Mmd.UnityIntegration
         private const string HumanoidPhysicsOffIkCapNotSupportedMessage =
             "A positive IK iteration cap is not supported for Humanoid retargeting while Physics Mode is Off. " +
             "Use the compatibility default 0 or Physics Mode Live.";
+        private const string HumanoidPhysicsBindingMissingComponentReason = "MissingComponent";
+        private const string HumanoidPhysicsBindingInvalidOperationReason = "InvalidOperation";
+        private const string HumanoidPhysicsBindingUnknownReason = "Unknown";
 
         private MmdUnityPlaybackBinding? binding;
         private MmdUnityPlaybackBinding? humanoidPhysicsBinding;
@@ -117,6 +127,13 @@ namespace Mmd.UnityIntegration
 
         public MmdPlaybackSnapshot? LastSnapshot { get; private set; }
 
+        /// <summary>
+        /// Raised on the main thread immediately after a playback pose is successfully applied.
+        /// Automatic serial and standalone worker playback both invoke the callback during Update.
+        /// Subscriber exceptions are logged and do not stop playback.
+        /// </summary>
+        public event Action<MmdPlaybackSnapshot>? PoseApplied;
+
         public MmdTimelineSetupTimingSummary? LastTimelineSetupTiming { get; internal set; }
 
         public MmdLivePhysicsFrameDiagnostics? LastLivePhysicsDiagnostics =>
@@ -156,11 +173,28 @@ namespace Mmd.UnityIntegration
 
         public MmdHumanoidRetargeterResult? LastHumanoidRetargetResult { get; private set; }
 
+        /// <summary>
+        /// Stable diagnostic name for the last model-only Humanoid physics binding failure.
+        /// An empty value means no binding failure has been recorded since the last source or
+        /// retarget configuration change.
+        /// </summary>
+        public string HumanoidPhysicsBindingFailureReason =>
+            humanoidPhysicsBindingFailureReason switch
+            {
+                MmdHumanoidPhysicsBindingFailureReason.None => string.Empty,
+                MmdHumanoidPhysicsBindingFailureReason.MissingComponent =>
+                    HumanoidPhysicsBindingMissingComponentReason,
+                MmdHumanoidPhysicsBindingFailureReason.InvalidOperation =>
+                    HumanoidPhysicsBindingInvalidOperationReason,
+                _ => HumanoidPhysicsBindingUnknownReason
+            };
+
         public void ConfigureHumanoidRetarget(
             Transform? proxyRoot,
             IReadOnlyList<MmdHumanoidRetargetBinding>? entries,
             IReadOnlyList<MmdHumanoidAppendTransformBinding>? appendEntries)
         {
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             if (physicsMode == MmdPhysicsMode.Off && ikMaxIterationsCap > 0 &&
                 proxyRoot != null && entries != null && entries.Count > 0)
             {
@@ -180,10 +214,12 @@ namespace Mmd.UnityIntegration
             DisposeHumanoidPhysicsBinding();
             DisposeHumanoidHostPoseSession();
             ResetHumanoidHostPoseFailureLatch();
+            ResetHumanoidPhysicsBindingFailureReason();
         }
 
         public void Configure(MmdUnityPlaybackBinding playbackBinding, MmdPlaybackConfig config)
         {
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             config.Validate();
             Configure(playbackBinding, config.FrameRate, config.PlayOnStart);
             ApplyFrame(config.InitialFrame);
@@ -191,6 +227,7 @@ namespace Mmd.UnityIntegration
 
         public void Configure(MmdUnityPlaybackBinding playbackBinding, float playbackFrameRate, bool playOnStart = true)
         {
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             if (playbackBinding == null)
             {
                 throw new ArgumentNullException(nameof(playbackBinding));
@@ -198,6 +235,8 @@ namespace Mmd.UnityIntegration
 
             MmdPlaybackTime.ValidateFrameRate(playbackFrameRate);
             ValidatePhysicsModeForSerialization();
+            ReleasePlaybackWorkerPool();
+            standaloneWorkerFaulted = false;
             DisposeHumanoidHostPoseSession();
             if (binding != null && !ReferenceEquals(binding, playbackBinding))
             {
@@ -206,6 +245,7 @@ namespace Mmd.UnityIntegration
 
             DisposeHumanoidPhysicsBinding();
             ResetHumanoidHostPoseFailureLatch();
+            ResetHumanoidPhysicsBindingFailureReason();
             binding = playbackBinding;
             frameRate = playbackFrameRate;
             playbackFrame = 0.0f;
@@ -225,11 +265,13 @@ namespace Mmd.UnityIntegration
 
         public void SetPlayOnStart(bool value)
         {
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             playOnStart = value;
         }
 
         public void SetPhysicsMode(MmdPhysicsMode mode)
         {
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             ApplyPhysicsMode(mode);
         }
 
@@ -243,8 +285,13 @@ namespace Mmd.UnityIntegration
             get => ikMaxIterationsCap;
             set
             {
+                ReleaseAutomaticWorkerForSynchronousPlayback();
                 ValidateIkMaxIterationsCap(value);
                 ValidateHumanoidPhysicsOffIkCap(value);
+                if (ikMaxIterationsCap != value)
+                {
+                    ReleasePlaybackWorkerPool();
+                }
                 ikMaxIterationsCap = value;
                 PropagateIkMaxIterationsCap();
             }
@@ -258,6 +305,11 @@ namespace Mmd.UnityIntegration
                 ValidateHumanoidPhysicsOffIkCap(ikMaxIterationsCap, mode);
             }
             MmdPhysicsMode previousMode = physicsMode;
+            if (mode != previousMode)
+            {
+                ReleasePlaybackWorkerPool();
+                standaloneWorkerFaulted = false;
+            }
             if (mode != MmdPhysicsMode.Off)
             {
                 DisposeHumanoidHostPoseSession();
@@ -292,6 +344,7 @@ namespace Mmd.UnityIntegration
 
         public MmdPlaybackSnapshot ApplyFrame(int frame)
         {
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             if (binding == null)
             {
                 throw new InvalidOperationException("Playback controller must be configured before applying frames.");
@@ -304,11 +357,12 @@ namespace Mmd.UnityIntegration
 
             playbackFrame = frame;
             CurrentFrame = frame;
-            return ApplyPlaybackPose(() => ApplyCurrentFrame());
+            return ApplyCurrentFramePose();
         }
 
         public MmdPlaybackSnapshot SeekFrame(int frame)
         {
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             if (binding == null)
             {
                 throw new InvalidOperationException("Playback controller must be configured before seeking.");
@@ -349,11 +403,13 @@ namespace Mmd.UnityIntegration
 
         public MmdPlaybackSnapshot ApplyTime(float time)
         {
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             return ApplyTime(time, frameRate);
         }
 
         public MmdPlaybackSnapshot ApplyTime(float time, float playbackFrameRate)
         {
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             if (binding == null)
             {
                 throw new InvalidOperationException("Playback controller must be configured before applying time.");
@@ -383,6 +439,7 @@ namespace Mmd.UnityIntegration
 
         public void Stop()
         {
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             IsPlaying = false;
             pendingSeekReseed = false;
             if (binding != null)
@@ -399,6 +456,7 @@ namespace Mmd.UnityIntegration
 
         public void Tick(float deltaTime)
         {
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             if (!IsPlaying)
             {
                 return;
@@ -411,12 +469,22 @@ namespace Mmd.UnityIntegration
 
             playbackFrame += deltaTime * frameRate;
             CurrentFrame = MmdPlaybackTime.ToFrame(playbackFrame / frameRate, frameRate);
-            ApplyPlaybackPose(() => ApplyCurrentFrame());
+            ApplyCurrentFramePose();
         }
 
         private void Update()
         {
             SyncSerializedPhysicsModeToBinding();
+            if (WasStandaloneWorkerDrivenThisFrame)
+            {
+                return;
+            }
+
+            if (IsStandaloneWorkerFaulted)
+            {
+                return;
+            }
+
             if (ShouldSuppressSelfTick(lastTimelineDriveFrameCount, Time.frameCount))
             {
                 // A Timeline/PlayableDirector evaluated this controller on this or the previous frame.
@@ -545,11 +613,14 @@ namespace Mmd.UnityIntegration
 
         private void OnDestroy()
         {
+            MmdStandaloneWorkerScheduler.Unregister(this);
+            ReleasePlaybackWorkerPool();
             ReleasePlaybackResources();
         }
 
         internal void ReleasePlaybackResources()
         {
+            ReleasePlaybackWorkerPool();
             DisposeHumanoidPhysicsBinding();
             DisposeHumanoidHostPoseSession();
             binding?.Dispose();
@@ -560,12 +631,19 @@ namespace Mmd.UnityIntegration
 
         private void OnDisable()
         {
+            MmdStandaloneWorkerScheduler.Unregister(this);
+            ReleasePlaybackWorkerPool();
             DisposeHumanoidPhysicsBinding();
             DisposeHumanoidHostPoseSession();
         }
 
         private void OnEnable()
         {
+            standaloneWorkerFaulted = false;
+            if (Application.isPlaying)
+            {
+                MmdStandaloneWorkerScheduler.Register(this);
+            }
             if (modelAsset != null)
             {
                 _ = modelAsset.BeginSynchronousPlaybackPreload(
@@ -730,17 +808,43 @@ namespace Mmd.UnityIntegration
             return LastSnapshot;
         }
 
-        private MmdPlaybackSnapshot ApplyPlaybackPose(Func<MmdPlaybackSnapshot> apply)
+        private MmdPlaybackSnapshot ApplyCurrentFramePose()
         {
+            bool poseWillBeApplied = binding?.PhysicsMode != MmdPhysicsMode.Live ||
+                !binding.CanReuseLivePhysicsSeed(CurrentFrame);
+            return ApplyPlaybackPose(() => ApplyCurrentFrame(), poseWillBeApplied);
+        }
+
+        private MmdPlaybackSnapshot ApplyPlaybackPose(
+            Func<MmdPlaybackSnapshot> apply,
+            bool poseWillBeApplied = true)
+        {
+            MmdPlaybackSnapshot snapshot;
             isApplyingPlaybackPose = true;
             try
             {
-                return apply();
+                snapshot = apply();
             }
             finally
             {
                 isApplyingPlaybackPose = false;
             }
+
+            if (!poseWillBeApplied)
+            {
+                return snapshot;
+            }
+
+            try
+            {
+                PoseApplied?.Invoke(snapshot);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception, this);
+            }
+
+            return snapshot;
         }
     }
 }

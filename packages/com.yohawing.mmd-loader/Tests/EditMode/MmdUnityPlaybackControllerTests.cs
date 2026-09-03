@@ -7,7 +7,9 @@ using System.Linq;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.TestTools;
 using Mmd.Editor;
+using Mmd.Native;
 using Mmd.Parser;
 using Mmd.Physics;
 using Mmd.Rendering;
@@ -30,6 +32,59 @@ namespace Mmd.Tests
         private const string PlaybackPmxId = "test_1bone_cube.pmx";
         private const string PlaybackVmdId = "test_1bone_cube_motion.vmd";
         private const int LivePhysicsPlaybackFrame = 10;
+
+        [Test]
+        public void PoseAppliedPublishesSuccessfulPoseAndIsolatesSubscriberFailure()
+        {
+            MmdUnityPlaybackBinding? binding = null;
+            try
+            {
+                binding = CreatePlaybackBinding();
+                MmdUnityPlaybackController controller =
+                    binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.Configure(binding, 30.0f, playOnStart: false);
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+                int mainThreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
+                int callbackCount = 0;
+                int callbackThreadId = -1;
+                bool snapshotWasPublished = false;
+                MmdPlaybackSnapshot? callbackSnapshot = null;
+                controller.PoseApplied += snapshot =>
+                {
+                    callbackCount++;
+                    callbackThreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
+                    callbackSnapshot = snapshot;
+                    snapshotWasPublished = ReferenceEquals(controller.LastSnapshot, snapshot);
+                };
+
+                MmdPlaybackSnapshot applied = controller.ApplyFrame(1);
+
+                Assert.That(callbackCount, Is.EqualTo(1));
+                Assert.That(callbackThreadId, Is.EqualTo(mainThreadId));
+                Assert.That(callbackSnapshot, Is.SameAs(applied));
+                Assert.That(snapshotWasPublished, Is.True);
+
+                controller.SetPhysicsMode(MmdPhysicsMode.Live);
+                int countAfterLiveSeed = callbackCount;
+                controller.ApplyFrame(0);
+                Assert.That(
+                    callbackCount,
+                    Is.EqualTo(countAfterLiveSeed),
+                    "A cached Live pose must not be published as a new application.");
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+
+                controller.PoseApplied += _ => throw new InvalidOperationException("pose hook failure");
+                LogAssert.Expect(
+                    LogType.Exception,
+                    new System.Text.RegularExpressions.Regex("InvalidOperationException: pose hook failure"));
+                Assert.DoesNotThrow(() => controller.ApplyFrame(2));
+                Assert.That(controller.LastSnapshot!.frame.frame, Is.EqualTo(2));
+            }
+            finally
+            {
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
+            }
+        }
 
         [Test]
         public void IkIterationCapDefaultsToCompatibilityAndPropagatesToPhysicsOffVmdEvaluation()
@@ -352,6 +407,8 @@ namespace Mmd.Tests
                     name = "remapped_body"
                 };
                 remapMaterial.SetFloat(MmdMaterialPropertyNames.Alpha, 0.8f);
+                remapMaterial.SetFloat("_OutlineWidth", 0.4f);
+                remapMaterial.SetFloat("_OutlineScreenSpaceWeight", 0.0f);
                 previewInstance.Materials[0] = remapMaterial;
                 previewInstance.SkinnedMeshRenderer!.sharedMaterials = previewInstance.Materials;
 
@@ -386,6 +443,8 @@ namespace Mmd.Tests
                 Assert.That(binding.PlaybackInstance.SkinnedMeshRenderer!.sharedMaterials[0], Is.SameAs(binding.PlaybackInstance.Materials[0]));
                 Assert.That(ReadMaterialFloat(binding.PlaybackInstance.Materials[0], MmdMaterialPropertyNames.Alpha), Is.EqualTo(0.8f).Within(0.00001f));
                 Assert.That(ReadMaterialFloat(remapMaterial, MmdMaterialPropertyNames.Alpha), Is.EqualTo(0.8f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(binding.PlaybackInstance.Materials[0], "_OutlineScreenSpaceWeight"), Is.EqualTo(0.0f).Within(0.00001f));
+                Assert.That(ReadMaterialFloat(remapMaterial, "_OutlineScreenSpaceWeight"), Is.EqualTo(0.0f).Within(0.00001f));
 
                 binding.Dispose();
                 Assert.That(binding.Instance, Is.SameAs(previewInstance));
@@ -508,6 +567,119 @@ namespace Mmd.Tests
                 MmdTestInstanceScope.DestroyInstance(previewInstance);
                 Object.DestroyImmediate(pmxAsset);
                 Object.DestroyImmediate(vmdAsset);
+                Object.DestroyImmediate(importedMaterial);
+            }
+        }
+
+        [Test]
+        public void BorrowedPlaybackNormalizesBuiltInOutlineOnActivationWithoutMutatingSource()
+        {
+            MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
+            MmdUnityModelInstance? previewInstance = null;
+            MmdUnityPlaybackBinding? binding = null;
+            Material? importedMaterial = null;
+
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                byte[] pmxBytes = File.ReadAllBytes(pmxPath);
+                byte[] vmdBytes = File.ReadAllBytes(vmdPath);
+                var parser = new NativeMmdParser();
+                previewInstance = MmdUnityModelFactory.CreateSkinnedModel(parser.LoadModel(pmxBytes), pmxPath);
+                Material authoredMaterial = previewInstance.Materials[0];
+                Shader importedShader = Shader.Find("MMD URP Toon")
+                    ?? throw new InvalidOperationException("MMD URP Toon shader is required for the playback material source test.");
+                importedMaterial = new Material(importedShader)
+                {
+                    name = "Stale Imported Material"
+                };
+                importedMaterial.SetFloat("_OutlineWidth", 0.4f);
+                importedMaterial.SetFloat("_OutlineScreenSpaceWeight", 0.0f);
+
+                pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                pmxAsset.Initialize(
+                    pmxBytes,
+                    "test_1bone_cube.pmx",
+                    pmxPath,
+                    assetShaderPreset: "MMD URP Toon",
+                    importedMaterialAssets: new[] { importedMaterial });
+                vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                vmdAsset.Initialize(vmdBytes, "test_1bone_cube_motion.vmd", vmdPath);
+
+                binding = MmdUnityPlaybackBinding.CreateSkinned(previewInstance, pmxAsset, vmdAsset);
+                binding.SetPhysicsMode(MmdPhysicsMode.Off);
+
+                Material playbackMaterial = binding.PlaybackInstance.Materials[0];
+                Assert.That(playbackMaterial, Is.Not.SameAs(importedMaterial));
+                Assert.That(playbackMaterial.GetFloat("_OutlineWidth"), Is.EqualTo(0.4f).Within(0.00001f));
+                Assert.That(playbackMaterial.GetFloat("_OutlineScreenSpaceWeight"), Is.EqualTo(1.0f).Within(0.00001f));
+                Assert.That(importedMaterial.GetFloat("_OutlineScreenSpaceWeight"), Is.EqualTo(0.0f).Within(0.00001f));
+                Assert.That(previewInstance.SkinnedMeshRenderer!.sharedMaterials[0], Is.SameAs(playbackMaterial));
+
+                binding.Dispose();
+                binding = null;
+                Assert.That(previewInstance.SkinnedMeshRenderer!.sharedMaterials[0], Is.SameAs(authoredMaterial));
+            }
+            finally
+            {
+                binding?.Dispose();
+                MmdTestInstanceScope.DestroyInstance(previewInstance);
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+                Object.DestroyImmediate(importedMaterial);
+            }
+        }
+
+        [Test]
+        public void BorrowedPlaybackPreservesCustomOutlineTargetOnActivation()
+        {
+            MmdUnityModelInstance? previewInstance = null;
+            MmdUnityPlaybackBinding? binding = null;
+            Material? importedMaterial = null;
+
+            try
+            {
+                string pmxPath = ResolvePackageFixture(PlaybackPmxId);
+                string vmdPath = ResolvePackageFixture(PlaybackVmdId);
+                byte[] pmxBytes = File.ReadAllBytes(pmxPath);
+                byte[] vmdBytes = File.ReadAllBytes(vmdPath);
+                var parser = new NativeMmdParser();
+                MmdModelDefinition model = parser.LoadModel(pmxBytes);
+                MmdMotionDefinition motion = parser.LoadMotion(vmdBytes);
+                previewInstance = MmdUnityModelFactory.CreateSkinnedModel(model, pmxPath);
+                Shader importedShader = Shader.Find("MMD URP Toon")
+                    ?? throw new InvalidOperationException("MMD URP Toon shader is required for the playback material source test.");
+                importedMaterial = new Material(importedShader)
+                {
+                    name = "Custom Target Material"
+                };
+                importedMaterial.SetFloat("_OutlineWidth", 0.4f);
+                importedMaterial.SetFloat("_OutlineScreenSpaceWeight", 0.0f);
+                var customTargets = new MmdMaterialRenderingTargets(
+                    outlineScreenSpaceWeightProperty: "_OutlineScreenSpaceWeight",
+                    unsupportedFeatures: new[] { "custom-outline" });
+
+                binding = MmdUnityPlaybackBinding.CreateSkinnedFromExistingSceneModel(
+                    previewInstance.Root,
+                    model,
+                    motion,
+                    PlaybackPmxId,
+                    PlaybackVmdId,
+                    sourcePath: pmxPath,
+                    importedMaterials: new[] { importedMaterial },
+                    materialRenderingTargets: new[] { customTargets });
+                binding.SetPhysicsMode(MmdPhysicsMode.Off);
+
+                Material playbackMaterial = binding.PlaybackInstance.Materials[0];
+                Assert.That(playbackMaterial.GetFloat("_OutlineScreenSpaceWeight"), Is.EqualTo(0.0f).Within(0.00001f));
+                Assert.That(importedMaterial.GetFloat("_OutlineScreenSpaceWeight"), Is.EqualTo(0.0f).Within(0.00001f));
+            }
+            finally
+            {
+                binding?.Dispose();
+                MmdTestInstanceScope.DestroyInstance(previewInstance);
                 Object.DestroyImmediate(importedMaterial);
             }
         }
@@ -1942,6 +2114,60 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void ConfigureFromAssetsLiveInitialSeedFailureReleasesCandidateAndRestoresScene()
+        {
+            MmdPmxAsset? pmxAsset = null;
+            MmdVmdAsset? vmdAsset = null;
+            MmdUnityModelInstance? previewInstance = null;
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                byte[] pmxBytes = File.ReadAllBytes(pmxPath);
+                var parser = new NativeMmdParser();
+                previewInstance = MmdUnityModelFactory.CreateSkinnedModel(parser.LoadModel(pmxBytes), pmxPath);
+                pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                pmxAsset.Initialize(pmxBytes, "test_1bone_cube.pmx", pmxPath, assetImportScale: 1.0f);
+                vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
+                MmdUnityPlaybackController controller = previewInstance.Root.AddComponent<MmdUnityPlaybackController>();
+                SkinnedMeshRenderer renderer = previewInstance.SkinnedMeshRenderer!;
+                Mesh authoredMesh = renderer.sharedMesh!;
+                Material[] authoredMaterials = renderer.sharedMaterials;
+                Transform? authoredRootBone = renderer.rootBone;
+                Bounds authoredBounds = renderer.localBounds;
+
+                InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+                    controller.ConfigureFromAssets(
+                        pmxAsset,
+                        vmdAsset,
+                        30.0f,
+                        startFrame: 1,
+                        playOnStart: false))!;
+
+                Assert.That(exception.Message, Is.EqualTo("Physics Live playback must start from frame 0."));
+                Assert.That(controller.IsConfigured, Is.False);
+                Assert.That(controller.LastSnapshot, Is.Null);
+                Assert.That(controller.ConfiguredInstanceRoot, Is.Null);
+                Assert.That(renderer.sharedMesh, Is.SameAs(authoredMesh));
+                Assert.That(renderer.sharedMaterials, Has.Length.EqualTo(authoredMaterials.Length));
+                for (int i = 0; i < authoredMaterials.Length; i++)
+                {
+                    Assert.That(renderer.sharedMaterials[i], Is.SameAs(authoredMaterials[i]));
+                }
+
+                Assert.That(renderer.rootBone, Is.SameAs(authoredRootBone));
+                Assert.That(renderer.localBounds, Is.EqualTo(authoredBounds));
+            }
+            finally
+            {
+                MmdTestInstanceScope.DestroyInstance(previewInstance);
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+            }
+        }
+
+        [Test]
         public void ConfigureFromAssetsCompatibilityFailurePreservesCurrentPlaybackBinding()
         {
             MmdPmxAsset? pmxAsset = null;
@@ -2164,8 +2390,19 @@ namespace Mmd.Tests
                 Assert.That(controller.ModelAssetSource, Is.SameAs(pmxAssetForSource));
                 Assert.That(controller.MotionAssetSource, Is.SameAs(vmdAsset));
 
-                // Exercise the split path in TryEnableFastRuntimeFromConfiguredSource.
-                _ = controller.TryEnableFastRuntimeFromConfiguredSource(out _);
+                LogAssert.Expect(
+                    LogType.Warning,
+                    "Standalone native worker playback faulted and was disabled for this controller: forced test fault");
+                controller.HandleStandaloneWorkerPreparationFailure("forced test fault");
+                Assert.That(controller.IsStandaloneWorkerFaulted, Is.True);
+
+                // Exercise the asset-source branch and prove an explicit successful re-enable is
+                // also the retry boundary for a faulted automatic worker.
+                Assert.That(
+                    controller.TryEnableFastRuntimeFromConfiguredSource(out string retryReason),
+                    Is.True,
+                    retryReason);
+                Assert.That(controller.IsStandaloneWorkerFaulted, Is.False);
             }
             finally
             {
@@ -2326,6 +2563,8 @@ namespace Mmd.Tests
                 controller.SetPhysicsMode(MmdPhysicsMode.Off);
 
                 MmdPlaybackSnapshot snapshot = controller.ApplyTime(inputTime, frameRate);
+                Vector3 actualPosition = instance.BoneTransforms[0].position;
+                Quaternion actualRotation = instance.BoneTransforms[0].rotation;
 
                 Assert.That(snapshot.frame.frame, Is.EqualTo(10));
                 Assert.That(snapshot.frame.time, Is.EqualTo(inputTime).Within(0.00001f));
@@ -2335,6 +2574,44 @@ namespace Mmd.Tests
                 Assert.That(controller.LastFastRuntimeReason, Is.Empty);
                 // random-access ApplyTime forces Off; the native path returns a lightweight snapshot.
                 Assert.That(snapshot.frame.bones, Is.Empty);
+                using (var expectedSession = MmdRuntimeFfiPlaybackSession.Create(
+                    File.ReadAllBytes(pmxPath),
+                    File.ReadAllBytes(vmdPath)))
+                {
+                    var expectedWorld = new float[expectedSession.WorldMatrixFloatCount];
+                    var expectedMorphs = new float[expectedSession.MorphWeightCount];
+                    var expectedIk = new byte[expectedSession.IkEnabledCount];
+                    expectedSession.EvaluateAndCopy(
+                        inputTime * frameRate,
+                        expectedWorld,
+                        expectedMorphs,
+                        expectedIk);
+                    MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(
+                        instance,
+                        expectedWorld);
+                    Vector3 expectedPosition = instance.BoneTransforms[0].position;
+                    Quaternion expectedRotation = instance.BoneTransforms[0].rotation;
+
+                    expectedSession.EvaluateAndCopy(
+                        snapshot.frame.frame,
+                        expectedWorld,
+                        expectedMorphs,
+                        expectedIk);
+                    MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(
+                        instance,
+                        expectedWorld);
+                    float integerFrameDifference =
+                        Vector3.Distance(expectedPosition, instance.BoneTransforms[0].position) +
+                        Quaternion.Angle(expectedRotation, instance.BoneTransforms[0].rotation);
+
+                    Assert.That(integerFrameDifference, Is.GreaterThan(0.0001f));
+                    Assert.That(
+                        Vector3.Distance(actualPosition, expectedPosition),
+                        Is.LessThan(0.0001f));
+                    Assert.That(
+                        Quaternion.Angle(actualRotation, expectedRotation),
+                        Is.LessThan(0.0001f));
+                }
             }
             finally
             {

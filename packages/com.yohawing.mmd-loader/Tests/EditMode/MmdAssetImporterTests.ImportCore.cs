@@ -69,14 +69,9 @@ namespace Mmd.Tests
             Assert.That(motion.lightKeyframeCount, Is.EqualTo(vmdAsset.LightKeyframeCount));
             Assert.That(motion.selfShadowKeyframeCount, Is.EqualTo(vmdAsset.SelfShadowKeyframeCount));
             Assert.That(motion.sourceBytes, Is.EqualTo(vmdAsset.GetBytesCopy()));
-
-            System.Reflection.FieldInfo? sourceReadbackField = typeof(MmdVmdAsset).GetField(
-                "sourceReadback",
-                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-            Assert.That(sourceReadbackField, Is.Not.Null);
-            byte[] cachedSourceBytes = (byte[])sourceReadbackField!.GetValue(vmdAsset)!;
-            Assert.That(motion.sourceBytes, Is.SameAs(cachedSourceBytes));
-            Assert.That(vmdAsset.GetBytesCopy(), Is.Not.SameAs(cachedSourceBytes));
+            MmdMotionDefinition secondMotion = vmdAsset.CreateNativeClipMotionHeader();
+            Assert.That(secondMotion.sourceBytes, Is.SameAs(motion.sourceBytes));
+            Assert.That(vmdAsset.GetBytesCopy(), Is.Not.SameAs(motion.sourceBytes));
         }
 
         [Test]
@@ -431,6 +426,7 @@ namespace Mmd.Tests
         public void PmxImporterCustomProfileUsesProfileShaderAndPreservesPresetSummary()
         {
             CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
             var profile = ScriptableObject.CreateInstance<MmdMaterialProfileAsset>();
             profile.shader = Shader.Find(MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName);
             profile.textureTargets = new MmdMaterialProfileTextureTargets
@@ -449,7 +445,8 @@ namespace Mmd.Tests
                 outlineScreenSpaceWeightProperty = string.Empty,
                 outlineZTestProperty = string.Empty,
                 unsupportedFeatures = new[] { "sphere-texture", "toon-texture", "outline" },
-                requiredKeywords = new[] { "_SURFACE_TYPE_TRANSPARENT" }
+                requiredKeywords = new[] { "_SURFACE_TYPE_TRANSPARENT" },
+                supportsMaterialMorphs = false
             };
             AssetDatabase.Refresh();
             AssetDatabase.CreateAsset(profile, TempMaterialProfilePath);
@@ -471,6 +468,45 @@ namespace Mmd.Tests
             Assert.That(pmxAsset.ImportedMaterials[0].shader.name,
                 Is.EqualTo(MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName));
             Assert.That(pmxAsset.ImportedMaterials[0].IsKeywordEnabled("_SURFACE_TYPE_TRANSPARENT"), Is.True);
+            Assert.That(pmxAsset.MaterialProfileProvenance, Is.Not.Null,
+                "custom profile imports must persist resolved mapper provenance");
+            Assert.That(pmxAsset.MaterialProfileAsset, Is.SameAs(profile),
+                "custom profile imports must retain the mapper asset for fresh runtime playback");
+            MmdMaterialProfileProvenance provenance = pmxAsset.MaterialProfileProvenance!;
+            Assert.That(provenance.schemaVersion, Is.EqualTo(MmdMaterialProfileProvenance.CurrentSchemaVersion));
+            Assert.That(provenance.profileId, Is.Not.Empty);
+            Assert.That(provenance.materialSlotCount, Is.EqualTo(pmxAsset.MaterialCount));
+            Assert.That(provenance.renderingTargets.requiredKeywords,
+                Does.Contain("_SURFACE_TYPE_TRANSPARENT"));
+            MmdUnityModelInstance? sceneInstance = null;
+            try
+            {
+                sceneInstance = MmdEditorPmxLoader.LoadPmxIntoScene(pmxAsset);
+                Assert.That(sceneInstance.MaterialRenderingTargets[0].SupportsMaterialMorphs, Is.False,
+                    "scene placement must use the persisted custom material target contract");
+            }
+            finally
+            {
+                if (sceneInstance?.Root != null)
+                {
+                    Object.DestroyImmediate(sceneInstance.Root);
+                }
+            }
+            MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(TempVmdPath);
+            Assert.That(vmdAsset, Is.Not.Null);
+            MmdUnityPlaybackBinding? playback = null;
+            try
+            {
+                playback = MmdUnityPlaybackBinding.CreateSkinned(pmxAsset, vmdAsset);
+                Assert.That(playback.Instance.Materials[0].shader, Is.SameAs(profile.shader),
+                    "fresh asset playback must recreate the custom profile shader");
+                Assert.That(playback.Instance.MaterialRenderingTargets[0].SupportsMaterialMorphs, Is.False,
+                    "fresh asset playback must preserve custom material capability targets");
+            }
+            finally
+            {
+                playback?.Dispose();
+            }
             Assert.That(AssetDatabase.GetDependencies(TempPmxPath), Does.Contain(TempMaterialProfilePath));
         }
 
@@ -832,7 +868,7 @@ namespace Mmd.Tests
             }
         }
         [Test]
-        public void PmxScriptedImporterVersionIsTwentyNineForMaterialReimportMigration()
+        public void PmxScriptedImporterVersionIsThirtyForMaterialProfileMigration()
         {
             object[] attributes = typeof(MmdPmxScriptedImporter).GetCustomAttributes(
                 typeof(ScriptedImporterAttribute),
@@ -840,8 +876,8 @@ namespace Mmd.Tests
 
             Assert.That(attributes, Has.Length.EqualTo(1));
             var attribute = (ScriptedImporterAttribute)attributes[0];
-            Assert.That(attribute.version, Is.EqualTo(29),
-                "PMX importer version must force a material rebind after the importer migration.");
+            Assert.That(attribute.version, Is.EqualTo(30),
+                "PMX importer version must migrate persisted material profile provenance.");
         }
 
         private static void CreateUtsProfileAsset(Shader utsShader)

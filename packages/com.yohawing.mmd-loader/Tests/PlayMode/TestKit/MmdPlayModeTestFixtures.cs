@@ -67,16 +67,54 @@ namespace Mmd.Tests
             };
         }
 
-        private static string ResolvePackageFixture(string fileName)
+        internal static string ResolvePackageFixture(string fileName)
         {
+            return ResolvePackageAssetPath(Path.Combine("Tests", "Fixtures", "Assets", fileName), "fixture");
+        }
+
+        internal static string ResolveBasicPlaybackSampleAsset(string fileName)
+        {
+            return ResolvePackageAssetPath(
+                Path.Combine("Samples~", "BasicPlayback", "Assets", fileName),
+                "Basic Playback sample asset");
+        }
+
+        private static string ResolvePackageAssetPath(string relativePath, string assetDescription)
+        {
+            if (string.IsNullOrWhiteSpace(relativePath))
+            {
+                throw new ArgumentException("Package asset path is required.", nameof(relativePath));
+            }
+
             string? projectRoot = Path.GetDirectoryName(Application.dataPath);
             if (string.IsNullOrWhiteSpace(projectRoot))
             {
                 throw new InvalidOperationException("Unity project root could not be resolved from Application.dataPath.");
             }
 
-            string packageRoot = Path.GetFullPath(Path.Combine(projectRoot, "..", "packages", "com.yohawing.mmd-loader"));
-            return Path.Combine(packageRoot, "Tests", "Fixtures", "Assets", fileName);
+            DirectoryInfo? directory = new DirectoryInfo(projectRoot);
+            while (directory != null)
+            {
+                string[] packageRoots =
+                {
+                    Path.Combine(directory.FullName, "packages", "com.yohawing.mmd-loader"),
+                    Path.Combine(directory.FullName, "Packages", "com.yohawing.mmd-loader")
+                };
+                foreach (string packageRoot in packageRoots)
+                {
+                    string candidate = Path.Combine(packageRoot, relativePath);
+                    if (File.Exists(candidate))
+                    {
+                        return candidate;
+                    }
+                }
+
+                directory = directory.Parent;
+            }
+
+            throw new FileNotFoundException(
+                $"The {assetDescription} could not be found in an ancestor package directory.",
+                relativePath);
         }
 
         private static byte[] CreateVmdBytes(string modelName, IReadOnlyList<GeneratedVmdBoneKeyframe> boneKeyframes)

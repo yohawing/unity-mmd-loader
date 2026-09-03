@@ -11,13 +11,13 @@ using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.Animations;
 using UnityEngine.Playables;
-using UnityEngine.SceneManagement;
 using UnityEngine.Timeline;
 using UnityEngine.TestTools;
 using Mmd.Parser;
 using Mmd.Physics;
 using Mmd.Timeline;
 using Mmd.UnityIntegration;
+using Object = UnityEngine.Object;
 
 namespace Mmd.Tests
 {
@@ -88,6 +88,147 @@ namespace Mmd.Tests
         }
 
         [UnityTest]
+        public IEnumerator PlayableDirectorTwoVmdClipsRebindsMotionAtBoundary()
+        {
+            const string modelSourceId = "playmode-model.pmx";
+            const string firstMotionSourceId = "playmode-first.vmd";
+            const string secondMotionSourceId = "playmode-second.vmd";
+
+            MmdPmxAsset? modelAsset = null;
+            MmdVmdAsset? firstMotionAsset = null;
+            MmdVmdAsset? secondMotionAsset = null;
+            MmdUnityModelInstance? instance = null;
+            MmdUnityPlaybackBinding? binding = null;
+            GameObject? directorObject = null;
+            TimelineAsset? timelineAsset = null;
+            try
+            {
+                byte[] pmxBytes = File.ReadAllBytes(ResolvePackageFixture("test_1bone_cube.pmx"));
+                byte[] firstVmdBytes = File.ReadAllBytes(ResolvePackageFixture("test_1bone_cube_motion.vmd"));
+                byte[] secondVmdBytes = File.ReadAllBytes(ResolvePackageFixture("test_append_bone.vmd"));
+                Assert.That(secondVmdBytes, Is.Not.EqualTo(firstVmdBytes));
+
+                modelAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                modelAsset.Initialize(pmxBytes, modelSourceId, modelSourceId);
+                firstMotionAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                firstMotionAsset.Initialize(firstVmdBytes, firstMotionSourceId, firstMotionSourceId);
+                secondMotionAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                secondMotionAsset.Initialize(secondVmdBytes, secondMotionSourceId, secondMotionSourceId);
+
+                var parser = new NativeMmdParser();
+                MmdModelDefinition model = parser.LoadModel(pmxBytes);
+                MmdMotionDefinition firstMotion = firstMotionAsset.LoadMotion(parser);
+                MmdMotionDefinition secondMotion = secondMotionAsset.LoadMotion(parser);
+                Assert.That(secondMotion.maxFrame, Is.Not.EqualTo(firstMotion.maxFrame));
+                instance = MmdUnityModelFactory.CreateSkinnedModel(model);
+                binding = MmdUnityPlaybackBinding.CreateSkinned(
+                    instance,
+                    modelAsset,
+                    firstMotionAsset,
+                    firstMotion);
+                MmdUnityPlaybackController controller = instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+                controller.ConfigureModelAsset(modelAsset);
+                controller.Configure(binding, 30.0f, playOnStart: false);
+
+                timelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
+                MmdVmdTimelineTrack track = timelineAsset.CreateTrack<MmdVmdTimelineTrack>(null, "MMD VMD");
+                TimelineClip firstClip = track.CreateClip<MmdVmdTimelineClip>();
+                firstClip.start = 0.0;
+                firstClip.duration = 1.0;
+                var firstClipAsset = (MmdVmdTimelineClip)firstClip.asset;
+                firstClipAsset.MotionAsset = firstMotionAsset;
+                firstClipAsset.ModelSourceId = modelSourceId;
+                firstClipAsset.MotionSourceId = firstMotionSourceId;
+                firstClipAsset.FrameRate = 30.0f;
+
+                TimelineClip secondClip = track.CreateClip<MmdVmdTimelineClip>();
+                secondClip.start = 1.0;
+                secondClip.duration = 1.0;
+                var secondClipAsset = (MmdVmdTimelineClip)secondClip.asset;
+                secondClipAsset.MotionAsset = secondMotionAsset;
+                secondClipAsset.ModelSourceId = modelSourceId;
+                secondClipAsset.MotionSourceId = secondMotionSourceId;
+                secondClipAsset.FrameRate = 30.0f;
+
+                directorObject = new GameObject("playmode-two-clip-director");
+                PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
+                director.playableAsset = timelineAsset;
+                director.SetGenericBinding(track, controller);
+
+                director.time = 0.5;
+                director.Evaluate();
+                Assert.That(controller.MotionSourceId, Is.EqualTo(firstMotionSourceId));
+                Assert.That(controller.CurrentFrame, Is.EqualTo(15));
+                int firstConfigurationRevision = controller.ConfigurationRevision;
+
+                director.time = 1.5;
+                director.Evaluate();
+                Assert.That(controller.MotionSourceId, Is.EqualTo(secondMotionSourceId));
+                Assert.That(controller.MotionMaxFrame, Is.EqualTo(secondMotion.maxFrame),
+                    "the second clip must expose its own motion frame range");
+                Assert.That(controller.CurrentFrame, Is.EqualTo(15),
+                    "the timeline time must remain stable while the winning motion is rebound");
+                Assert.That(controller.ConfigurationRevision, Is.EqualTo(firstConfigurationRevision + 1),
+                    "crossing the real PlayableGraph clip boundary must reconfigure the winning motion once");
+                Assert.That(controller.LastTimelineSetupTiming, Is.Not.Null);
+                Assert.That(controller.LastTimelineSetupTiming!.succeeded, Is.True);
+                int secondConfigurationRevision = controller.ConfigurationRevision;
+
+                director.Evaluate();
+                Assert.That(controller.ConfigurationRevision, Is.EqualTo(secondConfigurationRevision),
+                    "re-evaluating the same timeline time must not reconfigure the winning motion again");
+
+                director.time = 0.5;
+                director.Evaluate();
+                Assert.That(controller.MotionSourceId, Is.EqualTo(firstMotionSourceId));
+                Assert.That(controller.ConfigurationRevision, Is.EqualTo(secondConfigurationRevision + 1),
+                    "seeking back across the boundary must select the first clip again once");
+                int thirdConfigurationRevision = controller.ConfigurationRevision;
+
+                director.Evaluate();
+                Assert.That(controller.ConfigurationRevision, Is.EqualTo(thirdConfigurationRevision),
+                    "re-evaluating the same backward-seek time must not reconfigure the winning motion again");
+            }
+            finally
+            {
+                if (directorObject != null)
+                {
+                    directorObject.GetComponent<PlayableDirector>()?.Stop();
+                    Object.Destroy(directorObject);
+                }
+
+                if (timelineAsset != null)
+                {
+                    Object.Destroy(timelineAsset);
+                }
+
+                binding?.Dispose();
+                if (instance != null)
+                {
+                    MmdPlayModeTestInstanceScope.DestroyInstance(instance);
+                }
+
+                if (modelAsset != null)
+                {
+                    Object.Destroy(modelAsset);
+                }
+
+                if (firstMotionAsset != null)
+                {
+                    Object.Destroy(firstMotionAsset);
+                }
+
+                if (secondMotionAsset != null)
+                {
+                    Object.Destroy(secondMotionAsset);
+                }
+            }
+
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator TickRejectsInvalidDeltaTimeInPlayMode()
         {
             MmdUnityPlaybackBinding? binding = null;
@@ -121,76 +262,73 @@ namespace Mmd.Tests
         }
 
         [UnityTest]
-        public IEnumerator NativePlaybackSceneLoadsAndEvaluatesPackageFixture()
+        public IEnumerator NativePlaybackControllerRunsWithPackageFixtureWithoutConsumerScene()
         {
-            AsyncOperation loadOperation = SceneManager.LoadSceneAsync("NativePlayback", LoadSceneMode.Single);
-            Assert.That(loadOperation, Is.Not.Null);
-            while (!loadOperation.isDone)
+            const string modelSourceId = "package-fixture-model.pmx";
+            const string motionSourceId = "package-fixture-motion.vmd";
+            MmdPmxAsset? modelAsset = null;
+            MmdVmdAsset? motionAsset = null;
+            MmdUnityPlaybackBinding? binding = null;
+            try
             {
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                modelAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                modelAsset.Initialize(File.ReadAllBytes(pmxPath), modelSourceId, pmxPath);
+                motionAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                motionAsset.Initialize(File.ReadAllBytes(vmdPath), motionSourceId, vmdPath);
+
+                binding = MmdUnityPlaybackBinding.CreateSkinned(modelAsset, motionAsset);
+                MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+                controller.ConfigureModelAsset(modelAsset);
+                controller.Configure(binding, 30.0f, playOnStart: true);
+
                 yield return null;
+
+                // Set the motion source after Start has run. Otherwise the controller would
+                // treat both serialized sources as a request to rebind an existing scene model,
+                // which is intentionally not part of this package-only fixture.
+                controller.ConfigureMotionAsset(motionAsset);
+
+                Assert.That(controller, Is.Not.Null);
+                Assert.That(controller.IsConfigured, Is.True);
+                Assert.That(controller.IsPlaying, Is.True);
+                Assert.That(controller.PlayOnStart, Is.True);
+                Assert.That(controller.ModelAssetSource, Is.SameAs(modelAsset));
+                Assert.That(controller.MotionAssetSource, Is.SameAs(motionAsset));
+
+                MmdUnityModelInstance instance = binding.Instance;
+                SkinnedMeshRenderer? sceneSmr = instance.SkinnedMeshRenderer;
+                Assert.That(sceneSmr, Is.Not.Null, "the package fixture must create a skinned playback hierarchy");
+                Assert.That(sceneSmr!.sharedMesh, Is.SameAs(instance.Mesh));
+                Assert.That(sceneSmr.bones, Is.Not.Null.And.Not.Empty);
+                Assert.That(instance.BoneTransforms, Is.Not.Null.And.Not.Empty);
+                Assert.That(sceneSmr.bones.Length, Is.EqualTo(instance.BoneTransforms.Length));
+                Assert.That(sceneSmr.rootBone, Is.Not.Null);
+
+                controller.Pause();
+                MmdPlaybackSnapshot frameZero = controller.ApplyFrame(0);
+                MmdPlaybackSnapshot frameTen = controller.ApplyFrame(10);
+
+                Assert.That(frameZero.frame.frame, Is.EqualTo(0));
+                Assert.That(frameTen.frame.frame, Is.EqualTo(10));
+                Assert.That(controller.CurrentFrame, Is.EqualTo(10));
+                Assert.That(controller.LastSnapshot, Is.SameAs(frameTen));
             }
-
-            yield return null;
-
-            // The NativePlayback scene contains the configured "Native Playback" holder controller
-            // AND a second controller on the instantiated imported model hierarchy, because the
-            // importer attaches a MmdUnityPlaybackController to every imported model (Slice 7) and the
-            // scene builder Instantiates that hierarchy as a child. FindAnyObjectByType returns an
-            // arbitrary one of the two, so the holder must be selected deterministically by name.
-            MmdUnityPlaybackController[] sceneControllers =
-                UnityEngine.Object.FindObjectsByType<MmdUnityPlaybackController>(FindObjectsSortMode.None);
-            MmdUnityPlaybackController? foundController = sceneControllers
-                .FirstOrDefault(c => string.Equals(c.gameObject.name, "Native Playback", StringComparison.Ordinal));
-            Assert.That(foundController, Is.Not.Null,
-                $"scene must contain the 'Native Playback' holder controller (found {sceneControllers.Length} controller(s))");
-            MmdUnityPlaybackController controller = foundController!;
-            MmdPmxAsset modelAsset = controller.ModelAssetSource!;
-            MmdVmdAsset motionAsset = controller.MotionAssetSource!;
-            Assert.That(controller, Is.Not.Null);
-            Assert.That(modelAsset, Is.Not.Null);
-            Assert.That(motionAsset, Is.Not.Null);
-            Assert.That(controller.IsConfigured, Is.True);
-            Assert.That(controller.IsPlaying, Is.True);
-            Assert.That(controller.PlayOnStart, Is.True);
-
-            // Domain reload slice: verify that after scene load, the scene SMR preserves
-            // importer-owned Mesh/Material/bone references instead of rebuilding with "Split Runtime".
-            SkinnedMeshRenderer? foundSceneSMR = controller.ConfiguredInstanceRoot != null
-                ? controller.ConfiguredInstanceRoot.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true)
-                : GameObject.Find("Native Playback")?.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true);
-            Assert.That(foundSceneSMR, Is.Not.Null, "scene must have an SMR (imported hierarchy) for domain reload rebind");
-            SkinnedMeshRenderer sceneSMR = foundSceneSMR!;
-            Mesh sharedMesh = sceneSMR.sharedMesh;
-            Assert.That(sharedMesh, Is.Not.Null);
-            Assert.That(sharedMesh.name, Does.Not.Contain("Split Runtime"),
-                "scene SMR must use importer-owned Mesh, not a Split Runtime rebuild");
-            Assert.That(sceneSMR.bones, Is.Not.Null.And.Not.Empty);
-            Assert.That(sceneSMR.bones.Length, Is.EqualTo(modelAsset.BoneCount),
-                "scene SMR bone count must match pmxAsset.BoneCount");
-            Assert.That(sceneSMR.rootBone, Is.Not.Null,
-                "scene SMR must have a valid rootBone");
-            Assert.That(sharedMesh, Is.Not.SameAs(modelAsset.ImportedMesh),
-                "active playback must isolate mesh mutation from the importer-owned Mesh sub-asset");
-            Assert.That(sharedMesh.name, Does.StartWith(modelAsset.ImportedMesh.name));
-            if (modelAsset.ImportedMaterials is { Length: > 0 } mats)
+            finally
             {
-                Material[] smrMats = sceneSMR.sharedMaterials;
-                Assert.That(smrMats, Is.Not.Null.And.Not.Empty);
-                Assert.That(smrMats[0], Is.Not.SameAs(mats[0]),
-                    "active playback must isolate material mutation from the importer-owned Material sub-asset");
-                Assert.That(smrMats[0].name, Does.StartWith(mats[0].name));
+                MmdPlayModeTestInstanceScope.DestroyInstance(binding?.Instance);
+                if (modelAsset != null)
+                {
+                    Object.Destroy(modelAsset);
+                }
+
+                if (motionAsset != null)
+                {
+                    Object.Destroy(motionAsset);
+                }
             }
-
-            controller.Pause();
-            controller.SetPhysicsMode(MmdPhysicsMode.Off);
-            MmdPlaybackSnapshot frameZero = controller.ApplyFrame(0);
-            int frameZeroNumber = frameZero.frame.frame;
-            MmdPlaybackSnapshot frameTen = controller.ApplyFrame(10);
-            int frameTenNumber = frameTen.frame.frame;
-
-            Assert.That(frameZeroNumber, Is.EqualTo(0));
-            Assert.That(frameTenNumber, Is.EqualTo(10));
-            Assert.That(controller.CurrentFrame, Is.EqualTo(10));
         }
 
         private static void AddPinnedRootRigidbody(MmdModelDefinition model)
@@ -536,6 +674,7 @@ namespace Mmd.Tests
 
                 MmdUnityPlaybackController controller = instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.IkMaxIterationsCap = 64;
+                controller.LivePhysicsBodyDiagnosticsSampleInterval = 1;
                 controller.ConfigureModelAsset(pmxAsset);
                 controller.SetPhysicsMode(MmdPhysicsMode.Live);
 
@@ -559,6 +698,9 @@ namespace Mmd.Tests
                 Transform drivenBone = instance.BoneTransforms[drivenBoneIndex];
                 Vector3 proxyBindPosition = proxyHips.localPosition;
                 Vector3 drivenBindPosition = drivenBone.localPosition;
+                HashSet<int> hairBoneSlots = CollectNonStaticPhysicsBoneSlots(model, instance);
+                Assert.That(hairBoneSlots.Count, Is.GreaterThan(0),
+                    "Expected at least one non-static rigidbody linked to a hair bone");
                 controller.ConfigureHumanoidRetarget(
                     proxyRig.ProxyRoot.transform,
                     new[]
@@ -578,8 +720,27 @@ namespace Mmd.Tests
                     },
                     Array.Empty<MmdHumanoidAppendTransformBinding>());
 
+                // Prove the retarget contract with a deterministic, physics-free write before
+                // the Live loop: the native final-matrix diagnostics below are meaningful only
+                // when the preceding host pose actually reached the Unity bone transform.
+                int configuredIkMaxIterationsCap = controller.IkMaxIterationsCap;
+                controller.IkMaxIterationsCap = 0;
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+                Vector3 directRetargetDelta = new Vector3(0.03f, 0.0f, 0.0f);
+                proxyHips.localPosition = proxyBindPosition + directRetargetDelta;
+                MmdHumanoidRetargeterResult directRetargetResult = controller.ApplyHumanoidRetargetNow();
+                Assert.That(directRetargetResult.CopiedBoneCount, Is.EqualTo(1));
+                Assert.That(directRetargetResult.CopiedTranslationCount, Is.EqualTo(1));
+                Assert.That(
+                    Vector3.Distance(drivenBone.localPosition, drivenBindPosition + directRetargetDelta),
+                    Is.LessThanOrEqualTo(1.0e-5f),
+                    "retarget must write the requested host translation to the Unity bone before Live physics");
+                controller.SetPhysicsMode(MmdPhysicsMode.Live);
+                controller.IkMaxIterationsCap = configuredIkMaxIterationsCap;
+
                 proxyHips.localPosition = proxyBindPosition + new Vector3(0.05f, 0.0f, 0.0f);
                 proxyHips.localRotation = Quaternion.Euler(0.0f, 4.0f, 0.0f);
+                Vector3 liveStartWorldPosition = drivenBone.position;
                 yield return null;
 
                 Assert.That(controller.LastHumanoidRetargetGate, Is.EqualTo(MmdHumanoidRetargetGate.Ready));
@@ -587,6 +748,10 @@ namespace Mmd.Tests
                     "Self-tick humanoid Live physics must not configure the VMD playback binding.");
                 Assert.That(controller.LastLivePhysicsDiagnostics, Is.Not.Null);
                 Assert.That(controller.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(0));
+                MmdLivePhysicsBodyDiagnostics[] initialHairDiagnostics = controller.LastLivePhysicsDiagnostics.bodyDiagnostics
+                    .Where(body => hairBoneSlots.Contains(body.boneIndex))
+                    .ToArray();
+                Assert.That(initialHairDiagnostics, Is.Not.Empty);
                 Assert.That(controller.IkMaxIterationsCap, Is.EqualTo(64));
                 Assert.That(controller.LastLivePhysicsDiagnostics.deltaTime, Is.EqualTo(0.0f));
                 Assert.That(controller.LastLivePhysicsDiagnostics.evaluationPath, Is.EqualTo("HumanoidNativeFinal"));
@@ -614,47 +779,39 @@ namespace Mmd.Tests
                 Assert.That(controller.LastSnapshot, Is.Null,
                     "Humanoid-driven live physics must not overwrite the VMD playback snapshot surface.");
 
-                HashSet<int> hairBoneSlots = CollectNonStaticPhysicsBoneSlots(model, instance);
-                Assert.That(hairBoneSlots.Count, Is.GreaterThan(0),
-                    "Expected at least one non-static rigidbody linked to a hair bone");
-                var frameZeroPositions = new Dictionary<int, Vector3>();
-                var frameZeroRotations = new Dictionary<int, Quaternion>();
-                foreach (int slot in hairBoneSlots)
-                {
-                    frameZeroPositions[slot] = instance.BoneTransforms[slot].localPosition;
-                    frameZeroRotations[slot] = instance.BoneTransforms[slot].localRotation;
-                }
-
+                // This redistributable fixture intentionally exercises static + dynamicBone bodies;
+                // its rest pose is already at equilibrium, so this case verifies host-pose routing
+                // and complete native readback rather than inventing a motion oracle for the hair.
                 for (int i = 1; i <= 5; i++)
                 {
                     proxyHips.localPosition = proxyBindPosition + new Vector3(0.05f + 0.01f * i, 0.0f, 0.0f);
                     proxyHips.localRotation = Quaternion.Euler(0.0f, 4.0f + i, 0.0f);
                     yield return null;
                 }
-
                 Assert.That(controller.LastLivePhysicsDiagnostics, Is.Not.Null);
                 Assert.That(controller.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(5));
                 Assert.That(controller.LastLivePhysicsDiagnostics.deltaTime, Is.GreaterThan(0.0f));
                 Assert.That(controller.LastLivePhysicsDiagnostics.stepPhysicsMs, Is.GreaterThan(0.0));
-
-                bool anyHairBoneChanged = false;
-                foreach (int slot in hairBoneSlots)
-                {
-                    Transform bone = instance.BoneTransforms[slot];
-                    if ((bone.localPosition - frameZeroPositions[slot]).sqrMagnitude > 0.0001f ||
-                        Quaternion.Angle(frameZeroRotations[slot], bone.localRotation) > 0.01f)
-                    {
-                        anyHairBoneChanged = true;
-                    }
-
-                    Assert.That(
-                        Vector3.Distance(instance.Root.transform.position, bone.position),
-                        Is.LessThan(1000.0f),
-                        "Humanoid-driven live physics hair bone must remain near the model root");
-                }
-
-                Assert.That(anyHairBoneChanged, Is.True,
-                    "Expected humanoid-retargeted body motion to drive live physics feedback into at least one non-static hair bone");
+                Assert.That(controller.LastLivePhysicsDiagnostics.sampledBodyDiagnosticsThisFrame, Is.True);
+                Assert.That(controller.LastLivePhysicsDiagnostics.bodyDiagnosticsFrame, Is.EqualTo(5));
+                Assert.That(
+                    controller.LastLivePhysicsDiagnostics.bodyDiagnostics,
+                    Has.Length.EqualTo(model.physics.rigidbodies.Count),
+                    "the real hair fixture must expose a complete native readback sample");
+                Assert.That(controller.LastLivePhysicsDiagnostics.managedBodyTransformApplyPresent, Is.False,
+                    "Humanoid Live applies the native final matrix pose once");
+                Assert.That(controller.LastLivePhysicsDiagnostics.matrixTransformApplyPresent, Is.True);
+                Assert.That(controller.LastLivePhysicsDiagnostics.nativeBonesWrittenBack, Is.GreaterThan(0));
+                Assert.That(
+                    Vector3.Distance(drivenBone.position, liveStartWorldPosition),
+                    Is.GreaterThan(0.001f),
+                    "Humanoid Live must apply a changed native final pose to the configured Unity bone");
+                Assert.That(
+                    HasNativeHairBodyReadbackChanged(
+                        initialHairDiagnostics,
+                        controller.LastLivePhysicsDiagnostics.bodyDiagnostics),
+                    Is.True,
+                    "Humanoid Live must advance at least one non-static hair body's native readback");
 
                 Mesh humanoidPlaybackMesh = renderer.sharedMesh;
                 FieldInfo? physicsModeField = typeof(MmdUnityPlaybackController).GetField(
@@ -667,14 +824,14 @@ namespace Mmd.Tests
                 Assert.That(controller.IsConfigured, Is.True);
                 Assert.That(controller.LastLivePhysicsDiagnostics, Is.Null,
                     "VMD rebind with physics Off must release the previous Humanoid physics binding.");
-                Assert.That(humanoidPlaybackMesh == null, Is.True,
-                    "VMD rebind must release the previous Humanoid physics Mesh clone before capturing Scene state");
+                Assert.That(humanoidPlaybackMesh, Is.SameAs(authoredMesh),
+                    "model-only Humanoid physics reuses the authored blend-shape Mesh");
                 Mesh vmdPlaybackMesh = renderer.sharedMesh;
-                Assert.That(vmdPlaybackMesh, Is.Not.SameAs(authoredMesh));
+                Assert.That(vmdPlaybackMesh, Is.SameAs(authoredMesh));
 
                 controller.ReleasePlaybackResources();
                 yield return null;
-                Assert.That(vmdPlaybackMesh == null, Is.True);
+                Assert.That(vmdPlaybackMesh, Is.SameAs(authoredMesh));
                 Assert.That(renderer.sharedMesh, Is.SameAs(authoredMesh));
                 Assert.That(renderer.sharedMaterials[0], Is.SameAs(authoredMaterial));
             }
@@ -744,6 +901,7 @@ namespace Mmd.Tests
                 MmdUnityPlaybackController controller = instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.ConfigureModelAsset(pmxAsset);
                 controller.SetPhysicsMode(MmdPhysicsMode.Live);
+                controller.LivePhysicsBodyDiagnosticsSampleInterval = 1;
 
                 int drivenBoneIndex = FindFirstValidStaticPhysicsBone(model, instance);
                 Assert.That(drivenBoneIndex, Is.GreaterThanOrEqualTo(0),
@@ -765,6 +923,9 @@ namespace Mmd.Tests
                 Transform drivenBone = instance.BoneTransforms[drivenBoneIndex];
                 Vector3 proxyBindPosition = proxyHips.localPosition;
                 Vector3 drivenBindPosition = drivenBone.localPosition;
+                HashSet<int> hairBoneSlots = CollectNonStaticPhysicsBoneSlots(model, instance);
+                Assert.That(hairBoneSlots.Count, Is.GreaterThan(0),
+                    "Expected at least one non-static rigidbody linked to a hair bone");
                 controller.ConfigureHumanoidRetarget(
                     proxyRig.ProxyRoot.transform,
                     new[]
@@ -787,8 +948,24 @@ namespace Mmd.Tests
                 Assert.That(controller.IsConfigured, Is.False,
                     "The regression must start with no manually injected playback binding.");
 
+                // Keep the host-pose precondition observable independently from the rest-pose
+                // physics fixture: Live diagnostics cannot distinguish a stale Unity Transform
+                // from a stable dynamicBone equilibrium on their own.
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+                Vector3 directRetargetDelta = new Vector3(0.03f, 0.0f, 0.0f);
+                proxyHips.localPosition = proxyBindPosition + directRetargetDelta;
+                MmdHumanoidRetargeterResult directRetargetResult = controller.ApplyHumanoidRetargetNow();
+                Assert.That(directRetargetResult.CopiedBoneCount, Is.EqualTo(1));
+                Assert.That(directRetargetResult.CopiedTranslationCount, Is.EqualTo(1));
+                Assert.That(
+                    Vector3.Distance(drivenBone.localPosition, drivenBindPosition + directRetargetDelta),
+                    Is.LessThanOrEqualTo(1.0e-5f),
+                    "retarget must write the requested host translation to the Unity bone before Live physics");
+                controller.SetPhysicsMode(MmdPhysicsMode.Live);
+
                 proxyHips.localPosition = proxyBindPosition + new Vector3(0.05f, 0.0f, 0.0f);
                 proxyHips.localRotation = Quaternion.Euler(0.0f, 4.0f, 0.0f);
+                Vector3 liveStartWorldPosition = drivenBone.position;
                 yield return null;
 
                 Assert.That(controller.LastHumanoidRetargetGate, Is.EqualTo(MmdHumanoidRetargetGate.Ready));
@@ -798,17 +975,13 @@ namespace Mmd.Tests
                 Assert.That(controller.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(0));
                 Assert.That(controller.LastSnapshot, Is.Null,
                     "Model-only humanoid physics binding must not create a VMD playback snapshot.");
+                MmdLivePhysicsBodyDiagnostics[] initialHairDiagnostics = controller.LastLivePhysicsDiagnostics.bodyDiagnostics
+                    .Where(body => hairBoneSlots.Contains(body.boneIndex))
+                    .ToArray();
+                Assert.That(initialHairDiagnostics, Is.Not.Empty);
 
-                HashSet<int> hairBoneSlots = CollectNonStaticPhysicsBoneSlots(model, instance);
-                Assert.That(hairBoneSlots.Count, Is.GreaterThan(0),
-                    "Expected at least one non-static rigidbody linked to a hair bone");
-                var frameZeroPositions = new Dictionary<int, Vector3>();
-                var frameZeroRotations = new Dictionary<int, Quaternion>();
-                foreach (int slot in hairBoneSlots)
-                {
-                    frameZeroPositions[slot] = instance.BoneTransforms[slot].localPosition;
-                    frameZeroRotations[slot] = instance.BoneTransforms[slot].localRotation;
-                }
+                // The real fixture is the graph/binding probe here; deterministic mode-1 movement
+                // is covered by the synthetic two-bone Timeline regression in EditMode.
 
                 for (int i = 1; i <= 5; i++)
                 {
@@ -816,24 +989,30 @@ namespace Mmd.Tests
                     proxyHips.localRotation = Quaternion.Euler(0.0f, 4.0f + i, 0.0f);
                     yield return null;
                 }
-
                 Assert.That(controller.LastLivePhysicsDiagnostics, Is.Not.Null);
                 Assert.That(controller.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(5));
                 Assert.That(controller.LastLivePhysicsDiagnostics.deltaTime, Is.GreaterThan(0.0f));
-
-                bool anyHairBoneChanged = false;
-                foreach (int slot in hairBoneSlots)
-                {
-                    Transform bone = instance.BoneTransforms[slot];
-                    if ((bone.localPosition - frameZeroPositions[slot]).sqrMagnitude > 0.0001f ||
-                        Quaternion.Angle(frameZeroRotations[slot], bone.localRotation) > 0.01f)
-                    {
-                        anyHairBoneChanged = true;
-                    }
-                }
-
-                Assert.That(anyHairBoneChanged, Is.True,
-                    "Expected model-only humanoid live physics to feed Bullet readback into at least one non-static hair bone");
+                Assert.That(controller.LastLivePhysicsDiagnostics.stepPhysicsMs, Is.GreaterThan(0.0));
+                Assert.That(controller.LastLivePhysicsDiagnostics.sampledBodyDiagnosticsThisFrame, Is.True);
+                Assert.That(controller.LastLivePhysicsDiagnostics.bodyDiagnosticsFrame, Is.EqualTo(5));
+                Assert.That(
+                    controller.LastLivePhysicsDiagnostics.bodyDiagnostics,
+                    Has.Length.EqualTo(model.physics.rigidbodies.Count),
+                    "the real hair fixture must expose a complete native readback sample");
+                Assert.That(controller.LastLivePhysicsDiagnostics.managedBodyTransformApplyPresent, Is.False,
+                    "Humanoid Live applies the native final matrix pose once");
+                Assert.That(controller.LastLivePhysicsDiagnostics.matrixTransformApplyPresent, Is.True);
+                Assert.That(controller.LastLivePhysicsDiagnostics.nativeBonesWrittenBack, Is.GreaterThan(0));
+                Assert.That(
+                    Vector3.Distance(drivenBone.position, liveStartWorldPosition),
+                    Is.GreaterThan(0.001f),
+                    "Humanoid Live must apply a changed native final pose to the configured Unity bone");
+                Assert.That(
+                    HasNativeHairBodyReadbackChanged(
+                        initialHairDiagnostics,
+                        controller.LastLivePhysicsDiagnostics.bodyDiagnostics),
+                    Is.True,
+                    "Humanoid Live must advance at least one non-static hair body's native readback");
             }
             finally
             {
@@ -1923,6 +2102,381 @@ namespace Mmd.Tests
         }
 
         [UnityTest]
+        public IEnumerator AutomaticTimelineWorkerBatchAppliesTwoControllersBeforeLateUpdate()
+        {
+            MmdPmxAsset? modelAsset = null;
+            MmdVmdAsset? motionAsset = null;
+            MmdUnityPlaybackBinding? firstBinding = null;
+            MmdUnityPlaybackBinding? secondBinding = null;
+            TimelineAsset? timelineAsset = null;
+            GameObject? directorObject = null;
+            TimelineWorkerLateUpdateObservation? firstObservation = null;
+            TimelineWorkerLateUpdateObservation? secondObservation = null;
+            MmdMultiCharacterWorkerPool? firstTimelinePool = null;
+            int processFrameCount = 0;
+            Action<double> processFrameObserver = _ => processFrameCount++;
+            try
+            {
+                MmdVmdTimelineBehaviour.ProcessFrameEvaluated += processFrameObserver;
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                modelAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                motionAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                modelAsset.Initialize(File.ReadAllBytes(pmxPath), Path.GetFileName(pmxPath), pmxPath);
+                motionAsset.Initialize(File.ReadAllBytes(vmdPath), Path.GetFileName(vmdPath), vmdPath);
+
+                firstBinding = MmdUnityPlaybackBinding.CreateSkinned(modelAsset, motionAsset);
+                secondBinding = MmdUnityPlaybackBinding.CreateSkinned(modelAsset, motionAsset);
+                MmdUnityPlaybackController firstController =
+                    firstBinding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                MmdUnityPlaybackController secondController =
+                    secondBinding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                firstController.SetPhysicsMode(MmdPhysicsMode.Off);
+                firstController.Configure(firstBinding, 30.0f, playOnStart: false);
+                secondController.SetPhysicsMode(MmdPhysicsMode.Off);
+                secondController.Configure(secondBinding, 30.0f, playOnStart: false);
+
+                // Let controller Start() complete before attaching provider assets. This preserves
+                // the existing runtime setup contract used by the PlayMode fixture helpers.
+                yield return null;
+                ConfigureTimelineWorkerController(firstController, firstBinding, modelAsset, motionAsset);
+                ConfigureTimelineWorkerController(secondController, secondBinding, modelAsset, motionAsset);
+                Assert.That(
+                    firstController.TryGetOrCreateTimelineWorkerPool(
+                        out firstTimelinePool,
+                        out string firstPoolReason),
+                    Is.True,
+                    firstPoolReason);
+                firstObservation = firstBinding.Instance.Root.AddComponent<TimelineWorkerLateUpdateObservation>();
+                secondObservation = secondBinding.Instance.Root.AddComponent<TimelineWorkerLateUpdateObservation>();
+                firstObservation.Track(firstController, firstBinding.Instance.BoneTransforms[0]);
+                secondObservation.Track(secondController, secondBinding.Instance.BoneTransforms[0]);
+
+                timelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
+                MmdVmdTimelineTrack firstTrack = timelineAsset.CreateTrack<MmdVmdTimelineTrack>(null, "MMD VMD First");
+                MmdVmdTimelineTrack secondTrack = timelineAsset.CreateTrack<MmdVmdTimelineTrack>(null, "MMD VMD Second");
+                ConfigureTimelineWorkerClip(firstTrack.CreateClip<MmdVmdTimelineClip>(), modelAsset, motionAsset);
+                ConfigureTimelineWorkerClip(secondTrack.CreateClip<MmdVmdTimelineClip>(), modelAsset, motionAsset);
+
+                directorObject = new GameObject("timeline-worker-batch-director");
+                PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
+                director.playOnAwake = false;
+                director.timeUpdateMode = DirectorUpdateMode.GameTime;
+                director.playableAsset = timelineAsset;
+                director.SetGenericBinding(firstTrack, firstController);
+                director.SetGenericBinding(secondTrack, secondController);
+                Assert.That(EnsureTimelineWorkerSchedulerInstalled(), Is.True);
+
+                director.time = 10.0 / 30.0;
+                // The explicit Evaluate call is outside the collection boundary and must remain
+                // synchronous for programmatic seeks/preview-style callers.
+                director.Evaluate();
+                Assert.That(firstController.CurrentFrame, Is.EqualTo(10));
+                Assert.That(secondController.CurrentFrame, Is.EqualTo(10));
+                Assert.That(firstController.LastSnapshot, Is.Not.Null);
+                Assert.That(secondController.LastSnapshot, Is.Not.Null);
+
+                // Keep the controllers eligible for standalone playback while Timeline is active.
+                // The Timeline ownership marker must suppress the standalone boundary for the same
+                // frame, otherwise the shared Off worker would be driven twice.
+                firstController.Play();
+                secondController.Play();
+                director.Play();
+                director.DeferredEvaluate();
+                for (int frame = 0; frame < 30 &&
+                     (firstObservation.ObservedBatchSize != 2 || secondObservation.ObservedBatchSize != 2); frame++)
+                {
+                    yield return null;
+                }
+
+                Assert.That(processFrameCount, Is.GreaterThanOrEqualTo(2),
+                    "The PlayableDirector did not evaluate both Timeline tracks in PlayMode.");
+                Assert.That(
+                    GetTimelineWorkerSchedulerMetric<int>("LastCompletedBatchSize"),
+                    Is.EqualTo(2),
+                    $"processFrameCount={processFrameCount}, " +
+                    $"lastDrainFrame={GetTimelineWorkerSchedulerMetric<int>("LastDrainFrameCount")}, " +
+                    $"firstObservedBatch={firstObservation.ObservedBatchSize}, " +
+                    $"secondObservedBatch={secondObservation.ObservedBatchSize}");
+                Assert.That(GetTimelineWorkerSchedulerMetric<ulong>("LastCompletedGeneration"), Is.GreaterThan(0UL));
+                Assert.That(firstObservation.ObservedBatchSize, Is.EqualTo(2));
+                Assert.That(secondObservation.ObservedBatchSize, Is.EqualTo(2));
+                Assert.That(firstObservation.ObservedGeneration, Is.EqualTo(secondObservation.ObservedGeneration));
+                Assert.That(firstObservation.ObservedPlayerLoopFrame, Is.EqualTo(secondObservation.ObservedPlayerLoopFrame));
+                Assert.That(firstObservation.ObservedAppliedFrame, Is.EqualTo(firstController.CurrentFrame));
+                Assert.That(secondObservation.ObservedAppliedFrame, Is.EqualTo(secondController.CurrentFrame));
+                Assert.That(firstObservation.ObservedPlayerLoopFrame, Is.EqualTo(firstController.LastTimelineDriveFrameCount));
+                Assert.That(secondObservation.ObservedPlayerLoopFrame, Is.EqualTo(secondController.LastTimelineDriveFrameCount));
+                Assert.That(firstObservation.ObservedPosition, Is.EqualTo(secondObservation.ObservedPosition));
+                Assert.That(
+                    MmdStandaloneWorkerScheduler.LastBatchSize,
+                    Is.EqualTo(0),
+                    "Timeline-owned controllers must not be double-driven by standalone workers.");
+
+                director.Stop();
+                for (int frame = 0; frame < 5 && MmdStandaloneWorkerScheduler.LastBatchSize != 2; frame++)
+                {
+                    yield return null;
+                }
+
+                Assert.That(
+                    MmdStandaloneWorkerScheduler.LastBatchSize,
+                    Is.EqualTo(2),
+                    "Standalone playback must resume after Timeline stops.");
+                Assert.That(
+                    firstController.TryGetOrCreateStandaloneWorkerPool(
+                        out MmdMultiCharacterWorkerPool standalonePool,
+                        out string standalonePoolReason),
+                    Is.True,
+                    standalonePoolReason);
+                Assert.That(
+                    standalonePool,
+                    Is.SameAs(firstTimelinePool),
+                    "Timeline and standalone Physics Off playback must reuse the same worker slot.");
+            }
+            finally
+            {
+                MmdVmdTimelineBehaviour.ProcessFrameEvaluated -= processFrameObserver;
+                if (directorObject != null)
+                {
+                    directorObject.GetComponent<PlayableDirector>()?.Stop();
+                    Object.DestroyImmediate(directorObject);
+                }
+
+                if (timelineAsset != null)
+                {
+                    Object.DestroyImmediate(timelineAsset);
+                }
+
+                MmdPlayModeTestInstanceScope.DestroyInstance(firstBinding?.Instance);
+                MmdPlayModeTestInstanceScope.DestroyInstance(secondBinding?.Instance);
+                if (modelAsset != null)
+                {
+                    Object.DestroyImmediate(modelAsset);
+                }
+
+                if (motionAsset != null)
+                {
+                    Object.DestroyImmediate(motionAsset);
+                }
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator AutomaticTimelineWorkerBatchCombinesTwoDirectors()
+        {
+            MmdPmxAsset? modelAsset = null;
+            MmdVmdAsset? motionAsset = null;
+            MmdUnityPlaybackBinding? firstBinding = null;
+            MmdUnityPlaybackBinding? secondBinding = null;
+            TimelineAsset? firstTimelineAsset = null;
+            TimelineAsset? secondTimelineAsset = null;
+            GameObject? firstDirectorObject = null;
+            GameObject? secondDirectorObject = null;
+            TimelineWorkerLateUpdateObservation? firstObservation = null;
+            TimelineWorkerLateUpdateObservation? secondObservation = null;
+            int processFrameCount = 0;
+            Action<double> processFrameObserver = _ => processFrameCount++;
+            try
+            {
+                MmdVmdTimelineBehaviour.ProcessFrameEvaluated += processFrameObserver;
+                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                modelAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                motionAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+                modelAsset.Initialize(File.ReadAllBytes(pmxPath), Path.GetFileName(pmxPath), pmxPath);
+                motionAsset.Initialize(File.ReadAllBytes(vmdPath), Path.GetFileName(vmdPath), vmdPath);
+
+                firstBinding = MmdUnityPlaybackBinding.CreateSkinned(modelAsset, motionAsset);
+                secondBinding = MmdUnityPlaybackBinding.CreateSkinned(modelAsset, motionAsset);
+                MmdUnityPlaybackController firstController =
+                    firstBinding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                MmdUnityPlaybackController secondController =
+                    secondBinding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
+                firstController.SetPhysicsMode(MmdPhysicsMode.Off);
+                firstController.Configure(firstBinding, 30.0f, playOnStart: false);
+                secondController.SetPhysicsMode(MmdPhysicsMode.Off);
+                secondController.Configure(secondBinding, 30.0f, playOnStart: false);
+
+                yield return null;
+                ConfigureTimelineWorkerController(firstController, firstBinding, modelAsset, motionAsset);
+                ConfigureTimelineWorkerController(secondController, secondBinding, modelAsset, motionAsset);
+                firstObservation = firstBinding.Instance.Root.AddComponent<TimelineWorkerLateUpdateObservation>();
+                secondObservation = secondBinding.Instance.Root.AddComponent<TimelineWorkerLateUpdateObservation>();
+                firstObservation.Track(firstController, firstBinding.Instance.BoneTransforms[0]);
+                secondObservation.Track(secondController, secondBinding.Instance.BoneTransforms[0]);
+
+                firstTimelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
+                MmdVmdTimelineTrack firstTrack = firstTimelineAsset.CreateTrack<MmdVmdTimelineTrack>(null, "MMD VMD First");
+                ConfigureTimelineWorkerClip(firstTrack.CreateClip<MmdVmdTimelineClip>(), modelAsset, motionAsset);
+                firstDirectorObject = new GameObject("timeline-worker-batch-first-director");
+                PlayableDirector firstDirector = firstDirectorObject.AddComponent<PlayableDirector>();
+                firstDirector.playOnAwake = false;
+                firstDirector.timeUpdateMode = DirectorUpdateMode.GameTime;
+                firstDirector.playableAsset = firstTimelineAsset;
+                firstDirector.SetGenericBinding(firstTrack, firstController);
+
+                secondTimelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
+                MmdVmdTimelineTrack secondTrack = secondTimelineAsset.CreateTrack<MmdVmdTimelineTrack>(null, "MMD VMD Second");
+                ConfigureTimelineWorkerClip(secondTrack.CreateClip<MmdVmdTimelineClip>(), modelAsset, motionAsset);
+                secondDirectorObject = new GameObject("timeline-worker-batch-second-director");
+                PlayableDirector secondDirector = secondDirectorObject.AddComponent<PlayableDirector>();
+                secondDirector.playOnAwake = false;
+                secondDirector.timeUpdateMode = DirectorUpdateMode.GameTime;
+                secondDirector.playableAsset = secondTimelineAsset;
+                secondDirector.SetGenericBinding(secondTrack, secondController);
+                Assert.That(EnsureTimelineWorkerSchedulerInstalled(), Is.True);
+
+                firstDirector.Play();
+                secondDirector.Play();
+                firstDirector.DeferredEvaluate();
+                secondDirector.DeferredEvaluate();
+                for (int frame = 0; frame < 30 &&
+                     (firstObservation.ObservedBatchSize != 2 || secondObservation.ObservedBatchSize != 2); frame++)
+                {
+                    yield return null;
+                }
+
+                Assert.That(processFrameCount, Is.GreaterThanOrEqualTo(2));
+                Assert.That(GetTimelineWorkerSchedulerMetric<int>("LastCompletedBatchSize"), Is.EqualTo(2));
+                Assert.That(firstObservation.ObservedBatchSize, Is.EqualTo(2));
+                Assert.That(secondObservation.ObservedBatchSize, Is.EqualTo(2));
+                Assert.That(firstObservation.ObservedGeneration, Is.EqualTo(secondObservation.ObservedGeneration));
+                Assert.That(firstObservation.ObservedPlayerLoopFrame, Is.EqualTo(secondObservation.ObservedPlayerLoopFrame));
+                Assert.That(firstObservation.ObservedAppliedFrame, Is.EqualTo(firstController.CurrentFrame));
+                Assert.That(secondObservation.ObservedAppliedFrame, Is.EqualTo(secondController.CurrentFrame));
+            }
+            finally
+            {
+                MmdVmdTimelineBehaviour.ProcessFrameEvaluated -= processFrameObserver;
+                if (firstDirectorObject != null)
+                {
+                    firstDirectorObject.GetComponent<PlayableDirector>()?.Stop();
+                    Object.DestroyImmediate(firstDirectorObject);
+                }
+
+                if (secondDirectorObject != null)
+                {
+                    secondDirectorObject.GetComponent<PlayableDirector>()?.Stop();
+                    Object.DestroyImmediate(secondDirectorObject);
+                }
+
+                if (firstTimelineAsset != null)
+                {
+                    Object.DestroyImmediate(firstTimelineAsset);
+                }
+
+                if (secondTimelineAsset != null)
+                {
+                    Object.DestroyImmediate(secondTimelineAsset);
+                }
+
+                MmdPlayModeTestInstanceScope.DestroyInstance(firstBinding?.Instance);
+                MmdPlayModeTestInstanceScope.DestroyInstance(secondBinding?.Instance);
+                if (modelAsset != null)
+                {
+                    Object.DestroyImmediate(modelAsset);
+                }
+
+                if (motionAsset != null)
+                {
+                    Object.DestroyImmediate(motionAsset);
+                }
+            }
+        }
+
+        private static bool EnsureTimelineWorkerSchedulerInstalled()
+        {
+            Type schedulerType = ResolveTimelineWorkerSchedulerType();
+            MethodInfo method = schedulerType.GetMethod(
+                "EnsureInstalled",
+                BindingFlags.NonPublic | BindingFlags.Static)!;
+            return (bool)method.Invoke(null, null)!;
+        }
+
+        private static T GetTimelineWorkerSchedulerMetric<T>(string propertyName)
+        {
+            Type schedulerType = ResolveTimelineWorkerSchedulerType();
+            PropertyInfo property = schedulerType.GetProperty(
+                propertyName,
+                BindingFlags.NonPublic | BindingFlags.Static)!;
+            return (T)property.GetValue(null)!;
+        }
+
+        private static Type ResolveTimelineWorkerSchedulerType()
+        {
+            return AppDomain.CurrentDomain.GetAssemblies()
+                .Select(assembly => assembly.GetType("Mmd.Timeline.MmdTimelineWorkerBatchScheduler"))
+                .First(type => type != null)!;
+        }
+
+        private static void ConfigureTimelineWorkerController(
+            MmdUnityPlaybackController controller,
+            MmdUnityPlaybackBinding binding,
+            MmdPmxAsset modelAsset,
+            MmdVmdAsset motionAsset)
+        {
+            controller.ConfigureModelAsset(modelAsset);
+            controller.ConfigureMotionAsset(motionAsset);
+            Assert.That(
+                controller.TryEnableFastRuntimeFromConfiguredSource(out string reason),
+                Is.True,
+                reason);
+            controller.SeekFrame(0);
+        }
+
+        private static void ConfigureTimelineWorkerClip(
+            TimelineClip clip,
+            MmdPmxAsset modelAsset,
+            MmdVmdAsset motionAsset)
+        {
+            clip.start = 0.0;
+            clip.duration = 1.0;
+            var asset = (MmdVmdTimelineClip)clip.asset;
+            asset.ModelSourceId = modelAsset.SourceId;
+            asset.MotionSourceId = motionAsset.SourceId;
+            asset.MotionAsset = motionAsset;
+            asset.FrameRate = 30.0f;
+        }
+
+        [DefaultExecutionOrder(1000)]
+        private sealed class TimelineWorkerLateUpdateObservation : MonoBehaviour
+        {
+            private MmdUnityPlaybackController? controller;
+            private Transform? observedTransform;
+
+            internal int ObservedBatchSize { get; private set; } = -1;
+
+            internal ulong ObservedGeneration { get; private set; }
+
+            internal int ObservedPlayerLoopFrame { get; private set; } = -1;
+
+            internal int ObservedAppliedFrame { get; private set; } = -1;
+
+            internal Vector3 ObservedPosition { get; private set; }
+
+            internal void Track(MmdUnityPlaybackController target, Transform transform)
+            {
+                controller = target ?? throw new ArgumentNullException(nameof(target));
+                observedTransform = transform ?? throw new ArgumentNullException(nameof(transform));
+            }
+
+            private void LateUpdate()
+            {
+                if (controller == null || observedTransform == null || controller.LastSnapshot == null)
+                {
+                    return;
+                }
+
+                ObservedBatchSize = GetTimelineWorkerSchedulerMetric<int>("LastCompletedBatchSize");
+                ObservedGeneration = GetTimelineWorkerSchedulerMetric<ulong>("LastCompletedGeneration");
+                ObservedPlayerLoopFrame = Time.frameCount;
+                ObservedAppliedFrame = controller.LastSnapshot.frame.frame;
+                ObservedPosition = observedTransform.localPosition;
+            }
+        }
+
+        [UnityTest]
         public IEnumerator TimelineForwardPlaybackEvaluationStepsLivePhysics()
         {
             MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
@@ -2147,26 +2701,12 @@ namespace Mmd.Tests
         // in MmdVmdTimelineBehaviour.ProcessFrame and was verified via Editor.log instrumentation.
         private static string ResolvePackageFixture(string fileName)
         {
-            string? projectRoot = Path.GetDirectoryName(Application.dataPath);
-            if (string.IsNullOrWhiteSpace(projectRoot))
-            {
-                throw new InvalidOperationException("Unity project root could not be resolved from Application.dataPath.");
-            }
-
-            string packageRoot = Path.GetFullPath(Path.Combine(projectRoot, "..", "packages", "com.yohawing.mmd-loader"));
-            return Path.Combine(packageRoot, "Tests", "Fixtures", "Assets", fileName);
+            return MmdPlayModeTestFixtures.ResolvePackageFixture(fileName);
         }
 
         private static string ResolveBasicPlaybackSampleAsset(string fileName)
         {
-            string? projectRoot = Path.GetDirectoryName(Application.dataPath);
-            if (string.IsNullOrWhiteSpace(projectRoot))
-            {
-                throw new InvalidOperationException("Unity project root could not be resolved from Application.dataPath.");
-            }
-
-            string packageRoot = Path.GetFullPath(Path.Combine(projectRoot, "..", "packages", "com.yohawing.mmd-loader"));
-            return Path.Combine(packageRoot, "Samples~", "BasicPlayback", "Assets", fileName);
+            return MmdPlayModeTestFixtures.ResolveBasicPlaybackSampleAsset(fileName);
         }
 
         private static HairPhysicsScaleSample RunHairPhysicsForwardPlayback(float importScale)
@@ -2256,6 +2796,29 @@ namespace Mmd.Tests
             }
 
             return slots;
+        }
+
+        private static bool HasNativeHairBodyReadbackChanged(
+            IReadOnlyList<MmdLivePhysicsBodyDiagnostics> initial,
+            IReadOnlyList<MmdLivePhysicsBodyDiagnostics> final)
+        {
+            foreach (MmdLivePhysicsBodyDiagnostics initialBody in initial)
+            {
+                MmdLivePhysicsBodyDiagnostics? finalBody = final.FirstOrDefault(
+                    body => body.bodyIndex == initialBody.bodyIndex);
+                if (finalBody == null)
+                {
+                    continue;
+                }
+
+                if ((finalBody.readbackMmdPosition - initialBody.readbackMmdPosition).sqrMagnitude > 1.0e-6f ||
+                    Quaternion.Angle(finalBody.readbackMmdRotation, initialBody.readbackMmdRotation) > 0.01f)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static PlayableGraph CreateBoundAnimatorGraph(Animator animator)

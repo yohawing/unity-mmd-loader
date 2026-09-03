@@ -2,6 +2,7 @@
 
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using Mmd.IO;
 using UnityEngine;
 
 namespace Mmd.Editor
@@ -94,7 +95,7 @@ namespace Mmd.Editor
                 return false;
             }
 
-            if (Path.IsPathRooted(outputPath))
+            if (IsPathRootedAcrossPlatforms(outputPath))
             {
                 error = MmdOutputPathError.Rooted;
                 return false;
@@ -139,6 +140,25 @@ namespace Mmd.Editor
             return true;
         }
 
+        private static bool IsPathRootedAcrossPlatforms(string path)
+        {
+            if (Path.IsPathRooted(path))
+            {
+                return true;
+            }
+
+            // Unity asset paths are exchanged as strings, so a Windows-authored rooted path
+            // must remain rooted even when the package tests run on a POSIX host.
+            if (path.Length > 0 && (path[0] == '\\' || path[0] == '/'))
+            {
+                return true;
+            }
+
+            return path.Length >= 2 &&
+                path[1] == ':' &&
+                ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z'));
+        }
+
         private static bool TryResolveProjectRelativeAssetPath(
             string ownerAssetPath,
             string relativeReference,
@@ -154,34 +174,40 @@ namespace Mmd.Editor
             string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
             string ownerDirectory = Path.GetDirectoryName(ownerAssetPath)?.Replace('\\', '/') ?? string.Empty;
             string candidatePath;
+            bool validatedAgainstProjectRoot = false;
             if (Path.IsPathRooted(relativeReference))
             {
-                candidatePath = Path.GetFullPath(relativeReference);
+                if (!MmdSafeRelativePath.TryResolve(
+                        projectRoot,
+                        relativeReference,
+                        out candidatePath,
+                        out _,
+                        allowRoot: true))
+                {
+                    return false;
+                }
+                validatedAgainstProjectRoot = true;
             }
             else
             {
                 string ownerDirectoryFullPath = Path.GetFullPath(Path.Combine(projectRoot, ownerDirectory));
-                candidatePath = Path.GetFullPath(Path.Combine(ownerDirectoryFullPath, relativeReference));
-
-                // Traversal guard: after GetFullPath normalization (resolves ..), ensure candidate
-                // cannot escape the owner PMX asset directory. String prefix after normalization
-                // is sufficient because .. that escapes will land outside the owner tree.
-                string ownerDirWithSep = ownerDirectoryFullPath;
-                char sep = Path.DirectorySeparatorChar;
-                char alt = Path.AltDirectorySeparatorChar;
-                if (!ownerDirWithSep.EndsWith(sep) && !ownerDirWithSep.EndsWith(alt))
-                {
-                    ownerDirWithSep += sep;
-                }
-                bool underOwner = candidatePath.StartsWith(ownerDirWithSep, System.StringComparison.OrdinalIgnoreCase)
-                                  || string.Equals(candidatePath, ownerDirectoryFullPath, System.StringComparison.OrdinalIgnoreCase);
-                if (!underOwner)
+                if (!MmdSafeRelativePath.TryResolve(
+                        ownerDirectoryFullPath,
+                        relativeReference,
+                        out candidatePath,
+                        out _,
+                        allowRoot: true))
                 {
                     return false;
                 }
             }
 
-            if (!candidatePath.StartsWith(projectRoot, System.StringComparison.OrdinalIgnoreCase))
+            if (!validatedAgainstProjectRoot && !MmdSafeRelativePath.TryResolve(
+                    projectRoot,
+                    candidatePath,
+                    out _,
+                    out _,
+                    allowRoot: true))
             {
                 return false;
             }

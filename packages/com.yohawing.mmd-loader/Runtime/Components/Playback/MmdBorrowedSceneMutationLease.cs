@@ -6,7 +6,6 @@ using System.Linq;
 using Mmd;
 using Mmd.Rendering;
 using UnityEngine;
-using Object = UnityEngine.Object;
 
 namespace Mmd.UnityIntegration
 {
@@ -81,7 +80,10 @@ namespace Mmd.UnityIntegration
             bool capturedOriginalState = false;
             try
             {
-                createdMaterials = CloneMaterials(sourceMaterials);
+                createdMaterials = CloneMaterials(
+                    sourceMaterials,
+                    sourceInstance.MaterialRenderingTargets,
+                    excludedSlots);
                 MmdMaterialOverrideApplier.Apply(materialOverride, createdMaterials, excludedSlots);
 
                 CaptureOriginalState(sourceRenderer, sourceMesh, bones);
@@ -263,7 +265,10 @@ namespace Mmd.UnityIntegration
             }
         }
 
-        private static Material[] CloneMaterials(Material[] materials)
+        private static Material[] CloneMaterials(
+            Material[] materials,
+            MmdMaterialRenderingTargets[] materialRenderingTargets,
+            bool[] excludedSlots)
         {
             var clones = new Material[materials.Length];
             try
@@ -273,7 +278,13 @@ namespace Mmd.UnityIntegration
                     Material source = materials[i];
                     if (source != null)
                     {
-                        clones[i] = new Material(source) { name = BuildPlaybackMaterialName(source.name) };
+                        Material clone = new Material(source) { name = BuildPlaybackMaterialName(source.name) };
+                        if ((i >= excludedSlots.Length || !excludedSlots[i]) &&
+                            i < materialRenderingTargets.Length)
+                        {
+                            NormalizeBuiltInPlaybackOutline(clone, materialRenderingTargets[i]);
+                        }
+                        clones[i] = clone;
                     }
                 }
 
@@ -283,6 +294,22 @@ namespace Mmd.UnityIntegration
             {
                 DestroyCreatedResources(clones);
                 throw;
+            }
+        }
+
+        private static void NormalizeBuiltInPlaybackOutline(
+            Material material,
+            MmdMaterialRenderingTargets materialRenderingTargets)
+        {
+            if (!ReferenceEquals(materialRenderingTargets, MmdMaterialRenderingTargets.BuiltIn))
+            {
+                return;
+            }
+
+            string property = materialRenderingTargets.OutlineScreenSpaceWeightProperty;
+            if (!string.IsNullOrEmpty(property) && material.HasProperty(property))
+            {
+                material.SetFloat(property, 1.0f);
             }
         }
 
@@ -365,24 +392,7 @@ namespace Mmd.UnityIntegration
             var destroyedIds = new HashSet<int>();
             foreach (Material material in materials.Where(material => material != null))
             {
-                DestroyOnce(material, destroyedIds);
-            }
-        }
-
-        private static void DestroyOnce(Object? value, HashSet<int> destroyedIds)
-        {
-            if (value == null || !destroyedIds.Add(value.GetInstanceID()))
-            {
-                return;
-            }
-
-            if (Application.isPlaying)
-            {
-                Object.Destroy(value);
-            }
-            else
-            {
-                Object.DestroyImmediate(value);
+                MmdUnityPlaybackBinding.DestroyOwnedObjectOnce(material, destroyedIds);
             }
         }
     }
