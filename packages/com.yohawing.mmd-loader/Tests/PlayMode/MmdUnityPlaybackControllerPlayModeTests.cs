@@ -1547,6 +1547,7 @@ namespace Mmd.Tests
             Avatar? avatar = null;
             PlayableGraph graph = default;
             GameObject? managedAppendProbe = null;
+            GameObject? appendSourceProxyObject = null;
             try
             {
                 byte[] pmxBytes = File.ReadAllBytes(pmxPath);
@@ -1599,6 +1600,33 @@ namespace Mmd.Tests
                 Quaternion appendTargetBind = instance.BindLocalRotations[appendTargetIndex];
                 Quaternion ikLinkBindA = instance.BindLocalRotations[ikLinkIndexA];
                 Quaternion ikLinkBindB = instance.BindLocalRotations[ikLinkIndexB];
+
+                // The append source is a native-only helper in this fixture. Give it an explicit
+                // proxy input so the Off HostRig path is driven by the current pose rather than
+                // the stale display transform seeded below. Reuse an authored match if one exists.
+                MmdHumanoidRetargetBinding? existingAppendSourceEntry = entries.Find(
+                    entry => entry.MmdBoneIndex == appendSourceIndex);
+                MmdHumanoidRetargetBinding appendSourceEntry;
+                if (existingAppendSourceEntry == null)
+                {
+                    appendSourceProxyObject = new GameObject("playmode-native-append-source-proxy");
+                    appendSourceProxyObject.transform.SetParent(
+                        proxyRig.ProxyRoot.transform,
+                        worldPositionStays: false);
+                    appendSourceEntry = new MmdHumanoidRetargetBinding(
+                        HumanBodyBones.LastBone,
+                        appendSourceIndex,
+                        appendSourceProxyObject.transform,
+                        instance.BoneTransforms[appendSourceIndex],
+                        appendSourceProxyObject.transform.localRotation,
+                        instance.BindLocalRotations[appendSourceIndex]);
+                    entries.Add(appendSourceEntry);
+                }
+                else
+                {
+                    appendSourceEntry = existingAppendSourceEntry;
+                }
+
                 instance.BoneTransforms[appendSourceIndex].localRotation = Quaternion.Euler(18.0f, 24.0f, 30.0f);
                 instance.BoneTransforms[ikHandleIndex].localPosition =
                     instance.BindLocalPositions[ikHandleIndex] + new Vector3(0.2f, 0.0f, 0.0f);
@@ -1635,6 +1663,7 @@ namespace Mmd.Tests
                     entry.ProxyTransform!.localRotation = entry.ProxyBindLocalRotation;
                 }
                 mappedEntry.ProxyTransform!.localRotation = Quaternion.Euler(8.0f, 13.0f, 21.0f);
+                appendSourceEntry.ProxyTransform!.localRotation = Quaternion.Euler(18.0f, 24.0f, 30.0f);
 
                 yield return null;
 
