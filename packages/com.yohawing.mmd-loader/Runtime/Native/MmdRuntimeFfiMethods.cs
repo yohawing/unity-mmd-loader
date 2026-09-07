@@ -19,6 +19,7 @@ namespace Mmd.Native
         internal const uint FeatureVmdSharedContext = 1u << 9;
         internal const uint FeatureVmdSummaryBytes = 1u << 11;
         internal const uint FeatureVmdSharedContextRawReadback = 1u << 12;
+        internal const uint FeatureHostRig = 1u << 13;
         internal const uint PhysicsModeOff = 0;
         internal const uint PhysicsModeLive = 2;
         internal const uint PhysicsFrameActionSeed = 0;
@@ -701,6 +702,17 @@ namespace Mmd.Native
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_create_for_model", CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr InstanceCreateForModel(IntPtr model);
 
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_host_rig_create", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr HostRigCreate(
+            IntPtr model,
+            [In] uint[]? drivenBones,
+            IntPtr drivenCount,
+            [In] uint[]? goalBones,
+            IntPtr goalCount);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_host_rig_free", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void HostRigFree(IntPtr rig);
+
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_free", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void InstanceFree(IntPtr instance);
 
@@ -764,6 +776,14 @@ namespace Mmd.Native
         internal static extern int InstanceApplyHostPoseAndEvaluateBeforePhysics(
             IntPtr instance,
             ref PhysicsHostPoseView pose);
+
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_evaluate_host_rig_pose", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int InstanceEvaluateHostRigPose(
+            IntPtr instance,
+            IntPtr rig,
+            ref PhysicsHostPoseView pose,
+            float ikTolerance,
+            uint ikMaxIterationsCap);
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_evaluate_current_pose_after_physics", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int InstanceEvaluateCurrentPoseAfterPhysics(IntPtr instance);
@@ -898,6 +918,21 @@ namespace Mmd.Native
                 throw new MmdRuntimeUnsupportedException(
                     "mmd-runtime does not provide the split native host-pose evaluation contract " +
                     $"(required feature bits 0 and 3, flags=0x{featureFlags:X8}).");
+            }
+
+            return abiVersion;
+        }
+
+        internal static uint ValidateHostRigCapability()
+        {
+            uint abiVersion = ValidateAbiVersion();
+            uint featureFlags = FeatureFlags();
+            const uint requiredFeatures = FeatureHostRig | FeatureHostPoseNativeMorphs;
+            if ((featureFlags & requiredFeatures) != requiredFeatures)
+            {
+                throw new MmdRuntimeUnsupportedException(
+                    "mmd-runtime does not provide native HostRig evaluation " +
+                    $"(required feature bits 3 and 13, flags=0x{featureFlags:X8}).");
             }
 
             return abiVersion;

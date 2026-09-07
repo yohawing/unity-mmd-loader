@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using System.Linq;
 using NUnit.Framework;
 using Mmd.Native;
 
@@ -95,10 +96,168 @@ namespace Mmd.Tests.Contracts
                 Array.Empty<float>(), Array.Empty<byte>(), Array.Empty<float>()));
         }
 
+        [Test]
+        public void HostRigEvaluationRecoversAfterInvalidPose()
+        {
+            using MmdRuntimeFfiHostPoseSession session = MmdRuntimeFfiHostPoseSession.CreateWithRig(
+                MmdTestFixtures.ReadFixtureAssetBytes("test_semi_basic_bone.pmx"),
+                new[] { 0u },
+                Array.Empty<uint>());
+
+            var localPositionOffsetsXyz = new float[session.BoneCount * 3];
+            var localRotationXyzw = new float[session.BoneCount * 4];
+            var localScalesXyz = new float[session.BoneCount * 3];
+            var morphWeights = new float[session.MorphCount];
+            var ikEnabled = new byte[session.IkCount];
+            InitializeIdentityPose(
+                session,
+                localRotationXyzw,
+                localScalesXyz);
+            localPositionOffsetsXyz[0] = 0.25f;
+            localRotationXyzw[1] = (float)Math.Sin(0.25f);
+            localRotationXyzw[3] = (float)Math.Cos(0.25f);
+
+            var firstWorldMatrices = new float[session.WorldMatrixFloatCount];
+            session.EvaluateAndCopy(
+                localPositionOffsetsXyz,
+                localRotationXyzw,
+                localScalesXyz,
+                morphWeights,
+                ikEnabled,
+                firstWorldMatrices);
+            Assert.That(firstWorldMatrices.All(float.IsFinite), Is.True,
+                "host-rig world matrix output must remain finite");
+
+            var invalidScales = (float[])localScalesXyz.Clone();
+            invalidScales[1] = 2.0f;
+            Assert.Throws<InvalidOperationException>(() => session.EvaluateAndCopy(
+                localPositionOffsetsXyz,
+                localRotationXyzw,
+                invalidScales,
+                morphWeights,
+                ikEnabled,
+                new float[session.WorldMatrixFloatCount]));
+
+            var recoveredWorldMatrices = new float[session.WorldMatrixFloatCount];
+            session.EvaluateAndCopy(
+                localPositionOffsetsXyz,
+                localRotationXyzw,
+                localScalesXyz,
+                morphWeights,
+                ikEnabled,
+                recoveredWorldMatrices);
+            CollectionAssert.AreEqual(
+                firstWorldMatrices,
+                recoveredWorldMatrices,
+                "an invalid host-rig pose must not poison the next valid evaluation");
+
+            session.Dispose();
+            session.Dispose();
+            Assert.Throws<ObjectDisposedException>(() => session.EvaluateAndCopy(
+                localPositionOffsetsXyz,
+                localRotationXyzw,
+                localScalesXyz,
+                morphWeights,
+                ikEnabled,
+                recoveredWorldMatrices));
+        }
+
+        [Test]
+        public void HostRigRejectsInvalidDrivenAndGoalIndices()
+        {
+            byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_semi_basic_bone.pmx");
+            Assert.Throws<InvalidOperationException>(() => MmdRuntimeFfiHostPoseSession.CreateWithRig(
+                pmxBytes,
+                new[] { uint.MaxValue },
+                Array.Empty<uint>()));
+            Assert.Throws<InvalidOperationException>(() => MmdRuntimeFfiHostPoseSession.CreateWithRig(
+                pmxBytes,
+                Array.Empty<uint>(),
+                new[] { uint.MaxValue }));
+        }
+
+        [Test]
+        public void HostRigProtectsIncomingAppendTargetAndUsesItsInputForEvaluation()
+        {
+            byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_append_bone.pmx");
+            using MmdRuntimeFfiHostPoseSession legacy = MmdRuntimeFfiHostPoseSession.Create(pmxBytes);
+            using MmdRuntimeFfiHostPoseSession hostRig = MmdRuntimeFfiHostPoseSession.CreateWithRig(
+                pmxBytes,
+                new[] { 5u },
+                Array.Empty<uint>());
+
+            var legacyPositions = new float[legacy.BoneCount * 3];
+            var legacyRotations = new float[legacy.BoneCount * 4];
+            var legacyScales = new float[legacy.BoneCount * 3];
+            var legacyMorphs = new float[legacy.MorphCount];
+            var legacyIk = new byte[legacy.IkCount];
+            var rigPositions = new float[hostRig.BoneCount * 3];
+            var rigRotations = new float[hostRig.BoneCount * 4];
+            var rigScales = new float[hostRig.BoneCount * 3];
+            var rigMorphs = new float[hostRig.MorphCount];
+            var rigIk = new byte[hostRig.IkCount];
+            InitializeIdentityPose(legacy, legacyRotations, legacyScales);
+            InitializeIdentityPose(hostRig, rigRotations, rigScales);
+            SetRotationZ(legacyRotations, 3, 0.4f);
+            SetRotationZ(legacyRotations, 5, -0.2f);
+            SetRotationZ(rigRotations, 3, 0.4f);
+            SetRotationZ(rigRotations, 5, -0.2f);
+
+            var legacyWorldMatrices = new float[legacy.WorldMatrixFloatCount];
+            var rigWorldMatrices = new float[hostRig.WorldMatrixFloatCount];
+            legacy.EvaluateAndCopy(
+                legacyPositions,
+                legacyRotations,
+                legacyScales,
+                legacyMorphs,
+                legacyIk,
+                legacyWorldMatrices);
+            hostRig.EvaluateAndCopy(
+                rigPositions,
+                rigRotations,
+                rigScales,
+                rigMorphs,
+                rigIk,
+                rigWorldMatrices);
+
+            const float targetAngle = -0.2f;
+            int targetMatrixOffset = 5 * 16;
+            Assert.That(rigWorldMatrices[targetMatrixOffset + 12], Is.EqualTo(2.0f).Within(1.0e-5f));
+            Assert.That(rigWorldMatrices[targetMatrixOffset + 13], Is.EqualTo(2.0f).Within(1.0e-5f));
+            Assert.That(rigWorldMatrices[targetMatrixOffset + 14], Is.EqualTo(2.0f).Within(1.0e-5f));
+            Assert.That(rigWorldMatrices[targetMatrixOffset], Is.EqualTo(Math.Cos(targetAngle)).Within(1.0e-5));
+            Assert.That(rigWorldMatrices[targetMatrixOffset + 1], Is.EqualTo(Math.Sin(targetAngle)).Within(1.0e-5));
+            Assert.That(legacyWorldMatrices[targetMatrixOffset + 1], Is.EqualTo(Math.Sin(0.2f)).Within(1.0e-5));
+            Assert.That(
+                Math.Abs(rigWorldMatrices[targetMatrixOffset + 1] - legacyWorldMatrices[targetMatrixOffset + 1]),
+                Is.GreaterThan(0.1f),
+                "the legacy incoming Append result must differ from the protected FK target");
+        }
+
         private static MmdRuntimeFfiHostPoseSession CreateSession()
         {
             return MmdRuntimeFfiHostPoseSession.Create(
                 MmdTestFixtures.ReadFixtureAssetBytes("test_semi_basic_bone.pmx"));
+        }
+
+        private static void InitializeIdentityPose(
+            MmdRuntimeFfiHostPoseSession session,
+            float[] localRotationXyzw,
+            float[] localScalesXyz)
+        {
+            for (int boneIndex = 0; boneIndex < session.BoneCount; boneIndex++)
+            {
+                localRotationXyzw[boneIndex * 4 + 3] = 1.0f;
+                localScalesXyz[boneIndex * 3] = 1.0f;
+                localScalesXyz[boneIndex * 3 + 1] = 1.0f;
+                localScalesXyz[boneIndex * 3 + 2] = 1.0f;
+            }
+        }
+
+        private static void SetRotationZ(float[] localRotationXyzw, int boneIndex, float angle)
+        {
+            localRotationXyzw[boneIndex * 4 + 2] = (float)Math.Sin(angle * 0.5f);
+            localRotationXyzw[boneIndex * 4 + 3] = (float)Math.Cos(angle * 0.5f);
         }
 
     }
