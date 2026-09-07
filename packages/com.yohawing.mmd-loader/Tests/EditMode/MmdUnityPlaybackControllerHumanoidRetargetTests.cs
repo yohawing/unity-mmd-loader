@@ -524,6 +524,18 @@ namespace Mmd.Tests
                     "native world matrices must use the controller root coordinate space");
                 if (!verifyTimeline)
                 {
+                    controller.SetPhysicsMode(MmdPhysicsMode.Live);
+                    instance.BoneTransforms[appendTargetIndex].localRotation = Quaternion.Euler(67.0f, -18.0f, 29.0f);
+                    appendSourceEntry.ProxyTransform!.localRotation = Quaternion.Euler(-13.0f, 28.0f, 36.0f);
+                    MmdHumanoidRetargeterResult previewResult = controller.ApplyHumanoidRetargetNow();
+                    Assert.That(previewResult.AllSucceeded, Is.True,
+                        "Live EditMode preview must use the stateless native HostRig evaluator");
+                    Assert.That(controller.LastLivePhysicsDiagnostics, Is.Null,
+                        "Live EditMode preview must not create a physics backend");
+                    Assert.That(
+                        Quaternion.Angle(instance.BoneTransforms[appendTargetIndex].localRotation, appendTargetBind),
+                        Is.GreaterThan(0.01f),
+                        "Live EditMode preview must preserve native append helper evaluation");
                     return;
                 }
 

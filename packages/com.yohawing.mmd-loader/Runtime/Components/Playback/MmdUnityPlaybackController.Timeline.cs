@@ -19,6 +19,12 @@ namespace Mmd.UnityIntegration
         private int lastHumanoidRetargetTimelineDriveFrameCount = int.MinValue / 2;
         private bool timelinePreparationSeedPending;
         private bool timelinePreparationSeedWasLive;
+        private double lastHumanoidTimelineSourceTime;
+        private bool hasHumanoidTimelineClock;
+        private bool lastHumanoidTimelinePlaying;
+        private bool humanoidTimelineEvaluationActive;
+        private bool humanoidTimelineEvaluationPlaying;
+        private float? humanoidTimelinePhysicsDeltaTime;
 
         internal void PrepareTimelineSeed(float sourceTime, float frameRate, bool runLivePhysics)
         {
@@ -80,6 +86,90 @@ namespace Mmd.UnityIntegration
             return ApplyHumanoidRetargetCore(copyLocalPositions);
         }
 
+        internal MmdHumanoidRetargeterResult ApplyHumanoidRetargetFromTimeline(
+            double sourceTime,
+            bool timelinePlaying,
+            bool seekOccurred,
+            double timelineDeltaTime)
+        {
+            double observedSourceDelta = hasHumanoidTimelineClock
+                ? sourceTime - lastHumanoidTimelineSourceTime
+                : 0.0;
+            bool sourceTimeAdvancing = observedSourceDelta > 1.0e-7;
+            UpdateHumanoidTimelineClock(sourceTime, timelinePlaying || sourceTimeAdvancing, seekOccurred, timelineDeltaTime);
+            bool previousEvaluationActive = humanoidTimelineEvaluationActive;
+            bool previousEvaluationPlaying = humanoidTimelineEvaluationPlaying;
+            float? previousPhysicsDeltaTime = humanoidTimelinePhysicsDeltaTime;
+            humanoidTimelineEvaluationActive = true;
+            // Manual Timeline evaluation can report Paused while its source time advances. Treat
+            // that forward sample as playback so each sample steps Live physics instead of
+            // reseeding the solver merely because effectivePlayState is paused.
+            humanoidTimelineEvaluationPlaying = timelinePlaying || sourceTimeAdvancing;
+            humanoidTimelinePhysicsDeltaTime = sourceTimeAdvancing &&
+                                               observedSourceDelta <= float.MaxValue
+                ? (float)observedSourceDelta
+                : 0.0f;
+            try
+            {
+                return ApplyHumanoidRetargetFromTimeline();
+            }
+            finally
+            {
+                humanoidTimelineEvaluationActive = previousEvaluationActive;
+                humanoidTimelineEvaluationPlaying = previousEvaluationPlaying;
+                humanoidTimelinePhysicsDeltaTime = previousPhysicsDeltaTime;
+            }
+        }
+
+        internal void NotifyHumanoidTimelinePaused(double sourceTime)
+        {
+            UpdateHumanoidTimelineClock(
+                sourceTime,
+                timelinePlaying: false,
+                seekOccurred: true,
+                timelineDeltaTime: 0.0);
+        }
+
+        private void UpdateHumanoidTimelineClock(
+            double sourceTime,
+            bool timelinePlaying,
+            bool seekOccurred,
+            double timelineDeltaTime)
+        {
+            if (double.IsNaN(sourceTime) || double.IsInfinity(sourceTime) || sourceTime < 0.0)
+            {
+                return;
+            }
+
+            bool discontinuity = false;
+            if (hasHumanoidTimelineClock)
+            {
+                double observedDelta = sourceTime - lastHumanoidTimelineSourceTime;
+                double expectedDelta = !double.IsNaN(timelineDeltaTime) &&
+                                       !double.IsInfinity(timelineDeltaTime) &&
+                                       timelineDeltaTime > 1.0e-7
+                    ? timelineDeltaTime
+                    : 1.0 / (frameRate > 0.0f && float.IsFinite(frameRate) ? frameRate : 30.0f);
+                discontinuity = observedDelta < -1.0e-7 ||
+                    (seekOccurred && observedDelta >= 0.0 &&
+                     observedDelta > expectedDelta * 2.0 + 1.0e-4);
+                if (lastHumanoidTimelinePlaying && !timelinePlaying)
+                {
+                    discontinuity = true;
+                }
+            }
+
+            if (discontinuity && physicsMode == MmdPhysicsMode.Live)
+            {
+                humanoidPhysicsBinding?.ResetLivePhysicsForDriveSource();
+                ResetLivePhysicsDriveSource();
+            }
+
+            lastHumanoidTimelineSourceTime = sourceTime;
+            hasHumanoidTimelineClock = true;
+            lastHumanoidTimelinePlaying = timelinePlaying;
+        }
+
         private MmdHumanoidRetargeterResult ApplyHumanoidRetargetCore(bool copyLocalPositions)
         {
             MmdHumanoidRetargeterResult? nativeResult = null;
@@ -90,9 +180,43 @@ namespace Mmd.UnityIntegration
                 return LastHumanoidRetargetResult;
             }
 
+            bool nativePoseApplied = false;
             bool nativeLivePrepared = physicsMode == MmdPhysicsMode.Live &&
-                                      TryPrepareHumanoidNativeLivePhysics();
-            if (nativeResult == null)
+                                      TryPrepareHumanoidNativeLivePhysics(
+                                          copyLocalPositions,
+                                          out nativeResult);
+            if (nativeLivePrepared && nativeResult != null)
+            {
+                if (!Application.isPlaying)
+                {
+                    nativePoseApplied = true;
+                }
+                else
+                {
+                    try
+                    {
+                        nativePoseApplied = StepHumanoidRetargetLivePhysicsIfNeeded(
+                            nativeResult,
+                            humanoidHostPosePositions!,
+                            humanoidHostPoseRotations!,
+                            humanoidHostPoseScales!,
+                            humanoidHostPoseMorphs!,
+                            humanoidHostPoseIk!);
+                    }
+                    catch (Exception exception) when (IsNativeHostPoseFailure(exception))
+                    {
+                        DisposeHumanoidPhysicsBinding();
+                        RecordHumanoidHostPoseFailure(exception);
+                    }
+                }
+                if (nativePoseApplied)
+                {
+                    LastHumanoidRetargetResult = nativeResult;
+                    return LastHumanoidRetargetResult;
+                }
+            }
+
+            if (!nativePoseApplied)
             {
                 RestoreHumanoidHostPoseInputIfAvailable();
             }
@@ -100,14 +224,7 @@ namespace Mmd.UnityIntegration
             LastHumanoidRetargetResult = MmdHumanoidRetargeter.RetargetPose(
                 humanoidRetargetEntries,
                 copyLocalPositions);
-            bool nativePoseApplied = physicsMode == MmdPhysicsMode.Live
-                ? nativeLivePrepared && TryCaptureHumanoidNativeLivePose(LastHumanoidRetargetResult) &&
-                  StepHumanoidRetargetLivePhysicsIfNeeded(LastHumanoidRetargetResult)
-                : false;
-            if (!nativePoseApplied)
-            {
-                MmdHumanoidAppendTransformApplier.Apply(humanoidAppendEntries);
-            }
+            MmdHumanoidAppendTransformApplier.Apply(humanoidAppendEntries);
 
             return LastHumanoidRetargetResult;
         }
