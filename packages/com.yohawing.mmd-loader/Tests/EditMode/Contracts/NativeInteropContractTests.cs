@@ -668,6 +668,7 @@ namespace Mmd.Tests
         public void RuntimeFfiPinsHostRigEntrypointsAndFeature()
         {
             Assert.That(MmdRuntimeFfiMethods.FeatureHostRig, Is.EqualTo(1u << 13));
+            Assert.That(MmdRuntimeFfiMethods.FeatureHostRigPhysics, Is.EqualTo(1u << 14));
             AssertRuntimeFfiSignature(
                 "HostRigCreate",
                 typeof(IntPtr),
@@ -685,12 +686,25 @@ namespace Mmd.Tests
                 typeof(MmdRuntimeFfiMethods.PhysicsHostPoseView).MakeByRefType(),
                 typeof(float),
                 typeof(uint));
+            AssertRuntimeFfiSignature(
+                "EvaluateHostRigFrame",
+                typeof(int),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(IntPtr),
+                typeof(MmdRuntimeFfiMethods.PhysicsHostPoseView).MakeByRefType(),
+                typeof(uint),
+                typeof(float),
+                typeof(float),
+                typeof(uint),
+                typeof(MmdRuntimeFfiMethods.PhysicsWorldStepReport).MakeByRefType());
 
             foreach (string methodName in new[]
                      {
                          "HostRigCreate",
                          "HostRigFree",
-                         "InstanceEvaluateHostRigPose"
+                         "InstanceEvaluateHostRigPose",
+                         "EvaluateHostRigFrame"
                      })
             {
                 DllImportAttribute import = GetRuntimeFfiMethod(methodName).GetCustomAttribute<DllImportAttribute>()!;

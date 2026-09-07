@@ -20,6 +20,7 @@ namespace Mmd.Native
         internal const uint FeatureVmdSummaryBytes = 1u << 11;
         internal const uint FeatureVmdSharedContextRawReadback = 1u << 12;
         internal const uint FeatureHostRig = 1u << 13;
+        internal const uint FeatureHostRigPhysics = 1u << 14;
         internal const uint PhysicsModeOff = 0;
         internal const uint PhysicsModeLive = 2;
         internal const uint PhysicsFrameActionSeed = 0;
@@ -772,6 +773,18 @@ namespace Mmd.Native
             uint ikMaxIterationsCap,
             out PhysicsWorldStepReport outReport);
 
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_evaluate_host_rig_frame", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int EvaluateHostRigFrame(
+            IntPtr instance,
+            IntPtr world,
+            IntPtr rig,
+            ref PhysicsHostPoseView pose,
+            uint action,
+            float deltaTime,
+            float ikTolerance,
+            uint ikMaxIterationsCap,
+            out PhysicsWorldStepReport outReport);
+
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_apply_host_pose_and_evaluate_before_physics", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int InstanceApplyHostPoseAndEvaluateBeforePhysics(
             IntPtr instance,
@@ -933,6 +946,25 @@ namespace Mmd.Native
                 throw new MmdRuntimeUnsupportedException(
                     "mmd-runtime does not provide native HostRig evaluation " +
                     $"(required feature bits 3 and 13, flags=0x{featureFlags:X8}).");
+            }
+
+            return abiVersion;
+        }
+
+        internal static uint ValidateHostRigPhysicsCapability()
+        {
+            uint abiVersion = ValidateAbiVersion();
+            uint featureFlags = FeatureFlags();
+            const uint requiredFeatures = FeatureSplitPhysicsEvaluation |
+                FeaturePhysicsBulletNative |
+                FeatureHostPoseNativeMorphs |
+                FeatureHostRig |
+                FeatureHostRigPhysics;
+            if ((featureFlags & requiredFeatures) != requiredFeatures)
+            {
+                throw new MmdRuntimeUnsupportedException(
+                    "mmd-runtime does not provide native HostRig physics evaluation " +
+                    $"(required feature bits 0, 1, 3, 13 and 14, flags=0x{featureFlags:X8}).");
             }
 
             return abiVersion;
