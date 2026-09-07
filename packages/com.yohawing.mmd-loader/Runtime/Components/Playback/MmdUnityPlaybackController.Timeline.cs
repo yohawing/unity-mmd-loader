@@ -82,16 +82,28 @@ namespace Mmd.UnityIntegration
 
         private MmdHumanoidRetargeterResult ApplyHumanoidRetargetCore(bool copyLocalPositions)
         {
+            MmdHumanoidRetargeterResult? nativeResult = null;
+            if (physicsMode == MmdPhysicsMode.Off &&
+                TryApplyHumanoidNativeHostPose(copyLocalPositions, out nativeResult))
+            {
+                LastHumanoidRetargetResult = nativeResult!;
+                return LastHumanoidRetargetResult;
+            }
+
             bool nativeLivePrepared = physicsMode == MmdPhysicsMode.Live &&
                                       TryPrepareHumanoidNativeLivePhysics();
-            RestoreHumanoidHostPoseInputIfAvailable();
+            if (nativeResult == null)
+            {
+                RestoreHumanoidHostPoseInputIfAvailable();
+            }
+
             LastHumanoidRetargetResult = MmdHumanoidRetargeter.RetargetPose(
                 humanoidRetargetEntries,
                 copyLocalPositions);
             bool nativePoseApplied = physicsMode == MmdPhysicsMode.Live
                 ? nativeLivePrepared && TryCaptureHumanoidNativeLivePose(LastHumanoidRetargetResult) &&
                   StepHumanoidRetargetLivePhysicsIfNeeded(LastHumanoidRetargetResult)
-                : TryApplyHumanoidNativeHostPose(LastHumanoidRetargetResult);
+                : false;
             if (!nativePoseApplied)
             {
                 MmdHumanoidAppendTransformApplier.Apply(humanoidAppendEntries);

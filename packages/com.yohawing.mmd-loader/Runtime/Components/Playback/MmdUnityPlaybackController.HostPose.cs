@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using System.Collections.Generic;
 using Mmd;
 using Mmd.Native;
 using Mmd.Parser;
@@ -25,12 +26,25 @@ namespace Mmd.UnityIntegration
         private float[]? humanoidHostPoseMorphs;
         private byte[]? humanoidHostPoseIk;
         private float[]? humanoidHostPoseWorldMatrices;
+        private uint[]? humanoidHostPoseDrivenBones;
+        private uint[]? humanoidHostPoseGoalBones;
+        private byte[]? humanoidHostPoseIkEligibility;
         private bool humanoidHostPoseFailureLatched;
         private MmdPmxAsset? humanoidHostPoseFailureModelAsset;
+        private string humanoidHostPoseFailureReason = string.Empty;
         private uint humanoidHostPoseInputFingerprint;
 
-        private bool TryApplyHumanoidNativeHostPose(MmdHumanoidRetargeterResult result)
+        /// <summary>
+        /// Reports the most recent native HostRig failure. An empty value means no failure has
+        /// been recorded since the last Humanoid retarget configuration change.
+        /// </summary>
+        public string LastHumanoidNativeHostPoseFailureReason => humanoidHostPoseFailureReason;
+
+        private bool TryApplyHumanoidNativeHostPose(
+            bool copyLocalPositions,
+            out MmdHumanoidRetargeterResult? nativeResult)
         {
+            nativeResult = null;
             if (humanoidHostPoseFailureLatched && binding == null &&
                 !ReferenceEquals(humanoidHostPoseFailureModelAsset, modelAsset))
             {
@@ -39,8 +53,7 @@ namespace Mmd.UnityIntegration
 
             if (humanoidHostPoseFailureLatched ||
                 physicsMode != MmdPhysicsMode.Off ||
-                (binding == null && modelAsset == null) ||
-                result == null || !result.AllSucceeded)
+                (binding == null && modelAsset == null))
             {
                 return false;
             }
@@ -54,7 +67,25 @@ namespace Mmd.UnityIntegration
                     return false;
                 }
 
-                CaptureHumanoidHostPose();
+                PrepareHumanoidHostPoseArrays();
+                nativeResult = MmdHumanoidRetargeter.RetargetPoseToNativeArrays(
+                    humanoidRetargetEntries,
+                    humanoidHostPoseModel,
+                    humanoidHostPoseBones,
+                    humanoidHostPoseImportScale,
+                    humanoidHostPosePositions!,
+                    humanoidHostPoseRotations!,
+                    humanoidHostPoseScales!,
+                    copyLocalPositions);
+                if (!nativeResult.AllSucceeded)
+                {
+                    humanoidHostPoseFailureReason = nativeResult.Diagnostics.Count > 0
+                        ? nativeResult.Diagnostics[0]
+                        : "Humanoid native HostRig retarget validation failed.";
+                    ResetHumanoidHostPoseDisplayToBindRest();
+                    return false;
+                }
+
                 humanoidHostPoseSession.EvaluateAndCopy(
                     humanoidHostPosePositions!,
                     humanoidHostPoseRotations!,
@@ -63,13 +94,13 @@ namespace Mmd.UnityIntegration
                     humanoidHostPoseIk!,
                     humanoidHostPoseWorldMatrices!);
                 ApplyHumanoidHostPoseWorldMatrices();
+                humanoidHostPoseFailureReason = string.Empty;
                 return true;
             }
             catch (Exception exception) when (IsNativeHostPoseFailure(exception))
             {
-                DisposeHumanoidHostPoseSession();
-                humanoidHostPoseFailureLatched = true;
-                humanoidHostPoseFailureModelAsset = modelAsset;
+                ResetHumanoidHostPoseDisplayToBindRest();
+                RecordHumanoidHostPoseFailure(exception, restoreInput: false);
                 return false;
             }
         }
@@ -100,9 +131,7 @@ namespace Mmd.UnityIntegration
             }
             catch (Exception exception) when (IsNativeHostPoseFailure(exception))
             {
-                DisposeHumanoidHostPoseSession();
-                humanoidHostPoseFailureLatched = true;
-                humanoidHostPoseFailureModelAsset = modelAsset;
+                RecordHumanoidHostPoseFailure(exception);
                 return false;
             }
         }
@@ -127,9 +156,7 @@ namespace Mmd.UnityIntegration
             }
             catch (Exception exception) when (IsNativeHostPoseFailure(exception))
             {
-                DisposeHumanoidHostPoseSession();
-                humanoidHostPoseFailureLatched = true;
-                humanoidHostPoseFailureModelAsset = modelAsset;
+                RecordHumanoidHostPoseFailure(exception);
                 return false;
             }
         }
@@ -211,12 +238,272 @@ namespace Mmd.UnityIntegration
                 return;
             }
 
-            humanoidHostPoseSession = MmdRuntimeFfiHostPoseSession.Create(sourceBytes);
+            if (humanoidHostPoseDrivenBones == null ||
+                humanoidHostPoseGoalBones == null ||
+                humanoidHostPoseIkEligibility == null)
+            {
+                ConfigureHumanoidHostPoseRig(model, bones);
+            }
+
+            humanoidHostPoseSession = MmdRuntimeFfiHostPoseSession.CreateWithRig(
+                sourceBytes,
+                humanoidHostPoseDrivenBones!,
+                humanoidHostPoseGoalBones!);
             if (humanoidHostPoseSession.BoneCount != model.bones.Count)
             {
                 throw new InvalidOperationException("Humanoid native host pose session bone count does not match the PMX model.");
             }
 
+        }
+
+        internal readonly struct HumanoidHostPoseRigSelection
+        {
+            internal HumanoidHostPoseRigSelection(
+                uint[] drivenBones,
+                uint[] goalBones,
+                byte[] ikEligibility)
+            {
+                DrivenBones = drivenBones;
+                GoalBones = goalBones;
+                IkEligibility = ikEligibility;
+            }
+
+            internal uint[] DrivenBones { get; }
+            internal uint[] GoalBones { get; }
+            internal byte[] IkEligibility { get; }
+        }
+
+        private void ConfigureHumanoidHostPoseRig(
+            MmdModelDefinition model,
+            Transform[] bones)
+        {
+            HumanoidHostPoseRigSelection selection = BuildHumanoidHostPoseRigSelection(
+                model,
+                bones,
+                humanoidRetargetEntries);
+            humanoidHostPoseDrivenBones = selection.DrivenBones;
+            humanoidHostPoseGoalBones = selection.GoalBones;
+            humanoidHostPoseIkEligibility = selection.IkEligibility;
+        }
+
+        internal static HumanoidHostPoseRigSelection BuildHumanoidHostPoseRigSelection(
+            MmdModelDefinition model,
+            Transform[] bones,
+            IReadOnlyList<MmdHumanoidRetargetBinding> entries)
+        {
+            ValidateHostPoseTopology(model);
+            if (bones.Length != model.bones.Count)
+            {
+                throw new InvalidOperationException(
+                    "Humanoid native host pose bone mapping does not match the PMX model.");
+            }
+
+            var driven = new List<int>();
+            var drivenSet = new HashSet<int>();
+            for (int entryIndex = 0; entryIndex < entries.Count; entryIndex++)
+            {
+                MmdHumanoidRetargetBinding? entry = entries[entryIndex];
+                if (entry == null || entry.ProxyTransform == null)
+                {
+                    continue;
+                }
+
+                if (IsActualHostPoseTarget(entry.NativeTransform, bones, entry.MmdBoneIndex) &&
+                    drivenSet.Add(entry.MmdBoneIndex))
+                {
+                    driven.Add(entry.MmdBoneIndex);
+                }
+
+                if (entry.CopyLocalPosition &&
+                    IsActualHostPoseTarget(
+                        entry.TranslationTargetTransform,
+                        bones,
+                        entry.TranslationTargetMmdBoneIndex) &&
+                    drivenSet.Add(entry.TranslationTargetMmdBoneIndex))
+                {
+                    driven.Add(entry.TranslationTargetMmdBoneIndex);
+                }
+            }
+
+            var goals = new List<uint>();
+            var goalSet = new HashSet<int>();
+            var ikEligibility = new byte[model.ik.Count];
+            for (int ikIndex = 0; ikIndex < model.ik.Count; ikIndex++)
+            {
+                MmdIkDefinition? ik = model.ik[ikIndex];
+                if (ik == null)
+                {
+                    throw new InvalidOperationException(
+                        "Humanoid native host pose PMX IK definition is null at index " + ikIndex + ".");
+                }
+
+                bool eligible = IsStrictDescendantOfDriven(ik.boneIndex, drivenSet, model) &&
+                                IsIkControllerConflictFree(ik.boneIndex, drivenSet, model);
+                if (eligible)
+                {
+                    if (goalSet.Add(ik.boneIndex))
+                    {
+                        goals.Add((uint)ik.boneIndex);
+                    }
+
+                    ikEligibility[ikIndex] = 1;
+                }
+            }
+
+            return new HumanoidHostPoseRigSelection(
+                ToNativeBoneIndices(driven),
+                goals.ToArray(),
+                ikEligibility);
+        }
+
+        private static uint[] ToNativeBoneIndices(List<int> indices)
+        {
+            var result = new uint[indices.Count];
+            for (int index = 0; index < indices.Count; index++)
+            {
+                result[index] = checked((uint)indices[index]);
+            }
+
+            return result;
+        }
+
+        private static bool IsActualHostPoseTarget(
+            Transform? target,
+            IReadOnlyList<Transform> bones,
+            int index)
+        {
+            return index >= 0 && index < bones.Count &&
+                   target != null && ReferenceEquals(target, bones[index]);
+        }
+
+        private static bool IsStrictDescendantOfDriven(
+            int controllerIndex,
+            HashSet<int> driven,
+            MmdModelDefinition model)
+        {
+            int current = model.bones[controllerIndex].parentIndex;
+            while (current >= 0)
+            {
+                if (driven.Contains(current))
+                {
+                    return true;
+                }
+
+                current = model.bones[current].parentIndex;
+            }
+
+            return false;
+        }
+
+        private static bool IsIkControllerConflictFree(
+            int controllerIndex,
+            HashSet<int> driven,
+            MmdModelDefinition model)
+        {
+            for (int chainIndex = 0; chainIndex < model.ik.Count; chainIndex++)
+            {
+                MmdIkDefinition chain = model.ik[chainIndex];
+                if (chain.boneIndex != controllerIndex)
+                {
+                    continue;
+                }
+
+                for (int linkIndex = 0; linkIndex < chain.links.Count; linkIndex++)
+                {
+                    int linkBoneIndex = chain.links[linkIndex].boneIndex;
+                    foreach (int drivenBoneIndex in driven)
+                    {
+                        int current = drivenBoneIndex;
+                        while (current >= 0)
+                        {
+                            if (current == linkBoneIndex)
+                            {
+                                return false;
+                            }
+
+                            current = model.bones[current].parentIndex;
+                        }
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        private static void ValidateHostPoseTopology(MmdModelDefinition model)
+        {
+            if (model.bones == null || model.bones.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    "Humanoid native host pose PMX bone topology is empty.");
+            }
+
+            for (int index = 0; index < model.bones.Count; index++)
+            {
+                MmdBoneDefinition? bone = model.bones[index];
+                if (bone == null || bone.index != index)
+                {
+                    throw new InvalidOperationException(
+                        "Humanoid native host pose PMX bone topology has a non-contiguous index at " + index + ".");
+                }
+
+                if (bone.parentIndex < -1 || bone.parentIndex >= model.bones.Count)
+                {
+                    throw new InvalidOperationException(
+                        "Humanoid native host pose PMX parent index is invalid for bone " + index + ": " +
+                        bone.parentIndex + ".");
+                }
+            }
+
+            for (int startIndex = 0; startIndex < model.bones.Count; startIndex++)
+            {
+                int current = startIndex;
+                int hopCount = 0;
+                while (current >= 0)
+                {
+                    if (++hopCount > model.bones.Count)
+                    {
+                        throw new InvalidOperationException(
+                            "Humanoid native host pose PMX bone topology contains a parent cycle at " + current + ".");
+                    }
+
+                    current = model.bones[current].parentIndex;
+                }
+            }
+
+            if (model.ik == null)
+            {
+                throw new InvalidOperationException(
+                    "Humanoid native host pose PMX IK topology is null.");
+            }
+
+            for (int ikIndex = 0; ikIndex < model.ik.Count; ikIndex++)
+            {
+                MmdIkDefinition? ik = model.ik[ikIndex];
+                if (ik == null || ik.boneIndex < 0 || ik.boneIndex >= model.bones.Count ||
+                    ik.targetBoneIndex < 0 || ik.targetBoneIndex >= model.bones.Count)
+                {
+                    throw new InvalidOperationException(
+                        "Humanoid native host pose PMX IK topology is invalid at index " + ikIndex + ".");
+                }
+
+                if (ik.links == null)
+                {
+                    throw new InvalidOperationException(
+                        "Humanoid native host pose PMX IK links are null at index " + ikIndex + ".");
+                }
+
+                for (int linkIndex = 0; linkIndex < ik.links.Count; linkIndex++)
+                {
+                    MmdIkLinkDefinition? link = ik.links[linkIndex];
+                    if (link == null || link.boneIndex < 0 || link.boneIndex >= model.bones.Count)
+                    {
+                        throw new InvalidOperationException(
+                            "Humanoid native host pose PMX IK link topology is invalid at " +
+                            ikIndex + "[" + linkIndex + "].");
+                    }
+                }
+            }
         }
 
         private void CaptureHumanoidHostPose()
@@ -273,6 +560,40 @@ namespace Mmd.UnityIntegration
                 humanoidHostPoseScales);
             // Native morph expansion owns bone/material/vertex morph application. These are
             // pre-morph weights; this first Humanoid bridge has no managed morph authoring input.
+        }
+
+        private void PrepareHumanoidHostPoseArrays()
+        {
+            MmdModelDefinition model = humanoidHostPoseModel!;
+            int boneCount = model.bones.Count;
+            humanoidHostPosePositions = EnsureFloatBuffer(
+                humanoidHostPosePositions,
+                checked(boneCount * 3));
+            humanoidHostPoseRotations = EnsureFloatBuffer(
+                humanoidHostPoseRotations,
+                checked(boneCount * 4));
+            humanoidHostPoseScales = EnsureFloatBuffer(
+                humanoidHostPoseScales,
+                checked(boneCount * 3));
+            humanoidHostPoseMorphs = EnsureFloatBuffer(
+                humanoidHostPoseMorphs,
+                model.morphs.Count);
+            humanoidHostPoseIk = EnsureByteBuffer(
+                humanoidHostPoseIk,
+                model.ik.Count);
+            humanoidHostPoseWorldMatrices = EnsureFloatBuffer(
+                humanoidHostPoseWorldMatrices,
+                checked(boneCount * 16));
+            Array.Clear(humanoidHostPoseMorphs, 0, humanoidHostPoseMorphs.Length);
+            Array.Clear(humanoidHostPoseWorldMatrices, 0, humanoidHostPoseWorldMatrices.Length);
+            Array.Clear(humanoidHostPoseIk, 0, humanoidHostPoseIk.Length);
+            if (humanoidHostPoseIkEligibility != null)
+            {
+                Array.Copy(
+                    humanoidHostPoseIkEligibility,
+                    humanoidHostPoseIk,
+                    humanoidHostPoseIkEligibility.Length);
+            }
         }
 
         private static uint ComputeHumanoidHostPoseInputFingerprint(
@@ -348,10 +669,78 @@ namespace Mmd.UnityIntegration
             }
         }
 
+        private void ResetHumanoidHostPoseDisplayToBindRest()
+        {
+            if (humanoidHostPoseModel == null || humanoidHostPoseModel.bones == null ||
+                humanoidHostPoseBones == null)
+            {
+                return;
+            }
+
+            int boneCount = humanoidHostPoseModel.bones.Count;
+            if (boneCount <= 0 || humanoidHostPoseBones.Length != boneCount)
+            {
+                return;
+            }
+
+            MmdUnityModelInstance? instance = binding?.PlaybackInstance ?? humanoidPhysicsBinding?.PlaybackInstance;
+            if (instance != null &&
+                (instance.BindLocalPositions == null || instance.BindLocalRotations == null ||
+                 instance.BindLocalPositions.Length != boneCount ||
+                 instance.BindLocalRotations.Length != boneCount))
+            {
+                return;
+            }
+
+            if (instance == null &&
+                (humanoidHostPoseBindLocalPositions == null ||
+                 humanoidHostPoseBindLocalPositions.Length != boneCount))
+            {
+                return;
+            }
+
+            for (int index = 0; index < boneCount; index++)
+            {
+                if (humanoidHostPoseBones[index] == null)
+                {
+                    return;
+                }
+
+                Vector3 bindPosition = instance != null
+                    ? instance.BindLocalPositions[index]
+                    : humanoidHostPoseBindLocalPositions![index];
+                Quaternion bindRotation = instance != null
+                    ? instance.BindLocalRotations[index]
+                    : Quaternion.identity;
+                if (!float.IsFinite(bindPosition.x) || !float.IsFinite(bindPosition.y) ||
+                    !float.IsFinite(bindPosition.z) || !float.IsFinite(bindRotation.x) ||
+                    !float.IsFinite(bindRotation.y) || !float.IsFinite(bindRotation.z) ||
+                    !float.IsFinite(bindRotation.w))
+                {
+                    return;
+                }
+            }
+
+            for (int index = 0; index < boneCount; index++)
+            {
+                Transform bone = humanoidHostPoseBones[index];
+                Vector3 bindPosition = instance != null
+                    ? instance.BindLocalPositions[index]
+                    : humanoidHostPoseBindLocalPositions![index];
+                Quaternion bindRotation = instance != null
+                    ? instance.BindLocalRotations[index]
+                    : Quaternion.identity;
+                bone.localPosition = bindPosition;
+                bone.localRotation = bindRotation;
+                bone.localScale = Vector3.one;
+            }
+        }
+
         private static Vector3[] BuildHostPoseBindLocalPositions(
             MmdModelDefinition model,
             float importScale)
         {
+            ValidateHostPoseTopology(model);
             var origins = new Vector3[model.bones.Count];
             foreach (MmdBoneDefinition bone in model.bones)
             {
@@ -418,9 +807,13 @@ namespace Mmd.UnityIntegration
                    exception is BadImageFormatException;
         }
 
-        private void DisposeHumanoidHostPoseSession()
+        private void DisposeHumanoidHostPoseSession(bool restoreInput = true)
         {
-            RestoreHumanoidHostPoseInputIfAvailable();
+            if (restoreInput)
+            {
+                RestoreHumanoidHostPoseInputIfAvailable();
+            }
+
             humanoidHostPoseSession?.Dispose();
             humanoidHostPoseSession = null;
             humanoidHostPoseModelAsset = null;
@@ -435,12 +828,24 @@ namespace Mmd.UnityIntegration
             humanoidHostPoseMorphs = null;
             humanoidHostPoseIk = null;
             humanoidHostPoseWorldMatrices = null;
+            humanoidHostPoseDrivenBones = null;
+            humanoidHostPoseGoalBones = null;
+            humanoidHostPoseIkEligibility = null;
         }
 
         private void ResetHumanoidHostPoseFailureLatch()
         {
             humanoidHostPoseFailureLatched = false;
             humanoidHostPoseFailureModelAsset = null;
+            humanoidHostPoseFailureReason = string.Empty;
+        }
+
+        private void RecordHumanoidHostPoseFailure(Exception exception, bool restoreInput = true)
+        {
+            humanoidHostPoseFailureReason = exception.GetType().Name + ": " + exception.Message;
+            DisposeHumanoidHostPoseSession(restoreInput);
+            humanoidHostPoseFailureLatched = true;
+            humanoidHostPoseFailureModelAsset = modelAsset;
         }
     }
 }
