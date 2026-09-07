@@ -26,6 +26,7 @@ namespace Mmd.UnityIntegration
         private float[]? humanoidHostPoseMorphs;
         private byte[]? humanoidHostPoseIk;
         private float[]? humanoidHostPoseWorldMatrices;
+        private readonly HashSet<Transform> humanoidHostPoseBoneTransformSet = new();
         private uint[]? humanoidHostPoseDrivenBones;
         private uint[]? humanoidHostPoseGoalBones;
         private byte[]? humanoidHostPoseIkEligibility;
@@ -622,11 +623,13 @@ namespace Mmd.UnityIntegration
 
         private void ApplyHumanoidHostPoseWorldMatrices()
         {
-            MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(
+            MmdUnityWorldMatrixFrameApplier.ApplyHostRigColumnMajorWorldMatrices(
                 humanoidHostPoseRoot!,
                 humanoidHostPoseBones!,
                 humanoidHostPoseImportScale,
-                humanoidHostPoseWorldMatrices!);
+                humanoidHostPoseModel!.bones,
+                humanoidHostPoseWorldMatrices!,
+                humanoidHostPoseBoneTransformSet);
         }
 
         private void RestoreHumanoidHostPoseInputIfAvailable()
@@ -820,6 +823,7 @@ namespace Mmd.UnityIntegration
             humanoidHostPoseModel = null;
             humanoidHostPoseSourceBytes = null;
             humanoidHostPoseBones = null;
+            humanoidHostPoseBoneTransformSet.Clear();
             humanoidHostPoseBindLocalPositions = null;
             humanoidHostPoseRoot = null;
             humanoidHostPosePositions = null;
