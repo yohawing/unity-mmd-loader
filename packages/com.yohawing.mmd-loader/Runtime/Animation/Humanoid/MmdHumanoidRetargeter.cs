@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using Mmd.UnityIntegration;
+using Mmd.Parser;
 
 namespace Mmd
 {
@@ -282,6 +283,75 @@ namespace Mmd
             if (entries == null)
                 throw new ArgumentNullException(nameof(entries));
 
+            return RetargetPoseCore(entries, copyLocalPositions);
+        }
+
+        /// <summary>
+        /// Retargets directly into the native host-pose input arrays. The arrays are rebuilt from
+        /// a fresh rest pose on every call, so the previous display output is never sampled as input.
+        /// </summary>
+        /// <remarks>
+        /// <paramref name="nativeTransforms"/> is used to validate that every configured target
+        /// still points at the model bone represented by its MMD index. The managed Transform
+        /// retarget path remains available as the fallback when this validation or native
+        /// evaluation cannot be completed.
+        /// </remarks>
+        internal static MmdHumanoidRetargeterResult RetargetPoseToNativeArrays(
+            IReadOnlyList<MmdHumanoidRetargetBinding> entries,
+            MmdModelDefinition model,
+            IReadOnlyList<Transform> nativeTransforms,
+            float importScale,
+            float[] localPositionOffsetsXyz,
+            float[] localRotationXyzw,
+            float[] localScalesXyz,
+            bool copyLocalPositions = true)
+        {
+            if (entries == null)
+                throw new ArgumentNullException(nameof(entries));
+            if (model == null)
+                throw new ArgumentNullException(nameof(model));
+            if (nativeTransforms == null)
+                throw new ArgumentNullException(nameof(nativeTransforms));
+            if (localPositionOffsetsXyz == null)
+                throw new ArgumentNullException(nameof(localPositionOffsetsXyz));
+            if (localRotationXyzw == null)
+                throw new ArgumentNullException(nameof(localRotationXyzw));
+            if (localScalesXyz == null)
+                throw new ArgumentNullException(nameof(localScalesXyz));
+
+            if (model.bones == null)
+                throw new ArgumentException("Model bones are required.", nameof(model));
+
+            int boneCount = model.bones.Count;
+            RequireExactArrayLength(localPositionOffsetsXyz, checked(boneCount * 3), nameof(localPositionOffsetsXyz));
+            RequireExactArrayLength(localRotationXyzw, checked(boneCount * 4), nameof(localRotationXyzw));
+            RequireExactArrayLength(localScalesXyz, checked(boneCount * 3), nameof(localScalesXyz));
+            if (nativeTransforms.Count != boneCount)
+                throw new ArgumentException(
+                    $"Native transform count {nativeTransforms.Count} does not match model bone count {boneCount}.",
+                    nameof(nativeTransforms));
+
+            ValidateNativeArrayBoneMapping(model, nativeTransforms);
+            ResetNativeArrayPose(localPositionOffsetsXyz, localRotationXyzw, localScalesXyz);
+
+            float scale = NormalizeImportScale(importScale);
+            return RetargetPoseCore(
+                entries,
+                copyLocalPositions,
+                new NativeArrayOutput(
+                    model,
+                    nativeTransforms,
+                    scale,
+                    localPositionOffsetsXyz,
+                    localRotationXyzw));
+        }
+
+        private static MmdHumanoidRetargeterResult RetargetPoseCore(
+            IReadOnlyList<MmdHumanoidRetargetBinding> entries,
+            bool copyLocalPositions,
+            NativeArrayOutput? nativeArrayOutput = null)
+        {
+
             var diagnostics = new List<string>();
             int copiedCount = 0;
             int skippedCount = 0;
@@ -357,11 +427,29 @@ namespace Mmd
                         }
                         else
                         {
-                            nativeTransform.localRotation =
+                            Quaternion retargetedRotation =
                                 entry.NativeBindLocalRotation *
                                 Quaternion.Inverse(entry.ProxyBindLocalRotation) *
                                 proxyRot;
-                            copiedCount++;
+                            string? writeFailure = nativeArrayOutput.HasValue
+                                ? nativeArrayOutput.Value.TryWriteRotation(entry, retargetedRotation)
+                                : null;
+                            if (writeFailure != null)
+                            {
+                                diagnostics.Add(
+                                    $"retarget: skipped MmdBoneIndex {entry.MmdBoneIndex} " +
+                                    $"(HumanBone={entry.HumanBone}): {writeFailure}");
+                                skippedCount++;
+                            }
+                            else
+                            {
+                                if (!nativeArrayOutput.HasValue)
+                                {
+                                    nativeTransform.localRotation = retargetedRotation;
+                                }
+
+                                copiedCount++;
+                            }
                         }
                     }
 
@@ -401,8 +489,24 @@ namespace Mmd
                 }
 
                 Vector3 delta = proxyTransform.localPosition - entry.ProxyBindLocalPosition;
-                translationTarget.localPosition = entry.TranslationTargetBindLocalPosition + delta;
-                copiedTranslationCount++;
+                string? translationWriteFailure = nativeArrayOutput.HasValue
+                    ? nativeArrayOutput.Value.TryWriteTranslation(entry, delta)
+                    : null;
+                if (translationWriteFailure != null)
+                {
+                    diagnostics.Add(
+                        $"retarget: skipped translation for {entry.HumanBone}: {translationWriteFailure}");
+                    skippedTranslationCount++;
+                }
+                else
+                {
+                    if (!nativeArrayOutput.HasValue)
+                    {
+                        translationTarget.localPosition = entry.TranslationTargetBindLocalPosition + delta;
+                    }
+
+                    copiedTranslationCount++;
+                }
             }
 
             diagnostics.Add(
@@ -416,6 +520,153 @@ namespace Mmd
                 copiedTranslationCount,
                 skippedTranslationCount,
                 diagnostics.ToArray());
+        }
+
+        private static void ResetNativeArrayPose(
+            float[] localPositionOffsetsXyz,
+            float[] localRotationXyzw,
+            float[] localScalesXyz)
+        {
+            Array.Clear(localPositionOffsetsXyz, 0, localPositionOffsetsXyz.Length);
+            Array.Clear(localRotationXyzw, 0, localRotationXyzw.Length);
+            Array.Clear(localScalesXyz, 0, localScalesXyz.Length);
+            for (int boneIndex = 0; boneIndex < localRotationXyzw.Length / 4; boneIndex++)
+            {
+                localRotationXyzw[boneIndex * 4 + 3] = 1.0f;
+                localScalesXyz[boneIndex * 3] = 1.0f;
+                localScalesXyz[boneIndex * 3 + 1] = 1.0f;
+                localScalesXyz[boneIndex * 3 + 2] = 1.0f;
+            }
+        }
+
+        private static void ValidateNativeArrayBoneMapping(
+            MmdModelDefinition model,
+            IReadOnlyList<Transform> nativeTransforms)
+        {
+            if (model.bones == null)
+                throw new ArgumentException("Model bones are required.", nameof(model));
+
+            for (int listIndex = 0; listIndex < model.bones.Count; listIndex++)
+            {
+                MmdBoneDefinition? bone = model.bones[listIndex];
+                if (bone == null || bone.index != listIndex)
+                    throw new ArgumentException(
+                        "Model bone indices must be a unique contiguous mapping.", nameof(model));
+
+                if (bone.parentIndex < -1 || bone.parentIndex >= model.bones.Count)
+                    throw new ArgumentException(
+                        $"Model parent index {bone.parentIndex} is invalid for bone {bone.index}.", nameof(model));
+
+                if (nativeTransforms[listIndex] == null)
+                    throw new ArgumentException(
+                        $"Native transform {listIndex} is null.", nameof(nativeTransforms));
+            }
+        }
+
+        private static bool IsActualNativeTarget(
+            Transform? target,
+            IReadOnlyList<Transform> nativeTransforms,
+            int index)
+        {
+            return index >= 0 && index < nativeTransforms.Count &&
+                   target != null && ReferenceEquals(target, nativeTransforms[index]);
+        }
+
+        private static Vector3 GetModelParentLocalRestPosition(MmdModelDefinition model, int index)
+        {
+            MmdBoneDefinition bone = model.bones[index];
+            Vector3 origin = ToMmdVector3(bone.origin);
+            if (bone.parentIndex < 0)
+            {
+                return origin;
+            }
+
+            return origin - ToMmdVector3(model.bones[bone.parentIndex].origin);
+        }
+
+        private static Vector3 ToMmdVector3(float[]? values)
+        {
+            return values != null && values.Length >= 3
+                ? new Vector3(values[0], values[1], values[2])
+                : Vector3.zero;
+        }
+
+        private static float NormalizeImportScale(float value)
+        {
+            return float.IsFinite(value) && value > 0.0f ? value : 1.0f;
+        }
+
+        private static void RequireExactArrayLength<T>(T[] values, int expected, string label)
+        {
+            if (values.Length != expected)
+            {
+                throw new ArgumentException(
+                    label + " requires exactly " + expected + " elements, got " + values.Length + ".",
+                    label);
+            }
+        }
+
+        private readonly struct NativeArrayOutput
+        {
+            private readonly MmdModelDefinition model;
+            private readonly IReadOnlyList<Transform> nativeTransforms;
+            private readonly float importScale;
+            private readonly float[] positions;
+            private readonly float[] rotations;
+
+            internal NativeArrayOutput(
+                MmdModelDefinition model,
+                IReadOnlyList<Transform> nativeTransforms,
+                float importScale,
+                float[] positions,
+                float[] rotations)
+            {
+                this.model = model;
+                this.nativeTransforms = nativeTransforms;
+                this.importScale = importScale;
+                this.positions = positions;
+                this.rotations = rotations;
+            }
+
+            internal string? TryWriteRotation(
+                MmdHumanoidRetargetBinding entry,
+                Quaternion rotation)
+            {
+                int index = entry.MmdBoneIndex;
+                if (!IsActualNativeTarget(entry.NativeTransform, nativeTransforms, index))
+                {
+                    return "native rotation target mapping does not match MMD bone index " + index;
+                }
+
+                Quaternion nativeRotation = MmdCoordinateSpace.UnityToMmdRotation(rotation);
+                int offset = checked(index * 4);
+                rotations[offset] = nativeRotation.x;
+                rotations[offset + 1] = nativeRotation.y;
+                rotations[offset + 2] = nativeRotation.z;
+                rotations[offset + 3] = nativeRotation.w;
+                return null;
+            }
+
+            internal string? TryWriteTranslation(
+                MmdHumanoidRetargetBinding entry,
+                Vector3 delta)
+            {
+                int index = entry.TranslationTargetMmdBoneIndex;
+                if (!IsActualNativeTarget(entry.TranslationTargetTransform, nativeTransforms, index))
+                {
+                    return "native translation target mapping does not match MMD bone index " + index;
+                }
+
+                Vector3 restPosition = GetModelParentLocalRestPosition(model, index);
+                Vector3 targetPosition = entry.TranslationTargetBindLocalPosition + delta;
+                Vector3 targetPositionMmd = MmdCoordinateSpace.UnityToMmdPosition(targetPosition) / importScale;
+                Vector3 offsetPosition = targetPositionMmd - restPosition;
+                int offset = checked(index * 3);
+                positions[offset] = offsetPosition.x;
+                positions[offset + 1] = offsetPosition.y;
+                positions[offset + 2] = offsetPosition.z;
+                return null;
+            }
         }
 
         /// <summary>

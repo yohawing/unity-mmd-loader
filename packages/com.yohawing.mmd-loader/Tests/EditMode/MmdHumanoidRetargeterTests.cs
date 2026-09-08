@@ -1,8 +1,11 @@
 #nullable enable
 
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
+using Object = UnityEngine.Object;
 using Mmd.Parser;
 using Mmd.Rendering;
 using Mmd.UnityIntegration;
@@ -390,6 +393,216 @@ namespace Mmd.Tests
                 Object.DestroyImmediate(rotationTargetObject);
                 Object.DestroyImmediate(translationTargetObject);
             }
+        }
+
+        [Test]
+        public void RetargetNativeArraysWritesFreshPoseWithoutMutatingDisplayTransforms()
+        {
+            MmdModelDefinition model = CreateNativeArrayModel();
+            MmdUnityModelInstance native = CreateNativeInstance(model.bones.Count);
+            var proxyObject = new GameObject("native-array-proxy");
+            try
+            {
+                Transform proxy = proxyObject.transform;
+                Quaternion proxyBindRotation = Quaternion.Euler(5f, 10f, 15f);
+                Quaternion nativeBindRotation = Quaternion.Euler(-10f, 20f, 30f);
+                proxy.localRotation = Quaternion.Euler(25f, 35f, 45f);
+                proxy.localPosition = new Vector3(2f, 3f, 4f);
+                Vector3 proxyBindPosition = Vector3.zero;
+                Transform rotationTarget = native.BoneTransforms[1];
+                Transform translationTarget = native.BoneTransforms[2];
+                rotationTarget.localRotation = Quaternion.Euler(41f, 42f, 43f);
+                translationTarget.localPosition = new Vector3(0f, 20f, 0f);
+                Vector3 originalRotationTargetPosition = rotationTarget.localPosition;
+                Quaternion originalRotationTargetRotation = rotationTarget.localRotation;
+                Vector3 originalTranslationTargetPosition = translationTarget.localPosition;
+
+                var entries = new[]
+                {
+                    new MmdHumanoidRetargetBinding(
+                        HumanBodyBones.Spine,
+                        1,
+                        proxy,
+                        rotationTarget,
+                        proxyBindRotation,
+                        nativeBindRotation,
+                        copyLocalPosition: true,
+                        translationTargetTransform: translationTarget,
+                        translationTargetMmdBoneIndex: 2,
+                        proxyBindLocalPosition: proxyBindPosition,
+                        translationTargetBindLocalPosition: translationTarget.localPosition)
+                };
+                var positions = new float[model.bones.Count * 3];
+                var rotations = new float[model.bones.Count * 4];
+                var scales = new float[model.bones.Count * 3];
+                Array.Fill(positions, 99f);
+                Array.Fill(rotations, 99f);
+                Array.Fill(scales, 99f);
+
+                MmdHumanoidRetargeterResult result = MmdHumanoidRetargeter.RetargetPoseToNativeArrays(
+                    entries,
+                    model,
+                    native.BoneTransforms,
+                    importScale: 2.0f,
+                    positions,
+                    rotations,
+                    scales);
+
+                Assert.That(result.AllSucceeded, Is.True);
+                Assert.That(result.CopiedBoneCount, Is.EqualTo(1));
+                Assert.That(result.CopiedTranslationCount, Is.EqualTo(1));
+                Assert.That(rotationTarget.localRotation, Is.EqualTo(originalRotationTargetRotation),
+                    "array retargeting must not mutate display rotation output");
+                Assert.That(rotationTarget.localPosition, Is.EqualTo(originalRotationTargetPosition),
+                    "array retargeting must not mutate display rotation target position");
+                Assert.That(translationTarget.localPosition, Is.EqualTo(originalTranslationTargetPosition),
+                    "array retargeting must not mutate display translation output");
+
+                Quaternion expectedRotation = MmdCoordinateSpace.UnityToMmdRotation(
+                    nativeBindRotation * Quaternion.Inverse(proxyBindRotation) * proxy.localRotation);
+                Assert.That(rotations[4], Is.EqualTo(expectedRotation.x).Within(1.0e-5f));
+                Assert.That(rotations[5], Is.EqualTo(expectedRotation.y).Within(1.0e-5f));
+                Assert.That(rotations[6], Is.EqualTo(expectedRotation.z).Within(1.0e-5f));
+                Assert.That(rotations[7], Is.EqualTo(expectedRotation.w).Within(1.0e-5f));
+
+                Vector3 expectedTranslation = MmdCoordinateSpace.UnityToMmdPosition(
+                    originalTranslationTargetPosition + proxy.localPosition) / 2.0f - new Vector3(0f, 10f, 0f);
+                Assert.That(positions[6], Is.EqualTo(expectedTranslation.x).Within(1.0e-5f));
+                Assert.That(positions[7], Is.EqualTo(expectedTranslation.y).Within(1.0e-5f));
+                Assert.That(positions[8], Is.EqualTo(expectedTranslation.z).Within(1.0e-5f));
+                Assert.That(positions[0], Is.EqualTo(0f));
+                Assert.That(positions[1], Is.EqualTo(0f));
+                Assert.That(positions[2], Is.EqualTo(0f));
+                Assert.That(rotations[3], Is.EqualTo(1f));
+                Assert.That(rotations[11], Is.EqualTo(1f));
+                Assert.That(scales[0], Is.EqualTo(1f));
+                Assert.That(scales[4], Is.EqualTo(1f));
+                Assert.That(scales[8], Is.EqualTo(1f));
+
+                Array.Fill(positions, -77f);
+                Array.Fill(rotations, -77f);
+                Array.Fill(scales, -77f);
+                Vector3 changedDisplayPosition = translationTarget.localPosition + Vector3.one * 100f;
+                translationTarget.localPosition = changedDisplayPosition;
+                MmdHumanoidRetargeterResult repeated = MmdHumanoidRetargeter.RetargetPoseToNativeArrays(
+                    entries,
+                    model,
+                    native.BoneTransforms,
+                    importScale: 2.0f,
+                    positions,
+                    rotations,
+                    scales);
+
+                Assert.That(repeated.AllSucceeded, Is.True);
+                Assert.That(positions[6], Is.EqualTo(expectedTranslation.x).Within(1.0e-5f));
+                Assert.That(positions[7], Is.EqualTo(expectedTranslation.y).Within(1.0e-5f));
+                Assert.That(positions[8], Is.EqualTo(expectedTranslation.z).Within(1.0e-5f),
+                    "fresh array input must ignore poisoned display helper state");
+            }
+            finally
+            {
+                Object.DestroyImmediate(proxyObject);
+                DestroyInstance(native);
+            }
+        }
+
+        [Test]
+        public void RetargetNativeArraysCanOmitTranslationAndRejectActualTargetMismatch()
+        {
+            MmdModelDefinition model = CreateNativeArrayModel();
+            MmdUnityModelInstance native = CreateNativeInstance(model.bones.Count);
+            var proxyObject = new GameObject("native-array-copy-options-proxy");
+            var wrongTargetObject = new GameObject("native-array-wrong-target");
+            try
+            {
+                Transform proxy = proxyObject.transform;
+                proxy.localRotation = Quaternion.Euler(12f, 24f, 36f);
+                proxy.localPosition = new Vector3(3f, 4f, 5f);
+                Transform actualTranslationTarget = native.BoneTransforms[2];
+                Vector3 targetBind = new Vector3(0f, 20f, 0f);
+                actualTranslationTarget.localPosition = targetBind;
+                var noTranslationEntries = new[]
+                {
+                    new MmdHumanoidRetargetBinding(
+                        HumanBodyBones.Spine,
+                        1,
+                        proxy,
+                        native.BoneTransforms[1],
+                        copyLocalPosition: true,
+                        translationTargetTransform: actualTranslationTarget,
+                        translationTargetMmdBoneIndex: 2,
+                        proxyBindLocalPosition: Vector3.zero,
+                        translationTargetBindLocalPosition: targetBind)
+                };
+                var positions = new float[model.bones.Count * 3];
+                var rotations = new float[model.bones.Count * 4];
+                var scales = new float[model.bones.Count * 3];
+                MmdHumanoidRetargeterResult noTranslation = MmdHumanoidRetargeter.RetargetPoseToNativeArrays(
+                    noTranslationEntries,
+                    model,
+                    native.BoneTransforms,
+                    1.0f,
+                    positions,
+                    rotations,
+                    scales,
+                    copyLocalPositions: false);
+
+                Assert.That(noTranslation.AllSucceeded, Is.True);
+                Assert.That(noTranslation.CopiedTranslationCount, Is.EqualTo(0));
+                Assert.That(positions[6], Is.EqualTo(0f));
+                Assert.That(positions[7], Is.EqualTo(0f));
+                Assert.That(positions[8], Is.EqualTo(0f));
+
+                var mismatchEntries = new[]
+                {
+                    new MmdHumanoidRetargetBinding(
+                        HumanBodyBones.Spine,
+                        1,
+                        proxy,
+                        native.BoneTransforms[1],
+                        copyLocalPosition: true,
+                        translationTargetTransform: wrongTargetObject.transform,
+                        translationTargetMmdBoneIndex: 2,
+                        proxyBindLocalPosition: Vector3.zero,
+                        translationTargetBindLocalPosition: targetBind)
+                };
+                Array.Fill(positions, 123f);
+                Array.Fill(rotations, 123f);
+                Array.Fill(scales, 123f);
+                MmdHumanoidRetargeterResult mismatch = MmdHumanoidRetargeter.RetargetPoseToNativeArrays(
+                    mismatchEntries,
+                    model,
+                    native.BoneTransforms,
+                    1.0f,
+                    positions,
+                    rotations,
+                    scales);
+
+                Assert.That(mismatch.AllSucceeded, Is.False);
+                Assert.That(mismatch.SkippedTranslationCount, Is.EqualTo(1));
+                Assert.That(mismatch.Diagnostics.Any(d => d.Contains("mapping")), Is.True);
+                Assert.That(positions[6], Is.EqualTo(0f));
+                Assert.That(positions[7], Is.EqualTo(0f));
+                Assert.That(positions[8], Is.EqualTo(0f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(proxyObject);
+                Object.DestroyImmediate(wrongTargetObject);
+                DestroyInstance(native);
+            }
+        }
+
+        private static MmdModelDefinition CreateNativeArrayModel()
+        {
+            var model = new MmdModelDefinition();
+            AddBone(model, 0, "root", -1);
+            AddBone(model, 1, "spine", 0);
+            AddBone(model, 2, "center", 1);
+            model.bones[0].origin = new[] { 0f, 0f, 0f };
+            model.bones[1].origin = new[] { 0f, 10f, 0f };
+            model.bones[2].origin = new[] { 0f, 20f, 0f };
+            return model;
         }
 
         [Test]
@@ -781,11 +994,11 @@ namespace Mmd.Tests
             DestroyInstance(native);
         }
 
-        private static void DestroyImmediateIfPossible(Object? target)
+        private static void DestroyImmediateIfPossible(UnityEngine.Object? target)
         {
             if (target != null)
             {
-                Object.DestroyImmediate(target);
+                UnityEngine.Object.DestroyImmediate(target);
             }
         }
 

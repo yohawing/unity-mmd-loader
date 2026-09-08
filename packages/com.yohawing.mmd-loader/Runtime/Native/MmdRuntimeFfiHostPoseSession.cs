@@ -7,10 +7,12 @@ namespace Mmd.Native
     internal sealed class MmdRuntimeFfiHostPoseSession : IDisposable
     {
         private IntPtr model;
+        private IntPtr rig;
         private IntPtr instance;
         private bool disposed;
         private MmdRuntimeFfiHostPoseSession(
             IntPtr model,
+            IntPtr rig,
             IntPtr instance,
             int boneCount,
             int morphCount,
@@ -18,6 +20,7 @@ namespace Mmd.Native
             int worldMatrixFloatCount)
         {
             this.model = model;
+            this.rig = rig;
             this.instance = instance;
             BoneCount = boneCount;
             MorphCount = morphCount;
@@ -29,23 +32,39 @@ namespace Mmd.Native
         internal int MorphCount { get; }
         internal int IkCount { get; }
         internal int WorldMatrixFloatCount { get; }
-        internal static MmdRuntimeFfiHostPoseSession Create(byte[] pmxBytes)
+        internal static MmdRuntimeFfiHostPoseSession CreateWithRig(
+            byte[] pmxBytes,
+            uint[] drivenBones,
+            uint[] goalBones)
         {
-            if (pmxBytes == null || pmxBytes.Length == 0)
+            ValidatePmxBytes(pmxBytes);
+            if (drivenBones == null)
             {
-                throw new ArgumentException("PMX bytes are required.", nameof(pmxBytes));
+                throw new ArgumentNullException(nameof(drivenBones));
             }
+
+            if (goalBones == null)
+            {
+                throw new ArgumentNullException(nameof(goalBones));
+            }
+
             return MmdRuntimeNativeBoundary.Invoke(
-                "native host-pose session",
-                () => CreateNative(pmxBytes));
+                "native host-rig pose session",
+                () => CreateNative(pmxBytes, drivenBones, goalBones));
         }
-        private static MmdRuntimeFfiHostPoseSession CreateNative(byte[] pmxBytes)
+
+        private static MmdRuntimeFfiHostPoseSession CreateNative(
+            byte[] pmxBytes,
+            uint[] drivenBones,
+            uint[] goalBones)
         {
             IntPtr model = IntPtr.Zero;
+            IntPtr rig = IntPtr.Zero;
             IntPtr instance = IntPtr.Zero;
             try
             {
-                MmdRuntimeFfiMethods.ValidateHostPoseCapability();
+                MmdRuntimeFfiMethods.ValidateHostRigCapability();
+
                 model = MmdRuntimeFfiMethods.ModelCreateFromPmxBytes(
                     pmxBytes,
                     new IntPtr(pmxBytes.Length));
@@ -55,6 +74,20 @@ namespace Mmd.Native
                         "mmd-runtime host-pose PMX import returned a null model: " +
                         MmdRuntimeFfiMarshal.LastErrorMessage());
                 }
+
+                rig = MmdRuntimeFfiMethods.HostRigCreate(
+                    model,
+                    drivenBones.Length == 0 ? null : drivenBones,
+                    new IntPtr(drivenBones.Length),
+                    goalBones.Length == 0 ? null : goalBones,
+                    new IntPtr(goalBones.Length));
+                if (rig == IntPtr.Zero)
+                {
+                    throw new InvalidOperationException(
+                        "mmd-runtime host-rig creation returned null: " +
+                        MmdRuntimeFfiMarshal.LastErrorMessage());
+                }
+
                 int boneCount = MmdFfiMarshal.CheckedIntPtrToInt(MmdRuntimeFfiMethods.ModelBoneCount(model), "host-pose bone count");
                 int morphCount = MmdFfiMarshal.CheckedIntPtrToInt(MmdRuntimeFfiMethods.ModelMorphCount(model), "host-pose morph count");
                 int ikCount = MmdFfiMarshal.CheckedIntPtrToInt(MmdRuntimeFfiMethods.ModelIkCount(model), "host-pose IK count");
@@ -89,8 +122,9 @@ namespace Mmd.Native
                 }
 
                 MmdRuntimeFfiHostPoseSession session = new MmdRuntimeFfiHostPoseSession(
-                    model, instance, boneCount, morphCount, ikCount, worldMatrixFloatCount);
+                    model, rig, instance, boneCount, morphCount, ikCount, worldMatrixFloatCount);
                 model = IntPtr.Zero;
+                rig = IntPtr.Zero;
                 instance = IntPtr.Zero;
                 return session;
             }
@@ -99,6 +133,11 @@ namespace Mmd.Native
                 if (instance != IntPtr.Zero)
                 {
                     MmdRuntimeFfiMethods.InstanceFree(instance);
+                }
+
+                if (rig != IntPtr.Zero)
+                {
+                    MmdRuntimeFfiMethods.HostRigFree(rig);
                 }
 
                 if (model != IntPtr.Zero)
@@ -144,11 +183,13 @@ namespace Mmd.Native
                     ikCount = new IntPtr(IkCount)
                 };
 
-                int status = MmdRuntimeFfiMethods.InstanceApplyHostPoseAndEvaluateBeforePhysics(instance, ref pose);
-                ThrowForStatus(status, "apply host pose and evaluate before physics");
-
-                status = MmdRuntimeFfiMethods.InstanceEvaluateCurrentPoseAfterPhysics(instance);
-                ThrowForStatus(status, "evaluate current pose after physics");
+                int status = MmdRuntimeFfiMethods.InstanceEvaluateHostRigPose(
+                    instance,
+                    rig,
+                    ref pose,
+                    MmdRuntimeFfiMethods.DefaultIkTolerance,
+                    0);
+                ThrowForStatus(status, "evaluate host rig pose");
 
                 if (worldMatrices.Length > 0 &&
                     MmdRuntimeFfiMethods.InstanceCopyWorldMatrices(instance, worldMatrices, new IntPtr(worldMatrices.Length)) == 0)
@@ -177,6 +218,8 @@ namespace Mmd.Native
             disposed = true;
             IntPtr instanceHandle = instance;
             instance = IntPtr.Zero;
+            IntPtr rigHandle = rig;
+            rig = IntPtr.Zero;
             IntPtr modelHandle = model;
             model = IntPtr.Zero;
             try
@@ -188,10 +231,28 @@ namespace Mmd.Native
             }
             finally
             {
-                if (modelHandle != IntPtr.Zero)
+                try
                 {
-                    MmdRuntimeFfiMethods.ModelFree(modelHandle);
+                    if (rigHandle != IntPtr.Zero)
+                    {
+                        MmdRuntimeFfiMethods.HostRigFree(rigHandle);
+                    }
                 }
+                finally
+                {
+                    if (modelHandle != IntPtr.Zero)
+                    {
+                        MmdRuntimeFfiMethods.ModelFree(modelHandle);
+                    }
+                }
+            }
+        }
+
+        private static void ValidatePmxBytes(byte[] pmxBytes)
+        {
+            if (pmxBytes == null || pmxBytes.Length == 0)
+            {
+                throw new ArgumentException("PMX bytes are required.", nameof(pmxBytes));
             }
         }
 
@@ -263,7 +324,7 @@ namespace Mmd.Native
 
         private void ThrowIfDisposed()
         {
-            if (disposed || instance == IntPtr.Zero || model == IntPtr.Zero)
+            if (disposed || instance == IntPtr.Zero || rig == IntPtr.Zero || model == IntPtr.Zero)
             {
                 throw new ObjectDisposedException(nameof(MmdRuntimeFfiHostPoseSession));
             }

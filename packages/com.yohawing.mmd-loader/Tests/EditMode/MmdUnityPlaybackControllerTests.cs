@@ -981,9 +981,19 @@ namespace Mmd.Tests
                 Quaternion expectedLocalRotation = binding.Instance.BindLocalRotations[0]
                     * ToUnityRotation(expectedMmdLocalRotation);
 
+                const float halfTime = 4.5f / 30.0f;
+                controller.ApplyTime(halfTime);
+                Quaternion expectedHalfRotation = binding.Instance.BoneTransforms[0].localRotation;
+                controller.SeekFrame(0);
+                int poseNotifications = 0;
+                controller.PoseApplied += _ => poseNotifications++;
                 controller.Play();
-                controller.Tick(4.5f / 30.0f);
-                controller.Tick(4.5f / 30.0f);
+                controller.Tick(halfTime);
+                Assert.That(controller.LastSnapshot!.frame.time, Is.EqualTo(halfTime).Within(1e-7f));
+                Assert.That(Quaternion.Angle(binding.Instance.BoneTransforms[0].localRotation,
+                    expectedHalfRotation), Is.LessThan(0.001f));
+                controller.Tick(halfTime);
+                Assert.That(poseNotifications, Is.EqualTo(2));
 
                 Assert.That(controller.CurrentFrame, Is.EqualTo(frame));
                 Assert.That(controller.LastSnapshot, Is.Not.Null);

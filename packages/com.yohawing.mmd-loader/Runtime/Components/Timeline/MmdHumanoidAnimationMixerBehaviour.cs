@@ -9,17 +9,36 @@ namespace Mmd.Timeline
     [Serializable]
     public sealed class MmdHumanoidAnimationMixerBehaviour : PlayableBehaviour
     {
+        private MmdUnityPlaybackController? controller;
+
         public override void ProcessFrame(Playable playable, FrameData info, object playerData)
         {
+            controller = playerData as MmdUnityPlaybackController;
+
             if (!HasActiveClipInput(playable))
             {
+                controller?.NotifyHumanoidTimelinePaused(playable.GetTime());
                 return;
             }
 
-            if (playerData is MmdUnityPlaybackController controller)
+            if (controller != null)
             {
-                controller.ApplyHumanoidRetargetFromTimeline();
+                controller.ApplyHumanoidRetargetFromTimeline(
+                    playable.GetTime(),
+                    info.effectivePlayState == PlayState.Playing,
+                    info.seekOccurred,
+                    info.deltaTime);
             }
+        }
+
+        public override void OnBehaviourPause(Playable playable, FrameData info)
+        {
+            controller?.NotifyHumanoidTimelinePaused(playable.GetTime());
+        }
+
+        public override void OnGraphStop(Playable playable)
+        {
+            controller?.NotifyHumanoidTimelinePaused(playable.GetTime());
         }
 
         private static bool HasActiveClipInput(Playable playable)

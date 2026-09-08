@@ -57,8 +57,12 @@ namespace Mmd.UnityIntegration
         private float[]? livePhysicsAfterPhysicsWorldMatrices;
         private int livePhysicsBodyDiagnosticsSampleInterval;
         private bool nativeHumanoidHostPoseEnabled;
+        private uint[]? nativeHumanoidHostPoseDrivenBones;
+        private uint[]? nativeHumanoidHostPoseGoalBones;
+        private readonly HashSet<Transform> livePhysicsHostPoseBoneTransformSet = new();
 
         internal bool NativeHumanoidHostPoseEnabled => nativeHumanoidHostPoseEnabled;
+        internal string LastNativeHumanoidHostPoseFailureReason { get; private set; } = string.Empty;
         internal bool HasLivePhysicsBackend => livePhysicsBackend != null;
 
         internal MmdTimelineLivePhysicsTransfer? DetachTimelineLivePhysicsBackend()
@@ -132,12 +136,24 @@ namespace Mmd.UnityIntegration
         /// final world-matrix pose. The backend is established eagerly so callers can retain the
         /// managed append path as a fallback before mutating the pose.
         /// </summary>
-        internal bool TryEnableNativeHumanoidHostPose()
+        internal bool TryEnableNativeHumanoidHostPose(
+            uint[] drivenBones,
+            uint[] goalBones)
         {
             if (physicsMode != MmdPhysicsMode.Live)
             {
                 return false;
             }
+
+            if (drivenBones == null || goalBones == null)
+            {
+                throw new ArgumentNullException(
+                    drivenBones == null ? nameof(drivenBones) : nameof(goalBones));
+            }
+
+            nativeHumanoidHostPoseDrivenBones = drivenBones;
+            nativeHumanoidHostPoseGoalBones = goalBones;
+            LastNativeHumanoidHostPoseFailureReason = string.Empty;
 
             if (nativeHumanoidHostPoseEnabled && livePhysicsBackend != null)
             {
@@ -164,6 +180,8 @@ namespace Mmd.UnityIntegration
                 nativeHumanoidHostPoseEnabled = false;
                 livePhysicsBackend?.Dispose();
                 livePhysicsBackend = null;
+                LastNativeHumanoidHostPoseFailureReason =
+                    exception.GetType().Name + ": " + exception.Message;
                 return false;
             }
         }
@@ -175,9 +193,13 @@ namespace Mmd.UnityIntegration
                 return false;
             }
 
-            MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(
-                playbackInstance,
-                livePhysicsAfterPhysicsWorldMatrices);
+            MmdUnityWorldMatrixFrameApplier.ApplyHostRigColumnMajorWorldMatrices(
+                playbackInstance.Root.transform,
+                playbackInstance.BoneTransforms,
+                playbackInstance.ImportScale,
+                model.bones,
+                livePhysicsAfterPhysicsWorldMatrices,
+                livePhysicsHostPoseBoneTransformSet);
             return true;
         }
 
@@ -219,6 +241,43 @@ namespace Mmd.UnityIntegration
 
         internal void StepLivePhysicsFromCurrentPose(int sequenceFrame, float deltaTime, bool resetOnFirstStep)
         {
+            StepLivePhysicsPose(sequenceFrame, deltaTime, resetOnFirstStep);
+        }
+
+        internal void StepLivePhysicsFromHostPose(
+            int sequenceFrame,
+            float deltaTime,
+            bool resetOnFirstStep,
+            float[] localPositionOffsets,
+            float[] localRotations,
+            float[] localScales,
+            float[] morphWeights,
+            byte[] ikEnabled)
+        {
+            if (localPositionOffsets == null || localRotations == null || localScales == null ||
+                morphWeights == null || ikEnabled == null)
+            {
+                throw new ArgumentNullException(
+                    localPositionOffsets == null ? nameof(localPositionOffsets) :
+                    localRotations == null ? nameof(localRotations) :
+                    localScales == null ? nameof(localScales) :
+                    morphWeights == null ? nameof(morphWeights) : nameof(ikEnabled));
+            }
+
+            StepLivePhysicsPose(sequenceFrame, deltaTime, resetOnFirstStep,
+                localPositionOffsets, localRotations, localScales, morphWeights, ikEnabled);
+        }
+
+        private void StepLivePhysicsPose(
+            int sequenceFrame,
+            float deltaTime,
+            bool resetOnFirstStep,
+            float[]? localPositionOffsets = null,
+            float[]? localRotations = null,
+            float[]? localScales = null,
+            float[]? morphWeights = null,
+            byte[]? ikEnabled = null)
+        {
             MmdPlaybackTime.ValidateFrame(sequenceFrame);
             if (deltaTime < 0.0f || float.IsNaN(deltaTime) || float.IsInfinity(deltaTime))
             {
@@ -227,8 +286,7 @@ namespace Mmd.UnityIntegration
 
             if (physicsMode != MmdPhysicsMode.Live)
             {
-                throw new InvalidOperationException(
-                    "StepLivePhysicsFromCurrentPose requires Live physics mode. Set the binding physics mode to Live first.");
+                throw new InvalidOperationException("Pose stepping requires Live physics mode. Set the binding physics mode to Live first.");
             }
 
             EnsureBorrowedMutationActive();
@@ -252,7 +310,12 @@ namespace Mmd.UnityIntegration
                 evaluateFrameMs: 0.0,
                 applyAnimationFrameMs: 0.0,
                 evaluatedFrame: null,
-                out _);
+                out _,
+                providedLocalPositionOffsets: localPositionOffsets,
+                providedLocalRotations: localRotations,
+                providedLocalScales: localScales,
+                providedMorphWeights: morphWeights,
+                providedIkEnabled: ikEnabled);
             totalWatch.Stop();
             diagnostics.totalMs = totalWatch.Elapsed.TotalMilliseconds;
             lastLivePhysicsDiagnostics = diagnostics;
@@ -924,19 +987,50 @@ namespace Mmd.UnityIntegration
             double evaluateFrameMs,
             double applyAnimationFrameMs,
             MmdEvaluatedFrame? evaluatedFrame,
-            out double refreshSnapshotFrameMs)
+            out double refreshSnapshotFrameMs,
+            float[]? providedLocalPositionOffsets = null,
+            float[]? providedLocalRotations = null,
+            float[]? providedLocalScales = null,
+            float[]? providedMorphWeights = null,
+            byte[]? providedIkEnabled = null)
         {
             livePhysicsReadbackTransformCount = 0;
             livePhysicsReadbackShapeTypeCount = 0;
             long bridgeStartTimestamp = Stopwatch.GetTimestamp();
             var stageWatch = Stopwatch.StartNew();
             long hostPoseCaptureStartTimestamp = Stopwatch.GetTimestamp();
-            CaptureHostPoseFromUnityTransforms(
-                out float[] localPositionOffsets,
-                out float[] localRotations,
-                out float[] localScales,
-                out float[] morphWeights,
-                out byte[] ikEnabled);
+            float[] localPositionOffsets;
+            float[] localRotations;
+            float[] localScales;
+            float[] morphWeights;
+            byte[] ikEnabled;
+            bool hasProvidedHostPose = providedLocalPositionOffsets != null ||
+                providedLocalRotations != null || providedLocalScales != null ||
+                providedMorphWeights != null || providedIkEnabled != null;
+            if (hasProvidedHostPose)
+            {
+                if (providedLocalPositionOffsets == null || providedLocalRotations == null ||
+                    providedLocalScales == null || providedMorphWeights == null ||
+                    providedIkEnabled == null)
+                {
+                    throw new ArgumentException("A complete native HostRig pose array set is required.");
+                }
+
+                localPositionOffsets = providedLocalPositionOffsets;
+                localRotations = providedLocalRotations;
+                localScales = providedLocalScales;
+                morphWeights = providedMorphWeights;
+                ikEnabled = providedIkEnabled;
+            }
+            else
+            {
+                CaptureHostPoseFromUnityTransforms(
+                    out localPositionOffsets,
+                    out localRotations,
+                    out localScales,
+                    out morphWeights,
+                    out ikEnabled);
+            }
             long hostPoseCaptureEndTimestamp = Stopwatch.GetTimestamp();
             long pinnedDiagnosticsStartTimestamp = Stopwatch.GetTimestamp();
             MmdLivePhysicsPinnedBodyDiagnostics pinnedBodyDiagnostics =
@@ -1200,9 +1294,13 @@ namespace Mmd.UnityIntegration
                 // Humanoid Live intentionally applies the complete native post-physics pose once:
                 // this preserves append/IK results for helper bones while keeping static, dynamic,
                 // dynamic-orientation, and after-physics ownership in the native runtime.
-                MmdUnityWorldMatrixFrameApplier.ApplyColumnMajorWorldMatrices(
-                    playbackInstance,
-                    worldMatrices);
+                MmdUnityWorldMatrixFrameApplier.ApplyHostRigColumnMajorWorldMatrices(
+                    playbackInstance.Root.transform,
+                    playbackInstance.BoneTransforms,
+                    playbackInstance.ImportScale,
+                    model.bones,
+                    worldMatrices,
+                    livePhysicsHostPoseBoneTransformSet);
                 return;
             }
 
@@ -1373,16 +1471,36 @@ namespace Mmd.UnityIntegration
                 return livePhysicsBackend;
             }
 
-            bool created = nativeHumanoidHostPoseEnabled
-                ? MmdAnimPhysicsBackend.TryCreate(
-                    model.sourceBytes, modelId, motionId, out MmdAnimPhysicsBackend? nativeBackend, out string reason)
-                : MmdAnimPhysicsBackend.TryCreateForPlaybackSession(
+            MmdAnimPhysicsBackend? nativeBackend;
+            string reason;
+            bool created;
+            if (nativeHumanoidHostPoseEnabled)
+            {
+                if (nativeHumanoidHostPoseDrivenBones == null || nativeHumanoidHostPoseGoalBones == null)
+                {
+                    throw new InvalidOperationException(
+                        "Native Humanoid HostRig selection must be configured before creating the backend.");
+                }
+
+                created = MmdAnimPhysicsBackend.TryCreateWithHostRig(
+                    model.sourceBytes,
+                    nativeHumanoidHostPoseDrivenBones,
+                    nativeHumanoidHostPoseGoalBones,
+                    modelId,
+                    motionId,
+                    out nativeBackend,
+                    out reason);
+            }
+            else
+            {
+                created = MmdAnimPhysicsBackend.TryCreateForPlaybackSession(
                     model.sourceBytes,
                     fastSession ?? session.NativePlaybackSession,
                     modelId,
                     motionId,
                     out nativeBackend,
                     out reason);
+            }
             if (!created)
             {
                 throw new MmdPhysicsBackendException(
