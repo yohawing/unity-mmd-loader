@@ -58,11 +58,12 @@ namespace Mmd.Tests.Contracts
             Assert.That(frame.bones, Is.Not.Empty);
         }
 
-        [Test]
-        public void SourceBackedBeforePhysicsPreservesFrameAndTimeValidation()
+        [TestCase(false)]
+        [TestCase(true)]
+        public void SourceBackedBeforePhysicsPreservesFrameAndTimeValidation(bool deformAfterPhysics)
         {
             (MmdModelDefinition model, MmdMotionDefinition motion) = LoadCubeFixturePair();
-            model.bones[0].deformAfterPhysics = true;
+            model.bones[0].deformAfterPhysics = deformAfterPhysics;
             using var session = new MmdRuntimeSession(
                 model,
                 motion,
@@ -73,6 +74,49 @@ namespace Mmd.Tests.Contracts
                 () => session.EvaluateBeforePhysicsFrame(frame: -1, time: 0.0f));
             Assert.Throws<ArgumentOutOfRangeException>(
                 () => session.EvaluateBeforePhysicsFrame(frame: 0, time: -1.0f));
+        }
+
+        [TestCase(false, false)]
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        public void BeforePhysicsRejectsChangedSourcesAfterValidatingFrameAndTime(
+            bool deformAfterPhysics,
+            bool replaceSource)
+        {
+            (MmdModelDefinition model, MmdMotionDefinition motion) = LoadCubeFixturePair();
+            model.bones[0].deformAfterPhysics = deformAfterPhysics;
+            using var session = new MmdRuntimeSession(model, motion, "model", "motion");
+            if (replaceSource)
+                model.sourceBytes = (byte[])model.sourceBytes!.Clone();
+            else
+                model.sourceBytes![0] ^= 0xff;
+
+            Assert.That(Assert.Throws<ArgumentOutOfRangeException>(
+                () => session.EvaluateBeforePhysicsFrame(-1, -1.0f))!.ParamName, Is.EqualTo("frame"));
+            Assert.That(Assert.Throws<ArgumentOutOfRangeException>(
+                () => session.EvaluateBeforePhysicsFrame(0, -1.0f))!.ParamName, Is.EqualTo("time"));
+            InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
+                () => session.EvaluateBeforePhysicsFrame(0, 0.0f))!;
+            Assert.That(exception.Message, Is.EqualTo(replaceSource
+                ? "Native runtime session source identity changed before session compilation."
+                : "Native runtime source bytes changed before session compilation."));
+        }
+
+        [Test]
+        public void BeforePhysicsValidatesLifetimeThenSourceAvailabilityBeforeFrameAndTime()
+        {
+            (MmdModelDefinition model, MmdMotionDefinition motion) = LoadCubeFixturePair();
+            model.sourceBytes = null;
+            using var session = new MmdRuntimeSession(model, motion, "model", "motion");
+
+            InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
+                () => session.EvaluateBeforePhysicsFrame(-1, -1.0f))!;
+            Assert.That(exception.Message, Is.EqualTo(
+                "Model sourceBytes and motion sourceBytes are required for native evaluation."));
+
+            session.Dispose();
+            Assert.Throws<ObjectDisposedException>(() => session.EvaluateBeforePhysicsFrame(-1, -1.0f));
         }
 
         [Test]
