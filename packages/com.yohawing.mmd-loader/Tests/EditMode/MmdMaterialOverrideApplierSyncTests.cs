@@ -86,9 +86,9 @@ namespace Mmd.EditModeTests
 
             Assert.That(actual, Is.EqualTo(expected),
                 "MmdMaterialOverrideEntry に has* flag を追加/削除したら、" +
-                "MmdMaterialOverrideApplier の ApplyEntry / ApplyDescriptorEntry / " +
-                "ApplyUrpMaterialBindingEntry の 3 経路すべてを確認し、" +
-                "このテストと下の三経路テストを更新すること。");
+                "MmdMaterialOverrideApplier の ApplyEntry / ApplyDescriptorEntry と " +
+                "ApplyBindingSurfaceOverride を確認し、" +
+                "このテストと下の 3 sink のテストを更新すること。");
         }
 
         [Test]
@@ -293,6 +293,116 @@ namespace Mmd.EditModeTests
                 Assert.That(binding.isTransparent, Is.True);
                 Assert.That(binding.transparencyMode, Is.EqualTo("alphaBlend"));
                 Assert.That(binding.renderOrderBucket, Is.EqualTo("alphaBlend"));
+            }
+            finally
+            {
+                Destroy(asset);
+            }
+        }
+
+        [Test]
+        public void PartialOverridePreservesEachDescriptorSinksUnspecifiedValues()
+        {
+            MmdMaterialOverrideAsset asset = CreateAsset(new MmdMaterialOverrideEntry
+            {
+                materialIndex = 0,
+                hasAlpha = true,
+                alpha = 0.45f
+            });
+            try
+            {
+                MmdRenderingDescriptor descriptor = CreateDescriptor();
+                MmdMaterialDescriptor material = descriptor.materials[0];
+                MmdUrpMaterialBindingDescriptor binding = descriptor.urpMaterialBindings[0];
+                float[] materialAmbient = { 0.1f, 0.2f, 0.3f };
+                float[] bindingAmbient = { 0.4f, 0.5f, 0.6f };
+                material.ambientColor = materialAmbient;
+                binding.ambientColor = bindingAmbient;
+                material.toonBoundary = 0.2f;
+                binding.toonBoundary = 0.8f;
+                material.edgeSize = 1.0f;
+                binding.edgeSize = 2.0f;
+
+                MmdMaterialOverrideApplier.ApplyToRenderingDescriptor(asset, descriptor);
+
+                Assert.That(material.alpha, Is.EqualTo(0.45f));
+                Assert.That(binding.alpha, Is.EqualTo(0.45f));
+                Assert.That(material.ambientColor, Is.SameAs(materialAmbient));
+                Assert.That(binding.ambientColor, Is.SameAs(bindingAmbient));
+                Assert.That(materialAmbient, Is.EqualTo(new[] { 0.1f, 0.2f, 0.3f }));
+                Assert.That(bindingAmbient, Is.EqualTo(new[] { 0.4f, 0.5f, 0.6f }));
+                Assert.That(material.toonBoundary, Is.EqualTo(0.2f));
+                Assert.That(binding.toonBoundary, Is.EqualTo(0.8f));
+                Assert.That(material.edgeSize, Is.EqualTo(1.0f));
+                Assert.That(binding.edgeSize, Is.EqualTo(2.0f));
+            }
+            finally
+            {
+                Destroy(asset);
+            }
+        }
+
+        [Test]
+        public void OverrideColorArraysRemainIndependentBetweenDescriptorSinks()
+        {
+            MmdMaterialOverrideAsset asset = CreateAsset(CreateAllFlagsEntry(null, null, null, null));
+            try
+            {
+                MmdRenderingDescriptor descriptor = CreateDescriptor();
+                MmdMaterialOverrideApplier.ApplyToRenderingDescriptor(asset, descriptor);
+                MmdMaterialDescriptor material = descriptor.materials[0];
+                MmdUrpMaterialBindingDescriptor binding = descriptor.urpMaterialBindings[0];
+                float[][] materialColors =
+                {
+                    material.diffuseColor, material.ambientColor, material.emissionColor,
+                    material.stylizedSpecularColor, material.rimColor, material.edgeColor
+                };
+                float[][] bindingColors =
+                {
+                    binding.diffuseColor, binding.ambientColor, binding.emissionColor,
+                    binding.stylizedSpecularColor, binding.rimColor, binding.edgeColor
+                };
+                for (int i = 0; i < materialColors.Length; i++)
+                {
+                    Assert.That(bindingColors[i], Is.EqualTo(materialColors[i]));
+                    Assert.That(bindingColors[i], Is.Not.SameAs(materialColors[i]));
+                    float[] originalBindingColor = (float[])bindingColors[i].Clone();
+                    materialColors[i][0] = -10.0f;
+                    Assert.That(bindingColors[i], Is.EqualTo(originalBindingColor));
+                }
+            }
+            finally
+            {
+                Destroy(asset);
+            }
+        }
+
+        [Test]
+        public void OverrideAppliesToMaterialDescriptorWithoutUrpBinding()
+        {
+            MmdMaterialOverrideAsset asset = CreateAsset(new MmdMaterialOverrideEntry
+            {
+                materialIndex = 0,
+                hasBaseColor = true,
+                baseColor = new Color(0.1f, 0.2f, 0.3f, 0.8f),
+                hasAlpha = true,
+                alpha = 0.45f,
+                hasOutlineWidth = true,
+                outlineWidth = 1.75f
+            });
+            try
+            {
+                MmdRenderingDescriptor descriptor = CreateDescriptor();
+                descriptor.urpMaterialBindings.Clear();
+
+                MmdMaterialOverrideApplier.ApplyToRenderingDescriptor(asset, descriptor);
+
+                MmdMaterialDescriptor material = descriptor.materials[0];
+                Assert.That(material.diffuseColor, Is.EqualTo(new[] { 0.1f, 0.2f, 0.3f }));
+                Assert.That(material.alpha, Is.EqualTo(0.45f));
+                Assert.That(material.edgeSize, Is.EqualTo(1.75f));
+                Assert.That(material.drawEdgeFlag, Is.True);
+                Assert.That(descriptor.urpMaterialBindings, Is.Empty);
             }
             finally
             {
