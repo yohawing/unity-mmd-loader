@@ -16,18 +16,23 @@ namespace Mmd.UnityIntegration
         private LivePhysicsDriveSource livePhysicsDriveSource = LivePhysicsDriveSource.None;
         private MmdHumanoidPhysicsBindingFailureReason humanoidPhysicsBindingFailureReason;
 
-        private bool StepHumanoidRetargetLivePhysicsIfNeeded(MmdHumanoidRetargeterResult result)
+        private bool StepHumanoidRetargetLivePhysicsIfNeeded(
+            MmdHumanoidRetargeterResult result,
+            float[] localPositionOffsets,
+            float[] localRotations,
+            float[] localScales,
+            float[] morphWeights,
+            byte[] ikEnabled)
         {
-            if (lastHumanoidLivePhysicsFrameCount == Time.frameCount &&
+            bool sameFrame = lastHumanoidLivePhysicsFrameCount == Time.frameCount;
+            if (sameFrame &&
                 humanoidPhysicsBinding?.NativeHumanoidHostPoseEnabled == true)
             {
-                if (!hasLastHumanoidNativeHostPoseInputFingerprint ||
-                    humanoidHostPoseInputFingerprint != lastHumanoidNativeHostPoseInputFingerprint)
+                if (hasLastHumanoidNativeHostPoseInputFingerprint &&
+                    humanoidHostPoseInputFingerprint == lastHumanoidNativeHostPoseInputFingerprint)
                 {
-                    return false;
+                    return humanoidPhysicsBinding.ReapplyNativeHumanoidHostPoseWorldMatrices();
                 }
-
-                return humanoidPhysicsBinding.ReapplyNativeHumanoidHostPoseWorldMatrices();
             }
 
             if (physicsMode != MmdPhysicsMode.Live ||
@@ -37,8 +42,7 @@ namespace Mmd.UnityIntegration
                 IsVmdDriving ||
                 isApplyingPlaybackPose ||
                 ShouldSuppressSelfTick(lastTimelineDriveFrameCount, Time.frameCount) ||
-                lastVmdLivePhysicsFrameCount == Time.frameCount ||
-                lastHumanoidLivePhysicsFrameCount == Time.frameCount)
+                lastVmdLivePhysicsFrameCount == Time.frameCount)
             {
                 return false;
             }
@@ -57,14 +61,29 @@ namespace Mmd.UnityIntegration
                 ResetLivePhysicsDriveSource();
             }
 
-            bool resetOnFirstStep = PrepareLivePhysicsDriveSource(
+            bool switchedDriveSource = PrepareLivePhysicsDriveSource(
                 LivePhysicsDriveSource.HumanoidRetarget,
                 physicsBinding);
-            humanoidLivePhysicsStepIndex++;
-            physicsBinding.StepLivePhysicsFromCurrentPose(
+            bool resetOnFirstStep = (humanoidTimelineEvaluationActive &&
+                                     !humanoidTimelineEvaluationPlaying) ||
+                                    sameFrame || switchedDriveSource;
+            // Keep the native sequence frame stable for same-Unity-frame pose changes. A source
+            // switch can reset the index to -1 in that frame, so still allocate the first zero
+            // sequence frame for that seed.
+            if (!sameFrame || humanoidLivePhysicsStepIndex < 0)
+            {
+                humanoidLivePhysicsStepIndex++;
+            }
+            physicsBinding.StepLivePhysicsFromHostPose(
                 humanoidLivePhysicsStepIndex,
-                resetOnFirstStep ? 0.0f : Time.deltaTime,
-                resetOnFirstStep);
+                resetOnFirstStep ? 0.0f :
+                    humanoidTimelinePhysicsDeltaTime ?? Time.deltaTime,
+                resetOnFirstStep,
+                localPositionOffsets,
+                localRotations,
+                localScales,
+                morphWeights,
+                ikEnabled);
             lastHumanoidLivePhysicsFrameCount = Time.frameCount;
             lastHumanoidNativeHostPoseInputFingerprint = humanoidHostPoseInputFingerprint;
             hasLastHumanoidNativeHostPoseInputFingerprint = true;
@@ -132,10 +151,19 @@ namespace Mmd.UnityIntegration
                 ResetLivePhysicsDriveSource();
             }
 
-            if (physicsBinding.TryEnableNativeHumanoidHostPose())
+            if (humanoidHostPoseDrivenBones == null || humanoidHostPoseGoalBones == null)
+            {
+                return false;
+            }
+
+            if (physicsBinding.TryEnableNativeHumanoidHostPose(
+                humanoidHostPoseDrivenBones,
+                humanoidHostPoseGoalBones))
             {
                 return true;
             }
+
+            humanoidHostPoseFailureReason = physicsBinding.LastNativeHumanoidHostPoseFailureReason;
 
             // Native setup must succeed before the managed append path is skipped. Preserve the
             // existing managed append Oracle when the backend is unavailable or incompatible.

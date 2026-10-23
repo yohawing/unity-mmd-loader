@@ -101,6 +101,8 @@ namespace Mmd.Physics
         private IntPtr model;
         private IntPtr instance;
         private readonly bool ownsRuntimeHandles;
+        private IntPtr hostRig;
+        private readonly bool ownsHostRig;
         private IntPtr world;
         private readonly int boneCount;
         private readonly int worldMatrixFloatCount;
@@ -112,13 +114,19 @@ namespace Mmd.Physics
         private bool disposed;
         private int skippedWorldAnchorJointCount;
 
-        private MmdAnimPhysicsBackend(byte[] pmxBytes, string modelId, string motionId)
+        private MmdAnimPhysicsBackend(
+            byte[] pmxBytes,
+            string modelId,
+            string motionId,
+            uint[]? hostRigDrivenBones = null,
+            uint[]? hostRigGoalBones = null)
         {
             this.modelId = modelId ?? string.Empty;
             this.motionId = motionId ?? string.Empty;
 
             IntPtr createdModel = IntPtr.Zero;
             IntPtr createdInstance = IntPtr.Zero;
+            IntPtr createdHostRig = IntPtr.Zero;
             IntPtr createdWorld = IntPtr.Zero;
             try
             {
@@ -132,6 +140,22 @@ namespace Mmd.Physics
                 if (createdInstance == IntPtr.Zero)
                 {
                     throw CreateNativeException("InstanceCreateForModel", 4);
+                }
+
+                if (hostRigDrivenBones != null || hostRigGoalBones != null)
+                {
+                    hostRigDrivenBones ??= Array.Empty<uint>();
+                    hostRigGoalBones ??= Array.Empty<uint>();
+                    createdHostRig = MmdRuntimeFfiMethods.HostRigCreate(
+                        createdModel,
+                        hostRigDrivenBones,
+                        new IntPtr(hostRigDrivenBones.Length),
+                        hostRigGoalBones,
+                        new IntPtr(hostRigGoalBones.Length));
+                    if (createdHostRig == IntPtr.Zero)
+                    {
+                        throw CreateNativeException("HostRigCreate", 4);
+                    }
                 }
 
                 boneCount = MmdFfiMarshal.CheckedIntPtrToInt(
@@ -168,10 +192,13 @@ namespace Mmd.Physics
                 model = createdModel;
                 instance = createdInstance;
                 ownsRuntimeHandles = true;
+                hostRig = createdHostRig;
+                ownsHostRig = createdHostRig != IntPtr.Zero;
                 world = createdWorld;
                 rigidbodyStates = Array.Empty<float>();
                 createdModel = IntPtr.Zero;
                 createdInstance = IntPtr.Zero;
+                createdHostRig = IntPtr.Zero;
                 createdWorld = IntPtr.Zero;
             }
             finally
@@ -184,6 +211,11 @@ namespace Mmd.Physics
                 if (createdInstance != IntPtr.Zero)
                 {
                     MmdRuntimeFfiMethods.InstanceFree(createdInstance);
+                }
+
+                if (createdHostRig != IntPtr.Zero)
+                {
+                    MmdRuntimeFfiMethods.HostRigFree(createdHostRig);
                 }
 
                 if (createdModel != IntPtr.Zero)
@@ -204,6 +236,8 @@ namespace Mmd.Physics
             model = playbackSession.GetNativeModelHandle();
             instance = playbackSession.GetNativeInstanceHandle();
             ownsRuntimeHandles = false;
+            hostRig = IntPtr.Zero;
+            ownsHostRig = false;
             boneCount = playbackSession.BoneCount;
             worldMatrixFloatCount = playbackSession.WorldMatrixFloatCount;
             morphCount = playbackSession.MorphWeightCount;
@@ -399,6 +433,70 @@ namespace Mmd.Physics
                 reason = ex.Message;
             }
             catch (InvalidOperationException ex)
+            {
+                reason = ex.Message;
+            }
+
+            backend?.Dispose();
+            backend = null;
+            return false;
+        }
+
+        internal static bool TryCreateWithHostRig(
+            byte[]? pmxBytes,
+            uint[]? drivenBones,
+            uint[]? goalBones,
+            string modelId,
+            string motionId,
+            out MmdAnimPhysicsBackend? backend,
+            out string reason)
+        {
+            backend = null;
+            reason = string.Empty;
+            if (pmxBytes == null || pmxBytes.Length == 0)
+            {
+                reason = "Model source bytes are unavailable.";
+                return false;
+            }
+
+            if (drivenBones == null || goalBones == null)
+            {
+                reason = "Native HostRig driven and goal bone arrays are required.";
+                return false;
+            }
+
+            try
+            {
+                MmdRuntimeFfiMethods.ValidateHostRigPhysicsCapability();
+                backend = new MmdAnimPhysicsBackend(
+                    pmxBytes,
+                    modelId,
+                    motionId,
+                    drivenBones,
+                    goalBones);
+                return true;
+            }
+            catch (DllNotFoundException ex)
+            {
+                reason = ex.Message;
+            }
+            catch (EntryPointNotFoundException ex)
+            {
+                reason = ex.Message;
+            }
+            catch (BadImageFormatException ex)
+            {
+                reason = ex.Message;
+            }
+            catch (InvalidOperationException ex)
+            {
+                reason = ex.Message;
+            }
+            catch (ArgumentException ex)
+            {
+                reason = ex.Message;
+            }
+            catch (MmdRuntimeUnsupportedException ex)
             {
                 reason = ex.Message;
             }
@@ -834,19 +932,35 @@ namespace Mmd.Physics
                 };
                 pinEnd = Stopwatch.GetTimestamp();
                 nativeStart = pinEnd;
-                int status = MmdRuntimeFfiMethods.EvaluateHostFrame(
-                    instance,
-                    world,
-                    ref pose,
-                    seed || !seededSinceReset
-                        ? MmdRuntimeFfiMethods.PhysicsFrameActionSeed
-                        : MmdRuntimeFfiMethods.PhysicsFrameActionStep,
-                    deltaTime,
-                    ikTolerance: MmdRuntimeFfiMethods.DefaultIkTolerance,
-                    ikMaxIterationsCap: ikMaxIterationsCap,
-                    out report);
+                uint action = seed || !seededSinceReset
+                    ? MmdRuntimeFfiMethods.PhysicsFrameActionSeed
+                    : MmdRuntimeFfiMethods.PhysicsFrameActionStep;
+                int status = hostRig != IntPtr.Zero
+                    ? MmdRuntimeFfiMethods.EvaluateHostRigFrame(
+                        instance,
+                        world,
+                        hostRig,
+                        ref pose,
+                        action,
+                        deltaTime,
+                        ikTolerance: MmdRuntimeFfiMethods.DefaultIkTolerance,
+                        ikMaxIterationsCap: ikMaxIterationsCap,
+                        out report)
+                    : MmdRuntimeFfiMethods.EvaluateHostFrame(
+                        instance,
+                        world,
+                        ref pose,
+                        action,
+                        deltaTime,
+                        ikTolerance: MmdRuntimeFfiMethods.DefaultIkTolerance,
+                        ikMaxIterationsCap: ikMaxIterationsCap,
+                        out report);
                 nativeEnd = Stopwatch.GetTimestamp();
-                ThrowIfFailed(status, "EvaluateHostFrame", modelId, motionId);
+                ThrowIfFailed(
+                    status,
+                    hostRig != IntPtr.Zero ? "EvaluateHostRigFrame" : "EvaluateHostFrame",
+                    modelId,
+                    motionId);
                 rigidbodyCopyStart = nativeEnd;
                 CopyRigidbodyStates();
                 rigidbodyCopyEnd = Stopwatch.GetTimestamp();
@@ -1068,6 +1182,12 @@ namespace Mmd.Physics
             }
 
             disposed = true;
+            if (ownsHostRig && hostRig != IntPtr.Zero)
+            {
+                MmdRuntimeFfiMethods.HostRigFree(hostRig);
+                hostRig = IntPtr.Zero;
+            }
+
             if (world != IntPtr.Zero)
             {
                 MmdRuntimeFfiMethods.PhysicsWorldFree(world);
