@@ -1395,6 +1395,10 @@ namespace Mmd.Tests
 
                 director.time = 0.9;
                 director.Evaluate();
+                FieldInfo timelineClock = typeof(MmdUnityPlaybackController).GetField(
+                    "lastHumanoidTimelineSourceTime", BindingFlags.Instance | BindingFlags.NonPublic)!;
+                Assert.That((double)timelineClock.GetValue(controller), Is.EqualTo(director.time).Within(1e-7),
+                    "Humanoid physics must receive the Director clock even when the track mixer time stays zero");
                 yield return null;
                 Vector3 firstPosition = root.transform.position;
                 Quaternion firstRotation = root.transform.rotation;
@@ -1410,6 +1414,22 @@ namespace Mmd.Tests
                     "re-evaluating one Timeline time must not accumulate root translation");
                 Assert.That(Quaternion.Angle(root.transform.rotation, firstRotation), Is.LessThan(0.1f),
                     "re-evaluating one Timeline time must not accumulate root rotation");
+
+                director.Stop();
+                humanoidClip.start = 0.05;
+                MmdHumanoidAnimationTrack secondTrack =
+                    timelineAsset.CreateTrack<MmdHumanoidAnimationTrack>(null, "Second Humanoid");
+                TimelineClip secondClip = secondTrack.CreateClip<MmdHumanoidAnimationClip>();
+                ((MmdHumanoidAnimationClip)secondClip.asset).clip = muscleClip;
+                secondClip.duration = 1.0;
+                director.SetGenericBinding(secondTrack, controller);
+                director.timeUpdateMode = DirectorUpdateMode.GameTime;
+                director.time = 0.0;
+                director.Play();
+                yield return new WaitForSeconds(0.1f);
+                Assert.That(director.time, Is.GreaterThan(0.0), "the Director must be playing continuously");
+                Assert.That((double)timelineClock.GetValue(controller), Is.EqualTo(director.time).Within(1e-7),
+                    "continuous Timeline playback must advance the Humanoid physics clock too");
 
                 director.Stop();
                 yield return null;
