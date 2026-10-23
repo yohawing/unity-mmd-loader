@@ -807,6 +807,18 @@ namespace Mmd.Native
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_physics_world_copy_rigidbody_states", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int PhysicsWorldCopyRigidbodyStates(IntPtr world, [Out] float[] outTransformsF32, IntPtr outTransformsF32Len);
 
+        [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_reset_ik_history", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int InstanceResetIkHistory(IntPtr instance);
+
+        internal static void ResetIkHistory(IntPtr instance)
+        {
+            int status = InstanceResetIkHistory(instance);
+            if (status != StatusOk)
+                throw new InvalidOperationException(
+                    $"mmd-runtime IK history reset failed with status {status}: " +
+                    MmdRuntimeFfiMarshal.LastErrorMessage());
+        }
+
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_evaluate_clip_frame", CallingConvention = CallingConvention.Cdecl)]
         internal static extern byte InstanceEvaluateClipFrame(IntPtr instance, IntPtr clip, float frame);
 
@@ -1260,6 +1272,8 @@ namespace Mmd.Native
                 throw new ObjectDisposedException(nameof(MmdRuntimeFfiPlaybackSession));
             }
 
+            // Physics-off samples must remain independent of evaluation order.
+            MmdRuntimeFfiMethods.ResetIkHistory(instance);
             byte evaluated = ikMaxIterationsCap == 0
                 ? MmdRuntimeFfiMethods.InstanceEvaluateClipFrame(instance, clip, frame)
                 : MmdRuntimeFfiMethods.InstanceEvaluateClipFrameWithIkOptions(

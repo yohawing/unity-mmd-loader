@@ -853,6 +853,7 @@ namespace Mmd.Physics
         public void Reset()
         {
             ThrowIfDisposed();
+            MmdRuntimeFfiMethods.ResetIkHistory(instance);
             int status = MmdRuntimeFfiMethods.PhysicsWorldReset(world, instance, out _);
             ThrowIfFailed(status, "PhysicsWorldReset", modelId, motionId);
             CopyRigidbodyStates();
@@ -935,6 +936,8 @@ namespace Mmd.Physics
                 uint action = seed || !seededSinceReset
                     ? MmdRuntimeFfiMethods.PhysicsFrameActionSeed
                     : MmdRuntimeFfiMethods.PhysicsFrameActionStep;
+                if (action == MmdRuntimeFfiMethods.PhysicsFrameActionSeed)
+                    MmdRuntimeFfiMethods.ResetIkHistory(instance);
                 int status = hostRig != IntPtr.Zero
                     ? MmdRuntimeFfiMethods.EvaluateHostRigFrame(
                         instance,
@@ -1057,6 +1060,7 @@ namespace Mmd.Physics
             MmdRuntimeFfiMethods.PhysicsWorldStepReport report;
             if (seed || !seededSinceReset)
             {
+                MmdRuntimeFfiMethods.ResetIkHistory(instance);
                 // The existing bake ABI has no IK-options variant. Keep seed behavior
                 // unchanged; the configured before-phase cap applies from the first forward step.
                 if (seededSinceReset)
