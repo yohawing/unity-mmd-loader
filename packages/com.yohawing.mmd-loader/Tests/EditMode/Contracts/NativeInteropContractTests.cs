@@ -864,13 +864,14 @@ namespace Mmd.Tests
                 Is.EqualTo(0.001f).Within(1.0e-7f));
         }
 
-        [Test]
-        public void RuntimeFfiClipFrameBatchMatchesSequentialEvaluation()
+        [TestCase("ik_append_history.pmx")]
+        [TestCase("test_1bone_cube.pmx")]
+        public void RuntimeFfiClipFrameBatchMatchesSequentialEvaluation(string modelFile)
         {
 #if !UNITY_EDITOR_WIN
             Assert.Ignore("mmd-runtime batch playback is only distributed for the Windows Editor.");
 #endif
-            byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube.pmx");
+            byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes(modelFile);
             byte[] vmdBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube_motion.vmd");
             using var session = MmdRuntimeFfiPlaybackSession.Create(pmxBytes, vmdBytes);
             const int frameCount = 3;
@@ -882,7 +883,7 @@ namespace Mmd.Tests
             var sequentialWorld = new float[session.WorldMatrixFloatCount];
             var sequentialMorphs = new float[session.MorphWeightCount];
             var sequentialIk = new byte[session.IkEnabledCount];
-            for (int frame = 0; frame < frameCount; frame++)
+            foreach (int frame in new[] { 0, 1, 2, 2, 0, 1 })
             {
                 session.EvaluateAndCopy(frame, sequentialWorld, sequentialMorphs, sequentialIk);
                 CollectionAssert.AreEqual(

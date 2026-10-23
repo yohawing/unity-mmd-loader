@@ -183,6 +183,7 @@ namespace Mmd.Native
                     ikCount = new IntPtr(IkCount)
                 };
 
+                MmdRuntimeFfiMethods.ResetIkHistory(instance);
                 int status = MmdRuntimeFfiMethods.InstanceEvaluateHostRigPose(
                     instance,
                     rig,

@@ -232,6 +232,28 @@ namespace Mmd.Tests.Contracts
                 "the legacy incoming Append result must differ from the protected FK target");
         }
 
+        [Test]
+        public void AppendDependentIkHostSamplesRemainIndependent()
+        {
+#if !UNITY_EDITOR_WIN
+            Assert.Ignore("The distributed mmd-runtime host-pose gate is Windows Editor only.");
+#endif
+            using var session = MmdRuntimeFfiHostPoseSession.CreateWithRig(
+                MmdTestFixtures.ReadFixtureAssetBytes("ik_append_history.pmx"),
+                Array.Empty<uint>(), new uint[] { 3, 7 });
+            var positions = new float[session.BoneCount * 3];
+            var rotations = new float[session.BoneCount * 4];
+            var scales = new float[session.BoneCount * 3];
+            var morphs = new float[session.MorphCount];
+            var ik = Enumerable.Repeat((byte)1, session.IkCount).ToArray();
+            InitializeIdentityPose(session, rotations, scales);
+            var first = new float[session.WorldMatrixFloatCount];
+            var repeated = new float[session.WorldMatrixFloatCount];
+            session.EvaluateAndCopy(positions, rotations, scales, morphs, ik, first);
+            session.EvaluateAndCopy(positions, rotations, scales, morphs, ik, repeated);
+            CollectionAssert.AreEqual(first, repeated);
+        }
+
         private static MmdRuntimeFfiHostPoseSession CreateSession()
         {
             return MmdRuntimeFfiHostPoseSession.CreateWithRig(
