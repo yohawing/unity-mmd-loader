@@ -1255,6 +1255,17 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator HumanoidAnimationTrackAppliesStableRootPoseWithoutHeightCollapse()
         {
+            return VerifyHumanoidTimelineRootMotion(withVerticalOffsetCurve: true);
+        }
+
+        [UnityTest]
+        public IEnumerator HumanoidAnimationTrackPreservesVerticalMotionWithoutCustomCurve()
+        {
+            return VerifyHumanoidTimelineRootMotion(withVerticalOffsetCurve: false);
+        }
+
+        private IEnumerator VerifyHumanoidTimelineRootMotion(bool withVerticalOffsetCurve)
+        {
             GameObject? root = null;
             Avatar? avatar = null;
             TimelineAsset? timelineAsset = null;
@@ -1330,11 +1341,14 @@ namespace Mmd.Tests
                     typeof(Animator),
                     "RootT.y",
                     AnimationCurve.Linear(0.0f, bodyHeight, 1.0f, bodyHeight + 0.25f));
-                muscleClip.SetCurve(
-                    string.Empty,
-                    typeof(MmdHumanoidRootMotionDriver),
-                    "clipRootVerticalOffset",
-                    AnimationCurve.Linear(0.0f, 0.0f, 1.0f, 0.25f / animator.humanScale));
+                if (withVerticalOffsetCurve)
+                {
+                    muscleClip.SetCurve(
+                        string.Empty,
+                        typeof(MmdHumanoidRootMotionDriver),
+                        "clipRootVerticalOffset",
+                        AnimationCurve.Linear(0.0f, 0.0f, 1.0f, 0.25f / animator.humanScale));
+                }
                 muscleClip.SetCurve(string.Empty, typeof(Animator), "RootT.z", AnimationCurve.Constant(0.0f, 1.0f, 0.0f));
                 Quaternion rootRotation = Quaternion.Euler(0.0f, 90.0f, 0.0f);
                 muscleClip.SetCurve(string.Empty, typeof(Animator), "RootQ.x", AnimationCurve.Linear(0.0f, 0.0f, 1.0f, rootRotation.x));

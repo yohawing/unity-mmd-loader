@@ -253,6 +253,7 @@ namespace Mmd.Timeline
             if (canActivate)
             {
                 Activate();
+                guardedAnimator.GetComponent<MmdHumanoidRootMotionDriver>()?.PrepareTimelineSample();
             }
         }
 
@@ -280,7 +281,7 @@ namespace Mmd.Timeline
             guardedAnimator.applyRootMotion = false;
             if (state.ReferenceCount == 1)
             {
-                guardedAnimator.GetComponent<MmdHumanoidRootMotionDriver>()?.BeginTimelineEvaluation(guardedDirector);
+                guardedAnimator.GetComponent<MmdHumanoidRootMotionDriver>()?.BeginTimelineEvaluation();
             }
         }
 
