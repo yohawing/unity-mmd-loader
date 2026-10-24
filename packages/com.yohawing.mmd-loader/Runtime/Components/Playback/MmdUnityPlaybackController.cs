@@ -511,6 +511,7 @@ namespace Mmd.UnityIntegration
 
         private void LateUpdate()
         {
+            ApplyPendingHumanoidTimelineSample();
             if (!HasHumanoidRetargetInputsForLateUpdate())
             {
                 return;
@@ -644,6 +645,7 @@ namespace Mmd.UnityIntegration
 
         private void OnDisable()
         {
+            ClearPendingHumanoidTimelineSample();
             MmdStandaloneWorkerScheduler.Unregister(this);
             ReleasePlaybackWorkerPool();
             DisposeHumanoidPhysicsBinding();

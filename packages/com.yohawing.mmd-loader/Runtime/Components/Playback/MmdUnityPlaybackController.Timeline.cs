@@ -78,12 +78,65 @@ namespace Mmd.UnityIntegration
                 return LastHumanoidRetargetResult;
             }
 
-            // RootT is already consumed by the custom Timeline root-motion driver. Copying the
-            // proxy Hips position into the native center during the same evaluation would apply
-            // that translation twice. Keep the legacy position-copy path when no driver is active.
-            bool copyLocalPositions =
-                !(GetComponent<MmdHumanoidRootMotionDriver>()?.IsTimelineEvaluationActive ?? false);
-            return ApplyHumanoidRetargetCore(copyLocalPositions);
+            // Root motion moves the shared model root. Hips.localPosition is the remaining
+            // body displacement relative to that root and must still reach the display rig.
+            return ApplyHumanoidRetargetCore(copyLocalPositions: true);
+        }
+
+        private (double time, bool playing, bool seek, double delta)? pendingHumanoidTimelineSample;
+        private double? pendingHumanoidTimelinePause;
+
+        internal void ScheduleHumanoidRetargetFromTimeline(
+            double sourceTime, bool timelinePlaying, bool seekOccurred, double timelineDeltaTime)
+        {
+            if (Application.isPlaying &&
+                (GetComponent<MmdHumanoidRootMotionDriver>()?.IsTimelineEvaluationActive ?? false))
+            {
+                // Script outputs run before Animator sampling. Consume this sample from
+                // LateUpdate after the current pose and shared root have been applied.
+                pendingHumanoidTimelinePause = null;
+                pendingHumanoidTimelineSample = (sourceTime, timelinePlaying, seekOccurred, timelineDeltaTime);
+                return;
+            }
+
+            ApplyHumanoidRetargetFromTimeline(sourceTime, timelinePlaying, seekOccurred, timelineDeltaTime);
+        }
+
+        internal void ScheduleHumanoidTimelinePause(double sourceTime)
+        {
+            if (Application.isPlaying &&
+                (GetComponent<MmdHumanoidRootMotionDriver>()?.IsTimelineEvaluationActive ?? false))
+            {
+                if (!pendingHumanoidTimelineSample.HasValue)
+                {
+                    pendingHumanoidTimelinePause = sourceTime;
+                }
+                return;
+            }
+
+            NotifyHumanoidTimelinePaused(sourceTime);
+        }
+
+        private void ApplyPendingHumanoidTimelineSample()
+        {
+            if (!pendingHumanoidTimelineSample.HasValue)
+            {
+                if (pendingHumanoidTimelinePause.HasValue)
+                {
+                    NotifyHumanoidTimelinePaused(pendingHumanoidTimelinePause.Value);
+                }
+                return;
+            }
+
+            var sample = pendingHumanoidTimelineSample.Value;
+            pendingHumanoidTimelineSample = null;
+            ApplyHumanoidRetargetFromTimeline(sample.time, sample.playing, sample.seek, sample.delta);
+        }
+
+        internal void ClearPendingHumanoidTimelineSample()
+        {
+            pendingHumanoidTimelineSample = null;
+            pendingHumanoidTimelinePause = null;
         }
 
         internal MmdHumanoidRetargeterResult ApplyHumanoidRetargetFromTimeline(
@@ -123,6 +176,7 @@ namespace Mmd.UnityIntegration
 
         internal void NotifyHumanoidTimelinePaused(double sourceTime)
         {
+            ClearPendingHumanoidTimelineSample();
             UpdateHumanoidTimelineClock(
                 sourceTime,
                 timelinePlaying: false,

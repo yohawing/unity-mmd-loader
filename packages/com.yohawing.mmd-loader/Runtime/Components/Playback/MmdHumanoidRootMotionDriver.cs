@@ -37,6 +37,7 @@ namespace Mmd.UnityIntegration
         internal void EndTimelineEvaluation()
         {
             timelineEvaluationActive = false;
+            GetComponent<MmdUnityPlaybackController>()?.ClearPendingHumanoidTimelineSample();
             hasAppliedRootPose = false;
             clipRootVerticalOffset = originalVerticalOffset;
         }

@@ -13,6 +13,8 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 
 ### Fixed
 
+- Preserved residual Humanoid Hips translation alongside Timeline root motion so the MMD display rig follows the animated body without sliding.
+
 - Preserved vertical root motion from ordinary Humanoid clips without the converted VMD vertical-offset curve.
 - Fixed frozen Humanoid Live physics during multi-track Timeline playback by using the owning Director's clock.
 - Kept Physics Off and Timeline samples independent of evaluation order by clearing retained native IK history before each sample. Live physics retains history during forward playback and clears it on reset or reseed.

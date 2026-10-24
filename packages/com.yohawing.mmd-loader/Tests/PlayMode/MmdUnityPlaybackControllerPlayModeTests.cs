@@ -1387,10 +1387,11 @@ namespace Mmd.Tests
                 proxyHips.localPosition = proxyHipsBindPosition + retargetPositionDelta;
                 MmdHumanoidRetargeterResult timelineRetargetResult =
                     controller.ApplyHumanoidRetargetFromTimeline();
-                Assert.That(timelineRetargetResult.CopiedTranslationCount, Is.EqualTo(0),
-                    "Timeline retarget must not copy proxy Hips translation while RootT is active");
-                Assert.That(nativeCenterObject.transform.localPosition, Is.EqualTo(nativeCenterBindPosition),
-                    "RootT and native-center translation must not be applied together");
+                Assert.That(timelineRetargetResult.CopiedTranslationCount, Is.EqualTo(1),
+                    "Timeline must retain local Hips displacement after root motion extraction");
+                Assert.That(Vector3.Distance(nativeCenterObject.transform.localPosition,
+                    nativeCenterBindPosition + retargetPositionDelta), Is.LessThan(1.0e-5f),
+                    "root motion does not replace the residual local Hips translation");
 
                 MmdHumanoidRetargeterResult manualRetargetResult = controller.ApplyHumanoidRetargetNow();
                 Assert.That(manualRetargetResult.CopiedTranslationCount, Is.EqualTo(1),
@@ -1408,12 +1409,22 @@ namespace Mmd.Tests
                     "the baked clip has no foot-goal curves; otherwise both feet collapse to one fallback goal");
 
                 director.time = 0.9;
+                controller.ScheduleHumanoidTimelinePause(director.time);
                 director.Evaluate();
+                controller.ScheduleHumanoidTimelinePause(director.time);
+                yield return null;
+                Assert.That((bool)typeof(MmdUnityPlaybackController).GetField(
+                    "lastHumanoidTimelinePlaying", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(controller),
+                    Is.True, "an inactive track before or after an active sample must not pause the shared controller");
                 FieldInfo timelineClock = typeof(MmdUnityPlaybackController).GetField(
                     "lastHumanoidTimelineSourceTime", BindingFlags.Instance | BindingFlags.NonPublic)!;
                 Assert.That((double)timelineClock.GetValue(controller), Is.EqualTo(director.time).Within(1e-7),
                     "Humanoid physics must receive the Director clock even when the track mixer time stays zero");
-                yield return null;
+                Vector3 expectedCenterPosition = nativeCenterBindPosition +
+                    proxyHips.localPosition - proxyHipsBindPosition;
+                Assert.That(Vector3.Distance(nativeCenterObject.transform.localPosition, expectedCenterPosition),
+                    Is.LessThan(1.0e-5f), $"residual mismatch: native={nativeCenterObject.transform.localPosition:F6} expected={expectedCenterPosition:F6} hips={proxyHips.localPosition:F6}");
+                Vector3 firstCenterPosition = nativeCenterObject.transform.position;
                 Vector3 firstPosition = root.transform.position;
                 Quaternion firstRotation = root.transform.rotation;
                 Assert.That(firstPosition.x, Is.GreaterThan(0.1f), "horizontal RootT must reach the PMX root");
@@ -1428,6 +1439,9 @@ namespace Mmd.Tests
                     "re-evaluating one Timeline time must not accumulate root translation");
                 Assert.That(Quaternion.Angle(root.transform.rotation, firstRotation), Is.LessThan(0.1f),
                     "re-evaluating one Timeline time must not accumulate root rotation");
+
+                Assert.That(Vector3.Distance(nativeCenterObject.transform.position, firstCenterPosition),
+                    Is.LessThan(0.001f), "re-evaluating a sample must not accumulate display-rig translation");
 
                 director.Stop();
                 humanoidClip.start = 0.05;

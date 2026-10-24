@@ -17,13 +17,13 @@ namespace Mmd.Timeline
 
             if (!HasActiveClipInput(playable))
             {
-                controller?.NotifyHumanoidTimelinePaused(GetTimelineTime(playable));
+                controller?.ScheduleHumanoidTimelinePause(GetTimelineTime(playable));
                 return;
             }
 
             if (controller != null)
             {
-                controller.ApplyHumanoidRetargetFromTimeline(
+                controller.ScheduleHumanoidRetargetFromTimeline(
                     GetTimelineTime(playable),
                     info.effectivePlayState == PlayState.Playing,
                     info.seekOccurred,
