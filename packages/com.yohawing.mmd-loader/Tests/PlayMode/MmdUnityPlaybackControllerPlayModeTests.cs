@@ -1264,7 +1264,13 @@ namespace Mmd.Tests
             return VerifyHumanoidTimelineRootMotion(withVerticalOffsetCurve: false);
         }
 
-        private IEnumerator VerifyHumanoidTimelineRootMotion(bool withVerticalOffsetCurve)
+        [UnityTest]
+        public IEnumerator HumanoidAnimationTrackAppliesOptInFootIk()
+        {
+            return VerifyHumanoidTimelineRootMotion(withVerticalOffsetCurve: false, applyFootIK: true);
+        }
+
+        private IEnumerator VerifyHumanoidTimelineRootMotion(bool withVerticalOffsetCurve, bool applyFootIK = false)
         {
             GameObject? root = null;
             Avatar? avatar = null;
@@ -1364,6 +1370,7 @@ namespace Mmd.Tests
                 humanoidClip.duration = 1.0;
                 var humanoidClipAsset = (MmdHumanoidAnimationClip)humanoidClip.asset;
                 humanoidClipAsset.clip = muscleClip;
+                humanoidClipAsset.applyFootIK = applyFootIK;
 
                 directorObject = new GameObject("humanoid-rootmotion-director");
                 PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
@@ -1378,6 +1385,23 @@ namespace Mmd.Tests
                 director.Play();
                 director.Evaluate();
                 yield return null;
+
+                int animationOutputs = 0;
+                for (int i = 0; i < director.playableGraph.GetOutputCount(); i++)
+                {
+                    Playable source = director.playableGraph.GetOutput(i).GetSourcePlayable();
+                    if (source.IsValid() && source.GetPlayableType() == typeof(AnimationClipPlayable))
+                    {
+                        var animationPlayable = (AnimationClipPlayable)source;
+                        if (animationPlayable.GetAnimationClip() == muscleClip)
+                        {
+                            animationOutputs++;
+                            Assert.That(animationPlayable.GetApplyFootIK(), Is.EqualTo(applyFootIK),
+                                "the clip's Foot IK choice must reach its animation output");
+                        }
+                    }
+                }
+                Assert.That(animationOutputs, Is.GreaterThan(0));
 
                 Assert.That(animator.applyRootMotion, Is.False,
                     "the custom Timeline output must suppress Unity's accumulating automatic root motion");
@@ -1404,9 +1428,12 @@ namespace Mmd.Tests
                 nativeCenterObject.transform.localPosition = nativeCenterBindPosition;
                 Transform leftFoot = animator.GetBoneTransform(HumanBodyBones.LeftFoot);
                 Transform rightFoot = animator.GetBoneTransform(HumanBodyBones.RightFoot);
-                Assert.That(Vector3.Distance(leftFoot.position, rightFoot.position), Is.GreaterThan(0.05f),
-                    "Timeline playback must disable AnimationClipPlayable's default Foot IK when " +
-                    "the baked clip has no foot-goal curves; otherwise both feet collapse to one fallback goal");
+                if (!applyFootIK)
+                {
+                    Assert.That(Vector3.Distance(leftFoot.position, rightFoot.position), Is.GreaterThan(0.05f),
+                        "Timeline playback must disable AnimationClipPlayable's default Foot IK when " +
+                        "the baked clip has no foot-goal curves; otherwise both feet collapse to one fallback goal");
+                }
 
                 director.time = 0.9;
                 controller.ScheduleHumanoidTimelinePause(director.time);

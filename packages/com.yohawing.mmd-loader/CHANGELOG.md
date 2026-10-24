@@ -8,6 +8,8 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 
 ### Changed
 
+- Added a per-clip Foot IK option for Humanoid Timeline playback in Play Mode; existing and converted VMD clips remain off by default.
+
 - Updated the bundled Windows runtime and native pin to `mmd-anim` v0.5.3 (`7c626636ef75dfeca4d32771d1eebccc15441615`), retaining ABI 3 and adopting improved MMD IK iteration, fixed-axis, append, and rotation behavior.
 - Consolidated native frame evaluation and material override descriptor updates.
 
