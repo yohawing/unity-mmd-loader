@@ -41,6 +41,137 @@ namespace Mmd.Tests
             Assert.That(scalePointOneInstance.BoneTransforms[0].localScale, Is.EqualTo(Vector3.one));
             Assert.That(scalePointOneInstance.BoneTransforms[1].localScale, Is.EqualTo(Vector3.one));
         }
+
+        [Test]
+        public void ApplyHostRigWorldMatricesProjectsParentLocalPoseBeforeAssigningTransforms()
+        {
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.bones[0].parentIndex = 1;
+            model.bones[0].origin = new[] { 0.0f, 1.0f, 0.0f };
+            model.bones[1].parentIndex = -1;
+            model.bones[1].origin = new[] { 0.0f, 0.0f, 0.0f };
+
+            using var scope = new MmdTestInstanceScope(
+                MmdUnityModelFactory.CreateSkinnedModel(model, sourcePath: null, importScale: 0.1f));
+            MmdUnityModelInstance instance = scope.Instance;
+            Transform rootBone = instance.BoneTransforms[1];
+            Transform childBone = instance.BoneTransforms[0];
+            Vector3 rootLocalPosition = rootBone.localPosition;
+            Quaternion rootLocalRotation = rootBone.localRotation;
+            Vector3 rootLocalScale = rootBone.localScale;
+            var container = new GameObject("Bones");
+            container.transform.SetParent(instance.Root.transform, worldPositionStays: false);
+            rootBone.SetParent(container.transform, worldPositionStays: false);
+            rootBone.localPosition = rootLocalPosition;
+            rootBone.localRotation = rootLocalRotation;
+            rootBone.localScale = rootLocalScale;
+
+            instance.Root.transform.localPosition = new Vector3(3.0f, -2.0f, 4.0f);
+            instance.Root.transform.localRotation = Quaternion.Euler(10.0f, 25.0f, -15.0f);
+            instance.Root.transform.localScale = new Vector3(1.4f, 0.8f, 1.2f);
+
+            Vector3 rootNativePosition = new Vector3(2.0f, 3.0f, -4.0f);
+            Quaternion rootNativeRotation = Quaternion.Euler(0.0f, 25.0f, 0.0f);
+            float rootNativeScale = 1.5f;
+            Vector3 childNativeLocalPosition = new Vector3(1.0f, 2.0f, 0.5f);
+            Quaternion childNativeLocalRotation = Quaternion.Euler(-15.0f, 10.0f, 20.0f);
+            float childNativeLocalScale = 0.75f;
+            Matrix4x4 rootNativeWorld = Matrix4x4.TRS(
+                rootNativePosition,
+                rootNativeRotation,
+                Vector3.one * rootNativeScale);
+            Matrix4x4 childNativeWorld = rootNativeWorld * Matrix4x4.TRS(
+                childNativeLocalPosition,
+                childNativeLocalRotation,
+                Vector3.one * childNativeLocalScale);
+            float[] worldMatrices = Concatenate(
+                ToColumnMajorMatrix(childNativeWorld),
+                ToColumnMajorMatrix(rootNativeWorld));
+            var boneTransformSet = new HashSet<Transform>();
+
+            MmdUnityWorldMatrixFrameApplier.ApplyHostRigColumnMajorWorldMatrices(
+                instance.Root.transform,
+                instance.BoneTransforms,
+                0.1f,
+                model.bones,
+                worldMatrices,
+                boneTransformSet);
+
+            Assert.That(Vector3.Distance(
+                rootBone.localPosition,
+                MmdCoordinateSpace.MmdToUnityPosition(rootNativePosition) * 0.1f), Is.LessThan(0.0001f));
+            Assert.That(Quaternion.Angle(
+                rootBone.localRotation,
+                MmdCoordinateSpace.MmdToUnityRotation(rootNativeRotation)), Is.LessThan(0.001f));
+            Assert.That(Vector3.Distance(
+                rootBone.localScale,
+                Vector3.one * rootNativeScale), Is.LessThan(0.0001f));
+            Assert.That(Vector3.Distance(
+                childBone.localPosition,
+                MmdCoordinateSpace.MmdToUnityPosition(childNativeLocalPosition) * 0.1f), Is.LessThan(0.0001f));
+            Assert.That(Quaternion.Angle(
+                childBone.localRotation,
+                MmdCoordinateSpace.MmdToUnityRotation(childNativeLocalRotation)), Is.LessThan(0.001f));
+            Assert.That(Vector3.Distance(
+                childBone.localScale,
+                Vector3.one * childNativeLocalScale), Is.LessThan(0.0001f));
+
+            Matrix4x4 expectedRootWorld = instance.Root.transform.localToWorldMatrix * Matrix4x4.TRS(
+                MmdCoordinateSpace.MmdToUnityPosition(rootNativePosition) * 0.1f,
+                MmdCoordinateSpace.MmdToUnityRotation(rootNativeRotation),
+                Vector3.one * rootNativeScale);
+            Matrix4x4 expectedChildWorld = expectedRootWorld * Matrix4x4.TRS(
+                MmdCoordinateSpace.MmdToUnityPosition(childNativeLocalPosition) * 0.1f,
+                MmdCoordinateSpace.MmdToUnityRotation(childNativeLocalRotation),
+                Vector3.one * childNativeLocalScale);
+            AssertMatrixApproximatelyEqual(rootBone.localToWorldMatrix, expectedRootWorld);
+            AssertMatrixApproximatelyEqual(childBone.localToWorldMatrix, expectedChildWorld);
+
+            Matrix4x4 firstRootWorld = rootBone.localToWorldMatrix;
+            Matrix4x4 firstChildWorld = childBone.localToWorldMatrix;
+            MmdUnityWorldMatrixFrameApplier.ApplyHostRigColumnMajorWorldMatrices(
+                instance.Root.transform,
+                instance.BoneTransforms,
+                0.1f,
+                model.bones,
+                worldMatrices,
+                boneTransformSet);
+            AssertMatrixApproximatelyEqual(rootBone.localToWorldMatrix, firstRootWorld);
+            AssertMatrixApproximatelyEqual(childBone.localToWorldMatrix, firstChildWorld);
+        }
+
+        [Test]
+        public void ApplyHostRigWorldMatricesRejectsMalformedHierarchyBeforeMutatingTransforms()
+        {
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateSkinnedModel(model));
+            MmdUnityModelInstance instance = scope.Instance;
+            Vector3[] initialPositions = instance.BoneTransforms.Select(bone => bone.localPosition).ToArray();
+            Quaternion[] initialRotations = instance.BoneTransforms.Select(bone => bone.localRotation).ToArray();
+            Vector3[] initialScales = instance.BoneTransforms.Select(bone => bone.localScale).ToArray();
+            model.bones[0].parentIndex = 1;
+
+            float[] worldMatrices = Concatenate(
+                CreateColumnMajorWorldMatrix(Vector3.zero, Quaternion.identity),
+                CreateColumnMajorWorldMatrix(Vector3.zero, Quaternion.identity));
+            var boneTransformSet = new HashSet<Transform>();
+            Assert.Throws<InvalidOperationException>(() =>
+                MmdUnityWorldMatrixFrameApplier.ApplyHostRigColumnMajorWorldMatrices(
+                    instance.Root.transform,
+                    instance.BoneTransforms,
+                    1.0f,
+                    model.bones,
+                    worldMatrices,
+                    boneTransformSet));
+
+            for (int index = 0; index < instance.BoneTransforms.Length; index++)
+            {
+                Assert.That(instance.BoneTransforms[index].localPosition, Is.EqualTo(initialPositions[index]));
+                Assert.That(instance.BoneTransforms[index].localRotation, Is.EqualTo(initialRotations[index]));
+                Assert.That(instance.BoneTransforms[index].localScale, Is.EqualTo(initialScales[index]));
+            }
+        }
+
         [Test]
         public void ApplyFrameRejectsBoneIndexWithoutUnityTransform()
         {
@@ -565,6 +696,31 @@ namespace Mmd.Tests
             Assert.That(reboundInstance.SkinnedMeshRenderer, Is.SameAs(movedRenderer));
             Assert.That(reboundInstance.PhysicsBodies, Has.Length.EqualTo(1));
             Assert.That(reboundInstance.PhysicsBodies[0].BodyIndex, Is.EqualTo(0));
+        }
+
+        private static float[] ToColumnMajorMatrix(Matrix4x4 matrix)
+        {
+            return new[]
+            {
+                matrix[0, 0], matrix[1, 0], matrix[2, 0], matrix[3, 0],
+                matrix[0, 1], matrix[1, 1], matrix[2, 1], matrix[3, 1],
+                matrix[0, 2], matrix[1, 2], matrix[2, 2], matrix[3, 2],
+                matrix[0, 3], matrix[1, 3], matrix[2, 3], matrix[3, 3]
+            };
+        }
+
+        private static void AssertMatrixApproximatelyEqual(Matrix4x4 actual, Matrix4x4 expected)
+        {
+            for (int row = 0; row < 4; row++)
+            {
+                for (int column = 0; column < 4; column++)
+                {
+                    Assert.That(
+                        actual[row, column],
+                        Is.EqualTo(expected[row, column]).Within(0.0002f),
+                        $"matrix[{row},{column}]");
+                }
+            }
         }
     }
 }

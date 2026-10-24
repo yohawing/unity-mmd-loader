@@ -469,7 +469,20 @@ namespace Mmd.UnityIntegration
 
             playbackFrame += deltaTime * frameRate;
             CurrentFrame = MmdPlaybackTime.ToFrame(playbackFrame / frameRate, frameRate);
-            ApplyCurrentFramePose();
+            if (binding != null && binding.PhysicsMode == MmdPhysicsMode.Off)
+            {
+                // Preserve subframe animation during playback. Explicit frame
+                // seeks and Live physics keep their discrete evaluation path.
+                ApplyPlaybackPose(() =>
+                {
+                    LastSnapshot = binding.ApplyTime(playbackFrame / frameRate, frameRate);
+                    return LastSnapshot;
+                });
+            }
+            else
+            {
+                ApplyCurrentFramePose();
+            }
         }
 
         private void Update()
@@ -498,6 +511,7 @@ namespace Mmd.UnityIntegration
 
         private void LateUpdate()
         {
+            ApplyPendingHumanoidTimelineSample();
             if (!HasHumanoidRetargetInputsForLateUpdate())
             {
                 return;
@@ -631,6 +645,7 @@ namespace Mmd.UnityIntegration
 
         private void OnDisable()
         {
+            ClearPendingHumanoidTimelineSample();
             MmdStandaloneWorkerScheduler.Unregister(this);
             ReleasePlaybackWorkerPool();
             DisposeHumanoidPhysicsBinding();

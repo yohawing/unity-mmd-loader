@@ -43,10 +43,12 @@ namespace Mmd.Editor.Timeline
         private static readonly GUIContent AnimationClipLabel = new("Animation Clip");
 
         private SerializedProperty? clipProperty;
+        private SerializedProperty? applyFootIKProperty;
 
         private void OnEnable()
         {
             clipProperty = serializedObject.FindProperty("clip");
+            applyFootIKProperty = serializedObject.FindProperty("applyFootIK");
         }
 
         public override void OnInspectorGUI()
@@ -70,9 +72,15 @@ namespace Mmd.Editor.Timeline
                 }
             }
 
+            EditorGUI.BeginChangeCheck();
+            if (applyFootIKProperty != null)
+            {
+                EditorGUILayout.PropertyField(applyFootIKProperty, new GUIContent("Foot IK", applyFootIKProperty.tooltip));
+            }
+            bool footIKChanged = EditorGUI.EndChangeCheck();
             serializedObject.ApplyModifiedProperties();
 
-            if (!clipChanged)
+            if (!clipChanged && !footIKChanged)
             {
                 return;
             }

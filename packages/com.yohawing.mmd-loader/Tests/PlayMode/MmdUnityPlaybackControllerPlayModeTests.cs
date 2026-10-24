@@ -1163,6 +1163,10 @@ namespace Mmd.Tests
                     yield return null;
                 }
 
+                Assert.That(controller.LastLivePhysicsDiagnostics, Is.Not.Null);
+                Assert.That(controller.LastLivePhysicsDiagnostics!.deltaTime, Is.GreaterThan(0.0f),
+                    "a forward Humanoid Timeline sample must advance Live physics");
+
                 // Re-evaluate at the same final time to settle the accepted 1-evaluation lag
                 // (ProcessFrame reads the proxy the animation output posed on the prior pass).
                 director.time = 5 / 30.0;
@@ -1190,7 +1194,8 @@ namespace Mmd.Tests
                 Assert.That(controller.IsConfigured, Is.False);
                 Assert.That(controller.LastLivePhysicsDiagnostics, Is.Not.Null,
                     "the single humanoid track ProcessFrame must step Live physics in Play Mode.");
-                Assert.That(controller.LastLivePhysicsDiagnostics!.deltaTime, Is.GreaterThan(0.0f));
+                Assert.That(controller.LastLivePhysicsDiagnostics!.deltaTime, Is.EqualTo(0.0f),
+                    "re-evaluating the same Timeline time must not advance source-time physics");
                 Assert.That(controller.LastSnapshot, Is.Null,
                     "model-only humanoid Timeline physics must not create a VMD playback snapshot.");
             }
@@ -1249,6 +1254,23 @@ namespace Mmd.Tests
         // absolute root pose, while the imported Animator setting is restored after playback.
         [UnityTest]
         public IEnumerator HumanoidAnimationTrackAppliesStableRootPoseWithoutHeightCollapse()
+        {
+            return VerifyHumanoidTimelineRootMotion(withVerticalOffsetCurve: true);
+        }
+
+        [UnityTest]
+        public IEnumerator HumanoidAnimationTrackPreservesVerticalMotionWithoutCustomCurve()
+        {
+            return VerifyHumanoidTimelineRootMotion(withVerticalOffsetCurve: false);
+        }
+
+        [UnityTest]
+        public IEnumerator HumanoidAnimationTrackAppliesOptInFootIk()
+        {
+            return VerifyHumanoidTimelineRootMotion(withVerticalOffsetCurve: false, applyFootIK: true);
+        }
+
+        private IEnumerator VerifyHumanoidTimelineRootMotion(bool withVerticalOffsetCurve, bool applyFootIK = false)
         {
             GameObject? root = null;
             Avatar? avatar = null;
@@ -1325,11 +1347,14 @@ namespace Mmd.Tests
                     typeof(Animator),
                     "RootT.y",
                     AnimationCurve.Linear(0.0f, bodyHeight, 1.0f, bodyHeight + 0.25f));
-                muscleClip.SetCurve(
-                    string.Empty,
-                    typeof(MmdHumanoidRootMotionDriver),
-                    "clipRootVerticalOffset",
-                    AnimationCurve.Linear(0.0f, 0.0f, 1.0f, 0.25f / animator.humanScale));
+                if (withVerticalOffsetCurve)
+                {
+                    muscleClip.SetCurve(
+                        string.Empty,
+                        typeof(MmdHumanoidRootMotionDriver),
+                        "clipRootVerticalOffset",
+                        AnimationCurve.Linear(0.0f, 0.0f, 1.0f, 0.25f / animator.humanScale));
+                }
                 muscleClip.SetCurve(string.Empty, typeof(Animator), "RootT.z", AnimationCurve.Constant(0.0f, 1.0f, 0.0f));
                 Quaternion rootRotation = Quaternion.Euler(0.0f, 90.0f, 0.0f);
                 muscleClip.SetCurve(string.Empty, typeof(Animator), "RootQ.x", AnimationCurve.Linear(0.0f, 0.0f, 1.0f, rootRotation.x));
@@ -1345,6 +1370,7 @@ namespace Mmd.Tests
                 humanoidClip.duration = 1.0;
                 var humanoidClipAsset = (MmdHumanoidAnimationClip)humanoidClip.asset;
                 humanoidClipAsset.clip = muscleClip;
+                humanoidClipAsset.applyFootIK = applyFootIK;
 
                 directorObject = new GameObject("humanoid-rootmotion-director");
                 PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
@@ -1360,6 +1386,23 @@ namespace Mmd.Tests
                 director.Evaluate();
                 yield return null;
 
+                int animationOutputs = 0;
+                for (int i = 0; i < director.playableGraph.GetOutputCount(); i++)
+                {
+                    Playable source = director.playableGraph.GetOutput(i).GetSourcePlayable();
+                    if (source.IsValid() && source.GetPlayableType() == typeof(AnimationClipPlayable))
+                    {
+                        var animationPlayable = (AnimationClipPlayable)source;
+                        if (animationPlayable.GetAnimationClip() == muscleClip)
+                        {
+                            animationOutputs++;
+                            Assert.That(animationPlayable.GetApplyFootIK(), Is.EqualTo(applyFootIK),
+                                "the clip's Foot IK choice must reach its animation output");
+                        }
+                    }
+                }
+                Assert.That(animationOutputs, Is.GreaterThan(0));
+
                 Assert.That(animator.applyRootMotion, Is.False,
                     "the custom Timeline output must suppress Unity's accumulating automatic root motion");
                 Assert.That(root.transform.position.y, Is.EqualTo(0.0f).Within(0.001f),
@@ -1368,10 +1411,11 @@ namespace Mmd.Tests
                 proxyHips.localPosition = proxyHipsBindPosition + retargetPositionDelta;
                 MmdHumanoidRetargeterResult timelineRetargetResult =
                     controller.ApplyHumanoidRetargetFromTimeline();
-                Assert.That(timelineRetargetResult.CopiedTranslationCount, Is.EqualTo(0),
-                    "Timeline retarget must not copy proxy Hips translation while RootT is active");
-                Assert.That(nativeCenterObject.transform.localPosition, Is.EqualTo(nativeCenterBindPosition),
-                    "RootT and native-center translation must not be applied together");
+                Assert.That(timelineRetargetResult.CopiedTranslationCount, Is.EqualTo(1),
+                    "Timeline must retain local Hips displacement after root motion extraction");
+                Assert.That(Vector3.Distance(nativeCenterObject.transform.localPosition,
+                    nativeCenterBindPosition + retargetPositionDelta), Is.LessThan(1.0e-5f),
+                    "root motion does not replace the residual local Hips translation");
 
                 MmdHumanoidRetargeterResult manualRetargetResult = controller.ApplyHumanoidRetargetNow();
                 Assert.That(manualRetargetResult.CopiedTranslationCount, Is.EqualTo(1),
@@ -1384,13 +1428,30 @@ namespace Mmd.Tests
                 nativeCenterObject.transform.localPosition = nativeCenterBindPosition;
                 Transform leftFoot = animator.GetBoneTransform(HumanBodyBones.LeftFoot);
                 Transform rightFoot = animator.GetBoneTransform(HumanBodyBones.RightFoot);
-                Assert.That(Vector3.Distance(leftFoot.position, rightFoot.position), Is.GreaterThan(0.05f),
-                    "Timeline playback must disable AnimationClipPlayable's default Foot IK when " +
-                    "the baked clip has no foot-goal curves; otherwise both feet collapse to one fallback goal");
+                if (!applyFootIK)
+                {
+                    Assert.That(Vector3.Distance(leftFoot.position, rightFoot.position), Is.GreaterThan(0.05f),
+                        "Timeline playback must disable AnimationClipPlayable's default Foot IK when " +
+                        "the baked clip has no foot-goal curves; otherwise both feet collapse to one fallback goal");
+                }
 
                 director.time = 0.9;
+                controller.ScheduleHumanoidTimelinePause(director.time);
                 director.Evaluate();
+                controller.ScheduleHumanoidTimelinePause(director.time);
                 yield return null;
+                Assert.That((bool)typeof(MmdUnityPlaybackController).GetField(
+                    "lastHumanoidTimelinePlaying", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(controller),
+                    Is.True, "an inactive track before or after an active sample must not pause the shared controller");
+                FieldInfo timelineClock = typeof(MmdUnityPlaybackController).GetField(
+                    "lastHumanoidTimelineSourceTime", BindingFlags.Instance | BindingFlags.NonPublic)!;
+                Assert.That((double)timelineClock.GetValue(controller), Is.EqualTo(director.time).Within(1e-7),
+                    "Humanoid physics must receive the Director clock even when the track mixer time stays zero");
+                Vector3 expectedCenterPosition = nativeCenterBindPosition +
+                    proxyHips.localPosition - proxyHipsBindPosition;
+                Assert.That(Vector3.Distance(nativeCenterObject.transform.localPosition, expectedCenterPosition),
+                    Is.LessThan(1.0e-5f), $"residual mismatch: native={nativeCenterObject.transform.localPosition:F6} expected={expectedCenterPosition:F6} hips={proxyHips.localPosition:F6}");
+                Vector3 firstCenterPosition = nativeCenterObject.transform.position;
                 Vector3 firstPosition = root.transform.position;
                 Quaternion firstRotation = root.transform.rotation;
                 Assert.That(firstPosition.x, Is.GreaterThan(0.1f), "horizontal RootT must reach the PMX root");
@@ -1405,6 +1466,25 @@ namespace Mmd.Tests
                     "re-evaluating one Timeline time must not accumulate root translation");
                 Assert.That(Quaternion.Angle(root.transform.rotation, firstRotation), Is.LessThan(0.1f),
                     "re-evaluating one Timeline time must not accumulate root rotation");
+
+                Assert.That(Vector3.Distance(nativeCenterObject.transform.position, firstCenterPosition),
+                    Is.LessThan(0.001f), "re-evaluating a sample must not accumulate display-rig translation");
+
+                director.Stop();
+                humanoidClip.start = 0.05;
+                MmdHumanoidAnimationTrack secondTrack =
+                    timelineAsset.CreateTrack<MmdHumanoidAnimationTrack>(null, "Second Humanoid");
+                TimelineClip secondClip = secondTrack.CreateClip<MmdHumanoidAnimationClip>();
+                ((MmdHumanoidAnimationClip)secondClip.asset).clip = muscleClip;
+                secondClip.duration = 1.0;
+                director.SetGenericBinding(secondTrack, controller);
+                director.timeUpdateMode = DirectorUpdateMode.GameTime;
+                director.time = 0.0;
+                director.Play();
+                yield return new WaitForSeconds(0.1f);
+                Assert.That(director.time, Is.GreaterThan(0.0), "the Director must be playing continuously");
+                Assert.That((double)timelineClock.GetValue(controller), Is.EqualTo(director.time).Within(1e-7),
+                    "continuous Timeline playback must advance the Humanoid physics clock too");
 
                 director.Stop();
                 yield return null;
@@ -1547,6 +1627,7 @@ namespace Mmd.Tests
             Avatar? avatar = null;
             PlayableGraph graph = default;
             GameObject? managedAppendProbe = null;
+            GameObject? appendSourceProxyObject = null;
             try
             {
                 byte[] pmxBytes = File.ReadAllBytes(pmxPath);
@@ -1599,6 +1680,33 @@ namespace Mmd.Tests
                 Quaternion appendTargetBind = instance.BindLocalRotations[appendTargetIndex];
                 Quaternion ikLinkBindA = instance.BindLocalRotations[ikLinkIndexA];
                 Quaternion ikLinkBindB = instance.BindLocalRotations[ikLinkIndexB];
+
+                // The append source is a native-only helper in this fixture. Give it an explicit
+                // proxy input so the Off HostRig path is driven by the current pose rather than
+                // the stale display transform seeded below. Reuse an authored match if one exists.
+                MmdHumanoidRetargetBinding? existingAppendSourceEntry = entries.Find(
+                    entry => entry.MmdBoneIndex == appendSourceIndex);
+                MmdHumanoidRetargetBinding appendSourceEntry;
+                if (existingAppendSourceEntry == null)
+                {
+                    appendSourceProxyObject = new GameObject("playmode-native-append-source-proxy");
+                    appendSourceProxyObject.transform.SetParent(
+                        proxyRig.ProxyRoot.transform,
+                        worldPositionStays: false);
+                    appendSourceEntry = new MmdHumanoidRetargetBinding(
+                        HumanBodyBones.LastBone,
+                        appendSourceIndex,
+                        appendSourceProxyObject.transform,
+                        instance.BoneTransforms[appendSourceIndex],
+                        appendSourceProxyObject.transform.localRotation,
+                        instance.BindLocalRotations[appendSourceIndex]);
+                    entries.Add(appendSourceEntry);
+                }
+                else
+                {
+                    appendSourceEntry = existingAppendSourceEntry;
+                }
+
                 instance.BoneTransforms[appendSourceIndex].localRotation = Quaternion.Euler(18.0f, 24.0f, 30.0f);
                 instance.BoneTransforms[ikHandleIndex].localPosition =
                     instance.BindLocalPositions[ikHandleIndex] + new Vector3(0.2f, 0.0f, 0.0f);
@@ -1635,6 +1743,7 @@ namespace Mmd.Tests
                     entry.ProxyTransform!.localRotation = entry.ProxyBindLocalRotation;
                 }
                 mappedEntry.ProxyTransform!.localRotation = Quaternion.Euler(8.0f, 13.0f, 21.0f);
+                appendSourceEntry.ProxyTransform!.localRotation = Quaternion.Euler(18.0f, 24.0f, 30.0f);
 
                 yield return null;
 
@@ -1765,11 +1874,6 @@ namespace Mmd.Tests
                     translationTargetMmdBoneIndex: ikHandleIndex,
                     proxyBindLocalPosition: ikProxy.localPosition,
                     translationTargetBindLocalPosition: instance.BindLocalPositions[ikHandleIndex]));
-                entries.Add(new MmdHumanoidRetargetBinding(
-                    HumanBodyBones.LastBone,
-                    -1,
-                    proxyTransform: null,
-                    nativeTransform: null));
                 MmdHumanoidRetargetBinding mappedEntry = entries.Find(
                     entry => entry.MmdBoneIndex == appendSourceIndex) ?? entries[0];
 
@@ -1806,8 +1910,8 @@ namespace Mmd.Tests
 
                 Assert.That(controller.LastHumanoidRetargetGate, Is.EqualTo(MmdHumanoidRetargetGate.Ready));
                 Assert.That(controller.LastHumanoidRetargetResult!.CopiedBoneCount, Is.GreaterThan(0));
-                Assert.That(controller.LastHumanoidRetargetResult.SkippedBoneCount, Is.GreaterThan(0),
-                    "partial Humanoid retarget must continue through the native Live physics path");
+                Assert.That(controller.LastHumanoidRetargetResult.AllSucceeded, Is.True,
+                    "the native Live HostRig path must only run with a complete validated pose");
                 Assert.That(controller.LastLivePhysicsDiagnostics, Is.Not.Null);
                 Assert.That(controller.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(0));
                 Assert.That(Quaternion.Angle(managedAppendProbe.transform.localRotation, managedAppendBind), Is.LessThan(0.001f),
@@ -1842,6 +1946,65 @@ namespace Mmd.Tests
                     Is.LessThan(0.001f), "changed same-frame Humanoid input must replace the stale cached native pose");
                 Assert.That(controller.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(sameFrameNativeStep),
                     "changed same-frame input must not advance the native physics frame");
+
+                // Poison both a displayed native source and an append helper, then provide a
+                // fresh proxy pose. The Live HostRig input must come from the current proxy/rest
+                // arrays rather than recapturing either displayed transform.
+                instance.BoneTransforms[appendSourceIndex].localRotation = Quaternion.Euler(-47.0f, 61.0f, -23.0f);
+                instance.BoneTransforms[appendTargetIndex].localRotation = Quaternion.Euler(73.0f, -29.0f, 41.0f);
+                Quaternion freshMappedInput = Quaternion.Euler(-14.0f, 26.0f, 38.0f);
+                Quaternion expectedFreshNativeRotation =
+                    mappedEntry.NativeBindLocalRotation *
+                    Quaternion.Inverse(mappedEntry.ProxyBindLocalRotation) *
+                    freshMappedInput;
+                mappedEntry.ProxyTransform!.localRotation = freshMappedInput;
+                controller.ApplyHumanoidRetargetNow();
+                Assert.That(Quaternion.Angle(mappedEntry.NativeTransform!.localRotation, expectedFreshNativeRotation),
+                    Is.LessThan(0.001f), "fresh same-frame input must ignore poisoned displayed source/helper transforms");
+
+                // Exercise the Humanoid Timeline clock directly. A paused manual Evaluate whose
+                // source time advances must still step forward; reverse and stop must reseed.
+                controller.ApplyHumanoidRetargetFromTimeline(
+                    sourceTime: 0.0,
+                    timelinePlaying: true,
+                    seekOccurred: true,
+                    timelineDeltaTime: 0.0);
+                controller.NotifyHumanoidTimelinePaused(0.0);
+                controller.ApplyHumanoidRetargetFromTimeline(
+                    sourceTime: 0.0,
+                    timelinePlaying: false,
+                    seekOccurred: true,
+                    timelineDeltaTime: 0.0);
+                Assert.That(controller.LastLivePhysicsDiagnostics!.deltaTime, Is.EqualTo(0.0f),
+                    "a stopped Timeline must seed Live physics with zero deltaTime");
+                yield return null;
+
+                controller.ApplyHumanoidRetargetFromTimeline(
+                    sourceTime: 0.25,
+                    timelinePlaying: false,
+                    seekOccurred: true,
+                    timelineDeltaTime: 0.25);
+                Assert.That(controller.LastLivePhysicsDiagnostics, Is.Not.Null);
+                Assert.That(controller.LastLivePhysicsDiagnostics!.deltaTime, Is.EqualTo(0.25f).Within(0.0001f),
+                    "a forward manual Timeline sample must use source time delta even when paused is reported");
+
+                controller.NotifyHumanoidTimelinePaused(0.25);
+                yield return null;
+                controller.ApplyHumanoidRetargetFromTimeline(
+                    sourceTime: 0.5,
+                    timelinePlaying: false,
+                    seekOccurred: false,
+                    timelineDeltaTime: 0.25);
+                Assert.That(controller.LastLivePhysicsDiagnostics!.deltaTime, Is.EqualTo(0.0f),
+                    "stopping a manual forward Timeline must clear solver state before resume");
+
+                controller.ApplyHumanoidRetargetFromTimeline(
+                    sourceTime: 0.0,
+                    timelinePlaying: false,
+                    seekOccurred: true,
+                    timelineDeltaTime: 0.0);
+                Assert.That(controller.LastLivePhysicsDiagnostics!.deltaTime, Is.EqualTo(0.0f),
+                    "a same-frame backward Timeline seek must reseed Live physics");
                 LogAssert.NoUnexpectedReceived();
             }
             finally

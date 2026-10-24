@@ -15,6 +15,9 @@ namespace Mmd.Timeline
     {
         public AnimationClip? clip;
 
+        [Tooltip("Apply Unity Foot IK in Play Mode for Humanoid clips with foot IK goals. Leave off for converted VMD clips without foot goals.")]
+        public bool applyFootIK;
+
         public ClipCaps clipCaps => ClipCaps.None;
 
         public override Playable CreatePlayable(PlayableGraph graph, GameObject owner)
@@ -40,10 +43,9 @@ namespace Mmd.Timeline
             }
 
             AnimationClipPlayable clipPlayable = AnimationClipPlayable.Create(graph, clip);
-            // The evaluated MMD IK result is already baked into the Humanoid muscles.
-            // AnimationClipPlayable defaults this to true and would solve the legs again
-            // against fallback goals, collapsing or substantially changing the source pose.
-            clipPlayable.SetApplyFootIK(false);
+            // Converted VMD clips have baked leg poses but no foot goals. Keep their
+            // default unchanged; ordinary Humanoid clips can opt into Unity's Foot IK.
+            clipPlayable.SetApplyFootIK(applyFootIK);
             ScriptPlayable<MmdHumanoidAnimationRootMotionGuardBehaviour> guardPlayable =
                 ScriptPlayable<MmdHumanoidAnimationRootMotionGuardBehaviour>.Create(graph, 1);
             guardPlayable.GetBehaviour().Initialize(animator, director);
@@ -253,6 +255,7 @@ namespace Mmd.Timeline
             if (canActivate)
             {
                 Activate();
+                guardedAnimator.GetComponent<MmdHumanoidRootMotionDriver>()?.PrepareTimelineSample();
             }
         }
 
@@ -280,7 +283,7 @@ namespace Mmd.Timeline
             guardedAnimator.applyRootMotion = false;
             if (state.ReferenceCount == 1)
             {
-                guardedAnimator.GetComponent<MmdHumanoidRootMotionDriver>()?.BeginTimelineEvaluation(guardedDirector);
+                guardedAnimator.GetComponent<MmdHumanoidRootMotionDriver>()?.BeginTimelineEvaluation();
             }
         }
 
