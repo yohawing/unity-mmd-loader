@@ -4,12 +4,6 @@ namespace Mmd.Rendering
 {
     internal static class MmdMaterialPropertyNames
     {
-        public const string MmdLightDirection = "_MmdLightDirection";
-        public const string MmdLightColor = "_MmdLightColor";
-        public const string MmdSelfShadowReceive = "_MmdSelfShadowReceive";
-        public const string MmdSelfShadowMap = "_MmdSelfShadowMap";
-        public const string MmdSelfShadowWorldToShadow = "_MmdSelfShadowWorldToShadow";
-        public const string MmdSelfShadowParams = "_MmdSelfShadowParams";
         public const string MmdNormalMap = "_MmdNormalMap";
         public const string MmdNormalMapBound = "_MmdNormalMapBound";
         public const string MmdMetallicMap = "_MmdMetallicMap";

@@ -21,24 +21,6 @@ namespace Mmd.Rendering
         public bool linearFallbackToBoneWeights;
     }
 
-    [Serializable]
-    internal sealed class MmdSkinningModeInventoryDescriptor
-    {
-        public int vertexIndex;
-        public string skinningMode = string.Empty;
-        public string normalizedFamily = string.Empty;
-        public int boneInfluenceCount;
-        public int expectedBoneInfluenceCount;
-        public bool boneInfluenceCountMatchesMode;
-        public string supportStatus = string.Empty;
-        public string supportReason = string.Empty;
-        public bool handedOffToSkinningDescriptor;
-        public bool exactRuntimeSkinning;
-        public bool linearFallbackToBoneWeights;
-        public bool hasSdefParameters;
-        public string sdefParameterStatus = string.Empty;
-    }
-
     internal static class MmdSkinningDescriptorBuilder
     {
         private static readonly HashSet<string> KnownSkinningModes = new(StringComparer.Ordinal)
@@ -88,41 +70,6 @@ namespace Mmd.Rendering
             return descriptors;
         }
 
-        public static IReadOnlyList<MmdSkinningModeInventoryDescriptor> BuildModeInventory(MmdModelDefinition model)
-        {
-            if (model == null)
-            {
-                throw new ArgumentNullException(nameof(model));
-            }
-
-            MmdModelValidator.ThrowIfInvalid(model);
-            var inventory = new List<MmdSkinningModeInventoryDescriptor>(model.vertices.Count);
-            foreach (MmdVertexDefinition vertex in model.vertices.OrderBy(vertex => vertex.index))
-            {
-                string skinningMode = NormalizeSkinningMode(vertex.skinningMode);
-                int boneInfluenceCount = vertex.boneIndices.Length;
-                int expectedBoneInfluenceCount = GetExpectedBoneInfluenceCount(skinningMode);
-                inventory.Add(new MmdSkinningModeInventoryDescriptor
-                {
-                    vertexIndex = vertex.index,
-                    skinningMode = skinningMode,
-                    normalizedFamily = GetNormalizedFamily(skinningMode),
-                    boneInfluenceCount = boneInfluenceCount,
-                    expectedBoneInfluenceCount = expectedBoneInfluenceCount,
-                    boneInfluenceCountMatchesMode = expectedBoneInfluenceCount >= 0 && boneInfluenceCount == expectedBoneInfluenceCount,
-                    supportStatus = GetSupportStatus(skinningMode),
-                    supportReason = GetSupportReason(skinningMode),
-                    handedOffToSkinningDescriptor = IsCurrentRuntimeSupported(skinningMode) || IsLinearFallback(skinningMode),
-                    exactRuntimeSkinning = IsCurrentRuntimeSupported(skinningMode),
-                    linearFallbackToBoneWeights = IsLinearFallback(skinningMode),
-                    hasSdefParameters = vertex.hasSdefParameters,
-                    sdefParameterStatus = GetSdefParameterStatus(skinningMode, vertex.hasSdefParameters)
-                });
-            }
-
-            return inventory;
-        }
-
         private static string NormalizeSkinningMode(string value)
         {
             if (string.IsNullOrWhiteSpace(value))
@@ -132,19 +79,6 @@ namespace Mmd.Rendering
 
             string trimmed = value.Trim().ToLowerInvariant();
             return KnownSkinningModes.Contains(trimmed) ? trimmed : "unknown";
-        }
-
-        private static int GetExpectedBoneInfluenceCount(string skinningMode)
-        {
-            return skinningMode switch
-            {
-                "bdef1" => 1,
-                "bdef2" => 2,
-                "bdef4" => 4,
-                "sdef" => 2,
-                "qdef" => 4,
-                _ => -1
-            };
         }
 
         private static string GetNormalizedFamily(string skinningMode)
@@ -198,16 +132,6 @@ namespace Mmd.Rendering
         private static bool IsLinearFallback(string skinningMode)
         {
             return skinningMode is "sdef" or "qdef";
-        }
-
-        private static string GetSdefParameterStatus(string skinningMode, bool hasSdefParameters)
-        {
-            if (skinningMode == "sdef")
-            {
-                return hasSdefParameters ? "available" : "missing";
-            }
-
-            return hasSdefParameters ? "unexpected" : "not-applicable";
         }
     }
 }

@@ -75,11 +75,6 @@ namespace Mmd.Parser
             return (int)value;
         }
 
-        private static int UIntCountToInt(uint value)
-        {
-            return value > int.MaxValue ? int.MaxValue : (int)value;
-        }
-
         private static float GetFloat(float[]? values, int index, float fallback)
         {
             return values != null && index >= 0 && index < values.Length ? values[index] : fallback;

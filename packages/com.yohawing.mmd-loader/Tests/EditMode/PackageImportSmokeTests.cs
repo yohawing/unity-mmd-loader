@@ -457,58 +457,5 @@ namespace Mmd.Tests
             Assert.That(errors, Has.Some.Matches<string>(msg => msg.Contains("does not exist")));
         }
 
-        [Test]
-        public void MorphTypeInventoryExposesGroupOffsetCount()
-        {
-            var model = new MmdModelDefinition();
-            model.bones.Add(new MmdBoneDefinition
-            {
-                index = 0,
-                name = "root",
-                parentIndex = -1,
-                origin = new[] { 0.0f, 0.0f, 0.0f }
-            });
-            model.vertices.Add(new MmdVertexDefinition
-            {
-                index = 0,
-                position = new[] { 0.0f, 0.0f, 0.0f },
-                normal = new[] { 0.0f, 1.0f, 0.0f },
-                uv = new[] { 0.0f, 0.0f },
-                boneIndices = new[] { 0 },
-                boneWeights = new[] { 1.0f }
-            });
-            model.indices.AddRange(new[] { 0, 0, 0 });
-            model.materials.Add(new MmdMaterialDefinition { index = 0, name = "mat", vertexCount = 3 });
-            model.morphs.Add(new MmdMorphDefinition
-            {
-                index = 0,
-                name = "target",
-                type = "vertex",
-                vertexOffsets =
-                {
-                    new MmdVertexMorphOffsetDefinition { vertexIndex = 0, positionDelta = new[] { 0.0f, 0.1f, 0.0f } }
-                }
-            });
-            model.morphs.Add(new MmdMorphDefinition
-            {
-                index = 1,
-                name = "group",
-                type = "group",
-                groupOffsets =
-                {
-                    new MmdGroupMorphOffsetDefinition { morphIndex = 0, weight = 0.5f },
-                    new MmdGroupMorphOffsetDefinition { morphIndex = 0, weight = 1.0f }
-                }
-            });
-
-            IReadOnlyList<MmdMorphTypeInventoryDescriptor> inventory = MmdMorphDescriptorBuilder.BuildTypeInventory(model);
-
-            MmdMorphTypeInventoryDescriptor groupRecord = inventory.Single(record => record.morphType == "group");
-            Assert.That(groupRecord.groupOffsetCount, Is.EqualTo(2));
-            Assert.That(groupRecord.vertexOffsetCount, Is.EqualTo(0));
-            Assert.That(groupRecord.normalizedFamily, Is.EqualTo("composite"));
-            Assert.That(groupRecord.supportStatus, Is.EqualTo(MmdMorphDescriptorBuilder.InventoryOnlyStatus));
-        }
-
     }
 }

@@ -203,52 +203,6 @@ namespace Mmd.Rendering
             return scan.textureAlphaMode;
         }
 
-        /// <summary>
-        /// Resolve complete rendering-queue / transparency diagnostics for a
-        /// single material.  This is the pure-policy counterpart of what
-        /// <c>MmdUnityMaterialBuilder.ApplyMaterialRenderingPolicy</c> does at
-        /// Unity runtime.
-        /// </summary>
-        public static MaterialTransparencyDiagnostic ResolveDiagnostic(
-            float materialAlpha,
-            string materialName,
-            string? textureExtension,
-            IReadOnlyList<int>? textureAlphaValues,
-            int materialRenderOrder)
-        {
-            string resolvedMode = ResolveMaterialTransparencyMode(
-                materialAlpha,
-                materialName,
-                textureExtension,
-                textureAlphaValues);
-
-            int renderQueue;
-            int renderQueueOffset;
-            string depthWritePolicy = "enabled";
-
-            if (resolvedMode == ModeAlphaBlend)
-            {
-                // PMX material/submesh order via RenderQueue.Transparent + materialRenderOrder.
-                renderQueue = (int)RenderQueueValue.Transparent + materialRenderOrder;
-                renderQueueOffset = materialRenderOrder;
-            }
-            else
-            {
-                // Opaque or alphaTest stays in the Geometry queue.
-                renderQueue = (int)RenderQueueValue.Geometry;
-                renderQueueOffset = -1;
-            }
-
-            return new MaterialTransparencyDiagnostic
-            {
-                resolvedTransparencyMode = resolvedMode,
-                renderQueue = renderQueue,
-                renderQueueOffset = renderQueueOffset,
-                depthWritePolicy = depthWritePolicy,
-                materialRenderOrder = materialRenderOrder
-            };
-        }
-
         public static bool IsLikelyMmdAlphaOverlayMaterial(string? materialName)
         {
             string name = (materialName ?? string.Empty).ToLowerInvariant();
@@ -275,29 +229,6 @@ namespace Mmd.Rendering
         private static bool ContainsOrdinal(string value, string needle)
         {
             return value.IndexOf(needle, StringComparison.Ordinal) >= 0;
-        }
-
-        /// <summary>
-        /// Diagnostic record for one material's resolved transparency policy,
-        /// including queue offset and depth-write policy.
-        /// </summary>
-        internal sealed class MaterialTransparencyDiagnostic
-        {
-            public string resolvedTransparencyMode = ModeOpaque;
-            public int renderQueue;
-            public int renderQueueOffset = -1;
-            public string depthWritePolicy = "enabled";
-            public int materialRenderOrder;
-        }
-
-        /// <summary>
-        /// Well-known Unity RenderQueue values used by the pure policy
-        /// (mirrors UnityEngine.Rendering.RenderQueue constants).
-        /// </summary>
-        internal enum RenderQueueValue
-        {
-            Geometry = 2000,
-            Transparent = 3000
         }
     }
 }

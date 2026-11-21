@@ -42,7 +42,6 @@
 3cf76b8cf05d4f7db18db4f77d3e76dd | Mmd.Motion.NativeVmdCameraTrackSampler
 404c09f105d84fd3ada657900d267ca5 | Mmd.UnityIntegration.MmdSelfShadowBoundsCollector
 405edf7ff5b748e88655b5b926a1a17a | Mmd.Timeline.MmdVmdTimelineClip
-43e740454be04a40a8e230931e5353fb | Mmd.Rendering.MmdMorphDescriptorBuilder
 48ae64b36af74df7827dbe511a66abff | Mmd.UnityIntegration.MmdPmxParsePayload
 49790d85dc4463748ad973b56bfab837 | Mmd.MmdMaterialProfileAsset
 49cb8780886f4f4ab3b13e4c4e3a6b91 | Mmd.UnityIntegration.MmdUnityFrameApplier
@@ -59,7 +58,6 @@
 5192706ffa5e9c646aae103061ba76ec | Mmd.UnityIntegration.MmdTimelineLivePhysicsTransfer
 564b2aae742149daa505e11110988f8e | Mmd.Rendering.MmdMorphDescriptorBuilder
 56a737a31ab90854496d8077fcca3ede | Mmd.MmdHumanoidBoneMappingEvaluator
-56f6612b1ac0449298c8a0a7418465e2 | Mmd.Rendering.MmdTextureUvMorphEvaluator
 598534fefe11b7647838723efe445486 | Mmd.Editor.Timeline.MmdVmdTimelineClipEditor
 5a2636dd847b50b49887b7f3675b67f0 | Mmd.MmdPlaybackSnapshotDiagnostics
 5b44ae84f6e64030a9878c5b0f46d542 | Mmd.UnityIntegration.MmdUnityWorldMatrixFrameApplier
@@ -85,7 +83,6 @@
 69e3f6b0e0cce034b88ee1d61166c80f | Mmd.Editor.MmdPmxMissingTextureResolver
 6b2ed385b0437344198948c697e65cd8 | Mmd.MmdVmdAsset
 6c5261cbf06743219678a729c68cb8ac | Mmd.Editor.MmdSceneDragAndDrop
-6d50fa4d7f924d6aa6207d5d961dd88c | Mmd.Rendering.MmdMorphMeshPartitionSummaryDescriptor
 6f3f5bce0d9e4e22b25bdfb7a7f0c3e2 | Mmd.Editor.MmdToonLitShaderGUI
 6f4f1a2a5d1f4a0d9b74b4f2c8a1e6d3 | Mmd.Physics.MmdPhysicsBackendAvailability
 71d58e262e0844c6b8ee0606a398df7a | Mmd.Rendering.MmdMorphDescriptorBuilder
@@ -107,7 +104,6 @@
 7f5c3a3b8f2b4e7c8d9a0b1c2d3e4f50 | Mmd.Motion.VmdSelfShadowSampler
 7f62d57e6f9f4a01b0f1c84031614512 | Mmd.UnityIntegration.MmdPmxImportedAssetBuilder
 806d77ca59a3e884b9f4121f4438f2d0 | Mmd.UnityIntegration.MmdCoordinateSpace
-810feeddc30e4d468d3094c5de3ea056 | Mmd.Rendering.MmdMorphDescriptorBuilder
 82b7f958a51eb3a41aa2df1e43bb4e54 | Mmd.Timeline.MmdHumanoidAnimationMixerBehaviour
 861633d4bd0b4dc6aadc954a39ae35d6 | Mmd.UnityIntegration.MmdPmxHumanoidAvatarImportBuilder
 87c4a30b502544b28c0bc096b527e7e9 | Mmd.UnityIntegration.MmdJpegHeaderValidator
@@ -137,7 +133,6 @@ a02ba9a8f1cf26a42b39cda400c4d967 | Mmd.Editor.MmdToonLitShaderGUIState
 a123d1166ff94df5964acf772a18b774 | Mmd.IO.MmdSafeRelativePath
 a2d0a09ddc0b4f25b8bcb46dd5a5f6d1 | Mmd.Parser.MmdNativeMotionReadbackConverter
 a39c48ad92f24ac8bd0d58cfa9cedf31 | Mmd.MmdHumanoidMappingReadiness
-a3ec2b96c8b4028459f4cd4443d0faf2 | Mmd.Rendering.MmdVertexMorphEvaluator
 a3f8c2d1e5b64a7f9c0d1e2f3a4b5c6d | Mmd.UnityIntegration.MmdUnityPlaybackBinding
 a6c9e2f4b7d14a609de3c8f2514b9c72 | Mmd.Parser.PmxGeometryData
 a87554d7463d4fd4eae28afebd47f74a | Mmd.Mme.MmeFxParser
@@ -152,7 +147,6 @@ b4e9d3c2f6a75b8e0d1f2a3b4c5d6e7f | Mmd.UnityIntegration.MmdUnityPlaybackBinding
 b6930da7e175e3a4f86580fa4bf649ec | Mmd.UnityIntegration.MmdMultiCharacterWorkerPool
 b7e3a1c9d4f6528091ab3cde5678ef01 | Mmd.Parser.NativeMmdParser
 b847beb06ebc7764b9b71d9e68310881 | Mmd.Native.MmdRuntimeFfiTrackReadback
-ba22b9b98657fa64c9d535ab875d4af6 | Mmd.Rendering.MmdImpulseMorphDescriptor
 bc2a4da2864755c41a1a73406a1ca084 | Mmd.Parser.MmdMotionValidator
 bd1b111528a17d44ca34d729b52ff6b8 | Mmd.Timeline.MmdHumanoidAnimationClip
 bdc73a0f6ed13c547a144ad64a9b558b | Mmd.MmdRuntimeInfo
@@ -165,9 +159,7 @@ cc8e9d57474c97a4488fa22926809800 | Mmd.Editor.MmdEditorBatchmodeDiagnosticsComma
 ce0ffd2bf0d8f814788435067aa5bc18 | Mmd.Rendering.MmdFlipMorphDescriptor
 cf1c819856a647d4595f752622fb8b64 | Mmd.MmdRuntimeSession
 cfb2d8e40cf744638fa797a4db7bd617 | Mmd.Physics.MmdPhysicsPolicy
-d0ddcec4a59e89c47a8db446e11137eb | Mmd.Rendering.MmdBoneMorphDescriptor
 d0e1e69bfce448df82d6e41fbbad2184 | Mmd.Editor.MmdEditorVerificationFacade
-d26f6a09f9df4c1d9006fbd4bb234176 | Mmd.Rendering.MmdGroupMorphWeightResolver
 d2a3f7c881cb4c6da5e0e2f75f4f7a91 | Mmd.Native.MmdRuntimeFfiVmdContext
 d4dbb3a2961d4ad594f620f0a2cce410 | Mmd.UnityIntegration.MmdUnityModelInstance
 d4f14517f3634ab980182e8aebf41b5c | Mmd.UnityIntegration.MmdTgaDecoder
