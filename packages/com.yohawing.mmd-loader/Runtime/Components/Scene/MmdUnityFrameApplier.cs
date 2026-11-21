@@ -34,8 +34,7 @@ namespace Mmd.UnityIntegration
 
         internal static void ApplyBonePoses(
             MmdUnityModelInstance instance,
-            IReadOnlyList<MmdEvaluatedBonePose> bonePoses,
-            Func<MmdEvaluatedBonePose, bool>? predicate = null)
+            IReadOnlyList<MmdEvaluatedBonePose> bonePoses)
         {
             if (instance == null)
             {
@@ -52,11 +51,6 @@ namespace Mmd.UnityIntegration
                 if (bonePose == null)
                 {
                     throw new ArgumentException("Evaluated frame bone entries must not be null.", nameof(bonePoses));
-                }
-
-                if (predicate != null && !predicate(bonePose))
-                {
-                    continue;
                 }
 
                 int slot = bonePose.index;
@@ -482,36 +476,6 @@ namespace Mmd.UnityIntegration
             return values;
         }
 
-        private static float[] ValidateMorphedVector3(float[] values, int vertexIndex, string field)
-        {
-            if (values == null || values.Length < 3)
-            {
-                throw new ArgumentException($"Morphed vertex {vertexIndex} {field} must contain at least 3 values.");
-            }
-
-            if (!IsFinite(values[0]) || !IsFinite(values[1]) || !IsFinite(values[2]))
-            {
-                throw new ArgumentException($"Morphed vertex {vertexIndex} {field} contains a non-finite value.");
-            }
-
-            return values;
-        }
-
-        private static float[] ValidateMorphedVector2(float[] values, int vertexIndex, string field)
-        {
-            if (values == null || values.Length < 2)
-            {
-                throw new ArgumentException($"Morphed vertex {vertexIndex} {field} must contain at least 2 values.");
-            }
-
-            if (!IsFinite(values[0]) || !IsFinite(values[1]))
-            {
-                throw new ArgumentException($"Morphed vertex {vertexIndex} {field} contains a non-finite value.");
-            }
-
-            return values;
-        }
-
         private static float[] ValidateQuaternion(float[] values, int boneIndex)
         {
             if (values == null || values.Length < 4)
@@ -564,7 +528,6 @@ namespace Mmd.UnityIntegration
         public bool hasVertexMorphs;
         public bool hasTextureUvMorphs;
         public bool hasMaterialMorphs;
-        public bool meshUploadRequired;
         public bool blendShapePathUsed;
         public int vertexCount;
         public int morphWeightCount;
@@ -574,18 +537,10 @@ namespace Mmd.UnityIntegration
         public double totalMs;
         public double buildWeightMapMs;
         public double resolveCompositeWeightsMs;
-        public double vertexMorphEvalMs;
-        public double textureUvMorphEvalMs;
         public double materialMorphApplyMs;
         public bool materialMorphEvaluatorSkipped;
         public long materialMorphAllocatedBytes;
-        public double unityBufferBuildMs;
         public double setBlendShapeWeightMs;
-        public double setVerticesMs;
-        public double setUvsMs;
-        public double recalculateBoundsMs;
-        public double localBoundsAssignMs;
-        public bool localBoundsAssigned;
         public bool localBoundsSkipped;
     }
 }

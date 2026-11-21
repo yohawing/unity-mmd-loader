@@ -144,12 +144,6 @@ namespace Mmd.UnityIntegration
 
         public bool IsFastRuntimeEnabled => fastSession != null;
 
-        internal int FastRuntimePoseBoneCount => fastPoseBoneIndices.Length;
-
-        internal int FastRuntimeMorphCount => fastMorphIndices.Length;
-
-        internal int FastRuntimeAfterPhysicsBoneCount => fastAfterPhysicsBoneIndices.Length;
-
         public int MotionMaxFrame => session.MotionMaxFrame;
 
         public static MmdUnityPlaybackBinding CreateSkinned(

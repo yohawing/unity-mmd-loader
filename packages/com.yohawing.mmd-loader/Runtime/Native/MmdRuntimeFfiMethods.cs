@@ -933,21 +933,6 @@ namespace Mmd.Native
             return abiVersion;
         }
 
-        internal static uint ValidateHostPoseCapability()
-        {
-            uint abiVersion = ValidateAbiVersion();
-            uint featureFlags = FeatureFlags();
-            const uint requiredFeatures = FeatureSplitPhysicsEvaluation | FeatureHostPoseNativeMorphs;
-            if ((featureFlags & requiredFeatures) != requiredFeatures)
-            {
-                throw new MmdRuntimeUnsupportedException(
-                    "mmd-runtime does not provide the split native host-pose evaluation contract " +
-                    $"(required feature bits 0 and 3, flags=0x{featureFlags:X8}).");
-            }
-
-            return abiVersion;
-        }
-
         internal static uint ValidateHostRigCapability()
         {
             uint abiVersion = ValidateAbiVersion();

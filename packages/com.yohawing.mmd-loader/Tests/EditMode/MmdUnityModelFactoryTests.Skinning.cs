@@ -309,10 +309,6 @@ namespace Mmd.Tests
             MmdUnityMorphApplyTimingSummary timing = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame);
 
             Assert.That(timing.blendShapePathUsed, Is.True);
-            Assert.That(timing.meshUploadRequired, Is.False);
-            Assert.That(timing.setVerticesMs, Is.EqualTo(0.0));
-            Assert.That(timing.setUvsMs, Is.EqualTo(0.0));
-            Assert.That(timing.recalculateBoundsMs, Is.EqualTo(0.0));
             Assert.That(renderer.GetBlendShapeWeight(sharedUpIndex), Is.EqualTo(100f).Within(0.001f));
             Assert.That(instance.Mesh.vertices[0], Is.EqualTo(new Vector3(0.0f, 0.0f, 0.0f)));
         }
@@ -366,9 +362,7 @@ namespace Mmd.Tests
             MmdUnityMorphApplyTimingSummary timing = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame);
 
             Assert.That(timing.blendShapePathUsed, Is.True);
-            Assert.That(timing.localBoundsAssigned, Is.False);
             Assert.That(timing.localBoundsSkipped, Is.True);
-            Assert.That(timing.recalculateBoundsMs, Is.EqualTo(0.0));
             Assert.That(renderer.GetBlendShapeWeight(instance.BlendShapeIndexMap["smile"]), Is.EqualTo(125f).Within(0.001f));
             Assert.That(renderer.localBounds.center, Is.EqualTo(initialBounds.center));
             Assert.That(renderer.localBounds.size, Is.EqualTo(initialBounds.size));
@@ -392,11 +386,8 @@ namespace Mmd.Tests
             MmdUnityMorphApplyTimingSummary second = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, frame);
             Bounds secondBounds = renderer.localBounds;
 
-            Assert.That(first.localBoundsAssigned, Is.False);
             Assert.That(first.localBoundsSkipped, Is.True);
-            Assert.That(second.localBoundsAssigned, Is.False);
             Assert.That(second.localBoundsSkipped, Is.True);
-            Assert.That(second.localBoundsAssignMs, Is.EqualTo(0.0));
             Assert.That(firstBounds.center, Is.EqualTo(initialBounds.center));
             Assert.That(firstBounds.size, Is.EqualTo(initialBounds.size));
             Assert.That(secondBounds.center, Is.EqualTo(initialBounds.center));
@@ -425,9 +416,7 @@ namespace Mmd.Tests
             changed.morphs.Add(new MmdEvaluatedMorphWeight { name = "happy-face", weight = 1.0f });
             MmdUnityMorphApplyTimingSummary timing = MmdUnityFrameApplier.ApplyMorphsWithTiming(instance, changed);
 
-            Assert.That(timing.localBoundsAssigned, Is.False);
             Assert.That(timing.localBoundsSkipped, Is.True);
-            Assert.That(timing.recalculateBoundsMs, Is.EqualTo(0.0));
             Assert.That(renderer.GetBlendShapeWeight(instance.BlendShapeIndexMap["smile"]), Is.EqualTo(150f).Within(0.001f));
             Assert.That(renderer.localBounds.center, Is.EqualTo(initialBounds.center));
             Assert.That(renderer.localBounds.size, Is.EqualTo(initialBounds.size));

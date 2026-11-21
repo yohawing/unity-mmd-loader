@@ -592,9 +592,7 @@ namespace Mmd.Tests
 
             Assert.That(timing.hasVertexMorphs, Is.True);
             Assert.That(timing.hasTextureUvMorphs, Is.False);
-            Assert.That(timing.meshUploadRequired, Is.False);
             Assert.That(timing.blendShapePathUsed, Is.True);
-            Assert.That(timing.setVerticesMs, Is.EqualTo(0.0).Within(0.000001));
         }
         [Test]
         public void ReapplyImportedMaterialTransparencyReclassifiesByTextureAlpha()

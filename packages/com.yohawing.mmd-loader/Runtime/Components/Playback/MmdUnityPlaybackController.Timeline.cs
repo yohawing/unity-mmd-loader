@@ -64,7 +64,7 @@ namespace Mmd.UnityIntegration
                 return LastHumanoidRetargetResult;
             }
 
-            return ApplyHumanoidRetargetCore(copyLocalPositions: true);
+            return ApplyHumanoidRetargetCore();
         }
 
         internal MmdHumanoidRetargeterResult ApplyHumanoidRetargetFromTimeline()
@@ -80,7 +80,7 @@ namespace Mmd.UnityIntegration
 
             // Root motion moves the shared model root. Hips.localPosition is the remaining
             // body displacement relative to that root and must still reach the display rig.
-            return ApplyHumanoidRetargetCore(copyLocalPositions: true);
+            return ApplyHumanoidRetargetCore();
         }
 
         private (double time, bool playing, bool seek, double delta)? pendingHumanoidTimelineSample;
@@ -224,11 +224,11 @@ namespace Mmd.UnityIntegration
             lastHumanoidTimelinePlaying = timelinePlaying;
         }
 
-        private MmdHumanoidRetargeterResult ApplyHumanoidRetargetCore(bool copyLocalPositions)
+        private MmdHumanoidRetargeterResult ApplyHumanoidRetargetCore()
         {
             MmdHumanoidRetargeterResult? nativeResult;
             if (physicsMode == MmdPhysicsMode.Off &&
-                TryApplyHumanoidNativeHostPose(copyLocalPositions, out nativeResult))
+                TryApplyHumanoidNativeHostPose(out nativeResult))
             {
                 LastHumanoidRetargetResult = nativeResult!;
                 return LastHumanoidRetargetResult;
@@ -236,7 +236,7 @@ namespace Mmd.UnityIntegration
 
             // The Edit Mode Live preview is applied while preparing; PlayMode must also step.
             if (physicsMode == MmdPhysicsMode.Live &&
-                TryPrepareHumanoidNativeLivePhysics(copyLocalPositions, out nativeResult) &&
+                TryPrepareHumanoidNativeLivePhysics(out nativeResult) &&
                 nativeResult != null &&
                 (!Application.isPlaying || TryStepHumanoidNativeLivePhysics(nativeResult)))
             {
@@ -245,9 +245,7 @@ namespace Mmd.UnityIntegration
             }
 
             RestoreHumanoidHostPoseInputIfAvailable();
-            LastHumanoidRetargetResult = MmdHumanoidRetargeter.RetargetPose(
-                humanoidRetargetEntries,
-                copyLocalPositions);
+            LastHumanoidRetargetResult = MmdHumanoidRetargeter.RetargetPose(humanoidRetargetEntries);
             MmdHumanoidAppendTransformApplier.Apply(humanoidAppendEntries);
 
             return LastHumanoidRetargetResult;

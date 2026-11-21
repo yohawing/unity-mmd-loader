@@ -43,9 +43,7 @@ namespace Mmd.UnityIntegration
 
         internal bool HasHumanoidHostPoseSession => humanoidHostPoseSession != null;
 
-        private bool TryApplyHumanoidNativeHostPose(
-            bool copyLocalPositions,
-            out MmdHumanoidRetargeterResult? nativeResult)
+        private bool TryApplyHumanoidNativeHostPose(out MmdHumanoidRetargeterResult? nativeResult)
         {
             nativeResult = null;
             if (humanoidHostPoseFailureLatched && binding == null &&
@@ -67,7 +65,6 @@ namespace Mmd.UnityIntegration
                 if (humanoidHostPoseSession == null || humanoidHostPoseModel == null ||
                     humanoidHostPoseBones == null || humanoidHostPoseRoot == null ||
                     !TryPrepareHumanoidHostPoseInput(
-                        copyLocalPositions,
                         requireCopiedBones: false,
                         out nativeResult))
                 {
@@ -85,9 +82,7 @@ namespace Mmd.UnityIntegration
             }
         }
 
-        private bool TryPrepareHumanoidNativeLivePhysics(
-            bool copyLocalPositions,
-            out MmdHumanoidRetargeterResult? nativeResult)
+        private bool TryPrepareHumanoidNativeLivePhysics(out MmdHumanoidRetargeterResult? nativeResult)
         {
             nativeResult = null;
             if (humanoidHostPoseFailureLatched || physicsMode != MmdPhysicsMode.Live)
@@ -101,7 +96,6 @@ namespace Mmd.UnityIntegration
                 if (humanoidHostPoseModel == null ||
                     humanoidHostPoseBones == null || humanoidHostPoseRoot == null ||
                     !TryPrepareHumanoidHostPoseInput(
-                        copyLocalPositions,
                         requireCopiedBones: true,
                         out nativeResult))
                 {
@@ -138,7 +132,6 @@ namespace Mmd.UnityIntegration
         // Shared Off / Live input contract: configure the rig when needed, fill fresh native
         // input arrays from the proxy pose, and show the bind rest pose when validation fails.
         private bool TryPrepareHumanoidHostPoseInput(
-            bool copyLocalPositions,
             bool requireCopiedBones,
             out MmdHumanoidRetargeterResult nativeResult)
         {
@@ -157,8 +150,7 @@ namespace Mmd.UnityIntegration
                 humanoidHostPoseImportScale,
                 humanoidHostPosePositions!,
                 humanoidHostPoseRotations!,
-                humanoidHostPoseScales!,
-                copyLocalPositions);
+                humanoidHostPoseScales!);
             if ((requireCopiedBones && nativeResult.CopiedBoneCount <= 0) || !nativeResult.AllSucceeded)
             {
                 humanoidHostPoseFailureReason = nativeResult.Diagnostics.Count > 0
