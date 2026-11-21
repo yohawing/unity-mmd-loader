@@ -466,11 +466,15 @@ namespace Mmd.UnityIntegration
 
         public void Tick(float deltaTime)
         {
-            ReleaseAutomaticWorkerForSynchronousPlayback();
+            // A paused Tick mutates nothing, so keep the automatic worker (and its Live physics
+            // world) across Pause like the serial path keeps its binding state. Only a playing
+            // synchronous Tick takes over the clock and must invalidate the worker slot.
             if (!IsPlaying)
             {
                 return;
             }
+
+            ReleaseAutomaticWorkerForSynchronousPlayback();
 
             if (deltaTime < 0.0f || float.IsNaN(deltaTime) || float.IsInfinity(deltaTime))
             {
@@ -798,6 +802,9 @@ namespace Mmd.UnityIntegration
             }
 
             ValidatePhysicsMode(physicsMode);
+            // Applying a serialized mode change reseeds the binding directly. A paused Tick no
+            // longer releases the worker, so release it here like SetPhysicsMode does.
+            ReleaseAutomaticWorkerForSynchronousPlayback();
             if (physicsMode == MmdPhysicsMode.Off)
             {
                 ResetHumanoidHostPoseFailureLatch();

@@ -362,16 +362,44 @@ namespace Mmd.Tests
 
                 int heldFrame = automatic.CurrentFrame;
                 float heldDeltaTime = automatic.LastLivePhysicsDiagnostics.deltaTime;
+                MmdMultiCharacterWorkerPool? livePool = automatic.CurrentPlaybackWorkerPool;
+                Assert.That(livePool, Is.Not.Null);
                 automatic.Pause();
+                yield return null;
                 yield return null;
                 Assert.That(automatic.CurrentFrame, Is.EqualTo(heldFrame));
                 Assert.That(automatic.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(heldFrame));
                 Assert.That(automatic.LastLivePhysicsDiagnostics.deltaTime, Is.EqualTo(heldDeltaTime));
+                Assert.That(automatic.CurrentPlaybackWorkerPool, Is.SameAs(livePool),
+                    "Pause must keep the Live worker (thread, native session, physics world) like the serial path.");
 
+                // Resuming continues the paused physics world: no step after Play may be a
+                // zero-delta reseed, and the worker slot must stay the same instance.
+                MmdLivePhysicsFrameDiagnostics heldDiagnostics = automatic.LastLivePhysicsDiagnostics!;
                 automatic.Play();
-                yield return null;
+                bool observedReseed = false;
+                // Batchmode frames can be much shorter than one 30 fps playback frame, so wait
+                // on real time rather than a fixed number of PlayerLoop iterations.
+                float resumeDeadline = Time.realtimeSinceStartup + 5.0f;
+                while (automatic.LastLivePhysicsDiagnostics!.frame <= heldFrame &&
+                       Time.realtimeSinceStartup < resumeDeadline)
+                {
+                    yield return null;
+                    MmdLivePhysicsFrameDiagnostics? current = automatic.LastLivePhysicsDiagnostics;
+                    if (current != null && !ReferenceEquals(current, heldDiagnostics) &&
+                        current.deltaTime == 0.0f)
+                    {
+                        observedReseed = true;
+                    }
+                }
+
                 Assert.That(automatic.LastLivePhysicsDiagnostics, Is.Not.Null);
-                Assert.That(automatic.LastLivePhysicsDiagnostics!.frame, Is.GreaterThanOrEqualTo(heldFrame));
+                Assert.That(automatic.LastLivePhysicsDiagnostics!.frame, Is.GreaterThan(heldFrame));
+                Assert.That(observedReseed, Is.False,
+                    "Resuming after Pause must continue Live physics instead of reseeding it.");
+                Assert.That(automatic.LastLivePhysicsDiagnostics.deltaTime, Is.GreaterThan(0.0f));
+                Assert.That(automatic.CurrentPlaybackWorkerPool, Is.SameAs(livePool),
+                    "Resuming after Pause must reuse the same Live worker.");
 
                 automatic.SeekFrame(0);
                 automatic.Play();

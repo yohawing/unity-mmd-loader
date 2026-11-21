@@ -355,6 +355,8 @@ namespace Mmd.UnityIntegration
 
         internal bool IsStandaloneWorkerFaulted => standaloneWorkerFaulted;
 
+        internal MmdMultiCharacterWorkerPool? CurrentPlaybackWorkerPool => playbackWorkerPool;
+
         internal MmdModelDefinition? MultiCharacterModelDefinition => binding?.ManagedModelDefinition;
 
         internal readonly struct MmdMultiCharacterClockState
