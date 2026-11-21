@@ -7,21 +7,21 @@ using System.Text.RegularExpressions;
 namespace Mmd.Mme
 {
     [Serializable]
-    public sealed class MmeEmdMaterialEffectAssignment
+    internal sealed class MmeEmdMaterialEffectAssignment
     {
         public int materialIndex = -1;
         public string effectPath = string.Empty;
     }
 
     [Serializable]
-    public sealed class MmeEmdEffectMap
+    internal sealed class MmeEmdEffectMap
     {
         public string defaultEffectPath = string.Empty;
         public List<MmeEmdMaterialEffectAssignment> materialAssignments = new();
         public List<int> noneMaterialIndices = new();
     }
 
-    public static class MmeEmdParser
+    internal static class MmeEmdParser
     {
         private static readonly Regex SectionRegex =
             new(@"^\s*\[([^\]]+)\]\s*$", RegexOptions.Compiled);

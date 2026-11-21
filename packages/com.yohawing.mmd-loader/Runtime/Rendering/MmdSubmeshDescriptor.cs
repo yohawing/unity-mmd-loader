@@ -15,7 +15,7 @@ namespace Mmd.Rendering
         public int indexCount;
     }
 
-    public static class MmdSubmeshDescriptorBuilder
+    internal static class MmdSubmeshDescriptorBuilder
     {
         public static IReadOnlyList<MmdSubmeshDescriptor> Build(IReadOnlyList<MmdMaterialDescriptor> materials)
         {

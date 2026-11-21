@@ -7,7 +7,7 @@ using System.Linq;
 namespace Mmd.Rendering
 {
     [Serializable]
-    public sealed class MmdMorphMeshPartitionSummaryDescriptor
+    internal sealed class MmdMorphMeshPartitionSummaryDescriptor
     {
         public int vertexCount;
         public int indexCount;
@@ -26,7 +26,7 @@ namespace Mmd.Rendering
     }
 
     [Serializable]
-    public sealed class MmdMorphMeshPartitionMaterialDescriptor
+    internal sealed class MmdMorphMeshPartitionMaterialDescriptor
     {
         public int materialIndex;
         public int vertexStart;
@@ -42,7 +42,7 @@ namespace Mmd.Rendering
     }
 
     [Serializable]
-    public sealed class MmdMorphMeshPartitionSubmeshDescriptor
+    internal sealed class MmdMorphMeshPartitionSubmeshDescriptor
     {
         public int submeshIndex;
         public int materialIndex;
@@ -54,7 +54,7 @@ namespace Mmd.Rendering
     }
 
     [Serializable]
-    public sealed class MmdVertexMorphMeshPartitionDescriptor
+    internal sealed class MmdVertexMorphMeshPartitionDescriptor
     {
         public int morphIndex;
         public string morphName = string.Empty;
@@ -75,7 +75,7 @@ namespace Mmd.Rendering
     }
 
     [Serializable]
-    public sealed class MmdVertexMorphMeshPartitionCoverageDescriptor
+    internal sealed class MmdVertexMorphMeshPartitionCoverageDescriptor
     {
         public int submeshIndex;
         public int materialIndex;
@@ -83,7 +83,7 @@ namespace Mmd.Rendering
         public int referencedTriangleIndexCount;
     }
 
-    public static class MmdMorphMeshPartitionDescriptorBuilder
+    internal static class MmdMorphMeshPartitionDescriptorBuilder
     {
         public const string SingleSubmeshRecommendation = "single-submesh-local";
         public const string CrossSubmeshRecommendation = "cross-submesh-partition-required";

@@ -17,13 +17,13 @@ namespace Mmd.UnityIntegration
     /// with prior import builders. The importer retains ownership of enum decisions and sub-asset
     /// registration.
     /// </remarks>
-    public static class MmdPmxHumanoidAvatarImportBuilder
+    internal static class MmdPmxHumanoidAvatarImportBuilder
     {
         /// <summary>
         /// Result of the (optional) Humanoid Avatar import build.
         /// Avatar and ProxyRoot are non-null only on successful Ready case.
         /// </summary>
-        public readonly struct MmdPmxHumanoidAvatarImportResult
+        internal readonly struct MmdPmxHumanoidAvatarImportResult
         {
             public Avatar? Avatar { get; }
             public GameObject? ProxyRoot { get; }

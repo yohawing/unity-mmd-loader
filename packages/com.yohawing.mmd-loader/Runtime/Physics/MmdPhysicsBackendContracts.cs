@@ -5,7 +5,7 @@ using System;
 namespace Mmd.Physics
 {
     [Serializable]
-    public sealed class MmdPhysicsBackendAvailability
+    internal sealed class MmdPhysicsBackendAvailability
     {
         public string backendName = string.Empty;
         public string wrapperLibraryName = string.Empty;
@@ -15,7 +15,7 @@ namespace Mmd.Physics
         public string nativeVersion = string.Empty;
     }
 
-    public sealed class MmdPhysicsBodyTransform
+    internal sealed class MmdPhysicsBodyTransform
     {
         public float[] position = Array.Empty<float>();
         public float[] rotation = Array.Empty<float>();

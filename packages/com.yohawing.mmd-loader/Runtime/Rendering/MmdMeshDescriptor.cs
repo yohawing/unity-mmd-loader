@@ -17,7 +17,7 @@ namespace Mmd.Rendering
         public float edgeScale = float.NaN;
     }
 
-    public static class MmdMeshDescriptorBuilder
+    internal static class MmdMeshDescriptorBuilder
     {
         public static IReadOnlyList<MmdMeshVertexDescriptor> BuildVertices(MmdModelDefinition model)
         {

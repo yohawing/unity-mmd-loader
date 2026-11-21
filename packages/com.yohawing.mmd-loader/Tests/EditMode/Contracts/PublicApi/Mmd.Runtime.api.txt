@@ -4,8 +4,6 @@ Mmd.MmdAnimationBakeBoneCurve :: field public System.Collections.Generic.List<Mm
 Mmd.MmdAnimationBakeBoneCurve :: field public System.Collections.Generic.List<Mmd.MmdAnimationBakeRotationKey> rotationKeys
 Mmd.MmdAnimationBakeBoneCurve :: field public int boneIndex
 Mmd.MmdAnimationBakeBoneCurve :: field public string boneName
-Mmd.MmdAnimationBakePlanner :: (type) public static class MmdAnimationBakePlanner
-Mmd.MmdAnimationBakePlanner :: method public static Mmd.MmdAnimationBakeSummary BuildTransformBakeSummary(Mmd.MmdRuntimeSession session, int startFrame, int endFrame, float frameRate, string outputPath = "Assets/MmdUnity/BakedAnimations/animation-bake-plan.anim")
 Mmd.MmdAnimationBakePositionKey :: (type) public sealed class MmdAnimationBakePositionKey
 Mmd.MmdAnimationBakePositionKey :: ctor public .ctor()
 Mmd.MmdAnimationBakePositionKey :: field public float time
@@ -59,8 +57,6 @@ Mmd.MmdEvaluatedMorphWeight :: (type) public sealed class MmdEvaluatedMorphWeigh
 Mmd.MmdEvaluatedMorphWeight :: ctor public .ctor()
 Mmd.MmdEvaluatedMorphWeight :: field public float weight
 Mmd.MmdEvaluatedMorphWeight :: field public string name
-Mmd.MmdHumanoidAppendTransformApplier :: (type) public static class MmdHumanoidAppendTransformApplier
-Mmd.MmdHumanoidAppendTransformApplier :: method public static void Apply(System.Collections.Generic.IReadOnlyList<Mmd.MmdHumanoidAppendTransformBinding> appendEntries)
 Mmd.MmdHumanoidAppendTransformBinding :: (type) public sealed class MmdHumanoidAppendTransformBinding
 Mmd.MmdHumanoidAppendTransformBinding :: ctor public .ctor()
 Mmd.MmdHumanoidAppendTransformBinding :: ctor public .ctor(UnityEngine.Transform targetTransform, int targetMmdBoneIndex, UnityEngine.Transform appendParentTransform, int appendParentMmdBoneIndex, float appendRatio, bool appendRotation, bool appendTranslation, bool appendLocal, UnityEngine.Quaternion targetBindLocalRotation, UnityEngine.Vector3 targetBindLocalPosition, UnityEngine.Quaternion appendParentBindLocalRotation, UnityEngine.Vector3 appendParentBindLocalPosition, int evaluationOrder)
@@ -77,11 +73,6 @@ Mmd.MmdHumanoidAppendTransformBinding :: property float AppendRatio { public get
 Mmd.MmdHumanoidAppendTransformBinding :: property int AppendParentMmdBoneIndex { public get; }
 Mmd.MmdHumanoidAppendTransformBinding :: property int EvaluationOrder { public get; }
 Mmd.MmdHumanoidAppendTransformBinding :: property int TargetMmdBoneIndex { public get; }
-Mmd.MmdHumanoidAvatarBuildResult :: (type) public sealed class MmdHumanoidAvatarBuildResult
-Mmd.MmdHumanoidAvatarBuildResult :: ctor public .ctor(UnityEngine.Avatar avatar, System.Collections.Generic.IReadOnlyList<string> diagnostics)
-Mmd.MmdHumanoidAvatarBuildResult :: property System.Collections.Generic.IReadOnlyList<string> Diagnostics { public get; }
-Mmd.MmdHumanoidAvatarBuildResult :: property UnityEngine.Avatar Avatar { public get; }
-Mmd.MmdHumanoidAvatarBuildResult :: property bool IsValidHumanAvatar { public get; }
 Mmd.MmdHumanoidBoneMappingDiagnosticEntry :: (type) public sealed class MmdHumanoidBoneMappingDiagnosticEntry
 Mmd.MmdHumanoidBoneMappingDiagnosticEntry :: ctor public .ctor()
 Mmd.MmdHumanoidBoneMappingDiagnosticEntry :: ctor public .ctor(UnityEngine.HumanBodyBones humanBone, string mmdBoneName, int mmdBoneIndex, bool required, string source)
@@ -98,61 +89,16 @@ Mmd.MmdHumanoidBoneMappingDiagnosticSummary :: property System.Collections.Gener
 Mmd.MmdHumanoidBoneMappingDiagnosticSummary :: property System.Collections.Generic.IReadOnlyList<string> ConflictDiagnostics { public get; }
 Mmd.MmdHumanoidBoneMappingDiagnosticSummary :: property static Mmd.MmdHumanoidBoneMappingDiagnosticSummary Empty { public get; }
 Mmd.MmdHumanoidBoneMappingDiagnosticSummary :: property string Readiness { public get; }
-Mmd.MmdHumanoidBoneMappingEvaluator :: (type) public static class MmdHumanoidBoneMappingEvaluator
-Mmd.MmdHumanoidBoneMappingEvaluator :: method public static Mmd.MmdHumanoidBoneMappingReport Evaluate(Mmd.Parser.MmdModelDefinition model)
-Mmd.MmdHumanoidBoneMappingEvaluator :: method public static Mmd.MmdHumanoidBoneMappingReport EvaluateBoneNames(System.Collections.Generic.IReadOnlyList<string> boneNames)
-Mmd.MmdHumanoidBoneMappingEvaluator :: method public static bool IsRequiredHumanBone(UnityEngine.HumanBodyBones humanBone)
-Mmd.MmdHumanoidBoneMappingEvaluator :: method public static bool TryMapBoneName(string boneName, out UnityEngine.HumanBodyBones humanBone, out bool required)
-Mmd.MmdHumanoidBoneMappingEvaluator :: property static int RequiredHumanBoneCount { public get; }
-Mmd.MmdHumanoidBoneMappingMatch :: (type) public readonly struct MmdHumanoidBoneMappingMatch
-Mmd.MmdHumanoidBoneMappingMatch :: ctor public .ctor(UnityEngine.HumanBodyBones humanBone, string mmdBoneName, int mmdBoneIndex, bool required)
-Mmd.MmdHumanoidBoneMappingMatch :: property UnityEngine.HumanBodyBones HumanBone { public get; }
-Mmd.MmdHumanoidBoneMappingMatch :: property bool Required { public get; }
-Mmd.MmdHumanoidBoneMappingMatch :: property int MmdBoneIndex { public get; }
-Mmd.MmdHumanoidBoneMappingMatch :: property string MmdBoneName { public get; }
 Mmd.MmdHumanoidBoneMappingOverride :: (type) public sealed class MmdHumanoidBoneMappingOverride
 Mmd.MmdHumanoidBoneMappingOverride :: ctor public .ctor()
 Mmd.MmdHumanoidBoneMappingOverride :: ctor public .ctor(string mmdBoneName, UnityEngine.HumanBodyBones humanBone)
 Mmd.MmdHumanoidBoneMappingOverride :: property UnityEngine.HumanBodyBones HumanBone { public get; }
 Mmd.MmdHumanoidBoneMappingOverride :: property string MmdBoneName { public get; }
-Mmd.MmdHumanoidBoneMappingReport :: (type) public readonly struct MmdHumanoidBoneMappingReport
-Mmd.MmdHumanoidBoneMappingReport :: ctor public .ctor(string readiness, int totalBoneCount, int requiredMappedBoneCount, int optionalMappedBoneCount, int missingRequiredBoneCount, int ambiguousMappingCount, int ignoredHelperBoneCount, string[] diagnostics, Mmd.MmdSerializableBoneMappingEntry[] mappingEntries = null)
-Mmd.MmdHumanoidBoneMappingReport :: property Mmd.MmdSerializableBoneMappingEntry[] MappingEntries { public get; }
-Mmd.MmdHumanoidBoneMappingReport :: property int AmbiguousMappingCount { public get; }
-Mmd.MmdHumanoidBoneMappingReport :: property int IgnoredHelperBoneCount { public get; }
-Mmd.MmdHumanoidBoneMappingReport :: property int MissingRequiredBoneCount { public get; }
-Mmd.MmdHumanoidBoneMappingReport :: property int OptionalMappedBoneCount { public get; }
-Mmd.MmdHumanoidBoneMappingReport :: property int RequiredMappedBoneCount { public get; }
-Mmd.MmdHumanoidBoneMappingReport :: property int TotalBoneCount { public get; }
-Mmd.MmdHumanoidBoneMappingReport :: property string Readiness { public get; }
-Mmd.MmdHumanoidBoneMappingReport :: property string[] Diagnostics { public get; }
-Mmd.MmdHumanoidMappingReadiness :: (type) public static class MmdHumanoidMappingReadiness
-Mmd.MmdHumanoidMappingReadiness :: const public string Ambiguous = "Ambiguous"
-Mmd.MmdHumanoidMappingReadiness :: const public string HierarchyNotReady = "HierarchyNotReady"
-Mmd.MmdHumanoidMappingReadiness :: const public string MissingRequired = "MissingRequired"
-Mmd.MmdHumanoidMappingReadiness :: const public string NoBones = "NoBones"
-Mmd.MmdHumanoidMappingReadiness :: const public string NotEvaluated = "NotEvaluated"
-Mmd.MmdHumanoidMappingReadiness :: const public string Ready = "Ready"
 Mmd.MmdHumanoidMissingRequiredBone :: (type) public sealed class MmdHumanoidMissingRequiredBone
 Mmd.MmdHumanoidMissingRequiredBone :: ctor public .ctor()
 Mmd.MmdHumanoidMissingRequiredBone :: ctor public .ctor(UnityEngine.HumanBodyBones humanBone, string expectedMmdBoneName)
 Mmd.MmdHumanoidMissingRequiredBone :: property UnityEngine.HumanBodyBones HumanBone { public get; }
 Mmd.MmdHumanoidMissingRequiredBone :: property string ExpectedMmdBoneName { public get; }
-Mmd.MmdHumanoidProxyRigFactory :: (type) public static class MmdHumanoidProxyRigFactory
-Mmd.MmdHumanoidProxyRigFactory :: method public static Mmd.MmdHumanoidAvatarBuildResult BuildAvatar(Mmd.MmdHumanoidProxyRigResult proxyRig, Mmd.MmdHumanoidRetargetQualitySettings? retargetQualitySettings = null, UnityEngine.GameObject avatarRoot = null)
-Mmd.MmdHumanoidProxyRigFactory :: method public static Mmd.MmdHumanoidProxyRigResult CreateProxyRig(Mmd.MmdPmxAsset pmxAsset, string proxyRootName = "MmdHumanoidProxyRig", System.Collections.Generic.IReadOnlyList<Mmd.MmdHumanoidBoneMappingOverride> mappingOverrides = null)
-Mmd.MmdHumanoidProxyRigFactory :: method public static Mmd.MmdHumanoidProxyRigResult CreateProxyRig(Mmd.Parser.MmdModelDefinition model, string proxyRootName = "MmdHumanoidProxyRig", System.Collections.Generic.IReadOnlyList<Mmd.MmdHumanoidBoneMappingOverride> mappingOverrides = null)
-Mmd.MmdHumanoidProxyRigResult :: (type) public sealed class MmdHumanoidProxyRigResult
-Mmd.MmdHumanoidProxyRigResult :: ctor public .ctor(UnityEngine.GameObject proxyRoot, System.Collections.Generic.IReadOnlyDictionary<UnityEngine.HumanBodyBones, UnityEngine.Transform> boneMap, System.Collections.Generic.IReadOnlyList<Mmd.MmdHumanoidBoneMappingMatch> matches, string readiness, string[] diagnostics)
-Mmd.MmdHumanoidProxyRigResult :: property System.Collections.Generic.IReadOnlyDictionary<UnityEngine.HumanBodyBones, UnityEngine.Transform> BoneMap { public get; }
-Mmd.MmdHumanoidProxyRigResult :: property System.Collections.Generic.IReadOnlyList<Mmd.MmdHumanoidBoneMappingMatch> Matches { public get; }
-Mmd.MmdHumanoidProxyRigResult :: property System.Collections.Generic.IReadOnlyList<string> Diagnostics { public get; }
-Mmd.MmdHumanoidProxyRigResult :: property UnityEngine.GameObject ProxyRoot { public get; }
-Mmd.MmdHumanoidProxyRigResult :: property string Readiness { public get; }
-Mmd.MmdHumanoidRequiredBoneInfo :: (type) public readonly struct MmdHumanoidRequiredBoneInfo
-Mmd.MmdHumanoidRequiredBoneInfo :: ctor public .ctor(UnityEngine.HumanBodyBones humanBone, string mmdBoneName)
-Mmd.MmdHumanoidRequiredBoneInfo :: property UnityEngine.HumanBodyBones HumanBone { public get; }
-Mmd.MmdHumanoidRequiredBoneInfo :: property string MmdBoneName { public get; }
 Mmd.MmdHumanoidRetargetBinding :: (type) public sealed class MmdHumanoidRetargetBinding
 Mmd.MmdHumanoidRetargetBinding :: ctor public .ctor()
 Mmd.MmdHumanoidRetargetBinding :: ctor public .ctor(UnityEngine.HumanBodyBones humanBone, int mmdBoneIndex, UnityEngine.Transform proxyTransform, UnityEngine.Transform nativeTransform)
@@ -189,9 +135,6 @@ Mmd.MmdHumanoidRetargetQualitySettings :: property float LowerLegTwist { public 
 Mmd.MmdHumanoidRetargetQualitySettings :: property float UpperArmTwist { public get; }
 Mmd.MmdHumanoidRetargetQualitySettings :: property float UpperLegTwist { public get; }
 Mmd.MmdHumanoidRetargetQualitySettings :: property static Mmd.MmdHumanoidRetargetQualitySettings Default { public get; }
-Mmd.MmdHumanoidRetargeter :: (type) public static class MmdHumanoidRetargeter
-Mmd.MmdHumanoidRetargeter :: method public static Mmd.MmdHumanoidRetargeterResult RetargetPose(Mmd.MmdHumanoidProxyRigResult proxyRig, Mmd.UnityIntegration.MmdUnityModelInstance modelInstance)
-Mmd.MmdHumanoidRetargeter :: method public static Mmd.MmdHumanoidRetargeterResult RetargetPose(System.Collections.Generic.IReadOnlyList<Mmd.MmdHumanoidRetargetBinding> entries, bool copyLocalPositions = true)
 Mmd.MmdHumanoidRetargeterResult :: (type) public sealed class MmdHumanoidRetargeterResult
 Mmd.MmdHumanoidRetargeterResult :: ctor public .ctor(int copiedBoneCount, int skippedBoneCount, System.Collections.Generic.IReadOnlyList<string> diagnostics)
 Mmd.MmdHumanoidRetargeterResult :: ctor public .ctor(int copiedBoneCount, int skippedBoneCount, int copiedTranslationCount, int skippedTranslationCount, System.Collections.Generic.IReadOnlyList<string> diagnostics)
@@ -632,18 +575,6 @@ Mmd.MmdVmdParseSummary :: property int ModelKeyframeCount { public get; }
 Mmd.MmdVmdParseSummary :: property int MorphKeyframeCount { public get; }
 Mmd.MmdVmdParseSummary :: property int SelfShadowKeyframeCount { public get; }
 Mmd.MmdVmdParseSummary :: property string TargetModelName { public get; }
-Mmd.Mme.MmeEmdEffectMap :: (type) public sealed class MmeEmdEffectMap
-Mmd.Mme.MmeEmdEffectMap :: ctor public .ctor()
-Mmd.Mme.MmeEmdEffectMap :: field public System.Collections.Generic.List<Mmd.Mme.MmeEmdMaterialEffectAssignment> materialAssignments
-Mmd.Mme.MmeEmdEffectMap :: field public System.Collections.Generic.List<int> noneMaterialIndices
-Mmd.Mme.MmeEmdEffectMap :: field public string defaultEffectPath
-Mmd.Mme.MmeEmdMaterialEffectAssignment :: (type) public sealed class MmeEmdMaterialEffectAssignment
-Mmd.Mme.MmeEmdMaterialEffectAssignment :: ctor public .ctor()
-Mmd.Mme.MmeEmdMaterialEffectAssignment :: field public int materialIndex
-Mmd.Mme.MmeEmdMaterialEffectAssignment :: field public string effectPath
-Mmd.Mme.MmeEmdParser :: (type) public static class MmeEmdParser
-Mmd.Mme.MmeEmdParser :: method public static Mmd.Mme.MmeEmdEffectMap ParseEffectMap(string content)
-Mmd.Mme.MmeEmdParser :: method public static System.Collections.Generic.IReadOnlyList<Mmd.Mme.MmeEmdMaterialEffectAssignment> ParseMaterialEffectAssignments(string content)
 Mmd.Mme.MmeFxEffectDescriptor :: (type) public sealed class MmeFxEffectDescriptor
 Mmd.Mme.MmeFxEffectDescriptor :: ctor public .ctor()
 Mmd.Mme.MmeFxEffectDescriptor :: field public System.Collections.Generic.List<Mmd.Mme.MmeFxFloatParameter> floatParameters
@@ -673,11 +604,6 @@ Mmd.Mme.MmeFxFloatParameter :: (type) public sealed class MmeFxFloatParameter
 Mmd.Mme.MmeFxFloatParameter :: ctor public .ctor()
 Mmd.Mme.MmeFxFloatParameter :: field public float value
 Mmd.Mme.MmeFxFloatParameter :: field public string name
-Mmd.Mme.MmeFxParser :: (type) public static class MmeFxParser
-Mmd.Mme.MmeFxParser :: method public static Mmd.Mme.MmeFxEffectDescriptor TryParse(string content, string sourcePath)
-Mmd.Mme.MmeFxScanner :: (type) public static class MmeFxScanner
-Mmd.Mme.MmeFxScanner :: method public static System.Collections.Generic.IReadOnlyList<Mmd.Mme.MmeFxEffectDescriptor> ScanFromModelPath(string pmxPath)
-Mmd.Mme.MmeFxScanner :: method public static System.Collections.Generic.IReadOnlyList<Mmd.Mme.MmeFxEffectDescriptor> ScanFromModelPath(string pmxPath, int materialCount)
 Mmd.Motion.MmdCameraState :: (type) public readonly struct MmdCameraState
 Mmd.Motion.MmdCameraState :: ctor public .ctor(float distance, float[] position, float[] rotation, float viewAngle, bool perspective)
 Mmd.Motion.MmdCameraState :: property bool Perspective { public get; }
@@ -691,15 +617,6 @@ Mmd.Motion.MmdLightState :: ctor public .ctor(float[] color, float[] direction)
 Mmd.Motion.MmdLightState :: property float[] Color { public get; }
 Mmd.Motion.MmdLightState :: property float[] Direction { public get; }
 Mmd.Motion.MmdLightState :: property static Mmd.Motion.MmdLightState Default { public get; }
-Mmd.Motion.MmdSelfShadowMappingPolicy :: (type) public readonly struct MmdSelfShadowMappingPolicy
-Mmd.Motion.MmdSelfShadowMappingPolicy :: ctor public .ctor(bool enabled, float distanceScale = 100f, float minShadowDistance = 1f, float maxShadowDistance = 100f, float shadowStrength = 1f)
-Mmd.Motion.MmdSelfShadowMappingPolicy :: property bool Enabled { public get; }
-Mmd.Motion.MmdSelfShadowMappingPolicy :: property float DistanceScale { public get; }
-Mmd.Motion.MmdSelfShadowMappingPolicy :: property float MaxShadowDistance { public get; }
-Mmd.Motion.MmdSelfShadowMappingPolicy :: property float MinShadowDistance { public get; }
-Mmd.Motion.MmdSelfShadowMappingPolicy :: property float ShadowStrength { public get; }
-Mmd.Motion.MmdSelfShadowMappingPolicy :: property static Mmd.Motion.MmdSelfShadowMappingPolicy Disabled { public get; }
-Mmd.Motion.MmdSelfShadowMappingPolicy :: property static Mmd.Motion.MmdSelfShadowMappingPolicy OptInDefault { public get; }
 Mmd.Motion.MmdSelfShadowProjectionBounds :: (type) public readonly struct MmdSelfShadowProjectionBounds
 Mmd.Motion.MmdSelfShadowProjectionBounds :: ctor public .ctor(float centerX, float centerY, float centerZ, float sizeX, float sizeY, float sizeZ)
 Mmd.Motion.MmdSelfShadowProjectionBounds :: property float CenterX { public get; }
@@ -750,9 +667,6 @@ Mmd.Motion.MmdSelfShadowUnityShadowSettings :: property bool RuntimeApplicationE
 Mmd.Motion.MmdSelfShadowUnityShadowSettings :: property byte Mode { public get; }
 Mmd.Motion.MmdSelfShadowUnityShadowSettings :: property float ShadowDistance { public get; }
 Mmd.Motion.MmdSelfShadowUnityShadowSettings :: property float ShadowStrength { public get; }
-Mmd.Motion.VmdSelfShadowSampler :: (type) public static class VmdSelfShadowSampler
-Mmd.Motion.VmdSelfShadowSampler :: method public static Mmd.Motion.MmdSelfShadowState Sample(System.Collections.Generic.IReadOnlyList<Mmd.Parser.MmdSelfShadowKeyframeDefinition> keyframes, float frame)
-Mmd.Motion.VmdSelfShadowSampler :: method public static Mmd.Motion.MmdSelfShadowUnityShadowSettings MapToUnityShadowSettings(Mmd.Motion.MmdSelfShadowState state, Mmd.Motion.MmdSelfShadowMappingPolicy policy)
 Mmd.Native.MmdRuntimeNativeUnavailableException :: (type) public sealed class MmdRuntimeNativeUnavailableException : System.Exception
 Mmd.Parser.IMmdParser :: (type) public interface IMmdParser
 Mmd.Parser.IMmdParser :: method public Mmd.Parser.MmdModelDefinition LoadModel(System.ReadOnlySpan<byte> data)
@@ -946,8 +860,6 @@ Mmd.Parser.MmdMotionDefinition :: field public string targetModelName
 Mmd.Parser.MmdMotionValidator :: (type) public static class MmdMotionValidator
 Mmd.Parser.MmdMotionValidator :: method public static System.Collections.Generic.IReadOnlyList<string> ValidateStructuralMotion(Mmd.Parser.MmdMotionDefinition motion)
 Mmd.Parser.MmdMotionValidator :: method public static void ThrowIfInvalid(Mmd.Parser.MmdMotionDefinition motion)
-Mmd.Parser.MmdParserInput :: (type) public static class MmdParserInput
-Mmd.Parser.MmdParserInput :: method public static void RequireNonEmpty(System.ReadOnlySpan<byte> data, string parameterName)
 Mmd.Parser.MmdPhysicsDefinition :: (type) public sealed class MmdPhysicsDefinition
 Mmd.Parser.MmdPhysicsDefinition :: ctor public .ctor()
 Mmd.Parser.MmdPhysicsDefinition :: field public System.Collections.Generic.List<Mmd.Parser.MmdJointDefinition> joints
@@ -1001,14 +913,6 @@ Mmd.Parser.NativeMmdParser :: (type) public sealed class NativeMmdParser : Mmd.P
 Mmd.Parser.NativeMmdParser :: ctor public .ctor()
 Mmd.Parser.NativeMmdParser :: method public Mmd.Parser.MmdModelDefinition LoadModel(System.ReadOnlySpan<byte> data)
 Mmd.Parser.NativeMmdParser :: method public Mmd.Parser.MmdMotionDefinition LoadMotion(System.ReadOnlySpan<byte> data)
-Mmd.Physics.MmdPhysicsBackendAvailability :: (type) public sealed class MmdPhysicsBackendAvailability
-Mmd.Physics.MmdPhysicsBackendAvailability :: ctor public .ctor()
-Mmd.Physics.MmdPhysicsBackendAvailability :: field public bool backendAvailable
-Mmd.Physics.MmdPhysicsBackendAvailability :: field public string backendName
-Mmd.Physics.MmdPhysicsBackendAvailability :: field public string nativeVersion
-Mmd.Physics.MmdPhysicsBackendAvailability :: field public string status
-Mmd.Physics.MmdPhysicsBackendAvailability :: field public string unsupportedReason
-Mmd.Physics.MmdPhysicsBackendAvailability :: field public string wrapperLibraryName
 Mmd.Physics.MmdPhysicsBackendException :: (type) public sealed class MmdPhysicsBackendException : System.InvalidOperationException
 Mmd.Physics.MmdPhysicsBackendException :: ctor public .ctor(string operation, string backend, string status, string backendMessage, string modelId = "", string motionId = "")
 Mmd.Physics.MmdPhysicsBackendException :: property string backend { public get; }
@@ -1017,33 +921,10 @@ Mmd.Physics.MmdPhysicsBackendException :: property string modelId { public get; 
 Mmd.Physics.MmdPhysicsBackendException :: property string motionId { public get; }
 Mmd.Physics.MmdPhysicsBackendException :: property string operation { public get; }
 Mmd.Physics.MmdPhysicsBackendException :: property string status { public get; }
-Mmd.Physics.MmdPhysicsBodyTransform :: (type) public sealed class MmdPhysicsBodyTransform
-Mmd.Physics.MmdPhysicsBodyTransform :: ctor public .ctor()
-Mmd.Physics.MmdPhysicsBodyTransform :: field public float[] position
-Mmd.Physics.MmdPhysicsBodyTransform :: field public float[] rotation
-Mmd.Physics.MmdPhysicsDescriptorValidator :: (type) public static class MmdPhysicsDescriptorValidator
-Mmd.Physics.MmdPhysicsDescriptorValidator :: method public static System.Collections.Generic.IReadOnlyList<string> Validate(Mmd.Parser.MmdModelDefinition model)
-Mmd.Physics.MmdPhysicsDescriptorValidator :: method public static void ThrowIfInvalid(Mmd.Parser.MmdModelDefinition model)
 Mmd.Physics.MmdPhysicsMode :: (type) public enum MmdPhysicsMode : int
 Mmd.Physics.MmdPhysicsMode :: enum Cache = 2
 Mmd.Physics.MmdPhysicsMode :: enum Live = 1
 Mmd.Physics.MmdPhysicsMode :: enum Off = 0
-Mmd.Physics.MmdPhysicsModePolicyRecord :: (type) public sealed class MmdPhysicsModePolicyRecord
-Mmd.Physics.MmdPhysicsModePolicyRecord :: ctor public .ctor()
-Mmd.Physics.MmdPhysicsModePolicyRecord :: field public bool isDeterministic
-Mmd.Physics.MmdPhysicsModePolicyRecord :: field public bool supportsRandomAccess
-Mmd.Physics.MmdPhysicsModePolicyRecord :: field public string backendName
-Mmd.Physics.MmdPhysicsModePolicyRecord :: field public string physicsMode
-Mmd.Physics.MmdPhysicsModePolicyRecord :: field public string status
-Mmd.Physics.MmdPhysicsModePolicyRecord :: field public string unsupportedReason
-Mmd.Physics.MmdPhysicsPolicy :: (type) public static class MmdPhysicsPolicy
-Mmd.Physics.MmdPhysicsPolicy :: const public string StatusAvailable = "available"
-Mmd.Physics.MmdPhysicsPolicy :: const public string StatusUnsupported = "unsupported"
-Mmd.Physics.MmdPhysicsPolicy :: method public static Mmd.Physics.MmdPhysicsModePolicyRecord Describe(Mmd.Physics.MmdPhysicsMode mode)
-Mmd.Physics.MmdPhysicsPolicy :: method public static void ThrowIfRandomAccessUnsupported(Mmd.Physics.MmdPhysicsMode mode)
-Mmd.Physics.MmdPhysicsPolicy :: method public static void ValidateLiveStepInput(int frame, float deltaTime)
-Mmd.Rendering.MmdCompositeMorphWeightResolver :: (type) public static class MmdCompositeMorphWeightResolver
-Mmd.Rendering.MmdCompositeMorphWeightResolver :: method public static System.Collections.Generic.IReadOnlyDictionary<string, float> Resolve(System.Collections.Generic.IReadOnlyDictionary<string, float> frameWeights, System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdGroupMorphDescriptor> groupMorphs, System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor> flipMorphs)
 Mmd.Rendering.MmdGroupMorphDescriptor :: (type) public sealed class MmdGroupMorphDescriptor
 Mmd.Rendering.MmdGroupMorphDescriptor :: ctor public .ctor()
 Mmd.Rendering.MmdGroupMorphDescriptor :: field public System.Collections.Generic.List<Mmd.Rendering.MmdGroupMorphOffsetDescriptor> offsets
@@ -1054,8 +935,6 @@ Mmd.Rendering.MmdGroupMorphOffsetDescriptor :: ctor public .ctor()
 Mmd.Rendering.MmdGroupMorphOffsetDescriptor :: field public float weight
 Mmd.Rendering.MmdGroupMorphOffsetDescriptor :: field public int targetMorphIndex
 Mmd.Rendering.MmdGroupMorphOffsetDescriptor :: field public string targetMorphName
-Mmd.Rendering.MmdGroupMorphWeightResolver :: (type) public static class MmdGroupMorphWeightResolver
-Mmd.Rendering.MmdGroupMorphWeightResolver :: method public static System.Collections.Generic.IReadOnlyDictionary<string, float> Resolve(System.Collections.Generic.IReadOnlyDictionary<string, float> frameWeights, System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdGroupMorphDescriptor> groupMorphs)
 Mmd.Rendering.MmdMaterialDescriptor :: (type) public sealed class MmdMaterialDescriptor
 Mmd.Rendering.MmdMaterialDescriptor :: ctor public .ctor()
 Mmd.Rendering.MmdMaterialDescriptor :: field public bool drawEdgeFlag
@@ -1089,98 +968,10 @@ Mmd.Rendering.MmdMaterialDescriptor :: field public string sphereTexture
 Mmd.Rendering.MmdMaterialDescriptor :: field public string sphereTextureMode
 Mmd.Rendering.MmdMaterialDescriptor :: field public string texture
 Mmd.Rendering.MmdMaterialDescriptor :: field public string toonTexture
-Mmd.Rendering.MmdMaterialDescriptorBuilder :: (type) public static class MmdMaterialDescriptorBuilder
-Mmd.Rendering.MmdMaterialDescriptorBuilder :: method public static System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdMaterialDescriptor> Build(Mmd.Parser.MmdModelDefinition model)
-Mmd.Rendering.MmdMaterialMorphEvaluator :: (type) public static class MmdMaterialMorphEvaluator
-Mmd.Rendering.MmdMaterialMorphEvaluator :: method public static System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdMaterialDescriptor> ApplyMaterialMorphs(System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdMaterialDescriptor> baseMaterials, System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdMorphDescriptorBuilder.MmdMaterialMorphDescriptor> materialMorphs, System.Collections.Generic.IReadOnlyDictionary<string, float> morphWeights)
 Mmd.Rendering.MmdMaterialPreset :: (type) public enum MmdMaterialPreset : int
 Mmd.Rendering.MmdMaterialPreset :: enum MmdToon = 0
 Mmd.Rendering.MmdMaterialPreset :: enum MmdToonLit = 2
 Mmd.Rendering.MmdMaterialPreset :: enum UrpLit = 1
-Mmd.Rendering.MmdMaterialPropertyNames :: (type) public static class MmdMaterialPropertyNames
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string Alpha = "_Alpha"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string AlphaClipThreshold = "_AlphaClipThreshold"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string AmbientColor = "_AmbientColor"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string BaseColor = "_BaseColor"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string BumpMap = "_BumpMap"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string BumpScale = "_BumpScale"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string Color = "_Color"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string Cutoff = "_Cutoff"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string EmissionColor = "_EmissionColor"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string EmissionMap = "_EmissionMap"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string Metallic = "_Metallic"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string MetallicGlossMap = "_MetallicGlossMap"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string MmdEmissionIntensity = "_MmdEmissionIntensity"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string MmdEmissionMapBound = "_MmdEmissionMapBound"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string MmdEmissionMask = "_MmdEmissionMask"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string MmdEmissionMaskBound = "_MmdEmissionMaskBound"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string MmdLightColor = "_MmdLightColor"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string MmdLightDirection = "_MmdLightDirection"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string MmdMetallicMap = "_MmdMetallicMap"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string MmdMetallicMapBound = "_MmdMetallicMapBound"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string MmdNormalMap = "_MmdNormalMap"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string MmdNormalMapBound = "_MmdNormalMapBound"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string MmdOcclusionMap = "_MmdOcclusionMap"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string MmdOcclusionMapBound = "_MmdOcclusionMapBound"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string MmdRoughnessMap = "_MmdRoughnessMap"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string MmdRoughnessMapBound = "_MmdRoughnessMapBound"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string MmdSelfShadowMap = "_MmdSelfShadowMap"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string MmdSelfShadowParams = "_MmdSelfShadowParams"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string MmdSelfShadowReceive = "_MmdSelfShadowReceive"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string MmdSelfShadowWorldToShadow = "_MmdSelfShadowWorldToShadow"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string OcclusionMap = "_OcclusionMap"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string OcclusionStrength = "_OcclusionStrength"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string OutlineColor = "_OutlineColor"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string OutlineVisible = "_OutlineVisible"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string OutlineWidth = "_OutlineWidth"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string RimBoundary = "_RimBoundary"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string RimColor = "_RimColor"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string RimFeather = "_RimFeather"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string RimLightFollow = "_RimLightFollow"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string ShadowAlphaClipThreshold = "_ShadowAlphaClipThreshold"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string Smoothness = "_Smoothness"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string StylizedSpecularBoundary = "_StylizedSpecularBoundary"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string StylizedSpecularColor = "_StylizedSpecularColor"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string StylizedSpecularFeather = "_StylizedSpecularFeather"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string TextureAlphaOutputWeight = "_TextureAlphaOutputWeight"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string ToonBandCount = "_ToonBandCount"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string ToonBoundary = "_ToonBoundary"
-Mmd.Rendering.MmdMaterialPropertyNames :: const public string ToonFeather = "_ToonFeather"
-Mmd.Rendering.MmdMaterialTransparencyPolicy :: (type) public static class MmdMaterialTransparencyPolicy
-Mmd.Rendering.MmdMaterialTransparencyPolicy :: const public float PartialAlphaRatioThreshold = 0.25f
-Mmd.Rendering.MmdMaterialTransparencyPolicy :: const public int TextureAlphaBlendThreshold = 100
-Mmd.Rendering.MmdMaterialTransparencyPolicy :: const public int TextureOpaqueAlphaThreshold = 255
-Mmd.Rendering.MmdMaterialTransparencyPolicy :: const public string ModeAlphaBlend = "alphaBlend"
-Mmd.Rendering.MmdMaterialTransparencyPolicy :: const public string ModeAlphaTest = "alphaTest"
-Mmd.Rendering.MmdMaterialTransparencyPolicy :: const public string ModeOpaque = "opaque"
-Mmd.Rendering.MmdMaterialTransparencyPolicy :: method public static Mmd.Rendering.MmdMaterialTransparencyPolicy.MaterialTransparencyDiagnostic ResolveDiagnostic(float materialAlpha, string materialName, string textureExtension, System.Collections.Generic.IReadOnlyList<int> textureAlphaValues, int materialRenderOrder)
-Mmd.Rendering.MmdMaterialTransparencyPolicy :: method public static Mmd.Rendering.MmdMaterialTransparencyPolicy.TextureAlphaScanResult ClassifyTextureAlpha(System.Collections.Generic.IReadOnlyList<int> alphaValues)
-Mmd.Rendering.MmdMaterialTransparencyPolicy :: method public static bool IsLikelyMmdAlphaOverlayMaterial(string materialName)
-Mmd.Rendering.MmdMaterialTransparencyPolicy :: method public static bool IsLikelyMmdSoftAlphaOverlayMaterial(string materialName)
-Mmd.Rendering.MmdMaterialTransparencyPolicy :: method public static string ResolveMaterialTransparencyMode(float materialAlpha, string materialName, string textureExtension, System.Collections.Generic.IReadOnlyList<int> textureAlphaValues)
-Mmd.Rendering.MmdMaterialTransparencyPolicy.MaterialTransparencyDiagnostic :: (type) public sealed class MaterialTransparencyDiagnostic
-Mmd.Rendering.MmdMaterialTransparencyPolicy.MaterialTransparencyDiagnostic :: ctor public .ctor()
-Mmd.Rendering.MmdMaterialTransparencyPolicy.MaterialTransparencyDiagnostic :: field public int materialRenderOrder
-Mmd.Rendering.MmdMaterialTransparencyPolicy.MaterialTransparencyDiagnostic :: field public int renderQueue
-Mmd.Rendering.MmdMaterialTransparencyPolicy.MaterialTransparencyDiagnostic :: field public int renderQueueOffset
-Mmd.Rendering.MmdMaterialTransparencyPolicy.MaterialTransparencyDiagnostic :: field public string depthWritePolicy
-Mmd.Rendering.MmdMaterialTransparencyPolicy.MaterialTransparencyDiagnostic :: field public string resolvedTransparencyMode
-Mmd.Rendering.MmdMaterialTransparencyPolicy.RenderQueueValue :: (type) public enum RenderQueueValue : int
-Mmd.Rendering.MmdMaterialTransparencyPolicy.RenderQueueValue :: enum Geometry = 2000
-Mmd.Rendering.MmdMaterialTransparencyPolicy.RenderQueueValue :: enum Transparent = 3000
-Mmd.Rendering.MmdMaterialTransparencyPolicy.TextureAlphaScanResult :: (type) public sealed class TextureAlphaScanResult
-Mmd.Rendering.MmdMaterialTransparencyPolicy.TextureAlphaScanResult :: ctor public .ctor()
-Mmd.Rendering.MmdMaterialTransparencyPolicy.TextureAlphaScanResult :: field public float averageMiddleAlpha
-Mmd.Rendering.MmdMaterialTransparencyPolicy.TextureAlphaScanResult :: field public float middleAlphaRatio
-Mmd.Rendering.MmdMaterialTransparencyPolicy.TextureAlphaScanResult :: field public int maxAlpha
-Mmd.Rendering.MmdMaterialTransparencyPolicy.TextureAlphaScanResult :: field public int middleAlphaCount
-Mmd.Rendering.MmdMaterialTransparencyPolicy.TextureAlphaScanResult :: field public int minAlpha
-Mmd.Rendering.MmdMaterialTransparencyPolicy.TextureAlphaScanResult :: field public int pixelCount
-Mmd.Rendering.MmdMaterialTransparencyPolicy.TextureAlphaScanResult :: field public string textureAlphaClassificationReason
-Mmd.Rendering.MmdMaterialTransparencyPolicy.TextureAlphaScanResult :: field public string textureAlphaMode
-Mmd.Rendering.MmdMeshDescriptorBuilder :: (type) public static class MmdMeshDescriptorBuilder
-Mmd.Rendering.MmdMeshDescriptorBuilder :: method public static System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdMeshVertexDescriptor> BuildVertices(Mmd.Parser.MmdModelDefinition model)
-Mmd.Rendering.MmdMeshDescriptorBuilder :: method public static System.Collections.Generic.IReadOnlyList<int> BuildIndices(Mmd.Parser.MmdModelDefinition model)
 Mmd.Rendering.MmdMeshVertexDescriptor :: (type) public sealed class MmdMeshVertexDescriptor
 Mmd.Rendering.MmdMeshVertexDescriptor :: ctor public .ctor()
 Mmd.Rendering.MmdMeshVertexDescriptor :: field public float edgeScale
@@ -1283,50 +1074,6 @@ Mmd.Rendering.MmdMorphDescriptorBuilder.MmdUvMorphOffsetDescriptor :: field publ
 Mmd.Rendering.MmdMorphDescriptorBuilder.MmdUvMorphOffsetDescriptor :: field public bool targetVertexExists
 Mmd.Rendering.MmdMorphDescriptorBuilder.MmdUvMorphOffsetDescriptor :: field public float[] positionDelta
 Mmd.Rendering.MmdMorphDescriptorBuilder.MmdUvMorphOffsetDescriptor :: field public int vertexIndex
-Mmd.Rendering.MmdMorphMeshPartitionDescriptorBuilder :: (type) public static class MmdMorphMeshPartitionDescriptorBuilder
-Mmd.Rendering.MmdMorphMeshPartitionDescriptorBuilder :: const public string CrossSubmeshRecommendation = "cross-submesh-partition-required"
-Mmd.Rendering.MmdMorphMeshPartitionDescriptorBuilder :: const public string NoRenderedCoverageRecommendation = "no-rendered-vertex-coverage"
-Mmd.Rendering.MmdMorphMeshPartitionDescriptorBuilder :: const public string SingleSubmeshRecommendation = "single-submesh-local"
-Mmd.Rendering.MmdMorphMeshPartitionDescriptorBuilder :: const public string UnmappedVertexRecommendation = "inspect-unmapped-vertex-offsets"
-Mmd.Rendering.MmdMorphMeshPartitionDescriptorBuilder :: method public static Mmd.Rendering.MmdMorphMeshPartitionSummaryDescriptor Build(Mmd.Rendering.MmdRenderingDescriptor rendering)
-Mmd.Rendering.MmdMorphMeshPartitionMaterialDescriptor :: (type) public sealed class MmdMorphMeshPartitionMaterialDescriptor
-Mmd.Rendering.MmdMorphMeshPartitionMaterialDescriptor :: ctor public .ctor()
-Mmd.Rendering.MmdMorphMeshPartitionMaterialDescriptor :: field public bool drawEdgeFlag
-Mmd.Rendering.MmdMorphMeshPartitionMaterialDescriptor :: field public bool drawEdgeFlagExposed
-Mmd.Rendering.MmdMorphMeshPartitionMaterialDescriptor :: field public bool isTransparent
-Mmd.Rendering.MmdMorphMeshPartitionMaterialDescriptor :: field public bool outlineEligible
-Mmd.Rendering.MmdMorphMeshPartitionMaterialDescriptor :: field public float alpha
-Mmd.Rendering.MmdMorphMeshPartitionMaterialDescriptor :: field public float edgeSize
-Mmd.Rendering.MmdMorphMeshPartitionMaterialDescriptor :: field public int materialIndex
-Mmd.Rendering.MmdMorphMeshPartitionMaterialDescriptor :: field public int vertexCount
-Mmd.Rendering.MmdMorphMeshPartitionMaterialDescriptor :: field public int vertexStart
-Mmd.Rendering.MmdMorphMeshPartitionMaterialDescriptor :: field public string cullingPolicy
-Mmd.Rendering.MmdMorphMeshPartitionMaterialDescriptor :: field public string renderOrderBucket
-Mmd.Rendering.MmdMorphMeshPartitionSubmeshDescriptor :: (type) public sealed class MmdMorphMeshPartitionSubmeshDescriptor
-Mmd.Rendering.MmdMorphMeshPartitionSubmeshDescriptor :: ctor public .ctor()
-Mmd.Rendering.MmdMorphMeshPartitionSubmeshDescriptor :: field public int indexCount
-Mmd.Rendering.MmdMorphMeshPartitionSubmeshDescriptor :: field public int indexStart
-Mmd.Rendering.MmdMorphMeshPartitionSubmeshDescriptor :: field public int materialIndex
-Mmd.Rendering.MmdMorphMeshPartitionSubmeshDescriptor :: field public int maxReferencedVertexIndex
-Mmd.Rendering.MmdMorphMeshPartitionSubmeshDescriptor :: field public int minReferencedVertexIndex
-Mmd.Rendering.MmdMorphMeshPartitionSubmeshDescriptor :: field public int submeshIndex
-Mmd.Rendering.MmdMorphMeshPartitionSubmeshDescriptor :: field public int uniqueReferencedVertexCount
-Mmd.Rendering.MmdMorphMeshPartitionSummaryDescriptor :: (type) public sealed class MmdMorphMeshPartitionSummaryDescriptor
-Mmd.Rendering.MmdMorphMeshPartitionSummaryDescriptor :: ctor public .ctor()
-Mmd.Rendering.MmdMorphMeshPartitionSummaryDescriptor :: field public System.Collections.Generic.List<Mmd.Rendering.MmdMorphMeshPartitionMaterialDescriptor> materials
-Mmd.Rendering.MmdMorphMeshPartitionSummaryDescriptor :: field public System.Collections.Generic.List<Mmd.Rendering.MmdMorphMeshPartitionSubmeshDescriptor> submeshes
-Mmd.Rendering.MmdMorphMeshPartitionSummaryDescriptor :: field public System.Collections.Generic.List<Mmd.Rendering.MmdVertexMorphMeshPartitionDescriptor> vertexMorphPartitions
-Mmd.Rendering.MmdMorphMeshPartitionSummaryDescriptor :: field public int crossMaterialMorphCount
-Mmd.Rendering.MmdMorphMeshPartitionSummaryDescriptor :: field public int crossSubmeshMorphCount
-Mmd.Rendering.MmdMorphMeshPartitionSummaryDescriptor :: field public int indexCount
-Mmd.Rendering.MmdMorphMeshPartitionSummaryDescriptor :: field public int materialCount
-Mmd.Rendering.MmdMorphMeshPartitionSummaryDescriptor :: field public int maxTouchedSubmeshCount
-Mmd.Rendering.MmdMorphMeshPartitionSummaryDescriptor :: field public int outlineTouchedMorphCount
-Mmd.Rendering.MmdMorphMeshPartitionSummaryDescriptor :: field public int submeshCount
-Mmd.Rendering.MmdMorphMeshPartitionSummaryDescriptor :: field public int transparentTouchedMorphCount
-Mmd.Rendering.MmdMorphMeshPartitionSummaryDescriptor :: field public int unmappedVertexOffsetCount
-Mmd.Rendering.MmdMorphMeshPartitionSummaryDescriptor :: field public int vertexCount
-Mmd.Rendering.MmdMorphMeshPartitionSummaryDescriptor :: field public int vertexMorphCount
 Mmd.Rendering.MmdMorphTypeInventoryDescriptor :: (type) public sealed class MmdMorphTypeInventoryDescriptor
 Mmd.Rendering.MmdMorphTypeInventoryDescriptor :: ctor public .ctor()
 Mmd.Rendering.MmdMorphTypeInventoryDescriptor :: field public bool evaluatedByVertexMorphEvaluator
@@ -1362,15 +1109,6 @@ Mmd.Rendering.MmdRenderingDescriptor :: field public int ikCount
 Mmd.Rendering.MmdRenderingDescriptorBuilder :: (type) public static class MmdRenderingDescriptorBuilder
 Mmd.Rendering.MmdRenderingDescriptorBuilder :: method public static Mmd.Rendering.MmdRenderingDescriptor Build(Mmd.Parser.MmdModelDefinition model)
 Mmd.Rendering.MmdRenderingDescriptorBuilder :: method public static Mmd.Rendering.MmdRenderingDescriptor Build(Mmd.Parser.MmdModelDefinition model, Mmd.Rendering.MmdMaterialPreset preset)
-Mmd.Rendering.MmdRenderingMeshSplitResult :: (type) public sealed class MmdRenderingMeshSplitResult
-Mmd.Rendering.MmdRenderingMeshSplitResult :: ctor public .ctor()
-Mmd.Rendering.MmdRenderingMeshSplitResult :: field public Mmd.Rendering.MmdRenderingDescriptor rendering
-Mmd.Rendering.MmdRenderingMeshSplitResult :: field public System.Collections.Generic.List<Mmd.Rendering.MmdSplitVertexSourceDescriptor> vertexSources
-Mmd.Rendering.MmdRenderingMeshSplitResult :: field public int duplicatedVertexCount
-Mmd.Rendering.MmdRenderingMeshSplitResult :: field public int sourceVertexCount
-Mmd.Rendering.MmdRenderingMeshSplitResult :: field public int splitVertexCount
-Mmd.Rendering.MmdRenderingMeshSplitter :: (type) public static class MmdRenderingMeshSplitter
-Mmd.Rendering.MmdRenderingMeshSplitter :: method public static Mmd.Rendering.MmdRenderingMeshSplitResult SplitBySubmesh(Mmd.Rendering.MmdRenderingDescriptor source)
 Mmd.Rendering.MmdSkinningDescriptor :: (type) public sealed class MmdSkinningDescriptor
 Mmd.Rendering.MmdSkinningDescriptor :: ctor public .ctor()
 Mmd.Rendering.MmdSkinningDescriptor :: field public bool exactRuntimeSkinning
@@ -1382,45 +1120,12 @@ Mmd.Rendering.MmdSkinningDescriptor :: field public string normalizedFamily
 Mmd.Rendering.MmdSkinningDescriptor :: field public string skinningMode
 Mmd.Rendering.MmdSkinningDescriptor :: field public string supportReason
 Mmd.Rendering.MmdSkinningDescriptor :: field public string supportStatus
-Mmd.Rendering.MmdSkinningDescriptorBuilder :: (type) public static class MmdSkinningDescriptorBuilder
-Mmd.Rendering.MmdSkinningDescriptorBuilder :: const public string BoneWeightHandoffReason = "bone-index-weight-handoff"
-Mmd.Rendering.MmdSkinningDescriptorBuilder :: const public string CurrentRuntimeSupportedStatus = "current-runtime-supported"
-Mmd.Rendering.MmdSkinningDescriptorBuilder :: const public string LinearFallbackStatus = "linear-fallback"
-Mmd.Rendering.MmdSkinningDescriptorBuilder :: const public string NotSupportedStatus = "not-supported"
-Mmd.Rendering.MmdSkinningDescriptorBuilder :: const public string QdefDualQuaternionFutureReason = "qdef-dual-quaternion-future"
-Mmd.Rendering.MmdSkinningDescriptorBuilder :: const public string SdefExactDeformationFutureReason = "sdef-exact-deformation-future"
-Mmd.Rendering.MmdSkinningDescriptorBuilder :: const public string UnknownSkinningModeReason = "unknown-skinning-mode"
-Mmd.Rendering.MmdSkinningDescriptorBuilder :: method public static System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdSkinningDescriptor> Build(Mmd.Parser.MmdModelDefinition model)
-Mmd.Rendering.MmdSkinningDescriptorBuilder :: method public static System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdSkinningModeInventoryDescriptor> BuildModeInventory(Mmd.Parser.MmdModelDefinition model)
-Mmd.Rendering.MmdSkinningModeInventoryDescriptor :: (type) public sealed class MmdSkinningModeInventoryDescriptor
-Mmd.Rendering.MmdSkinningModeInventoryDescriptor :: ctor public .ctor()
-Mmd.Rendering.MmdSkinningModeInventoryDescriptor :: field public bool boneInfluenceCountMatchesMode
-Mmd.Rendering.MmdSkinningModeInventoryDescriptor :: field public bool exactRuntimeSkinning
-Mmd.Rendering.MmdSkinningModeInventoryDescriptor :: field public bool handedOffToSkinningDescriptor
-Mmd.Rendering.MmdSkinningModeInventoryDescriptor :: field public bool hasSdefParameters
-Mmd.Rendering.MmdSkinningModeInventoryDescriptor :: field public bool linearFallbackToBoneWeights
-Mmd.Rendering.MmdSkinningModeInventoryDescriptor :: field public int boneInfluenceCount
-Mmd.Rendering.MmdSkinningModeInventoryDescriptor :: field public int expectedBoneInfluenceCount
-Mmd.Rendering.MmdSkinningModeInventoryDescriptor :: field public int vertexIndex
-Mmd.Rendering.MmdSkinningModeInventoryDescriptor :: field public string normalizedFamily
-Mmd.Rendering.MmdSkinningModeInventoryDescriptor :: field public string sdefParameterStatus
-Mmd.Rendering.MmdSkinningModeInventoryDescriptor :: field public string skinningMode
-Mmd.Rendering.MmdSkinningModeInventoryDescriptor :: field public string supportReason
-Mmd.Rendering.MmdSkinningModeInventoryDescriptor :: field public string supportStatus
-Mmd.Rendering.MmdSplitVertexSourceDescriptor :: (type) public sealed class MmdSplitVertexSourceDescriptor
-Mmd.Rendering.MmdSplitVertexSourceDescriptor :: ctor public .ctor()
-Mmd.Rendering.MmdSplitVertexSourceDescriptor :: field public int materialIndex
-Mmd.Rendering.MmdSplitVertexSourceDescriptor :: field public int sourceVertexIndex
-Mmd.Rendering.MmdSplitVertexSourceDescriptor :: field public int splitVertexIndex
-Mmd.Rendering.MmdSplitVertexSourceDescriptor :: field public int submeshIndex
 Mmd.Rendering.MmdSubmeshDescriptor :: (type) public sealed class MmdSubmeshDescriptor
 Mmd.Rendering.MmdSubmeshDescriptor :: ctor public .ctor()
 Mmd.Rendering.MmdSubmeshDescriptor :: field public int indexCount
 Mmd.Rendering.MmdSubmeshDescriptor :: field public int indexStart
 Mmd.Rendering.MmdSubmeshDescriptor :: field public int materialIndex
 Mmd.Rendering.MmdSubmeshDescriptor :: field public int submeshIndex
-Mmd.Rendering.MmdSubmeshDescriptorBuilder :: (type) public static class MmdSubmeshDescriptorBuilder
-Mmd.Rendering.MmdSubmeshDescriptorBuilder :: method public static System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdSubmeshDescriptor> Build(System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdMaterialDescriptor> materials)
 Mmd.Rendering.MmdTextureOrientationDescriptor :: (type) public sealed class MmdTextureOrientationDescriptor
 Mmd.Rendering.MmdTextureOrientationDescriptor :: ctor public .ctor()
 Mmd.Rendering.MmdTextureOrientationDescriptor :: field public bool flipTexturePixels
@@ -1437,14 +1142,6 @@ Mmd.Rendering.MmdTextureOrientationDescriptor :: field public string headlessSna
 Mmd.Rendering.MmdTextureOrientationDescriptor :: field public string sourceUvConvention
 Mmd.Rendering.MmdTextureOrientationDescriptor :: field public string viewportUvConvention
 Mmd.Rendering.MmdTextureOrientationDescriptor :: field public string viewportVTransform
-Mmd.Rendering.MmdTextureOrientationDescriptorBuilder :: (type) public static class MmdTextureOrientationDescriptorBuilder
-Mmd.Rendering.MmdTextureOrientationDescriptorBuilder :: const public string MmdUvConvention = "mmd-texture-space"
-Mmd.Rendering.MmdTextureOrientationDescriptorBuilder :: const public string UnityUvConvention = "unity-viewport-space"
-Mmd.Rendering.MmdTextureOrientationDescriptorBuilder :: const public string ViewportVTransform = "v = 1 - sourceV"
-Mmd.Rendering.MmdTextureOrientationDescriptorBuilder :: method public static Mmd.Rendering.MmdTextureOrientationDescriptor Build(System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdMeshVertexDescriptor> vertices)
-Mmd.Rendering.MmdTextureOrientationDescriptorBuilder :: method public static float[] ToViewportUv(float[] sourceUv)
-Mmd.Rendering.MmdTextureUvMorphEvaluator :: (type) public static class MmdTextureUvMorphEvaluator
-Mmd.Rendering.MmdTextureUvMorphEvaluator :: method public static System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdMeshVertexDescriptor> ApplyTextureUvMorphs(System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdMeshVertexDescriptor> vertices, System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdMorphDescriptorBuilder.MmdUvMorphDescriptor> uvMorphs, System.Collections.Generic.IReadOnlyDictionary<string, float> morphWeights)
 Mmd.Rendering.MmdUrpMaterialBindingDescriptor :: (type) public sealed class MmdUrpMaterialBindingDescriptor
 Mmd.Rendering.MmdUrpMaterialBindingDescriptor :: ctor public .ctor()
 Mmd.Rendering.MmdUrpMaterialBindingDescriptor :: field public bool drawEdgeFlag
@@ -1494,32 +1191,6 @@ Mmd.Rendering.MmdVertexMorphDescriptor :: ctor public .ctor()
 Mmd.Rendering.MmdVertexMorphDescriptor :: field public System.Collections.Generic.List<Mmd.Rendering.MmdVertexMorphOffsetDescriptor> offsets
 Mmd.Rendering.MmdVertexMorphDescriptor :: field public int morphIndex
 Mmd.Rendering.MmdVertexMorphDescriptor :: field public string morphName
-Mmd.Rendering.MmdVertexMorphEvaluator :: (type) public static class MmdVertexMorphEvaluator
-Mmd.Rendering.MmdVertexMorphEvaluator :: method public static System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdMeshVertexDescriptor> ApplyVertexMorphs(System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdMeshVertexDescriptor> vertices, System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdVertexMorphDescriptor> vertexMorphs, System.Collections.Generic.IReadOnlyDictionary<string, float> morphWeights)
-Mmd.Rendering.MmdVertexMorphMeshPartitionCoverageDescriptor :: (type) public sealed class MmdVertexMorphMeshPartitionCoverageDescriptor
-Mmd.Rendering.MmdVertexMorphMeshPartitionCoverageDescriptor :: ctor public .ctor()
-Mmd.Rendering.MmdVertexMorphMeshPartitionCoverageDescriptor :: field public int materialIndex
-Mmd.Rendering.MmdVertexMorphMeshPartitionCoverageDescriptor :: field public int offsetVertexCount
-Mmd.Rendering.MmdVertexMorphMeshPartitionCoverageDescriptor :: field public int referencedTriangleIndexCount
-Mmd.Rendering.MmdVertexMorphMeshPartitionCoverageDescriptor :: field public int submeshIndex
-Mmd.Rendering.MmdVertexMorphMeshPartitionDescriptor :: (type) public sealed class MmdVertexMorphMeshPartitionDescriptor
-Mmd.Rendering.MmdVertexMorphMeshPartitionDescriptor :: ctor public .ctor()
-Mmd.Rendering.MmdVertexMorphMeshPartitionDescriptor :: field public System.Collections.Generic.List<Mmd.Rendering.MmdVertexMorphMeshPartitionCoverageDescriptor> coverage
-Mmd.Rendering.MmdVertexMorphMeshPartitionDescriptor :: field public System.Collections.Generic.List<int> touchedMaterialIndices
-Mmd.Rendering.MmdVertexMorphMeshPartitionDescriptor :: field public System.Collections.Generic.List<int> touchedSubmeshIndices
-Mmd.Rendering.MmdVertexMorphMeshPartitionDescriptor :: field public bool crossesMaterialRange
-Mmd.Rendering.MmdVertexMorphMeshPartitionDescriptor :: field public bool crossesSubmeshRange
-Mmd.Rendering.MmdVertexMorphMeshPartitionDescriptor :: field public bool touchesOpaqueMaterial
-Mmd.Rendering.MmdVertexMorphMeshPartitionDescriptor :: field public bool touchesOutlineEligibleMaterial
-Mmd.Rendering.MmdVertexMorphMeshPartitionDescriptor :: field public bool touchesTransparentMaterial
-Mmd.Rendering.MmdVertexMorphMeshPartitionDescriptor :: field public int maxVertexIndex
-Mmd.Rendering.MmdVertexMorphMeshPartitionDescriptor :: field public int minVertexIndex
-Mmd.Rendering.MmdVertexMorphMeshPartitionDescriptor :: field public int morphIndex
-Mmd.Rendering.MmdVertexMorphMeshPartitionDescriptor :: field public int offsetCount
-Mmd.Rendering.MmdVertexMorphMeshPartitionDescriptor :: field public int uniqueVertexCount
-Mmd.Rendering.MmdVertexMorphMeshPartitionDescriptor :: field public int unmappedVertexOffsetCount
-Mmd.Rendering.MmdVertexMorphMeshPartitionDescriptor :: field public string morphName
-Mmd.Rendering.MmdVertexMorphMeshPartitionDescriptor :: field public string partitionRecommendation
 Mmd.Rendering.MmdVertexMorphOffsetDescriptor :: (type) public sealed class MmdVertexMorphOffsetDescriptor
 Mmd.Rendering.MmdVertexMorphOffsetDescriptor :: ctor public .ctor()
 Mmd.Rendering.MmdVertexMorphOffsetDescriptor :: field public float[] positionDelta
@@ -1527,12 +1198,6 @@ Mmd.Rendering.MmdVertexMorphOffsetDescriptor :: field public int vertexIndex
 Mmd.UnityIntegration.MmdCameraStateToUnity :: (type) public static class MmdCameraStateToUnity
 Mmd.UnityIntegration.MmdCameraStateToUnity :: const public float DefaultMinFieldOfView = 1f
 Mmd.UnityIntegration.MmdCameraStateToUnity :: method public static Mmd.UnityIntegration.MmdUnityCameraPose Convert(Mmd.Motion.MmdCameraState state, float minFieldOfView = 1f, float importScale = 1f)
-Mmd.UnityIntegration.MmdCoordinateSpace :: (type) public static class MmdCoordinateSpace
-Mmd.UnityIntegration.MmdCoordinateSpace :: method public static UnityEngine.Quaternion MmdToUnityRotation(UnityEngine.Quaternion mmd)
-Mmd.UnityIntegration.MmdCoordinateSpace :: method public static UnityEngine.Quaternion UnityToMmdRotation(UnityEngine.Quaternion unity)
-Mmd.UnityIntegration.MmdCoordinateSpace :: method public static UnityEngine.Vector3 MmdToUnityPosition(UnityEngine.Vector3 mmd)
-Mmd.UnityIntegration.MmdCoordinateSpace :: method public static UnityEngine.Vector3 MmdToUnityPosition(UnityEngine.Vector3 mmd, float importScale)
-Mmd.UnityIntegration.MmdCoordinateSpace :: method public static UnityEngine.Vector3 UnityToMmdPosition(UnityEngine.Vector3 unity)
 Mmd.UnityIntegration.MmdHumanoidRetargetGate :: (type) public enum MmdHumanoidRetargetGate : int
 Mmd.UnityIntegration.MmdHumanoidRetargetGate :: enum AnimatorNotDriven = 3
 Mmd.UnityIntegration.MmdHumanoidRetargetGate :: enum ComponentDisabled = 1
@@ -1712,34 +1377,6 @@ Mmd.UnityIntegration.MmdMaterialTextureTargets :: property string SphereTextureB
 Mmd.UnityIntegration.MmdMaterialTextureTargets :: property string SphereTextureProperty { public get; }
 Mmd.UnityIntegration.MmdMaterialTextureTargets :: property string ToonTextureBoundProperty { public get; }
 Mmd.UnityIntegration.MmdMaterialTextureTargets :: property string ToonTextureProperty { public get; }
-Mmd.UnityIntegration.MmdPmxGenericAvatarImportBuilder :: (type) public static class MmdPmxGenericAvatarImportBuilder
-Mmd.UnityIntegration.MmdPmxGenericAvatarImportBuilder :: method public static Mmd.UnityIntegration.MmdPmxGenericAvatarImportBuilder.MmdPmxGenericAvatarImportResult TryBuildGenericAvatar(UnityEngine.GameObject root, string modelName, bool shouldBuildGeneric, string animationTypeLabel, string rootMotionTransformName)
-Mmd.UnityIntegration.MmdPmxGenericAvatarImportBuilder.MmdPmxGenericAvatarImportResult :: (type) public readonly struct MmdPmxGenericAvatarImportResult
-Mmd.UnityIntegration.MmdPmxGenericAvatarImportBuilder.MmdPmxGenericAvatarImportResult :: ctor public .ctor(UnityEngine.Avatar avatar, string readiness, string diagnostic)
-Mmd.UnityIntegration.MmdPmxGenericAvatarImportBuilder.MmdPmxGenericAvatarImportResult :: property UnityEngine.Avatar Avatar { public get; }
-Mmd.UnityIntegration.MmdPmxGenericAvatarImportBuilder.MmdPmxGenericAvatarImportResult :: property string Diagnostic { public get; }
-Mmd.UnityIntegration.MmdPmxGenericAvatarImportBuilder.MmdPmxGenericAvatarImportResult :: property string Readiness { public get; }
-Mmd.UnityIntegration.MmdPmxHumanoidAvatarImportBuilder :: (type) public static class MmdPmxHumanoidAvatarImportBuilder
-Mmd.UnityIntegration.MmdPmxHumanoidAvatarImportBuilder :: method public static Mmd.UnityIntegration.MmdPmxHumanoidAvatarImportBuilder.MmdPmxHumanoidAvatarImportResult TryBuildHumanoidAvatar(Mmd.MmdPmxAsset asset, string modelName, bool shouldBuildHumanoid, string animationTypeLabel, System.Collections.Generic.IReadOnlyList<Mmd.MmdHumanoidBoneMappingOverride> mappingOverrides = null, Mmd.Parser.MmdModelDefinition model = null, Mmd.MmdHumanoidRetargetQualitySettings? retargetQualitySettings = null, UnityEngine.GameObject avatarRoot = null)
-Mmd.UnityIntegration.MmdPmxHumanoidAvatarImportBuilder.MmdPmxHumanoidAvatarImportResult :: (type) public readonly struct MmdPmxHumanoidAvatarImportResult
-Mmd.UnityIntegration.MmdPmxHumanoidAvatarImportBuilder.MmdPmxHumanoidAvatarImportResult :: ctor public .ctor(UnityEngine.Avatar avatar, string readiness, string diagnostic, Mmd.MmdHumanoidBoneMappingDiagnosticSummary mappingDiagnostics = null, UnityEngine.GameObject proxyRoot = null, System.Collections.Generic.IReadOnlyList<Mmd.MmdHumanoidRetargetBinding> retargetBindings = null, System.Collections.Generic.IReadOnlyList<Mmd.MmdHumanoidAppendTransformBinding> appendBindings = null)
-Mmd.UnityIntegration.MmdPmxHumanoidAvatarImportBuilder.MmdPmxHumanoidAvatarImportResult :: property Mmd.MmdHumanoidBoneMappingDiagnosticSummary MappingDiagnostics { public get; }
-Mmd.UnityIntegration.MmdPmxHumanoidAvatarImportBuilder.MmdPmxHumanoidAvatarImportResult :: property System.Collections.Generic.IReadOnlyList<Mmd.MmdHumanoidAppendTransformBinding> AppendBindings { public get; }
-Mmd.UnityIntegration.MmdPmxHumanoidAvatarImportBuilder.MmdPmxHumanoidAvatarImportResult :: property System.Collections.Generic.IReadOnlyList<Mmd.MmdHumanoidRetargetBinding> RetargetBindings { public get; }
-Mmd.UnityIntegration.MmdPmxHumanoidAvatarImportBuilder.MmdPmxHumanoidAvatarImportResult :: property UnityEngine.Avatar Avatar { public get; }
-Mmd.UnityIntegration.MmdPmxHumanoidAvatarImportBuilder.MmdPmxHumanoidAvatarImportResult :: property UnityEngine.GameObject ProxyRoot { public get; }
-Mmd.UnityIntegration.MmdPmxHumanoidAvatarImportBuilder.MmdPmxHumanoidAvatarImportResult :: property string Diagnostic { public get; }
-Mmd.UnityIntegration.MmdPmxHumanoidAvatarImportBuilder.MmdPmxHumanoidAvatarImportResult :: property string Readiness { public get; }
-Mmd.UnityIntegration.MmdPmxImportAssetCacheBuilder :: (type) public static class MmdPmxImportAssetCacheBuilder
-Mmd.UnityIntegration.MmdPmxImportAssetCacheBuilder :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateImportedAssetCache(Mmd.Parser.MmdModelDefinition model, float importScale, bool includeSelfShadowTarget = true, Mmd.Rendering.MmdMaterialPreset preset = 0, Mmd.MmdMaterialOverrideAsset materialOverride = null, Mmd.UnityIntegration.MmdMaterialMapperSet materialMappers = null)
-Mmd.UnityIntegration.MmdPmxImportedAssetBuilder :: (type) public static class MmdPmxImportedAssetBuilder
-Mmd.UnityIntegration.MmdPmxImportedAssetBuilder :: method public static Mmd.MmdPmxAsset CreateAndInitializeImportedAsset(byte[] bytes, string assetPath, string resolvedSourcePath, float importScale, string modelPreset, string meshGenerationMode, string materialTexturePolicy, string shaderPreset, Mmd.MmdPmxParseSummary parseSummary, Mmd.UnityIntegration.MmdUnityModelInstance generatedAssets, UnityEngine.Material[] materialRemaps, string animationType, Mmd.MmdMaterialOverrideAsset materialOverrideAsset = null)
-Mmd.UnityIntegration.MmdPmxImportedAssetBuilder :: method public static Mmd.MmdPmxAsset CreateAndInitializeImportedAsset(byte[] bytes, string assetPath, string resolvedSourcePath, float importScale, string modelPreset, string shaderPreset, Mmd.MmdPmxParseSummary parseSummary, Mmd.UnityIntegration.MmdUnityModelInstance generatedAssets, UnityEngine.Material[] materialRemaps, string animationType, Mmd.MmdMaterialOverrideAsset materialOverrideAsset = null)
-Mmd.UnityIntegration.MmdPmxParsePayload :: (type) public readonly struct MmdPmxParsePayload
-Mmd.UnityIntegration.MmdPmxParsePayload :: ctor public .ctor(Mmd.Parser.MmdModelDefinition model, Mmd.MmdPmxParseSummary parseSummary)
-Mmd.UnityIntegration.MmdPmxParsePayload :: method public static Mmd.UnityIntegration.MmdPmxParsePayload FromBytes(byte[] bytes)
-Mmd.UnityIntegration.MmdPmxParsePayload :: property Mmd.MmdPmxParseSummary ParseSummary { public get; }
-Mmd.UnityIntegration.MmdPmxParsePayload :: property Mmd.Parser.MmdModelDefinition Model { public get; }
 Mmd.UnityIntegration.MmdResolvedTexture :: (type) public sealed class MmdResolvedTexture
 Mmd.UnityIntegration.MmdResolvedTexture :: property Mmd.UnityIntegration.MmdTextureUsage Usage { public get; }
 Mmd.UnityIntegration.MmdResolvedTexture :: property UnityEngine.Texture2D Texture { public get; }
@@ -1830,9 +1467,6 @@ Mmd.UnityIntegration.MmdSceneSelfShadowDiagnosticStatus :: enum NoCharacterRoots
 Mmd.UnityIntegration.MmdSceneSelfShadowDiagnosticStatus :: enum NoRendererFeature = 8
 Mmd.UnityIntegration.MmdSceneSelfShadowDiagnosticStatus :: enum NoSelfShadowState = 0
 Mmd.UnityIntegration.MmdSceneSelfShadowDiagnosticStatus :: enum ReceiverGateOff = 7
-Mmd.UnityIntegration.MmdSelfShadowBoundsCollector :: (type) public static class MmdSelfShadowBoundsCollector
-Mmd.UnityIntegration.MmdSelfShadowBoundsCollector :: method public static Mmd.UnityIntegration.MmdSelfShadowBoundsResult Collect(UnityEngine.GameObject characterRoot, Mmd.Motion.MmdSelfShadowProjectionPolicy policy)
-Mmd.UnityIntegration.MmdSelfShadowBoundsCollector :: method public static Mmd.UnityIntegration.MmdSelfShadowBoundsResult Collect(UnityEngine.Transform characterRoot, Mmd.Motion.MmdSelfShadowProjectionPolicy policy)
 Mmd.UnityIntegration.MmdSelfShadowBoundsResult :: (type) public readonly struct MmdSelfShadowBoundsResult
 Mmd.UnityIntegration.MmdSelfShadowBoundsResult :: method public static Mmd.UnityIntegration.MmdSelfShadowBoundsResult FromBounds(UnityEngine.Bounds bounds, Mmd.UnityIntegration.MmdSelfShadowBoundsSource source, int includedRendererCount)
 Mmd.UnityIntegration.MmdSelfShadowBoundsResult :: property Mmd.UnityIntegration.MmdSelfShadowBoundsSource Source { public get; }

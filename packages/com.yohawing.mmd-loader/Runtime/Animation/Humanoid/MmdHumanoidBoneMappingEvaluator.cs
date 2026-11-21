@@ -8,7 +8,7 @@ using Mmd.Parser;
 
 namespace Mmd
 {
-    public static class MmdHumanoidBoneMappingEvaluator
+    internal static class MmdHumanoidBoneMappingEvaluator
     {
         private static readonly BoneRule[] RequiredRules =
         {

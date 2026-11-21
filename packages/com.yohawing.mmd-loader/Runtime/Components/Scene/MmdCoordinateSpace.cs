@@ -13,7 +13,7 @@ namespace Mmd.UnityIntegration
     /// (mesh / bone / physics / humanoid / camera); new code should call these helpers so the
     /// convention stays consistent in one place.
     /// </summary>
-    public static class MmdCoordinateSpace
+    internal static class MmdCoordinateSpace
     {
         public static Vector3 MmdToUnityPosition(Vector3 mmd)
         {

@@ -9,9 +9,9 @@ namespace Mmd.UnityIntegration
     /// Editor-independent helper for Generic Avatar construction during PMX import.
     /// The importer owns the animation type decision, sub-asset registration, and Animator assignment.
     /// </summary>
-    public static class MmdPmxGenericAvatarImportBuilder
+    internal static class MmdPmxGenericAvatarImportBuilder
     {
-        public readonly struct MmdPmxGenericAvatarImportResult
+        internal readonly struct MmdPmxGenericAvatarImportResult
         {
             public Avatar? Avatar { get; }
             public string Readiness { get; }

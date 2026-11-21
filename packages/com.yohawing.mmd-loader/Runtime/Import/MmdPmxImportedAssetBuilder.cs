@@ -17,7 +17,7 @@ namespace Mmd.UnityIntegration
     /// Project texture binding and sub-asset registration are intentionally kept
     /// in the importer shell.
     /// </remarks>
-    public static class MmdPmxImportedAssetBuilder
+    internal static class MmdPmxImportedAssetBuilder
     {
         [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
         public static MmdPmxAsset CreateAndInitializeImportedAsset(

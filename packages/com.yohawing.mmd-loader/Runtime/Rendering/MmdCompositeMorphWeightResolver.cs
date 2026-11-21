@@ -11,7 +11,7 @@ namespace Mmd.Rendering
     /// referenced group and flip morphs is allowed; cycles throw
     /// <see cref="InvalidOperationException"/>.
     /// </summary>
-    public static class MmdCompositeMorphWeightResolver
+    internal static class MmdCompositeMorphWeightResolver
     {
         private const string CycleDetectionMessage = "Composite morph cycle detected: {0}";
 

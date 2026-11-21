@@ -242,7 +242,7 @@ namespace Mmd.Motion
     /// The default policy is disabled so parsing/sampling self-shadow data never mutates scene
     /// lighting unless a caller explicitly opts in.
     /// </summary>
-    public readonly struct MmdSelfShadowMappingPolicy
+    internal readonly struct MmdSelfShadowMappingPolicy
     {
         private const float DefaultDistanceScale = 100.0f;
         private const float DefaultMinShadowDistance = 1.0f;
@@ -335,7 +335,7 @@ namespace Mmd.Motion
         public float ShadowStrength { get; }
     }
 
-    public static class VmdSelfShadowSampler
+    internal static class VmdSelfShadowSampler
     {
         /// <summary>
         /// Samples VMD self-shadow state using native runtime semantics: mode is a step value and

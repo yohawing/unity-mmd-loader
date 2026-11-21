@@ -12,7 +12,7 @@ namespace Mmd.UnityIntegration
     /// while leaving all Editor asset import context, texture binding, avatar, and sub-asset
     /// registration in the importer.
     /// </summary>
-    public readonly struct MmdPmxParsePayload
+    internal readonly struct MmdPmxParsePayload
     {
         public MmdModelDefinition Model { get; }
         public MmdPmxParseSummary ParseSummary { get; }

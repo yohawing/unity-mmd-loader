@@ -207,7 +207,7 @@ namespace Mmd
     /// 書き換える。position は変更しない。Animator, Avatar, AssetDatabase,
     /// Timeline, AnimationClip には一切触れない。
     /// </summary>
-    public static class MmdHumanoidRetargeter
+    internal static class MmdHumanoidRetargeter
     {
         /// <summary>
         /// Retarget proxy rig local rotations to the native MMD skeleton.

@@ -50,30 +50,19 @@ Mmd.Rendering.Universal	Mmd.Rendering.Universal.MmdSelfShadowPcfSamples	stable	M
 Mmd.Rendering.Universal	Mmd.Rendering.Universal.MmdSelfShadowRenderPass	unity-entry	Unity が型を探して使う (base ScriptableRenderPass)
 Mmd.Rendering.Universal	Mmd.Rendering.Universal.MmdSelfShadowRendererFeature	stable	HOW_TO_USE に記載
 Mmd.Runtime	Mmd.MmdAnimationBakeBoneCurve	advanced	MmdAnimationBakeSummary の public signature から到達
-Mmd.Runtime	Mmd.MmdAnimationBakePlanner	pending-internal	API-02 決定: internal にする
 Mmd.Runtime	Mmd.MmdAnimationBakePositionKey	advanced	MmdAnimationBakeBoneCurve の public signature から到達
 Mmd.Runtime	Mmd.MmdAnimationBakeRotationKey	advanced	MmdAnimationBakeBoneCurve の public signature から到達
 Mmd.Runtime	Mmd.MmdAnimationBakeSummary	advanced	MmdRuntimeSession の public signature から到達
 Mmd.Runtime	Mmd.MmdEvaluatedBonePose	advanced	MmdEvaluatedFrame の public signature から到達
 Mmd.Runtime	Mmd.MmdEvaluatedFrame	advanced	ARCHITECTURE: Runtime API (MmdEvaluatedFrame)
 Mmd.Runtime	Mmd.MmdEvaluatedMorphWeight	advanced	MmdEvaluatedFrame の public signature から到達
-Mmd.Runtime	Mmd.MmdHumanoidAppendTransformApplier	pending-internal	どの root からも public signature で到達しない
 Mmd.Runtime	Mmd.MmdHumanoidAppendTransformBinding	stable	MmdUnityPlaybackController の public signature から到達
-Mmd.Runtime	Mmd.MmdHumanoidAvatarBuildResult	pending-internal	どの root からも public signature で到達しない
 Mmd.Runtime	Mmd.MmdHumanoidBoneMappingDiagnosticEntry	stable	MmdHumanoidBoneMappingDiagnosticSummary の public signature から到達
 Mmd.Runtime	Mmd.MmdHumanoidBoneMappingDiagnosticSummary	stable	MmdPmxAsset の public signature から到達
-Mmd.Runtime	Mmd.MmdHumanoidBoneMappingEvaluator	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.MmdHumanoidBoneMappingMatch	pending-internal	どの root からも public signature で到達しない
 Mmd.Runtime	Mmd.MmdHumanoidBoneMappingOverride	stable	MmdPmxScriptedImporter の public signature から到達
-Mmd.Runtime	Mmd.MmdHumanoidBoneMappingReport	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.MmdHumanoidMappingReadiness	pending-internal	どの root からも public signature で到達しない
 Mmd.Runtime	Mmd.MmdHumanoidMissingRequiredBone	stable	MmdHumanoidBoneMappingDiagnosticSummary の public signature から到達
-Mmd.Runtime	Mmd.MmdHumanoidProxyRigFactory	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.MmdHumanoidProxyRigResult	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.MmdHumanoidRequiredBoneInfo	pending-internal	どの root からも public signature で到達しない
 Mmd.Runtime	Mmd.MmdHumanoidRetargetBinding	stable	MmdUnityPlaybackController の public signature から到達
 Mmd.Runtime	Mmd.MmdHumanoidRetargetQualitySettings	stable	MmdPmxScriptedImporter の public signature から到達
-Mmd.Runtime	Mmd.MmdHumanoidRetargeter	pending-internal	どの root からも public signature で到達しない
 Mmd.Runtime	Mmd.MmdHumanoidRetargeterResult	stable	MmdUnityPlaybackController の public signature から到達
 Mmd.Runtime	Mmd.MmdHumanoidSetupAsset	obsolete	[Obsolete] 宣言。MonoScript binding 維持のため残す
 Mmd.Runtime	Mmd.MmdHumanoidSetupPreset	obsolete	[Obsolete] 宣言。MonoScript binding 維持のため残す
@@ -108,23 +97,16 @@ Mmd.Runtime	Mmd.MmdSerializableBoneMappingEntry	obsolete-exposed	API-02 決定: 
 Mmd.Runtime	Mmd.MmdVmdAsset	stable	plans/002 stable list
 Mmd.Runtime	Mmd.MmdVmdImportSummaryStatus	stable	MmdVmdAsset の public signature から到達
 Mmd.Runtime	Mmd.MmdVmdParseSummary	stable	MmdVmdAsset の public signature から到達
-Mmd.Runtime	Mmd.Mme.MmeEmdEffectMap	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.Mme.MmeEmdMaterialEffectAssignment	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.Mme.MmeEmdParser	pending-internal	どの root からも public signature で到達しない
 Mmd.Runtime	Mmd.Mme.MmeFxEffectDescriptor	pending-internal	どの root からも public signature で到達しない
 Mmd.Runtime	Mmd.Mme.MmeFxFloatParameter	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.Mme.MmeFxParser	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.Mme.MmeFxScanner	pending-internal	どの root からも public signature で到達しない
 Mmd.Runtime	Mmd.Motion.MmdCameraState	stable	MmdCinemachineCameraBinding の public signature から到達
 Mmd.Runtime	Mmd.Motion.MmdLightState	stable	MmdSceneEnvironmentBinding の public signature から到達
-Mmd.Runtime	Mmd.Motion.MmdSelfShadowMappingPolicy	pending-internal	どの root からも public signature で到達しない
 Mmd.Runtime	Mmd.Motion.MmdSelfShadowProjectionBounds	stable	MmdSelfShadowProjectionPolicy の public signature から到達
 Mmd.Runtime	Mmd.Motion.MmdSelfShadowProjectionPolicy	stable	MmdSceneEnvironmentBinding の public signature から到達
 Mmd.Runtime	Mmd.Motion.MmdSelfShadowProjectionScope	stable	MmdSelfShadowProjectionPolicy の public signature から到達
 Mmd.Runtime	Mmd.Motion.MmdSelfShadowProjectionState	stable	MmdSceneEnvironmentBinding の public signature から到達
 Mmd.Runtime	Mmd.Motion.MmdSelfShadowState	stable	MmdSceneEnvironmentBinding の public signature から到達
 Mmd.Runtime	Mmd.Motion.MmdSelfShadowUnityShadowSettings	stable	MmdSceneEnvironmentBinding の public signature から到達
-Mmd.Runtime	Mmd.Motion.VmdSelfShadowSampler	pending-internal	API-02 決定: internal にする
 Mmd.Runtime	Mmd.Native.MmdRuntimeNativeUnavailableException	advanced	plans/002: public API から投げる例外型は public 維持
 Mmd.Runtime	Mmd.Parser.IMmdParser	advanced	ARCHITECTURE: Runtime API (IMmdParser)
 Mmd.Runtime	Mmd.Parser.MmdBoneDefinition	advanced	ARCHITECTURE: Runtime API (neutral IR DTOs)
@@ -149,7 +131,6 @@ Mmd.Runtime	Mmd.Parser.MmdMorphDefinition	advanced	ARCHITECTURE: Runtime API (ne
 Mmd.Runtime	Mmd.Parser.MmdMorphKeyframeDefinition	advanced	ARCHITECTURE: Runtime API (neutral IR DTOs)
 Mmd.Runtime	Mmd.Parser.MmdMotionDefinition	advanced	ARCHITECTURE: Runtime API (neutral IR DTOs)
 Mmd.Runtime	Mmd.Parser.MmdMotionValidator	advanced	ARCHITECTURE: Runtime API (validators)
-Mmd.Runtime	Mmd.Parser.MmdParserInput	pending-internal	API-02 決定: internal にする
 Mmd.Runtime	Mmd.Parser.MmdPhysicsDefinition	advanced	ARCHITECTURE: Runtime API (neutral IR DTOs)
 Mmd.Runtime	Mmd.Parser.MmdRigidbodyDefinition	advanced	ARCHITECTURE: Runtime API (neutral IR DTOs)
 Mmd.Runtime	Mmd.Parser.MmdSelfShadowKeyframeDefinition	advanced	ARCHITECTURE: Runtime API (neutral IR DTOs)
@@ -157,27 +138,12 @@ Mmd.Runtime	Mmd.Parser.MmdUvMorphOffsetDefinition	advanced	ARCHITECTURE: Runtime
 Mmd.Runtime	Mmd.Parser.MmdVertexDefinition	advanced	ARCHITECTURE: Runtime API (neutral IR DTOs)
 Mmd.Runtime	Mmd.Parser.MmdVertexMorphOffsetDefinition	advanced	ARCHITECTURE: Runtime API (neutral IR DTOs)
 Mmd.Runtime	Mmd.Parser.NativeMmdParser	advanced	ARCHITECTURE: Runtime API (NativeMmdParser)
-Mmd.Runtime	Mmd.Physics.MmdPhysicsBackendAvailability	pending-internal	どの root からも public signature で到達しない
 Mmd.Runtime	Mmd.Physics.MmdPhysicsBackendException	advanced	plans/002: public API から投げる例外型は public 維持
-Mmd.Runtime	Mmd.Physics.MmdPhysicsBodyTransform	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.Physics.MmdPhysicsDescriptorValidator	pending-internal	API-02 決定: internal にする (devtools は Runtime IVT で可)
 Mmd.Runtime	Mmd.Physics.MmdPhysicsMode	stable	MmdUnityPlaybackController の public signature から到達
-Mmd.Runtime	Mmd.Physics.MmdPhysicsModePolicyRecord	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.Physics.MmdPhysicsPolicy	pending-internal	API-02 決定: internal にする
-Mmd.Runtime	Mmd.Rendering.MmdCompositeMorphWeightResolver	pending-internal	どの root からも public signature で到達しない
 Mmd.Runtime	Mmd.Rendering.MmdGroupMorphDescriptor	advanced	MmdRenderingDescriptor の public signature から到達
 Mmd.Runtime	Mmd.Rendering.MmdGroupMorphOffsetDescriptor	advanced	MmdGroupMorphDescriptor の public signature から到達
-Mmd.Runtime	Mmd.Rendering.MmdGroupMorphWeightResolver	pending-internal	どの root からも public signature で到達しない
 Mmd.Runtime	Mmd.Rendering.MmdMaterialDescriptor	stable	plans/002 stable list
-Mmd.Runtime	Mmd.Rendering.MmdMaterialDescriptorBuilder	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.Rendering.MmdMaterialMorphEvaluator	pending-internal	どの root からも public signature で到達しない
 Mmd.Runtime	Mmd.Rendering.MmdMaterialPreset	stable	MmdMaterialMapperSet の public signature から到達
-Mmd.Runtime	Mmd.Rendering.MmdMaterialPropertyNames	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.Rendering.MmdMaterialTransparencyPolicy	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.Rendering.MmdMaterialTransparencyPolicy.MaterialTransparencyDiagnostic	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.Rendering.MmdMaterialTransparencyPolicy.RenderQueueValue	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.Rendering.MmdMaterialTransparencyPolicy.TextureAlphaScanResult	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.Rendering.MmdMeshDescriptorBuilder	pending-internal	どの root からも public signature で到達しない
 Mmd.Runtime	Mmd.Rendering.MmdMeshVertexDescriptor	advanced	MmdRenderingDescriptor の public signature から到達
 Mmd.Runtime	Mmd.Rendering.MmdMorphDescriptorBuilder	advanced	MmdRenderingDescriptor の公開 field が入れ子型(Flip/Material/Uv Morph)を露出。入れ子型を外へ移すまで internal 化不可
 Mmd.Runtime	Mmd.Rendering.MmdMorphDescriptorBuilder.MmdBoneMorphDescriptor	pending-internal	どの root からも public signature で到達しない
@@ -190,33 +156,17 @@ Mmd.Runtime	Mmd.Rendering.MmdMorphDescriptorBuilder.MmdMaterialMorphDescriptor	a
 Mmd.Runtime	Mmd.Rendering.MmdMorphDescriptorBuilder.MmdMaterialMorphOffsetDescriptor	advanced	MmdMaterialMorphDescriptor の public signature から到達
 Mmd.Runtime	Mmd.Rendering.MmdMorphDescriptorBuilder.MmdUvMorphDescriptor	advanced	MmdRenderingDescriptor の public signature から到達
 Mmd.Runtime	Mmd.Rendering.MmdMorphDescriptorBuilder.MmdUvMorphOffsetDescriptor	advanced	MmdUvMorphDescriptor の public signature から到達
-Mmd.Runtime	Mmd.Rendering.MmdMorphMeshPartitionDescriptorBuilder	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.Rendering.MmdMorphMeshPartitionMaterialDescriptor	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.Rendering.MmdMorphMeshPartitionSubmeshDescriptor	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.Rendering.MmdMorphMeshPartitionSummaryDescriptor	pending-internal	どの root からも public signature で到達しない
 Mmd.Runtime	Mmd.Rendering.MmdMorphTypeInventoryDescriptor	pending-internal	どの root からも public signature で到達しない
 Mmd.Runtime	Mmd.Rendering.MmdRenderingDescriptor	advanced	plans/002 advanced (主要 rendering descriptor)
 Mmd.Runtime	Mmd.Rendering.MmdRenderingDescriptorBuilder	advanced	plans/002 advanced (主要 rendering descriptor builder)
-Mmd.Runtime	Mmd.Rendering.MmdRenderingMeshSplitResult	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.Rendering.MmdRenderingMeshSplitter	pending-internal	どの root からも public signature で到達しない
 Mmd.Runtime	Mmd.Rendering.MmdSkinningDescriptor	advanced	MmdRenderingDescriptor の public signature から到達
-Mmd.Runtime	Mmd.Rendering.MmdSkinningDescriptorBuilder	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.Rendering.MmdSkinningModeInventoryDescriptor	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.Rendering.MmdSplitVertexSourceDescriptor	pending-internal	どの root からも public signature で到達しない
 Mmd.Runtime	Mmd.Rendering.MmdSubmeshDescriptor	advanced	MmdRenderingDescriptor の public signature から到達
-Mmd.Runtime	Mmd.Rendering.MmdSubmeshDescriptorBuilder	pending-internal	どの root からも public signature で到達しない
 Mmd.Runtime	Mmd.Rendering.MmdTextureOrientationDescriptor	advanced	MmdRenderingDescriptor の public signature から到達
-Mmd.Runtime	Mmd.Rendering.MmdTextureOrientationDescriptorBuilder	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.Rendering.MmdTextureUvMorphEvaluator	pending-internal	どの root からも public signature で到達しない
 Mmd.Runtime	Mmd.Rendering.MmdUrpMaterialBindingDescriptor	advanced	MmdRenderingDescriptor の public signature から到達
 Mmd.Runtime	Mmd.Rendering.MmdUrpMaterialBindingDescriptorBuilder	pending-internal	API-02 決定: Mmd.DevTools.EditModeTests 向け IVT を足して internal にする
 Mmd.Runtime	Mmd.Rendering.MmdVertexMorphDescriptor	advanced	MmdRenderingDescriptor の public signature から到達
-Mmd.Runtime	Mmd.Rendering.MmdVertexMorphEvaluator	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.Rendering.MmdVertexMorphMeshPartitionCoverageDescriptor	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.Rendering.MmdVertexMorphMeshPartitionDescriptor	pending-internal	どの root からも public signature で到達しない
 Mmd.Runtime	Mmd.Rendering.MmdVertexMorphOffsetDescriptor	advanced	MmdVertexMorphDescriptor の public signature から到達
 Mmd.Runtime	Mmd.UnityIntegration.MmdCameraStateToUnity	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.UnityIntegration.MmdCoordinateSpace	pending-internal	どの root からも public signature で到達しない
 Mmd.Runtime	Mmd.UnityIntegration.MmdHumanoidRetargetGate	stable	MmdUnityPlaybackController の public signature から到達
 Mmd.Runtime	Mmd.UnityIntegration.MmdHumanoidRootMotionDriver	unity-entry	API-02 決定: unity-entry (PMX importer が付与し scene に serialize)
 Mmd.Runtime	Mmd.UnityIntegration.MmdLivePhysicsBodyDiagnostics	stable	MmdLivePhysicsFrameDiagnostics の public signature から到達
@@ -226,13 +176,6 @@ Mmd.Runtime	Mmd.UnityIntegration.MmdMaterialMapper	stable	plans/002 stable list
 Mmd.Runtime	Mmd.UnityIntegration.MmdMaterialMapperSet	stable	plans/002 stable list
 Mmd.Runtime	Mmd.UnityIntegration.MmdMaterialRenderingTargets	stable	MmdMaterialMapperSet の public signature から到達
 Mmd.Runtime	Mmd.UnityIntegration.MmdMaterialTextureTargets	stable	MmdMaterialMapperSet の public signature から到達
-Mmd.Runtime	Mmd.UnityIntegration.MmdPmxGenericAvatarImportBuilder	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.UnityIntegration.MmdPmxGenericAvatarImportBuilder.MmdPmxGenericAvatarImportResult	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.UnityIntegration.MmdPmxHumanoidAvatarImportBuilder	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.UnityIntegration.MmdPmxHumanoidAvatarImportBuilder.MmdPmxHumanoidAvatarImportResult	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.UnityIntegration.MmdPmxImportAssetCacheBuilder	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.UnityIntegration.MmdPmxImportedAssetBuilder	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.UnityIntegration.MmdPmxParsePayload	pending-internal	どの root からも public signature で到達しない
 Mmd.Runtime	Mmd.UnityIntegration.MmdResolvedTexture	advanced	MmdRuntimeTextureResolution の public signature から到達
 Mmd.Runtime	Mmd.UnityIntegration.MmdRuntimeImporterComponent	advanced	ARCHITECTURE: Components (raw-path owner)
 Mmd.Runtime	Mmd.UnityIntegration.MmdRuntimeTextureResolution	advanced	MmdRuntimeTextureResolver の public signature から到達
@@ -242,7 +185,6 @@ Mmd.Runtime	Mmd.UnityIntegration.MmdSceneEnvironmentBinding	stable	plans/002 sta
 Mmd.Runtime	Mmd.UnityIntegration.MmdSceneLightApplyStatus	stable	MmdSceneEnvironmentBinding の public signature から到達
 Mmd.Runtime	Mmd.UnityIntegration.MmdSceneSelfShadowApplyStatus	stable	MmdSceneEnvironmentBinding の public signature から到達
 Mmd.Runtime	Mmd.UnityIntegration.MmdSceneSelfShadowDiagnosticStatus	stable	MmdSceneEnvironmentBinding の public signature から到達
-Mmd.Runtime	Mmd.UnityIntegration.MmdSelfShadowBoundsCollector	pending-internal	どの root からも public signature で到達しない
 Mmd.Runtime	Mmd.UnityIntegration.MmdSelfShadowBoundsResult	stable	MmdSelfShadowTarget の public signature から到達
 Mmd.Runtime	Mmd.UnityIntegration.MmdSelfShadowBoundsSource	stable	MmdSelfShadowBoundsResult の public signature から到達
 Mmd.Runtime	Mmd.UnityIntegration.MmdSelfShadowTarget	stable	plans/002 stable list

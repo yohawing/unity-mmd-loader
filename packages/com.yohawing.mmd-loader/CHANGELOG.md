@@ -4,6 +4,17 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 
 ## [Unreleased]
 
+### Breaking
+
+- Changed implementation types that were public but not part of the supported API to `internal`. Use the importer, playback, and asset entry points instead.
+  - `Mmd`: `MmdAnimationBakePlanner`, `MmdHumanoidAppendTransformApplier`, `MmdHumanoidAvatarBuildResult`, `MmdHumanoidBoneMappingEvaluator`, `MmdHumanoidBoneMappingMatch`, `MmdHumanoidBoneMappingReport`, `MmdHumanoidMappingReadiness`, `MmdHumanoidProxyRigFactory`, `MmdHumanoidProxyRigResult`, `MmdHumanoidRequiredBoneInfo`, `MmdHumanoidRetargeter`.
+  - `Mmd.Mme`: `MmeEmdEffectMap`, `MmeEmdMaterialEffectAssignment`, `MmeEmdParser`, `MmeFxParser`, `MmeFxScanner`.
+  - `Mmd.Motion`: `MmdSelfShadowMappingPolicy`, `VmdSelfShadowSampler`.
+  - `Mmd.Parser`: `MmdParserInput`.
+  - `Mmd.Physics`: `MmdPhysicsBackendAvailability`, `MmdPhysicsBodyTransform`, `MmdPhysicsDescriptorValidator`, `MmdPhysicsModePolicyRecord`, `MmdPhysicsPolicy`.
+  - `Mmd.Rendering`: `MmdCompositeMorphWeightResolver`, `MmdGroupMorphWeightResolver`, `MmdMaterialDescriptorBuilder`, `MmdMaterialMorphEvaluator`, `MmdMaterialPropertyNames`, `MmdMaterialTransparencyPolicy` (with its nested `MaterialTransparencyDiagnostic`, `RenderQueueValue`, and `TextureAlphaScanResult`), `MmdMeshDescriptorBuilder`, `MmdMorphMeshPartitionDescriptorBuilder`, `MmdMorphMeshPartitionMaterialDescriptor`, `MmdMorphMeshPartitionSubmeshDescriptor`, `MmdMorphMeshPartitionSummaryDescriptor`, `MmdRenderingMeshSplitResult`, `MmdRenderingMeshSplitter`, `MmdSkinningDescriptorBuilder`, `MmdSkinningModeInventoryDescriptor`, `MmdSplitVertexSourceDescriptor`, `MmdSubmeshDescriptorBuilder`, `MmdTextureOrientationDescriptorBuilder`, `MmdTextureUvMorphEvaluator`, `MmdVertexMorphEvaluator`, `MmdVertexMorphMeshPartitionCoverageDescriptor`, `MmdVertexMorphMeshPartitionDescriptor`.
+  - `Mmd.UnityIntegration`: `MmdCoordinateSpace`, `MmdPmxGenericAvatarImportBuilder` (with its nested `MmdPmxGenericAvatarImportResult`), `MmdPmxHumanoidAvatarImportBuilder` (with its nested `MmdPmxHumanoidAvatarImportResult`), `MmdPmxImportAssetCacheBuilder`, `MmdPmxImportedAssetBuilder`, `MmdPmxParsePayload`, `MmdSelfShadowBoundsCollector`.
+
 ## [0.5.1] - 2026-10-23
 
 ### Changed

@@ -5,7 +5,7 @@ using System.Collections.Generic;
 
 namespace Mmd.Rendering
 {
-    public static class MmdVertexMorphEvaluator
+    internal static class MmdVertexMorphEvaluator
     {
         public static IReadOnlyList<MmdMeshVertexDescriptor> ApplyVertexMorphs(
             IReadOnlyList<MmdMeshVertexDescriptor> vertices,

@@ -20,7 +20,7 @@ namespace Mmd.Rendering
     /// Other PMX material morph fields (specular, texture blend) are preserved in the
     /// descriptor but not evaluated here.
     /// </summary>
-    public static class MmdMaterialMorphEvaluator
+    internal static class MmdMaterialMorphEvaluator
     {
         /// <summary>
         /// Applies material morph offsets to a copy of the base material descriptors.

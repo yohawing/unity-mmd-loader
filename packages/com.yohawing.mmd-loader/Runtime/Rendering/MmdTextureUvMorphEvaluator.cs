@@ -10,7 +10,7 @@ namespace Mmd.Rendering
     /// Does not evaluate uva1-uva4 extra UV channels because
     /// <see cref="MmdMeshVertexDescriptor"/> currently has only <c>uv</c> and no uva1-uva4.
     /// </summary>
-    public static class MmdTextureUvMorphEvaluator
+    internal static class MmdTextureUvMorphEvaluator
     {
         /// <summary>
         /// Applies texture UV morph offsets to a copy of the input vertex descriptors.

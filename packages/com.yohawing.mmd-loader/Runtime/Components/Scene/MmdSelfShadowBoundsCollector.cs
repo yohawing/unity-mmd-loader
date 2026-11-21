@@ -57,7 +57,7 @@ namespace Mmd.UnityIntegration
         }
     }
 
-    public static class MmdSelfShadowBoundsCollector
+    internal static class MmdSelfShadowBoundsCollector
     {
         public static MmdSelfShadowBoundsResult Collect(
             GameObject? characterRoot,

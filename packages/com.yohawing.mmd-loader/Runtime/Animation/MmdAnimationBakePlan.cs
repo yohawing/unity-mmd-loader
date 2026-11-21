@@ -57,7 +57,7 @@ namespace Mmd
         public float w;
     }
 
-    public static class MmdAnimationBakePlanner
+    internal static class MmdAnimationBakePlanner
     {
         public static MmdAnimationBakeSummary BuildTransformBakeSummary(
             MmdRuntimeSession session,

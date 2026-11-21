@@ -4,7 +4,7 @@ using System;
 
 namespace Mmd.Parser
 {
-    public static class MmdParserInput
+    internal static class MmdParserInput
     {
         public static void RequireNonEmpty(ReadOnlySpan<byte> data, string parameterName)
         {

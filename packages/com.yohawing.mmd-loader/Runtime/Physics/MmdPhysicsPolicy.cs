@@ -5,7 +5,7 @@ using System;
 namespace Mmd.Physics
 {
     [Serializable]
-    public sealed class MmdPhysicsModePolicyRecord
+    internal sealed class MmdPhysicsModePolicyRecord
     {
         public string physicsMode = string.Empty;
         public string backendName = string.Empty;
@@ -15,7 +15,7 @@ namespace Mmd.Physics
         public string unsupportedReason = string.Empty;
     }
 
-    public static class MmdPhysicsPolicy
+    internal static class MmdPhysicsPolicy
     {
         public const string StatusAvailable = "available";
         public const string StatusUnsupported = "unsupported";

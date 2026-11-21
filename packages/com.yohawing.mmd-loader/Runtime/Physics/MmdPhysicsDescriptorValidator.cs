@@ -6,7 +6,7 @@ using Mmd.Parser;
 
 namespace Mmd.Physics
 {
-    public static class MmdPhysicsDescriptorValidator
+    internal static class MmdPhysicsDescriptorValidator
     {
         public static IReadOnlyList<string> Validate(MmdModelDefinition model)
         {

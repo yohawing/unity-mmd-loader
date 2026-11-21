@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace Mmd
 {
-    public static class MmdHumanoidMappingReadiness
+    internal static class MmdHumanoidMappingReadiness
     {
         public const string NotEvaluated = "NotEvaluated";
         public const string Ready = "Ready";

@@ -14,7 +14,7 @@ namespace Mmd.UnityIntegration
     /// The separate BindProjectTextureAssetsToMaterials (Editor-only) step later
     /// binds project Texture2D assets by resolved path.
     /// </summary>
-    public static class MmdPmxImportAssetCacheBuilder
+    internal static class MmdPmxImportAssetCacheBuilder
     {
         /// <summary>
         /// Creates the importer asset cache (mesh, materials, hierarchy) for the given model.

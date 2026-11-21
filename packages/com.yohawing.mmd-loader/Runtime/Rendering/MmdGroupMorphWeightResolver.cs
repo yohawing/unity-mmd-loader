@@ -5,7 +5,7 @@ using System.Collections.Generic;
 
 namespace Mmd.Rendering
 {
-    public static class MmdGroupMorphWeightResolver
+    internal static class MmdGroupMorphWeightResolver
     {
         public static IReadOnlyDictionary<string, float> Resolve(
             IReadOnlyDictionary<string, float> frameWeights,

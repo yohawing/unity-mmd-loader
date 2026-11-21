@@ -2,7 +2,7 @@
 
 namespace Mmd.Rendering
 {
-    public static class MmdMaterialPropertyNames
+    internal static class MmdMaterialPropertyNames
     {
         public const string MmdLightDirection = "_MmdLightDirection";
         public const string MmdLightColor = "_MmdLightColor";

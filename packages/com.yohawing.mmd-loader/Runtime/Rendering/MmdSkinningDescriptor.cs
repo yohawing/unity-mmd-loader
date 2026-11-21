@@ -22,7 +22,7 @@ namespace Mmd.Rendering
     }
 
     [Serializable]
-    public sealed class MmdSkinningModeInventoryDescriptor
+    internal sealed class MmdSkinningModeInventoryDescriptor
     {
         public int vertexIndex;
         public string skinningMode = string.Empty;
@@ -39,7 +39,7 @@ namespace Mmd.Rendering
         public string sdefParameterStatus = string.Empty;
     }
 
-    public static class MmdSkinningDescriptorBuilder
+    internal static class MmdSkinningDescriptorBuilder
     {
         private static readonly HashSet<string> KnownSkinningModes = new(StringComparer.Ordinal)
         {

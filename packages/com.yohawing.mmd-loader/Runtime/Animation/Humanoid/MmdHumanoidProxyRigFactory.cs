@@ -15,7 +15,7 @@ namespace Mmd
     /// parented with Unity Humanoid relationships. No Avatar, Animator, or mapping
     /// assets are created.
     /// </summary>
-    public sealed class MmdHumanoidProxyRigResult
+    internal sealed class MmdHumanoidProxyRigResult
     {
         public MmdHumanoidProxyRigResult(
             GameObject? proxyRoot,
@@ -63,7 +63,7 @@ namespace Mmd
     /// The Avatar is created via AvatarBuilder.BuildHumanAvatar using a
     /// synthetic HumanDescription built from the proxy rig transforms.
     /// </summary>
-    public sealed class MmdHumanoidAvatarBuildResult
+    internal sealed class MmdHumanoidAvatarBuildResult
     {
         public MmdHumanoidAvatarBuildResult(
             Avatar? avatar,
@@ -182,7 +182,7 @@ namespace Mmd
     /// 生成された Transform 階層は HumanBodyBones 名にマッピングされた MMD ボーンのみを含む。
     /// IK/捩/操作 helper ボーンは含まれない。
     /// </summary>
-    public static class MmdHumanoidProxyRigFactory
+    internal static class MmdHumanoidProxyRigFactory
     {
         /// <summary>
         /// Create a hidden proxy rig from an MMD model definition.

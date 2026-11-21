@@ -48,7 +48,7 @@ namespace Mmd.Rendering
         public int vertexCount;
     }
 
-    public static class MmdMaterialDescriptorBuilder
+    internal static class MmdMaterialDescriptorBuilder
     {
         public static IReadOnlyList<MmdMaterialDescriptor> Build(MmdModelDefinition model)
         {

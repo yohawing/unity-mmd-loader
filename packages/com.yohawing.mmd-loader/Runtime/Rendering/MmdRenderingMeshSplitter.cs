@@ -7,7 +7,7 @@ using System.Linq;
 namespace Mmd.Rendering
 {
     [Serializable]
-    public sealed class MmdSplitVertexSourceDescriptor
+    internal sealed class MmdSplitVertexSourceDescriptor
     {
         public int splitVertexIndex;
         public int sourceVertexIndex;
@@ -16,7 +16,7 @@ namespace Mmd.Rendering
     }
 
     [Serializable]
-    public sealed class MmdRenderingMeshSplitResult
+    internal sealed class MmdRenderingMeshSplitResult
     {
         public MmdRenderingDescriptor rendering = new();
         public List<MmdSplitVertexSourceDescriptor> vertexSources = new();
@@ -25,7 +25,7 @@ namespace Mmd.Rendering
         public int duplicatedVertexCount;
     }
 
-    public static class MmdRenderingMeshSplitter
+    internal static class MmdRenderingMeshSplitter
     {
         public static MmdRenderingMeshSplitResult SplitBySubmesh(MmdRenderingDescriptor source)
         {

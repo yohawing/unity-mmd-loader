@@ -10,7 +10,7 @@ namespace Mmd.Rendering
     /// from material alpha, material name, texture extension, and texture alpha
     /// scan data. This type does not reference UnityEngine.
     /// </summary>
-    public static class MmdMaterialTransparencyPolicy
+    internal static class MmdMaterialTransparencyPolicy
     {
         // Real MMD (and the faithful saba reference) has no "opaque-enough" cutoff: it always
         // multiplies the diffuse texture alpha into the fragment and alpha-blends. So a used-UV
@@ -30,7 +30,7 @@ namespace Mmd.Rendering
         public const string ModeAlphaBlend = "alphaBlend";
 
         /// <summary>Diagnostic summary produced by <see cref="ClassifyTextureAlpha"/>.</summary>
-        public sealed class TextureAlphaScanResult
+        internal sealed class TextureAlphaScanResult
         {
             public int pixelCount;
             public int minAlpha;
@@ -281,7 +281,7 @@ namespace Mmd.Rendering
         /// Diagnostic record for one material's resolved transparency policy,
         /// including queue offset and depth-write policy.
         /// </summary>
-        public sealed class MaterialTransparencyDiagnostic
+        internal sealed class MaterialTransparencyDiagnostic
         {
             public string resolvedTransparencyMode = ModeOpaque;
             public int renderQueue;
@@ -294,7 +294,7 @@ namespace Mmd.Rendering
         /// Well-known Unity RenderQueue values used by the pure policy
         /// (mirrors UnityEngine.Rendering.RenderQueue constants).
         /// </summary>
-        public enum RenderQueueValue
+        internal enum RenderQueueValue
         {
             Geometry = 2000,
             Transparent = 3000

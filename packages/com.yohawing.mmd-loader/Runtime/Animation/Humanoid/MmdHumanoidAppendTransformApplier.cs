@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace Mmd
 {
-    public static class MmdHumanoidAppendTransformApplier
+    internal static class MmdHumanoidAppendTransformApplier
     {
         public static void Apply(IReadOnlyList<MmdHumanoidAppendTransformBinding> appendEntries)
         {

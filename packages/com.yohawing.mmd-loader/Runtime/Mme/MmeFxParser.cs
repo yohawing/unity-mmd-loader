@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 
 namespace Mmd.Mme
 {
-    public static class MmeFxParser
+    internal static class MmeFxParser
     {
         private static readonly Regex DefineStringRegex =
             new(@"^\s*#define\s+(\w+)\s+""([^""]+)""", RegexOptions.Compiled);

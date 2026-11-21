@@ -8,7 +8,7 @@ using Mmd.IO;
 
 namespace Mmd.Mme
 {
-    public static class MmeFxScanner
+    internal static class MmeFxScanner
     {
         private const string DotFxExtension = ".fx";
 

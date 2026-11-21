@@ -8,7 +8,7 @@ using Mmd.Parser;
 
 namespace Mmd
 {
-    public readonly struct MmdHumanoidBoneMappingReport
+    internal readonly struct MmdHumanoidBoneMappingReport
     {
         public MmdHumanoidBoneMappingReport(
             string readiness,
@@ -51,7 +51,7 @@ namespace Mmd
         public MmdSerializableBoneMappingEntry[] MappingEntries { get; }
     }
 
-    public readonly struct MmdHumanoidBoneMappingMatch
+    internal readonly struct MmdHumanoidBoneMappingMatch
     {
         public MmdHumanoidBoneMappingMatch(
             HumanBodyBones humanBone,
@@ -74,7 +74,7 @@ namespace Mmd
         public bool Required { get; }
     }
 
-    public readonly struct MmdHumanoidRequiredBoneInfo
+    internal readonly struct MmdHumanoidRequiredBoneInfo
     {
         public MmdHumanoidRequiredBoneInfo(HumanBodyBones humanBone, string mmdBoneName)
         {

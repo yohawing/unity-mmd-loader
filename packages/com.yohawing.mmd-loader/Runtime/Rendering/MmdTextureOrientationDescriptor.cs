@@ -24,7 +24,7 @@ namespace Mmd.Rendering
         public float viewportMaxV;
     }
 
-    public static class MmdTextureOrientationDescriptorBuilder
+    internal static class MmdTextureOrientationDescriptorBuilder
     {
         public const string MmdUvConvention = "mmd-texture-space";
         public const string UnityUvConvention = "unity-viewport-space";
