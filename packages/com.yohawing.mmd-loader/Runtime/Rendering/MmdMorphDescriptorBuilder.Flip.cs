@@ -7,27 +7,8 @@ using Mmd.Parser;
 
 namespace Mmd.Rendering
 {
-    public static partial class MmdMorphDescriptorBuilder
+    internal static partial class MmdMorphDescriptorBuilder
     {
-        [Serializable]
-        public sealed class MmdFlipMorphDescriptor
-        {
-            public int morphIndex;
-            public string morphName = string.Empty;
-            public int flipOffsetCount;
-            public List<MmdFlipMorphOffsetDescriptor> offsets = new();
-        }
-
-        [Serializable]
-        public sealed class MmdFlipMorphOffsetDescriptor
-        {
-            public int targetMorphIndex;
-            public string targetMorphName = string.Empty;
-            public string targetMorphType = string.Empty;
-            public float weight;
-            public bool finiteWeight;
-        }
-
         public static IReadOnlyList<MmdFlipMorphDescriptor> BuildFlipMorphs(MmdModelDefinition model)
         {
             if (model == null)

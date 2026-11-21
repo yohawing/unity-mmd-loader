@@ -7,7 +7,7 @@ using Mmd.Parser;
 
 namespace Mmd.Rendering
 {
-    public static partial class MmdMorphDescriptorBuilder
+    internal static partial class MmdMorphDescriptorBuilder
     {
         public static IReadOnlyList<MmdGroupMorphDescriptor> BuildGroupMorphs(MmdModelDefinition model)
         {

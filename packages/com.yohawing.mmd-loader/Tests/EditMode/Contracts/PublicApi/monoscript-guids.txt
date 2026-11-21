@@ -2,7 +2,9 @@
 022a38b5eedf45708e45fa4951792f55 | Mmd.UnityIntegration.MmdBorrowedSceneMutationLease
 02f3deddfd218f240a16aadc69f93f0d | Mmd.MmdHumanoidBoneMappingReport
 0390ef4b7709b8743a73453ec176e7af | Mmd.Physics.MmdAnimPhysicsBackend
+0410f1f124bdd14469854bbf1328a6e7 | Mmd.Rendering.MmdUvMorphDescriptor
 04408b475aa025346b22906621672692 | Mmd.Editor.MmdPbrTextureConventionScanner
+0b57706ac169fcc4cab01be6a2bf60e2 | Mmd.Rendering.MmdMaterialMorphDescriptor
 0ca92ba3edd2c954099d1a47e1914314 | Mmd.Motion.NativeVmdLightTrackSampler
 0d88b69d9da94800a4d06b0598566ef4 | Mmd.UnityIntegration.MmdRuntimeImporterComponent
 0db9bf3a04a74ab44ade92bc3a40e82f | Mmd.UnityIntegration.MmdUnityMaterialBuilder
@@ -149,6 +151,7 @@ b4e9d3c2f6a75b8e0d1f2a3b4c5d6e7f | Mmd.UnityIntegration.MmdTimelineLivePhysicsTr
 b6930da7e175e3a4f86580fa4bf649ec | Mmd.UnityIntegration.MmdMultiCharacterWorkerPool
 b7e3a1c9d4f6528091ab3cde5678ef01 | Mmd.Parser.NativeMmdParser
 b847beb06ebc7764b9b71d9e68310881 | Mmd.Native.MmdRuntimeFfiTrackReadback
+ba22b9b98657fa64c9d535ab875d4af6 | Mmd.Rendering.MmdImpulseMorphDescriptor
 bc2a4da2864755c41a1a73406a1ca084 | Mmd.Parser.MmdMotionValidator
 bd1b111528a17d44ca34d729b52ff6b8 | Mmd.Timeline.MmdHumanoidAnimationClip
 bdc73a0f6ed13c547a144ad64a9b558b | Mmd.MmdRuntimeInfo
@@ -158,8 +161,10 @@ c5b7b05b454247b1a1c8bc8ff81c77a4 | Mmd.UnityIntegration.MmdUnityModelFactory
 c5f0e4d3a7b86c9f1e2d3a4b5c6d7e8f | Mmd.UnityIntegration.MmdUnityPlaybackBinding
 c875ec2c968d8554da652385d579b9eb | Mmd.UnityIntegration.MmdCameraStateToUnity
 cc8e9d57474c97a4488fa22926809800 | Mmd.Editor.MmdEditorBatchmodeDiagnosticsCommand
+ce0ffd2bf0d8f814788435067aa5bc18 | Mmd.Rendering.MmdFlipMorphDescriptor
 cf1c819856a647d4595f752622fb8b64 | Mmd.MmdRuntimeSession
 cfb2d8e40cf744638fa797a4db7bd617 | Mmd.Physics.MmdPhysicsPolicy
+d0ddcec4a59e89c47a8db446e11137eb | Mmd.Rendering.MmdBoneMorphDescriptor
 d0e1e69bfce448df82d6e41fbbad2184 | Mmd.Editor.MmdEditorVerificationFacade
 d26f6a09f9df4c1d9006fbd4bb234176 | Mmd.Rendering.MmdGroupMorphWeightResolver
 d2a3f7c881cb4c6da5e0e2f75f4f7a91 | Mmd.Native.MmdRuntimeFfiVmdContext

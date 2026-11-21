@@ -25,7 +25,7 @@ namespace Mmd.Rendering
         /// <returns>New vertex descriptors with texture UV morph offsets applied.</returns>
         public static IReadOnlyList<MmdMeshVertexDescriptor> ApplyTextureUvMorphs(
             IReadOnlyList<MmdMeshVertexDescriptor> vertices,
-            IReadOnlyList<MmdMorphDescriptorBuilder.MmdUvMorphDescriptor> uvMorphs,
+            IReadOnlyList<MmdUvMorphDescriptor> uvMorphs,
             IReadOnlyDictionary<string, float> morphWeights)
         {
             if (vertices == null)
@@ -66,7 +66,7 @@ namespace Mmd.Rendering
             var sortedMorphs = new List<IndexedUvMorphDescriptor>(uvMorphs.Count);
             for (int morphListIndex = 0; morphListIndex < uvMorphs.Count; morphListIndex++)
             {
-                MmdMorphDescriptorBuilder.MmdUvMorphDescriptor m = uvMorphs[morphListIndex];
+                MmdUvMorphDescriptor m = uvMorphs[morphListIndex];
                 if (m == null || !string.Equals(m.morphType, "texture", StringComparison.Ordinal))
                 {
                     continue;
@@ -79,7 +79,7 @@ namespace Mmd.Rendering
 
             foreach (IndexedUvMorphDescriptor entry in sortedMorphs)
             {
-                MmdMorphDescriptorBuilder.MmdUvMorphDescriptor morph = entry.Morph;
+                MmdUvMorphDescriptor morph = entry.Morph;
 
                 if (string.IsNullOrWhiteSpace(morph.morphName))
                 {
@@ -103,7 +103,7 @@ namespace Mmd.Rendering
 
                 for (int offsetIndex = 0; offsetIndex < morph.offsets.Count; offsetIndex++)
                 {
-                    MmdMorphDescriptorBuilder.MmdUvMorphOffsetDescriptor offset = morph.offsets[offsetIndex];
+                    MmdUvMorphOffsetDescriptor offset = morph.offsets[offsetIndex];
                     if (offset == null)
                     {
                         throw new InvalidOperationException($"Texture UV morph offset is required: {morph.morphName}[{offsetIndex}]");
@@ -166,13 +166,13 @@ namespace Mmd.Rendering
 
         private readonly struct IndexedUvMorphDescriptor
         {
-            public IndexedUvMorphDescriptor(MmdMorphDescriptorBuilder.MmdUvMorphDescriptor morph, int sourceIndex)
+            public IndexedUvMorphDescriptor(MmdUvMorphDescriptor morph, int sourceIndex)
             {
                 Morph = morph;
                 SourceIndex = sourceIndex;
             }
 
-            public MmdMorphDescriptorBuilder.MmdUvMorphDescriptor Morph { get; }
+            public MmdUvMorphDescriptor Morph { get; }
 
             public int SourceIndex { get; }
         }

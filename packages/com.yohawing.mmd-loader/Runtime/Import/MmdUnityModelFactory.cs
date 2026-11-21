@@ -536,9 +536,9 @@ namespace Mmd.UnityIntegration
                 () => MmdMaterialDescriptorBuilder.Build(model).ToList());
             Task<List<MmdGroupMorphDescriptor>> groupsTask = Task.Run(
                 () => MmdMorphDescriptorBuilder.BuildGroupMorphs(model).ToList());
-            Task<List<MmdMorphDescriptorBuilder.MmdMaterialMorphDescriptor>> materialMorphsTask = Task.Run(
+            Task<List<MmdMaterialMorphDescriptor>> materialMorphsTask = Task.Run(
                 () => MmdMorphDescriptorBuilder.BuildMaterialMorphs(model).ToList());
-            Task<List<MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor>> flipsTask = Task.Run(
+            Task<List<MmdFlipMorphDescriptor>> flipsTask = Task.Run(
                 () => MmdMorphDescriptorBuilder.BuildFlipMorphs(model).ToList());
             Task.WaitAll(materialsTask, groupsTask, materialMorphsTask, flipsTask);
 
@@ -552,7 +552,7 @@ namespace Mmd.UnityIntegration
                     morphName = morph.name
                 })
                 .ToList();
-            List<MmdMorphDescriptorBuilder.MmdUvMorphDescriptor> uvMorphs = model.morphs
+            List<MmdUvMorphDescriptor> uvMorphs = model.morphs
                 .Where(morph =>
                 {
                     string type = MmdMorphDescriptorBuilder.NormalizeMorphType(morph.type);
@@ -560,7 +560,7 @@ namespace Mmd.UnityIntegration
                            type == "uva3" || type == "uva4";
                 })
                 .OrderBy(morph => morph.index)
-                .Select(morph => new MmdMorphDescriptorBuilder.MmdUvMorphDescriptor
+                .Select(morph => new MmdUvMorphDescriptor
                 {
                     morphIndex = morph.index,
                     morphName = morph.name,

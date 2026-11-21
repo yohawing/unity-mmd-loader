@@ -368,7 +368,7 @@ namespace Mmd.UnityIntegration
 
             if (descriptor.flipMorphs != null)
             {
-                foreach (MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor morph in descriptor.flipMorphs)
+                foreach (MmdFlipMorphDescriptor morph in descriptor.flipMorphs)
                 {
                     if (morph == null || string.IsNullOrWhiteSpace(morph.morphName))
                         continue;
@@ -380,7 +380,7 @@ namespace Mmd.UnityIntegration
                         continue;
                     }
 
-                    foreach (MmdMorphDescriptorBuilder.MmdFlipMorphOffsetDescriptor offset in morph.offsets)
+                    foreach (MmdFlipMorphOffsetDescriptor offset in morph.offsets)
                     {
                         AddCompositeMorphEdge(
                             compositeEdges,

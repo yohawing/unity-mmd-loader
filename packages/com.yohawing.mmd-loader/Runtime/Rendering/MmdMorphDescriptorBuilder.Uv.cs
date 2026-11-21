@@ -7,27 +7,8 @@ using Mmd.Parser;
 
 namespace Mmd.Rendering
 {
-    public static partial class MmdMorphDescriptorBuilder
+    internal static partial class MmdMorphDescriptorBuilder
     {
-        [Serializable]
-        public sealed class MmdUvMorphDescriptor
-        {
-            public int morphIndex;
-            public string morphName = string.Empty;
-            public string morphType = string.Empty;
-            public int uvOffsetCount;
-            public List<MmdUvMorphOffsetDescriptor> offsets = new();
-        }
-
-        [Serializable]
-        public sealed class MmdUvMorphOffsetDescriptor
-        {
-            public int vertexIndex;
-            public float[] positionDelta = Array.Empty<float>();
-            public bool targetVertexExists;
-            public bool allPayloadFinite;
-        }
-
         public static IReadOnlyList<MmdUvMorphDescriptor> BuildUvMorphs(MmdModelDefinition model)
         {
             if (model == null)

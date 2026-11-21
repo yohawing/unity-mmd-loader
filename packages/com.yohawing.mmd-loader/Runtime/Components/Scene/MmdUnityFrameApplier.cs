@@ -152,8 +152,8 @@ namespace Mmd.UnityIntegration
             IReadOnlyList<MmdMeshVertexDescriptor>? vertices = descriptor.vertices;
             IReadOnlyList<MmdVertexMorphDescriptor>? vertexMorphs = descriptor.vertexMorphs;
             IReadOnlyList<MmdGroupMorphDescriptor>? groupMorphs = descriptor.groupMorphs;
-            IReadOnlyList<MmdMorphDescriptorBuilder.MmdMaterialMorphDescriptor>? materialMorphs = descriptor.materialMorphs;
-            IReadOnlyList<MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor>? flipMorphs = descriptor.flipMorphs;
+            IReadOnlyList<MmdMaterialMorphDescriptor>? materialMorphs = descriptor.materialMorphs;
+            IReadOnlyList<MmdFlipMorphDescriptor>? flipMorphs = descriptor.flipMorphs;
             if (timing != null)
             {
                 timing.vertexCount = vertices?.Count ?? 0;
@@ -202,7 +202,7 @@ namespace Mmd.UnityIntegration
             IReadOnlyDictionary<string, float> resolvedWeights = MmdCompositeMorphWeightResolver.Resolve(
                 morphWeightMap,
                 groupMorphsForResolve,
-                flipMorphs ?? Array.Empty<MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor>());
+                flipMorphs ?? Array.Empty<MmdFlipMorphDescriptor>());
             if (timing != null)
             {
                 timing.resolveCompositeWeightsMs = ToMilliseconds(Stopwatch.GetTimestamp() - stageStart);
@@ -286,12 +286,12 @@ namespace Mmd.UnityIntegration
         {
             IReadOnlyList<MmdMaterialDescriptor> materials = descriptor.materials
                 ?? throw new InvalidOperationException("Rendering descriptor materials are required for material morph evaluation.");
-            IReadOnlyList<MmdMorphDescriptorBuilder.MmdMaterialMorphDescriptor> materialMorphs = descriptor.materialMorphs
+            IReadOnlyList<MmdMaterialMorphDescriptor> materialMorphs = descriptor.materialMorphs
                 ?? throw new InvalidOperationException("Rendering descriptor material morphs are required for material morph evaluation.");
             bool hasNonZeroMaterialMorphWeight = false;
             for (int i = 0; i < materialMorphs.Count; i++)
             {
-                MmdMorphDescriptorBuilder.MmdMaterialMorphDescriptor morph = materialMorphs[i];
+                MmdMaterialMorphDescriptor morph = materialMorphs[i];
                 if (morph == null || string.IsNullOrWhiteSpace(morph.morphName))
                 {
                     continue;

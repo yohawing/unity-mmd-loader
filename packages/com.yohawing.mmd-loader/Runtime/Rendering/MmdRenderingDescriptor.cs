@@ -18,9 +18,9 @@ namespace Mmd.Rendering
         public List<MmdUrpMaterialBindingDescriptor> urpMaterialBindings = new();
         public List<MmdVertexMorphDescriptor> vertexMorphs = new();
         public List<MmdGroupMorphDescriptor> groupMorphs = new();
-        public List<MmdMorphDescriptorBuilder.MmdUvMorphDescriptor> uvMorphs = new();
-        public List<MmdMorphDescriptorBuilder.MmdMaterialMorphDescriptor> materialMorphs = new();
-        public List<MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor> flipMorphs = new();
+        public List<MmdUvMorphDescriptor> uvMorphs = new();
+        public List<MmdMaterialMorphDescriptor> materialMorphs = new();
+        public List<MmdFlipMorphDescriptor> flipMorphs = new();
         public MmdTextureOrientationDescriptor textureOrientation = new();
         public int ikCount;
     }

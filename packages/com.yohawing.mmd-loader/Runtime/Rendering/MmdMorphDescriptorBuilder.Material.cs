@@ -7,30 +7,8 @@ using Mmd.Parser;
 
 namespace Mmd.Rendering
 {
-    public static partial class MmdMorphDescriptorBuilder
+    internal static partial class MmdMorphDescriptorBuilder
     {
-        [Serializable]
-        public sealed class MmdMaterialMorphDescriptor
-        {
-            public int morphIndex;
-            public string morphName = string.Empty;
-            public List<MmdMaterialMorphOffsetDescriptor> offsets = new();
-        }
-
-        [Serializable]
-        public sealed class MmdMaterialMorphOffsetDescriptor
-        {
-            public int materialIndex = -1;
-            public string operation = "unknown";
-            public float[] diffuseColor = Array.Empty<float>();
-            public float diffuseOpacity = 1.0f;
-            public float[] ambientColor = Array.Empty<float>();
-            public float[] edgeColor = Array.Empty<float>();
-            public float edgeOpacity = 1.0f;
-            public float edgeSize;
-            public bool allOffsetsFinite;
-        }
-
         public static IReadOnlyList<MmdMaterialMorphDescriptor> BuildMaterialMorphs(MmdModelDefinition model)
         {
             if (model == null)

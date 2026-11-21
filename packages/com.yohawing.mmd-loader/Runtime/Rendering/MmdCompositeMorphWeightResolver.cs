@@ -27,7 +27,7 @@ namespace Mmd.Rendering
         public static IReadOnlyDictionary<string, float> Resolve(
             IReadOnlyDictionary<string, float> frameWeights,
             IReadOnlyList<MmdGroupMorphDescriptor> groupMorphs,
-            IReadOnlyList<MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor> flipMorphs)
+            IReadOnlyList<MmdFlipMorphDescriptor> flipMorphs)
         {
             if (frameWeights == null)
             {
@@ -65,7 +65,7 @@ namespace Mmd.Rendering
                 }
             }
 
-            foreach (MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor flipMorph in flipMorphs)
+            foreach (MmdFlipMorphDescriptor flipMorph in flipMorphs)
             {
                 if (!string.IsNullOrWhiteSpace(flipMorph.morphName))
                 {
@@ -204,7 +204,7 @@ namespace Mmd.Rendering
         }
 
         private static void ExpandFlipOffsets(
-            IReadOnlyList<MmdMorphDescriptorBuilder.MmdFlipMorphOffsetDescriptor>? offsets,
+            IReadOnlyList<MmdFlipMorphOffsetDescriptor>? offsets,
             string morphName,
             float compositeWeight,
             Dictionary<string, CompositeMorphEntry> compositeByName,
@@ -218,7 +218,7 @@ namespace Mmd.Rendering
 
             for (int offsetIndex = 0; offsetIndex < offsets.Count; offsetIndex++)
             {
-                MmdMorphDescriptorBuilder.MmdFlipMorphOffsetDescriptor offset = offsets[offsetIndex];
+                MmdFlipMorphOffsetDescriptor offset = offsets[offsetIndex];
                 if (offset.weight == 0.0f)
                 {
                     continue;
@@ -261,18 +261,18 @@ namespace Mmd.Rendering
             public string MorphName { get; }
             public bool IsGroup { get; }
             public IReadOnlyList<MmdGroupMorphOffsetDescriptor> GroupOffsets { get; }
-            public IReadOnlyList<MmdMorphDescriptorBuilder.MmdFlipMorphOffsetDescriptor> FlipOffsets { get; }
+            public IReadOnlyList<MmdFlipMorphOffsetDescriptor> FlipOffsets { get; }
 
             public CompositeMorphEntry(
                 string morphName,
                 bool isGroup,
                 IReadOnlyList<MmdGroupMorphOffsetDescriptor>? groupOffsets = null,
-                IReadOnlyList<MmdMorphDescriptorBuilder.MmdFlipMorphOffsetDescriptor>? flipOffsets = null)
+                IReadOnlyList<MmdFlipMorphOffsetDescriptor>? flipOffsets = null)
             {
                 MorphName = morphName;
                 IsGroup = isGroup;
                 GroupOffsets = groupOffsets ?? Array.Empty<MmdGroupMorphOffsetDescriptor>();
-                FlipOffsets = flipOffsets ?? Array.Empty<MmdMorphDescriptorBuilder.MmdFlipMorphOffsetDescriptor>();
+                FlipOffsets = flipOffsets ?? Array.Empty<MmdFlipMorphOffsetDescriptor>();
             }
         }
 

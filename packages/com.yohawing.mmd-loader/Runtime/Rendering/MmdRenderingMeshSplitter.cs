@@ -311,23 +311,23 @@ namespace Mmd.Rendering
                 .ToList();
         }
 
-        private static List<MmdMorphDescriptorBuilder.MmdMaterialMorphDescriptor> CloneMaterialMorphs(
-            IReadOnlyList<MmdMorphDescriptorBuilder.MmdMaterialMorphDescriptor>? source)
+        private static List<MmdMaterialMorphDescriptor> CloneMaterialMorphs(
+            IReadOnlyList<MmdMaterialMorphDescriptor>? source)
         {
             if (source == null || source.Count == 0)
             {
-                return new List<MmdMorphDescriptorBuilder.MmdMaterialMorphDescriptor>();
+                return new List<MmdMaterialMorphDescriptor>();
             }
 
             return source
                 .OrderBy(morph => morph.morphIndex)
-                .Select(morph => new MmdMorphDescriptorBuilder.MmdMaterialMorphDescriptor
+                .Select(morph => new MmdMaterialMorphDescriptor
                 {
                     morphIndex = morph.morphIndex,
                     morphName = morph.morphName,
-                    offsets = (morph.offsets ?? new List<MmdMorphDescriptorBuilder.MmdMaterialMorphOffsetDescriptor>())
+                    offsets = (morph.offsets ?? new List<MmdMaterialMorphOffsetDescriptor>())
                         .OrderBy(offset => offset.materialIndex)
-                        .Select(offset => new MmdMorphDescriptorBuilder.MmdMaterialMorphOffsetDescriptor
+                        .Select(offset => new MmdMaterialMorphOffsetDescriptor
                         {
                             materialIndex = offset.materialIndex,
                             operation = offset.operation,
@@ -344,23 +344,23 @@ namespace Mmd.Rendering
                 .ToList();
         }
 
-        private static List<MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor> CloneFlipMorphs(
-            IReadOnlyList<MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor>? source)
+        private static List<MmdFlipMorphDescriptor> CloneFlipMorphs(
+            IReadOnlyList<MmdFlipMorphDescriptor>? source)
         {
             if (source == null || source.Count == 0)
             {
-                return new List<MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor>();
+                return new List<MmdFlipMorphDescriptor>();
             }
 
             return source
                 .OrderBy(morph => morph.morphIndex)
-                .Select(morph => new MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor
+                .Select(morph => new MmdFlipMorphDescriptor
                 {
                     morphIndex = morph.morphIndex,
                     morphName = morph.morphName,
                     flipOffsetCount = morph.flipOffsetCount,
-                    offsets = (morph.offsets ?? new List<MmdMorphDescriptorBuilder.MmdFlipMorphOffsetDescriptor>())
-                        .Select(offset => new MmdMorphDescriptorBuilder.MmdFlipMorphOffsetDescriptor
+                    offsets = (morph.offsets ?? new List<MmdFlipMorphOffsetDescriptor>())
+                        .Select(offset => new MmdFlipMorphOffsetDescriptor
                         {
                             targetMorphIndex = offset.targetMorphIndex,
                             targetMorphName = offset.targetMorphName,
@@ -414,13 +414,13 @@ namespace Mmd.Rendering
                 .ToList();
         }
 
-        private static List<MmdMorphDescriptorBuilder.MmdUvMorphDescriptor> SplitUvMorphs(
-            IReadOnlyList<MmdMorphDescriptorBuilder.MmdUvMorphDescriptor>? source,
+        private static List<MmdUvMorphDescriptor> SplitUvMorphs(
+            IReadOnlyList<MmdUvMorphDescriptor>? source,
             IReadOnlyDictionary<int, List<int>> splitIndicesBySourceVertex)
         {
-            return (source ?? Array.Empty<MmdMorphDescriptorBuilder.MmdUvMorphDescriptor>())
+            return (source ?? Array.Empty<MmdUvMorphDescriptor>())
                 .OrderBy(morph => morph.morphIndex)
-                .Select(morph => new MmdMorphDescriptorBuilder.MmdUvMorphDescriptor
+                .Select(morph => new MmdUvMorphDescriptor
                 {
                     morphIndex = morph.morphIndex,
                     morphName = morph.morphName,
@@ -456,12 +456,12 @@ namespace Mmd.Rendering
             return offsets.OrderBy(offset => offset.vertexIndex).ToList();
         }
 
-        private static List<MmdMorphDescriptorBuilder.MmdUvMorphOffsetDescriptor> SplitUvMorphOffsets(
-            MmdMorphDescriptorBuilder.MmdUvMorphDescriptor morph,
+        private static List<MmdUvMorphOffsetDescriptor> SplitUvMorphOffsets(
+            MmdUvMorphDescriptor morph,
             IReadOnlyDictionary<int, List<int>> splitIndicesBySourceVertex)
         {
-            var offsets = new List<MmdMorphDescriptorBuilder.MmdUvMorphOffsetDescriptor>();
-            foreach (MmdMorphDescriptorBuilder.MmdUvMorphOffsetDescriptor offset in (morph.offsets ?? new List<MmdMorphDescriptorBuilder.MmdUvMorphOffsetDescriptor>()).OrderBy(item => item.vertexIndex))
+            var offsets = new List<MmdUvMorphOffsetDescriptor>();
+            foreach (MmdUvMorphOffsetDescriptor offset in (morph.offsets ?? new List<MmdUvMorphOffsetDescriptor>()).OrderBy(item => item.vertexIndex))
             {
                 if (!splitIndicesBySourceVertex.TryGetValue(offset.vertexIndex, out List<int>? splitVertexIndices))
                 {
@@ -470,7 +470,7 @@ namespace Mmd.Rendering
 
                 foreach (int splitVertexIndex in splitVertexIndices.OrderBy(index => index))
                 {
-                    offsets.Add(new MmdMorphDescriptorBuilder.MmdUvMorphOffsetDescriptor
+                    offsets.Add(new MmdUvMorphOffsetDescriptor
                     {
                         vertexIndex = splitVertexIndex,
                         positionDelta = offset.positionDelta.ToArray(),

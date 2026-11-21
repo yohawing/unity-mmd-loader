@@ -14,7 +14,7 @@ namespace Mmd.Rendering
             return MmdCompositeMorphWeightResolver.Resolve(
                 frameWeights,
                 groupMorphs,
-                Array.Empty<MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor>());
+                Array.Empty<MmdFlipMorphDescriptor>());
         }
     }
 }

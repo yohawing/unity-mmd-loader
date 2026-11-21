@@ -57,13 +57,13 @@ namespace Mmd.Tests
                 morphIndex = 2,
                 morphName = "face"
             });
-            descriptor.flipMorphs.Add(new MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor
+            descriptor.flipMorphs.Add(new MmdFlipMorphDescriptor
             {
                 morphIndex = 1,
                 morphName = "flip-source",
-                offsets = new List<MmdMorphDescriptorBuilder.MmdFlipMorphOffsetDescriptor>
+                offsets = new List<MmdFlipMorphOffsetDescriptor>
                 {
-                    new MmdMorphDescriptorBuilder.MmdFlipMorphOffsetDescriptor
+                    new MmdFlipMorphOffsetDescriptor
                     {
                         targetMorphIndex = 2,
                         targetMorphName = "face",

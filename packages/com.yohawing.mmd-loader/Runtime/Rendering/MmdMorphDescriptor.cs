@@ -39,7 +39,7 @@ namespace Mmd.Rendering
     }
 
     [Serializable]
-    public sealed class MmdMorphTypeInventoryDescriptor
+    internal sealed class MmdMorphTypeInventoryDescriptor
     {
         public int morphIndex;
         public string morphName = string.Empty;
@@ -58,7 +58,7 @@ namespace Mmd.Rendering
         public bool evaluatedByVertexMorphEvaluator;
     }
 
-    public static partial class MmdMorphDescriptorBuilder
+    internal static partial class MmdMorphDescriptorBuilder
     {
         private static readonly HashSet<string> KnownMorphTypes = new(StringComparer.Ordinal)
         {

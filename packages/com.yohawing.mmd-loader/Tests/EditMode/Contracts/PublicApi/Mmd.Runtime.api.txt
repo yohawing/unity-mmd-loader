@@ -889,6 +889,19 @@ Mmd.Physics.MmdPhysicsMode :: (type) public enum MmdPhysicsMode : int
 Mmd.Physics.MmdPhysicsMode :: enum Cache = 2
 Mmd.Physics.MmdPhysicsMode :: enum Live = 1
 Mmd.Physics.MmdPhysicsMode :: enum Off = 0
+Mmd.Rendering.MmdFlipMorphDescriptor :: (type) public sealed class MmdFlipMorphDescriptor
+Mmd.Rendering.MmdFlipMorphDescriptor :: ctor public .ctor()
+Mmd.Rendering.MmdFlipMorphDescriptor :: field public System.Collections.Generic.List<Mmd.Rendering.MmdFlipMorphOffsetDescriptor> offsets
+Mmd.Rendering.MmdFlipMorphDescriptor :: field public int flipOffsetCount
+Mmd.Rendering.MmdFlipMorphDescriptor :: field public int morphIndex
+Mmd.Rendering.MmdFlipMorphDescriptor :: field public string morphName
+Mmd.Rendering.MmdFlipMorphOffsetDescriptor :: (type) public sealed class MmdFlipMorphOffsetDescriptor
+Mmd.Rendering.MmdFlipMorphOffsetDescriptor :: ctor public .ctor()
+Mmd.Rendering.MmdFlipMorphOffsetDescriptor :: field public bool finiteWeight
+Mmd.Rendering.MmdFlipMorphOffsetDescriptor :: field public float weight
+Mmd.Rendering.MmdFlipMorphOffsetDescriptor :: field public int targetMorphIndex
+Mmd.Rendering.MmdFlipMorphOffsetDescriptor :: field public string targetMorphName
+Mmd.Rendering.MmdFlipMorphOffsetDescriptor :: field public string targetMorphType
 Mmd.Rendering.MmdGroupMorphDescriptor :: (type) public sealed class MmdGroupMorphDescriptor
 Mmd.Rendering.MmdGroupMorphDescriptor :: ctor public .ctor()
 Mmd.Rendering.MmdGroupMorphDescriptor :: field public System.Collections.Generic.List<Mmd.Rendering.MmdGroupMorphOffsetDescriptor> offsets
@@ -932,6 +945,22 @@ Mmd.Rendering.MmdMaterialDescriptor :: field public string sphereTexture
 Mmd.Rendering.MmdMaterialDescriptor :: field public string sphereTextureMode
 Mmd.Rendering.MmdMaterialDescriptor :: field public string texture
 Mmd.Rendering.MmdMaterialDescriptor :: field public string toonTexture
+Mmd.Rendering.MmdMaterialMorphDescriptor :: (type) public sealed class MmdMaterialMorphDescriptor
+Mmd.Rendering.MmdMaterialMorphDescriptor :: ctor public .ctor()
+Mmd.Rendering.MmdMaterialMorphDescriptor :: field public System.Collections.Generic.List<Mmd.Rendering.MmdMaterialMorphOffsetDescriptor> offsets
+Mmd.Rendering.MmdMaterialMorphDescriptor :: field public int morphIndex
+Mmd.Rendering.MmdMaterialMorphDescriptor :: field public string morphName
+Mmd.Rendering.MmdMaterialMorphOffsetDescriptor :: (type) public sealed class MmdMaterialMorphOffsetDescriptor
+Mmd.Rendering.MmdMaterialMorphOffsetDescriptor :: ctor public .ctor()
+Mmd.Rendering.MmdMaterialMorphOffsetDescriptor :: field public bool allOffsetsFinite
+Mmd.Rendering.MmdMaterialMorphOffsetDescriptor :: field public float diffuseOpacity
+Mmd.Rendering.MmdMaterialMorphOffsetDescriptor :: field public float edgeOpacity
+Mmd.Rendering.MmdMaterialMorphOffsetDescriptor :: field public float edgeSize
+Mmd.Rendering.MmdMaterialMorphOffsetDescriptor :: field public float[] ambientColor
+Mmd.Rendering.MmdMaterialMorphOffsetDescriptor :: field public float[] diffuseColor
+Mmd.Rendering.MmdMaterialMorphOffsetDescriptor :: field public float[] edgeColor
+Mmd.Rendering.MmdMaterialMorphOffsetDescriptor :: field public int materialIndex
+Mmd.Rendering.MmdMaterialMorphOffsetDescriptor :: field public string operation
 Mmd.Rendering.MmdMaterialPreset :: (type) public enum MmdMaterialPreset : int
 Mmd.Rendering.MmdMaterialPreset :: enum MmdToon = 0
 Mmd.Rendering.MmdMaterialPreset :: enum MmdToonLit = 2
@@ -943,130 +972,18 @@ Mmd.Rendering.MmdMeshVertexDescriptor :: field public float[] normal
 Mmd.Rendering.MmdMeshVertexDescriptor :: field public float[] position
 Mmd.Rendering.MmdMeshVertexDescriptor :: field public float[] uv
 Mmd.Rendering.MmdMeshVertexDescriptor :: field public int vertexIndex
-Mmd.Rendering.MmdMorphDescriptorBuilder :: (type) public static class MmdMorphDescriptorBuilder
-Mmd.Rendering.MmdMorphDescriptorBuilder :: const public string BoneMorphEvaluatorReason = "bone-morph-evaluator"
-Mmd.Rendering.MmdMorphDescriptorBuilder :: const public string CompositeMorphInventoryOnlyReason = "composite-morph-inventory-only"
-Mmd.Rendering.MmdMorphDescriptorBuilder :: const public string FlipMorphEvaluatorReason = "flip-morph-weight-resolver"
-Mmd.Rendering.MmdMorphDescriptorBuilder :: const public string FutureRuntimePathReason = "future-runtime-path"
-Mmd.Rendering.MmdMorphDescriptorBuilder :: const public string FutureStatus = "future"
-Mmd.Rendering.MmdMorphDescriptorBuilder :: const public string InventoryOnlyStatus = "inventory-only"
-Mmd.Rendering.MmdMorphDescriptorBuilder :: const public string MaterialMorphEvaluatorReason = "material-morph-evaluator"
-Mmd.Rendering.MmdMorphDescriptorBuilder :: const public string NoOpSupportedStatus = "no-op-supported"
-Mmd.Rendering.MmdMorphDescriptorBuilder :: const public string NotSupportedStatus = "not-supported"
-Mmd.Rendering.MmdMorphDescriptorBuilder :: const public string PhysicsImpulseOutOfScopeReason = "physics-impulse-out-of-scope"
-Mmd.Rendering.MmdMorphDescriptorBuilder :: const public string SupportedStatus = "supported"
-Mmd.Rendering.MmdMorphDescriptorBuilder :: const public string TextureUvMorphEvaluatorReason = "texture-uv-morph-evaluator"
-Mmd.Rendering.MmdMorphDescriptorBuilder :: const public string UnknownMorphTypeReason = "unknown-morph-type"
-Mmd.Rendering.MmdMorphDescriptorBuilder :: const public string VertexMorphEvaluatorReason = "vertex-morph-evaluator"
-Mmd.Rendering.MmdMorphDescriptorBuilder :: const public string VertexMorphNoOffsetsReason = "vertex-morph-no-offsets"
-Mmd.Rendering.MmdMorphDescriptorBuilder :: method public static System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdGroupMorphDescriptor> BuildGroupMorphs(Mmd.Parser.MmdModelDefinition model)
-Mmd.Rendering.MmdMorphDescriptorBuilder :: method public static System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdMorphDescriptorBuilder.MmdBoneMorphDescriptor> BuildBoneMorphs(Mmd.Parser.MmdModelDefinition model)
-Mmd.Rendering.MmdMorphDescriptorBuilder :: method public static System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor> BuildFlipMorphs(Mmd.Parser.MmdModelDefinition model)
-Mmd.Rendering.MmdMorphDescriptorBuilder :: method public static System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdMorphDescriptorBuilder.MmdImpulseMorphDescriptor> BuildImpulseMorphs(Mmd.Parser.MmdModelDefinition model)
-Mmd.Rendering.MmdMorphDescriptorBuilder :: method public static System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdMorphDescriptorBuilder.MmdMaterialMorphDescriptor> BuildMaterialMorphs(Mmd.Parser.MmdModelDefinition model)
-Mmd.Rendering.MmdMorphDescriptorBuilder :: method public static System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdMorphDescriptorBuilder.MmdUvMorphDescriptor> BuildUvMorphs(Mmd.Parser.MmdModelDefinition model)
-Mmd.Rendering.MmdMorphDescriptorBuilder :: method public static System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdMorphTypeInventoryDescriptor> BuildTypeInventory(Mmd.Parser.MmdModelDefinition model)
-Mmd.Rendering.MmdMorphDescriptorBuilder :: method public static System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdVertexMorphDescriptor> BuildVertexMorphs(Mmd.Parser.MmdModelDefinition model)
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdBoneMorphDescriptor :: (type) public sealed class MmdBoneMorphDescriptor
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdBoneMorphDescriptor :: ctor public .ctor()
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdBoneMorphDescriptor :: field public System.Collections.Generic.List<Mmd.Rendering.MmdMorphDescriptorBuilder.MmdBoneMorphOffsetDescriptor> offsets
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdBoneMorphDescriptor :: field public int boneOffsetCount
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdBoneMorphDescriptor :: field public int morphIndex
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdBoneMorphDescriptor :: field public string morphName
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdBoneMorphOffsetDescriptor :: (type) public sealed class MmdBoneMorphOffsetDescriptor
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdBoneMorphOffsetDescriptor :: ctor public .ctor()
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdBoneMorphOffsetDescriptor :: field public bool allPayloadFinite
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdBoneMorphOffsetDescriptor :: field public bool targetBoneExists
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdBoneMorphOffsetDescriptor :: field public float[] orientation
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdBoneMorphOffsetDescriptor :: field public float[] translation
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdBoneMorphOffsetDescriptor :: field public int boneIndex
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdBoneMorphOffsetDescriptor :: field public string targetBoneName
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor :: (type) public sealed class MmdFlipMorphDescriptor
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor :: ctor public .ctor()
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor :: field public System.Collections.Generic.List<Mmd.Rendering.MmdMorphDescriptorBuilder.MmdFlipMorphOffsetDescriptor> offsets
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor :: field public int flipOffsetCount
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor :: field public int morphIndex
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor :: field public string morphName
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdFlipMorphOffsetDescriptor :: (type) public sealed class MmdFlipMorphOffsetDescriptor
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdFlipMorphOffsetDescriptor :: ctor public .ctor()
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdFlipMorphOffsetDescriptor :: field public bool finiteWeight
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdFlipMorphOffsetDescriptor :: field public float weight
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdFlipMorphOffsetDescriptor :: field public int targetMorphIndex
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdFlipMorphOffsetDescriptor :: field public string targetMorphName
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdFlipMorphOffsetDescriptor :: field public string targetMorphType
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdImpulseMorphDescriptor :: (type) public sealed class MmdImpulseMorphDescriptor
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdImpulseMorphDescriptor :: ctor public .ctor()
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdImpulseMorphDescriptor :: field public System.Collections.Generic.List<Mmd.Rendering.MmdMorphDescriptorBuilder.MmdImpulseMorphOffsetDescriptor> offsets
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdImpulseMorphDescriptor :: field public int impulseOffsetCount
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdImpulseMorphDescriptor :: field public int morphIndex
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdImpulseMorphDescriptor :: field public string morphName
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdImpulseMorphOffsetDescriptor :: (type) public sealed class MmdImpulseMorphOffsetDescriptor
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdImpulseMorphOffsetDescriptor :: ctor public .ctor()
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdImpulseMorphOffsetDescriptor :: field public bool allPayloadFinite
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdImpulseMorphOffsetDescriptor :: field public bool local
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdImpulseMorphOffsetDescriptor :: field public bool targetRigidbodyExists
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdImpulseMorphOffsetDescriptor :: field public float[] torque
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdImpulseMorphOffsetDescriptor :: field public float[] velocity
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdImpulseMorphOffsetDescriptor :: field public int rigidbodyIndex
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdImpulseMorphOffsetDescriptor :: field public string rigidbodyName
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdMaterialMorphDescriptor :: (type) public sealed class MmdMaterialMorphDescriptor
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdMaterialMorphDescriptor :: ctor public .ctor()
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdMaterialMorphDescriptor :: field public System.Collections.Generic.List<Mmd.Rendering.MmdMorphDescriptorBuilder.MmdMaterialMorphOffsetDescriptor> offsets
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdMaterialMorphDescriptor :: field public int morphIndex
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdMaterialMorphDescriptor :: field public string morphName
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdMaterialMorphOffsetDescriptor :: (type) public sealed class MmdMaterialMorphOffsetDescriptor
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdMaterialMorphOffsetDescriptor :: ctor public .ctor()
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdMaterialMorphOffsetDescriptor :: field public bool allOffsetsFinite
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdMaterialMorphOffsetDescriptor :: field public float diffuseOpacity
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdMaterialMorphOffsetDescriptor :: field public float edgeOpacity
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdMaterialMorphOffsetDescriptor :: field public float edgeSize
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdMaterialMorphOffsetDescriptor :: field public float[] ambientColor
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdMaterialMorphOffsetDescriptor :: field public float[] diffuseColor
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdMaterialMorphOffsetDescriptor :: field public float[] edgeColor
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdMaterialMorphOffsetDescriptor :: field public int materialIndex
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdMaterialMorphOffsetDescriptor :: field public string operation
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdUvMorphDescriptor :: (type) public sealed class MmdUvMorphDescriptor
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdUvMorphDescriptor :: ctor public .ctor()
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdUvMorphDescriptor :: field public System.Collections.Generic.List<Mmd.Rendering.MmdMorphDescriptorBuilder.MmdUvMorphOffsetDescriptor> offsets
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdUvMorphDescriptor :: field public int morphIndex
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdUvMorphDescriptor :: field public int uvOffsetCount
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdUvMorphDescriptor :: field public string morphName
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdUvMorphDescriptor :: field public string morphType
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdUvMorphOffsetDescriptor :: (type) public sealed class MmdUvMorphOffsetDescriptor
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdUvMorphOffsetDescriptor :: ctor public .ctor()
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdUvMorphOffsetDescriptor :: field public bool allPayloadFinite
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdUvMorphOffsetDescriptor :: field public bool targetVertexExists
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdUvMorphOffsetDescriptor :: field public float[] positionDelta
-Mmd.Rendering.MmdMorphDescriptorBuilder.MmdUvMorphOffsetDescriptor :: field public int vertexIndex
-Mmd.Rendering.MmdMorphTypeInventoryDescriptor :: (type) public sealed class MmdMorphTypeInventoryDescriptor
-Mmd.Rendering.MmdMorphTypeInventoryDescriptor :: ctor public .ctor()
-Mmd.Rendering.MmdMorphTypeInventoryDescriptor :: field public bool evaluatedByVertexMorphEvaluator
-Mmd.Rendering.MmdMorphTypeInventoryDescriptor :: field public int boneOffsetCount
-Mmd.Rendering.MmdMorphTypeInventoryDescriptor :: field public int flipOffsetCount
-Mmd.Rendering.MmdMorphTypeInventoryDescriptor :: field public int groupOffsetCount
-Mmd.Rendering.MmdMorphTypeInventoryDescriptor :: field public int impulseOffsetCount
-Mmd.Rendering.MmdMorphTypeInventoryDescriptor :: field public int materialOffsetCount
-Mmd.Rendering.MmdMorphTypeInventoryDescriptor :: field public int morphIndex
-Mmd.Rendering.MmdMorphTypeInventoryDescriptor :: field public int uvOffsetCount
-Mmd.Rendering.MmdMorphTypeInventoryDescriptor :: field public int vertexOffsetCount
-Mmd.Rendering.MmdMorphTypeInventoryDescriptor :: field public string morphName
-Mmd.Rendering.MmdMorphTypeInventoryDescriptor :: field public string morphType
-Mmd.Rendering.MmdMorphTypeInventoryDescriptor :: field public string normalizedFamily
-Mmd.Rendering.MmdMorphTypeInventoryDescriptor :: field public string panel
-Mmd.Rendering.MmdMorphTypeInventoryDescriptor :: field public string supportReason
-Mmd.Rendering.MmdMorphTypeInventoryDescriptor :: field public string supportStatus
 Mmd.Rendering.MmdRenderingDescriptor :: (type) public sealed class MmdRenderingDescriptor
 Mmd.Rendering.MmdRenderingDescriptor :: ctor public .ctor()
 Mmd.Rendering.MmdRenderingDescriptor :: field public Mmd.Rendering.MmdTextureOrientationDescriptor textureOrientation
+Mmd.Rendering.MmdRenderingDescriptor :: field public System.Collections.Generic.List<Mmd.Rendering.MmdFlipMorphDescriptor> flipMorphs
 Mmd.Rendering.MmdRenderingDescriptor :: field public System.Collections.Generic.List<Mmd.Rendering.MmdGroupMorphDescriptor> groupMorphs
 Mmd.Rendering.MmdRenderingDescriptor :: field public System.Collections.Generic.List<Mmd.Rendering.MmdMaterialDescriptor> materials
+Mmd.Rendering.MmdRenderingDescriptor :: field public System.Collections.Generic.List<Mmd.Rendering.MmdMaterialMorphDescriptor> materialMorphs
 Mmd.Rendering.MmdRenderingDescriptor :: field public System.Collections.Generic.List<Mmd.Rendering.MmdMeshVertexDescriptor> vertices
-Mmd.Rendering.MmdRenderingDescriptor :: field public System.Collections.Generic.List<Mmd.Rendering.MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor> flipMorphs
-Mmd.Rendering.MmdRenderingDescriptor :: field public System.Collections.Generic.List<Mmd.Rendering.MmdMorphDescriptorBuilder.MmdMaterialMorphDescriptor> materialMorphs
-Mmd.Rendering.MmdRenderingDescriptor :: field public System.Collections.Generic.List<Mmd.Rendering.MmdMorphDescriptorBuilder.MmdUvMorphDescriptor> uvMorphs
 Mmd.Rendering.MmdRenderingDescriptor :: field public System.Collections.Generic.List<Mmd.Rendering.MmdSkinningDescriptor> skinning
 Mmd.Rendering.MmdRenderingDescriptor :: field public System.Collections.Generic.List<Mmd.Rendering.MmdSubmeshDescriptor> submeshes
 Mmd.Rendering.MmdRenderingDescriptor :: field public System.Collections.Generic.List<Mmd.Rendering.MmdUrpMaterialBindingDescriptor> urpMaterialBindings
+Mmd.Rendering.MmdRenderingDescriptor :: field public System.Collections.Generic.List<Mmd.Rendering.MmdUvMorphDescriptor> uvMorphs
 Mmd.Rendering.MmdRenderingDescriptor :: field public System.Collections.Generic.List<Mmd.Rendering.MmdVertexMorphDescriptor> vertexMorphs
 Mmd.Rendering.MmdRenderingDescriptor :: field public System.Collections.Generic.List<int> indices
 Mmd.Rendering.MmdRenderingDescriptor :: field public int ikCount
@@ -1144,6 +1061,19 @@ Mmd.Rendering.MmdUrpMaterialBindingDescriptor :: field public string sphereTextu
 Mmd.Rendering.MmdUrpMaterialBindingDescriptor :: field public string toonTexture
 Mmd.Rendering.MmdUrpMaterialBindingDescriptor :: field public string toonTextureSourceHint
 Mmd.Rendering.MmdUrpMaterialBindingDescriptor :: field public string transparencyMode
+Mmd.Rendering.MmdUvMorphDescriptor :: (type) public sealed class MmdUvMorphDescriptor
+Mmd.Rendering.MmdUvMorphDescriptor :: ctor public .ctor()
+Mmd.Rendering.MmdUvMorphDescriptor :: field public System.Collections.Generic.List<Mmd.Rendering.MmdUvMorphOffsetDescriptor> offsets
+Mmd.Rendering.MmdUvMorphDescriptor :: field public int morphIndex
+Mmd.Rendering.MmdUvMorphDescriptor :: field public int uvOffsetCount
+Mmd.Rendering.MmdUvMorphDescriptor :: field public string morphName
+Mmd.Rendering.MmdUvMorphDescriptor :: field public string morphType
+Mmd.Rendering.MmdUvMorphOffsetDescriptor :: (type) public sealed class MmdUvMorphOffsetDescriptor
+Mmd.Rendering.MmdUvMorphOffsetDescriptor :: ctor public .ctor()
+Mmd.Rendering.MmdUvMorphOffsetDescriptor :: field public bool allPayloadFinite
+Mmd.Rendering.MmdUvMorphOffsetDescriptor :: field public bool targetVertexExists
+Mmd.Rendering.MmdUvMorphOffsetDescriptor :: field public float[] positionDelta
+Mmd.Rendering.MmdUvMorphOffsetDescriptor :: field public int vertexIndex
 Mmd.Rendering.MmdVertexMorphDescriptor :: (type) public sealed class MmdVertexMorphDescriptor
 Mmd.Rendering.MmdVertexMorphDescriptor :: ctor public .ctor()
 Mmd.Rendering.MmdVertexMorphDescriptor :: field public System.Collections.Generic.List<Mmd.Rendering.MmdVertexMorphOffsetDescriptor> offsets

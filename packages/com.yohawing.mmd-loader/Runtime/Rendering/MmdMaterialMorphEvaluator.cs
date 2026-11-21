@@ -2,7 +2,6 @@
 
 using System;
 using System.Collections.Generic;
-using static Mmd.Rendering.MmdMorphDescriptorBuilder;
 
 namespace Mmd.Rendering
 {

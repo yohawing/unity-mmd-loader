@@ -129,29 +129,23 @@ Mmd.Runtime	Mmd.Parser.MmdVertexMorphOffsetDefinition	advanced	ARCHITECTURE: Run
 Mmd.Runtime	Mmd.Parser.NativeMmdParser	advanced	ARCHITECTURE: Runtime API (NativeMmdParser)
 Mmd.Runtime	Mmd.Physics.MmdPhysicsBackendException	advanced	plans/002: public API から投げる例外型は public 維持
 Mmd.Runtime	Mmd.Physics.MmdPhysicsMode	stable	MmdUnityPlaybackController の public signature から到達
+Mmd.Runtime	Mmd.Rendering.MmdFlipMorphDescriptor	advanced	MmdRenderingDescriptor の public signature から到達
+Mmd.Runtime	Mmd.Rendering.MmdFlipMorphOffsetDescriptor	advanced	MmdFlipMorphDescriptor の public signature から到達
 Mmd.Runtime	Mmd.Rendering.MmdGroupMorphDescriptor	advanced	MmdRenderingDescriptor の public signature から到達
 Mmd.Runtime	Mmd.Rendering.MmdGroupMorphOffsetDescriptor	advanced	MmdGroupMorphDescriptor の public signature から到達
 Mmd.Runtime	Mmd.Rendering.MmdMaterialDescriptor	stable	plans/002 stable list
+Mmd.Runtime	Mmd.Rendering.MmdMaterialMorphDescriptor	advanced	MmdRenderingDescriptor の public signature から到達
+Mmd.Runtime	Mmd.Rendering.MmdMaterialMorphOffsetDescriptor	advanced	MmdMaterialMorphDescriptor の public signature から到達
 Mmd.Runtime	Mmd.Rendering.MmdMaterialPreset	stable	MmdMaterialMapperSet の public signature から到達
 Mmd.Runtime	Mmd.Rendering.MmdMeshVertexDescriptor	advanced	MmdRenderingDescriptor の public signature から到達
-Mmd.Runtime	Mmd.Rendering.MmdMorphDescriptorBuilder	advanced	MmdRenderingDescriptor の公開 field が入れ子型(Flip/Material/Uv Morph)を露出。入れ子型を外へ移すまで internal 化不可
-Mmd.Runtime	Mmd.Rendering.MmdMorphDescriptorBuilder.MmdBoneMorphDescriptor	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.Rendering.MmdMorphDescriptorBuilder.MmdBoneMorphOffsetDescriptor	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.Rendering.MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor	advanced	MmdRenderingDescriptor の public signature から到達
-Mmd.Runtime	Mmd.Rendering.MmdMorphDescriptorBuilder.MmdFlipMorphOffsetDescriptor	advanced	MmdFlipMorphDescriptor の public signature から到達
-Mmd.Runtime	Mmd.Rendering.MmdMorphDescriptorBuilder.MmdImpulseMorphDescriptor	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.Rendering.MmdMorphDescriptorBuilder.MmdImpulseMorphOffsetDescriptor	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.Rendering.MmdMorphDescriptorBuilder.MmdMaterialMorphDescriptor	advanced	MmdRenderingDescriptor の public signature から到達
-Mmd.Runtime	Mmd.Rendering.MmdMorphDescriptorBuilder.MmdMaterialMorphOffsetDescriptor	advanced	MmdMaterialMorphDescriptor の public signature から到達
-Mmd.Runtime	Mmd.Rendering.MmdMorphDescriptorBuilder.MmdUvMorphDescriptor	advanced	MmdRenderingDescriptor の public signature から到達
-Mmd.Runtime	Mmd.Rendering.MmdMorphDescriptorBuilder.MmdUvMorphOffsetDescriptor	advanced	MmdUvMorphDescriptor の public signature から到達
-Mmd.Runtime	Mmd.Rendering.MmdMorphTypeInventoryDescriptor	pending-internal	どの root からも public signature で到達しない
 Mmd.Runtime	Mmd.Rendering.MmdRenderingDescriptor	advanced	plans/002 advanced (主要 rendering descriptor)
 Mmd.Runtime	Mmd.Rendering.MmdRenderingDescriptorBuilder	advanced	plans/002 advanced (主要 rendering descriptor builder)
 Mmd.Runtime	Mmd.Rendering.MmdSkinningDescriptor	advanced	MmdRenderingDescriptor の public signature から到達
 Mmd.Runtime	Mmd.Rendering.MmdSubmeshDescriptor	advanced	MmdRenderingDescriptor の public signature から到達
 Mmd.Runtime	Mmd.Rendering.MmdTextureOrientationDescriptor	advanced	MmdRenderingDescriptor の public signature から到達
 Mmd.Runtime	Mmd.Rendering.MmdUrpMaterialBindingDescriptor	advanced	MmdRenderingDescriptor の public signature から到達
+Mmd.Runtime	Mmd.Rendering.MmdUvMorphDescriptor	advanced	MmdRenderingDescriptor の public signature から到達
+Mmd.Runtime	Mmd.Rendering.MmdUvMorphOffsetDescriptor	advanced	MmdUvMorphDescriptor の public signature から到達
 Mmd.Runtime	Mmd.Rendering.MmdVertexMorphDescriptor	advanced	MmdRenderingDescriptor の public signature から到達
 Mmd.Runtime	Mmd.Rendering.MmdVertexMorphOffsetDescriptor	advanced	MmdVertexMorphDescriptor の public signature から到達
 Mmd.Runtime	Mmd.UnityIntegration.MmdCameraStateToUnity	advanced	Mmd.Cinemachine と MmdCinemachineCameraBinding の引数既定値(DefaultMinFieldOfView)が使用

@@ -7,28 +7,8 @@ using Mmd.Parser;
 
 namespace Mmd.Rendering
 {
-    public static partial class MmdMorphDescriptorBuilder
+    internal static partial class MmdMorphDescriptorBuilder
     {
-        [Serializable]
-        public sealed class MmdBoneMorphDescriptor
-        {
-            public int morphIndex;
-            public string morphName = string.Empty;
-            public int boneOffsetCount;
-            public List<MmdBoneMorphOffsetDescriptor> offsets = new();
-        }
-
-        [Serializable]
-        public sealed class MmdBoneMorphOffsetDescriptor
-        {
-            public int boneIndex;
-            public string targetBoneName = string.Empty;
-            public bool targetBoneExists;
-            public float[] translation = Array.Empty<float>();
-            public float[] orientation = Array.Empty<float>();
-            public bool allPayloadFinite;
-        }
-
         public static IReadOnlyList<MmdBoneMorphDescriptor> BuildBoneMorphs(MmdModelDefinition model)
         {
             if (model == null)

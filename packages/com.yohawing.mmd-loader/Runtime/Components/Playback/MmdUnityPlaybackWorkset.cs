@@ -131,17 +131,17 @@ namespace Mmd.UnityIntegration
                 TryMarkMorph(slotsByMorphIndex, required, morph?.morphIndex ?? -1);
             }
 
-            foreach (MmdMorphDescriptorBuilder.MmdUvMorphDescriptor morph in descriptor.uvMorphs)
+            foreach (MmdUvMorphDescriptor morph in descriptor.uvMorphs)
             {
                 TryMarkMorph(slotsByMorphIndex, required, morph?.morphIndex ?? -1);
             }
 
-            foreach (MmdMorphDescriptorBuilder.MmdMaterialMorphDescriptor morph in descriptor.materialMorphs)
+            foreach (MmdMaterialMorphDescriptor morph in descriptor.materialMorphs)
             {
                 TryMarkMorph(slotsByMorphIndex, required, morph?.morphIndex ?? -1);
             }
 
-            foreach (MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor morph in descriptor.flipMorphs)
+            foreach (MmdFlipMorphDescriptor morph in descriptor.flipMorphs)
             {
                 if (morph == null)
                 {
@@ -154,7 +154,7 @@ namespace Mmd.UnityIntegration
                     continue;
                 }
 
-                foreach (MmdMorphDescriptorBuilder.MmdFlipMorphOffsetDescriptor offset in morph.offsets)
+                foreach (MmdFlipMorphOffsetDescriptor offset in morph.offsets)
                 {
                     if (offset != null)
                     {

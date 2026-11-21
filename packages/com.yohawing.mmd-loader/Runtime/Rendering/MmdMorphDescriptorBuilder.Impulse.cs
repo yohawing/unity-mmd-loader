@@ -7,29 +7,8 @@ using Mmd.Parser;
 
 namespace Mmd.Rendering
 {
-    public static partial class MmdMorphDescriptorBuilder
+    internal static partial class MmdMorphDescriptorBuilder
     {
-        [Serializable]
-        public sealed class MmdImpulseMorphDescriptor
-        {
-            public int morphIndex;
-            public string morphName = string.Empty;
-            public int impulseOffsetCount;
-            public List<MmdImpulseMorphOffsetDescriptor> offsets = new();
-        }
-
-        [Serializable]
-        public sealed class MmdImpulseMorphOffsetDescriptor
-        {
-            public int rigidbodyIndex = -1;
-            public string rigidbodyName = string.Empty;
-            public bool targetRigidbodyExists;
-            public float[] velocity = Array.Empty<float>();
-            public float[] torque = Array.Empty<float>();
-            public bool local;
-            public bool allPayloadFinite;
-        }
-
         public static IReadOnlyList<MmdImpulseMorphDescriptor> BuildImpulseMorphs(MmdModelDefinition model)
         {
             if (model == null)
