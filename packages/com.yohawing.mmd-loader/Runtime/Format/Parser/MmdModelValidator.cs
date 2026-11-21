@@ -22,6 +22,34 @@ namespace Mmd.Parser
             IReadOnlyList<MmdMorphDefinition> morphs = model.morphs != null ? model.morphs : Array.Empty<MmdMorphDefinition>();
             IReadOnlyList<MmdMaterialDefinition> materials = model.materials != null ? model.materials : Array.Empty<MmdMaterialDefinition>();
             IReadOnlyList<MmdIkDefinition> ikDefinitions = model.ik != null ? model.ik : Array.Empty<MmdIkDefinition>();
+            ValidateRequiredCollections(errors, model);
+
+            HashSet<int> vertexIndices = ValidateVertices(errors, vertices);
+            ValidateIndices(errors, indices, vertexIndices);
+            HashSet<int> boneIndices = ValidateBones(errors, bones);
+            ValidateVertexBoneReferences(errors, vertices, boneIndices);
+            Dictionary<int, MmdBoneDefinition> bonesByIndex = BuildBonesByIndex(bones);
+            ValidateBoneParentReferences(errors, bones, boneIndices);
+            ValidateBoneParentCycles(errors, bones, bonesByIndex);
+            ValidateIk(errors, ikDefinitions, boneIndices);
+            ValidateMorphs(errors, model, morphs, materials, vertexIndices, boneIndices);
+            ValidateMaterials(errors, materials);
+            ValidateMaterialVertexCountSum(errors, indices, materials);
+
+            return errors;
+        }
+
+        public static void ThrowIfInvalid(MmdModelDefinition model)
+        {
+            IReadOnlyList<string> errors = ValidateStructuralModel(model);
+            if (errors.Count > 0)
+            {
+                throw new InvalidOperationException(string.Join("; ", errors));
+            }
+        }
+
+        private static void ValidateRequiredCollections(List<string> errors, MmdModelDefinition model)
+        {
             if (model.vertices == null)
             {
                 errors.Add("model vertices must not be null");
@@ -51,9 +79,10 @@ namespace Mmd.Parser
             {
                 errors.Add("model ik must not be null");
             }
+        }
 
-            var boneIndices = new HashSet<int>(bones.Count);
-            var boneNames = new HashSet<string>(bones.Count, StringComparer.Ordinal);
+        private static HashSet<int> ValidateVertices(List<string> errors, IReadOnlyList<MmdVertexDefinition> vertices)
+        {
             var vertexIndices = new HashSet<int>(vertices.Count);
             for (int i = 0; i < vertices.Count; i++)
             {
@@ -118,6 +147,11 @@ namespace Mmd.Parser
                 }
             }
 
+            return vertexIndices;
+        }
+
+        private static void ValidateIndices(List<string> errors, IReadOnlyList<int> indices, HashSet<int> vertexIndices)
+        {
             if (indices.Count > 0)
             {
                 if (indices.Count % 3 != 0)
@@ -134,7 +168,12 @@ namespace Mmd.Parser
                     }
                 }
             }
+        }
 
+        private static HashSet<int> ValidateBones(List<string> errors, IReadOnlyList<MmdBoneDefinition> bones)
+        {
+            var boneIndices = new HashSet<int>(bones.Count);
+            var boneNames = new HashSet<string>(bones.Count, StringComparer.Ordinal);
             for (int i = 0; i < bones.Count; i++)
             {
                 MmdBoneDefinition bone = bones[i];
@@ -162,6 +201,11 @@ namespace Mmd.Parser
                 }
             }
 
+            return boneIndices;
+        }
+
+        private static void ValidateVertexBoneReferences(List<string> errors, IReadOnlyList<MmdVertexDefinition> vertices, HashSet<int> boneIndices)
+        {
             for (int i = 0; i < vertices.Count; i++)
             {
                 MmdVertexDefinition vertex = vertices[i];
@@ -179,7 +223,10 @@ namespace Mmd.Parser
                     }
                 }
             }
+        }
 
+        private static Dictionary<int, MmdBoneDefinition> BuildBonesByIndex(IReadOnlyList<MmdBoneDefinition> bones)
+        {
             var bonesByIndex = new Dictionary<int, MmdBoneDefinition>(bones.Count);
             for (int i = 0; i < bones.Count; i++)
             {
@@ -190,6 +237,11 @@ namespace Mmd.Parser
                 }
             }
 
+            return bonesByIndex;
+        }
+
+        private static void ValidateBoneParentReferences(List<string> errors, IReadOnlyList<MmdBoneDefinition> bones, HashSet<int> boneIndices)
+        {
             for (int i = 0; i < bones.Count; i++)
             {
                 MmdBoneDefinition bone = bones[i];
@@ -203,7 +255,10 @@ namespace Mmd.Parser
                     errors.Add($"bone appendParentIndex does not reference an existing bone: {bone.index} -> {bone.appendParentIndex}");
                 }
             }
+        }
 
+        private static void ValidateBoneParentCycles(List<string> errors, IReadOnlyList<MmdBoneDefinition> bones, Dictionary<int, MmdBoneDefinition> bonesByIndex)
+        {
             var cycleChecked = new HashSet<int>();
             for (int i = 0; i < bones.Count; i++)
             {
@@ -226,7 +281,10 @@ namespace Mmd.Parser
                     currentIndex = currentBone.parentIndex;
                 }
             }
+        }
 
+        private static void ValidateIk(List<string> errors, IReadOnlyList<MmdIkDefinition> ikDefinitions, HashSet<int> boneIndices)
+        {
             for (int i = 0; i < ikDefinitions.Count; i++)
             {
                 MmdIkDefinition ik = ikDefinitions[i];
@@ -286,7 +344,22 @@ namespace Mmd.Parser
                     }
                 }
             }
+        }
 
+        private static void ValidateMorphs(List<string> errors, MmdModelDefinition model, IReadOnlyList<MmdMorphDefinition> morphs, IReadOnlyList<MmdMaterialDefinition> materials, HashSet<int> vertexIndices, HashSet<int> boneIndices)
+        {
+            // Each pass visits every morph before the next pass starts; the diagnostic order depends on it.
+            HashSet<int> morphIndices = ValidateMorphFieldsAndVertexOffsets(errors, morphs, vertexIndices);
+            ValidateGroupMorphOffsets(errors, morphs, morphIndices);
+            ValidateMaterialMorphOffsets(errors, morphs, materials);
+            ValidateUvMorphOffsets(errors, morphs, vertexIndices);
+            ValidateBoneMorphOffsets(errors, morphs, boneIndices);
+            ValidateFlipMorphOffsets(errors, morphs, morphIndices);
+            ValidateImpulseMorphOffsets(errors, model, morphs);
+        }
+
+        private static HashSet<int> ValidateMorphFieldsAndVertexOffsets(List<string> errors, IReadOnlyList<MmdMorphDefinition> morphs, HashSet<int> vertexIndices)
+        {
             var morphIndices = new HashSet<int>(morphs.Count);
             // First pass: collect morph indices and validate morph-level fields
             for (int i = 0; i < morphs.Count; i++)
@@ -347,6 +420,11 @@ namespace Mmd.Parser
                 }
             }
 
+            return morphIndices;
+        }
+
+        private static void ValidateGroupMorphOffsets(List<string> errors, IReadOnlyList<MmdMorphDefinition> morphs, HashSet<int> morphIndices)
+        {
             // Second pass: validate group morph offset references (requires all morph indices to be collected)
             for (int i = 0; i < morphs.Count; i++)
             {
@@ -371,7 +449,10 @@ namespace Mmd.Parser
                     }
                 }
             }
+        }
 
+        private static void ValidateMaterialMorphOffsets(List<string> errors, IReadOnlyList<MmdMorphDefinition> morphs, IReadOnlyList<MmdMaterialDefinition> materials)
+        {
             // Third pass: validate material morph offset fields
             var knownOperations = new HashSet<string>(StringComparer.Ordinal)
             {
@@ -429,7 +510,10 @@ namespace Mmd.Parser
                     }
                 }
             }
+        }
 
+        private static void ValidateUvMorphOffsets(List<string> errors, IReadOnlyList<MmdMorphDefinition> morphs, HashSet<int> vertexIndices)
+        {
             // Fourth pass: validate UV morph offset fields
             for (int i = 0; i < morphs.Count; i++)
             {
@@ -453,7 +537,10 @@ namespace Mmd.Parser
                     }
                 }
             }
+        }
 
+        private static void ValidateBoneMorphOffsets(List<string> errors, IReadOnlyList<MmdMorphDefinition> morphs, HashSet<int> boneIndices)
+        {
             // Fifth pass: validate bone morph offset fields
             for (int i = 0; i < morphs.Count; i++)
             {
@@ -491,7 +578,10 @@ namespace Mmd.Parser
                     }
                 }
             }
+        }
 
+        private static void ValidateFlipMorphOffsets(List<string> errors, IReadOnlyList<MmdMorphDefinition> morphs, HashSet<int> morphIndices)
+        {
             // Sixth pass: validate flip morph offset fields
             for (int i = 0; i < morphs.Count; i++)
             {
@@ -521,7 +611,10 @@ namespace Mmd.Parser
                     }
                 }
             }
+        }
 
+        private static void ValidateImpulseMorphOffsets(List<string> errors, MmdModelDefinition model, IReadOnlyList<MmdMorphDefinition> morphs)
+        {
             // Seventh pass: validate impulse morph offset fields
             var rigidbodyIndices = new HashSet<int>();
             foreach (MmdRigidbodyDefinition rb in model.physics.rigidbodies)
@@ -565,7 +658,10 @@ namespace Mmd.Parser
                     }
                 }
             }
+        }
 
+        private static void ValidateMaterials(List<string> errors, IReadOnlyList<MmdMaterialDefinition> materials)
+        {
             var materialIndices = new HashSet<int>(materials.Count);
             for (int i = 0; i < materials.Count; i++)
             {
@@ -604,7 +700,10 @@ namespace Mmd.Parser
                     errors.Add($"material cullingPolicy must be unknown, double-sided, or backface-culling: {material.index}");
                 }
             }
+        }
 
+        private static void ValidateMaterialVertexCountSum(List<string> errors, IReadOnlyList<int> indices, IReadOnlyList<MmdMaterialDefinition> materials)
+        {
             if (indices.Count > 0 && materials.Count > 0)
             {
                 int materialVertexCount = 0;
@@ -617,17 +716,6 @@ namespace Mmd.Parser
                 {
                     errors.Add($"material vertexCount sum must match model indices count: {materialVertexCount} != {indices.Count}");
                 }
-            }
-
-            return errors;
-        }
-
-        public static void ThrowIfInvalid(MmdModelDefinition model)
-        {
-            IReadOnlyList<string> errors = ValidateStructuralModel(model);
-            if (errors.Count > 0)
-            {
-                throw new InvalidOperationException(string.Join("; ", errors));
             }
         }
 
