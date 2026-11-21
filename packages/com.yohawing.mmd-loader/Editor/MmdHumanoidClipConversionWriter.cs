@@ -495,7 +495,7 @@ namespace Mmd.Editor
         {
             rootMotionSamples = NativeRootMotionSamples.Empty;
             MmdUnityModelInstance instance = binding.Instance;
-            if (!MmdGenericAnimationClipWriter.CanUseNativeBatch(
+            if (!MmdNativeBatchPoseSampler.CanUseNativeBatch(
                     binding,
                     instance,
                     out int[] parentBoneIndices,
@@ -616,7 +616,7 @@ namespace Mmd.Editor
             out Vector3 localPosition,
             out Quaternion localRotation)
         {
-            MmdGenericAnimationClipWriter.ReadWorldPose(
+            MmdNativeBatchPoseSampler.ReadWorldPose(
                 frameWorld,
                 boneIndex,
                 out Vector3 worldPosition,
@@ -624,7 +624,7 @@ namespace Mmd.Editor
             int parentBone = parentBoneIndices[boneIndex];
             if (parentBone >= 0)
             {
-                MmdGenericAnimationClipWriter.ReadWorldPose(
+                MmdNativeBatchPoseSampler.ReadWorldPose(
                     frameWorld,
                     parentBone,
                     out Vector3 parentPosition,

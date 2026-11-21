@@ -326,7 +326,7 @@ namespace Mmd.Editor
                 var morphKeys = new Keyframe[morphs.Count][];
                 for (int morph = 0; morph < morphs.Count; morph++) morphKeys[morph] = new Keyframe[frameCount];
 
-                if (!CanUseNativeBatch(
+                if (!MmdNativeBatchPoseSampler.CanUseNativeBatch(
                         binding,
                         instance,
                         out int[] parentBoneIndices,
@@ -419,7 +419,7 @@ namespace Mmd.Editor
             AnimationClip clip,
             bool highPrecision)
         {
-            if (!CanUseNativeBatch(binding, instance, out _, out _, out _))
+            if (!MmdNativeBatchPoseSampler.CanUseNativeBatch(binding, instance, out _, out _, out _))
             {
                 throw new InvalidOperationException(
                     "native Generic AnimationClip sparse reduction is unavailable because native batch evaluation is unavailable or the Unity hierarchy is unsupported.");
@@ -821,61 +821,6 @@ namespace Mmd.Editor
             }
         }
 
-        internal static bool CanUseNativeBatch(
-            MmdUnityPlaybackBinding binding,
-            MmdUnityModelInstance instance,
-            out int[] parentBoneIndices,
-            out Vector3[] staticParentPositions,
-            out Quaternion[] staticParentRotations,
-            bool requireMorphCompatibility = true)
-        {
-            parentBoneIndices = Array.Empty<int>();
-            staticParentPositions = Array.Empty<Vector3>();
-            staticParentRotations = Array.Empty<Quaternion>();
-            if (!binding.HasFastRuntimeBatch ||
-                binding.FastRuntimeWorldMatrixFloatCount != instance.BoneTransforms.Length * 16 ||
-                requireMorphCompatibility &&
-                (binding.FastRuntimeMorphWeightCount <= 0 && instance.VertexMorphBlendShapes.Count > 0 ||
-                 instance.RenderingDescriptor.flipMorphs.Count > 0))
-            {
-                return false;
-            }
-
-            var boneIndices = new Dictionary<Transform, int>(instance.BoneTransforms.Length);
-            for (int bone = 0; bone < instance.BoneTransforms.Length; bone++)
-            {
-                boneIndices[instance.BoneTransforms[bone]] = bone;
-            }
-
-            parentBoneIndices = new int[instance.BoneTransforms.Length];
-            staticParentPositions = new Vector3[instance.BoneTransforms.Length];
-            staticParentRotations = new Quaternion[instance.BoneTransforms.Length];
-            Transform root = instance.Root.transform;
-            for (int bone = 0; bone < instance.BoneTransforms.Length; bone++)
-            {
-                Transform? parent = instance.BoneTransforms[bone].parent;
-                if (parent != null && boneIndices.TryGetValue(parent, out int parentBone))
-                {
-                    parentBoneIndices[bone] = parentBone;
-                }
-                else if (parent != null && (parent == root || parent.IsChildOf(root)))
-                {
-                    parentBoneIndices[bone] = -1;
-                    staticParentPositions[bone] = root.InverseTransformPoint(parent.position);
-                    staticParentRotations[bone] = Quaternion.Inverse(root.rotation) * parent.rotation;
-                }
-                else
-                {
-                    parentBoneIndices = Array.Empty<int>();
-                    staticParentPositions = Array.Empty<Vector3>();
-                    staticParentRotations = Array.Empty<Quaternion>();
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
         private static void FillDenseKeysFromNativeBatch(
             MmdUnityPlaybackBinding binding,
             MmdUnityModelInstance instance,
@@ -919,13 +864,13 @@ namespace Mmd.Editor
                         worldFloatsPerFrame);
                     for (int bone = 0; bone < instance.BoneTransforms.Length; bone++)
                     {
-                        ReadWorldPose(frameWorld, bone, out Vector3 worldPosition, out Quaternion worldRotation);
+                        MmdNativeBatchPoseSampler.ReadWorldPose(frameWorld, bone, out Vector3 worldPosition, out Quaternion worldRotation);
                         int parentBone = parentBoneIndices[bone];
                         Vector3 localPosition;
                         Quaternion localRotation;
                         if (parentBone >= 0)
                         {
-                            ReadWorldPose(frameWorld, parentBone, out Vector3 parentPosition, out Quaternion parentRotation);
+                            MmdNativeBatchPoseSampler.ReadWorldPose(frameWorld, parentBone, out Vector3 parentPosition, out Quaternion parentRotation);
                             Quaternion inverseParent = Quaternion.Inverse(parentRotation);
                             localPosition = inverseParent * (worldPosition - parentPosition) * importScale;
                             localRotation = inverseParent * worldRotation;
@@ -973,31 +918,6 @@ namespace Mmd.Editor
                     }
                 }
             }
-        }
-
-        internal static void ReadWorldPose(
-            ReadOnlySpan<float> frameWorld,
-            int bone,
-            out Vector3 position,
-            out Quaternion rotation)
-        {
-            int offset = bone * 16;
-            position = MmdCoordinateSpace.MmdToUnityPosition(new Vector3(
-                frameWorld[offset + 12],
-                frameWorld[offset + 13],
-                frameWorld[offset + 14]));
-            Vector3 forward = new Vector3(
-                frameWorld[offset + 8],
-                frameWorld[offset + 9],
-                frameWorld[offset + 10]);
-            Vector3 up = new Vector3(
-                frameWorld[offset + 4],
-                frameWorld[offset + 5],
-                frameWorld[offset + 6]);
-            Quaternion mmdRotation = forward.sqrMagnitude > 0.0f && up.sqrMagnitude > 0.0f
-                ? Quaternion.LookRotation(forward.normalized, up.normalized)
-                : Quaternion.identity;
-            rotation = MmdCoordinateSpace.MmdToUnityRotation(mmdRotation);
         }
 
         private static AnimationCurve CreateBakedCurve(
