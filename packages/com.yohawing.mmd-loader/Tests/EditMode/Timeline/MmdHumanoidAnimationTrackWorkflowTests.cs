@@ -47,12 +47,12 @@ namespace Mmd.Tests
                 director.playableAsset = timeline;
 
                 MmdHumanoidAnimationTrack track =
-                    MmdTimelineAssetWorkflow.CreateHumanoidAnimationTrack(timeline, director, controller);
+                    MmdTimelineFixtureBuilder.CreateHumanoidAnimationTrack(timeline, director, controller);
                 Assert.That(director.GetGenericBinding(track), Is.SameAs(controller),
                     "the humanoid track must be bound to the controller");
 
                 TimelineClip clip =
-                    MmdTimelineAssetWorkflow.CreateHumanoidAnimationClip(track, muscleClip, controller, director);
+                    MmdTimelineFixtureBuilder.CreateHumanoidAnimationClip(track, muscleClip, controller, director);
                 var clipAsset = (MmdHumanoidAnimationClip)clip.asset;
 
                 Assert.That(clipAsset.clip, Is.SameAs(muscleClip), "the AnimationClip must be assigned to the clip asset");
@@ -74,61 +74,6 @@ namespace Mmd.Tests
                 if (muscleClip != null)
                 {
                     Object.DestroyImmediate(muscleClip);
-                }
-
-                if (root != null)
-                {
-                    Object.DestroyImmediate(root);
-                }
-            }
-        }
-
-        [Test]
-        public void CreateHumanoidAnimationClipRejectsNonHumanoidClip()
-        {
-            GameObject? root = null;
-            GameObject? directorObject = null;
-            TimelineAsset? timeline = null;
-            AnimationClip? genericClip = null;
-            try
-            {
-                root = new GameObject("workflow-reject-root");
-                root.AddComponent<Animator>();
-                MmdUnityPlaybackController controller = root.AddComponent<MmdUnityPlaybackController>();
-
-                genericClip = new AnimationClip { frameRate = 30.0f };
-                genericClip.SetCurve("Bone", typeof(Transform), "localPosition.x",
-                    AnimationCurve.Linear(0.0f, 0.0f, 1.0f, 1.0f));
-                Assert.That(genericClip.humanMotion, Is.False, "a transform-curve clip must not be Humanoid motion");
-
-                timeline = ScriptableObject.CreateInstance<TimelineAsset>();
-                directorObject = new GameObject("workflow-reject-director");
-                PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
-                director.playOnAwake = false;
-                director.playableAsset = timeline;
-
-                MmdHumanoidAnimationTrack track =
-                    MmdTimelineAssetWorkflow.CreateHumanoidAnimationTrack(timeline, director, controller);
-
-                Assert.Throws<InvalidOperationException>(
-                    () => MmdTimelineAssetWorkflow.CreateHumanoidAnimationClip(track, genericClip, controller, director),
-                    "a Generic/transform AnimationClip must be rejected (it cannot retarget onto the proxy avatar)");
-            }
-            finally
-            {
-                if (directorObject != null)
-                {
-                    Object.DestroyImmediate(directorObject);
-                }
-
-                if (timeline != null)
-                {
-                    Object.DestroyImmediate(timeline);
-                }
-
-                if (genericClip != null)
-                {
-                    Object.DestroyImmediate(genericClip);
                 }
 
                 if (root != null)

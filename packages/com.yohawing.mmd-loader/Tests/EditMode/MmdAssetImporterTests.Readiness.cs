@@ -332,20 +332,6 @@ namespace Mmd.Tests
             }
         }
         [Test]
-        public void PmxPrefabExporterFeedbackPathCreatesPrefabAndSelectsIt()
-        {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
-            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
-
-            MmdPmxPrefabExportResult? result = MmdPmxPrefabExporter.CreatePrefabWithFeedback(pmxAsset);
-
-            Assert.That(result, Is.Not.Null);
-            Assert.That(result!.PrefabAssetPath, Does.EndWith(".prefab"));
-            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(result.PrefabAssetPath);
-            Assert.That(prefab, Is.Not.Null);
-            Assert.That(Selection.activeObject, Is.SameAs(prefab));
-        }
-        [Test]
         public void PmxPrefabExporterRejectsTraversalPathBeforeCreatingDirectories()
         {
             CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);

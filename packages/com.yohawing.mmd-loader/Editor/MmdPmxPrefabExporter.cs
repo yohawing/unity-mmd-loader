@@ -16,28 +16,6 @@ namespace Mmd.Editor
         private const string MeshSuffix = "_mesh.asset";
         private const string MaterialSuffix = "_material";
 
-        public static MmdPmxPrefabExportResult? CreatePrefabWithFeedback(MmdPmxAsset pmxAsset)
-        {
-            try
-            {
-                MmdPmxPrefabExportResult result = CreatePrefab(pmxAsset, GetDefaultPrefabPath(pmxAsset));
-                Selection.activeObject = AssetDatabase.LoadAssetAtPath<GameObject>(result.PrefabAssetPath);
-                Debug.LogFormat(
-                    "Created MMD PMX prefab: {0}; meshAssets={1}; materialAssets={2}; textureCopyPolicy={3}",
-                    result.PrefabAssetPath,
-                    result.MeshAssetPaths.Length,
-                    result.MaterialAssetPaths.Length,
-                    result.TextureCopyPolicy);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError("Failed to create MMD PMX prefab:" + Environment.NewLine + ex);
-                EditorUtility.DisplayDialog("MMD PMX Prefab Export Failed", ex.Message, "OK");
-                return null;
-            }
-        }
-
         public static string GetDefaultPrefabPath(MmdPmxAsset pmxAsset)
         {
             if (pmxAsset == null)

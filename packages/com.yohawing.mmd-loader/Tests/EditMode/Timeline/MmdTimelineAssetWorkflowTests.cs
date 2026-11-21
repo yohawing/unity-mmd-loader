@@ -44,16 +44,16 @@ namespace Mmd.Tests
             {
                 instance = MmdSceneDragAndDrop.LoadPmxForDragAndDrop(pmxAsset, Vector3.zero, parent: null);
                 Assert.That(
-                    MmdTimelineAssetWorkflow.TryGetPlaybackController(instance.Root, out MmdUnityPlaybackController? controller),
+                    MmdTimelineFixtureBuilder.TryGetPlaybackController(instance.Root, out MmdUnityPlaybackController? controller),
                     Is.True);
                 // Timeline asset workflow uses the controller PMX source plus the clip MotionAsset.
 
                 timelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
                 directorObject = new GameObject("mmd-asset-workflow-timeline-director");
                 PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
-                MmdVmdTimelineTrack track = MmdTimelineAssetWorkflow.CreateVmdTrack(timelineAsset, director, controller!);
+                MmdVmdTimelineTrack track = MmdTimelineFixtureBuilder.CreateVmdTrack(timelineAsset, director, controller!);
                 int gameObjectCountBeforeClip = Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None).Length;
-                TimelineClip clip = MmdTimelineAssetWorkflow.CreateVmdClip(track, vmdAsset, controller!, frameRate: 30.0f);
+                TimelineClip clip = MmdTimelineFixtureBuilder.CreateVmdClip(track, vmdAsset, controller!, frameRate: 30.0f);
                 var mmdClip = (MmdVmdTimelineClip)clip.asset;
                 int gameObjectCountAfterClip = Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None).Length;
                 Assert.That(controller!.IsConfigured, Is.False);
@@ -64,7 +64,7 @@ namespace Mmd.Tests
                 director.Evaluate();
 
                 Assert.That(director.GetGenericBinding(track), Is.SameAs(controller));
-                Assert.That(MmdTimelineAssetWorkflow.FindFirstMmdVmdTrack(timelineAsset), Is.SameAs(track));
+                Assert.That(MmdTimelineFixtureBuilder.FindFirstMmdVmdTrack(timelineAsset), Is.SameAs(track));
                 Assert.That(mmdClip.MotionAsset, Is.SameAs(vmdAsset));
                 Assert.That(mmdClip.ModelSourceId, Is.EqualTo(TempPmxPath));
                 Assert.That(mmdClip.MotionSourceId, Is.EqualTo(TempVmdPath));
@@ -176,7 +176,7 @@ namespace Mmd.Tests
                 timelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
                 MmdVmdTimelineTrack track = timelineAsset.CreateTrack<MmdVmdTimelineTrack>(null, "MMD VMD");
 
-                TimelineClip clip = MmdTimelineAssetWorkflow.CreateVmdClip(
+                TimelineClip clip = MmdTimelineFixtureBuilder.CreateVmdClip(
                     track,
                     vmdAsset,
                     controller,
@@ -285,10 +285,10 @@ namespace Mmd.Tests
                 timelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
                 directorObject = new GameObject("mmd-multi-clip-timeline-director");
                 PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
-                MmdVmdTimelineTrack track = MmdTimelineAssetWorkflow.CreateVmdTrack(timelineAsset, director, controller);
+                MmdVmdTimelineTrack track = MmdTimelineFixtureBuilder.CreateVmdTrack(timelineAsset, director, controller);
 
-                MmdTimelineAssetWorkflow.CreateVmdClip(track, firstVmdAsset, controller, startSeconds: 0.0, frameRate: 30.0f, director: director);
-                MmdTimelineAssetWorkflow.CreateVmdClip(track, secondVmdAsset, controller, startSeconds: 2.0, frameRate: 30.0f, director: director);
+                MmdTimelineFixtureBuilder.CreateVmdClip(track, firstVmdAsset, controller, startSeconds: 0.0, frameRate: 30.0f, director: director);
+                MmdTimelineFixtureBuilder.CreateVmdClip(track, secondVmdAsset, controller, startSeconds: 2.0, frameRate: 30.0f, director: director);
                 Assert.That(controller.IsConfigured, Is.False);
 
                 var firstBehaviour = new MmdVmdTimelineBehaviour
@@ -426,7 +426,7 @@ namespace Mmd.Tests
                 timelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
                 MmdVmdTimelineTrack track = timelineAsset.CreateTrack<MmdVmdTimelineTrack>(null, "MMD VMD");
 
-                TimelineClip clip = MmdTimelineAssetWorkflow.CreateVmdClip(track, vmdAsset, controller);
+                TimelineClip clip = MmdTimelineFixtureBuilder.CreateVmdClip(track, vmdAsset, controller);
                 var behaviour = new MmdVmdTimelineBehaviour
                 {
                     MotionAsset = vmdAsset,

@@ -570,11 +570,11 @@ namespace Mmd.Tests
                 timelineAsset = ScriptableObject.CreateInstance<TimelineAsset>();
                 directorObject = new GameObject("mmd-vmd-import-timeline-perf-director");
                 PlayableDirector director = directorObject.AddComponent<PlayableDirector>();
-                MmdVmdTimelineTrack track = MmdTimelineAssetWorkflow.CreateVmdTrack(
+                MmdVmdTimelineTrack track = MmdTimelineFixtureBuilder.CreateVmdTrack(
                     timelineAsset,
                     director,
                     controller);
-                MmdTimelineAssetWorkflow.CreateVmdClip(
+                MmdTimelineFixtureBuilder.CreateVmdClip(
                     track,
                     vmdAsset,
                     controller,

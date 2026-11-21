@@ -1684,6 +1684,36 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void PlaybackConfigResolutionPrefersRuntimeImporterSettingsOverControllerFallback()
+        {
+            MmdPmxAsset pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+            MmdVmdAsset vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+            GameObject root = new("MMD Playback Config Importer Priority");
+            try
+            {
+                MmdUnityPlaybackController controller = root.AddComponent<MmdUnityPlaybackController>();
+                MmdRuntimeImporterComponent importer = root.AddComponent<MmdRuntimeImporterComponent>();
+                importer.ConfigurePaths("dummy.pmx", "dummy.vmd", playbackFrameRate: 42.0f, startFrame: 7, shouldPlayOnStart: false);
+
+                MmdPlaybackConfig config = MmdUnityPlaybackControllerEditor.ResolvePlaybackConfigForNewSource(
+                    controller,
+                    fallbackInitialFrame: controller.CurrentFrame);
+
+                Assert.That(config.FrameRate, Is.EqualTo(42.0f));
+                Assert.That(config.InitialFrame, Is.EqualTo(7));
+                Assert.That(config.PlayOnStart, Is.False);
+                // Resolve uses importer-owned settings (no physics); controller (default Live) owns physics mode
+                Assert.That(controller.PhysicsMode, Is.EqualTo(MmdPhysicsMode.Live));
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+            }
+        }
+
+        [Test]
         public void PhysicsCacheModeFailsWithReleaseFacingNotImplementedMessage()
         {
             MmdUnityPlaybackBinding? binding = null;

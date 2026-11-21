@@ -32,6 +32,7 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
   - `Mmd.UnityIntegration.MmdSceneSelfShadowApplyStatus`: `Applied` (use `Recorded`), `NoTargetLight`, and `UnsupportedLightType`. Self-shadow recording never returned the last two; check `Recorded` or `Disabled` instead.
   - `Mmd.Editor.MmdHumanoidSetupAssetBuilder`, including `GetDefaultSetupAssetPath` and `CreateHumanoidSetupAsset`. Reimport the PMX with Animation Type = Humanoid instead.
   - `MmdHumanoidSetupAsset.Initialize`. Reimport the PMX with Animation Type = Humanoid and use the imported Avatar and retarget mapping. Existing `MmdHumanoidSetupAsset` files still load, and the obsolete `MmdHumanoidSetupPreset` enum stays because it is the type of their serialized `setupPreset` field.
+- Removed `Mmd.Editor.MmdPmxPrefabExporter.CreatePrefabWithFeedback`, which no menu or window called. Call `CreatePrefab(pmxAsset, GetDefaultPrefabPath(pmxAsset))` instead; it throws on failure and does not change the selection.
 
 ### Fixed
 

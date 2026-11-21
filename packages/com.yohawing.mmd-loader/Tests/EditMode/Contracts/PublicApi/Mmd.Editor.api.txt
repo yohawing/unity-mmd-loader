@@ -119,7 +119,6 @@ Mmd.Editor.MmdPmxPrefabExportResult :: property string[] MeshAssetPaths { public
 Mmd.Editor.MmdPmxPrefabExportResult :: property string[] TextureAssetPaths { public get; }
 Mmd.Editor.MmdPmxPrefabExporter :: (type) public static class MmdPmxPrefabExporter
 Mmd.Editor.MmdPmxPrefabExporter :: method public static Mmd.Editor.MmdPmxPrefabExportResult CreatePrefab(Mmd.MmdPmxAsset pmxAsset, string prefabPath)
-Mmd.Editor.MmdPmxPrefabExporter :: method public static Mmd.Editor.MmdPmxPrefabExportResult CreatePrefabWithFeedback(Mmd.MmdPmxAsset pmxAsset)
 Mmd.Editor.MmdPmxPrefabExporter :: method public static string GetDefaultPrefabPath(Mmd.MmdPmxAsset pmxAsset)
 Mmd.Editor.MmdPmxScriptedImporter :: (type) public sealed class MmdPmxScriptedImporter : UnityEditor.AssetImporters.ScriptedImporter
 Mmd.Editor.MmdPmxScriptedImporter :: ctor public .ctor()
