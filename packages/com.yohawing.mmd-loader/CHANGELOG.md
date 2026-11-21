@@ -38,6 +38,9 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 - Humanoid Live playback no longer re-parses the PMX every frame after the model-only physics binding fails to build; it retries once after the scene is reconfigured or Live physics is re-enabled.
 - `MmdUnityPlaybackController` teardown (`OnDisable` and resource release) no longer leaks the native Humanoid host pose session when a bone transform was destroyed, and restores the surviving bones.
 - Pausing a controller that plays through the automatic worker keeps its Live physics state instead of reseeding physics on resume.
+- A locked or corrupt texture no longer fails the whole runtime model build; it is reported as an unreadable or decode-failed texture and already decoded textures are released. Sphere and toon files holding PNG or JPEG data now decode.
+- `MmdUnityModelFactory.CreateFromImportedHierarchy` no longer leaves the instantiated hierarchy or cloned materials behind when validation fails, and static hierarchies use the mesh of the renderer they bind.
+- A material override with alpha below 1 and an alpha clip threshold but no explicit surface mode is now transparent without clipping on both the material and its URP binding.
 - `MmdModelValidator` reports a missing `physics`, `physics.rigidbodies` or `physics.joints` as a validation error instead of throwing `NullReferenceException`.
 
 ## [0.5.1] - 2026-10-23
