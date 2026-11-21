@@ -778,6 +778,54 @@ namespace Mmd.Tests
                 Assert.That(controller.LastLivePhysicsDiagnostics.snapshotBuildPresent, Is.False);
                 Assert.That(controller.LastSnapshot, Is.Null,
                     "Humanoid-driven live physics must not overwrite the VMD playback snapshot surface.");
+                // Golden of the current Humanoid native (path C) diagnostics surface. Values record
+                // present-time behavior; timing (*Ms), deltaTime and substep counts are excluded as non-deterministic.
+                MmdLivePhysicsFrameDiagnostics initialGolden = controller.LastLivePhysicsDiagnostics!;
+                Assert.That(initialGolden.backendName, Is.EqualTo("mmd-anim-bullet-native"));
+                Assert.That(initialGolden.evaluationPath, Is.EqualTo("HumanoidNativeFinal"));
+                Assert.That(initialGolden.comparisonSpace, Is.EqualTo("runtime-forward-playback-diagnostics"));
+                Assert.That(initialGolden.importScale, Is.EqualTo(MmdPmxAsset.DefaultImportScale));
+                Assert.That(initialGolden.phaseDiagnosticsPresent, Is.True);
+                Assert.That(initialGolden.nativeStepReportPresent, Is.True);
+                Assert.That(initialGolden.hostPoseCapturePresent, Is.True);
+                Assert.That(initialGolden.pinnedDiagnosticsPresent, Is.True);
+                Assert.That(initialGolden.pinMarshalPresent, Is.True);
+                Assert.That(initialGolden.nativeHostFramePresent, Is.True);
+                Assert.That(initialGolden.playbackEvaluateBeforePhysicsPresent, Is.False);
+                Assert.That(initialGolden.playbackCopyEvaluatedOutputsPresent, Is.False);
+                Assert.That(initialGolden.physicsWorldStepRuntimePresent, Is.False);
+                Assert.That(initialGolden.nativeRigidbodyCopyPresent, Is.True);
+                Assert.That(initialGolden.managedRigidbodyFanOutPresent, Is.True);
+                Assert.That(initialGolden.managedBodyTransformApplyPresent, Is.False);
+                Assert.That(initialGolden.afterPhysicsMatrixReadbackPresent, Is.True);
+                Assert.That(initialGolden.matrixTransformApplyPresent, Is.True);
+                Assert.That(initialGolden.sampledDiagnosticsPresent, Is.True);
+                Assert.That(initialGolden.sampledBodyDiagnosticsThisFrame, Is.True);
+                Assert.That(initialGolden.evaluatedFrameRefreshPresent, Is.False);
+                Assert.That(initialGolden.diagnosticsConstructionPresent, Is.True);
+                Assert.That(initialGolden.ensureBackendPresent, Is.True);
+                Assert.That(initialGolden.evaluateFramePresent, Is.False);
+                Assert.That(initialGolden.applyAnimationFramePresent, Is.False);
+                Assert.That(initialGolden.snapshotBuildPresent, Is.False);
+                Assert.That(initialGolden.readbackTransformCount, Is.EqualTo(16));
+                Assert.That(initialGolden.nativeRigidbodyCount, Is.EqualTo(16));
+                Assert.That(initialGolden.nativeBoneCount, Is.EqualTo(21));
+                Assert.That(initialGolden.unsupportedWorldAnchorJointCount, Is.Zero);
+                Assert.That(initialGolden.modelBoneCount, Is.EqualTo(21));
+                Assert.That(initialGolden.appliedBoneCount, Is.EqualTo(21));
+                Assert.That(initialGolden.modelMorphCount, Is.EqualTo(6));
+                Assert.That(initialGolden.appliedMorphCount, Is.EqualTo(6));
+                Assert.That(initialGolden.pinnedBodies.staticPinnedBodyCount, Is.EqualTo(2));
+                Assert.That(initialGolden.pinnedBodies.dynamicInitialPinnedBodyCount, Is.Zero);
+                Assert.That(initialGolden.pinnedBodies.worstPinnedBodyIndex, Is.EqualTo(-1));
+                Assert.That(initialGolden.pinnedBodies.worstPinnedBodyRotationIndex, Is.EqualTo(-1));
+                Assert.That(initialGolden.frame, Is.EqualTo(0));
+                Assert.That(initialGolden.bodyDiagnosticsFrame, Is.EqualTo(0));
+                Assert.That(initialGolden.readbackShapeTypeCount, Is.EqualTo(16));
+                Assert.That(initialGolden.nativeKinematicRigidbodiesFed, Is.Zero);
+                Assert.That(initialGolden.nativeBonesWrittenBack, Is.Zero);
+                Assert.That(initialGolden.pinnedBodies.pinnedBodyCount, Is.EqualTo(16));
+                Assert.That(initialGolden.pinnedBodies.dynamicOrientationPinnedBodyCount, Is.EqualTo(14));
 
                 // This redistributable fixture intentionally exercises static + dynamicBone bodies;
                 // its rest pose is already at equilibrium, so this case verifies host-pose routing
@@ -812,6 +860,54 @@ namespace Mmd.Tests
                         controller.LastLivePhysicsDiagnostics.bodyDiagnostics),
                     Is.True,
                     "Humanoid Live must advance at least one non-static hair body's native readback");
+                // Golden of the current Humanoid native (path C) diagnostics surface. Values record
+                // present-time behavior; timing (*Ms), deltaTime and substep counts are excluded as non-deterministic.
+                MmdLivePhysicsFrameDiagnostics steppedGolden = controller.LastLivePhysicsDiagnostics!;
+                Assert.That(steppedGolden.backendName, Is.EqualTo("mmd-anim-bullet-native"));
+                Assert.That(steppedGolden.evaluationPath, Is.EqualTo("HumanoidNativeFinal"));
+                Assert.That(steppedGolden.comparisonSpace, Is.EqualTo("runtime-forward-playback-diagnostics"));
+                Assert.That(steppedGolden.importScale, Is.EqualTo(MmdPmxAsset.DefaultImportScale));
+                Assert.That(steppedGolden.phaseDiagnosticsPresent, Is.True);
+                Assert.That(steppedGolden.nativeStepReportPresent, Is.True);
+                Assert.That(steppedGolden.hostPoseCapturePresent, Is.True);
+                Assert.That(steppedGolden.pinnedDiagnosticsPresent, Is.True);
+                Assert.That(steppedGolden.pinMarshalPresent, Is.True);
+                Assert.That(steppedGolden.nativeHostFramePresent, Is.True);
+                Assert.That(steppedGolden.playbackEvaluateBeforePhysicsPresent, Is.False);
+                Assert.That(steppedGolden.playbackCopyEvaluatedOutputsPresent, Is.False);
+                Assert.That(steppedGolden.physicsWorldStepRuntimePresent, Is.False);
+                Assert.That(steppedGolden.nativeRigidbodyCopyPresent, Is.True);
+                Assert.That(steppedGolden.managedRigidbodyFanOutPresent, Is.True);
+                Assert.That(steppedGolden.managedBodyTransformApplyPresent, Is.False);
+                Assert.That(steppedGolden.afterPhysicsMatrixReadbackPresent, Is.True);
+                Assert.That(steppedGolden.matrixTransformApplyPresent, Is.True);
+                Assert.That(steppedGolden.sampledDiagnosticsPresent, Is.True);
+                Assert.That(steppedGolden.sampledBodyDiagnosticsThisFrame, Is.True);
+                Assert.That(steppedGolden.evaluatedFrameRefreshPresent, Is.False);
+                Assert.That(steppedGolden.diagnosticsConstructionPresent, Is.True);
+                Assert.That(steppedGolden.ensureBackendPresent, Is.True);
+                Assert.That(steppedGolden.evaluateFramePresent, Is.False);
+                Assert.That(steppedGolden.applyAnimationFramePresent, Is.False);
+                Assert.That(steppedGolden.snapshotBuildPresent, Is.False);
+                Assert.That(steppedGolden.readbackTransformCount, Is.EqualTo(16));
+                Assert.That(steppedGolden.nativeRigidbodyCount, Is.EqualTo(16));
+                Assert.That(steppedGolden.nativeBoneCount, Is.EqualTo(21));
+                Assert.That(steppedGolden.unsupportedWorldAnchorJointCount, Is.Zero);
+                Assert.That(steppedGolden.modelBoneCount, Is.EqualTo(21));
+                Assert.That(steppedGolden.appliedBoneCount, Is.EqualTo(21));
+                Assert.That(steppedGolden.modelMorphCount, Is.EqualTo(6));
+                Assert.That(steppedGolden.appliedMorphCount, Is.EqualTo(6));
+                Assert.That(steppedGolden.pinnedBodies.staticPinnedBodyCount, Is.EqualTo(2));
+                Assert.That(steppedGolden.pinnedBodies.dynamicInitialPinnedBodyCount, Is.Zero);
+                Assert.That(steppedGolden.pinnedBodies.worstPinnedBodyIndex, Is.EqualTo(-1));
+                Assert.That(steppedGolden.pinnedBodies.worstPinnedBodyRotationIndex, Is.EqualTo(-1));
+                Assert.That(steppedGolden.frame, Is.EqualTo(5));
+                Assert.That(steppedGolden.bodyDiagnosticsFrame, Is.EqualTo(5));
+                Assert.That(steppedGolden.readbackShapeTypeCount, Is.Zero);
+                Assert.That(steppedGolden.nativeKinematicRigidbodiesFed, Is.EqualTo(2));
+                Assert.That(steppedGolden.nativeBonesWrittenBack, Is.EqualTo(14));
+                Assert.That(steppedGolden.pinnedBodies.pinnedBodyCount, Is.EqualTo(2));
+                Assert.That(steppedGolden.pinnedBodies.dynamicOrientationPinnedBodyCount, Is.Zero);
 
                 Mesh humanoidPlaybackMesh = renderer.sharedMesh;
                 FieldInfo? physicsModeField = typeof(MmdUnityPlaybackController).GetField(
