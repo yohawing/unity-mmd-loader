@@ -468,6 +468,209 @@ namespace Mmd.Tests
             }
         }
         [Test]
+        public void ImportedHierarchyBoneMismatchThrowsWithoutLeakingInstanceOrMaterialClones()
+        {
+            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+            Assert.That(pmxAsset, Is.Not.Null);
+            Assert.That(pmxAsset.ImportedRoot, Is.Not.Null);
+            MmdModelDefinition model = CreateModelWithExtraBone(pmxAsset.LoadModel());
+            MmdMaterialOverrideAsset overrideAsset = CreateAlphaOverrideAsset();
+            try
+            {
+                int gameObjectCountBefore = Resources.FindObjectsOfTypeAll<GameObject>().Length;
+                int materialCountBefore = Resources.FindObjectsOfTypeAll<Material>().Length;
+
+                InvalidOperationException error = Assert.Throws<InvalidOperationException>(() =>
+                    MmdUnityModelFactory.CreateFromImportedHierarchy(
+                        pmxAsset.ImportedRoot!,
+                        model,
+                        sourcePath: null,
+                        pmxAsset.ImportScale,
+                        overrideAsset))!;
+
+                Assert.That(error.Message, Is.EqualTo("Imported PMX SkinnedMeshRenderer bones do not match the PMX bone descriptor."));
+                Assert.That(Resources.FindObjectsOfTypeAll<GameObject>().Length, Is.EqualTo(gameObjectCountBefore),
+                    "the instantiated imported hierarchy must be destroyed when validation fails");
+                Assert.That(Resources.FindObjectsOfTypeAll<Material>().Length, Is.EqualTo(materialCountBefore),
+                    "override material clones must not survive a failed validation");
+            }
+            finally
+            {
+                Object.DestroyImmediate(overrideAsset);
+            }
+        }
+
+        [Test]
+        public void ImportedHierarchyMissingSkinnedMeshRendererThrowsWithoutLeakingInstance()
+        {
+            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+            Assert.That(pmxAsset, Is.Not.Null);
+            Assert.That(pmxAsset.ImportedRoot, Is.Not.Null);
+            GameObject source = Object.Instantiate(pmxAsset.ImportedRoot!);
+            try
+            {
+                foreach (SkinnedMeshRenderer renderer in source.GetComponentsInChildren<SkinnedMeshRenderer>(includeInactive: true))
+                {
+                    Object.DestroyImmediate(renderer);
+                }
+
+                MmdModelDefinition model = pmxAsset.LoadModel();
+                int gameObjectCountBefore = Resources.FindObjectsOfTypeAll<GameObject>().Length;
+
+                InvalidOperationException error = Assert.Throws<InvalidOperationException>(() =>
+                    MmdUnityModelFactory.CreateFromImportedHierarchy(
+                        source,
+                        model,
+                        sourcePath: null,
+                        pmxAsset.ImportScale))!;
+
+                Assert.That(error.Message, Is.EqualTo("Imported PMX hierarchy must contain a SkinnedMeshRenderer."));
+                Assert.That(Resources.FindObjectsOfTypeAll<GameObject>().Length, Is.EqualTo(gameObjectCountBefore),
+                    "the instantiated imported hierarchy must be destroyed when validation fails");
+            }
+            finally
+            {
+                Object.DestroyImmediate(source);
+            }
+        }
+
+        [Test]
+        public void InstantiatedImportedHierarchyBoneMismatchDoesNotLeakMaterialClones()
+        {
+            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
+            Assert.That(pmxAsset, Is.Not.Null);
+            Assert.That(pmxAsset.ImportedRoot, Is.Not.Null);
+            MmdModelDefinition model = CreateModelWithExtraBone(pmxAsset.LoadModel());
+            MmdMaterialOverrideAsset overrideAsset = CreateAlphaOverrideAsset();
+            GameObject sceneRoot = Object.Instantiate(pmxAsset.ImportedRoot!);
+            try
+            {
+                SkinnedMeshRenderer renderer = sceneRoot.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true);
+                Material[] originalMaterials = renderer.sharedMaterials;
+                int materialCountBefore = Resources.FindObjectsOfTypeAll<Material>().Length;
+
+                Assert.Throws<InvalidOperationException>(() =>
+                    MmdUnityModelFactory.CreateFromInstantiatedImportedHierarchy(
+                        sceneRoot,
+                        model,
+                        sourcePath: null,
+                        pmxAsset.ImportScale,
+                        includeSelfShadowTarget: true,
+                        materialOverride: overrideAsset));
+
+                Assert.That(sceneRoot != null, Is.True, "a caller-owned root must not be destroyed by the factory");
+                Assert.That(Resources.FindObjectsOfTypeAll<Material>().Length, Is.EqualTo(materialCountBefore),
+                    "override material clones must not survive a failed validation");
+                Assert.That(renderer.sharedMaterials, Is.EqualTo(originalMaterials),
+                    "a failed validation must leave the caller-owned renderer materials untouched");
+            }
+            finally
+            {
+                Object.DestroyImmediate(overrideAsset);
+                Object.DestroyImmediate(sceneRoot);
+            }
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void StaticImportedHierarchyUsesMeshFilterOfTheChosenChildRenderer(bool rootHasOtherMeshFilter)
+        {
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit")
+                ?? throw new InvalidOperationException("Universal Render Pipeline/Lit shader was not found.");
+            var drawnMesh = new Mesh { name = "drawn-static-mesh" };
+            var otherMesh = new Mesh { name = "unrelated-root-mesh" };
+            var material = new Material(shader) { name = "static-child-material" };
+            var sceneRoot = new GameObject("static-imported-root");
+            MmdUnityModelInstance? instance = null;
+            try
+            {
+                var child = new GameObject("static-child-renderer");
+                child.transform.SetParent(sceneRoot.transform, worldPositionStays: false);
+                child.AddComponent<MeshFilter>().sharedMesh = drawnMesh;
+                child.AddComponent<MeshRenderer>().sharedMaterials = new[] { material };
+                if (rootHasOtherMeshFilter)
+                {
+                    sceneRoot.AddComponent<MeshFilter>().sharedMesh = otherMesh;
+                }
+
+                instance = MmdUnityModelFactory.CreateFromInstantiatedImportedHierarchy(
+                    sceneRoot,
+                    CreateStaticTriangleModel(),
+                    sourcePath: null,
+                    importScale: 1.0f,
+                    includeSelfShadowTarget: false);
+
+                Assert.That(instance.MeshRenderer, Is.SameAs(child.GetComponent<MeshRenderer>()));
+                Assert.That(instance.Mesh, Is.SameAs(drawnMesh),
+                    "the static instance must use the mesh drawn by the chosen renderer");
+            }
+            finally
+            {
+                Object.DestroyImmediate(sceneRoot);
+                Object.DestroyImmediate(material);
+                Object.DestroyImmediate(drawnMesh);
+                Object.DestroyImmediate(otherMesh);
+            }
+        }
+
+        private static MmdModelDefinition CreateStaticTriangleModel()
+        {
+            var model = new MmdModelDefinition { name = "static-imported-triangle" };
+            for (int i = 0; i < 3; i++)
+            {
+                model.vertices.Add(new MmdVertexDefinition
+                {
+                    index = i,
+                    position = new[] { i == 1 ? 1.0f : 0.0f, i == 2 ? 1.0f : 0.0f, 0.0f },
+                    normal = new[] { 0.0f, 0.0f, 1.0f },
+                    uv = new[] { 0.0f, 0.0f }
+                });
+            }
+
+            model.indices.AddRange(new[] { 0, 1, 2 });
+            model.materials.Add(new MmdMaterialDefinition
+            {
+                index = 0,
+                name = "static-child-material",
+                vertexCount = 3
+            });
+            return model;
+        }
+
+        private static MmdModelDefinition CreateModelWithExtraBone(MmdModelDefinition model)
+        {
+            model.bones.Add(new MmdBoneDefinition
+            {
+                index = model.bones.Count,
+                name = "extra-unbound-bone",
+                parentIndex = -1,
+                transformOrder = 0,
+                origin = new[] { 0.0f, 0.0f, 0.0f },
+                isMovable = true,
+                isRotatable = true
+            });
+            return model;
+        }
+
+        private static MmdMaterialOverrideAsset CreateAlphaOverrideAsset()
+        {
+            MmdMaterialOverrideAsset overrideAsset = ScriptableObject.CreateInstance<MmdMaterialOverrideAsset>();
+            overrideAsset.entries = new[]
+            {
+                new MmdMaterialOverrideEntry
+                {
+                    materialIndex = 0,
+                    hasAlpha = true,
+                    alpha = 0.45f
+                }
+            };
+            return overrideAsset;
+        }
+
+        [Test]
         public void ImportedHierarchyWrapperAppliesMaterialOverrideToDescriptor()
         {
             CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);

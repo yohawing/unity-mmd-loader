@@ -45,23 +45,27 @@ namespace Mmd.UnityIntegration
                 throw new ArgumentNullException(nameof(model));
             }
 
-            float scale = NormalizeImportScale(importScale);
-
-            // Instantiate the imported hierarchy to create a dedicated scene copy.
+            // Instantiate the imported hierarchy to create a dedicated scene copy. Scene-visibility
+            // hideFlags are cleared by CreateFromInstantiatedImportedHierarchy.
             GameObject instanceRoot = UnityEngine.Object.Instantiate(importedRoot);
             instanceRoot.name = importedRoot.name;
-
-            // Clear non-scene hideFlags on the instantiated hierarchy to ensure scene-visibility.
-            ClearNonSceneHideFlags(instanceRoot.transform);
-
-            return CreateFromInstantiatedImportedHierarchy(
-                instanceRoot,
-                model,
-                sourcePath,
-                importScale,
-                includeSelfShadowTarget,
-                materialOverride,
-                materialRenderingTargets);
+            try
+            {
+                return CreateFromInstantiatedImportedHierarchy(
+                    instanceRoot,
+                    model,
+                    sourcePath,
+                    importScale,
+                    includeSelfShadowTarget,
+                    materialOverride,
+                    materialRenderingTargets);
+            }
+            catch
+            {
+                // This method owns the copy it instantiated; do not leave it in the scene.
+                DestroyGeneratedObject(instanceRoot);
+                throw;
+            }
         }
 
         internal static MmdUnityModelInstance CreateFromInstantiatedImportedHierarchy(
@@ -125,8 +129,7 @@ namespace Mmd.UnityIntegration
             MmdMaterialRenderingTargets[]? materialRenderingTargets)
         {
             Transform modelRoot = FindModelRoot(instanceRoot.transform);
-            SkinnedMeshRenderer renderer = modelRoot.GetComponent<SkinnedMeshRenderer>()
-                ?? instanceRoot.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true)
+            SkinnedMeshRenderer renderer = FindImportedRenderer<SkinnedMeshRenderer>(modelRoot, instanceRoot)
                 ?? throw new InvalidOperationException("Imported PMX hierarchy must contain a SkinnedMeshRenderer.");
 
             Mesh sharedMesh = renderer.sharedMesh;
@@ -135,16 +138,15 @@ namespace Mmd.UnityIntegration
                 throw new InvalidOperationException("Imported PMX SkinnedMeshRenderer has no sharedMesh.");
             }
 
-            Material[] materials = renderer.sharedMaterials;
-            if (materials.Length < descriptor.materials.Count)
+            Material[] sourceMaterials = renderer.sharedMaterials;
+            if (sourceMaterials.Length < descriptor.materials.Count)
             {
                 throw new InvalidOperationException(
                     "Imported PMX SkinnedMeshRenderer material slots do not match the PMX material descriptor.");
             }
-            materials = CloneMaterialsForOverride(materials, materialOverride);
-            renderer.sharedMaterials = materials;
-            MmdMaterialOverrideApplier.Apply(materialOverride, materials);
 
+            // Validate everything that can reject the hierarchy before cloning override materials,
+            // so a rejected hierarchy never carries clones.
             Transform[] boneTransforms = renderer.bones;
             IReadOnlyList<MmdBoneDefinition> orderedBones = CreateOrderedBones(model.bones);
             if (boneTransforms == null || boneTransforms.Length != orderedBones.Count)
@@ -153,28 +155,41 @@ namespace Mmd.UnityIntegration
                     "Imported PMX SkinnedMeshRenderer bones do not match the PMX bone descriptor.");
             }
 
-            ResetExistingBoneTransformsToBindPose(orderedBones, boneTransforms, scale);
-            renderer.rootBone = boneTransforms.Length > 0 ? boneTransforms[0] : modelRoot;
+            Material[] materials = CloneMaterialsForOverride(sourceMaterials, materialOverride);
+            try
+            {
+                renderer.sharedMaterials = materials;
+                MmdMaterialOverrideApplier.Apply(materialOverride, materials);
 
-            MmdUnityPhysicsBody[] physicsBodies = instanceRoot.GetComponentsInChildren<MmdUnityPhysicsBody>(includeInactive: true);
-            MmdShaderBindingDiagnostics shaderDiagnostics = MmdUnityMaterialBuilder.BuildExistingShaderDiagnostics(renderer);
-            ApplySelfShadowTargetPolicy(instanceRoot, modelRoot, includeSelfShadowTarget);
+                ResetExistingBoneTransformsToBindPose(orderedBones, boneTransforms, scale);
+                renderer.rootBone = boneTransforms.Length > 0 ? boneTransforms[0] : modelRoot;
 
-            return new MmdUnityModelInstance(
-                instanceRoot,
-                sharedMesh,
-                materials,
-                descriptor,
-                boneTransforms,
-                physicsBodies,
-                meshRenderer: null,
-                renderer,
-                MmdUnityModelSourceContext.FromOptionalPath(sourcePath),
-                Array.Empty<Texture2D>(),
-                new MmdTextureBindingDiagnostics(),
-                shaderDiagnostics,
-                scale,
-                NormalizeMaterialRenderingTargets(materials.Length, materialRenderingTargets));
+                MmdUnityPhysicsBody[] physicsBodies = instanceRoot.GetComponentsInChildren<MmdUnityPhysicsBody>(includeInactive: true);
+                MmdShaderBindingDiagnostics shaderDiagnostics = MmdUnityMaterialBuilder.BuildExistingShaderDiagnostics(renderer);
+                ApplySelfShadowTargetPolicy(instanceRoot, modelRoot, includeSelfShadowTarget);
+
+                return new MmdUnityModelInstance(
+                    instanceRoot,
+                    sharedMesh,
+                    materials,
+                    descriptor,
+                    boneTransforms,
+                    physicsBodies,
+                    meshRenderer: null,
+                    renderer,
+                    MmdUnityModelSourceContext.FromOptionalPath(sourcePath),
+                    Array.Empty<Texture2D>(),
+                    new MmdTextureBindingDiagnostics(),
+                    shaderDiagnostics,
+                    scale,
+                    NormalizeMaterialRenderingTargets(materials.Length, materialRenderingTargets));
+            }
+            catch
+            {
+                renderer.sharedMaterials = sourceMaterials;
+                DestroyMaterialClones(materials, sourceMaterials);
+                throw;
+            }
         }
 
         private static MmdUnityModelInstance CreateFromImportedStaticHierarchy(
@@ -188,45 +203,83 @@ namespace Mmd.UnityIntegration
             MmdMaterialRenderingTargets[]? materialRenderingTargets)
         {
             Transform modelRoot = FindModelRoot(instanceRoot.transform);
-            MeshRenderer meshRenderer = modelRoot.GetComponent<MeshRenderer>()
-                ?? instanceRoot.GetComponentInChildren<MeshRenderer>(includeInactive: true)
+            MeshRenderer meshRenderer = FindImportedRenderer<MeshRenderer>(modelRoot, instanceRoot)
                 ?? throw new InvalidOperationException("Imported PMX hierarchy must contain a MeshRenderer.");
 
-            MeshFilter meshFilter = modelRoot.GetComponent<MeshFilter>();
+            // The mesh drawn by the chosen renderer lives on that renderer's GameObject.
+            MeshFilter meshFilter = meshRenderer.GetComponent<MeshFilter>();
             if (meshFilter == null || meshFilter.sharedMesh == null)
             {
                 throw new InvalidOperationException("Imported PMX hierarchy must contain a MeshFilter with a sharedMesh.");
             }
 
             Mesh sharedMesh = meshFilter.sharedMesh;
-            Material[] materials = meshRenderer.sharedMaterials;
-            if (materials.Length < descriptor.materials.Count)
+            Material[] sourceMaterials = meshRenderer.sharedMaterials;
+            if (sourceMaterials.Length < descriptor.materials.Count)
             {
                 throw new InvalidOperationException(
                     "Imported PMX MeshRenderer material slots do not match the PMX material descriptor.");
             }
-            materials = CloneMaterialsForOverride(materials, materialOverride);
-            meshRenderer.sharedMaterials = materials;
-            MmdMaterialOverrideApplier.Apply(materialOverride, materials);
 
-            MmdShaderBindingDiagnostics shaderDiagnostics = BuildMeshRendererShaderDiagnostics(meshRenderer);
-            ApplySelfShadowTargetPolicy(instanceRoot, modelRoot, includeSelfShadowTarget);
+            Material[] materials = CloneMaterialsForOverride(sourceMaterials, materialOverride);
+            try
+            {
+                meshRenderer.sharedMaterials = materials;
+                MmdMaterialOverrideApplier.Apply(materialOverride, materials);
 
-            return new MmdUnityModelInstance(
-                instanceRoot,
-                sharedMesh,
-                materials,
-                descriptor,
-                Array.Empty<Transform>(),
-                Array.Empty<MmdUnityPhysicsBody>(),
-                meshRenderer,
-                skinnedMeshRenderer: null,
-                MmdUnityModelSourceContext.FromOptionalPath(sourcePath),
-                Array.Empty<Texture2D>(),
-                new MmdTextureBindingDiagnostics(),
-                shaderDiagnostics,
-                scale,
-                NormalizeMaterialRenderingTargets(materials.Length, materialRenderingTargets));
+                MmdShaderBindingDiagnostics shaderDiagnostics = BuildMeshRendererShaderDiagnostics(meshRenderer);
+                ApplySelfShadowTargetPolicy(instanceRoot, modelRoot, includeSelfShadowTarget);
+
+                return new MmdUnityModelInstance(
+                    instanceRoot,
+                    sharedMesh,
+                    materials,
+                    descriptor,
+                    Array.Empty<Transform>(),
+                    Array.Empty<MmdUnityPhysicsBody>(),
+                    meshRenderer,
+                    skinnedMeshRenderer: null,
+                    MmdUnityModelSourceContext.FromOptionalPath(sourcePath),
+                    Array.Empty<Texture2D>(),
+                    new MmdTextureBindingDiagnostics(),
+                    shaderDiagnostics,
+                    scale,
+                    NormalizeMaterialRenderingTargets(materials.Length, materialRenderingTargets));
+            }
+            catch
+            {
+                meshRenderer.sharedMaterials = sourceMaterials;
+                DestroyMaterialClones(materials, sourceMaterials);
+                throw;
+            }
+        }
+
+        // GetComponent returns Unity's fake-null placeholder in the Editor, which the C# `??`
+        // operator treats as non-null; compare through UnityEngine.Object equality instead.
+        private static T? FindImportedRenderer<T>(Transform modelRoot, GameObject instanceRoot)
+            where T : Renderer
+        {
+            T renderer = modelRoot.GetComponent<T>();
+            if (renderer != null)
+            {
+                return renderer;
+            }
+
+            renderer = instanceRoot.GetComponentInChildren<T>(includeInactive: true);
+            return renderer != null ? renderer : null;
+        }
+
+        private static void DestroyMaterialClones(Material[] materials, Material[] sourceMaterials)
+        {
+            if (ReferenceEquals(materials, sourceMaterials))
+            {
+                return;
+            }
+
+            foreach (Material material in materials)
+            {
+                DestroyGeneratedObject(material);
+            }
         }
 
         private static MmdShaderBindingDiagnostics BuildMeshRendererShaderDiagnostics(MeshRenderer renderer)
