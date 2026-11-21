@@ -11,7 +11,7 @@ using UnityEngine;
 
 namespace Mmd.Editor
 {
-    public static class MmdPbrTextureConventionScanner
+    internal static class MmdPbrTextureConventionScanner
     {
         private static readonly string[] TextureExtensions = { ".png", ".tga", ".jpg", ".jpeg" };
         private static readonly string[] NormalSuffixes = { "_normal", "_Normal", "_normalmap", "_NormalMap", "_n", "_N", "_nm", "_NM" };

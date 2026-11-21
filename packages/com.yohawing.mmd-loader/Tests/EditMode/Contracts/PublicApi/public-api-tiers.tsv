@@ -2,18 +2,12 @@
 # Every public type in *.api.txt must appear exactly once. Tiers: stable, advanced, unity-entry, obsolete, obsolete-exposed, pending-internal.
 assembly	type	tier	reason
 Mmd.Cinemachine	Mmd.UnityIntegration.Cinemachine.MmdCinemachineCameraBinding	stable	CreateAssetMenu/AddComponentMenu で利用者が作成
-Mmd.Editor	Mmd.Editor.MmdEditorBatchmodeDiagnosticsCommand	pending-internal	API-02 決定: Mmd.Editor に devtools 向け IVT を足して internal にする
-Mmd.Editor	Mmd.Editor.MmdEditorPlaybackLoader	pending-internal	API-02 決定: Mmd.Editor に devtools 向け IVT を足して internal にする
 Mmd.Editor	Mmd.Editor.MmdEditorPlaybackSceneLoadResult	advanced	MmdEditorVerificationFacade の public signature から到達
-Mmd.Editor	Mmd.Editor.MmdEditorPmxLoader	pending-internal	どの root からも public signature で到達しない
 Mmd.Editor	Mmd.Editor.MmdEditorPmxSceneLoadResult	advanced	MmdEditorVerificationFacade の public signature から到達
-Mmd.Editor	Mmd.Editor.MmdEditorSelectionSnapshot	pending-internal	どの root からも public signature で到達しない
 Mmd.Editor	Mmd.Editor.MmdEditorVerificationException	advanced	plans/002: public API から投げる例外型は public 維持
 Mmd.Editor	Mmd.Editor.MmdEditorVerificationFacade	advanced	ARCHITECTURE: Runtime API (MmdEditorVerificationFacade, Editor-only)
-Mmd.Editor	Mmd.Editor.MmdEditorWorkflow	pending-internal	どの root からも public signature で到達しない
 Mmd.Editor	Mmd.Editor.MmdGenericAnimationClipBakeOptions	advanced	API-02 決定: advanced 維持 (Generic bake)
 Mmd.Editor	Mmd.Editor.MmdGenericAnimationClipBakeWindow	unity-entry	Unity が型を探して使う (base EditorWindow)
-Mmd.Editor	Mmd.Editor.MmdGenericAnimationClipBakeWindow.ClipType	pending-internal	どの root からも public signature で到達しない
 Mmd.Editor	Mmd.Editor.MmdGenericAnimationClipWriter	advanced	API-02 決定: advanced 維持 (Generic bake)
 Mmd.Editor	Mmd.Editor.MmdGenericAnimationClipWriterResult	advanced	API-02 決定: advanced 維持 (Generic bake)
 Mmd.Editor	Mmd.Editor.MmdHumanoidClipConversionPlan	advanced	API-02 決定: advanced 維持 (Humanoid clip 変換)
@@ -21,9 +15,7 @@ Mmd.Editor	Mmd.Editor.MmdHumanoidClipConversionPlanner	advanced	API-02 決定: a
 Mmd.Editor	Mmd.Editor.MmdHumanoidClipConversionWriter	advanced	API-02 決定: advanced 維持 (Humanoid clip 変換)
 Mmd.Editor	Mmd.Editor.MmdHumanoidClipConversionWriterResult	advanced	API-02 決定: advanced 維持 (Humanoid clip 変換)
 Mmd.Editor	Mmd.Editor.MmdHumanoidSetupAssetBuilder	obsolete	[Obsolete] 宣言。MonoScript binding 維持のため残す
-Mmd.Editor	Mmd.Editor.MmdMmeFxMaterialOverrideBuilder	pending-internal	どの root からも public signature で到達しない
 Mmd.Editor	Mmd.Editor.MmdMmeNormalMapTexturePostprocessor	unity-entry	Unity が型を探して使う (base AssetPostprocessor)
-Mmd.Editor	Mmd.Editor.MmdPbrTextureConventionScanner	pending-internal	どの root からも public signature で到達しない
 Mmd.Editor	Mmd.Editor.MmdPlaybackMaterialReimportPostprocessor	unity-entry	Unity が型を探して使う (base AssetPostprocessor)
 Mmd.Editor	Mmd.Editor.MmdPmxAnimationType	stable	plans/002 stable list
 Mmd.Editor	Mmd.Editor.MmdPmxMaterialTexturePolicy	stable	plans/002 stable list
@@ -97,8 +89,6 @@ Mmd.Runtime	Mmd.MmdSerializableBoneMappingEntry	obsolete-exposed	API-02 決定: 
 Mmd.Runtime	Mmd.MmdVmdAsset	stable	plans/002 stable list
 Mmd.Runtime	Mmd.MmdVmdImportSummaryStatus	stable	MmdVmdAsset の public signature から到達
 Mmd.Runtime	Mmd.MmdVmdParseSummary	stable	MmdVmdAsset の public signature から到達
-Mmd.Runtime	Mmd.Mme.MmeFxEffectDescriptor	pending-internal	どの root からも public signature で到達しない
-Mmd.Runtime	Mmd.Mme.MmeFxFloatParameter	pending-internal	どの root からも public signature で到達しない
 Mmd.Runtime	Mmd.Motion.MmdCameraState	stable	MmdCinemachineCameraBinding の public signature から到達
 Mmd.Runtime	Mmd.Motion.MmdLightState	stable	MmdSceneEnvironmentBinding の public signature から到達
 Mmd.Runtime	Mmd.Motion.MmdSelfShadowProjectionBounds	stable	MmdSelfShadowProjectionPolicy の public signature から到達

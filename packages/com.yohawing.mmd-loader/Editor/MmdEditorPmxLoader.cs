@@ -9,7 +9,7 @@ using Object = UnityEngine.Object;
 
 namespace Mmd.Editor
 {
-    public static class MmdEditorPmxLoader
+    internal static class MmdEditorPmxLoader
     {
         public static MmdUnityModelInstance LoadPmxIntoScene(string path)
         {

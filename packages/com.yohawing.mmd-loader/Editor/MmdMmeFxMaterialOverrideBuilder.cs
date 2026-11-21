@@ -12,7 +12,7 @@ using UnityEngine;
 
 namespace Mmd.Editor
 {
-    public static class MmdMmeFxMaterialOverrideBuilder
+    internal static class MmdMmeFxMaterialOverrideBuilder
     {
         private const string DotEmdExtension = ".emd";
 

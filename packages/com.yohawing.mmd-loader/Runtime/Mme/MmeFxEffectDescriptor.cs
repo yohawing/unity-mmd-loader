@@ -6,14 +6,14 @@ using System.Collections.Generic;
 namespace Mmd.Mme
 {
     [Serializable]
-    public sealed class MmeFxFloatParameter
+    internal sealed class MmeFxFloatParameter
     {
         public string name = string.Empty;
         public float value;
     }
 
     [Serializable]
-    public sealed class MmeFxEffectDescriptor
+    internal sealed class MmeFxEffectDescriptor
     {
         public string sourcePath = string.Empty;
         public string effectType = string.Empty;

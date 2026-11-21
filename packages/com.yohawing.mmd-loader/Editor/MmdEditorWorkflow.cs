@@ -8,7 +8,7 @@ using Object = UnityEngine.Object;
 
 namespace Mmd.Editor
 {
-    public static class MmdEditorWorkflow
+    internal static class MmdEditorWorkflow
     {
         public static MmdEditorSelectionSnapshot BuildSelectionSnapshot(Object[] selection, GameObject? activeGameObject)
         {
@@ -98,7 +98,7 @@ namespace Mmd.Editor
         }
     }
 
-    public readonly struct MmdEditorSelectionSnapshot
+    internal readonly struct MmdEditorSelectionSnapshot
     {
         public static readonly MmdEditorSelectionSnapshot Empty = new(null, null, null, null, null, null);
 

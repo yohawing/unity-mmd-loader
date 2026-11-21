@@ -8,7 +8,7 @@ using Mmd.UnityIntegration;
 
 namespace Mmd.Editor
 {
-    public static class MmdEditorPlaybackLoader
+    internal static class MmdEditorPlaybackLoader
     {
         // Full PMX + VMD bundled playback loader entry points (model + motion together).
         // Bundled asset paths store PMX/VMD source refs on MmdUnityPlaybackController.

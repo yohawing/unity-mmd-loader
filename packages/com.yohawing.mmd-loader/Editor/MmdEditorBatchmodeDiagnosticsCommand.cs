@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace Mmd.Editor
 {
-    public static class MmdEditorBatchmodeDiagnosticsCommand
+    internal static class MmdEditorBatchmodeDiagnosticsCommand
     {
         public static string GetRequiredArg(string name)
         {

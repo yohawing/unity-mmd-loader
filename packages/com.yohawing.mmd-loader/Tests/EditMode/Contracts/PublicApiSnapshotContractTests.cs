@@ -79,7 +79,7 @@ namespace Mmd.Tests.Contracts
                 },
                 ["Mmd.Timeline"] = new[] { "Mmd.TimelineEditModeTests" },
                 ["Mmd.Rendering.Universal"] = Array.Empty<string>(),
-                ["Mmd.Editor"] = new[] { "Mmd.EditModeTests", "Mmd.TimelineEditModeTests" },
+                ["Mmd.Editor"] = new[] { "Mmd.DevTools.Editor", "Mmd.EditModeTests", "Mmd.TimelineEditModeTests" },
                 ["Mmd.Editor.Timeline"] = new[] { "Mmd.Editor", "Mmd.TimelineEditModeTests" }
             };
 

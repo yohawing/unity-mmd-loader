@@ -10,7 +10,7 @@ namespace Mmd.Editor
 {
     public sealed class MmdGenericAnimationClipBakeWindow : EditorWindow
     {
-        public enum ClipType
+        internal enum ClipType
         {
             Generic,
             Humanoid,

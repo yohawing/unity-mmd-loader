@@ -575,35 +575,6 @@ Mmd.MmdVmdParseSummary :: property int ModelKeyframeCount { public get; }
 Mmd.MmdVmdParseSummary :: property int MorphKeyframeCount { public get; }
 Mmd.MmdVmdParseSummary :: property int SelfShadowKeyframeCount { public get; }
 Mmd.MmdVmdParseSummary :: property string TargetModelName { public get; }
-Mmd.Mme.MmeFxEffectDescriptor :: (type) public sealed class MmeFxEffectDescriptor
-Mmd.Mme.MmeFxEffectDescriptor :: ctor public .ctor()
-Mmd.Mme.MmeFxEffectDescriptor :: field public System.Collections.Generic.List<Mmd.Mme.MmeFxFloatParameter> floatParameters
-Mmd.Mme.MmeFxEffectDescriptor :: field public bool useMaterialSpecular
-Mmd.Mme.MmeFxEffectDescriptor :: field public bool useMaterialSphere
-Mmd.Mme.MmeFxEffectDescriptor :: field public bool useMaterialTexture
-Mmd.Mme.MmeFxEffectDescriptor :: field public bool useNormalMap
-Mmd.Mme.MmeFxEffectDescriptor :: field public bool useSelfShadow
-Mmd.Mme.MmeFxEffectDescriptor :: field public bool useSoftShadow
-Mmd.Mme.MmeFxEffectDescriptor :: field public float normalMapResolution
-Mmd.Mme.MmeFxEffectDescriptor :: field public float? metalness
-Mmd.Mme.MmeFxEffectDescriptor :: field public float? selfShadowPower
-Mmd.Mme.MmeFxEffectDescriptor :: field public float? smoothness
-Mmd.Mme.MmeFxEffectDescriptor :: field public float? softShadowParam
-Mmd.Mme.MmeFxEffectDescriptor :: field public int materialIndex
-Mmd.Mme.MmeFxEffectDescriptor :: field public int maxAnisotropy
-Mmd.Mme.MmeFxEffectDescriptor :: field public string albedoMapTexture
-Mmd.Mme.MmeFxEffectDescriptor :: field public string effectType
-Mmd.Mme.MmeFxEffectDescriptor :: field public string metalnessMapFile
-Mmd.Mme.MmeFxEffectDescriptor :: field public string normalMapFile
-Mmd.Mme.MmeFxEffectDescriptor :: field public string normalMapTexture
-Mmd.Mme.MmeFxEffectDescriptor :: field public string smoothnessMapFile
-Mmd.Mme.MmeFxEffectDescriptor :: field public string sourcePath
-Mmd.Mme.MmeFxEffectDescriptor :: field public string thresholdTexture
-Mmd.Mme.MmeFxEffectDescriptor :: method public bool TryGetFloatParameter(string name, out float value)
-Mmd.Mme.MmeFxFloatParameter :: (type) public sealed class MmeFxFloatParameter
-Mmd.Mme.MmeFxFloatParameter :: ctor public .ctor()
-Mmd.Mme.MmeFxFloatParameter :: field public float value
-Mmd.Mme.MmeFxFloatParameter :: field public string name
 Mmd.Motion.MmdCameraState :: (type) public readonly struct MmdCameraState
 Mmd.Motion.MmdCameraState :: ctor public .ctor(float distance, float[] position, float[] rotation, float viewAngle, bool perspective)
 Mmd.Motion.MmdCameraState :: property bool Perspective { public get; }
