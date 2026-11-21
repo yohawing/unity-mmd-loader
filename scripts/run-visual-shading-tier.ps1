@@ -2,7 +2,9 @@ param(
     [string] $Unity = "C:\Program Files\Unity\Hub\Editor\6000.4.8f1\Editor\Unity.exe",
     [string] $ArtifactsRoot = "",
     [string] $ProjectPath = "",
-    [switch] $SkipPerturbationProof
+    [switch] $SkipPerturbationProof,
+    # Keep the throwaway project after a green run (it is always kept after a failure).
+    [switch] $KeepProject
 )
 
 $ErrorActionPreference = "Stop"
@@ -10,12 +12,17 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 . (Join-Path $repoRoot "scripts\unity-process-environment.ps1")
 Initialize-UnityProcessEnvironment
 . (Join-Path $repoRoot "scripts\read-nunit-test-result.ps1")
+. (Join-Path $repoRoot "scripts\unity-batch-common.ps1")
 
 if ([string]::IsNullOrEmpty($ArtifactsRoot)) {
     $ArtifactsRoot = Join-Path $repoRoot "artifacts\visual-shading-tier"
 }
-$runId = Get-Date -Format "yyyyMMdd-HHmmss"
+$runId = Get-Date -Format "yyyyMMdd-HHmmss-fff"
 $runRoot = Join-Path $ArtifactsRoot $runId
+# Each run owns its directory (and its throwaway project); never share one with another run.
+if (Test-Path -LiteralPath $runRoot) {
+    throw "Visual tier run directory already exists: $runRoot"
+}
 $resultsRoot = Join-Path $runRoot "results"
 $captureRoot = Join-Path $runRoot "captures"
 New-Item -ItemType Directory -Force -Path $runRoot, $resultsRoot, $captureRoot | Out-Null
@@ -36,8 +43,9 @@ function Invoke-UnityProcess {
     param(
         [Parameter(Mandatory = $true)][string[]] $Arguments
     )
-    $proc = Start-Process -FilePath $Unity -ArgumentList $Arguments -Wait -PassThru -NoNewWindow
-    return $proc.ExitCode
+    # Invoke-UnityBatch waits on the Unity process itself; Start-Process -Wait also waited
+    # for the Roslyn compiler server Unity leaves running after a real compile.
+    return Invoke-UnityBatch -Unity $Unity -Arguments $Arguments
 }
 
 function Wait-ForFileToSettle {
@@ -80,7 +88,8 @@ function Wait-ForFileToSettle {
 # dependencies that fail to resolve in offline/batchmode ("The path argument must be of
 # type string. Received undefined."). Always bootstrap an isolated throwaway project
 # unless the caller explicitly passes -ProjectPath.
-if ([string]::IsNullOrEmpty($ProjectPath)) {
+$ownsProject = [string]::IsNullOrEmpty($ProjectPath)
+if ($ownsProject) {
     $ProjectPath = Join-Path $runRoot "project"
 }
 $ProjectPath = [IO.Path]::GetFullPath($ProjectPath)
@@ -281,6 +290,11 @@ try {
 finally {
     Remove-Item Env:YMU_VISUAL_TIER_PERTURB -ErrorAction SilentlyContinue
     Remove-Item Env:YMU_VISUAL_PARITY_ARTIFACTS -ErrorAction SilentlyContinue
+}
+
+# Every run bootstraps a fresh ~1.7 GB project; keep only results and captures once green.
+if ($ownsProject -and -not $KeepProject) {
+    Remove-Item -LiteralPath $ProjectPath -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 Write-Host "Visual shading tier passed. artifacts=$runRoot"

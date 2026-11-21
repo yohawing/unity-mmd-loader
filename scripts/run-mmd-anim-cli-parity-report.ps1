@@ -1,5 +1,5 @@
 param(
-    [string] $Unity = "C:\Program Files\Unity\Hub\Editor\6000.4.8f1\Editor\Unity.exe",
+    [string] $Unity = "",
     [string] $ProjectPath = "F:\Develop\MMDDev\unity-mmd-loader\unity-mmd",
     [string] $ResultsFile = "F:\Develop\MMDDev\unity-mmd-loader\artifacts\parity\mmd-anim-cli-parity-results.xml",
     [string] $LogFile = "F:\Develop\MMDDev\unity-mmd-loader\artifacts\parity\mmd-anim-cli-parity.log"
@@ -8,20 +8,10 @@ param(
 $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "unity-project-guard.ps1")
-. (Join-Path $PSScriptRoot "unity-process-environment.ps1")
-Initialize-UnityProcessEnvironment
+. (Join-Path $PSScriptRoot "unity-batch-common.ps1")
 . (Join-Path $PSScriptRoot "read-nunit-test-result.ps1")
 
-function Resolve-OutputPath {
-    param([Parameter(Mandatory = $true)][string] $Path)
-
-    if ([System.IO.Path]::IsPathRooted($Path)) {
-        return [System.IO.Path]::GetFullPath($Path)
-    }
-
-    return [System.IO.Path]::GetFullPath((Join-Path (Get-Location) $Path))
-}
-
+$Unity = Resolve-UnityExecutable $Unity
 $ResultsFile = Resolve-OutputPath $ResultsFile
 $LogFile = Resolve-OutputPath $LogFile
 
@@ -34,13 +24,16 @@ Remove-Item -LiteralPath $ResultsFile, $LogFile -Force -ErrorAction SilentlyCont
 $previousParityFlag = $env:YMU_MMD_ANIM_CLI_PARITY
 $env:YMU_MMD_ANIM_CLI_PARITY = "1"
 try {
-    & $Unity -batchmode -runTests `
-        -projectPath $ProjectPath `
-        -testPlatform EditMode `
-        -testFilter "Mmd.Tests.Contracts.MmdNativeParityTests.MmdAnimCliParityReportComparesCliWithPackagedNativeRuntime" `
-        -testResults $ResultsFile `
-        -logFile $LogFile
-    $unityExitCode = if ($null -eq $LASTEXITCODE) { 0 } else { $LASTEXITCODE }
+    Clear-StaleUnityProjectLocks -ProjectPath $ProjectPath
+    $unityExitCode = Invoke-UnityBatch -Unity $Unity -Arguments @(
+        "-batchmode",
+        "-runTests",
+        "-projectPath", $ProjectPath,
+        "-testPlatform", "EditMode",
+        "-testFilter", "Mmd.Tests.Contracts.MmdNativeParityTests.MmdAnimCliParityReportComparesCliWithPackagedNativeRuntime",
+        "-testResults", $ResultsFile,
+        "-logFile", $LogFile
+    )
 }
 finally {
     if ($null -eq $previousParityFlag) {
@@ -51,58 +44,10 @@ finally {
     }
 }
 
-function Wait-ForFile {
-    param(
-        [Parameter(Mandatory = $true)][string] $Path,
-        [int] $TimeoutSeconds = 120
-    )
-
-    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
-    while ((Get-Date) -lt $deadline) {
-        if (Test-Path -LiteralPath $Path) {
-            return
-        }
-        Start-Sleep -Milliseconds 250
-    }
-}
-
-function Wait-ForFileToSettle {
-    param(
-        [Parameter(Mandatory = $true)][string] $Path,
-        [int] $TimeoutSeconds = 30
-    )
-
-    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
-    $lastLength = -1
-    $lastWriteTimeUtc = [datetime]::MinValue
-    $stableCount = 0
-    while ((Get-Date) -lt $deadline) {
-        $item = Get-Item -LiteralPath $Path -ErrorAction SilentlyContinue
-        if ($null -eq $item) {
-            Start-Sleep -Milliseconds 250
-            continue
-        }
-
-        if ($item.Length -eq $lastLength -and $item.LastWriteTimeUtc -eq $lastWriteTimeUtc) {
-            $stableCount++
-            if ($stableCount -ge 4) {
-                return
-            }
-        }
-        else {
-            $stableCount = 0
-            $lastLength = $item.Length
-            $lastWriteTimeUtc = $item.LastWriteTimeUtc
-        }
-
-        Start-Sleep -Milliseconds 250
-    }
-}
-
-Wait-ForFile -Path $LogFile
-Wait-ForFile -Path $ResultsFile
-Wait-ForFileToSettle -Path $LogFile
-Wait-ForFileToSettle -Path $ResultsFile
+Wait-ForFile -Path $LogFile | Out-Null
+Wait-ForFile -Path $ResultsFile | Out-Null
+Wait-ForFileToSettle -Path $LogFile | Out-Null
+Wait-ForFileToSettle -Path $ResultsFile | Out-Null
 
 if (-not (Test-Path -LiteralPath $LogFile)) {
     throw ("mmd-anim CLI parity report failed. exitCode={0}; log was not created: {1}" -f $unityExitCode, $LogFile)

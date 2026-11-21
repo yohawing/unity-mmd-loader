@@ -12,6 +12,7 @@ scripts/*
 !scripts/run-mmd-anim-cli-parity-report.ps1
 !scripts/unity-project-guard.ps1
 !scripts/verify-unity-toon-shader-sample.ps1
+!scripts/unity-batch-common.ps1
 packages/com.yohawing.mmd-loader.devtools/
 
 # Tracked minimum visual shading tier. Keep the rest of DevTools local-only.
