@@ -154,6 +154,66 @@ namespace Mmd.UnityIntegration
             var toonTextures = new List<MmdResolvedTexture>(descriptor.materials.Count);
             var decodedTextures = new Dictionary<string, Texture2D>(StringComparer.OrdinalIgnoreCase);
 
+            try
+            {
+                ResolveMaterialTextures(descriptor, sourceContext, diagnostics, diffuseTextures, sphereTextures, toonTextures, decodedTextures);
+            }
+            catch
+            {
+                // The caller never receives a resolution on failure, so nothing else can own the
+                // textures decoded so far.
+                DestroyResolvedTextures(decodedTextures.Values, diffuseTextures, sphereTextures, toonTextures);
+                throw;
+            }
+
+            return new MmdRuntimeTextureResolution(diffuseTextures, sphereTextures, toonTextures, diagnostics);
+        }
+
+        private static void DestroyResolvedTextures(
+            IEnumerable<Texture2D> decodedTextures,
+            params List<MmdResolvedTexture>[] resolvedTextures)
+        {
+            var destroyed = new HashSet<Texture2D>();
+            foreach (Texture2D texture in decodedTextures)
+            {
+                DestroyTexture(texture, destroyed);
+            }
+
+            foreach (List<MmdResolvedTexture> list in resolvedTextures)
+            {
+                foreach (MmdResolvedTexture resolved in list)
+                {
+                    DestroyTexture(resolved.Texture, destroyed);
+                }
+            }
+        }
+
+        private static void DestroyTexture(Texture2D? texture, HashSet<Texture2D> destroyed)
+        {
+            if (texture == null || !destroyed.Add(texture))
+            {
+                return;
+            }
+
+            if (Application.isPlaying)
+            {
+                UnityEngine.Object.Destroy(texture);
+            }
+            else
+            {
+                UnityEngine.Object.DestroyImmediate(texture);
+            }
+        }
+
+        private static void ResolveMaterialTextures(
+            MmdRenderingDescriptor descriptor,
+            MmdUnityModelSourceContext? sourceContext,
+            MmdTextureBindingDiagnostics diagnostics,
+            List<MmdResolvedTexture> diffuseTextures,
+            List<MmdResolvedTexture> sphereTextures,
+            List<MmdResolvedTexture> toonTextures,
+            Dictionary<string, Texture2D> decodedTextures)
+        {
             foreach (MmdMaterialDescriptor material in descriptor.materials)
             {
                 if (material == null)
@@ -206,8 +266,6 @@ namespace Mmd.UnityIntegration
                     AddSharedToonTexture(material.materialIndex, material.sharedToonIndex, toonTextures, diagnostics);
                 }
             }
-
-            return new MmdRuntimeTextureResolution(diffuseTextures, sphereTextures, toonTextures, diagnostics);
         }
 
         private static void AddSharedToonTexture(
@@ -374,12 +432,28 @@ namespace Mmd.UnityIntegration
                 return new MmdResolvedTexture(materialIndex, usage, textureReference, resolvedPath, texture);
             }
 
+            bool readCompleted = false;
             try
             {
                 byte[] bytes = MmdTextureDecodeBudget.Default.ReadFileBytes(resolvedPath);
+                readCompleted = true;
                 texture = LoadTextureBytes(bytes, extension, Path.GetFileNameWithoutExtension(resolvedPath));
             }
-            catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException)
+            catch (Exception ex) when (!readCompleted && (ex is IOException || ex is UnauthorizedAccessException))
+            {
+                // The exception message can carry the absolute path, so only its type is recorded.
+                diagnostics.UnsupportedTextureReferenceCount++;
+                diagnostics.AddTextureReference(CreateReferenceDiagnostic(
+                    materialIndex,
+                    usage,
+                    diagnosticReference,
+                    diagnosticPath,
+                    status: "unreadable",
+                    reason: $"read failed ({ex.GetType().Name})"));
+                diagnostics.AddMessage($"Material {materialIndex} {usageLabel} texture '{diagnosticPath}' could not be read at runtime ({ex.GetType().Name}).");
+                return null;
+            }
+            catch (Exception ex) when (IsDecodeFailure(ex))
             {
                 diagnostics.UnsupportedTextureReferenceCount++;
                 diagnostics.AddTextureReference(CreateReferenceDiagnostic(
@@ -442,14 +516,40 @@ namespace Mmd.UnityIntegration
         {
             if (bytes == null || bytes.Length == 0) return null;
             try { return LoadTextureBytes(bytes, extension, textureName); }
-            catch (System.Exception ex) when (ex is System.ArgumentException || ex is System.NotSupportedException) { return null; }
+            catch (System.Exception ex) when (IsDecodeFailure(ex)) { return null; }
+        }
+
+        // Decoders run over untrusted bytes; these are the failure types they (and the
+        // framework streams they use) raise for malformed or unsupported content.
+        private static bool IsDecodeFailure(Exception ex)
+        {
+            return ex is ArgumentException
+                || ex is NotSupportedException
+                || ex is IOException
+                || ex is InvalidDataException
+                || ex is OverflowException;
         }
 
         private static Texture2D? LoadTextureBytes(byte[] bytes, string extension, string textureName)
         {
-            if (IsBmp(bytes))
+            if (!SupportedRuntimeImageExtensions.Contains(extension))
             {
-                return MmdBmpDecoder.Decode(bytes, textureName);
+                throw new NotSupportedException($"Texture extension '{extension}' is not supported for runtime decode.");
+            }
+
+            // MMD sphere maps (.sph/.spa) and mislabeled files often carry PNG/JPEG/BMP/DDS
+            // content, so the signature wins over the extension. TGA has no reliable signature
+            // and is only chosen by extension.
+            switch (DetectContentFormat(bytes))
+            {
+                case ContentFormat.Bmp:
+                    return MmdBmpDecoder.Decode(bytes, textureName);
+                case ContentFormat.Png:
+                    return MmdPngDecoder.Decode(bytes, textureName);
+                case ContentFormat.Jpeg:
+                    return DecodeJpeg(bytes, textureName);
+                case ContentFormat.Dds:
+                    return MmdDdsDecoder.Decode(bytes, textureName);
             }
 
             if (string.Equals(extension, ".tga", StringComparison.OrdinalIgnoreCase))
@@ -470,26 +570,63 @@ namespace Mmd.UnityIntegration
             if (string.Equals(extension, ".jpg", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(extension, ".jpeg", StringComparison.OrdinalIgnoreCase))
             {
-                MmdJpegHeaderValidator.Validate(bytes, MmdTextureDecodeBudget.Default);
-                var jpegTexture = new Texture2D(2, 2, TextureFormat.RGBA32, mipChain: true)
-                {
-                    name = textureName
-                };
-                if (jpegTexture.LoadImage(bytes, markNonReadable: false))
-                {
-                    return jpegTexture;
-                }
-
-                UnityEngine.Object.DestroyImmediate(jpegTexture);
-                return null;
+                return DecodeJpeg(bytes, textureName);
             }
 
             throw new NotSupportedException($"Texture extension '{extension}' is not supported for runtime decode.");
         }
 
-        private static bool IsBmp(byte[] bytes)
+        private static Texture2D? DecodeJpeg(byte[] bytes, string textureName)
         {
-            return bytes.Length >= 2 && bytes[0] == (byte)'B' && bytes[1] == (byte)'M';
+            MmdJpegHeaderValidator.Validate(bytes, MmdTextureDecodeBudget.Default);
+            var jpegTexture = new Texture2D(2, 2, TextureFormat.RGBA32, mipChain: true)
+            {
+                name = textureName
+            };
+            if (jpegTexture.LoadImage(bytes, markNonReadable: false))
+            {
+                return jpegTexture;
+            }
+
+            UnityEngine.Object.DestroyImmediate(jpegTexture);
+            return null;
+        }
+
+        private enum ContentFormat
+        {
+            Unknown,
+            Bmp,
+            Png,
+            Jpeg,
+            Dds
+        }
+
+        private static ContentFormat DetectContentFormat(byte[] bytes)
+        {
+            if (bytes.Length >= 8
+                && bytes[0] == 0x89 && bytes[1] == (byte)'P' && bytes[2] == (byte)'N' && bytes[3] == (byte)'G'
+                && bytes[4] == 0x0d && bytes[5] == 0x0a && bytes[6] == 0x1a && bytes[7] == 0x0a)
+            {
+                return ContentFormat.Png;
+            }
+
+            if (bytes.Length >= 3 && bytes[0] == 0xff && bytes[1] == 0xd8 && bytes[2] == 0xff)
+            {
+                return ContentFormat.Jpeg;
+            }
+
+            if (bytes.Length >= 4
+                && bytes[0] == (byte)'D' && bytes[1] == (byte)'D' && bytes[2] == (byte)'S' && bytes[3] == (byte)' ')
+            {
+                return ContentFormat.Dds;
+            }
+
+            if (bytes.Length >= 2 && bytes[0] == (byte)'B' && bytes[1] == (byte)'M')
+            {
+                return ContentFormat.Bmp;
+            }
+
+            return ContentFormat.Unknown;
         }
 
         private static string NormalizeTextureReference(string? textureReference)

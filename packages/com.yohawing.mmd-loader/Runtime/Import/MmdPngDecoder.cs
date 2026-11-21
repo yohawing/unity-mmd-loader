@@ -198,7 +198,7 @@ namespace Mmd.UnityIntegration
             int offset = 0;
             while (offset < output.Length)
             {
-                int read = deflate.Read(output, offset, output.Length - offset);
+                int read = ReadDeflate(() => deflate.Read(output, offset, output.Length - offset));
                 if (read == 0)
                 {
                     throw new ArgumentException("PNG image data ended before all rows were decoded.", nameof(bytes));
@@ -207,12 +207,27 @@ namespace Mmd.UnityIntegration
                 offset += read;
             }
 
-            if (deflate.ReadByte() != -1)
+            if (ReadDeflate(deflate.ReadByte) != -1)
             {
                 throw new ArgumentException("PNG image data exceeds the expected row budget.", nameof(bytes));
             }
 
             return output;
+        }
+
+        // A malformed deflate stream surfaces as IOException ("Corrupted data") on Unity's Mono
+        // and as InvalidDataException on .NET. Normalize both to the decoder's ArgumentException
+        // contract so callers classify it as a decode failure instead of a file read failure.
+        private static int ReadDeflate(Func<int> read)
+        {
+            try
+            {
+                return read();
+            }
+            catch (Exception ex) when (ex is IOException || ex is InvalidDataException)
+            {
+                throw new ArgumentException("PNG image data is corrupt.", ex);
+            }
         }
 
         private static void Unfilter(byte[] current, byte[] previous, byte filter, int bytesPerPixel)

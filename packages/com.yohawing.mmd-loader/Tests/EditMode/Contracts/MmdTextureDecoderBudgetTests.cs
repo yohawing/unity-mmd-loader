@@ -46,6 +46,19 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void CorruptPngDeflateStreamIsRejectedAsArgumentException()
+        {
+            byte[] png = CreatePng(1, 1, new byte[] { 0, 1, 2, 3, 4 });
+            byte[] corruptIdat = { 0x78, 0x01, 0xff, 0xff, 0xff, 0xff, 0, 0, 0, 0 };
+            png = ReplaceIdat(png, corruptIdat);
+
+            ArgumentException error = Assert.Throws<ArgumentException>(() => MmdPngDecoder.Decode(png, "corrupt-idat"))!;
+            Assert.That(error.Message, Does.Contain("corrupt"));
+            Assert.That(error.InnerException, Is.Not.Null);
+            Assert.That(MmdRuntimeTextureResolver.DecodeTextureBytes(png, ".png", "corrupt-idat"), Is.Null);
+        }
+
+        [Test]
         public void ValidRgbaPngPreservesAlphaAndVerticalOrientation()
         {
             byte[] scanlines =
@@ -308,6 +321,24 @@ namespace Mmd.Tests
 
             WriteChunk(stream, "IDAT", CreateZlib(inflated));
             WriteChunk(stream, "IEND", Array.Empty<byte>());
+            return stream.ToArray();
+        }
+
+        private static byte[] ReplaceIdat(byte[] png, byte[] idatData)
+        {
+            using var stream = new MemoryStream();
+            stream.Write(png, 0, 8);
+            int cursor = 8;
+            while (cursor + 12 <= png.Length)
+            {
+                int length = (png[cursor] << 24) | (png[cursor + 1] << 16) | (png[cursor + 2] << 8) | png[cursor + 3];
+                string type = System.Text.Encoding.ASCII.GetString(png, cursor + 4, 4);
+                byte[] data = new byte[length];
+                Array.Copy(png, cursor + 8, data, 0, length);
+                WriteChunk(stream, type, type == "IDAT" ? idatData : data);
+                cursor += length + 12;
+            }
+
             return stream.ToArray();
         }
 

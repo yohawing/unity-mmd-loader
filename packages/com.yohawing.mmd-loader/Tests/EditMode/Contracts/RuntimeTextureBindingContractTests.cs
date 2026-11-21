@@ -348,6 +348,297 @@ namespace Mmd.Tests
             }
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void CorruptPngImageDataIsContainedAsTextureDiagnosticWithoutLeakingTextures(bool skinned)
+        {
+            string tempRoot = CreateTempDirectory();
+            MmdUnityModelInstance? instance = null;
+            try
+            {
+                string pmxPath = Path.Combine(tempRoot, "model.pmx");
+                File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
+                WritePng(Path.Combine(tempRoot, "valid.png"), Color.red);
+                File.WriteAllBytes(Path.Combine(tempRoot, "corrupt.png"), CreateCorruptIdatPng());
+                MmdModelDefinition model = CreateTwoMaterialModel("valid.png", "corrupt.png");
+                int textureCountBefore = CountLoadedTexture2D();
+
+                instance = skinned
+                    ? MmdUnityModelFactory.CreateSkinnedModel(model, pmxPath)
+                    : MmdUnityModelFactory.CreateStaticModel(model, pmxPath);
+
+                Assert.That(instance.LoadedDiffuseTextureCount, Is.EqualTo(1));
+                Assert.That(instance.UnsupportedTextureReferenceCount, Is.EqualTo(1));
+                MmdTextureReferenceDiagnostic failed = instance.TextureDiagnostics.TextureReferences
+                    .Single(diagnostic => diagnostic.materialIndex == 1);
+                Assert.That(failed.status, Is.EqualTo("unsupported"));
+                Assert.That(failed.reason, Is.EqualTo("decode failed"));
+                Assert.That(failed.resolvedPath, Is.EqualTo("corrupt.png"));
+                AssertDiagnosticsDoNotContain(instance.TextureDiagnostics, tempRoot, pmxPath);
+
+                DestroyInstance(instance);
+                instance = null;
+                Assert.That(CountLoadedTexture2D(), Is.EqualTo(textureCountBefore));
+            }
+            finally
+            {
+                DestroyInstance(instance);
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void LockedTextureFileIsContainedAsUnreadableDiagnosticWithoutLeakingTextures(bool skinned)
+        {
+            if (Path.DirectorySeparatorChar != '\\')
+            {
+                Assert.Ignore("FileShare.None is only enforced as a mandatory lock on Windows.");
+            }
+
+            string tempRoot = CreateTempDirectory();
+            MmdUnityModelInstance? instance = null;
+            try
+            {
+                string pmxPath = Path.Combine(tempRoot, "model.pmx");
+                string lockedPath = Path.Combine(tempRoot, "locked.png");
+                File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
+                WritePng(Path.Combine(tempRoot, "valid.png"), Color.red);
+                WritePng(lockedPath, Color.blue);
+                MmdModelDefinition model = CreateTwoMaterialModel("valid.png", "locked.png");
+                int textureCountBefore = CountLoadedTexture2D();
+
+                using (new FileStream(lockedPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                {
+                    instance = skinned
+                        ? MmdUnityModelFactory.CreateSkinnedModel(model, pmxPath)
+                        : MmdUnityModelFactory.CreateStaticModel(model, pmxPath);
+                }
+
+                Assert.That(instance.LoadedDiffuseTextureCount, Is.EqualTo(1));
+                Assert.That(instance.UnsupportedTextureReferenceCount, Is.EqualTo(1));
+                MmdTextureReferenceDiagnostic failed = instance.TextureDiagnostics.TextureReferences
+                    .Single(diagnostic => diagnostic.materialIndex == 1);
+                Assert.That(failed.status, Is.EqualTo("unreadable"));
+                Assert.That(failed.reason, Does.StartWith("read failed"));
+                Assert.That(failed.resolvedPath, Is.EqualTo("locked.png"));
+                Assert.That(
+                    instance.TextureDiagnostics.Messages.Any(message => message.Contains("could not be read")),
+                    Is.True);
+                AssertDiagnosticsDoNotContain(instance.TextureDiagnostics, tempRoot, pmxPath, lockedPath);
+
+                DestroyInstance(instance);
+                instance = null;
+                Assert.That(CountLoadedTexture2D(), Is.EqualTo(textureCountBefore));
+            }
+            finally
+            {
+                DestroyInstance(instance);
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+
+        [Test]
+        public void ResolverDestroysAlreadyDecodedTexturesWhenAnUncontainedFailureEscapes()
+        {
+            string tempRoot = CreateTempDirectory();
+            try
+            {
+                string pmxPath = Path.Combine(tempRoot, "model.pmx");
+                File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
+                WritePng(Path.Combine(tempRoot, "valid.png"), Color.red);
+                MmdModelDefinition model = CreateMinimalTriangleModel();
+                model.materials[0].texture = "valid.png";
+                MmdRenderingDescriptor descriptor = MmdRenderingDescriptorBuilder.Build(model);
+                descriptor.materials.Add(null!);
+                int textureCountBefore = CountLoadedTexture2D();
+
+                Assert.Throws<System.ArgumentException>(() => MmdRuntimeTextureResolver.ResolveDiffuseTextures(
+                    descriptor,
+                    MmdUnityModelSourceContext.FromOptionalPath(pmxPath)));
+
+                Assert.That(CountLoadedTexture2D(), Is.EqualTo(textureCountBefore));
+            }
+            finally
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+
+        [TestCase("sphere.sph", "png")]
+        [TestCase("sphere.spa", "jpg")]
+        [TestCase("sphere.bmp", "png")]
+        [TestCase("sphere.png", "bmp")]
+        public void SphereTextureIsDecodedByContentSignatureRatherThanExtension(string fileName, string contentFormat)
+        {
+            string tempRoot = CreateTempDirectory();
+            MmdRuntimeTextureResolution? resolution = null;
+            try
+            {
+                string pmxPath = Path.Combine(tempRoot, "model.pmx");
+                File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
+                File.WriteAllBytes(Path.Combine(tempRoot, fileName), EncodeSolidTexture(contentFormat, Color.green));
+                MmdModelDefinition model = CreateMinimalTriangleModel();
+                model.materials[0].sphereTexture = fileName;
+
+                resolution = MmdRuntimeTextureResolver.ResolveDiffuseTextures(
+                    MmdRenderingDescriptorBuilder.Build(model),
+                    MmdUnityModelSourceContext.FromOptionalPath(pmxPath));
+
+                Assert.That(resolution.SphereTextures, Has.Count.EqualTo(1));
+                Assert.That(resolution.Diagnostics.UnsupportedTextureReferenceCount, Is.Zero);
+                MmdTextureReferenceDiagnostic diagnostic = resolution.Diagnostics.TextureReferences.Single();
+                Assert.That(diagnostic.status, Is.EqualTo("loaded"));
+                Assert.That(resolution.SphereTextures[0].Texture.width, Is.EqualTo(2));
+            }
+            finally
+            {
+                if (resolution != null)
+                {
+                    foreach (Texture2D texture in resolution.SphereTextures.Select(item => item.Texture).Distinct())
+                    {
+                        Object.DestroyImmediate(texture);
+                    }
+                }
+
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+
+        [Test]
+        public void CaseVariantReferencesShareOneDecodedTexture()
+        {
+            // The decode cache key is case-insensitive on every platform so case-insensitive
+            // volumes (Windows, default macOS) never decode the same file twice.
+            string tempRoot = CreateTempDirectory();
+            MmdRuntimeTextureResolution? resolution = null;
+            try
+            {
+                string pmxPath = Path.Combine(tempRoot, "model.pmx");
+                File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
+                WritePng(Path.Combine(tempRoot, "shared.png"), Color.red);
+                if (!File.Exists(Path.Combine(tempRoot, "SHARED.png")))
+                {
+                    WritePng(Path.Combine(tempRoot, "SHARED.png"), Color.red);
+                }
+
+                MmdModelDefinition model = CreateTwoMaterialModel("shared.png", "SHARED.png");
+                resolution = MmdRuntimeTextureResolver.ResolveDiffuseTextures(
+                    MmdRenderingDescriptorBuilder.Build(model),
+                    MmdUnityModelSourceContext.FromOptionalPath(pmxPath));
+
+                Assert.That(resolution.DiffuseTextures, Has.Count.EqualTo(2));
+                Assert.That(resolution.DiffuseTextures[1].Texture, Is.SameAs(resolution.DiffuseTextures[0].Texture));
+            }
+            finally
+            {
+                if (resolution != null)
+                {
+                    foreach (Texture2D texture in resolution.DiffuseTextures.Select(item => item.Texture).Distinct())
+                    {
+                        Object.DestroyImmediate(texture);
+                    }
+                }
+
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+
+        private static int CountLoadedTexture2D()
+        {
+            return Resources.FindObjectsOfTypeAll<Texture2D>().Length;
+        }
+
+        private static MmdModelDefinition CreateTwoMaterialModel(string firstTexture, string secondTexture)
+        {
+            MmdModelDefinition model = CreateMinimalTriangleModel();
+            model.indices.AddRange(new[] { 0, 1, 2 });
+            model.materials[0].texture = firstTexture;
+            model.materials.Add(new MmdMaterialDefinition
+            {
+                index = 1,
+                name = "second-texture-material",
+                texture = secondTexture,
+                vertexCount = 3
+            });
+            return model;
+        }
+
+        private static byte[] CreateCorruptIdatPng()
+        {
+            using var stream = new MemoryStream();
+            stream.Write(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }, 0, 8);
+            WritePngChunk(stream, "IHDR", new byte[] { 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0 });
+            // zlib header followed by a deflate block with the reserved BTYPE=11, then a dummy Adler-32.
+            WritePngChunk(stream, "IDAT", new byte[] { 0x78, 0x01, 0xff, 0xff, 0xff, 0xff, 0, 0, 0, 0 });
+            WritePngChunk(stream, "IEND", System.Array.Empty<byte>());
+            return stream.ToArray();
+        }
+
+        private static void WritePngChunk(Stream stream, string type, byte[] data)
+        {
+            stream.WriteByte((byte)(data.Length >> 24));
+            stream.WriteByte((byte)(data.Length >> 16));
+            stream.WriteByte((byte)(data.Length >> 8));
+            stream.WriteByte((byte)data.Length);
+            byte[] typeBytes = System.Text.Encoding.ASCII.GetBytes(type);
+            stream.Write(typeBytes, 0, typeBytes.Length);
+            stream.Write(data, 0, data.Length);
+            stream.Write(new byte[4], 0, 4);
+        }
+
+        private static byte[] EncodeSolidTexture(string format, Color color)
+        {
+            if (format == "bmp")
+            {
+                // 2x2 24bpp bottom-up BMP; each row is 6 bytes padded to 8.
+                var bytes = new byte[54 + 16];
+                bytes[0] = (byte)'B';
+                bytes[1] = (byte)'M';
+                WriteLittleEndian(bytes, 2, bytes.Length);
+                WriteLittleEndian(bytes, 10, 54);
+                WriteLittleEndian(bytes, 14, 40);
+                WriteLittleEndian(bytes, 18, 2);
+                WriteLittleEndian(bytes, 22, 2);
+                bytes[26] = 1;
+                bytes[28] = 24;
+                WriteLittleEndian(bytes, 34, 16);
+                Color32 pixel = color;
+                for (int row = 0; row < 2; row++)
+                {
+                    for (int x = 0; x < 2; x++)
+                    {
+                        int offset = 54 + row * 8 + x * 3;
+                        bytes[offset] = pixel.b;
+                        bytes[offset + 1] = pixel.g;
+                        bytes[offset + 2] = pixel.r;
+                    }
+                }
+
+                return bytes;
+            }
+
+            var texture = new Texture2D(2, 2, TextureFormat.RGBA32, mipChain: false);
+            try
+            {
+                texture.SetPixels(new[] { color, color, color, color });
+                texture.Apply();
+                return format == "jpg" ? texture.EncodeToJPG() : texture.EncodeToPNG();
+            }
+            finally
+            {
+                Object.DestroyImmediate(texture);
+            }
+        }
+
+        private static void WriteLittleEndian(byte[] bytes, int offset, int value)
+        {
+            bytes[offset] = (byte)value;
+            bytes[offset + 1] = (byte)(value >> 8);
+            bytes[offset + 2] = (byte)(value >> 16);
+            bytes[offset + 3] = (byte)(value >> 24);
+        }
+
         private static MmdRuntimeTextureResolution ResolveSingleTexture(string pmxPath, string textureReference)
         {
             MmdModelDefinition model = CreateMinimalTriangleModel();

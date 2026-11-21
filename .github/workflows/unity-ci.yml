@@ -358,7 +358,8 @@ jobs:
             "Mmd.Tests.MmdGenericAnimationClipWriterCharacterizationTests.DenseBudgetOverflowReportsExactDiagnostics",
             "Mmd.Tests.MmdGenericAnimationClipWriterCharacterizationTests.SuccessfulBakesReportExactDiagnostics",
             "Mmd.Tests.MmdGenericAnimationClipWriterCharacterizationTests.InvalidOutputPathReportsBakeDiagnosticsThenPathError",
-            "Mmd.Tests.MmdGenericAnimationClipWriterCharacterizationTests.BakesDoNotLeakTemporaryObjects"
+            "Mmd.Tests.MmdGenericAnimationClipWriterCharacterizationTests.BakesDoNotLeakTemporaryObjects",
+            "Mmd.Tests.RuntimeTextureBindingContractTests.LockedTextureFileIsContainedAsUnreadableDiagnosticWithoutLeakingTextures"
           )
 
           foreach ($evidence in @(
