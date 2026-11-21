@@ -96,7 +96,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        [Explicit("Run the S1a main-light visual delta explicitly; FLIP artifacts still require human review.")]
+        [Explicit("Run the S1a main-light visual delta explicitly; machine-checked FLIP deltas, no human review.")]
         [Category("VisualShadingTier")]
         public void ToonRampToonLit_TracksUnityMainLightWhileLegacyStaysInvariant()
         {
@@ -126,6 +126,7 @@ namespace Mmd.Tests
 
             string artifactsDir = ResolveArtifactsDir();
             Directory.CreateDirectory(artifactsDir);
+            WarmUpFirstCapture(visualCase, fixtureDirectory, artifactsDir);
             Color changedLightColor = new Color(0.18f, 0.82f, 0.31f, 1.0f);
             const float changedLightIntensity = 0.35f;
             string legacyReference = Path.Combine(artifactsDir, visualCase.name + ".legacy-main-light-default.png");
@@ -267,7 +268,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        [Explicit("Run the S1b Ambient SH and fog visual deltas explicitly; FLIP artifacts still require human review.")]
+        [Explicit("Run the S1b Ambient SH and fog visual deltas explicitly; machine-checked FLIP deltas, no human review.")]
         [Category("VisualShadingTier")]
         public void ToonRampToonLit_TracksAmbientShAndFogWhileLegacyStaysInvariant()
         {
@@ -297,6 +298,7 @@ namespace Mmd.Tests
 
             string artifactsDir = ResolveArtifactsDir();
             Directory.CreateDirectory(artifactsDir);
+            WarmUpFirstCapture(visualCase, fixtureDirectory, artifactsDir);
             string ambientLegacyOffPath = Path.Combine(artifactsDir, visualCase.name + ".legacy-ambient-sh-off.png");
             string ambientLegacyOnPath = Path.Combine(artifactsDir, visualCase.name + ".legacy-ambient-sh-on.png");
             string ambientToonLitOffPath = Path.Combine(artifactsDir, visualCase.name + ".toon-lit-ambient-sh-off.png");
@@ -361,7 +363,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        [Explicit("Run the S1b URP SSAO visual delta explicitly; FLIP artifacts still require human review.")]
+        [Explicit("Run the S1b URP SSAO visual delta explicitly; machine-checked FLIP deltas, no human review.")]
         [Category("VisualShadingTier")]
         public void ToonRampToonLit_TracksSsaoWhileLegacyStaysInvariant()
         {
@@ -391,6 +393,7 @@ namespace Mmd.Tests
 
             string artifactsDir = ResolveArtifactsDir();
             Directory.CreateDirectory(artifactsDir);
+            WarmUpFirstCapture(visualCase, fixtureDirectory, artifactsDir);
             string legacyOffPath = Path.Combine(artifactsDir, visualCase.name + ".legacy-ssao-off.png");
             string legacyOnPath = Path.Combine(artifactsDir, visualCase.name + ".legacy-ssao-on.png");
             string toonLitOffPath = Path.Combine(artifactsDir, visualCase.name + ".toon-lit-ssao-off.png");
@@ -444,7 +447,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        [Explicit("Run the S1b URP reflection-probe visual delta explicitly; FLIP artifacts still require human review.")]
+        [Explicit("Run the S1b URP reflection-probe visual delta explicitly; machine-checked FLIP deltas, no human review.")]
         [Category("VisualShadingTier")]
         public void ToonRampToonLit_TracksReflectionProbeWhileLegacyStaysInvariant()
         {
@@ -474,6 +477,7 @@ namespace Mmd.Tests
 
             string artifactsDir = ResolveArtifactsDir();
             Directory.CreateDirectory(artifactsDir);
+            WarmUpFirstCapture(visualCase, fixtureDirectory, artifactsDir);
             string legacyOffPath = Path.Combine(artifactsDir, visualCase.name + ".legacy-reflection-probe-off.png");
             string legacyOnPath = Path.Combine(artifactsDir, visualCase.name + ".legacy-reflection-probe-on.png");
             string toonLitOffPath = Path.Combine(artifactsDir, visualCase.name + ".toon-lit-reflection-probe-off.png");
@@ -510,7 +514,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        [Explicit("Run the S1c Toon boundary/feather visual delta explicitly; FLIP artifacts still require human review.")]
+        [Explicit("Run the S1c Toon boundary/feather visual delta explicitly; machine-checked FLIP deltas, no human review.")]
         [Category("VisualShadingTier")]
         public void ToonRampToonLit_TracksToonBoundaryAndFeatherWhileLegacyStaysInvariant()
         {
@@ -526,7 +530,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        [Explicit("Run the S1c Toon band-count visual delta explicitly; FLIP artifacts still require human review.")]
+        [Explicit("Run the S1c Toon band-count visual delta explicitly; machine-checked FLIP deltas, no human review.")]
         [Category("VisualShadingTier")]
         public void ToonRampToonLit_TracksToonBandCountWhileLegacyStaysInvariant()
         {
@@ -542,7 +546,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        [Explicit("Run the S1c stylized-specular visual delta explicitly; FLIP artifacts still require human review.")]
+        [Explicit("Run the S1c stylized-specular visual delta explicitly; machine-checked FLIP deltas, no human review.")]
         [Category("VisualShadingTier")]
         public void ToonRampToonLit_TracksStylizedSpecularWhileLegacyStaysInvariant()
         {
@@ -564,7 +568,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        [Explicit("Run the S1c rim-light visual delta explicitly; FLIP artifacts still require human review.")]
+        [Explicit("Run the S1c rim-light visual delta explicitly; machine-checked FLIP deltas, no human review.")]
         [Category("VisualShadingTier")]
         public void ToonRampToonLit_TracksRimLightWhileLegacyStaysInvariant()
         {
@@ -588,7 +592,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        [Explicit("Run the S1c rim-light follow visual delta explicitly; FLIP artifacts still require human review.")]
+        [Explicit("Run the S1c rim-light follow visual delta explicitly; machine-checked FLIP deltas, no human review.")]
         [Category("VisualShadingTier")]
         public void ToonRampToonLit_TracksRimLightFollowWhileLegacyStaysInvariant()
         {
@@ -612,7 +616,7 @@ namespace Mmd.Tests
         }
 
         [Test]
-        [Explicit("Run the S1c HDR emission visual delta explicitly; FLIP artifacts still require human review.")]
+        [Explicit("Run the S1c HDR emission visual delta explicitly; machine-checked FLIP deltas, no human review.")]
         [Category("VisualShadingTier")]
         public void ToonRampToonLit_TracksHdrEmissionWhileLegacyStaysInvariant()
         {
@@ -685,6 +689,7 @@ namespace Mmd.Tests
 
             string artifactsDir = ResolveArtifactsDir();
             Directory.CreateDirectory(artifactsDir);
+            WarmUpFirstCapture(visualCase, fixtureDirectory, artifactsDir);
             string legacyOffPath = Path.Combine(artifactsDir, visualCase.name + ".legacy-" + artifactStem + "-off.png");
             string legacyOnPath = Path.Combine(artifactsDir, visualCase.name + ".legacy-" + artifactStem + "-on.png");
             string toonLitOffPath = Path.Combine(artifactsDir, visualCase.name + ".toon-lit-" + artifactStem + "-off.png");
@@ -860,6 +865,26 @@ namespace Mmd.Tests
                 ? "UniversalForwardOnly"
                 : "UniversalForward";
             Assert.That(report.selectedMaterialLightMode, Is.EqualTo(expectedLightMode), label + ": LightMode mismatch.");
+        }
+
+        private static bool firstCaptureWarmedUp;
+
+        // The first generated-PMX capture in a fresh Editor domain reports an empty ForwardLit
+        // pass selection (Material.FindPass returns -1 before the shader is first used), even
+        // though the image itself renders correctly. The golden test tolerates this by checking
+        // only its second capture; the delta tests render once here so every asserted capture
+        // is taken after that one-time warm-up, independent of test order.
+        private static void WarmUpFirstCapture(
+            MmdGeneratedPmxVisualCase visualCase,
+            string fixtureDirectory,
+            string artifactsDir)
+        {
+            if (firstCaptureWarmedUp)
+                return;
+            MmdEditorRenderingDiagnostics.RenderGeneratedPmxVisualCase(
+                visualCase, fixtureDirectory, Path.Combine(artifactsDir, visualCase.name + ".first-capture-warmup.png"),
+                backgroundEnabled: true, postProcessingEnabled: false);
+            firstCaptureWarmedUp = true;
         }
 
         private static void RequireOrOptOut(bool optedOut, string reason)

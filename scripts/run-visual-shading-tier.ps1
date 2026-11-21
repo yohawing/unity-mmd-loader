@@ -280,12 +280,57 @@ function Invoke-VisualTierRun {
     }
 }
 
+# Toon Lit S1a-S1c delta tests: each renders Legacy/Toon Lit off/on pairs and asserts FLIP
+# deltas (Legacy invariant, Toon Lit visibly changed). They need the same bootstrapped URP
+# project as the golden gate, so they run here in one more process. Names are discovered from
+# the tracked test source so a new delta test cannot silently drop out of the tier.
+function Invoke-ToonLitDeltaRun {
+    $testSource = Join-Path $repoRoot "packages\com.yohawing.mmd-loader.devtools\Tests\EditMode\MmdGeneratedPmxVisualParityTests.cs"
+    $deltaTestNames = @(
+        [regex]::Matches((Get-Content -LiteralPath $testSource -Raw), 'public void (ToonRampToonLit_\w+)\(') |
+            ForEach-Object { "Mmd.Tests.MmdGeneratedPmxVisualParityTests." + $_.Groups[1].Value } |
+            Sort-Object -Unique)
+    if ($deltaTestNames.Count -eq 0) {
+        throw "No ToonRampToonLit_* tests were found in $testSource"
+    }
+    $name = "toon-lit-deltas"
+    $results = Join-Path $resultsRoot "$name.xml"
+    $log = Join-Path $resultsRoot "$name.log"
+    $env:YMU_VISUAL_PARITY_ARTIFACTS = Join-Path $captureRoot $name
+    Remove-Item Env:YMU_VISUAL_TIER_PERTURB -ErrorAction SilentlyContinue
+    Remove-Item Env:YMU_VISUAL_TIER_OPT_OUT -ErrorAction SilentlyContinue
+    $deltaExitCode = Invoke-UnityProcess -Arguments @(
+        "-batchmode", "-runTests", "-projectPath", $ProjectPath, "-testPlatform", "EditMode",
+        "-testFilter", ($deltaTestNames -join ";"), "-testResults", $results, "-logFile", $log
+    )
+    if ($deltaExitCode -ne 0) {
+        throw "$name Unity run exited with code $deltaExitCode. results=$results log=$log"
+    }
+    if (-not (Wait-ForFileToSettle -Path $results)) {
+        throw "$name did not produce test results. log=$log"
+    }
+    $testSummary = Read-NUnitTestRunSummary -Path $results -Context "$name results"
+    try {
+        Assert-NUnitTestRunEvidence `
+            -Summary $testSummary `
+            -MinimumTotal $deltaTestNames.Count `
+            -MinimumPassed $deltaTestNames.Count `
+            -AllowedSkippedTests @() `
+            -Context "$name results" | Out-Null
+    }
+    catch {
+        throw "$name failed NUnit evidence policy: $($_.Exception.Message). results=$results log=$log"
+    }
+    Write-Host ("{0} passed. passed={1}; total={2}; results={3}" -f $name, $testSummary.Passed, $testSummary.Total, $results)
+}
+
 try {
     Invoke-VisualTierRun -Name "green-before" -Perturb $false -ExpectFailure $false
     if (-not $SkipPerturbationProof) {
         Invoke-VisualTierRun -Name "red-perturbed" -Perturb $true -ExpectFailure $true
         Invoke-VisualTierRun -Name "green-after" -Perturb $false -ExpectFailure $false
     }
+    Invoke-ToonLitDeltaRun
 }
 finally {
     Remove-Item Env:YMU_VISUAL_TIER_PERTURB -ErrorAction SilentlyContinue
