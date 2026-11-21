@@ -845,8 +845,11 @@ namespace Mmd.UnityIntegration
                 return;
             }
 
-            bool seed = lastFrame < 0;
-            float deltaTime = seed ? 0.0f : (frame - lastFrame) / frameRate;
+            bool seed = MmdUnityPlaybackBinding.ResolveLivePhysicsStep(
+                frame,
+                lastFrame,
+                frameRate,
+                out float deltaTime);
             if (backend == null)
             {
                 // Match the serial binding lifecycle exactly: its current native pose is evaluated

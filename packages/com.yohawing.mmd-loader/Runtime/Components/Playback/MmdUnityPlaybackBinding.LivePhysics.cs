@@ -373,6 +373,23 @@ namespace Mmd.UnityIntegration
             return ApplyVmdNativePhysicsFrame(frame, frameRate);
         }
 
+        /// <summary>
+        /// Shared VMD Live step rule for the serial binding, its worker-result validation, and the
+        /// multi-character worker: the first step after a reset (no previous frame) is a seed with
+        /// deltaTime 0, otherwise deltaTime is the frame distance divided by the frame rate. Worker
+        /// results are compared with the serial values bit-for-bit, so the expression must not change.
+        /// </summary>
+        internal static bool ResolveLivePhysicsStep(
+            int frame,
+            int lastFrame,
+            float frameRate,
+            out float deltaTime)
+        {
+            bool seed = lastFrame < 0;
+            deltaTime = seed ? 0.0f : (frame - lastFrame) / frameRate;
+            return seed;
+        }
+
         private void ThrowIfNativeHumanoidHostPoseEnabled()
         {
             if (nativeHumanoidHostPoseEnabled)
@@ -447,8 +464,7 @@ namespace Mmd.UnityIntegration
                 throw new MmdPhysicsBackendException("StepPlaybackFrame", backend.Name, "vmd-bridge-unsupported",
                     "VMD native physics requires the mmd-anim backend.", modelId, motionId);
             double ensureBackendMs = stageWatch.Elapsed.TotalMilliseconds;
-            bool seed = lastLiveFrame < 0;
-            float deltaTime = seed ? 0.0f : (frame - lastLiveFrame) / frameRate;
+            bool seed = ResolveLivePhysicsStep(frame, lastLiveFrame, frameRate, out float deltaTime);
 
             EnsureLivePhysicsNativeOutputBuffers();
             MmdRuntimeFfiPlaybackSession playbackSession = fastSession ?? session.NativePlaybackSession;
@@ -680,8 +696,11 @@ namespace Mmd.UnityIntegration
             }
 
             float expectedTime = MmdPlaybackTime.ToTime(frame, frameRate);
-            bool expectedSeed = lastLiveFrame < 0;
-            float expectedDeltaTime = expectedSeed ? 0.0f : (frame - lastLiveFrame) / frameRate;
+            bool expectedSeed = ResolveLivePhysicsStep(
+                frame,
+                lastLiveFrame,
+                frameRate,
+                out float expectedDeltaTime);
             if (result.EvaluatedFrame != frame || result.EvaluatedTime != expectedTime ||
                 result.WasSeed != expectedSeed || result.DeltaTime != expectedDeltaTime)
             {
