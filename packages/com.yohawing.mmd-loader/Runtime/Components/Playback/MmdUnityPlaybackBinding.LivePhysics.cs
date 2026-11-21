@@ -80,15 +80,25 @@ namespace Mmd.UnityIntegration
 
         private void ClearTransferredLivePhysicsState()
         {
-            lastLiveFrame = -1;
+            InvalidateLiveFrameState();
             lastForwardPlaybackFrame = -1;
-            lastLiveSnapshot = null;
-            lastLivePhysicsDiagnostics = null;
-            LastDetailedApplyTiming = null;
             livePhysicsAfterPhysicsWorldMatrices = null;
             livePhysicsMetadataInstance = null;
             livePhysicsMetadataBackend = null;
             livePhysicsBodyMetadata = null;
+        }
+
+        /// <summary>
+        /// Clears the per-frame Live state shared by every reset kind: the last stepped frame and its
+        /// snapshot, the frame/body diagnostics, and the detailed apply timing. Callers decide separately
+        /// whether the forward-scrub frame, the after-physics matrices, and the body metadata cache survive.
+        /// </summary>
+        private void InvalidateLiveFrameState()
+        {
+            lastLiveFrame = -1;
+            lastLiveSnapshot = null;
+            lastLivePhysicsDiagnostics = null;
+            LastDetailedApplyTiming = null;
             ClearLivePhysicsBodyDiagnostics();
         }
 
@@ -166,13 +176,7 @@ namespace Mmd.UnityIntegration
                 return false;
             }
 
-            MmdUnityWorldMatrixFrameApplier.ApplyHostRigColumnMajorWorldMatrices(
-                playbackInstance.Root.transform,
-                playbackInstance.BoneTransforms,
-                playbackInstance.ImportScale,
-                model.bones,
-                livePhysicsAfterPhysicsWorldMatrices,
-                livePhysicsHostPoseBoneTransformSet);
+            ApplyAfterPhysicsWorldMatrices(livePhysicsAfterPhysicsWorldMatrices);
             return true;
         }
 
@@ -313,13 +317,9 @@ namespace Mmd.UnityIntegration
             }
             // A preflight-created Humanoid backend is intentionally retained without resetting;
             // the immediately following seed step performs the single required SoftReset.
-            lastLiveFrame = -1;
+            InvalidateLiveFrameState();
             lastForwardPlaybackFrame = -1;
-            lastLiveSnapshot = null;
-            lastLivePhysicsDiagnostics = null;
-            LastDetailedApplyTiming = null;
             livePhysicsAfterPhysicsWorldMatrices = null;
-            ClearLivePhysicsBodyDiagnostics();
         }
 
         /// <summary>
@@ -332,11 +332,7 @@ namespace Mmd.UnityIntegration
         private void SoftResetLivePhysicsSimulation()
         {
             livePhysicsBackend?.Reset();
-            lastLiveFrame = -1;
-            lastLiveSnapshot = null;
-            lastLivePhysicsDiagnostics = null;
-            LastDetailedApplyTiming = null;
-            ClearLivePhysicsBodyDiagnostics();
+            InvalidateLiveFrameState();
         }
 
         private void PrepareLivePhysicsForRandomAccessEvaluation()
@@ -468,11 +464,9 @@ namespace Mmd.UnityIntegration
 
             EnsureLivePhysicsNativeOutputBuffers();
             MmdRuntimeFfiPlaybackSession playbackSession = fastSession ?? session.NativePlaybackSession;
-            livePhysicsAfterPhysicsWorldMatrices ??= new float[livePhysicsNativeWorldMatrices!.Length];
-            if (livePhysicsAfterPhysicsWorldMatrices.Length != livePhysicsNativeWorldMatrices!.Length)
-            {
-                livePhysicsAfterPhysicsWorldMatrices = new float[livePhysicsNativeWorldMatrices.Length];
-            }
+            livePhysicsAfterPhysicsWorldMatrices = EnsureLivePhysicsBuffer(
+                livePhysicsAfterPhysicsWorldMatrices,
+                livePhysicsNativeWorldMatrices!.Length);
             stageWatch.Restart();
             nativeBackend.StepPlaybackFrame(
                 playbackSession,
@@ -843,17 +837,21 @@ namespace Mmd.UnityIntegration
                 out int worldMatrixCount,
                 out int morphWeightCount,
                 out int ikEnabledCount);
-            if (livePhysicsNativeWorldMatrices == null || livePhysicsNativeWorldMatrices.Length != worldMatrixCount)
-                livePhysicsNativeWorldMatrices = new float[worldMatrixCount];
-            if (livePhysicsNativeMorphWeights == null || livePhysicsNativeMorphWeights.Length != morphWeightCount)
-                livePhysicsNativeMorphWeights = new float[morphWeightCount];
-            if (livePhysicsNativeIkEnabled == null || livePhysicsNativeIkEnabled.Length != ikEnabledCount)
-                livePhysicsNativeIkEnabled = new byte[ikEnabledCount];
+            livePhysicsNativeWorldMatrices = EnsureLivePhysicsBuffer(livePhysicsNativeWorldMatrices, worldMatrixCount);
+            livePhysicsNativeMorphWeights = EnsureLivePhysicsBuffer(livePhysicsNativeMorphWeights, morphWeightCount);
+            livePhysicsNativeIkEnabled = EnsureLivePhysicsBuffer(livePhysicsNativeIkEnabled, ikEnabledCount);
             int rowMajorLength = checked(livePhysicsOrderedBones.Length * 16);
-            if (livePhysicsRowMajorMatrices == null || livePhysicsRowMajorMatrices.Length != rowMajorLength)
-                livePhysicsRowMajorMatrices = new float[rowMajorLength];
-            if (livePhysicsLocalMatrixScratch == null || livePhysicsLocalMatrixScratch.Length != 16)
-                livePhysicsLocalMatrixScratch = new float[16];
+            livePhysicsRowMajorMatrices = EnsureLivePhysicsBuffer(livePhysicsRowMajorMatrices, rowMajorLength);
+            livePhysicsLocalMatrixScratch = EnsureLivePhysicsBuffer(livePhysicsLocalMatrixScratch, 16);
+        }
+
+        /// <summary>
+        /// Returns <paramref name="buffer"/> when it already has <paramref name="length"/> elements;
+        /// otherwise allocates a new zeroed array of that length.
+        /// </summary>
+        private static T[] EnsureLivePhysicsBuffer<T>(T[]? buffer, int length)
+        {
+            return buffer != null && buffer.Length == length ? buffer : new T[length];
         }
 
         private MmdEvaluatedFrame EnsureLivePhysicsFrame()
@@ -1152,12 +1150,9 @@ namespace Mmd.UnityIntegration
                 return false;
             }
 
-            livePhysicsAfterPhysicsWorldMatrices ??= new float[nativeBackend.WorldMatrixFloatCount];
-            if (livePhysicsAfterPhysicsWorldMatrices.Length != nativeBackend.WorldMatrixFloatCount)
-            {
-                livePhysicsAfterPhysicsWorldMatrices = new float[nativeBackend.WorldMatrixFloatCount];
-            }
-
+            livePhysicsAfterPhysicsWorldMatrices = EnsureLivePhysicsBuffer(
+                livePhysicsAfterPhysicsWorldMatrices,
+                nativeBackend.WorldMatrixFloatCount);
             nativeBackend.CopyAfterPhysicsWorldMatrices(livePhysicsAfterPhysicsWorldMatrices);
             return true;
         }
