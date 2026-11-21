@@ -65,7 +65,7 @@ namespace Mmd.Editor
 
             string normalizedPrefabPath = NormalizePrefabPath(prefabPath);
             string outputDirectory = Path.GetDirectoryName(normalizedPrefabPath)?.Replace('\\', '/') ?? "Assets";
-            EnsureAssetDirectory(outputDirectory);
+            MmdAssetPathUtility.EnsureAssetDirectory(outputDirectory);
 
             Scene previousActiveScene = SceneManager.GetActiveScene();
             Scene exportScene = EditorSceneManager.NewPreviewScene();
@@ -263,18 +263,6 @@ namespace Mmd.Editor
                 default:
                     throw new ArgumentException("Prefab path must be an Assets/*.prefab path.", nameof(prefabPath));
             }
-        }
-
-        private static void EnsureAssetDirectory(string assetDirectory)
-        {
-            if (AssetDatabase.IsValidFolder(assetDirectory))
-            {
-                return;
-            }
-
-            string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-            Directory.CreateDirectory(Path.Combine(projectRoot, assetDirectory));
-            AssetDatabase.Refresh();
         }
     }
 

@@ -226,11 +226,9 @@ namespace Mmd.Editor
             try
             {
                 string? directory = Path.GetDirectoryName(normalizedPath)?.Replace('\\', '/');
-                if (!string.IsNullOrWhiteSpace(directory) && !AssetDatabase.IsValidFolder(directory))
+                if (!string.IsNullOrWhiteSpace(directory))
                 {
-                    string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-                    Directory.CreateDirectory(Path.Combine(projectRoot, directory));
-                    AssetDatabase.Refresh();
+                    MmdAssetPathUtility.EnsureAssetDirectory(directory);
                 }
 
                 string uniquePath = AssetDatabase.GenerateUniqueAssetPath(normalizedPath);

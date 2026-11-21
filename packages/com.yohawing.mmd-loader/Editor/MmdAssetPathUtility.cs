@@ -3,6 +3,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using Mmd.IO;
+using UnityEditor;
 using UnityEngine;
 
 namespace Mmd.Editor
@@ -67,6 +68,18 @@ namespace Mmd.Editor
         {
             return "Assets/" + GetSourceStem(pmxSourceId, "PMX") + "_"
                    + GetSourceStem(vmdSourceId, "VMD") + ".anim";
+        }
+
+        internal static void EnsureAssetDirectory(string assetDirectory)
+        {
+            if (AssetDatabase.IsValidFolder(assetDirectory))
+            {
+                return;
+            }
+
+            string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            Directory.CreateDirectory(Path.Combine(projectRoot, assetDirectory));
+            AssetDatabase.Refresh();
         }
 
         internal static string NormalizeIdentifier(string value)

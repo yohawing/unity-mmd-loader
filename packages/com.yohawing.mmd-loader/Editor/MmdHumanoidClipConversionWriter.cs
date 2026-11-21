@@ -42,10 +42,9 @@ namespace Mmd.Editor
             try
             {
                 string? outputDirectory = Path.GetDirectoryName(normalizedOutputPath)?.Replace('\\', '/');
-                if (!string.IsNullOrWhiteSpace(outputDirectory) && !AssetDatabase.IsValidFolder(outputDirectory))
+                if (!string.IsNullOrWhiteSpace(outputDirectory))
                 {
-                    Directory.CreateDirectory(Path.Combine(ProjectRoot, outputDirectory));
-                    AssetDatabase.Refresh();
+                    MmdAssetPathUtility.EnsureAssetDirectory(outputDirectory);
                 }
 
                 string uniqueAssetPath = AssetDatabase.GenerateUniqueAssetPath(normalizedOutputPath);
@@ -1026,8 +1025,6 @@ namespace Mmd.Editor
 
             return true;
         }
-
-        private static string ProjectRoot => Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
     }
 
     public sealed class MmdHumanoidClipConversionWriterResult
