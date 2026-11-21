@@ -7,6 +7,11 @@ scripts/*
 !scripts/unity-process-environment.ps1
 !scripts/run-visual-shading-tier.ps1
 !scripts/VisualShadingTierBootstrap.cs
+!scripts/read-nunit-test-result.ps1
+!scripts/run-local-asset-fixture-gate.ps1
+!scripts/run-mmd-anim-cli-parity-report.ps1
+!scripts/unity-project-guard.ps1
+!scripts/verify-unity-toon-shader-sample.ps1
 packages/com.yohawing.mmd-loader.devtools/
 
 # Tracked minimum visual shading tier. Keep the rest of DevTools local-only.
