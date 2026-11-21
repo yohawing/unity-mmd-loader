@@ -305,7 +305,6 @@ namespace Mmd.UnityIntegration
             fastIkEnabled = null;
             fastMorphFrame = null;
             fastLastAppliedMorphWeights = null;
-            fastLivePhysicsFrame = null;
             fastMorphApplied = false;
             fastMorphCacheValid = false;
             fastSnapshot = null;
@@ -529,44 +528,6 @@ namespace Mmd.UnityIntegration
             }
 
             return new MmdEvaluatedFrame { morphs = morphList };
-        }
-
-        private MmdEvaluatedFrame BuildFastLivePhysicsFrame(int frame, float time)
-        {
-            if (fastLivePhysicsFrame == null)
-            {
-                var bones = new List<MmdEvaluatedBonePose>(model.bones.Count);
-                foreach (MmdBoneDefinition bone in model.bones)
-                {
-                    bones.Add(new MmdEvaluatedBonePose
-                    {
-                        index = bone.index,
-                        name = string.IsNullOrWhiteSpace(bone.name)
-                            ? bone.index.ToString(System.Globalization.CultureInfo.InvariantCulture)
-                            : bone.name,
-                        localPosition = new[] { 0.0f, 0.0f, 0.0f },
-                        localRotation = new[] { 0.0f, 0.0f, 0.0f, 1.0f },
-                        localScale = new[] { 1.0f, 1.0f, 1.0f },
-                        worldMatrix = new[]
-                        {
-                            1.0f, 0.0f, 0.0f, 0.0f,
-                            0.0f, 1.0f, 0.0f, 0.0f,
-                            0.0f, 0.0f, 1.0f, 0.0f,
-                            0.0f, 0.0f, 0.0f, 1.0f
-                        }
-                    });
-                }
-
-                fastLivePhysicsFrame = new MmdEvaluatedFrame
-                {
-                    bones = bones,
-                    morphs = fastMorphFrame!.morphs
-                };
-            }
-
-            fastLivePhysicsFrame.frame = frame;
-            fastLivePhysicsFrame.time = time;
-            return fastLivePhysicsFrame;
         }
 
         private bool HasAnyNonZeroMorphWeight(float[] weights)

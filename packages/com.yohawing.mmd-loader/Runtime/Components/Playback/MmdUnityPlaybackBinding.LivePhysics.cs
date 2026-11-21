@@ -194,6 +194,7 @@ namespace Mmd.UnityIntegration
                     "ApplyLivePhysicsForwardFrame requires Live physics mode. Set the binding physics mode to Live first.");
             }
 
+            ThrowIfNativeHumanoidHostPoseEnabled();
             EnsureBorrowedMutationActive();
             bool isBackwardScrub = lastForwardPlaybackFrame >= 0 && frame < lastForwardPlaybackFrame;
             if (isBackwardScrub)
@@ -210,11 +211,6 @@ namespace Mmd.UnityIntegration
 
             lastForwardPlaybackFrame = frame;
             return ApplyLivePhysicsFrame(frame, frameRate, allowArbitraryStart: true);
-        }
-
-        internal void StepLivePhysicsFromCurrentPose(int sequenceFrame, float deltaTime, bool resetOnFirstStep)
-        {
-            StepLivePhysicsPose(sequenceFrame, deltaTime, resetOnFirstStep);
         }
 
         internal void StepLivePhysicsFromHostPose(
@@ -245,11 +241,11 @@ namespace Mmd.UnityIntegration
             int sequenceFrame,
             float deltaTime,
             bool resetOnFirstStep,
-            float[]? localPositionOffsets = null,
-            float[]? localRotations = null,
-            float[]? localScales = null,
-            float[]? morphWeights = null,
-            byte[]? ikEnabled = null)
+            float[] localPositionOffsets,
+            float[] localRotations,
+            float[] localScales,
+            float[] morphWeights,
+            byte[] ikEnabled)
         {
             MmdPlaybackTime.ValidateFrame(sequenceFrame);
             if (deltaTime < 0.0f || float.IsNaN(deltaTime) || float.IsInfinity(deltaTime))
@@ -284,11 +280,11 @@ namespace Mmd.UnityIntegration
                 applyAnimationFrameMs: 0.0,
                 evaluatedFrame: null,
                 out _,
-                providedLocalPositionOffsets: localPositionOffsets,
-                providedLocalRotations: localRotations,
-                providedLocalScales: localScales,
-                providedMorphWeights: morphWeights,
-                providedIkEnabled: ikEnabled);
+                localPositionOffsets,
+                localRotations,
+                localScales,
+                morphWeights,
+                ikEnabled);
             totalWatch.Stop();
             diagnostics.totalMs = totalWatch.Elapsed.TotalMilliseconds;
             lastLivePhysicsDiagnostics = diagnostics;
@@ -358,6 +354,7 @@ namespace Mmd.UnityIntegration
 
         private MmdPlaybackSnapshot ApplyLivePhysicsFrame(int frame, float frameRate, bool allowArbitraryStart = false)
         {
+            ThrowIfNativeHumanoidHostPoseEnabled();
             if (lastLiveFrame < 0 && frame != 0 && !allowArbitraryStart)
             {
                 throw new InvalidOperationException("Physics Live playback must start from frame 0.");
@@ -373,63 +370,16 @@ namespace Mmd.UnityIntegration
                 return lastLiveSnapshot;
             }
 
-            if (!nativeHumanoidHostPoseEnabled)
-            {
-                return ApplyVmdNativePhysicsFrame(frame, frameRate);
-            }
+            return ApplyVmdNativePhysicsFrame(frame, frameRate);
+        }
 
-            var totalWatch = Stopwatch.StartNew();
-            var stageWatch = Stopwatch.StartNew();
-            IMmdLivePhysicsBackend backend = EnsureLivePhysicsBackend();
-            double ensureBackendMs = stageWatch.Elapsed.TotalMilliseconds;
-            stageWatch.Restart();
-            float time = MmdPlaybackTime.ToTime(frame, frameRate);
-            MmdEvaluatedFrame? evaluatedFrame = null;
-            if (fastSession == null)
+        private void ThrowIfNativeHumanoidHostPoseEnabled()
+        {
+            if (nativeHumanoidHostPoseEnabled)
             {
-                evaluatedFrame = EvaluateLiveAnimationFrame(frame, time);
+                throw new InvalidOperationException(
+                    "Humanoid native host pose binding must be stepped through StepLivePhysicsFromHostPose.");
             }
-
-            double evaluateFrameMs = stageWatch.Elapsed.TotalMilliseconds;
-            stageWatch.Restart();
-            if (fastSession != null)
-            {
-                ApplyFastFrame(frame, frameRate);
-                evaluatedFrame = BuildFastLivePhysicsFrame(frame, time);
-            }
-            else
-            {
-                ApplyLiveAnimationFrame(evaluatedFrame!);
-            }
-
-            double applyAnimationFrameMs = stageWatch.Elapsed.TotalMilliseconds;
-            stageWatch.Restart();
-            bool initializeDynamicBodies = lastLiveFrame < 0;
-            float deltaTime = initializeDynamicBodies ? 0.0f : (frame - lastLiveFrame) / frameRate;
-            MmdLivePhysicsFrameDiagnostics diagnostics = StepLivePhysicsCore(
-                backend,
-                frame,
-                initializeDynamicBodies,
-                deltaTime,
-                totalWatch,
-                ensureBackendMs,
-                evaluateFrameMs,
-                applyAnimationFrameMs,
-                evaluatedFrame,
-                out double refreshSnapshotFrameMs);
-            lastLiveFrame = frame;
-            long snapshotBuildStartTimestamp = Stopwatch.GetTimestamp();
-            lastLiveSnapshot = BuildOrUpdateLiveSnapshot(evaluatedFrame!);
-            long snapshotBuildEndTimestamp = Stopwatch.GetTimestamp();
-            totalWatch.Stop();
-            diagnostics.refreshSnapshotFrameMs = refreshSnapshotFrameMs;
-            diagnostics.snapshotBuildMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(
-                snapshotBuildStartTimestamp,
-                snapshotBuildEndTimestamp);
-            diagnostics.snapshotBuildPresent = true;
-            diagnostics.totalMs = totalWatch.Elapsed.TotalMilliseconds;
-            lastLivePhysicsDiagnostics = diagnostics;
-            return lastLiveSnapshot;
         }
 
         private readonly struct PreparedLivePhysicsFrame
@@ -833,31 +783,6 @@ namespace Mmd.UnityIntegration
                 completedWorkerMs: result.StepPlaybackFrameMs + result.RigidbodyFanOutMs);
         }
 
-        private MmdEvaluatedFrame EvaluateLiveAnimationFrame(int frame, float time)
-        {
-            EnsureLivePhysicsNativeOutputBuffers();
-            session.EvaluateBeforePhysicsFrameInto(
-                frame,
-                time,
-                livePhysicsNativeWorldMatrices!,
-                livePhysicsNativeMorphWeights!,
-                livePhysicsNativeIkEnabled!,
-                (uint)ikMaxIterationsCap);
-            return MmdRuntimeFrameEvaluator.BuildFrameFromNativeInPlace(
-                model,
-                frame,
-                time,
-                livePhysicsNativeWorldMatrices!,
-                livePhysicsNativeMorphWeights!,
-                EnsureLivePhysicsFrame(),
-                livePhysicsRowMajorMatrices!,
-                livePhysicsLocalMatrixScratch!,
-                livePhysicsOrderedBones,
-                livePhysicsMorphEntries!,
-                livePhysicsMorphOrder!,
-                includeMaterials: false);
-        }
-
         private void ApplyLiveAnimationFrame(MmdEvaluatedFrame frame)
         {
             MmdUnityFrameApplier.ValidateSupportedMorphPlayback(playbackInstance);
@@ -961,49 +886,17 @@ namespace Mmd.UnityIntegration
             double applyAnimationFrameMs,
             MmdEvaluatedFrame? evaluatedFrame,
             out double refreshSnapshotFrameMs,
-            float[]? providedLocalPositionOffsets = null,
-            float[]? providedLocalRotations = null,
-            float[]? providedLocalScales = null,
-            float[]? providedMorphWeights = null,
-            byte[]? providedIkEnabled = null)
+            float[] localPositionOffsets,
+            float[] localRotations,
+            float[] localScales,
+            float[] morphWeights,
+            byte[] ikEnabled)
         {
             livePhysicsReadbackTransformCount = 0;
             livePhysicsReadbackShapeTypeCount = 0;
             long bridgeStartTimestamp = Stopwatch.GetTimestamp();
             var stageWatch = Stopwatch.StartNew();
             long hostPoseCaptureStartTimestamp = Stopwatch.GetTimestamp();
-            float[] localPositionOffsets;
-            float[] localRotations;
-            float[] localScales;
-            float[] morphWeights;
-            byte[] ikEnabled;
-            bool hasProvidedHostPose = providedLocalPositionOffsets != null ||
-                providedLocalRotations != null || providedLocalScales != null ||
-                providedMorphWeights != null || providedIkEnabled != null;
-            if (hasProvidedHostPose)
-            {
-                if (providedLocalPositionOffsets == null || providedLocalRotations == null ||
-                    providedLocalScales == null || providedMorphWeights == null ||
-                    providedIkEnabled == null)
-                {
-                    throw new ArgumentException("A complete native HostRig pose array set is required.");
-                }
-
-                localPositionOffsets = providedLocalPositionOffsets;
-                localRotations = providedLocalRotations;
-                localScales = providedLocalScales;
-                morphWeights = providedMorphWeights;
-                ikEnabled = providedIkEnabled;
-            }
-            else
-            {
-                CaptureHostPoseFromUnityTransforms(
-                    out localPositionOffsets,
-                    out localRotations,
-                    out localScales,
-                    out morphWeights,
-                    out ikEnabled);
-            }
             long hostPoseCaptureEndTimestamp = Stopwatch.GetTimestamp();
             long pinnedDiagnosticsStartTimestamp = Stopwatch.GetTimestamp();
             MmdLivePhysicsPinnedBodyDiagnostics pinnedBodyDiagnostics =
@@ -1281,123 +1174,6 @@ namespace Mmd.UnityIntegration
                 playbackInstance,
                 worldMatrices,
                 fastAfterPhysicsBoneIndices);
-        }
-
-        private void CaptureHostPoseFromUnityTransforms(
-            out float[] localPositionOffsets,
-            out float[] localRotations,
-            out float[] localScales,
-            out float[] morphWeights,
-            out byte[] ikEnabled)
-        {
-            int boneCount = model.bones.Count;
-            localPositionOffsets = EnsureLivePhysicsBuffer(
-                ref livePhysicsLocalPositionOffsets,
-                checked(boneCount * 3));
-            localRotations = EnsureLivePhysicsBuffer(
-                ref livePhysicsLocalRotations,
-                checked(boneCount * 4));
-            localScales = EnsureLivePhysicsBuffer(
-                ref livePhysicsLocalScales,
-                checked(boneCount * 3));
-            Array.Clear(localPositionOffsets, 0, localPositionOffsets.Length);
-            Array.Clear(localRotations, 0, localRotations.Length);
-            Array.Clear(localScales, 0, localScales.Length);
-            for (int i = 0; i < boneCount; i++)
-            {
-                localRotations[i * 4 + 3] = 1.0f;
-                localScales[i * 3] = 1.0f;
-                localScales[i * 3 + 1] = 1.0f;
-                localScales[i * 3 + 2] = 1.0f;
-            }
-
-            float importScale = NormalizeImportScale(playbackInstance.ImportScale);
-            for (int i = 0; i < model.bones.Count; i++)
-            {
-                MmdBoneDefinition bone = model.bones[i];
-                int index = bone.index;
-                if (index < 0 || index >= playbackInstance.BoneTransforms.Length || index >= boneCount)
-                {
-                    continue;
-                }
-
-                Transform boneTransform = playbackInstance.BoneTransforms[index];
-                Vector3 localDelta = boneTransform.localPosition - playbackInstance.BindLocalPositions[index];
-                Quaternion localRotation = Quaternion.Inverse(playbackInstance.BindLocalRotations[index]) *
-                    boneTransform.localRotation;
-                Vector3 modelPosition = ToMmdModelPosition(localDelta, importScale);
-                Quaternion modelRotation = ToMmdModelRotation(localRotation);
-                int positionOffset = index * 3;
-                localPositionOffsets[positionOffset] = modelPosition.x;
-                localPositionOffsets[positionOffset + 1] = modelPosition.y;
-                localPositionOffsets[positionOffset + 2] = modelPosition.z;
-                int rotationOffset = index * 4;
-                localRotations[rotationOffset] = modelRotation.x;
-                localRotations[rotationOffset + 1] = modelRotation.y;
-                localRotations[rotationOffset + 2] = modelRotation.z;
-                localRotations[rotationOffset + 3] = modelRotation.w;
-                int scaleOffset = index * 3;
-                Vector3 scale = boneTransform.localScale;
-                localScales[scaleOffset] = scale.x;
-                localScales[scaleOffset + 1] = scale.y;
-                localScales[scaleOffset + 2] = scale.z;
-            }
-
-            morphWeights = EnsureLivePhysicsBuffer(
-                ref livePhysicsMorphWeights,
-                model.morphs.Count);
-            Array.Clear(morphWeights, 0, morphWeights.Length);
-            SkinnedMeshRenderer? renderer = playbackInstance.SkinnedMeshRenderer;
-            if (renderer != null)
-            {
-                for (int i = 0; i < model.morphs.Count; i++)
-                {
-                    MmdMorphDefinition morph = model.morphs[i];
-                    if (morph.index < 0 || morph.index >= morphWeights.Length ||
-                        !playbackInstance.BlendShapeIndexMap.TryGetValue(morph.name, out int blendShapeIndex))
-                    {
-                        continue;
-                    }
-
-                    morphWeights[morph.index] = renderer.GetBlendShapeWeight(blendShapeIndex) / 100.0f;
-                }
-            }
-
-            // Humanoid Live supplies the retargeted pre-append pose to the native runtime, so native
-            // IK remains enabled. Ordinary VMD Live keeps the legacy managed-pose contract and
-            // disables native IK to avoid a second solve.
-            ikEnabled = EnsureLivePhysicsBuffer(ref livePhysicsIkEnabled, model.ik.Count);
-            if (nativeHumanoidHostPoseEnabled)
-            {
-                for (int i = 0; i < ikEnabled.Length; i++)
-                {
-                    ikEnabled[i] = 1;
-                }
-            }
-            else
-            {
-                Array.Clear(ikEnabled, 0, ikEnabled.Length);
-            }
-        }
-
-        private static float[] EnsureLivePhysicsBuffer(ref float[]? buffer, int length)
-        {
-            if (buffer == null || buffer.Length != length)
-            {
-                buffer = new float[length];
-            }
-
-            return buffer;
-        }
-
-        private static byte[] EnsureLivePhysicsBuffer(ref byte[]? buffer, int length)
-        {
-            if (buffer == null || buffer.Length != length)
-            {
-                buffer = new byte[length];
-            }
-
-            return buffer;
         }
 
         private MmdLivePhysicsPinnedBodyDiagnostics BuildHostPosePinnedBodyDiagnostics(bool resetSeed)

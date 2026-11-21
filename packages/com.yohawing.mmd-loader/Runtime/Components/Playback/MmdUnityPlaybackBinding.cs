@@ -45,18 +45,12 @@ namespace Mmd.UnityIntegration
         private byte[]? fastIkEnabled;
         private MmdEvaluatedFrame? fastMorphFrame;
         private float[]? fastLastAppliedMorphWeights;
-        private MmdEvaluatedFrame? fastLivePhysicsFrame;
         private bool fastMorphApplied;
         private bool fastMorphCacheValid;
         private MmdPlaybackSnapshot? fastSnapshot;
         private readonly int[] fastPoseBoneIndices;
         private readonly int[] fastMorphIndices;
         private readonly int[] fastAfterPhysicsBoneIndices;
-        private float[]? livePhysicsLocalPositionOffsets;
-        private float[]? livePhysicsLocalRotations;
-        private float[]? livePhysicsLocalScales;
-        private float[]? livePhysicsMorphWeights;
-        private byte[]? livePhysicsIkEnabled;
         private float[]? livePhysicsNativeWorldMatrices;
         private float[]? livePhysicsNativeMorphWeights;
         private byte[]? livePhysicsNativeIkEnabled;
@@ -155,12 +149,6 @@ namespace Mmd.UnityIntegration
         internal int FastRuntimeMorphCount => fastMorphIndices.Length;
 
         internal int FastRuntimeAfterPhysicsBoneCount => fastAfterPhysicsBoneIndices.Length;
-
-        internal MmdEvaluatedFrame? FastLivePhysicsFrameForTests => fastLivePhysicsFrame;
-
-        internal MmdEvaluatedFrame? LivePhysicsFrameForTests => livePhysicsFrame;
-
-        internal float[]? LivePhysicsNativeWorldMatricesForTests => livePhysicsNativeWorldMatrices;
 
         public int MotionMaxFrame => session.MotionMaxFrame;
 
