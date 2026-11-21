@@ -39,14 +39,22 @@ namespace Mmd.Tests
             string assemblyName = assembly.GetName().Name;
             List<string> actual = PublicApiSnapshot.Build(assembly);
             Assert.That(actual, Is.Not.Empty, assemblyName + " exposes no public API; the snapshot would be meaningless.");
+            AssertLinesMatchBaseline("Public API of " + assemblyName, actual, baselinePath, assemblyName + ".api.txt");
+        }
 
-            string? candidatePath = null;
-            if (string.Equals(Environment.GetEnvironmentVariable(GenerateBaselineVariable), "1", StringComparison.Ordinal))
-            {
-                Directory.CreateDirectory(CandidateRoot);
-                candidatePath = Path.Combine(CandidateRoot, assemblyName + ".api.txt");
-                File.WriteAllText(candidatePath, string.Concat(actual.Select(line => line + "\n")), new UTF8Encoding(false));
-            }
+        /// <summary>
+        /// Compares an already built, Ordinal-sorted and unique snapshot with a
+        /// committed baseline. <paramref name="label"/> names the snapshot in
+        /// failure messages; <paramref name="candidateFileName"/> is the file
+        /// written under <see cref="CandidateRoot"/> when candidates are requested.
+        /// </summary>
+        internal static void AssertLinesMatchBaseline(
+            string label,
+            IReadOnlyList<string> actual,
+            string baselinePath,
+            string candidateFileName)
+        {
+            string? candidatePath = WriteCandidateIfRequested(candidateFileName, actual);
 
             string candidateHint = candidatePath != null
                 ? "Candidate written to: " + candidatePath + ". Review it and copy it to " + baselinePath + " by hand."
@@ -54,7 +62,7 @@ namespace Mmd.Tests
 
             if (!File.Exists(baselinePath))
             {
-                Assert.Fail("Public API baseline is missing: " + baselinePath + "\n" + candidateHint);
+                Assert.Fail(label + " baseline is missing: " + baselinePath + "\n" + candidateHint);
             }
 
             List<string> expected = ReadBaseline(baselinePath);
@@ -63,7 +71,24 @@ namespace Mmd.Tests
                 return;
             }
 
-            Assert.Fail(DescribeDifference(assemblyName, baselinePath, expected, actual) + "\n" + candidateHint);
+            Assert.Fail(DescribeDifference(label, baselinePath, expected, actual) + "\n" + candidateHint);
+        }
+
+        /// <summary>
+        /// Writes <paramref name="lines"/> under <see cref="CandidateRoot"/> only when
+        /// <c>YMU_GENERATE_API_BASELINE=1</c>; returns the written path or null.
+        /// </summary>
+        internal static string? WriteCandidateIfRequested(string candidateFileName, IEnumerable<string> lines)
+        {
+            if (!string.Equals(Environment.GetEnvironmentVariable(GenerateBaselineVariable), "1", StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            Directory.CreateDirectory(CandidateRoot);
+            string candidatePath = Path.Combine(CandidateRoot, candidateFileName);
+            File.WriteAllText(candidatePath, string.Concat(lines.Select(line => line + "\n")), new UTF8Encoding(false));
+            return candidatePath;
         }
 
         private static List<string> ReadBaseline(string path)
@@ -77,7 +102,7 @@ namespace Mmd.Tests
         }
 
         private static string DescribeDifference(
-            string assemblyName,
+            string label,
             string baselinePath,
             IReadOnlyList<string> expected,
             IReadOnlyList<string> actual)
@@ -88,7 +113,7 @@ namespace Mmd.Tests
             List<string> removed = expected.Where(line => !actualSet.Contains(line)).Distinct(StringComparer.Ordinal).ToList();
 
             var message = new StringBuilder();
-            message.Append("Public API of ").Append(assemblyName).Append(" differs from ").Append(baselinePath).Append('\n');
+            message.Append(label).Append(" differs from ").Append(baselinePath).Append('\n');
             message.Append("Added: ").Append(added.Count).Append(", removed: ").Append(removed.Count).Append('\n');
             AppendLines(message, "+ ", added);
             AppendLines(message, "- ", removed);
@@ -159,7 +184,7 @@ namespace Mmd.Tests
             return lines.Distinct(StringComparer.Ordinal).ToList();
         }
 
-        private static IEnumerable<Type> LoadTypes(Assembly assembly)
+        internal static IEnumerable<Type> LoadTypes(Assembly assembly)
         {
             try
             {
@@ -581,7 +606,7 @@ namespace Mmd.Tests
             return tick >= 0 ? name.Substring(0, tick) : name;
         }
 
-        private static string TypeDefinitionName(Type type)
+        internal static string TypeDefinitionName(Type type)
         {
             string prefix = type.IsNested
                 ? TypeDefinitionName(type.DeclaringType!) + "."

@@ -1,0 +1,2 @@
+[Mmd.Cinemachine] Mmd.UnityIntegration.Cinemachine.MmdCinemachineCameraBinding :: (type) UnityEngine.Object base=Mmd.UnityIntegration.MmdSceneEnvironmentBinding
+[Mmd.Cinemachine] Mmd.UnityIntegration.Cinemachine.MmdCinemachineCameraBinding :: targetCinemachineCamera : Unity.Cinemachine.CinemachineCamera
