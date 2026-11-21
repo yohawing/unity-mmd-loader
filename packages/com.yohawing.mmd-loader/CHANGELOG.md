@@ -27,6 +27,11 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
   - `Mmd.UnityIntegration.MmdSceneEnvironmentBinding`: `ApplyLightState`, `ApplySelfShadowState`, `EnsureSelfShadowDefaultState`, `TryEvaluateSelfShadowAtFrame`.
   - `Mmd.UnityIntegration.MmdSelfShadowTarget`: `RefreshReceiverGate`, `DisableAllReceiverGates`.
   - `Mmd.UnityIntegration.MmdUnityPlaybackController`: `ApplyHumanoidRetargetNow`, `ConfigureFromPlaybackSourceIfAvailable`, `ConfigureFromRuntimeImporterPaths`, `ConfigureHumanoidRetarget`, `StartPlaybackIfRequested`.
+- Removed obsolete APIs.
+  - `Mmd.UnityIntegration.MmdSceneEnvironmentBinding`: `ApplySelfShadowToLight` (use `SelfShadowEnabled`), and `SelfShadowDistanceScale`, `SelfShadowMinDistance`, `SelfShadowMaxDistance`, `SelfShadowStrength`, `SelfShadowLightMode`, which had no effect (self-shadow no longer drives a Unity Light; the distance comes from VMD self-shadow keys). The serialized `selfShadowEnabled` field is unchanged.
+  - `Mmd.UnityIntegration.MmdSceneSelfShadowApplyStatus`: `Applied` (use `Recorded`), `NoTargetLight`, and `UnsupportedLightType`. Self-shadow recording never returned the last two; check `Recorded` or `Disabled` instead.
+  - `Mmd.Editor.MmdHumanoidSetupAssetBuilder`, including `GetDefaultSetupAssetPath` and `CreateHumanoidSetupAsset`. Reimport the PMX with Animation Type = Humanoid instead.
+  - `MmdHumanoidSetupAsset.Initialize`. Reimport the PMX with Animation Type = Humanoid and use the imported Avatar and retarget mapping. Existing `MmdHumanoidSetupAsset` files still load, and the obsolete `MmdHumanoidSetupPreset` enum stays because it is the type of their serialized `setupPreset` field.
 
 ## [0.5.1] - 2026-10-23
 

@@ -141,7 +141,6 @@ Mmd.MmdHumanoidSetupAsset :: const public string NoNativePlaybackImpact = "None"
 Mmd.MmdHumanoidSetupAsset :: const public string NotEvaluatedReadiness = "NotEvaluated"
 Mmd.MmdHumanoidSetupAsset :: const public string ReadyReadiness = "Ready"
 Mmd.MmdHumanoidSetupAsset :: ctor public .ctor()
-Mmd.MmdHumanoidSetupAsset :: method public [Obsolete] void Initialize(Mmd.MmdPmxAsset sourceAsset, Mmd.MmdHumanoidSetupPreset preset = 0)
 Mmd.MmdHumanoidSetupAsset :: property Mmd.MmdHumanoidSetupPreset SetupPreset { public get; }
 Mmd.MmdHumanoidSetupAsset :: property Mmd.MmdPmxAsset PmxAsset { public get; }
 Mmd.MmdHumanoidSetupAsset :: property System.Collections.Generic.IReadOnlyList<Mmd.MmdSerializableBoneMappingEntry> MappingEntries { public get; }
@@ -1298,12 +1297,6 @@ Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: property Mmd.UnityIntegration
 Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: property UnityEngine.Camera TargetCamera { public get; public set; }
 Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: property UnityEngine.Light SelfShadowDirectionLight { public get; public set; }
 Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: property UnityEngine.Light TargetLight { public get; public set; }
-Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: property [Obsolete] UnityEngine.LightShadows SelfShadowLightMode { public get; public set; }
-Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: property [Obsolete] bool ApplySelfShadowToLight { public get; public set; }
-Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: property [Obsolete] float SelfShadowDistanceScale { public get; public set; }
-Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: property [Obsolete] float SelfShadowMaxDistance { public get; public set; }
-Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: property [Obsolete] float SelfShadowMinDistance { public get; public set; }
-Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: property [Obsolete] float SelfShadowStrength { public get; public set; }
 Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: property bool SelfShadowEnabled { public get; public set; }
 Mmd.UnityIntegration.MmdSceneLightApplyStatus :: (type) public enum MmdSceneLightApplyStatus : int
 Mmd.UnityIntegration.MmdSceneLightApplyStatus :: enum Applied = 1
@@ -1311,12 +1304,9 @@ Mmd.UnityIntegration.MmdSceneLightApplyStatus :: enum AppliedNonDirectional = 3
 Mmd.UnityIntegration.MmdSceneLightApplyStatus :: enum NoTargetLight = 2
 Mmd.UnityIntegration.MmdSceneLightApplyStatus :: enum NotApplied = 0
 Mmd.UnityIntegration.MmdSceneSelfShadowApplyStatus :: (type) public enum MmdSceneSelfShadowApplyStatus : int
-Mmd.UnityIntegration.MmdSceneSelfShadowApplyStatus :: enum Applied = 2
 Mmd.UnityIntegration.MmdSceneSelfShadowApplyStatus :: enum Disabled = 1
-Mmd.UnityIntegration.MmdSceneSelfShadowApplyStatus :: enum NoTargetLight = 3
 Mmd.UnityIntegration.MmdSceneSelfShadowApplyStatus :: enum NotApplied = 0
 Mmd.UnityIntegration.MmdSceneSelfShadowApplyStatus :: enum Recorded = 2
-Mmd.UnityIntegration.MmdSceneSelfShadowApplyStatus :: enum UnsupportedLightType = 4
 Mmd.UnityIntegration.MmdSceneSelfShadowDiagnosticStatus :: (type) public enum MmdSceneSelfShadowDiagnosticStatus : int
 Mmd.UnityIntegration.MmdSceneSelfShadowDiagnosticStatus :: enum Active = 1
 Mmd.UnityIntegration.MmdSceneSelfShadowDiagnosticStatus :: enum AmbiguousEnvironment = 6

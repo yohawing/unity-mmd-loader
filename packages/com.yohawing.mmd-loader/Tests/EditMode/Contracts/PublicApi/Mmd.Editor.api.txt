@@ -83,9 +83,6 @@ Mmd.Editor.MmdHumanoidClipConversionWriterResult :: property System.Collections.
 Mmd.Editor.MmdHumanoidClipConversionWriterResult :: property UnityEngine.AnimationClip Clip { public get; }
 Mmd.Editor.MmdHumanoidClipConversionWriterResult :: property bool CanCreateClipNow { public get; }
 Mmd.Editor.MmdHumanoidClipConversionWriterResult :: property bool PrerequisitesReady { public get; }
-Mmd.Editor.MmdHumanoidSetupAssetBuilder :: (type) public [Obsolete] static class MmdHumanoidSetupAssetBuilder
-Mmd.Editor.MmdHumanoidSetupAssetBuilder :: method public [Obsolete] static Mmd.MmdHumanoidSetupAsset CreateHumanoidSetupAsset(Mmd.MmdPmxAsset pmxAsset, string assetPath, Mmd.MmdHumanoidSetupPreset preset = 0)
-Mmd.Editor.MmdHumanoidSetupAssetBuilder :: method public static string GetDefaultSetupAssetPath(Mmd.MmdPmxAsset pmxAsset)
 Mmd.Editor.MmdMmeNormalMapTexturePostprocessor :: (type) public sealed class MmdMmeNormalMapTexturePostprocessor : UnityEditor.AssetPostprocessor
 Mmd.Editor.MmdMmeNormalMapTexturePostprocessor :: ctor public .ctor()
 Mmd.Editor.MmdMmeNormalMapTexturePostprocessor :: method public void OnPreprocessTexture()

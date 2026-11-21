@@ -143,7 +143,6 @@ a8f593669b858de498b9f27c5d31fac0 | Mmd.Motion.MmdLightState
 a98626ad22b487444a8b953f1633ef5b | Mmd.Mme.MmeFxScanner
 ab477ed96fedca44c8638d669f91075e | Mmd.Editor.MmdGenericAnimationClipBakeWindow
 ad1850449d5a4284d9842ffe972699ca | Mmd.Editor.MmdPmxScriptedImporterEditor
-af1750c5181eecf48adabeae0940b657 | Mmd.Editor.MmdHumanoidSetupAssetBuilder
 b2d3bf66695846c4a50933ca0b14c1c6 | Mmd.UnityIntegration.MmdShaderBindingDiagnostics
 b360601f0bcb4d85af9da5b2760a420d | Mmd.Editor.MmdHumanoidClipConversionPlanner
 b42a5d6c87f641fc9b38e1ed6f5f1789 | Mmd.MmdHumanoidAppendTransformApplier

@@ -14,7 +14,6 @@ Mmd.Editor	Mmd.Editor.MmdHumanoidClipConversionPlan	advanced	API-02 決定: adva
 Mmd.Editor	Mmd.Editor.MmdHumanoidClipConversionPlanner	advanced	API-02 決定: advanced 維持 (Humanoid clip 変換)
 Mmd.Editor	Mmd.Editor.MmdHumanoidClipConversionWriter	advanced	API-02 決定: advanced 維持 (Humanoid clip 変換)
 Mmd.Editor	Mmd.Editor.MmdHumanoidClipConversionWriterResult	advanced	API-02 決定: advanced 維持 (Humanoid clip 変換)
-Mmd.Editor	Mmd.Editor.MmdHumanoidSetupAssetBuilder	obsolete	[Obsolete] 宣言。MonoScript binding 維持のため残す
 Mmd.Editor	Mmd.Editor.MmdMmeNormalMapTexturePostprocessor	unity-entry	Unity が型を探して使う (base AssetPostprocessor)
 Mmd.Editor	Mmd.Editor.MmdPlaybackMaterialReimportPostprocessor	unity-entry	Unity が型を探して使う (base AssetPostprocessor)
 Mmd.Editor	Mmd.Editor.MmdPmxAnimationType	stable	plans/002 stable list
@@ -57,7 +56,7 @@ Mmd.Runtime	Mmd.MmdHumanoidRetargetBinding	stable	MmdUnityPlaybackController の
 Mmd.Runtime	Mmd.MmdHumanoidRetargetQualitySettings	stable	MmdPmxScriptedImporter の public signature から到達
 Mmd.Runtime	Mmd.MmdHumanoidRetargeterResult	stable	MmdUnityPlaybackController の public signature から到達
 Mmd.Runtime	Mmd.MmdHumanoidSetupAsset	obsolete	[Obsolete] 宣言。MonoScript binding 維持のため残す
-Mmd.Runtime	Mmd.MmdHumanoidSetupPreset	obsolete	[Obsolete] 宣言。MonoScript binding 維持のため残す
+Mmd.Runtime	Mmd.MmdHumanoidSetupPreset	obsolete	[Obsolete] 宣言。MmdHumanoidSetupAsset.setupPreset の serialized field 型なので既存 asset 読み込みのため残す
 Mmd.Runtime	Mmd.MmdImportReadiness	stable	MmdPmxAsset の public signature から到達
 Mmd.Runtime	Mmd.MmdMaterialOverrideAsset	stable	CreateAssetMenu/AddComponentMenu で利用者が作成
 Mmd.Runtime	Mmd.MmdMaterialOverrideEntry	stable	MmdMaterialOverrideAsset の public signature から到達

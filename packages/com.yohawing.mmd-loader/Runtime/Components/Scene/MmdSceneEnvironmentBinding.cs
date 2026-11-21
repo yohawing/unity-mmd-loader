@@ -71,19 +71,7 @@ namespace Mmd.UnityIntegration
         Disabled = 1,
 
         /// <summary>The sampled self-shadow state was recorded on the binding.</summary>
-        Recorded = 2,
-
-        /// <summary>Compatibility alias. Self-shadow is now recorded as scene state and does not mutate Light.</summary>
-        [Obsolete("Use Recorded. Self-shadow is now scene/render state and no longer mutates Light.", false)]
-        Applied = Recorded,
-
-        /// <summary>Compatibility value. Missing Light is no longer relevant to self-shadow state recording.</summary>
-        [Obsolete("Self-shadow no longer targets Light; use SelfShadowEnabled and Recorded/Disabled status.", false)]
-        NoTargetLight = 3,
-
-        /// <summary>Compatibility value. Light type is no longer relevant to self-shadow state recording.</summary>
-        [Obsolete("Self-shadow no longer targets Light; use SelfShadowEnabled and Recorded/Disabled status.", false)]
-        UnsupportedLightType = 4
+        Recorded = 2
     }
 
     /// <summary>
@@ -192,48 +180,6 @@ namespace Mmd.UnityIntegration
                     ApplyDefaultSelfShadowState();
                 }
             }
-        }
-
-        [Obsolete("Use SelfShadowEnabled. Self-shadow no longer drives Unity Light shadows.", false)]
-        public bool ApplySelfShadowToLight
-        {
-            get => selfShadowEnabled;
-            set => selfShadowEnabled = value;
-        }
-
-        [Obsolete("Self-shadow distance is now recorded from VMD state; Light shadow-distance mapping is not applied.", false)]
-        public float SelfShadowDistanceScale
-        {
-            get => 100.0f;
-            set { }
-        }
-
-        [Obsolete("Self-shadow distance is now recorded from VMD state; Light shadow-distance mapping is not applied.", false)]
-        public float SelfShadowMinDistance
-        {
-            get => 1.0f;
-            set { }
-        }
-
-        [Obsolete("Self-shadow distance is now recorded from VMD state; Light shadow-distance mapping is not applied.", false)]
-        public float SelfShadowMaxDistance
-        {
-            get => 100.0f;
-            set { }
-        }
-
-        [Obsolete("Self-shadow no longer drives Unity Light shadowStrength.", false)]
-        public float SelfShadowStrength
-        {
-            get => 1.0f;
-            set { }
-        }
-
-        [Obsolete("Self-shadow no longer drives Unity Light.shadows.", false)]
-        public LightShadows SelfShadowLightMode
-        {
-            get => LightShadows.Soft;
-            set { }
         }
 
         /// <summary>The status of the most recent <see cref="ApplyCameraState"/> call.</summary>

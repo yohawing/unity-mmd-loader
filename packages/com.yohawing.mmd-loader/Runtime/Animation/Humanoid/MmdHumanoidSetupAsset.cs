@@ -8,7 +8,8 @@ using UnityEngine;
 
 namespace Mmd
 {
-    [Obsolete("MmdHumanoidSetupPreset is retained only for source compatibility. Configure Humanoid mapping on the PMX importer instead.")]
+    // Retained as the serialized field type of legacy MmdHumanoidSetupAsset files (setupPreset).
+    [Obsolete("MmdHumanoidSetupPreset is retained only to read existing MmdHumanoidSetupAsset files. Configure Humanoid mapping on the PMX importer instead.")]
     public enum MmdHumanoidSetupPreset
     {
         MmdSemiStandard = 0,
@@ -64,106 +65,5 @@ namespace Mmd
         public IReadOnlyList<string> MappingDiagnostics => mappingDiagnostics;
         public string NativePlaybackImpact => nativePlaybackImpact;
         public IReadOnlyList<MmdSerializableBoneMappingEntry> MappingEntries => Array.AsReadOnly(mappingEntries);
-
-        [Obsolete("Reimport the PMX with Animation Type set to Humanoid instead. This method only supports legacy integrations.")]
-        public void Initialize(
-            MmdPmxAsset sourceAsset,
-            MmdHumanoidSetupPreset preset = MmdHumanoidSetupPreset.MmdSemiStandard)
-        {
-            if (sourceAsset == null)
-            {
-                throw new ArgumentNullException(nameof(sourceAsset));
-            }
-
-            pmxAsset = sourceAsset;
-            setupPreset = preset;
-            mappingInputSource = NoMappingInputSource;
-            pmxBoneCount = Math.Max(0, sourceAsset.BoneCount);
-            nativePlaybackImpact = NoNativePlaybackImpact;
-
-            try
-            {
-                GameObject? importedRoot = sourceAsset.ImportedRoot;
-                if (importedRoot == null)
-                {
-                    ApplyHierarchyNotReadyReport("hierarchy-not-ready: ImportedRoot is null. Reimport the .pmx asset.");
-                    return;
-                }
-
-                SkinnedMeshRenderer? renderer = importedRoot.GetComponentInChildren<SkinnedMeshRenderer>(
-                    includeInactive: true);
-                if (sourceAsset.BoneCount > 0)
-                {
-                    if (renderer == null || renderer.bones == null || renderer.bones.Length != sourceAsset.BoneCount)
-                    {
-                        ApplyHierarchyNotReadyReport(
-                            "hierarchy-not-ready: Imported SkinnedMeshRenderer bones do not match PMX BoneCount.");
-                        return;
-                    }
-
-                    var boneNames = new string[renderer.bones.Length];
-                    for (int i = 0; i < renderer.bones.Length; i++)
-                    {
-                        if (renderer.bones[i] == null)
-                        {
-                            ApplyHierarchyNotReadyReport(
-                                "hierarchy-not-ready: SkinnedMeshRenderer.bones contains null entry.");
-                            return;
-                        }
-
-                        boneNames[i] = renderer.bones[i].name;
-                    }
-
-                    pmxBoneCount = boneNames.Length;
-                    mappingInputSource = ImportedHierarchyInputSource;
-                    ApplyMappingReport(MmdHumanoidBoneMappingEvaluator.EvaluateBoneNames(boneNames));
-                    return;
-                }
-
-                mappingInputSource = ImportedHierarchyInputSource;
-                pmxBoneCount = 0;
-                ApplyMappingReport(MmdHumanoidBoneMappingEvaluator.EvaluateBoneNames(Array.Empty<string>()));
-            }
-            catch (Exception ex)
-            {
-                mappingReadiness = EvaluationFailedReadiness;
-                requiredMappedBoneCount = 0;
-                optionalMappedBoneCount = 0;
-                missingRequiredBoneCount = 0;
-                ambiguousMappingCount = 0;
-                ignoredHelperBoneCount = 0;
-                mappingInputSource = NoMappingInputSource;
-                mappingDiagnostics = new[] { "evaluation-failed: " + ex.GetType().Name + ": " + ex.Message };
-                mappingEntries = Array.Empty<MmdSerializableBoneMappingEntry>();
-            }
-        }
-
-        private void ApplyHierarchyNotReadyReport(string diagnostic)
-        {
-            mappingReadiness = HierarchyNotReadyReadiness;
-            pmxBoneCount = 0;
-            requiredMappedBoneCount = 0;
-            optionalMappedBoneCount = 0;
-            missingRequiredBoneCount = 0;
-            ambiguousMappingCount = 0;
-            ignoredHelperBoneCount = 0;
-            mappingInputSource = NoMappingInputSource;
-            mappingDiagnostics = new[] { diagnostic };
-            mappingEntries = Array.Empty<MmdSerializableBoneMappingEntry>();
-        }
-
-        private void ApplyMappingReport(MmdHumanoidBoneMappingReport report)
-        {
-            mappingReadiness = report.Readiness;
-            requiredMappedBoneCount = report.RequiredMappedBoneCount;
-            optionalMappedBoneCount = report.OptionalMappedBoneCount;
-            missingRequiredBoneCount = report.MissingRequiredBoneCount;
-            ambiguousMappingCount = report.AmbiguousMappingCount;
-            ignoredHelperBoneCount = report.IgnoredHelperBoneCount;
-            mappingDiagnostics = report.Diagnostics;
-            mappingEntries = report.MappingEntries != null
-                ? (MmdSerializableBoneMappingEntry[])report.MappingEntries.Clone()
-                : Array.Empty<MmdSerializableBoneMappingEntry>();
-        }
     }
 }

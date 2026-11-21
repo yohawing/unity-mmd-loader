@@ -2,12 +2,10 @@
 
 #pragma warning disable CS0618
 
-using System;
 using System.IO;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
-using Mmd.Editor;
 
 namespace Mmd.Tests
 {
@@ -83,65 +81,6 @@ namespace Mmd.Tests
                 AssetDatabase.DeleteAsset(AssetPath);
                 if (File.Exists(absolutePath)) File.Delete(absolutePath);
                 if (File.Exists(absolutePath + ".meta")) File.Delete(absolutePath + ".meta");
-            }
-        }
-
-        [Test]
-        public void LegacyInitializeRejectsNullSource()
-        {
-            var asset = ScriptableObject.CreateInstance<MmdHumanoidSetupAsset>();
-            try
-            {
-                Assert.Throws<ArgumentNullException>(() => asset.Initialize(null!));
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(asset);
-            }
-        }
-
-        [Test]
-        public void LegacyBuilderKeepsDefaultPathHelper()
-        {
-            var pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
-            try
-            {
-                Assert.That(
-                    MmdHumanoidSetupAssetBuilder.GetDefaultSetupAssetPath(pmxAsset),
-                    Is.EqualTo("Assets/MmdHumanoidSetup.asset"));
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(pmxAsset);
-            }
-        }
-
-        [Test]
-        public void LegacyBuilderRejectsCreationBeforeValidatingInputs()
-        {
-            NotSupportedException? exception = Assert.Throws<NotSupportedException>(() =>
-                MmdHumanoidSetupAssetBuilder.CreateHumanoidSetupAsset(null!, string.Empty));
-
-            Assert.That(exception!.Message, Does.Contain("Animation Type = Humanoid"));
-        }
-
-        [Test]
-        public void LegacyBuilderNeverCreatesNewSetupAsset()
-        {
-            var pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
-            try
-            {
-                NotSupportedException? exception = Assert.Throws<NotSupportedException>(() =>
-                    MmdHumanoidSetupAssetBuilder.CreateHumanoidSetupAsset(
-                        pmxAsset,
-                        "Assets/MmdHumanoidSetup.asset",
-                        MmdHumanoidSetupPreset.MmdStandard));
-
-                Assert.That(exception!.Message, Does.Contain("Animation Type = Humanoid"));
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(pmxAsset);
             }
         }
     }
