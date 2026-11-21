@@ -79,6 +79,23 @@ namespace Mmd.Parser
             {
                 errors.Add("model ik must not be null");
             }
+
+            if (model.physics == null)
+            {
+                errors.Add("model physics must not be null");
+            }
+            else
+            {
+                if (model.physics.rigidbodies == null)
+                {
+                    errors.Add("model physics rigidbodies must not be null");
+                }
+
+                if (model.physics.joints == null)
+                {
+                    errors.Add("model physics joints must not be null");
+                }
+            }
         }
 
         private static HashSet<int> ValidateVertices(List<string> errors, IReadOnlyList<MmdVertexDefinition> vertices)
@@ -617,7 +634,12 @@ namespace Mmd.Parser
         {
             // Seventh pass: validate impulse morph offset fields
             var rigidbodyIndices = new HashSet<int>();
-            foreach (MmdRigidbodyDefinition rb in model.physics.rigidbodies)
+            // A missing physics block or rigidbody list is reported by ValidateRequiredCollections;
+            // treat it as empty here so impulse offsets report unresolved references instead of throwing.
+            IReadOnlyList<MmdRigidbodyDefinition> rigidbodies = model.physics?.rigidbodies != null
+                ? model.physics.rigidbodies
+                : Array.Empty<MmdRigidbodyDefinition>();
+            foreach (MmdRigidbodyDefinition rb in rigidbodies)
             {
                 rigidbodyIndices.Add(rb.index);
             }

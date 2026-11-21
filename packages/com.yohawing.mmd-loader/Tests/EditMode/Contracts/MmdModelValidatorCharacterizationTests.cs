@@ -31,14 +31,23 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void NullPhysicsThrowsNullReferenceException()
+        public void MissingPhysicsCollectionsAreReportedWithoutThrowing()
         {
-            // Current behavior, recorded as-is: physics is dereferenced without a null guard
-            // when collecting rigidbody indices for impulse morph validation.
-            MmdModelDefinition model = CreateValidModel();
-            model.physics = null!;
+            // physics, its rigidbodies and its joints are required like the other model collections;
+            // a missing rigidbody list is treated as empty so impulse offsets report unresolved references.
+            const string unresolvedImpulse = "morph impulse offset rigidbodyIndex does not reference an existing rigidbody: 6[0] -> 0";
 
-            Assert.Throws<NullReferenceException>(() => MmdModelValidator.ValidateStructuralModel(model));
+            MmdModelDefinition withoutPhysics = CreateValidModel();
+            withoutPhysics.physics = null!;
+            AssertDiagnostics(withoutPhysics, new[] { "model physics must not be null", unresolvedImpulse });
+
+            MmdModelDefinition withoutRigidbodies = CreateValidModel();
+            withoutRigidbodies.physics.rigidbodies = null!;
+            AssertDiagnostics(withoutRigidbodies, new[] { "model physics rigidbodies must not be null", unresolvedImpulse });
+
+            MmdModelDefinition withoutJoints = CreateValidModel();
+            withoutJoints.physics.joints = null!;
+            AssertDiagnostics(withoutJoints, new[] { "model physics joints must not be null" });
         }
 
         [TestCaseSource(nameof(Cases))]
