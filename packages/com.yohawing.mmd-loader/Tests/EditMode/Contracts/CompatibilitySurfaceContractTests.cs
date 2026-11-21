@@ -189,9 +189,7 @@ namespace Mmd.Tests.Contracts
             ("PhysicsWorldCreate", "mmd_runtime_physics_world_create"),
             ("PhysicsWorldFree", "mmd_runtime_physics_world_free"),
             ("PhysicsWorldStepRuntime", "mmd_runtime_physics_world_step_runtime"),
-            ("EvaluateHostFrame", "mmd_runtime_evaluate_host_frame"),
-            ("InstanceApplyHostPoseAndEvaluateBeforePhysics", "mmd_runtime_instance_apply_host_pose_and_evaluate_before_physics"),
-            ("InstanceEvaluateCurrentPoseAfterPhysics", "mmd_runtime_instance_evaluate_current_pose_after_physics")
+            ("EvaluateHostFrame", "mmd_runtime_evaluate_host_frame")
         };
 
         [Test]

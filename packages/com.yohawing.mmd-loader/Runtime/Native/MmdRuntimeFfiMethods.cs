@@ -785,11 +785,6 @@ namespace Mmd.Native
             uint ikMaxIterationsCap,
             out PhysicsWorldStepReport outReport);
 
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_apply_host_pose_and_evaluate_before_physics", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern int InstanceApplyHostPoseAndEvaluateBeforePhysics(
-            IntPtr instance,
-            ref PhysicsHostPoseView pose);
-
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_evaluate_host_rig_pose", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int InstanceEvaluateHostRigPose(
             IntPtr instance,
@@ -797,9 +792,6 @@ namespace Mmd.Native
             ref PhysicsHostPoseView pose,
             float ikTolerance,
             uint ikMaxIterationsCap);
-
-        [DllImport(LibraryName, EntryPoint = "mmd_runtime_instance_evaluate_current_pose_after_physics", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern int InstanceEvaluateCurrentPoseAfterPhysics(IntPtr instance);
 
         [DllImport(LibraryName, EntryPoint = "mmd_runtime_physics_world_rigidbody_count", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int PhysicsWorldRigidbodyCount(IntPtr world, out IntPtr rigidbodyCount);
