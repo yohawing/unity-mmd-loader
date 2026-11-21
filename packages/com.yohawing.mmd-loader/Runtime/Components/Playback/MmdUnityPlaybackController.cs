@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Runtime.ExceptionServices;
 using Mmd;
 using Mmd.Physics;
 using UnityEngine;
@@ -646,22 +647,51 @@ namespace Mmd.UnityIntegration
 
         internal void ReleasePlaybackResources()
         {
-            ReleasePlaybackWorkerPool();
-            DisposeHumanoidPhysicsBinding();
-            DisposeHumanoidHostPoseSession();
-            binding?.Dispose();
+            // Every teardown step runs even if an earlier one throws; the first failure is
+            // rethrown after the native resources have been released.
+            Exception? firstError = null;
+            RunTeardownStep(ReleasePlaybackWorkerPool, ref firstError);
+            RunTeardownStep(DisposeHumanoidPhysicsBinding, ref firstError);
+            RunTeardownStep(() => DisposeHumanoidHostPoseSession(), ref firstError);
+            MmdUnityPlaybackBinding? playbackBinding = binding;
             binding = null;
             LastSnapshot = null;
             IsPlaying = false;
+            if (playbackBinding != null)
+            {
+                RunTeardownStep(playbackBinding.Dispose, ref firstError);
+            }
+
+            if (firstError != null)
+            {
+                ExceptionDispatchInfo.Capture(firstError).Throw();
+            }
         }
 
         private void OnDisable()
         {
-            ClearPendingHumanoidTimelineSample();
-            MmdStandaloneWorkerScheduler.Unregister(this);
-            ReleasePlaybackWorkerPool();
-            DisposeHumanoidPhysicsBinding();
-            DisposeHumanoidHostPoseSession();
+            Exception? firstError = null;
+            RunTeardownStep(ClearPendingHumanoidTimelineSample, ref firstError);
+            RunTeardownStep(() => MmdStandaloneWorkerScheduler.Unregister(this), ref firstError);
+            RunTeardownStep(ReleasePlaybackWorkerPool, ref firstError);
+            RunTeardownStep(DisposeHumanoidPhysicsBinding, ref firstError);
+            RunTeardownStep(() => DisposeHumanoidHostPoseSession(), ref firstError);
+            if (firstError != null)
+            {
+                ExceptionDispatchInfo.Capture(firstError).Throw();
+            }
+        }
+
+        private static void RunTeardownStep(Action step, ref Exception? firstError)
+        {
+            try
+            {
+                step();
+            }
+            catch (Exception exception)
+            {
+                firstError ??= exception;
+            }
         }
 
         private void OnEnable()

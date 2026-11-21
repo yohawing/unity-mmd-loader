@@ -41,6 +41,8 @@ namespace Mmd.UnityIntegration
         /// </summary>
         public string LastHumanoidNativeHostPoseFailureReason => humanoidHostPoseFailureReason;
 
+        internal bool HasHumanoidHostPoseSession => humanoidHostPoseSession != null;
+
         private bool TryApplyHumanoidNativeHostPose(
             bool copyLocalPositions,
             out MmdHumanoidRetargeterResult? nativeResult)
@@ -613,10 +615,42 @@ namespace Mmd.UnityIntegration
                 return;
             }
 
-            MmdUnityModelInstance? instance = binding?.PlaybackInstance ?? humanoidPhysicsBinding?.PlaybackInstance;
-            float scale = NormalizeHostPoseImportScale(humanoidHostPoseImportScale);
-            for (int index = 0; index < humanoidHostPoseBones.Length; index++)
+            // Teardown calls this before disposing the native session, so it must tolerate the
+            // same stale state as ResetHumanoidHostPoseDisplayToBindRest instead of throwing.
+            int boneCount = humanoidHostPoseBones.Length;
+            if (boneCount <= 0 ||
+                humanoidHostPosePositions.Length < boneCount * 3 ||
+                humanoidHostPoseRotations.Length < boneCount * 4 ||
+                humanoidHostPoseScales.Length < boneCount * 3)
             {
+                return;
+            }
+
+            MmdUnityModelInstance? instance = binding?.PlaybackInstance ?? humanoidPhysicsBinding?.PlaybackInstance;
+            if (instance != null &&
+                (instance.BindLocalPositions == null || instance.BindLocalRotations == null ||
+                 instance.BindLocalPositions.Length < boneCount ||
+                 instance.BindLocalRotations.Length < boneCount))
+            {
+                return;
+            }
+
+            if (instance == null &&
+                (humanoidHostPoseBindLocalPositions == null ||
+                 humanoidHostPoseBindLocalPositions.Length < boneCount))
+            {
+                return;
+            }
+
+            float scale = NormalizeHostPoseImportScale(humanoidHostPoseImportScale);
+            for (int index = 0; index < boneCount; index++)
+            {
+                // A destroyed bone has nothing to restore; keep restoring the surviving bones.
+                if (humanoidHostPoseBones[index] == null)
+                {
+                    continue;
+                }
+
                 Vector3 bindPosition = instance != null
                     ? instance.BindLocalPositions[index]
                     : humanoidHostPoseBindLocalPositions![index];
@@ -784,13 +818,32 @@ namespace Mmd.UnityIntegration
 
         private void DisposeHumanoidHostPoseSession(bool restoreInput = true)
         {
-            if (restoreInput)
+            try
             {
-                RestoreHumanoidHostPoseInputIfAvailable();
+                if (restoreInput)
+                {
+                    RestoreHumanoidHostPoseInputIfAvailable();
+                }
             }
+            finally
+            {
+                // The native session has no finalizer: release it even if restoring the input
+                // pose failed.
+                MmdRuntimeFfiHostPoseSession? session = humanoidHostPoseSession;
+                humanoidHostPoseSession = null;
+                try
+                {
+                    session?.Dispose();
+                }
+                finally
+                {
+                    ClearHumanoidHostPoseSessionState();
+                }
+            }
+        }
 
-            humanoidHostPoseSession?.Dispose();
-            humanoidHostPoseSession = null;
+        private void ClearHumanoidHostPoseSessionState()
+        {
             humanoidHostPoseModelAsset = null;
             humanoidHostPoseModel = null;
             humanoidHostPoseSourceBytes = null;

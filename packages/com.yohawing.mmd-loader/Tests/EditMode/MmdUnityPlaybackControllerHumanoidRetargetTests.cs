@@ -827,6 +827,181 @@ namespace Mmd.Tests
             }
         }
 
+        // Restoring the host pose input must not stop teardown when a bone Transform was destroyed:
+        // the native host pose session has no finalizer, and the playback binding is released
+        // after it.
+        [TestCase(true, TestName = "NativeHostPoseTeardownSurvivesDestroyedBone_ReleasePlaybackResources")]
+        [TestCase(false, TestName = "NativeHostPoseTeardownSurvivesDestroyedBone_OnDisable")]
+        public void NativeHostPoseTeardownSurvivesDestroyedBone(bool releasePlaybackResources)
+        {
+            string fixturePath = MmdTestFixtures.FixtureAssetPath("test_semi_basic_bone.pmx");
+            string motionPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
+            MmdPmxAsset pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+            MmdVmdAsset vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+            MmdUnityPlaybackBinding? playbackBinding = null;
+            GameObject? root = null;
+            MmdHumanoidProxyRigResult? proxyRig = null;
+            Avatar? avatar = null;
+            RuntimeAnimatorController? animatorController = null;
+            try
+            {
+                pmxAsset.Initialize(File.ReadAllBytes(fixturePath), fixturePath, fixturePath, assetImportScale: 1.0f);
+                vmdAsset.Initialize(File.ReadAllBytes(motionPath), "test_1bone_cube_motion.vmd", motionPath);
+                MmdModelDefinition model = pmxAsset.LoadModel(new NativeMmdParser());
+                playbackBinding = MmdUnityPlaybackBinding.CreateSkinned(pmxAsset, vmdAsset);
+                MmdUnityModelInstance instance = playbackBinding.Instance;
+
+                root = new GameObject("native-host-pose-teardown-root");
+                instance.Root.transform.SetParent(root.transform, worldPositionStays: false);
+                proxyRig = MmdHumanoidProxyRigFactory.CreateProxyRig(model);
+                Assert.That(proxyRig.ProxyRoot, Is.Not.Null);
+                MmdHumanoidAvatarBuildResult avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(proxyRig);
+                Assert.That(avatarResult.IsValidHumanAvatar, Is.True, string.Join("\n", avatarResult.Diagnostics));
+                avatar = avatarResult.Avatar;
+                proxyRig.ProxyRoot!.transform.SetParent(root.transform, worldPositionStays: false);
+                proxyRig.ProxyRoot.SetActive(true);
+
+                var animator = root.AddComponent<Animator>();
+                animator.avatar = avatar;
+                var animatorAsset = new AnimatorController();
+                animatorAsset.AddLayer("Base");
+                animatorController = animatorAsset;
+                animator.runtimeAnimatorController = animatorAsset;
+
+                var entries = new List<MmdHumanoidRetargetBinding>();
+                foreach (MmdHumanoidBoneMappingMatch match in proxyRig.Matches)
+                {
+                    if (match.MmdBoneIndex < 0 || match.MmdBoneIndex >= instance.BoneTransforms.Length ||
+                        !proxyRig.BoneMap.TryGetValue(match.HumanBone, out Transform? proxyTransform))
+                    {
+                        continue;
+                    }
+
+                    entries.Add(new MmdHumanoidRetargetBinding(
+                        match.HumanBone,
+                        match.MmdBoneIndex,
+                        proxyTransform,
+                        instance.BoneTransforms[match.MmdBoneIndex]));
+                }
+                Assert.That(entries, Is.Not.Empty);
+
+                MmdUnityPlaybackController controller = root.AddComponent<MmdUnityPlaybackController>();
+                controller.ConfigureModelAsset(pmxAsset);
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+                controller.Configure(playbackBinding, playbackFrameRate: 30.0f, playOnStart: false);
+                controller.ConfigureHumanoidRetarget(
+                    proxyRig.ProxyRoot.transform,
+                    entries,
+                    System.Array.Empty<MmdHumanoidAppendTransformBinding>());
+                entries[0].ProxyTransform!.localRotation = Quaternion.Euler(6.0f, 12.0f, 18.0f);
+                MmdHumanoidRetargeterResult result = controller.ApplyHumanoidRetargetNow();
+                Assert.That(result.AllSucceeded, Is.True);
+                Assert.That(controller.LastHumanoidNativeHostPoseFailureReason, Is.Empty);
+                Assert.That(controller.HasHumanoidHostPoseSession, Is.True,
+                    "The regression needs a live native host pose session before teardown.");
+
+                // Record the restored input pose with an intact hierarchy: reconfiguring disposes
+                // the session through the same restore path. Re-applying the unchanged proxy pose
+                // then recreates a session with identical input.
+                Transform[] bones = (Transform[])instance.BoneTransforms.Clone();
+                controller.ConfigureHumanoidRetarget(
+                    proxyRig.ProxyRoot.transform,
+                    entries,
+                    System.Array.Empty<MmdHumanoidAppendTransformBinding>());
+                Assert.That(controller.HasHumanoidHostPoseSession, Is.False);
+                Vector3[] expectedPositions = CapturePositions(bones);
+                Quaternion[] expectedRotations = CaptureRotations(bones);
+                Assert.That(controller.ApplyHumanoidRetargetNow().AllSucceeded, Is.True);
+                Assert.That(controller.HasHumanoidHostPoseSession, Is.True);
+
+                int leafBoneIndex = -1;
+                for (int i = bones.Length - 1; i >= 0; i--)
+                {
+                    if (bones[i] != null && bones[i].childCount == 0)
+                    {
+                        leafBoneIndex = i;
+                        break;
+                    }
+                }
+                Assert.That(leafBoneIndex, Is.GreaterThanOrEqualTo(0), "fixture leaf bone");
+
+                // Move every surviving bone away from the input pose and out of the playback
+                // instance, so the owned instance teardown cannot destroy what the test observes.
+                for (int i = 0; i < bones.Length; i++)
+                {
+                    if (i == leafBoneIndex)
+                    {
+                        continue;
+                    }
+
+                    bones[i].localPosition += new Vector3(0.1f, 0.2f, 0.3f);
+                    bones[i].localRotation *= Quaternion.Euler(10.0f, 20.0f, 30.0f);
+                }
+
+                for (int i = 0; i < bones.Length; i++)
+                {
+                    if (i != leafBoneIndex)
+                    {
+                        bones[i].SetParent(root.transform, worldPositionStays: false);
+                    }
+                }
+
+                Object.DestroyImmediate(bones[leafBoneIndex].gameObject);
+
+                if (releasePlaybackResources)
+                {
+                    Assert.DoesNotThrow(() => controller.ReleasePlaybackResources());
+                    Assert.That(controller.IsConfigured, Is.False,
+                        "the playback binding must be released after the host pose session");
+                    playbackBinding = null;
+                }
+                else
+                {
+                    MethodInfo onDisable = typeof(MmdUnityPlaybackController).GetMethod(
+                        "OnDisable",
+                        BindingFlags.Instance | BindingFlags.NonPublic)!;
+                    Assert.That(onDisable, Is.Not.Null);
+                    Assert.DoesNotThrow(() => onDisable.Invoke(controller, null));
+                }
+
+                Assert.That(controller.HasHumanoidHostPoseSession, Is.False,
+                    "the native host pose session must be disposed even when a bone was destroyed");
+                for (int i = 0; i < bones.Length; i++)
+                {
+                    if (i == leafBoneIndex)
+                    {
+                        continue;
+                    }
+
+                    Assert.That(Vector3.Distance(bones[i].localPosition, expectedPositions[i]), Is.LessThan(1.0e-4f),
+                        $"surviving bone {i} must be restored to the input position");
+                    Assert.That(Quaternion.Angle(bones[i].localRotation, expectedRotations[i]), Is.LessThan(0.01f),
+                        $"surviving bone {i} must be restored to the input rotation");
+                }
+            }
+            finally
+            {
+                playbackBinding?.Dispose();
+                if (root != null)
+                {
+                    Object.DestroyImmediate(root);
+                }
+
+                if (avatar != null)
+                {
+                    Object.DestroyImmediate(avatar);
+                }
+
+                if (animatorController != null)
+                {
+                    Object.DestroyImmediate(animatorController);
+                }
+
+                Object.DestroyImmediate(pmxAsset);
+                Object.DestroyImmediate(vmdAsset);
+            }
+        }
+
         private static void EvaluateTimelineAt(PlayableDirector director, double time)
         {
             director.time = time;

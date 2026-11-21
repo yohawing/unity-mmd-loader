@@ -232,9 +232,16 @@ namespace Mmd.UnityIntegration
                 return;
             }
 
-            humanoidPhysicsBinding.Dispose();
+            MmdUnityPlaybackBinding physicsBinding = humanoidPhysicsBinding;
             humanoidPhysicsBinding = null;
-            ResetLivePhysicsDriveSource();
+            try
+            {
+                physicsBinding.Dispose();
+            }
+            finally
+            {
+                ResetLivePhysicsDriveSource();
+            }
         }
     }
 }
