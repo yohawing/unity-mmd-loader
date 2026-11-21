@@ -1,5 +1,5 @@
-# Public API tier ledger (0.6.0 API cleanup). stable = compatibility promised; advanced = public, may change in 0.x minors; unity-entry = discovered by Unity; obsolete(-exposed) = kept for migration; pending-internal = to become internal before 0.6.0.
-# Every public type in *.api.txt must appear exactly once. Tiers: stable, advanced, unity-entry, obsolete, obsolete-exposed, pending-internal.
+# Public API tier ledger. stable = compatibility promised; advanced = public, may change in 0.x minors; unity-entry = discovered by Unity; obsolete(-exposed) = kept for migration. New public types must be classified here.
+# Every public type in *.api.txt must appear exactly once. Tiers: stable, advanced, unity-entry, obsolete, obsolete-exposed.
 assembly	type	tier	reason
 Mmd.Cinemachine	Mmd.UnityIntegration.Cinemachine.MmdCinemachineCameraBinding	stable	CreateAssetMenu/AddComponentMenu で利用者が作成
 Mmd.Editor	Mmd.Editor.MmdEditorPlaybackSceneLoadResult	advanced	MmdEditorVerificationFacade の public signature から到達

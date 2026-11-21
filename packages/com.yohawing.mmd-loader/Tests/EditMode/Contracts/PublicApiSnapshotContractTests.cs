@@ -41,8 +41,7 @@ namespace Mmd.Tests.Contracts
             "advanced",
             "unity-entry",
             "obsolete",
-            "obsolete-exposed",
-            "pending-internal"
+            "obsolete-exposed"
         };
 
         private static IEnumerable<string> SnapshotAssemblyNames => SnapshotAssemblies;
