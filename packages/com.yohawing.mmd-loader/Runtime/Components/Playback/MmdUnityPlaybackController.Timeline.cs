@@ -226,7 +226,7 @@ namespace Mmd.UnityIntegration
 
         private MmdHumanoidRetargeterResult ApplyHumanoidRetargetCore(bool copyLocalPositions)
         {
-            MmdHumanoidRetargeterResult? nativeResult = null;
+            MmdHumanoidRetargeterResult? nativeResult;
             if (physicsMode == MmdPhysicsMode.Off &&
                 TryApplyHumanoidNativeHostPose(copyLocalPositions, out nativeResult))
             {
@@ -234,53 +234,43 @@ namespace Mmd.UnityIntegration
                 return LastHumanoidRetargetResult;
             }
 
-            bool nativePoseApplied = false;
-            bool nativeLivePrepared = physicsMode == MmdPhysicsMode.Live &&
-                                      TryPrepareHumanoidNativeLivePhysics(
-                                          copyLocalPositions,
-                                          out nativeResult);
-            if (nativeLivePrepared && nativeResult != null)
+            // The Edit Mode Live preview is applied while preparing; PlayMode must also step.
+            if (physicsMode == MmdPhysicsMode.Live &&
+                TryPrepareHumanoidNativeLivePhysics(copyLocalPositions, out nativeResult) &&
+                nativeResult != null &&
+                (!Application.isPlaying || TryStepHumanoidNativeLivePhysics(nativeResult)))
             {
-                if (!Application.isPlaying)
-                {
-                    nativePoseApplied = true;
-                }
-                else
-                {
-                    try
-                    {
-                        nativePoseApplied = StepHumanoidRetargetLivePhysicsIfNeeded(
-                            nativeResult,
-                            humanoidHostPosePositions!,
-                            humanoidHostPoseRotations!,
-                            humanoidHostPoseScales!,
-                            humanoidHostPoseMorphs!,
-                            humanoidHostPoseIk!);
-                    }
-                    catch (Exception exception) when (IsNativeHostPoseFailure(exception))
-                    {
-                        DisposeHumanoidPhysicsBinding();
-                        RecordHumanoidHostPoseFailure(exception);
-                    }
-                }
-                if (nativePoseApplied)
-                {
-                    LastHumanoidRetargetResult = nativeResult;
-                    return LastHumanoidRetargetResult;
-                }
+                LastHumanoidRetargetResult = nativeResult;
+                return LastHumanoidRetargetResult;
             }
 
-            if (!nativePoseApplied)
-            {
-                RestoreHumanoidHostPoseInputIfAvailable();
-            }
-
+            RestoreHumanoidHostPoseInputIfAvailable();
             LastHumanoidRetargetResult = MmdHumanoidRetargeter.RetargetPose(
                 humanoidRetargetEntries,
                 copyLocalPositions);
             MmdHumanoidAppendTransformApplier.Apply(humanoidAppendEntries);
 
             return LastHumanoidRetargetResult;
+        }
+
+        private bool TryStepHumanoidNativeLivePhysics(MmdHumanoidRetargeterResult nativeResult)
+        {
+            try
+            {
+                return StepHumanoidRetargetLivePhysicsIfNeeded(
+                    nativeResult,
+                    humanoidHostPosePositions!,
+                    humanoidHostPoseRotations!,
+                    humanoidHostPoseScales!,
+                    humanoidHostPoseMorphs!,
+                    humanoidHostPoseIk!);
+            }
+            catch (Exception exception) when (IsNativeHostPoseFailure(exception))
+            {
+                DisposeHumanoidPhysicsBinding();
+                RecordHumanoidHostPoseFailure(exception);
+                return false;
+            }
         }
 
         internal MmdHumanoidRetargetGate EvaluateHumanoidRetargetGate(bool requireAnimatorDriver)

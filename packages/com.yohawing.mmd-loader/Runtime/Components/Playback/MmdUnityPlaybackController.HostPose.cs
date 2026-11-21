@@ -63,39 +63,16 @@ namespace Mmd.UnityIntegration
             {
                 EnsureHumanoidHostPoseSession();
                 if (humanoidHostPoseSession == null || humanoidHostPoseModel == null ||
-                    humanoidHostPoseBones == null || humanoidHostPoseRoot == null)
+                    humanoidHostPoseBones == null || humanoidHostPoseRoot == null ||
+                    !TryPrepareHumanoidHostPoseInput(
+                        copyLocalPositions,
+                        requireCopiedBones: false,
+                        out nativeResult))
                 {
                     return false;
                 }
 
-                PrepareHumanoidHostPoseArrays();
-                nativeResult = MmdHumanoidRetargeter.RetargetPoseToNativeArrays(
-                    humanoidRetargetEntries,
-                    humanoidHostPoseModel,
-                    humanoidHostPoseBones,
-                    humanoidHostPoseImportScale,
-                    humanoidHostPosePositions!,
-                    humanoidHostPoseRotations!,
-                    humanoidHostPoseScales!,
-                    copyLocalPositions);
-                if (!nativeResult.AllSucceeded)
-                {
-                    humanoidHostPoseFailureReason = nativeResult.Diagnostics.Count > 0
-                        ? nativeResult.Diagnostics[0]
-                        : "Humanoid native HostRig retarget validation failed.";
-                    ResetHumanoidHostPoseDisplayToBindRest();
-                    return false;
-                }
-
-                humanoidHostPoseSession.EvaluateAndCopy(
-                    humanoidHostPosePositions!,
-                    humanoidHostPoseRotations!,
-                    humanoidHostPoseScales!,
-                    humanoidHostPoseMorphs!,
-                    humanoidHostPoseIk!,
-                    humanoidHostPoseWorldMatrices!);
-                ApplyHumanoidHostPoseWorldMatrices();
-                humanoidHostPoseFailureReason = string.Empty;
+                EvaluateAndApplyHumanoidHostPose(humanoidHostPoseSession);
                 return true;
             }
             catch (Exception exception) when (IsNativeHostPoseFailure(exception))
@@ -120,34 +97,12 @@ namespace Mmd.UnityIntegration
             {
                 EnsureHumanoidHostPoseSession(createNativeSession: !Application.isPlaying);
                 if (humanoidHostPoseModel == null ||
-                    humanoidHostPoseBones == null || humanoidHostPoseRoot == null)
+                    humanoidHostPoseBones == null || humanoidHostPoseRoot == null ||
+                    !TryPrepareHumanoidHostPoseInput(
+                        copyLocalPositions,
+                        requireCopiedBones: true,
+                        out nativeResult))
                 {
-                    return false;
-                }
-
-                if (humanoidHostPoseDrivenBones == null ||
-                    humanoidHostPoseGoalBones == null ||
-                    humanoidHostPoseIkEligibility == null)
-                {
-                    ConfigureHumanoidHostPoseRig(humanoidHostPoseModel, humanoidHostPoseBones);
-                }
-
-                PrepareHumanoidHostPoseArrays();
-                nativeResult = MmdHumanoidRetargeter.RetargetPoseToNativeArrays(
-                    humanoidRetargetEntries,
-                    humanoidHostPoseModel,
-                    humanoidHostPoseBones,
-                    humanoidHostPoseImportScale,
-                    humanoidHostPosePositions!,
-                    humanoidHostPoseRotations!,
-                    humanoidHostPoseScales!,
-                    copyLocalPositions);
-                if (nativeResult.CopiedBoneCount <= 0 || !nativeResult.AllSucceeded)
-                {
-                    humanoidHostPoseFailureReason = nativeResult.Diagnostics.Count > 0
-                        ? nativeResult.Diagnostics[0]
-                        : "Humanoid native HostRig retarget validation failed.";
-                    ResetHumanoidHostPoseDisplayToBindRest();
                     return false;
                 }
 
@@ -158,31 +113,73 @@ namespace Mmd.UnityIntegration
                     humanoidHostPoseMorphs!,
                     humanoidHostPoseIk!);
 
-                if (!Application.isPlaying)
+                if (Application.isPlaying)
                 {
-                    if (humanoidHostPoseSession == null)
-                    {
-                        return false;
-                    }
-
-                    humanoidHostPoseSession.EvaluateAndCopy(
-                        humanoidHostPosePositions!,
-                        humanoidHostPoseRotations!,
-                        humanoidHostPoseScales!,
-                        humanoidHostPoseMorphs!,
-                        humanoidHostPoseIk!,
-                        humanoidHostPoseWorldMatrices!);
-                    ApplyHumanoidHostPoseWorldMatrices();
-                    humanoidHostPoseFailureReason = string.Empty;
-                    return true;
+                    return TryPrepareHumanoidNativeLivePhysicsBinding();
                 }
-                return TryPrepareHumanoidNativeLivePhysicsBinding();
+
+                if (humanoidHostPoseSession == null)
+                {
+                    return false;
+                }
+
+                EvaluateAndApplyHumanoidHostPose(humanoidHostPoseSession);
+                return true;
             }
             catch (Exception exception) when (IsNativeHostPoseFailure(exception))
             {
                 RecordHumanoidHostPoseFailure(exception);
                 return false;
             }
+        }
+
+        // Shared Off / Live input contract: configure the rig when needed, fill fresh native
+        // input arrays from the proxy pose, and show the bind rest pose when validation fails.
+        private bool TryPrepareHumanoidHostPoseInput(
+            bool copyLocalPositions,
+            bool requireCopiedBones,
+            out MmdHumanoidRetargeterResult nativeResult)
+        {
+            if (humanoidHostPoseDrivenBones == null ||
+                humanoidHostPoseGoalBones == null ||
+                humanoidHostPoseIkEligibility == null)
+            {
+                ConfigureHumanoidHostPoseRig(humanoidHostPoseModel!, humanoidHostPoseBones!);
+            }
+
+            PrepareHumanoidHostPoseArrays();
+            nativeResult = MmdHumanoidRetargeter.RetargetPoseToNativeArrays(
+                humanoidRetargetEntries,
+                humanoidHostPoseModel!,
+                humanoidHostPoseBones!,
+                humanoidHostPoseImportScale,
+                humanoidHostPosePositions!,
+                humanoidHostPoseRotations!,
+                humanoidHostPoseScales!,
+                copyLocalPositions);
+            if ((requireCopiedBones && nativeResult.CopiedBoneCount <= 0) || !nativeResult.AllSucceeded)
+            {
+                humanoidHostPoseFailureReason = nativeResult.Diagnostics.Count > 0
+                    ? nativeResult.Diagnostics[0]
+                    : "Humanoid native HostRig retarget validation failed.";
+                ResetHumanoidHostPoseDisplayToBindRest();
+                return false;
+            }
+
+            return true;
+        }
+
+        private void EvaluateAndApplyHumanoidHostPose(MmdRuntimeFfiHostPoseSession session)
+        {
+            session.EvaluateAndCopy(
+                humanoidHostPosePositions!,
+                humanoidHostPoseRotations!,
+                humanoidHostPoseScales!,
+                humanoidHostPoseMorphs!,
+                humanoidHostPoseIk!,
+                humanoidHostPoseWorldMatrices!);
+            ApplyHumanoidHostPoseWorldMatrices();
+            humanoidHostPoseFailureReason = string.Empty;
         }
 
         private void EnsureHumanoidHostPoseSession(bool createNativeSession = true)
