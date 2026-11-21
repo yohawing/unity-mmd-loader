@@ -48,7 +48,7 @@ namespace Mmd.Rendering
         public int vertexCount;
     }
 
-    public static class MmdUrpMaterialBindingDescriptorBuilder
+    internal static class MmdUrpMaterialBindingDescriptorBuilder
     {
         public const string DefaultShaderName = "MMD Basic Toon";
         public const string MmdToonLitShaderName = "MMD URP Toon";

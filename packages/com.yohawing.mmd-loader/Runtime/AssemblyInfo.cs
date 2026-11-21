@@ -9,3 +9,4 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("Mmd.TimelineEditModeTests")]
 [assembly: InternalsVisibleTo("Mmd.Timeline")]
 [assembly: InternalsVisibleTo("Mmd.DevTools.Editor")]
+[assembly: InternalsVisibleTo("Mmd.DevTools.EditModeTests")]

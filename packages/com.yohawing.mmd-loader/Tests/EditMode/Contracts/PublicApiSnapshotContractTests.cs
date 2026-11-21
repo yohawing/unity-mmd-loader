@@ -74,7 +74,7 @@ namespace Mmd.Tests.Contracts
             {
                 ["Mmd.Runtime"] = new[]
                 {
-                    "Mmd.DevTools.Editor", "Mmd.EditModeTests", "Mmd.Editor", "Mmd.PlayModeTests",
+                    "Mmd.DevTools.EditModeTests", "Mmd.DevTools.Editor", "Mmd.EditModeTests", "Mmd.Editor", "Mmd.PlayModeTests",
                     "Mmd.Rendering.Universal", "Mmd.Timeline", "Mmd.TimelineEditModeTests"
                 },
                 ["Mmd.Timeline"] = new[] { "Mmd.TimelineEditModeTests" },

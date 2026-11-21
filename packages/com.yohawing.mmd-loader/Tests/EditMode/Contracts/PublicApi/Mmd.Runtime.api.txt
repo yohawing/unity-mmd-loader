@@ -1151,12 +1151,6 @@ Mmd.Rendering.MmdUrpMaterialBindingDescriptor :: field public string sphereTextu
 Mmd.Rendering.MmdUrpMaterialBindingDescriptor :: field public string toonTexture
 Mmd.Rendering.MmdUrpMaterialBindingDescriptor :: field public string toonTextureSourceHint
 Mmd.Rendering.MmdUrpMaterialBindingDescriptor :: field public string transparencyMode
-Mmd.Rendering.MmdUrpMaterialBindingDescriptorBuilder :: (type) public static class MmdUrpMaterialBindingDescriptorBuilder
-Mmd.Rendering.MmdUrpMaterialBindingDescriptorBuilder :: const public string DefaultShaderName = "MMD Basic Toon"
-Mmd.Rendering.MmdUrpMaterialBindingDescriptorBuilder :: const public string MmdToonLitShaderName = "MMD URP Toon"
-Mmd.Rendering.MmdUrpMaterialBindingDescriptorBuilder :: const public string UrpLitShaderName = "Universal Render Pipeline/Lit"
-Mmd.Rendering.MmdUrpMaterialBindingDescriptorBuilder :: method public static System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdUrpMaterialBindingDescriptor> Build(System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdMaterialDescriptor> materials, Mmd.Rendering.MmdMaterialPreset preset)
-Mmd.Rendering.MmdUrpMaterialBindingDescriptorBuilder :: method public static System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdUrpMaterialBindingDescriptor> Build(System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdMaterialDescriptor> materials, string shaderName = "MMD Basic Toon")
 Mmd.Rendering.MmdVertexMorphDescriptor :: (type) public sealed class MmdVertexMorphDescriptor
 Mmd.Rendering.MmdVertexMorphDescriptor :: ctor public .ctor()
 Mmd.Rendering.MmdVertexMorphDescriptor :: field public System.Collections.Generic.List<Mmd.Rendering.MmdVertexMorphOffsetDescriptor> offsets

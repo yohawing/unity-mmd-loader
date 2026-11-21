@@ -153,7 +153,6 @@ Mmd.Runtime	Mmd.Rendering.MmdSkinningDescriptor	advanced	MmdRenderingDescriptor 
 Mmd.Runtime	Mmd.Rendering.MmdSubmeshDescriptor	advanced	MmdRenderingDescriptor の public signature から到達
 Mmd.Runtime	Mmd.Rendering.MmdTextureOrientationDescriptor	advanced	MmdRenderingDescriptor の public signature から到達
 Mmd.Runtime	Mmd.Rendering.MmdUrpMaterialBindingDescriptor	advanced	MmdRenderingDescriptor の public signature から到達
-Mmd.Runtime	Mmd.Rendering.MmdUrpMaterialBindingDescriptorBuilder	pending-internal	API-02 決定: Mmd.DevTools.EditModeTests 向け IVT を足して internal にする
 Mmd.Runtime	Mmd.Rendering.MmdVertexMorphDescriptor	advanced	MmdRenderingDescriptor の public signature から到達
 Mmd.Runtime	Mmd.Rendering.MmdVertexMorphOffsetDescriptor	advanced	MmdVertexMorphDescriptor の public signature から到達
 Mmd.Runtime	Mmd.UnityIntegration.MmdCameraStateToUnity	pending-internal	どの root からも public signature で到達しない
