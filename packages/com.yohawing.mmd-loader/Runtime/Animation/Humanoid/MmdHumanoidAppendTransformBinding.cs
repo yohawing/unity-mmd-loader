@@ -22,11 +22,11 @@ namespace Mmd
         [SerializeField] private Vector3 appendParentBindLocalPosition;
         [SerializeField] private int evaluationOrder;
 
-        public MmdHumanoidAppendTransformBinding()
+        internal MmdHumanoidAppendTransformBinding()
         {
         }
 
-        public MmdHumanoidAppendTransformBinding(
+        internal MmdHumanoidAppendTransformBinding(
             Transform? targetTransform,
             int targetMmdBoneIndex,
             Transform? appendParentTransform,

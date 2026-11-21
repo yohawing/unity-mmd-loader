@@ -23,11 +23,11 @@ namespace Mmd
         [SerializeField] private Vector3 proxyBindLocalPosition;
         [SerializeField] private Vector3 translationTargetBindLocalPosition;
 
-        public MmdHumanoidRetargetBinding()
+        internal MmdHumanoidRetargetBinding()
         {
         }
 
-        public MmdHumanoidRetargetBinding(
+        internal MmdHumanoidRetargetBinding(
             HumanBodyBones humanBone,
             int mmdBoneIndex,
             Transform? proxyTransform,
@@ -39,7 +39,7 @@ namespace Mmd
             this.nativeTransform = nativeTransform;
         }
 
-        public MmdHumanoidRetargetBinding(
+        internal MmdHumanoidRetargetBinding(
             HumanBodyBones humanBone,
             int mmdBoneIndex,
             Transform? proxyTransform,
@@ -52,7 +52,7 @@ namespace Mmd
             this.nativeBindLocalRotation = nativeBindLocalRotation;
         }
 
-        public MmdHumanoidRetargetBinding(
+        internal MmdHumanoidRetargetBinding(
             HumanBodyBones humanBone,
             int mmdBoneIndex,
             Transform? proxyTransform,
@@ -77,7 +77,7 @@ namespace Mmd
         {
         }
 
-        public MmdHumanoidRetargetBinding(
+        internal MmdHumanoidRetargetBinding(
             HumanBodyBones humanBone,
             int mmdBoneIndex,
             Transform? proxyTransform,
@@ -134,7 +134,7 @@ namespace Mmd
     /// </summary>
     public sealed class MmdHumanoidRetargeterResult
     {
-        public MmdHumanoidRetargeterResult(
+        internal MmdHumanoidRetargeterResult(
             int copiedBoneCount,
             int skippedBoneCount,
             IReadOnlyList<string> diagnostics)
@@ -147,7 +147,7 @@ namespace Mmd
         {
         }
 
-        public MmdHumanoidRetargeterResult(
+        internal MmdHumanoidRetargeterResult(
             int copiedBoneCount,
             int skippedBoneCount,
             int copiedTranslationCount,

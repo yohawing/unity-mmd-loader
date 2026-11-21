@@ -335,7 +335,7 @@ namespace Mmd.UnityIntegration
             }
         }
 
-        public MmdSceneSelfShadowApplyStatus EnsureSelfShadowDefaultState()
+        internal MmdSceneSelfShadowApplyStatus EnsureSelfShadowDefaultState()
         {
             return lastSelfShadowApplyStatus == MmdSceneSelfShadowApplyStatus.NotApplied || !hasExplicitSelfShadowState
                 ? ApplyDefaultSelfShadowState()
@@ -388,7 +388,7 @@ namespace Mmd.UnityIntegration
         /// color / direction but is reported as <see cref="MmdSceneLightApplyStatus.AppliedNonDirectional"/>
         /// so the caller can warn (MMD light maps to a directional source).
         /// </summary>
-        public MmdSceneLightApplyStatus ApplyLightState(MmdLightState state)
+        internal MmdSceneLightApplyStatus ApplyLightState(MmdLightState state)
         {
             Vector3 mmdDir = new Vector3(
                 Component(state.Direction, 0),
@@ -427,7 +427,7 @@ namespace Mmd.UnityIntegration
         /// not mutate Light.shadows, Light.shadowStrength, RenderSettings, QualitySettings shadow
         /// distance, URP assets, or Materials.
         /// </summary>
-        public MmdSceneSelfShadowApplyStatus ApplySelfShadowState(MmdSelfShadowState state)
+        internal MmdSceneSelfShadowApplyStatus ApplySelfShadowState(MmdSelfShadowState state)
         {
             return ApplySelfShadowState(state, explicitState: true);
         }
@@ -473,7 +473,7 @@ namespace Mmd.UnityIntegration
         /// Samples VMD self-shadow keyframes at <paramref name="frame"/> and records the result on this
         /// scene environment. Returns false when the clip has no self-shadow state to sample.
         /// </summary>
-        public bool TryEvaluateSelfShadowAtFrame(
+        internal bool TryEvaluateSelfShadowAtFrame(
             IReadOnlyList<MmdSelfShadowKeyframeDefinition>? keyframes,
             float frame,
             out MmdSceneSelfShadowApplyStatus status)

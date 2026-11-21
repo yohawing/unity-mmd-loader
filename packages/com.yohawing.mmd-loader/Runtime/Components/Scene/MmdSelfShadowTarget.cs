@@ -111,7 +111,7 @@ namespace Mmd.UnityIntegration
 
         private static MaterialPropertyBlock SharedPropertyBlock => sharedPropertyBlock ??= new MaterialPropertyBlock();
 
-        public static void DisableAllReceiverGates()
+        internal static void DisableAllReceiverGates()
         {
             receiverGateAvailable = false;
             for (int i = ActiveTargets.Count - 1; i >= 0; i--)
@@ -210,7 +210,7 @@ namespace Mmd.UnityIntegration
             return MmdSelfShadowBoundsCollector.Collect(BoundsRoot, EffectiveProjectionPolicy);
         }
 
-        public void RefreshReceiverGate()
+        internal void RefreshReceiverGate()
         {
             if (isActiveAndEnabled)
             {

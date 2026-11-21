@@ -193,7 +193,7 @@ namespace Mmd.Motion
 
     public readonly struct MmdSelfShadowProjectionState
     {
-        public MmdSelfShadowProjectionState(
+        internal MmdSelfShadowProjectionState(
             bool active,
             byte mode,
             float farDistance,
@@ -310,7 +310,7 @@ namespace Mmd.Motion
 
     public readonly struct MmdSelfShadowUnityShadowSettings
     {
-        public MmdSelfShadowUnityShadowSettings(
+        internal MmdSelfShadowUnityShadowSettings(
             bool runtimeApplicationEnabled,
             bool castShadows,
             byte mode,

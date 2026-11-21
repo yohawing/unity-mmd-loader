@@ -18,9 +18,9 @@ namespace Mmd
             Array.Empty<MmdHumanoidMissingRequiredBone>();
         [SerializeField] private string[] conflictDiagnostics = Array.Empty<string>();
 
-        public MmdHumanoidBoneMappingDiagnosticSummary() { }
+        internal MmdHumanoidBoneMappingDiagnosticSummary() { }
 
-        public MmdHumanoidBoneMappingDiagnosticSummary(
+        internal MmdHumanoidBoneMappingDiagnosticSummary(
             string readiness,
             MmdHumanoidBoneMappingDiagnosticEntry[]? mappedEntries,
             MmdHumanoidMissingRequiredBone[]? missingRequiredBones,
@@ -65,9 +65,9 @@ namespace Mmd
         [SerializeField] private bool required;
         [SerializeField] private string source = MmdHumanoidBoneMappingDiagnosticsBuilder.AutomaticSource;
 
-        public MmdHumanoidBoneMappingDiagnosticEntry() { }
+        internal MmdHumanoidBoneMappingDiagnosticEntry() { }
 
-        public MmdHumanoidBoneMappingDiagnosticEntry(
+        internal MmdHumanoidBoneMappingDiagnosticEntry(
             HumanBodyBones humanBone,
             string mmdBoneName,
             int mmdBoneIndex,
@@ -100,9 +100,9 @@ namespace Mmd
         [SerializeField] private HumanBodyBones humanBone;
         [SerializeField] private string expectedMmdBoneName = string.Empty;
 
-        public MmdHumanoidMissingRequiredBone() { }
+        internal MmdHumanoidMissingRequiredBone() { }
 
-        public MmdHumanoidMissingRequiredBone(HumanBodyBones humanBone, string expectedMmdBoneName)
+        internal MmdHumanoidMissingRequiredBone(HumanBodyBones humanBone, string expectedMmdBoneName)
         {
             this.humanBone = humanBone;
             this.expectedMmdBoneName = expectedMmdBoneName ?? string.Empty;

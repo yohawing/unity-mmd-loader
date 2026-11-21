@@ -82,6 +82,8 @@ namespace Mmd.UnityIntegration
         public int appliedMorphCount;
         public MmdLivePhysicsPinnedBodyDiagnostics pinnedBodies = new();
         public MmdLivePhysicsBodyDiagnostics[] bodyDiagnostics = System.Array.Empty<MmdLivePhysicsBodyDiagnostics>();
+
+        internal MmdLivePhysicsFrameDiagnostics() { }
     }
 
     internal static class MmdLivePhysicsDiagnosticsClock
@@ -133,6 +135,8 @@ namespace Mmd.UnityIntegration
         public float debugToReadbackWorldDistance;
         public float boneToDebugWorldDistance;
         public float boneToReadbackWorldDistance;
+
+        internal MmdLivePhysicsBodyDiagnostics() { }
     }
 
     [Serializable]
@@ -156,5 +160,7 @@ namespace Mmd.UnityIntegration
         public int worstPinnedBodyRotationBoneIndex = -1;
         public string worstPinnedBodyRotationBoneName = string.Empty;
         public string worstPinnedBodyRotationPhysicsKind = string.Empty;
+
+        internal MmdLivePhysicsPinnedBodyDiagnostics() { }
     }
 }

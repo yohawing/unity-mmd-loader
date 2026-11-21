@@ -54,6 +54,8 @@ namespace Mmd.UnityIntegration
         public bool livePhysicsPrewarmed;
         public bool livePhysicsWorldReused;
         public bool succeeded;
+
+        internal MmdTimelineSetupTimingSummary() { }
     }
 
     [DisallowMultipleComponent]
@@ -189,7 +191,7 @@ namespace Mmd.UnityIntegration
                 _ => HumanoidPhysicsBindingUnknownReason
             };
 
-        public void ConfigureHumanoidRetarget(
+        internal void ConfigureHumanoidRetarget(
             Transform? proxyRoot,
             IReadOnlyList<MmdHumanoidRetargetBinding>? entries,
             IReadOnlyList<MmdHumanoidAppendTransformBinding>? appendEntries)
@@ -604,7 +606,7 @@ namespace Mmd.UnityIntegration
             }
         }
 
-        public void StartPlaybackIfRequested()
+        internal void StartPlaybackIfRequested()
         {
             if (playOnStart && binding != null)
             {

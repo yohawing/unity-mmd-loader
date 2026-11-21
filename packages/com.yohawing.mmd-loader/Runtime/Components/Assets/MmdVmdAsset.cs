@@ -264,7 +264,7 @@ namespace Mmd
             return CreateNativeClipMotionHeaderCore(sourceBytes, summary, rawSource != null);
         }
 
-        public static MmdMotionDefinition CreateNativeClipMotionHeader(
+        internal static MmdMotionDefinition CreateNativeClipMotionHeader(
             byte[] vmdBytes,
             MmdVmdParseSummary summary)
         {

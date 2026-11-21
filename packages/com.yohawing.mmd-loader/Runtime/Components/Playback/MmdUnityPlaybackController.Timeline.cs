@@ -53,7 +53,7 @@ namespace Mmd.UnityIntegration
             timelinePreparationSeedWasLive = seedLivePhysics;
         }
 
-        public MmdHumanoidRetargeterResult ApplyHumanoidRetargetNow()
+        internal MmdHumanoidRetargeterResult ApplyHumanoidRetargetNow()
         {
             ReleaseAutomaticWorkerForSynchronousPlayback();
             MmdHumanoidRetargetGate gate = EvaluateHumanoidRetargetGate(requireAnimatorDriver: true);

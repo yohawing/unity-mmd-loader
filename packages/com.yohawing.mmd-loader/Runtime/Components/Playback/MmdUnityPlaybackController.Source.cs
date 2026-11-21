@@ -67,7 +67,7 @@ namespace Mmd.UnityIntegration
                 applyStartFrame: null);
         }
 
-        public void ConfigureFromRuntimeImporterPaths(
+        internal void ConfigureFromRuntimeImporterPaths(
             string pmxPath,
             string vmdPath,
             MmdPlaybackConfig config)
@@ -382,7 +382,7 @@ namespace Mmd.UnityIntegration
                 timelineEvaluation);
         }
 
-        public bool ConfigureFromPlaybackSourceIfAvailable()
+        internal bool ConfigureFromPlaybackSourceIfAvailable()
         {
             return ConfigureFromPlaybackSourceIfAvailableCore(timelineEvaluation: false);
         }

@@ -44,7 +44,7 @@ namespace Mmd.UnityIntegration
             source: MmdSelfShadowBoundsSource.None,
             includedRendererCount: 0);
 
-        public static MmdSelfShadowBoundsResult FromBounds(
+        internal static MmdSelfShadowBoundsResult FromBounds(
             Bounds bounds,
             MmdSelfShadowBoundsSource source,
             int includedRendererCount)

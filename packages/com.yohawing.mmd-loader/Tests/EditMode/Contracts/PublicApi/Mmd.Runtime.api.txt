@@ -58,8 +58,6 @@ Mmd.MmdEvaluatedMorphWeight :: ctor public .ctor()
 Mmd.MmdEvaluatedMorphWeight :: field public float weight
 Mmd.MmdEvaluatedMorphWeight :: field public string name
 Mmd.MmdHumanoidAppendTransformBinding :: (type) public sealed class MmdHumanoidAppendTransformBinding
-Mmd.MmdHumanoidAppendTransformBinding :: ctor public .ctor()
-Mmd.MmdHumanoidAppendTransformBinding :: ctor public .ctor(UnityEngine.Transform targetTransform, int targetMmdBoneIndex, UnityEngine.Transform appendParentTransform, int appendParentMmdBoneIndex, float appendRatio, bool appendRotation, bool appendTranslation, bool appendLocal, UnityEngine.Quaternion targetBindLocalRotation, UnityEngine.Vector3 targetBindLocalPosition, UnityEngine.Quaternion appendParentBindLocalRotation, UnityEngine.Vector3 appendParentBindLocalPosition, int evaluationOrder)
 Mmd.MmdHumanoidAppendTransformBinding :: property UnityEngine.Quaternion AppendParentBindLocalRotation { public get; }
 Mmd.MmdHumanoidAppendTransformBinding :: property UnityEngine.Quaternion TargetBindLocalRotation { public get; }
 Mmd.MmdHumanoidAppendTransformBinding :: property UnityEngine.Transform AppendParentTransform { public get; }
@@ -74,16 +72,12 @@ Mmd.MmdHumanoidAppendTransformBinding :: property int AppendParentMmdBoneIndex {
 Mmd.MmdHumanoidAppendTransformBinding :: property int EvaluationOrder { public get; }
 Mmd.MmdHumanoidAppendTransformBinding :: property int TargetMmdBoneIndex { public get; }
 Mmd.MmdHumanoidBoneMappingDiagnosticEntry :: (type) public sealed class MmdHumanoidBoneMappingDiagnosticEntry
-Mmd.MmdHumanoidBoneMappingDiagnosticEntry :: ctor public .ctor()
-Mmd.MmdHumanoidBoneMappingDiagnosticEntry :: ctor public .ctor(UnityEngine.HumanBodyBones humanBone, string mmdBoneName, int mmdBoneIndex, bool required, string source)
 Mmd.MmdHumanoidBoneMappingDiagnosticEntry :: property UnityEngine.HumanBodyBones HumanBone { public get; }
 Mmd.MmdHumanoidBoneMappingDiagnosticEntry :: property bool Required { public get; }
 Mmd.MmdHumanoidBoneMappingDiagnosticEntry :: property int MmdBoneIndex { public get; }
 Mmd.MmdHumanoidBoneMappingDiagnosticEntry :: property string MmdBoneName { public get; }
 Mmd.MmdHumanoidBoneMappingDiagnosticEntry :: property string Source { public get; }
 Mmd.MmdHumanoidBoneMappingDiagnosticSummary :: (type) public sealed class MmdHumanoidBoneMappingDiagnosticSummary
-Mmd.MmdHumanoidBoneMappingDiagnosticSummary :: ctor public .ctor()
-Mmd.MmdHumanoidBoneMappingDiagnosticSummary :: ctor public .ctor(string readiness, Mmd.MmdHumanoidBoneMappingDiagnosticEntry[] mappedEntries, Mmd.MmdHumanoidMissingRequiredBone[] missingRequiredBones, string[] conflictDiagnostics)
 Mmd.MmdHumanoidBoneMappingDiagnosticSummary :: property System.Collections.Generic.IReadOnlyList<Mmd.MmdHumanoidBoneMappingDiagnosticEntry> MappedEntries { public get; }
 Mmd.MmdHumanoidBoneMappingDiagnosticSummary :: property System.Collections.Generic.IReadOnlyList<Mmd.MmdHumanoidMissingRequiredBone> MissingRequiredBones { public get; }
 Mmd.MmdHumanoidBoneMappingDiagnosticSummary :: property System.Collections.Generic.IReadOnlyList<string> ConflictDiagnostics { public get; }
@@ -95,16 +89,9 @@ Mmd.MmdHumanoidBoneMappingOverride :: ctor public .ctor(string mmdBoneName, Unit
 Mmd.MmdHumanoidBoneMappingOverride :: property UnityEngine.HumanBodyBones HumanBone { public get; }
 Mmd.MmdHumanoidBoneMappingOverride :: property string MmdBoneName { public get; }
 Mmd.MmdHumanoidMissingRequiredBone :: (type) public sealed class MmdHumanoidMissingRequiredBone
-Mmd.MmdHumanoidMissingRequiredBone :: ctor public .ctor()
-Mmd.MmdHumanoidMissingRequiredBone :: ctor public .ctor(UnityEngine.HumanBodyBones humanBone, string expectedMmdBoneName)
 Mmd.MmdHumanoidMissingRequiredBone :: property UnityEngine.HumanBodyBones HumanBone { public get; }
 Mmd.MmdHumanoidMissingRequiredBone :: property string ExpectedMmdBoneName { public get; }
 Mmd.MmdHumanoidRetargetBinding :: (type) public sealed class MmdHumanoidRetargetBinding
-Mmd.MmdHumanoidRetargetBinding :: ctor public .ctor()
-Mmd.MmdHumanoidRetargetBinding :: ctor public .ctor(UnityEngine.HumanBodyBones humanBone, int mmdBoneIndex, UnityEngine.Transform proxyTransform, UnityEngine.Transform nativeTransform)
-Mmd.MmdHumanoidRetargetBinding :: ctor public .ctor(UnityEngine.HumanBodyBones humanBone, int mmdBoneIndex, UnityEngine.Transform proxyTransform, UnityEngine.Transform nativeTransform, UnityEngine.Quaternion proxyBindLocalRotation, UnityEngine.Quaternion nativeBindLocalRotation)
-Mmd.MmdHumanoidRetargetBinding :: ctor public .ctor(UnityEngine.HumanBodyBones humanBone, int mmdBoneIndex, UnityEngine.Transform proxyTransform, UnityEngine.Transform nativeTransform, UnityEngine.Quaternion proxyBindLocalRotation, UnityEngine.Quaternion nativeBindLocalRotation, bool copyLocalPosition, UnityEngine.Transform translationTargetTransform, int translationTargetMmdBoneIndex, UnityEngine.Vector3 proxyBindLocalPosition, UnityEngine.Vector3 translationTargetBindLocalPosition)
-Mmd.MmdHumanoidRetargetBinding :: ctor public .ctor(UnityEngine.HumanBodyBones humanBone, int mmdBoneIndex, UnityEngine.Transform proxyTransform, UnityEngine.Transform nativeTransform, bool copyLocalPosition, UnityEngine.Transform translationTargetTransform, int translationTargetMmdBoneIndex, UnityEngine.Vector3 proxyBindLocalPosition, UnityEngine.Vector3 translationTargetBindLocalPosition)
 Mmd.MmdHumanoidRetargetBinding :: property UnityEngine.HumanBodyBones HumanBone { public get; }
 Mmd.MmdHumanoidRetargetBinding :: property UnityEngine.Quaternion NativeBindLocalRotation { public get; }
 Mmd.MmdHumanoidRetargetBinding :: property UnityEngine.Quaternion ProxyBindLocalRotation { public get; }
@@ -136,8 +123,6 @@ Mmd.MmdHumanoidRetargetQualitySettings :: property float UpperArmTwist { public 
 Mmd.MmdHumanoidRetargetQualitySettings :: property float UpperLegTwist { public get; }
 Mmd.MmdHumanoidRetargetQualitySettings :: property static Mmd.MmdHumanoidRetargetQualitySettings Default { public get; }
 Mmd.MmdHumanoidRetargeterResult :: (type) public sealed class MmdHumanoidRetargeterResult
-Mmd.MmdHumanoidRetargeterResult :: ctor public .ctor(int copiedBoneCount, int skippedBoneCount, System.Collections.Generic.IReadOnlyList<string> diagnostics)
-Mmd.MmdHumanoidRetargeterResult :: ctor public .ctor(int copiedBoneCount, int skippedBoneCount, int copiedTranslationCount, int skippedTranslationCount, System.Collections.Generic.IReadOnlyList<string> diagnostics)
 Mmd.MmdHumanoidRetargeterResult :: property System.Collections.Generic.IReadOnlyList<string> Diagnostics { public get; }
 Mmd.MmdHumanoidRetargeterResult :: property bool AllSucceeded { public get; }
 Mmd.MmdHumanoidRetargeterResult :: property int CopiedBoneCount { public get; }
@@ -272,7 +257,6 @@ Mmd.MmdMaterialProfileAsset :: field public int schemaVersion
 Mmd.MmdMaterialProfileAsset :: method public bool TryCreateMapperSet(out Mmd.UnityIntegration.MmdMaterialMapperSet mapperSet, out string reason)
 Mmd.MmdMaterialProfileProvenance :: (type) public sealed class MmdMaterialProfileProvenance
 Mmd.MmdMaterialProfileProvenance :: const public int CurrentSchemaVersion = 1
-Mmd.MmdMaterialProfileProvenance :: ctor public .ctor()
 Mmd.MmdMaterialProfileProvenance :: field public Mmd.MmdMaterialProfileRenderingTargets renderingTargets
 Mmd.MmdMaterialProfileProvenance :: field public int materialSlotCount
 Mmd.MmdMaterialProfileProvenance :: field public int schemaVersion
@@ -389,8 +373,6 @@ Mmd.MmdPmxAsset :: const public float DefaultImportScale = 0.1f
 Mmd.MmdPmxAsset :: ctor public .ctor()
 Mmd.MmdPmxAsset :: method public Mmd.Parser.MmdModelDefinition LoadModel(Mmd.Parser.IMmdParser parser = null)
 Mmd.MmdPmxAsset :: method public byte[] GetBytesCopy()
-Mmd.MmdPmxAsset :: method public void ApplyHumanoidAvatarImportSummary(string assetAnimationType, UnityEngine.Avatar avatar, string readiness, string diagnostic, Mmd.MmdHumanoidBoneMappingDiagnosticSummary mappingDiagnostics = null)
-Mmd.MmdPmxAsset :: method public void ApplyProjectTextureBindingSummary(int resolvedReferenceCount, int missingReferenceCount, string missingReferenceSample)
 Mmd.MmdPmxAsset :: method public void Initialize(byte[] bytes, string assetSourceId, string assetSourcePath, float assetImportScale = 0.1f, string assetModelPreset = "Custom", string assetMeshGenerationMode = "SingleMesh", string assetMaterialTexturePolicy = "ResolveReferencesOnly", string assetShaderPreset = "MmdBasicUrpToon", Mmd.MmdPmxParseSummary? parseSummary = null, UnityEngine.Mesh importedMeshAsset = null, UnityEngine.Material[] importedMaterialAssets = null, UnityEngine.Material[] materialRemapAssets = null, UnityEngine.GameObject importedRootAsset = null, Mmd.MmdImportReadiness hierarchyReadinessValue = 0, Mmd.MmdImportReadiness rendererReadinessValue = 0, Mmd.MmdImportReadiness boneBindingReadinessValue = 0, string hierarchyReadinessDiagnosticValue = null, string rendererReadinessDiagnosticValue = null, string boneBindingReadinessDiagnosticValue = null, string assetAnimationType = "Generic", Mmd.MmdMaterialOverrideAsset importedMaterialOverrideAsset = null)
 Mmd.MmdPmxAsset :: property Mmd.MmdHumanoidBoneMappingDiagnosticSummary HumanoidBoneMappingDiagnostics { public get; }
 Mmd.MmdPmxAsset :: property Mmd.MmdImportReadiness BoneBindingReadiness { public get; }
@@ -537,7 +519,6 @@ Mmd.MmdVmdAsset :: ctor public .ctor()
 Mmd.MmdVmdAsset :: method public Mmd.Parser.MmdMotionDefinition CreateNativeClipMotionHeader()
 Mmd.MmdVmdAsset :: method public Mmd.Parser.MmdMotionDefinition LoadMotion(Mmd.Parser.IMmdParser parser = null)
 Mmd.MmdVmdAsset :: method public byte[] GetBytesCopy()
-Mmd.MmdVmdAsset :: method public static Mmd.Parser.MmdMotionDefinition CreateNativeClipMotionHeader(byte[] vmdBytes, Mmd.MmdVmdParseSummary summary)
 Mmd.MmdVmdAsset :: method public void Initialize(byte[] bytes, string assetSourceId, string assetSourcePath, Mmd.MmdVmdParseSummary? vmdParseSummary = null, System.Collections.Generic.IReadOnlyList<string> importDiagnostics = null)
 Mmd.MmdVmdAsset :: property Mmd.MmdVmdImportSummaryStatus ImportSummaryStatus { public get; }
 Mmd.MmdVmdAsset :: property System.Collections.Generic.IReadOnlyList<string> StructuralDiagnostics { public get; }
@@ -609,7 +590,6 @@ Mmd.Motion.MmdSelfShadowProjectionScope :: (type) public enum MmdSelfShadowProje
 Mmd.Motion.MmdSelfShadowProjectionScope :: enum CharacterAndOptInBackground = 1
 Mmd.Motion.MmdSelfShadowProjectionScope :: enum CharacterOnly = 0
 Mmd.Motion.MmdSelfShadowProjectionState :: (type) public readonly struct MmdSelfShadowProjectionState
-Mmd.Motion.MmdSelfShadowProjectionState :: ctor public .ctor(bool active, byte mode, float farDistance, Mmd.Motion.MmdSelfShadowProjectionScope scope, float boundsPadding, bool hasManualBoundsOverride = false, Mmd.Motion.MmdSelfShadowProjectionBounds manualBoundsOverride = default)
 Mmd.Motion.MmdSelfShadowProjectionState :: property Mmd.Motion.MmdSelfShadowProjectionBounds ManualBoundsOverride { public get; }
 Mmd.Motion.MmdSelfShadowProjectionState :: property Mmd.Motion.MmdSelfShadowProjectionScope Scope { public get; }
 Mmd.Motion.MmdSelfShadowProjectionState :: property bool Active { public get; }
@@ -625,7 +605,6 @@ Mmd.Motion.MmdSelfShadowState :: property byte Mode { public get; }
 Mmd.Motion.MmdSelfShadowState :: property float Distance { public get; }
 Mmd.Motion.MmdSelfShadowState :: property static Mmd.Motion.MmdSelfShadowState Default { public get; }
 Mmd.Motion.MmdSelfShadowUnityShadowSettings :: (type) public readonly struct MmdSelfShadowUnityShadowSettings
-Mmd.Motion.MmdSelfShadowUnityShadowSettings :: ctor public .ctor(bool runtimeApplicationEnabled, bool castShadows, byte mode, float shadowDistance, float shadowStrength)
 Mmd.Motion.MmdSelfShadowUnityShadowSettings :: property bool CastShadows { public get; }
 Mmd.Motion.MmdSelfShadowUnityShadowSettings :: property bool RuntimeApplicationEnabled { public get; }
 Mmd.Motion.MmdSelfShadowUnityShadowSettings :: property byte Mode { public get; }
@@ -1096,7 +1075,6 @@ Mmd.UnityIntegration.MmdHumanoidRetargetGate :: enum Ready = 0
 Mmd.UnityIntegration.MmdHumanoidRootMotionDriver :: (type) public sealed class MmdHumanoidRootMotionDriver : UnityEngine.MonoBehaviour
 Mmd.UnityIntegration.MmdHumanoidRootMotionDriver :: ctor public .ctor()
 Mmd.UnityIntegration.MmdLivePhysicsBodyDiagnostics :: (type) public sealed class MmdLivePhysicsBodyDiagnostics
-Mmd.UnityIntegration.MmdLivePhysicsBodyDiagnostics :: ctor public .ctor()
 Mmd.UnityIntegration.MmdLivePhysicsBodyDiagnostics :: field public UnityEngine.Quaternion debugColliderWorldRotation
 Mmd.UnityIntegration.MmdLivePhysicsBodyDiagnostics :: field public UnityEngine.Quaternion readbackMmdRotation
 Mmd.UnityIntegration.MmdLivePhysicsBodyDiagnostics :: field public UnityEngine.Quaternion readbackWorldRotation
@@ -1122,7 +1100,6 @@ Mmd.UnityIntegration.MmdLivePhysicsBodyDiagnostics :: field public string native
 Mmd.UnityIntegration.MmdLivePhysicsBodyDiagnostics :: field public string physicsKind
 Mmd.UnityIntegration.MmdLivePhysicsBodyDiagnostics :: field public string shapeType
 Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: (type) public sealed class MmdLivePhysicsFrameDiagnostics
-Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: ctor public .ctor()
 Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: field public Mmd.UnityIntegration.MmdLivePhysicsBodyDiagnostics[] bodyDiagnostics
 Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: field public Mmd.UnityIntegration.MmdLivePhysicsPinnedBodyDiagnostics pinnedBodies
 Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: field public bool afterPhysicsMatrixReadbackPresent
@@ -1192,7 +1169,6 @@ Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: field public string backe
 Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: field public string comparisonSpace
 Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: field public string evaluationPath
 Mmd.UnityIntegration.MmdLivePhysicsPinnedBodyDiagnostics :: (type) public sealed class MmdLivePhysicsPinnedBodyDiagnostics
-Mmd.UnityIntegration.MmdLivePhysicsPinnedBodyDiagnostics :: ctor public .ctor()
 Mmd.UnityIntegration.MmdLivePhysicsPinnedBodyDiagnostics :: field public float maxPinnedBodyRotationAngle
 Mmd.UnityIntegration.MmdLivePhysicsPinnedBodyDiagnostics :: field public float maxPinnedBodySyncDistance
 Mmd.UnityIntegration.MmdLivePhysicsPinnedBodyDiagnostics :: field public float worstPinnedBodyRotationAngle
@@ -1307,11 +1283,7 @@ Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: const public byte DefaultSelf
 Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: const public float DefaultSelfShadowDistance = 0.5f
 Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: ctor public .ctor()
 Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: method protected Mmd.UnityIntegration.MmdSceneCameraApplyStatus SetLastCameraApplyStatus(Mmd.UnityIntegration.MmdSceneCameraApplyStatus status)
-Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: method public Mmd.UnityIntegration.MmdSceneLightApplyStatus ApplyLightState(Mmd.Motion.MmdLightState state)
-Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: method public Mmd.UnityIntegration.MmdSceneSelfShadowApplyStatus ApplySelfShadowState(Mmd.Motion.MmdSelfShadowState state)
-Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: method public Mmd.UnityIntegration.MmdSceneSelfShadowApplyStatus EnsureSelfShadowDefaultState()
 Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: method public Mmd.UnityIntegration.MmdSceneSelfShadowDiagnosticStatus EvaluateSelfShadowDiagnosticStatus()
-Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: method public bool TryEvaluateSelfShadowAtFrame(System.Collections.Generic.IReadOnlyList<Mmd.Parser.MmdSelfShadowKeyframeDefinition> keyframes, float frame, out Mmd.UnityIntegration.MmdSceneSelfShadowApplyStatus status)
 Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: method public bool TryGetLastUnityLightDirection(out UnityEngine.Vector3 direction)
 Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: method public bool TryGetSelfShadowUnityLightDirection(out UnityEngine.Vector3 direction)
 Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: method public virtual Mmd.UnityIntegration.MmdSceneCameraApplyStatus ApplyCameraState(Mmd.Motion.MmdCameraState state, float minFieldOfView = 1f, float importScale = 1f)
@@ -1356,7 +1328,6 @@ Mmd.UnityIntegration.MmdSceneSelfShadowDiagnosticStatus :: enum NoRendererFeatur
 Mmd.UnityIntegration.MmdSceneSelfShadowDiagnosticStatus :: enum NoSelfShadowState = 0
 Mmd.UnityIntegration.MmdSceneSelfShadowDiagnosticStatus :: enum ReceiverGateOff = 7
 Mmd.UnityIntegration.MmdSelfShadowBoundsResult :: (type) public readonly struct MmdSelfShadowBoundsResult
-Mmd.UnityIntegration.MmdSelfShadowBoundsResult :: method public static Mmd.UnityIntegration.MmdSelfShadowBoundsResult FromBounds(UnityEngine.Bounds bounds, Mmd.UnityIntegration.MmdSelfShadowBoundsSource source, int includedRendererCount)
 Mmd.UnityIntegration.MmdSelfShadowBoundsResult :: property Mmd.UnityIntegration.MmdSelfShadowBoundsSource Source { public get; }
 Mmd.UnityIntegration.MmdSelfShadowBoundsResult :: property UnityEngine.Bounds Bounds { public get; }
 Mmd.UnityIntegration.MmdSelfShadowBoundsResult :: property UnityEngine.Vector3 Center { public get; }
@@ -1376,8 +1347,6 @@ Mmd.UnityIntegration.MmdSelfShadowTarget :: method public Mmd.UnityIntegration.M
 Mmd.UnityIntegration.MmdSelfShadowTarget :: method public bool TryGetActiveProjectionState(out Mmd.Motion.MmdSelfShadowProjectionState projectionState)
 Mmd.UnityIntegration.MmdSelfShadowTarget :: method public bool TryGetSelfShadowLightDirection(out UnityEngine.Vector3 direction)
 Mmd.UnityIntegration.MmdSelfShadowTarget :: method public static void CollectActiveTargets(System.Collections.Generic.List<Mmd.UnityIntegration.MmdSelfShadowTarget> buffer)
-Mmd.UnityIntegration.MmdSelfShadowTarget :: method public static void DisableAllReceiverGates()
-Mmd.UnityIntegration.MmdSelfShadowTarget :: method public void RefreshReceiverGate()
 Mmd.UnityIntegration.MmdSelfShadowTarget :: property Mmd.Motion.MmdSelfShadowProjectionPolicy ProjectionPolicy { public get; public set; }
 Mmd.UnityIntegration.MmdSelfShadowTarget :: property Mmd.UnityIntegration.MmdSceneEnvironmentBinding SceneEnvironment { public get; public set; }
 Mmd.UnityIntegration.MmdSelfShadowTarget :: property UnityEngine.Transform BoundsRoot { public get; public set; }
@@ -1416,7 +1385,6 @@ Mmd.UnityIntegration.MmdTextureUsage :: enum Diffuse = 0
 Mmd.UnityIntegration.MmdTextureUsage :: enum Sphere = 1
 Mmd.UnityIntegration.MmdTextureUsage :: enum Toon = 2
 Mmd.UnityIntegration.MmdTimelineSetupTimingSummary :: (type) public sealed class MmdTimelineSetupTimingSummary
-Mmd.UnityIntegration.MmdTimelineSetupTimingSummary :: ctor public .ctor()
 Mmd.UnityIntegration.MmdTimelineSetupTimingSummary :: field public bool configured
 Mmd.UnityIntegration.MmdTimelineSetupTimingSummary :: field public bool livePhysicsPrewarmed
 Mmd.UnityIntegration.MmdTimelineSetupTimingSummary :: field public bool livePhysicsWorldReused
@@ -1597,12 +1565,10 @@ Mmd.UnityIntegration.MmdUnityPlaybackBinding :: property string MotionId { publi
 Mmd.UnityIntegration.MmdUnityPlaybackController :: (type) public sealed class MmdUnityPlaybackController : UnityEngine.MonoBehaviour
 Mmd.UnityIntegration.MmdUnityPlaybackController :: ctor public .ctor()
 Mmd.UnityIntegration.MmdUnityPlaybackController :: event public System.Action<Mmd.MmdPlaybackSnapshot> PoseApplied
-Mmd.UnityIntegration.MmdUnityPlaybackController :: method public Mmd.MmdHumanoidRetargeterResult ApplyHumanoidRetargetNow()
 Mmd.UnityIntegration.MmdUnityPlaybackController :: method public Mmd.MmdPlaybackSnapshot ApplyFrame(int frame)
 Mmd.UnityIntegration.MmdUnityPlaybackController :: method public Mmd.MmdPlaybackSnapshot ApplyTime(float time)
 Mmd.UnityIntegration.MmdUnityPlaybackController :: method public Mmd.MmdPlaybackSnapshot ApplyTime(float time, float playbackFrameRate)
 Mmd.UnityIntegration.MmdUnityPlaybackController :: method public Mmd.MmdPlaybackSnapshot SeekFrame(int frame)
-Mmd.UnityIntegration.MmdUnityPlaybackController :: method public bool ConfigureFromPlaybackSourceIfAvailable()
 Mmd.UnityIntegration.MmdUnityPlaybackController :: method public bool IsConfiguredForMotionAsset(Mmd.MmdVmdAsset motion)
 Mmd.UnityIntegration.MmdUnityPlaybackController :: method public bool TryEnableFastRuntime(byte[] pmxBytes, byte[] vmdBytes, out string reason)
 Mmd.UnityIntegration.MmdUnityPlaybackController :: method public bool TryEnableFastRuntimeFromConfiguredSource(out string reason)
@@ -1610,8 +1576,6 @@ Mmd.UnityIntegration.MmdUnityPlaybackController :: method public void Configure(
 Mmd.UnityIntegration.MmdUnityPlaybackController :: method public void Configure(Mmd.UnityIntegration.MmdUnityPlaybackBinding playbackBinding, float playbackFrameRate, bool playOnStart = true)
 Mmd.UnityIntegration.MmdUnityPlaybackController :: method public void ConfigureFromAssets(Mmd.MmdPmxAsset pmxAsset, Mmd.MmdVmdAsset vmdAsset, float playbackFrameRate, int startFrame = 0, bool playOnStart = true)
 Mmd.UnityIntegration.MmdUnityPlaybackController :: method public void ConfigureFromPlaybackSource(Mmd.MmdPmxAsset pmxAsset, Mmd.MmdVmdAsset vmdAsset, Mmd.MmdPlaybackConfig config)
-Mmd.UnityIntegration.MmdUnityPlaybackController :: method public void ConfigureFromRuntimeImporterPaths(string pmxPath, string vmdPath, Mmd.MmdPlaybackConfig config)
-Mmd.UnityIntegration.MmdUnityPlaybackController :: method public void ConfigureHumanoidRetarget(UnityEngine.Transform proxyRoot, System.Collections.Generic.IReadOnlyList<Mmd.MmdHumanoidRetargetBinding> entries, System.Collections.Generic.IReadOnlyList<Mmd.MmdHumanoidAppendTransformBinding> appendEntries)
 Mmd.UnityIntegration.MmdUnityPlaybackController :: method public void ConfigureModelAsset(Mmd.MmdPmxAsset pmxAsset)
 Mmd.UnityIntegration.MmdUnityPlaybackController :: method public void ConfigureMotionAsset(Mmd.MmdVmdAsset vmdAsset)
 Mmd.UnityIntegration.MmdUnityPlaybackController :: method public void ConfigureMotionFromProviderModelSource(Mmd.MmdVmdAsset vmdAsset, Mmd.MmdPlaybackConfig config)
@@ -1621,7 +1585,6 @@ Mmd.UnityIntegration.MmdUnityPlaybackController :: method public void Pause()
 Mmd.UnityIntegration.MmdUnityPlaybackController :: method public void Play()
 Mmd.UnityIntegration.MmdUnityPlaybackController :: method public void SetPhysicsMode(Mmd.Physics.MmdPhysicsMode mode)
 Mmd.UnityIntegration.MmdUnityPlaybackController :: method public void SetPlayOnStart(bool value)
-Mmd.UnityIntegration.MmdUnityPlaybackController :: method public void StartPlaybackIfRequested()
 Mmd.UnityIntegration.MmdUnityPlaybackController :: method public void Stop()
 Mmd.UnityIntegration.MmdUnityPlaybackController :: method public void Tick(float deltaTime)
 Mmd.UnityIntegration.MmdUnityPlaybackController :: property Mmd.MmdHumanoidRetargeterResult LastHumanoidRetargetResult { public get; }

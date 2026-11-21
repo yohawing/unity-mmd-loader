@@ -56,6 +56,8 @@ namespace Mmd
         public MmdMaterialProfileRenderingTargets renderingTargets = new();
         [SerializeField] private bool initialized;
 
+        internal MmdMaterialProfileProvenance() { }
+
         internal static MmdMaterialProfileProvenance Create(
             string profileId,
             string profileName,
@@ -742,7 +744,7 @@ namespace Mmd
             return mapperSet;
         }
 
-        public void ApplyHumanoidAvatarImportSummary(
+        internal void ApplyHumanoidAvatarImportSummary(
             string assetAnimationType,
             Avatar? avatar,
             string readiness,
@@ -756,7 +758,7 @@ namespace Mmd
             humanoidBoneMappingDiagnostics = mappingDiagnostics ?? MmdHumanoidBoneMappingDiagnosticSummary.Empty;
         }
 
-        public void ApplyProjectTextureBindingSummary(
+        internal void ApplyProjectTextureBindingSummary(
             int resolvedReferenceCount,
             int missingReferenceCount,
             string? missingReferenceSample)

@@ -20,6 +20,13 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
   - `MmdMorphDescriptorBuilder.MmdMaterialMorphDescriptor` → `MmdMaterialMorphDescriptor`, `MmdMorphDescriptorBuilder.MmdMaterialMorphOffsetDescriptor` → `MmdMaterialMorphOffsetDescriptor`.
   - `MmdMorphDescriptorBuilder.MmdUvMorphDescriptor` → `MmdUvMorphDescriptor`, `MmdMorphDescriptorBuilder.MmdUvMorphOffsetDescriptor` → `MmdUvMorphOffsetDescriptor`.
   - The nested `MmdBoneMorphDescriptor`, `MmdBoneMorphOffsetDescriptor`, `MmdImpulseMorphDescriptor`, and `MmdImpulseMorphOffsetDescriptor` moved the same way and are now `internal` (listed above).
+- Changed members of supported types that only the importer and playback pipeline use to `internal`. The types stay public, and their properties and fields can still be read.
+  - Constructors of the result and diagnostic types: `MmdHumanoidAppendTransformBinding`, `MmdHumanoidBoneMappingDiagnosticEntry`, `MmdHumanoidBoneMappingDiagnosticSummary`, `MmdHumanoidMissingRequiredBone`, `MmdHumanoidRetargetBinding`, `MmdHumanoidRetargeterResult`, `MmdMaterialProfileProvenance`, `Mmd.Motion.MmdSelfShadowProjectionState`, `Mmd.Motion.MmdSelfShadowUnityShadowSettings`, `Mmd.UnityIntegration.MmdLivePhysicsBodyDiagnostics`, `Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics`, `Mmd.UnityIntegration.MmdLivePhysicsPinnedBodyDiagnostics`, `Mmd.UnityIntegration.MmdTimelineSetupTimingSummary`, and the static `Mmd.UnityIntegration.MmdSelfShadowBoundsResult.FromBounds`.
+  - `MmdPmxAsset`: `ApplyHumanoidAvatarImportSummary`, `ApplyProjectTextureBindingSummary`.
+  - `MmdVmdAsset`: the static `CreateNativeClipMotionHeader(byte[], MmdVmdParseSummary)`. The instance `CreateNativeClipMotionHeader()` stays public.
+  - `Mmd.UnityIntegration.MmdSceneEnvironmentBinding`: `ApplyLightState`, `ApplySelfShadowState`, `EnsureSelfShadowDefaultState`, `TryEvaluateSelfShadowAtFrame`.
+  - `Mmd.UnityIntegration.MmdSelfShadowTarget`: `RefreshReceiverGate`, `DisableAllReceiverGates`.
+  - `Mmd.UnityIntegration.MmdUnityPlaybackController`: `ApplyHumanoidRetargetNow`, `ConfigureFromPlaybackSourceIfAvailable`, `ConfigureFromRuntimeImporterPaths`, `ConfigureHumanoidRetarget`, `StartPlaybackIfRequested`.
 
 ## [0.5.1] - 2026-10-23
 
