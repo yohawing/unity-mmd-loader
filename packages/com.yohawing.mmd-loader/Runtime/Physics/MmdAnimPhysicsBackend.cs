@@ -102,7 +102,6 @@ namespace Mmd.Physics
         private IntPtr instance;
         private readonly bool ownsRuntimeHandles;
         private IntPtr hostRig;
-        private readonly bool ownsHostRig;
         private IntPtr world;
         private readonly int boneCount;
         private readonly int worldMatrixFloatCount;
@@ -193,7 +192,6 @@ namespace Mmd.Physics
                 instance = createdInstance;
                 ownsRuntimeHandles = true;
                 hostRig = createdHostRig;
-                ownsHostRig = createdHostRig != IntPtr.Zero;
                 world = createdWorld;
                 rigidbodyStates = Array.Empty<float>();
                 createdModel = IntPtr.Zero;
@@ -237,7 +235,6 @@ namespace Mmd.Physics
             instance = playbackSession.GetNativeInstanceHandle();
             ownsRuntimeHandles = false;
             hostRig = IntPtr.Zero;
-            ownsHostRig = false;
             boneCount = playbackSession.BoneCount;
             worldMatrixFloatCount = playbackSession.WorldMatrixFloatCount;
             morphCount = playbackSession.MorphWeightCount;
@@ -357,19 +354,8 @@ namespace Mmd.Physics
                     nativeVersion = $"abi-{abiVersion}"
                 };
             }
-            catch (DllNotFoundException ex)
-            {
-                return Unavailable(ex.Message);
-            }
-            catch (EntryPointNotFoundException ex)
-            {
-                return Unavailable(ex.Message);
-            }
-            catch (BadImageFormatException ex)
-            {
-                return Unavailable(ex.Message);
-            }
-            catch (InvalidOperationException ex)
+            catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or
+                                       BadImageFormatException or InvalidOperationException)
             {
                 return Unavailable(ex.Message);
             }
@@ -420,19 +406,8 @@ namespace Mmd.Physics
                 backend = new MmdAnimPhysicsBackend(pmxBytes, modelId, motionId);
                 return true;
             }
-            catch (DllNotFoundException ex)
-            {
-                reason = ex.Message;
-            }
-            catch (EntryPointNotFoundException ex)
-            {
-                reason = ex.Message;
-            }
-            catch (BadImageFormatException ex)
-            {
-                reason = ex.Message;
-            }
-            catch (InvalidOperationException ex)
+            catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or
+                                       BadImageFormatException or InvalidOperationException)
             {
                 reason = ex.Message;
             }
@@ -476,27 +451,9 @@ namespace Mmd.Physics
                     goalBones);
                 return true;
             }
-            catch (DllNotFoundException ex)
-            {
-                reason = ex.Message;
-            }
-            catch (EntryPointNotFoundException ex)
-            {
-                reason = ex.Message;
-            }
-            catch (BadImageFormatException ex)
-            {
-                reason = ex.Message;
-            }
-            catch (InvalidOperationException ex)
-            {
-                reason = ex.Message;
-            }
-            catch (ArgumentException ex)
-            {
-                reason = ex.Message;
-            }
-            catch (MmdRuntimeUnsupportedException ex)
+            catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or
+                                       BadImageFormatException or InvalidOperationException or
+                                       ArgumentException or MmdRuntimeUnsupportedException)
             {
                 reason = ex.Message;
             }
@@ -1186,7 +1143,7 @@ namespace Mmd.Physics
             }
 
             disposed = true;
-            if (ownsHostRig && hostRig != IntPtr.Zero)
+            if (hostRig != IntPtr.Zero)
             {
                 MmdRuntimeFfiMethods.HostRigFree(hostRig);
                 hostRig = IntPtr.Zero;
