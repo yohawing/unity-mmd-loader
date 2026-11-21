@@ -321,6 +321,13 @@ namespace Mmd.UnityIntegration
                 ResetHumanoidHostPoseFailureLatch();
             }
 
+            if (mode == MmdPhysicsMode.Live && previousMode != MmdPhysicsMode.Live)
+            {
+                // Explicitly re-enabling Live allows one fresh model-only binding attempt; the
+                // latch still suppresses per-frame retries while Live stays enabled.
+                ResetHumanoidPhysicsBindingFailureReason();
+            }
+
             if (binding != null)
             {
                 ApplyPhysicsModeToBinding(mode);
@@ -575,6 +582,9 @@ namespace Mmd.UnityIntegration
                 if (physicsMode == MmdPhysicsMode.Off)
                 {
                     ResetHumanoidHostPoseFailureLatch();
+                    // The serialized field has no previous value here; clearing while Off lets
+                    // the next serialized Off->Live switch retry the model-only binding once.
+                    ResetHumanoidPhysicsBindingFailureReason();
                 }
                 else
                 {

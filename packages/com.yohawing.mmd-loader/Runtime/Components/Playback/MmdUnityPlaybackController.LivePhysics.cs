@@ -16,6 +16,10 @@ namespace Mmd.UnityIntegration
         private LivePhysicsDriveSource livePhysicsDriveSource = LivePhysicsDriveSource.None;
         private MmdHumanoidPhysicsBindingFailureReason humanoidPhysicsBindingFailureReason;
 
+        internal int HumanoidPhysicsBindingCreateAttemptCount { get; private set; }
+
+        internal bool HasHumanoidPhysicsBinding => humanoidPhysicsBinding != null;
+
         private bool StepHumanoidRetargetLivePhysicsIfNeeded(
             MmdHumanoidRetargeterResult result,
             float[] localPositionOffsets,
@@ -92,8 +96,11 @@ namespace Mmd.UnityIntegration
 
         private void EnsureHumanoidPhysicsBinding()
         {
+            // A recorded failure latches until a source or retarget configuration change resets
+            // it; retrying would re-parse and re-validate the full PMX every LateUpdate.
             if (binding != null ||
                 humanoidPhysicsBinding != null ||
+                humanoidPhysicsBindingFailureReason != MmdHumanoidPhysicsBindingFailureReason.None ||
                 physicsMode != MmdPhysicsMode.Live ||
                 !Application.isPlaying ||
                 proxyRoot == null ||
@@ -107,6 +114,7 @@ namespace Mmd.UnityIntegration
                 return;
             }
 
+            HumanoidPhysicsBindingCreateAttemptCount++;
             try
             {
                 humanoidPhysicsBinding = MmdUnityPlaybackBinding.CreateSkinnedForModelOnlyPhysicsFromExistingSceneModel(

@@ -1136,6 +1136,189 @@ namespace Mmd.Tests
             }
         }
 
+        // A failed model-only physics binding parses and validates the full PMX. The failure must
+        // latch until a source or retarget configuration change instead of retrying every
+        // LateUpdate.
+        [UnityTest]
+        public IEnumerator HumanoidRetargetLateUpdateLatchesModelOnlyPhysicsBindingFailureUntilReconfigured()
+        {
+            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
+            if (!availability.backendAvailable)
+            {
+                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
+                yield break;
+            }
+
+            MmdUnityModelInstance? instance = null;
+            MmdPmxAsset? pmxAsset = null;
+            MmdHumanoidProxyRigResult? proxyRig = null;
+            Avatar? avatar = null;
+            PlayableGraph graph = default;
+            try
+            {
+                string pmxPath = ResolvePackageFixture("test_hair_physics.pmx");
+                byte[] pmxBytes = File.ReadAllBytes(pmxPath);
+                MmdModelDefinition model = LoadHairPhysicsModelForLive(pmxPath);
+                instance = MmdUnityModelFactory.CreateSkinnedModel(
+                    model,
+                    pmxPath,
+                    MmdPmxAsset.DefaultImportScale);
+                pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
+                pmxAsset.Initialize(
+                    pmxBytes,
+                    "test_hair_physics.pmx",
+                    pmxPath,
+                    MmdPmxAsset.DefaultImportScale,
+                    parseSummary: MmdPmxParseSummary.FromModel(model));
+
+                MmdUnityPlaybackController controller = instance.Root.AddComponent<MmdUnityPlaybackController>();
+                controller.ConfigureModelAsset(pmxAsset);
+                controller.SetPhysicsMode(MmdPhysicsMode.Live);
+
+                int drivenBoneIndex = FindFirstValidStaticPhysicsBone(model, instance);
+                Assert.That(drivenBoneIndex, Is.GreaterThanOrEqualTo(0));
+
+                proxyRig = MmdHumanoidProxyRigFactory.CreateProxyRig(CreateHumanoidMappingModelWithOriginsForLivePhysics());
+                Assert.That(proxyRig.ProxyRoot, Is.Not.Null);
+                proxyRig.ProxyRoot!.transform.SetParent(instance.Root.transform, worldPositionStays: false);
+                proxyRig.ProxyRoot.SetActive(true);
+                MmdHumanoidAvatarBuildResult avatarResult = MmdHumanoidProxyRigFactory.BuildAvatar(proxyRig);
+                Assert.That(avatarResult.IsValidHumanAvatar, Is.True, string.Join("\n", avatarResult.Diagnostics));
+                avatar = avatarResult.Avatar;
+
+                Animator animator = instance.Root.AddComponent<Animator>();
+                animator.avatar = avatar;
+                graph = CreateBoundAnimatorGraph(animator);
+
+                Transform proxyHips = proxyRig.BoneMap[HumanBodyBones.Hips];
+                Transform drivenBone = instance.BoneTransforms[drivenBoneIndex];
+                var entries = new[]
+                {
+                    new MmdHumanoidRetargetBinding(
+                        HumanBodyBones.Hips,
+                        drivenBoneIndex,
+                        proxyHips,
+                        drivenBone,
+                        proxyHips.localRotation,
+                        drivenBone.localRotation)
+                };
+
+                // The host pose input only needs the renderer bones; the model-only physics
+                // binding additionally requires one material slot per PMX material.
+                SkinnedMeshRenderer renderer = instance.Root.GetComponentInChildren<SkinnedMeshRenderer>(includeInactive: true);
+                Assert.That(renderer, Is.Not.Null);
+                Material[] originalMaterials = renderer.sharedMaterials;
+                Assert.That(originalMaterials.Length, Is.GreaterThan(0));
+                renderer.sharedMaterials = Array.Empty<Material>();
+
+                controller.ConfigureHumanoidRetarget(
+                    proxyRig.ProxyRoot.transform,
+                    entries,
+                    Array.Empty<MmdHumanoidAppendTransformBinding>());
+                int attemptsBefore = controller.HumanoidPhysicsBindingCreateAttemptCount;
+
+                for (int i = 0; i < 3; i++)
+                {
+                    proxyHips.localRotation = Quaternion.Euler(0.0f, 2.0f * (i + 1), 0.0f);
+                    yield return null;
+                }
+
+                Assert.That(controller.LastHumanoidRetargetGate, Is.EqualTo(MmdHumanoidRetargetGate.Ready));
+                Assert.That(controller.HasHumanoidPhysicsBinding, Is.False);
+                Assert.That(controller.HumanoidPhysicsBindingFailureReason, Is.Not.Empty);
+                Assert.That(controller.HumanoidPhysicsBindingCreateAttemptCount - attemptsBefore, Is.EqualTo(1),
+                    "A recorded model-only physics binding failure must not re-parse the PMX every LateUpdate.");
+
+                // Fixing the cause alone does not retry while Live stays enabled...
+                renderer.sharedMaterials = originalMaterials;
+                int attemptsWhileLatched = controller.HumanoidPhysicsBindingCreateAttemptCount;
+                for (int i = 0; i < 2; i++)
+                {
+                    yield return null;
+                }
+
+                Assert.That(controller.HumanoidPhysicsBindingCreateAttemptCount, Is.EqualTo(attemptsWhileLatched));
+                Assert.That(controller.HasHumanoidPhysicsBinding, Is.False);
+
+                // ...but explicitly re-enabling Live allows exactly one fresh attempt.
+                controller.SetPhysicsMode(MmdPhysicsMode.Off);
+                yield return null;
+                Assert.That(controller.HumanoidPhysicsBindingCreateAttemptCount, Is.EqualTo(attemptsWhileLatched),
+                    "Physics Off must not attempt the model-only physics binding.");
+                controller.SetPhysicsMode(MmdPhysicsMode.Live);
+                Assert.That(controller.HumanoidPhysicsBindingFailureReason, Is.Empty);
+                for (int i = 0; i < 3; i++)
+                {
+                    proxyHips.localRotation = Quaternion.Euler(0.0f, 3.0f * (i + 1), 0.0f);
+                    yield return null;
+                }
+
+                Assert.That(controller.HumanoidPhysicsBindingCreateAttemptCount - attemptsWhileLatched, Is.EqualTo(1),
+                    "Re-enabling Live must retry the model-only physics binding exactly once.");
+                Assert.That(controller.HasHumanoidPhysicsBinding, Is.True);
+                Assert.That(controller.HumanoidPhysicsBindingFailureReason, Is.Empty);
+
+                // Fail again, then check that a retarget configuration change also clears the latch.
+                // Break the renderer only after reconfiguring: disposing the binding restores the
+                // borrowed renderer state.
+                controller.ConfigureHumanoidRetarget(
+                    proxyRig.ProxyRoot.transform,
+                    entries,
+                    Array.Empty<MmdHumanoidAppendTransformBinding>());
+                renderer.sharedMaterials = Array.Empty<Material>();
+                int attemptsBeforeSecondFailure = controller.HumanoidPhysicsBindingCreateAttemptCount;
+                for (int i = 0; i < 3; i++)
+                {
+                    yield return null;
+                }
+
+                Assert.That(controller.HumanoidPhysicsBindingCreateAttemptCount - attemptsBeforeSecondFailure, Is.EqualTo(1));
+                Assert.That(controller.HumanoidPhysicsBindingFailureReason, Is.Not.Empty);
+
+                renderer.sharedMaterials = originalMaterials;
+                controller.ConfigureHumanoidRetarget(
+                    proxyRig.ProxyRoot.transform,
+                    entries,
+                    Array.Empty<MmdHumanoidAppendTransformBinding>());
+                Assert.That(controller.HumanoidPhysicsBindingFailureReason, Is.Empty);
+                int attemptsAfterReset = controller.HumanoidPhysicsBindingCreateAttemptCount;
+                for (int i = 0; i < 3; i++)
+                {
+                    proxyHips.localRotation = Quaternion.Euler(0.0f, -2.0f * (i + 1), 0.0f);
+                    yield return null;
+                }
+
+                Assert.That(controller.HumanoidPhysicsBindingCreateAttemptCount - attemptsAfterReset, Is.EqualTo(1),
+                    "Reconfiguring the retarget must retry the binding exactly once.");
+                Assert.That(controller.HasHumanoidPhysicsBinding, Is.True);
+                Assert.That(controller.HumanoidPhysicsBindingFailureReason, Is.Empty);
+            }
+            finally
+            {
+                if (graph.IsValid())
+                {
+                    graph.Destroy();
+                }
+
+                if (avatar != null)
+                {
+                    UnityEngine.Object.Destroy(avatar);
+                }
+
+                if (proxyRig?.ProxyRoot != null)
+                {
+                    UnityEngine.Object.Destroy(proxyRig.ProxyRoot);
+                }
+
+                if (pmxAsset != null)
+                {
+                    UnityEngine.Object.Destroy(pmxAsset);
+                }
+
+                MmdPlayModeTestInstanceScope.DestroyInstance(instance);
+            }
+        }
+
         // Alternative C regression: a SINGLE MmdHumanoidAnimationTrack (bound only to the
         // controller, no separate AnimationTrack/Animator binding) carrying a real Humanoid
         // muscle clip must (a) pose the proxy avatar via the track's manually-created
