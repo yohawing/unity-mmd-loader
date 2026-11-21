@@ -35,6 +35,9 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 
 ### Fixed
 
+- Humanoid Live playback no longer re-parses the PMX every frame after the model-only physics binding fails to build; it retries once after the scene is reconfigured or Live physics is re-enabled.
+- `MmdUnityPlaybackController` teardown (`OnDisable` and resource release) no longer leaks the native Humanoid host pose session when a bone transform was destroyed, and restores the surviving bones.
+- Pausing a controller that plays through the automatic worker keeps its Live physics state instead of reseeding physics on resume.
 - `MmdModelValidator` reports a missing `physics`, `physics.rigidbodies` or `physics.joints` as a validation error instead of throwing `NullReferenceException`.
 
 ## [0.5.1] - 2026-10-23
