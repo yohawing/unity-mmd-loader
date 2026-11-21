@@ -1,0 +1,21 @@
+Mmd.Editor.Timeline.MmdHumanoidAnimationClipEditor :: (type) public sealed class MmdHumanoidAnimationClipEditor : UnityEditor.Timeline.ClipEditor
+Mmd.Editor.Timeline.MmdHumanoidAnimationClipEditor :: ctor public .ctor()
+Mmd.Editor.Timeline.MmdHumanoidAnimationClipEditor :: method public override void OnCreate(UnityEngine.Timeline.TimelineClip clip, UnityEngine.Timeline.TrackAsset track, UnityEngine.Timeline.TimelineClip clonedFrom)
+Mmd.Editor.Timeline.MmdHumanoidAnimationClipEditor :: method public static bool ApplyDurationFromAnimationClip(UnityEngine.Timeline.TimelineClip clip)
+Mmd.Editor.Timeline.MmdHumanoidAnimationClipInspector :: (type) public sealed class MmdHumanoidAnimationClipInspector : UnityEditor.Editor
+Mmd.Editor.Timeline.MmdHumanoidAnimationClipInspector :: ctor public .ctor()
+Mmd.Editor.Timeline.MmdHumanoidAnimationClipInspector :: method public override void OnInspectorGUI()
+Mmd.Editor.Timeline.MmdVmdCameraClipEditor :: (type) public sealed class MmdVmdCameraClipEditor : UnityEditor.Timeline.ClipEditor
+Mmd.Editor.Timeline.MmdVmdCameraClipEditor :: ctor public .ctor()
+Mmd.Editor.Timeline.MmdVmdCameraClipEditor :: method public override void OnCreate(UnityEngine.Timeline.TimelineClip clip, UnityEngine.Timeline.TrackAsset track, UnityEngine.Timeline.TimelineClip clonedFrom)
+Mmd.Editor.Timeline.MmdVmdCameraClipEditor :: method public static bool ApplyDurationFromMotionAsset(UnityEngine.Timeline.TimelineClip clip)
+Mmd.Editor.Timeline.MmdVmdCameraClipInspector :: (type) public sealed class MmdVmdCameraClipInspector : UnityEditor.Editor
+Mmd.Editor.Timeline.MmdVmdCameraClipInspector :: ctor public .ctor()
+Mmd.Editor.Timeline.MmdVmdCameraClipInspector :: method public override void OnInspectorGUI()
+Mmd.Editor.Timeline.MmdVmdTimelineClipEditor :: (type) public sealed class MmdVmdTimelineClipEditor : UnityEditor.Timeline.ClipEditor
+Mmd.Editor.Timeline.MmdVmdTimelineClipEditor :: ctor public .ctor()
+Mmd.Editor.Timeline.MmdVmdTimelineClipEditor :: method public override void OnCreate(UnityEngine.Timeline.TimelineClip clip, UnityEngine.Timeline.TrackAsset track, UnityEngine.Timeline.TimelineClip clonedFrom)
+Mmd.Editor.Timeline.MmdVmdTimelineClipEditor :: method public static bool ApplyDurationFromMotionAsset(UnityEngine.Timeline.TimelineClip clip)
+Mmd.Editor.Timeline.MmdVmdTimelineClipInspector :: (type) public sealed class MmdVmdTimelineClipInspector : UnityEditor.Editor
+Mmd.Editor.Timeline.MmdVmdTimelineClipInspector :: ctor public .ctor()
+Mmd.Editor.Timeline.MmdVmdTimelineClipInspector :: method public override void OnInspectorGUI()

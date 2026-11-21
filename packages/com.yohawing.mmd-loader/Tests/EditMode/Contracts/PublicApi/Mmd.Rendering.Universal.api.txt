@@ -1,0 +1,32 @@
+Mmd.Rendering.Universal.MmdOutlineRenderPass :: (type) public sealed class MmdOutlineRenderPass : UnityEngine.Rendering.Universal.ScriptableRenderPass
+Mmd.Rendering.Universal.MmdOutlineRenderPass :: ctor public .ctor()
+Mmd.Rendering.Universal.MmdOutlineRenderPass :: method public override void RecordRenderGraph(UnityEngine.Rendering.RenderGraphModule.RenderGraph renderGraph, UnityEngine.Rendering.ContextContainer frameData)
+Mmd.Rendering.Universal.MmdOutlineRendererFeature :: (type) public sealed class MmdOutlineRendererFeature : UnityEngine.Rendering.Universal.ScriptableRendererFeature
+Mmd.Rendering.Universal.MmdOutlineRendererFeature :: ctor public .ctor()
+Mmd.Rendering.Universal.MmdOutlineRendererFeature :: method public override void AddRenderPasses(UnityEngine.Rendering.Universal.ScriptableRenderer renderer, ref UnityEngine.Rendering.Universal.RenderingData renderingData)
+Mmd.Rendering.Universal.MmdOutlineRendererFeature :: method public override void Create()
+Mmd.Rendering.Universal.MmdSelfShadowPcfSamples :: (type) public enum MmdSelfShadowPcfSamples : int
+Mmd.Rendering.Universal.MmdSelfShadowPcfSamples :: enum Eight = 8
+Mmd.Rendering.Universal.MmdSelfShadowPcfSamples :: enum Four = 4
+Mmd.Rendering.Universal.MmdSelfShadowPcfSamples :: enum One = 1
+Mmd.Rendering.Universal.MmdSelfShadowRenderPass :: (type) public sealed class MmdSelfShadowRenderPass : UnityEngine.Rendering.Universal.ScriptableRenderPass
+Mmd.Rendering.Universal.MmdSelfShadowRenderPass :: ctor public .ctor()
+Mmd.Rendering.Universal.MmdSelfShadowRenderPass :: field public static readonly int MmdSelfShadowMapId
+Mmd.Rendering.Universal.MmdSelfShadowRenderPass :: field public static readonly int MmdSelfShadowParamsId
+Mmd.Rendering.Universal.MmdSelfShadowRenderPass :: field public static readonly int MmdSelfShadowWorldToShadowId
+Mmd.Rendering.Universal.MmdSelfShadowRenderPass :: method public bool Setup(int requestedMapSize, UnityEngine.Vector3 requestedShadowDirection)
+Mmd.Rendering.Universal.MmdSelfShadowRenderPass :: method public bool Setup(int requestedMapSize, UnityEngine.Vector3 requestedShadowDirection, float requestedShadowDepthBias)
+Mmd.Rendering.Universal.MmdSelfShadowRenderPass :: method public bool Setup(int requestedMapSize, UnityEngine.Vector3 requestedShadowDirection, float requestedShadowDepthBias, int requestedPcfTapCount, float requestedSoftShadowRadius)
+Mmd.Rendering.Universal.MmdSelfShadowRenderPass :: method public override void RecordRenderGraph(UnityEngine.Rendering.RenderGraphModule.RenderGraph renderGraph, UnityEngine.Rendering.ContextContainer frameData)
+Mmd.Rendering.Universal.MmdSelfShadowRenderPass :: method public static void PublishDisabledGlobals(Mmd.UnityIntegration.MmdSceneSelfShadowDiagnosticStatus diagnosticStatus = 8)
+Mmd.Rendering.Universal.MmdSelfShadowRenderPass :: property static Mmd.UnityIntegration.MmdSceneSelfShadowDiagnosticStatus LastDiagnosticStatus { public get; }
+Mmd.Rendering.Universal.MmdSelfShadowRendererFeature :: (type) public sealed class MmdSelfShadowRendererFeature : UnityEngine.Rendering.Universal.ScriptableRendererFeature
+Mmd.Rendering.Universal.MmdSelfShadowRendererFeature :: ctor public .ctor()
+Mmd.Rendering.Universal.MmdSelfShadowRendererFeature :: method protected override void Dispose(bool disposing)
+Mmd.Rendering.Universal.MmdSelfShadowRendererFeature :: method public override void AddRenderPasses(UnityEngine.Rendering.Universal.ScriptableRenderer renderer, ref UnityEngine.Rendering.Universal.RenderingData renderingData)
+Mmd.Rendering.Universal.MmdSelfShadowRendererFeature :: method public override void Create()
+Mmd.Rendering.Universal.MmdSelfShadowRendererFeature :: property Mmd.Rendering.Universal.MmdSelfShadowPcfSamples PcfSamples { public get; public set; }
+Mmd.Rendering.Universal.MmdSelfShadowRendererFeature :: property UnityEngine.Vector3 ShadowDirection { public get; public set; }
+Mmd.Rendering.Universal.MmdSelfShadowRendererFeature :: property float ShadowDepthBias { public get; public set; }
+Mmd.Rendering.Universal.MmdSelfShadowRendererFeature :: property float SoftShadowRadius { public get; public set; }
+Mmd.Rendering.Universal.MmdSelfShadowRendererFeature :: property int ShadowMapSize { public get; public set; }

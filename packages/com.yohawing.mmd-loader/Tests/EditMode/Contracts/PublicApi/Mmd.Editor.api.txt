@@ -1,0 +1,204 @@
+Mmd.Editor.MmdEditorBatchmodeDiagnosticsCommand :: (type) public static class MmdEditorBatchmodeDiagnosticsCommand
+Mmd.Editor.MmdEditorBatchmodeDiagnosticsCommand :: method public static float TryParseFloat(string name, float defaultValue)
+Mmd.Editor.MmdEditorBatchmodeDiagnosticsCommand :: method public static int TryParseInt(string name, int defaultValue)
+Mmd.Editor.MmdEditorBatchmodeDiagnosticsCommand :: method public static string GetRequiredArg(string name)
+Mmd.Editor.MmdEditorBatchmodeDiagnosticsCommand :: method public static string TryGetArg(string name)
+Mmd.Editor.MmdEditorBatchmodeDiagnosticsCommand :: method public static void RunCommand(System.Func<string> action, string failurePrefix)
+Mmd.Editor.MmdEditorBatchmodeDiagnosticsCommand :: method public static void WriteJsonOutput<T>(string outputPath, T value)
+Mmd.Editor.MmdEditorPlaybackLoader :: (type) public static class MmdEditorPlaybackLoader
+Mmd.Editor.MmdEditorPlaybackLoader :: method public static Mmd.Editor.MmdEditorPlaybackSceneLoadResult LoadPlaybackIntoScene(Mmd.MmdPmxAsset pmxAsset, Mmd.MmdVmdAsset vmdAsset, float frameRate = 30f, int initialFrame = 0, bool playOnStart = true)
+Mmd.Editor.MmdEditorPlaybackLoader :: method public static Mmd.Editor.MmdEditorPlaybackSceneLoadResult LoadPlaybackIntoScene(string pmxPath, string vmdPath, float frameRate = 30f, int initialFrame = 0, bool playOnStart = true)
+Mmd.Editor.MmdEditorPlaybackSceneLoadResult :: (type) public sealed class MmdEditorPlaybackSceneLoadResult
+Mmd.Editor.MmdEditorPlaybackSceneLoadResult :: ctor public .ctor(Mmd.UnityIntegration.MmdUnityModelInstance instance, Mmd.UnityIntegration.MmdUnityPlaybackBinding binding, Mmd.UnityIntegration.MmdUnityPlaybackController controller, Mmd.Parser.MmdModelDefinition model, Mmd.Parser.MmdMotionDefinition motion, string modelPath, string motionPath, Mmd.MmdPlaybackSnapshot initialSnapshot)
+Mmd.Editor.MmdEditorPlaybackSceneLoadResult :: property Mmd.MmdPlaybackSnapshot InitialSnapshot { public get; }
+Mmd.Editor.MmdEditorPlaybackSceneLoadResult :: property Mmd.Parser.MmdModelDefinition Model { public get; }
+Mmd.Editor.MmdEditorPlaybackSceneLoadResult :: property Mmd.Parser.MmdMotionDefinition Motion { public get; }
+Mmd.Editor.MmdEditorPlaybackSceneLoadResult :: property Mmd.UnityIntegration.MmdUnityModelInstance Instance { public get; }
+Mmd.Editor.MmdEditorPlaybackSceneLoadResult :: property Mmd.UnityIntegration.MmdUnityPlaybackBinding Binding { public get; }
+Mmd.Editor.MmdEditorPlaybackSceneLoadResult :: property Mmd.UnityIntegration.MmdUnityPlaybackController Controller { public get; }
+Mmd.Editor.MmdEditorPlaybackSceneLoadResult :: property string ModelPath { public get; }
+Mmd.Editor.MmdEditorPlaybackSceneLoadResult :: property string MotionPath { public get; }
+Mmd.Editor.MmdEditorPmxLoader :: (type) public static class MmdEditorPmxLoader
+Mmd.Editor.MmdEditorPmxLoader :: method public static Mmd.UnityIntegration.MmdUnityModelInstance LoadPmxIntoScene(Mmd.MmdPmxAsset pmxAsset)
+Mmd.Editor.MmdEditorPmxLoader :: method public static Mmd.UnityIntegration.MmdUnityModelInstance LoadPmxIntoScene(string path)
+Mmd.Editor.MmdEditorPmxSceneLoadResult :: (type) public sealed class MmdEditorPmxSceneLoadResult
+Mmd.Editor.MmdEditorPmxSceneLoadResult :: ctor public .ctor(Mmd.Parser.MmdModelDefinition model, Mmd.UnityIntegration.MmdUnityModelInstance instance, string modelPath)
+Mmd.Editor.MmdEditorPmxSceneLoadResult :: property Mmd.Parser.MmdModelDefinition Model { public get; }
+Mmd.Editor.MmdEditorPmxSceneLoadResult :: property Mmd.UnityIntegration.MmdUnityModelInstance Instance { public get; }
+Mmd.Editor.MmdEditorPmxSceneLoadResult :: property string ModelPath { public get; }
+Mmd.Editor.MmdEditorSelectionSnapshot :: (type) public readonly struct MmdEditorSelectionSnapshot
+Mmd.Editor.MmdEditorSelectionSnapshot :: ctor public .ctor(Mmd.MmdPmxAsset pmxAsset, Mmd.MmdVmdAsset vmdAsset, Mmd.UnityIntegration.MmdUnityPlaybackController controller, UnityEngine.Playables.PlayableDirector director, UnityEngine.Timeline.TimelineAsset timelineAsset, Mmd.UnityIntegration.MmdRuntimeImporterComponent runtimeImporter = null)
+Mmd.Editor.MmdEditorSelectionSnapshot :: field public static readonly Mmd.Editor.MmdEditorSelectionSnapshot Empty
+Mmd.Editor.MmdEditorSelectionSnapshot :: property Mmd.MmdPmxAsset PmxAsset { public get; }
+Mmd.Editor.MmdEditorSelectionSnapshot :: property Mmd.MmdVmdAsset VmdAsset { public get; }
+Mmd.Editor.MmdEditorSelectionSnapshot :: property Mmd.UnityIntegration.MmdRuntimeImporterComponent RuntimeImporter { public get; }
+Mmd.Editor.MmdEditorSelectionSnapshot :: property Mmd.UnityIntegration.MmdUnityPlaybackController Controller { public get; }
+Mmd.Editor.MmdEditorSelectionSnapshot :: property UnityEngine.Playables.PlayableDirector Director { public get; }
+Mmd.Editor.MmdEditorSelectionSnapshot :: property UnityEngine.Timeline.TimelineAsset TimelineAsset { public get; }
+Mmd.Editor.MmdEditorVerificationException :: (type) public sealed class MmdEditorVerificationException : System.Exception
+Mmd.Editor.MmdEditorVerificationException :: ctor public .ctor(string stage, string message, System.Exception innerException)
+Mmd.Editor.MmdEditorVerificationException :: property string Stage { public get; }
+Mmd.Editor.MmdEditorVerificationFacade :: (type) public static class MmdEditorVerificationFacade
+Mmd.Editor.MmdEditorVerificationFacade :: const public string CompleteStage = "complete"
+Mmd.Editor.MmdEditorVerificationFacade :: const public string InputValidationStage = "input-validation"
+Mmd.Editor.MmdEditorVerificationFacade :: const public string PmxParseStage = "pmx-parse"
+Mmd.Editor.MmdEditorVerificationFacade :: const public string PmxReadStage = "pmx-read"
+Mmd.Editor.MmdEditorVerificationFacade :: const public string PmxValidationStage = "pmx-validation"
+Mmd.Editor.MmdEditorVerificationFacade :: const public string RuntimeApplyFrameStage = "runtime-apply-frame"
+Mmd.Editor.MmdEditorVerificationFacade :: const public string UnityInstantiationStage = "unity-instantiation"
+Mmd.Editor.MmdEditorVerificationFacade :: const public string VmdParseStage = "vmd-parse"
+Mmd.Editor.MmdEditorVerificationFacade :: const public string VmdReadStage = "vmd-read"
+Mmd.Editor.MmdEditorVerificationFacade :: const public string VmdValidationStage = "vmd-validation"
+Mmd.Editor.MmdEditorVerificationFacade :: method public static Mmd.Editor.MmdEditorPlaybackSceneLoadResult LoadPlaybackIntoScene(Mmd.MmdPmxAsset pmxAsset, Mmd.MmdVmdAsset vmdAsset, float frameRate = 30f, int initialFrame = 0, bool playOnStart = true)
+Mmd.Editor.MmdEditorVerificationFacade :: method public static Mmd.Editor.MmdEditorPlaybackSceneLoadResult LoadPlaybackIntoScene(string pmxPath, string vmdPath, float frameRate = 30f, int initialFrame = 0, bool playOnStart = true)
+Mmd.Editor.MmdEditorVerificationFacade :: method public static Mmd.Editor.MmdEditorPmxSceneLoadResult LoadPmxIntoScene(Mmd.MmdPmxAsset pmxAsset)
+Mmd.Editor.MmdEditorVerificationFacade :: method public static Mmd.Editor.MmdEditorPmxSceneLoadResult LoadPmxIntoScene(string pmxPath)
+Mmd.Editor.MmdEditorWorkflow :: (type) public static class MmdEditorWorkflow
+Mmd.Editor.MmdEditorWorkflow :: method public static Mmd.Editor.MmdEditorSelectionSnapshot BuildSelectionSnapshot(UnityEngine.Object[] selection, UnityEngine.GameObject activeGameObject)
+Mmd.Editor.MmdEditorWorkflow :: method public static bool CanCreatePlaybackConfig(Mmd.Editor.MmdEditorSelectionSnapshot selectionSnapshot)
+Mmd.Editor.MmdEditorWorkflow :: method public static bool CanCreatePlaybackSource(Mmd.Editor.MmdEditorSelectionSnapshot selectionSnapshot)
+Mmd.Editor.MmdEditorWorkflow :: method public static bool CanCreateTimelineClip(Mmd.Editor.MmdEditorSelectionSnapshot selectionSnapshot)
+Mmd.Editor.MmdGenericAnimationClipBakeOptions :: (type) public readonly struct MmdGenericAnimationClipBakeOptions
+Mmd.Editor.MmdGenericAnimationClipBakeOptions :: ctor public .ctor(bool reduceKeys, bool highPrecision)
+Mmd.Editor.MmdGenericAnimationClipBakeOptions :: property bool HighPrecision { public get; }
+Mmd.Editor.MmdGenericAnimationClipBakeOptions :: property bool ReduceKeys { public get; }
+Mmd.Editor.MmdGenericAnimationClipBakeOptions :: property static Mmd.Editor.MmdGenericAnimationClipBakeOptions Default { public get; }
+Mmd.Editor.MmdGenericAnimationClipBakeWindow :: (type) public sealed class MmdGenericAnimationClipBakeWindow : UnityEditor.EditorWindow
+Mmd.Editor.MmdGenericAnimationClipBakeWindow :: ctor public .ctor()
+Mmd.Editor.MmdGenericAnimationClipBakeWindow :: method public static Mmd.Editor.MmdGenericAnimationClipBakeWindow OpenFromVmd(Mmd.MmdVmdAsset vmdAsset)
+Mmd.Editor.MmdGenericAnimationClipBakeWindow.ClipType :: (type) public enum ClipType : int
+Mmd.Editor.MmdGenericAnimationClipBakeWindow.ClipType :: enum Generic = 0
+Mmd.Editor.MmdGenericAnimationClipBakeWindow.ClipType :: enum Humanoid = 1
+Mmd.Editor.MmdGenericAnimationClipWriter :: (type) public static class MmdGenericAnimationClipWriter
+Mmd.Editor.MmdGenericAnimationClipWriter :: method public static Mmd.Editor.MmdGenericAnimationClipWriterResult CreateAnimationClipAsset(Mmd.MmdPmxAsset pmxAsset, Mmd.MmdVmdAsset vmdAsset, float frameRate, int startFrame = 0, int? endFrame = null, string outputPath = null)
+Mmd.Editor.MmdGenericAnimationClipWriter :: method public static Mmd.Editor.MmdGenericAnimationClipWriterResult CreateAnimationClipAsset(Mmd.MmdPmxAsset pmxAsset, Mmd.MmdVmdAsset vmdAsset, float frameRate, int startFrame, int? endFrame, string outputPath, Mmd.Editor.MmdGenericAnimationClipBakeOptions options)
+Mmd.Editor.MmdGenericAnimationClipWriter :: method public static Mmd.Editor.MmdGenericAnimationClipWriterResult CreateInMemoryClip(Mmd.MmdPmxAsset pmxAsset, Mmd.MmdVmdAsset vmdAsset, float frameRate, int startFrame = 0, int? endFrame = null)
+Mmd.Editor.MmdGenericAnimationClipWriter :: method public static Mmd.Editor.MmdGenericAnimationClipWriterResult CreateInMemoryClip(Mmd.MmdPmxAsset pmxAsset, Mmd.MmdVmdAsset vmdAsset, float frameRate, int startFrame, int? endFrame, Mmd.Editor.MmdGenericAnimationClipBakeOptions options)
+Mmd.Editor.MmdGenericAnimationClipWriter :: method public static string GetDefaultOutputPath(Mmd.MmdPmxAsset pmxAsset, Mmd.MmdVmdAsset vmdAsset)
+Mmd.Editor.MmdGenericAnimationClipWriterResult :: (type) public sealed class MmdGenericAnimationClipWriterResult
+Mmd.Editor.MmdGenericAnimationClipWriterResult :: property Mmd.Physics.MmdPhysicsMode PhysicsMode { public get; }
+Mmd.Editor.MmdGenericAnimationClipWriterResult :: property System.Collections.Generic.IReadOnlyList<string> Diagnostics { public get; }
+Mmd.Editor.MmdGenericAnimationClipWriterResult :: property UnityEngine.AnimationClip Clip { public get; }
+Mmd.Editor.MmdGenericAnimationClipWriterResult :: property string AssetPath { public get; }
+Mmd.Editor.MmdHumanoidClipConversionPlan :: (type) public sealed class MmdHumanoidClipConversionPlan
+Mmd.Editor.MmdHumanoidClipConversionPlan :: ctor public .ctor(bool prerequisitesReady, bool canCreateClipNow, string readiness, System.Collections.Generic.IReadOnlyList<string> diagnostics, string pmxSourceId, string vmdSourceId, int pmxBoneCount, string pmxHierarchyReadiness, string pmxRendererReadiness, string pmxBoneBindingReadiness, int vmdMaxFrame, int vmdBoneKeyframeCount, int vmdMorphKeyframeCount, int vmdModelKeyframeCount)
+Mmd.Editor.MmdHumanoidClipConversionPlan :: property System.Collections.Generic.IReadOnlyList<string> Diagnostics { public get; }
+Mmd.Editor.MmdHumanoidClipConversionPlan :: property bool CanCreateClipNow { public get; }
+Mmd.Editor.MmdHumanoidClipConversionPlan :: property bool PrerequisitesReady { public get; }
+Mmd.Editor.MmdHumanoidClipConversionPlan :: property int PmxBoneCount { public get; }
+Mmd.Editor.MmdHumanoidClipConversionPlan :: property int VmdBoneKeyframeCount { public get; }
+Mmd.Editor.MmdHumanoidClipConversionPlan :: property int VmdMaxFrame { public get; }
+Mmd.Editor.MmdHumanoidClipConversionPlan :: property int VmdModelKeyframeCount { public get; }
+Mmd.Editor.MmdHumanoidClipConversionPlan :: property int VmdMorphKeyframeCount { public get; }
+Mmd.Editor.MmdHumanoidClipConversionPlan :: property string PmxBoneBindingReadiness { public get; }
+Mmd.Editor.MmdHumanoidClipConversionPlan :: property string PmxHierarchyReadiness { public get; }
+Mmd.Editor.MmdHumanoidClipConversionPlan :: property string PmxRendererReadiness { public get; }
+Mmd.Editor.MmdHumanoidClipConversionPlan :: property string PmxSourceId { public get; }
+Mmd.Editor.MmdHumanoidClipConversionPlan :: property string Readiness { public get; }
+Mmd.Editor.MmdHumanoidClipConversionPlan :: property string VmdSourceId { public get; }
+Mmd.Editor.MmdHumanoidClipConversionPlanner :: (type) public static class MmdHumanoidClipConversionPlanner
+Mmd.Editor.MmdHumanoidClipConversionPlanner :: const public string ImportedPmxHumanoidMappingSource = "Imported PMX Humanoid settings"
+Mmd.Editor.MmdHumanoidClipConversionPlanner :: const public string NotReadyReadiness = "prerequisites-not-ready"
+Mmd.Editor.MmdHumanoidClipConversionPlanner :: const public string ReadyReadiness = "prerequisites-ready"
+Mmd.Editor.MmdHumanoidClipConversionPlanner :: method public static Mmd.Editor.MmdHumanoidClipConversionPlan AnalyzePrerequisites(Mmd.MmdPmxAsset pmxAsset, Mmd.MmdVmdAsset vmdAsset)
+Mmd.Editor.MmdHumanoidClipConversionWriter :: (type) public static class MmdHumanoidClipConversionWriter
+Mmd.Editor.MmdHumanoidClipConversionWriter :: method public static Mmd.Editor.MmdHumanoidClipConversionWriterResult CreateHumanoidAnimationClipAsset(Mmd.MmdPmxAsset pmxAsset, Mmd.MmdVmdAsset vmdAsset, float frameRate, int startFrame = 0, int? endFrame = null, string outputPath = null)
+Mmd.Editor.MmdHumanoidClipConversionWriter :: method public static Mmd.Editor.MmdHumanoidClipConversionWriterResult CreateInMemoryClip(Mmd.MmdPmxAsset pmxAsset, Mmd.MmdVmdAsset vmdAsset, float frameRate, int startFrame = 0, int? endFrame = null)
+Mmd.Editor.MmdHumanoidClipConversionWriter :: method public static bool TryNormalizeAndValidateOutputPath(string outputPath, System.Collections.Generic.List<string> diagnostics, out string normalizedOutputPath)
+Mmd.Editor.MmdHumanoidClipConversionWriter :: method public static string GetDefaultOutputPath(Mmd.MmdPmxAsset pmxAsset, Mmd.MmdVmdAsset vmdAsset)
+Mmd.Editor.MmdHumanoidClipConversionWriterResult :: (type) public sealed class MmdHumanoidClipConversionWriterResult
+Mmd.Editor.MmdHumanoidClipConversionWriterResult :: ctor public .ctor(UnityEngine.AnimationClip clip, Mmd.Editor.MmdHumanoidClipConversionPlan plan, System.Collections.Generic.IReadOnlyList<string> diagnostics)
+Mmd.Editor.MmdHumanoidClipConversionWriterResult :: property Mmd.Editor.MmdHumanoidClipConversionPlan Plan { public get; }
+Mmd.Editor.MmdHumanoidClipConversionWriterResult :: property System.Collections.Generic.IReadOnlyList<string> Diagnostics { public get; }
+Mmd.Editor.MmdHumanoidClipConversionWriterResult :: property UnityEngine.AnimationClip Clip { public get; }
+Mmd.Editor.MmdHumanoidClipConversionWriterResult :: property bool CanCreateClipNow { public get; }
+Mmd.Editor.MmdHumanoidClipConversionWriterResult :: property bool PrerequisitesReady { public get; }
+Mmd.Editor.MmdHumanoidSetupAssetBuilder :: (type) public [Obsolete] static class MmdHumanoidSetupAssetBuilder
+Mmd.Editor.MmdHumanoidSetupAssetBuilder :: method public [Obsolete] static Mmd.MmdHumanoidSetupAsset CreateHumanoidSetupAsset(Mmd.MmdPmxAsset pmxAsset, string assetPath, Mmd.MmdHumanoidSetupPreset preset = 0)
+Mmd.Editor.MmdHumanoidSetupAssetBuilder :: method public static string GetDefaultSetupAssetPath(Mmd.MmdPmxAsset pmxAsset)
+Mmd.Editor.MmdMmeFxMaterialOverrideBuilder :: (type) public static class MmdMmeFxMaterialOverrideBuilder
+Mmd.Editor.MmdMmeFxMaterialOverrideBuilder :: method public static Mmd.MmdMaterialOverrideEntry[] BuildMaterialOverrides(System.Collections.Generic.IReadOnlyList<Mmd.Rendering.MmdMaterialDescriptor> materialDescriptors, System.Collections.Generic.IReadOnlyList<Mmd.Mme.MmeFxEffectDescriptor> effectDescriptors)
+Mmd.Editor.MmdMmeNormalMapTexturePostprocessor :: (type) public sealed class MmdMmeNormalMapTexturePostprocessor : UnityEditor.AssetPostprocessor
+Mmd.Editor.MmdMmeNormalMapTexturePostprocessor :: ctor public .ctor()
+Mmd.Editor.MmdMmeNormalMapTexturePostprocessor :: method public void OnPreprocessTexture()
+Mmd.Editor.MmdPbrTextureConventionScanner :: (type) public static class MmdPbrTextureConventionScanner
+Mmd.Editor.MmdPbrTextureConventionScanner :: method public static Mmd.MmdMaterialOverrideEntry[] BuildMaterialOverrides(Mmd.Parser.MmdModelDefinition model, string pmxAssetPath)
+Mmd.Editor.MmdPlaybackMaterialReimportPostprocessor :: (type) public sealed class MmdPlaybackMaterialReimportPostprocessor : UnityEditor.AssetPostprocessor
+Mmd.Editor.MmdPlaybackMaterialReimportPostprocessor :: ctor public .ctor()
+Mmd.Editor.MmdPmxAnimationType :: (type) public enum MmdPmxAnimationType : int
+Mmd.Editor.MmdPmxAnimationType :: enum Generic = 1
+Mmd.Editor.MmdPmxAnimationType :: enum Humanoid = 2
+Mmd.Editor.MmdPmxAnimationType :: enum None = 0
+Mmd.Editor.MmdPmxMaterialTexturePolicy :: (type) public enum MmdPmxMaterialTexturePolicy : int
+Mmd.Editor.MmdPmxMaterialTexturePolicy :: enum ResolveReferencesOnly = 0
+Mmd.Editor.MmdPmxMeshGenerationMode :: (type) public enum MmdPmxMeshGenerationMode : int
+Mmd.Editor.MmdPmxMeshGenerationMode :: enum SingleMesh = 0
+Mmd.Editor.MmdPmxMeshGenerationMode :: enum SplitByMaterial = 1
+Mmd.Editor.MmdPmxModelPreset :: (type) public enum MmdPmxModelPreset : int
+Mmd.Editor.MmdPmxModelPreset :: enum Character = 1
+Mmd.Editor.MmdPmxModelPreset :: enum Custom = 0
+Mmd.Editor.MmdPmxModelPreset :: enum Stage = 2
+Mmd.Editor.MmdPmxPrefabExportResult :: (type) public sealed class MmdPmxPrefabExportResult
+Mmd.Editor.MmdPmxPrefabExportResult :: property int LoadedDiffuseTextureCount { public get; }
+Mmd.Editor.MmdPmxPrefabExportResult :: property int LoadedSphereTextureCount { public get; }
+Mmd.Editor.MmdPmxPrefabExportResult :: property int LoadedToonTextureCount { public get; }
+Mmd.Editor.MmdPmxPrefabExportResult :: property int MaterialCount { public get; }
+Mmd.Editor.MmdPmxPrefabExportResult :: property int MissingTextureCount { public get; }
+Mmd.Editor.MmdPmxPrefabExportResult :: property int UnsupportedTextureCount { public get; }
+Mmd.Editor.MmdPmxPrefabExportResult :: property int VertexCount { public get; }
+Mmd.Editor.MmdPmxPrefabExportResult :: property string OutputDirectory { public get; }
+Mmd.Editor.MmdPmxPrefabExportResult :: property string PmxSourceId { public get; }
+Mmd.Editor.MmdPmxPrefabExportResult :: property string PmxSourcePath { public get; }
+Mmd.Editor.MmdPmxPrefabExportResult :: property string PrefabAssetPath { public get; }
+Mmd.Editor.MmdPmxPrefabExportResult :: property string TextureCopyPolicy { public get; }
+Mmd.Editor.MmdPmxPrefabExportResult :: property string[] MaterialAssetPaths { public get; }
+Mmd.Editor.MmdPmxPrefabExportResult :: property string[] MeshAssetPaths { public get; }
+Mmd.Editor.MmdPmxPrefabExportResult :: property string[] TextureAssetPaths { public get; }
+Mmd.Editor.MmdPmxPrefabExporter :: (type) public static class MmdPmxPrefabExporter
+Mmd.Editor.MmdPmxPrefabExporter :: method public static Mmd.Editor.MmdPmxPrefabExportResult CreatePrefab(Mmd.MmdPmxAsset pmxAsset, string prefabPath)
+Mmd.Editor.MmdPmxPrefabExporter :: method public static Mmd.Editor.MmdPmxPrefabExportResult CreatePrefabWithFeedback(Mmd.MmdPmxAsset pmxAsset)
+Mmd.Editor.MmdPmxPrefabExporter :: method public static string GetDefaultPrefabPath(Mmd.MmdPmxAsset pmxAsset)
+Mmd.Editor.MmdPmxScriptedImporter :: (type) public sealed class MmdPmxScriptedImporter : UnityEditor.AssetImporters.ScriptedImporter
+Mmd.Editor.MmdPmxScriptedImporter :: ctor public .ctor()
+Mmd.Editor.MmdPmxScriptedImporter :: method public override void OnImportAsset(UnityEditor.AssetImporters.AssetImportContext ctx)
+Mmd.Editor.MmdPmxScriptedImporter :: property Mmd.Editor.MmdPmxAnimationType AnimationType { public get; }
+Mmd.Editor.MmdPmxScriptedImporter :: property Mmd.Editor.MmdPmxMaterialTexturePolicy MaterialTexturePolicy { public get; }
+Mmd.Editor.MmdPmxScriptedImporter :: property Mmd.Editor.MmdPmxMeshGenerationMode MeshGenerationMode { public get; }
+Mmd.Editor.MmdPmxScriptedImporter :: property Mmd.Editor.MmdPmxModelPreset ModelPreset { public get; }
+Mmd.Editor.MmdPmxScriptedImporter :: property Mmd.Editor.MmdPmxShaderPreset ShaderPreset { public get; }
+Mmd.Editor.MmdPmxScriptedImporter :: property Mmd.MmdHumanoidBoneMappingOverride[] HumanoidBoneMappingOverrides { public get; }
+Mmd.Editor.MmdPmxScriptedImporter :: property Mmd.MmdHumanoidRetargetQualitySettings HumanoidRetargetQualitySettings { public get; }
+Mmd.Editor.MmdPmxScriptedImporter :: property Mmd.MmdMaterialProfileAsset MaterialProfileAsset { public get; }
+Mmd.Editor.MmdPmxScriptedImporter :: property UnityEngine.Material[] MaterialRemaps { public get; }
+Mmd.Editor.MmdPmxScriptedImporter :: property float ImportScale { public get; }
+Mmd.Editor.MmdPmxScriptedImporterEditor :: (type) public sealed class MmdPmxScriptedImporterEditor : UnityEditor.AssetImporters.ScriptedImporterEditor
+Mmd.Editor.MmdPmxScriptedImporterEditor :: ctor public .ctor()
+Mmd.Editor.MmdPmxScriptedImporterEditor :: method public override void OnEnable()
+Mmd.Editor.MmdPmxScriptedImporterEditor :: method public override void OnInspectorGUI()
+Mmd.Editor.MmdPmxShaderPreset :: (type) public enum MmdPmxShaderPreset : int
+Mmd.Editor.MmdPmxShaderPreset :: enum CustomProfile = 3
+Mmd.Editor.MmdPmxShaderPreset :: enum MmdBasicUrpToon = 0
+Mmd.Editor.MmdPmxShaderPreset :: enum MmdToonLit = 2
+Mmd.Editor.MmdPmxShaderPreset :: enum UrpLit = 1
+Mmd.Editor.MmdToonLitShaderGUI :: (type) public sealed class MmdToonLitShaderGUI : UnityEditor.ShaderGUI
+Mmd.Editor.MmdToonLitShaderGUI :: ctor public .ctor()
+Mmd.Editor.MmdToonLitShaderGUI :: method public override void OnGUI(UnityEditor.MaterialEditor materialEditor, UnityEditor.MaterialProperty[] properties)
+Mmd.Editor.MmdUnityPlaybackControllerEditor :: (type) public sealed class MmdUnityPlaybackControllerEditor : UnityEditor.Editor
+Mmd.Editor.MmdUnityPlaybackControllerEditor :: const public string CacheNotImplementedMessage = "Physics Cache is not implemented yet. Use Off for random access or Live for forward Play Mode playback."
+Mmd.Editor.MmdUnityPlaybackControllerEditor :: const public string FrameRateFieldName = "frameRate"
+Mmd.Editor.MmdUnityPlaybackControllerEditor :: const public string IkMaxIterationsCapFieldName = "ikMaxIterationsCap"
+Mmd.Editor.MmdUnityPlaybackControllerEditor :: const public string InitialFrameFieldName = "initialFrame"
+Mmd.Editor.MmdUnityPlaybackControllerEditor :: const public string LastFastRuntimeReasonFieldName = "lastFastRuntimeReason"
+Mmd.Editor.MmdUnityPlaybackControllerEditor :: const public string PhysicsModeFieldName = "physicsMode"
+Mmd.Editor.MmdUnityPlaybackControllerEditor :: const public string PlayOnStartFieldName = "playOnStart"
+Mmd.Editor.MmdUnityPlaybackControllerEditor :: ctor public .ctor()
+Mmd.Editor.MmdUnityPlaybackControllerEditor :: field public static readonly string[] DefaultInspectorExcludedProperties
+Mmd.Editor.MmdUnityPlaybackControllerEditor :: method public override void OnInspectorGUI()
+Mmd.Editor.MmdUnityPlaybackControllerEditor :: method public static Mmd.MmdPlaybackConfig ResolvePlaybackConfigForNewSource(Mmd.UnityIntegration.MmdUnityPlaybackController controller, int fallbackInitialFrame = 0)
+Mmd.Editor.MmdUnityPlaybackControllerEditor :: method public static bool InspectorAllowsPhysicsMode(Mmd.Physics.MmdPhysicsMode mode)
+Mmd.Editor.MmdVmdScriptedImporter :: (type) public sealed class MmdVmdScriptedImporter : UnityEditor.AssetImporters.ScriptedImporter
+Mmd.Editor.MmdVmdScriptedImporter :: ctor public .ctor()
+Mmd.Editor.MmdVmdScriptedImporter :: method public override void OnImportAsset(UnityEditor.AssetImporters.AssetImportContext ctx)
+Mmd.Editor.MmdVmdScriptedImporterEditor :: (type) public sealed class MmdVmdScriptedImporterEditor : UnityEditor.AssetImporters.ScriptedImporterEditor
+Mmd.Editor.MmdVmdScriptedImporterEditor :: ctor public .ctor()
+Mmd.Editor.MmdVmdScriptedImporterEditor :: method public override void OnInspectorGUI()

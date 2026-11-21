@@ -1,0 +1,82 @@
+Mmd.Timeline.MmdHumanoidAnimationClip :: (type) public sealed class MmdHumanoidAnimationClip : UnityEngine.Playables.PlayableAsset, UnityEngine.Timeline.ITimelineClipAsset
+Mmd.Timeline.MmdHumanoidAnimationClip :: ctor public .ctor()
+Mmd.Timeline.MmdHumanoidAnimationClip :: field public UnityEngine.AnimationClip clip
+Mmd.Timeline.MmdHumanoidAnimationClip :: field public bool applyFootIK
+Mmd.Timeline.MmdHumanoidAnimationClip :: method public override UnityEngine.Playables.Playable CreatePlayable(UnityEngine.Playables.PlayableGraph graph, UnityEngine.GameObject owner)
+Mmd.Timeline.MmdHumanoidAnimationClip :: property UnityEngine.Timeline.ClipCaps clipCaps { public get; }
+Mmd.Timeline.MmdHumanoidAnimationMixerBehaviour :: (type) public sealed class MmdHumanoidAnimationMixerBehaviour : UnityEngine.Playables.PlayableBehaviour
+Mmd.Timeline.MmdHumanoidAnimationMixerBehaviour :: ctor public .ctor()
+Mmd.Timeline.MmdHumanoidAnimationMixerBehaviour :: method public override void OnBehaviourPause(UnityEngine.Playables.Playable playable, UnityEngine.Playables.FrameData info)
+Mmd.Timeline.MmdHumanoidAnimationMixerBehaviour :: method public override void OnGraphStop(UnityEngine.Playables.Playable playable)
+Mmd.Timeline.MmdHumanoidAnimationMixerBehaviour :: method public override void ProcessFrame(UnityEngine.Playables.Playable playable, UnityEngine.Playables.FrameData info, object playerData)
+Mmd.Timeline.MmdHumanoidAnimationTrack :: (type) public sealed class MmdHumanoidAnimationTrack : UnityEngine.Timeline.TrackAsset
+Mmd.Timeline.MmdHumanoidAnimationTrack :: ctor public .ctor()
+Mmd.Timeline.MmdHumanoidAnimationTrack :: method public override UnityEngine.Playables.Playable CreateTrackMixer(UnityEngine.Playables.PlayableGraph graph, UnityEngine.GameObject go, int inputCount)
+Mmd.Timeline.MmdHumanoidAnimationTrack :: method public override void GatherProperties(UnityEngine.Playables.PlayableDirector director, UnityEngine.Timeline.IPropertyCollector driver)
+Mmd.Timeline.MmdVmdCameraBehaviour :: (type) public sealed class MmdVmdCameraBehaviour : UnityEngine.Playables.PlayableBehaviour
+Mmd.Timeline.MmdVmdCameraBehaviour :: ctor public .ctor()
+Mmd.Timeline.MmdVmdCameraBehaviour :: method public Mmd.UnityIntegration.MmdSceneCameraApplyStatus EvaluateAtLocalTime(Mmd.UnityIntegration.MmdSceneEnvironmentBinding target, double localTime)
+Mmd.Timeline.MmdVmdCameraBehaviour :: method public override void OnPlayableDestroy(UnityEngine.Playables.Playable playable)
+Mmd.Timeline.MmdVmdCameraBehaviour :: method public override void ProcessFrame(UnityEngine.Playables.Playable playable, UnityEngine.Playables.FrameData info, object playerData)
+Mmd.Timeline.MmdVmdCameraBehaviour :: property Mmd.Timeline.MmdVmdTimelineLoopPolicy LoopPolicy { public get; public set; }
+Mmd.Timeline.MmdVmdCameraBehaviour :: property Mmd.UnityIntegration.MmdSceneCameraApplyStatus LastApplyStatus { public get; }
+Mmd.Timeline.MmdVmdCameraBehaviour :: property Mmd.UnityIntegration.MmdSceneEnvironmentBinding Binding { public get; public set; }
+Mmd.Timeline.MmdVmdCameraBehaviour :: property byte[] MotionBytes { public get; public set; }
+Mmd.Timeline.MmdVmdCameraBehaviour :: property float FrameRate { public get; public set; }
+Mmd.Timeline.MmdVmdCameraBehaviour :: property float ImportScale { public get; public set; }
+Mmd.Timeline.MmdVmdCameraBehaviour :: property float MinFieldOfView { public get; public set; }
+Mmd.Timeline.MmdVmdCameraBehaviour :: property float StartOffsetSeconds { public get; public set; }
+Mmd.Timeline.MmdVmdCameraBehaviour :: property int? ExpectedCameraKeyframeCount { public get; public set; }
+Mmd.Timeline.MmdVmdCameraBehaviour :: property int? ExpectedLightKeyframeCount { public get; public set; }
+Mmd.Timeline.MmdVmdCameraBehaviour :: property int? ExpectedSelfShadowKeyframeCount { public get; public set; }
+Mmd.Timeline.MmdVmdCameraBehaviour :: property string MotionSourceId { public get; public set; }
+Mmd.Timeline.MmdVmdCameraBehaviour :: property string NativeCameraTrackDiagnostic { public get; }
+Mmd.Timeline.MmdVmdCameraBehaviour :: property string NativeLightTrackDiagnostic { public get; }
+Mmd.Timeline.MmdVmdCameraBehaviour :: property string NativeSelfShadowTrackDiagnostic { public get; }
+Mmd.Timeline.MmdVmdCameraClip :: (type) public sealed class MmdVmdCameraClip : UnityEngine.Playables.PlayableAsset, UnityEngine.Timeline.ITimelineClipAsset
+Mmd.Timeline.MmdVmdCameraClip :: ctor public .ctor()
+Mmd.Timeline.MmdVmdCameraClip :: method public override UnityEngine.Playables.Playable CreatePlayable(UnityEngine.Playables.PlayableGraph graph, UnityEngine.GameObject owner)
+Mmd.Timeline.MmdVmdCameraClip :: property Mmd.MmdVmdAsset MotionAsset { public get; public set; }
+Mmd.Timeline.MmdVmdCameraClip :: property Mmd.Timeline.MmdVmdTimelineLoopPolicy LoopPolicy { public get; public set; }
+Mmd.Timeline.MmdVmdCameraClip :: property UnityEngine.ExposedReference<Mmd.UnityIntegration.MmdSceneEnvironmentBinding> Binding { public get; public set; }
+Mmd.Timeline.MmdVmdCameraClip :: property UnityEngine.Timeline.ClipCaps clipCaps { public get; }
+Mmd.Timeline.MmdVmdCameraClip :: property float FrameRate { public get; public set; }
+Mmd.Timeline.MmdVmdCameraClip :: property float ImportScale { public get; public set; }
+Mmd.Timeline.MmdVmdCameraClip :: property float MinFieldOfView { public get; public set; }
+Mmd.Timeline.MmdVmdCameraClip :: property float StartOffsetSeconds { public get; public set; }
+Mmd.Timeline.MmdVmdCameraClip :: property string MotionSourceId { public get; public set; }
+Mmd.Timeline.MmdVmdCameraTrack :: (type) public sealed class MmdVmdCameraTrack : UnityEngine.Timeline.TrackAsset
+Mmd.Timeline.MmdVmdCameraTrack :: ctor public .ctor()
+Mmd.Timeline.MmdVmdTimelineBehaviour :: (type) public sealed class MmdVmdTimelineBehaviour : UnityEngine.Playables.PlayableBehaviour
+Mmd.Timeline.MmdVmdTimelineBehaviour :: ctor public .ctor()
+Mmd.Timeline.MmdVmdTimelineBehaviour :: event public static System.Action<double> ProcessFrameEvaluated
+Mmd.Timeline.MmdVmdTimelineBehaviour :: method public Mmd.MmdPlaybackSnapshot EvaluateAtLocalTime(Mmd.UnityIntegration.MmdUnityPlaybackController target, double localTime)
+Mmd.Timeline.MmdVmdTimelineBehaviour :: method public Mmd.MmdPlaybackSnapshot EvaluateAtLocalTime(Mmd.UnityIntegration.MmdUnityPlaybackController target, double localTime, bool runLivePhysics)
+Mmd.Timeline.MmdVmdTimelineBehaviour :: property Mmd.MmdVmdAsset MotionAsset { public get; public set; }
+Mmd.Timeline.MmdVmdTimelineBehaviour :: property Mmd.Timeline.MmdVmdTimelineLoopPolicy LoopPolicy { public get; public set; }
+Mmd.Timeline.MmdVmdTimelineBehaviour :: property Mmd.UnityIntegration.MmdUnityPlaybackController Controller { public get; public set; }
+Mmd.Timeline.MmdVmdTimelineBehaviour :: property bool PhysicsOffByDefault { public get; }
+Mmd.Timeline.MmdVmdTimelineBehaviour :: property float FrameRate { public get; public set; }
+Mmd.Timeline.MmdVmdTimelineBehaviour :: property float StartOffsetSeconds { public get; public set; }
+Mmd.Timeline.MmdVmdTimelineBehaviour :: property string ModelSourceId { public get; public set; }
+Mmd.Timeline.MmdVmdTimelineBehaviour :: property string MotionSourceId { public get; public set; }
+Mmd.Timeline.MmdVmdTimelineClip :: (type) public sealed class MmdVmdTimelineClip : UnityEngine.Playables.PlayableAsset, UnityEngine.Timeline.ITimelineClipAsset
+Mmd.Timeline.MmdVmdTimelineClip :: ctor public .ctor()
+Mmd.Timeline.MmdVmdTimelineClip :: method public override UnityEngine.Playables.Playable CreatePlayable(UnityEngine.Playables.PlayableGraph graph, UnityEngine.GameObject owner)
+Mmd.Timeline.MmdVmdTimelineClip :: property Mmd.MmdVmdAsset MotionAsset { public get; public set; }
+Mmd.Timeline.MmdVmdTimelineClip :: property Mmd.Timeline.MmdVmdTimelineLoopPolicy LoopPolicy { public get; public set; }
+Mmd.Timeline.MmdVmdTimelineClip :: property UnityEngine.ExposedReference<Mmd.UnityIntegration.MmdUnityPlaybackController> Controller { public get; public set; }
+Mmd.Timeline.MmdVmdTimelineClip :: property UnityEngine.Timeline.ClipCaps clipCaps { public get; }
+Mmd.Timeline.MmdVmdTimelineClip :: property float FrameRate { public get; public set; }
+Mmd.Timeline.MmdVmdTimelineClip :: property float StartOffsetSeconds { public get; public set; }
+Mmd.Timeline.MmdVmdTimelineClip :: property string ModelSourceId { public get; public set; }
+Mmd.Timeline.MmdVmdTimelineClip :: property string MotionSourceId { public get; public set; }
+Mmd.Timeline.MmdVmdTimelineLoopPolicy :: (type) public enum MmdVmdTimelineLoopPolicy : int
+Mmd.Timeline.MmdVmdTimelineLoopPolicy :: enum None = 0
+Mmd.Timeline.MmdVmdTimelineMixerBehaviour :: (type) public sealed class MmdVmdTimelineMixerBehaviour : UnityEngine.Playables.PlayableBehaviour
+Mmd.Timeline.MmdVmdTimelineMixerBehaviour :: ctor public .ctor()
+Mmd.Timeline.MmdVmdTimelineMixerBehaviour :: method public override void OnGraphStart(UnityEngine.Playables.Playable playable)
+Mmd.Timeline.MmdVmdTimelineMixerBehaviour :: method public override void ProcessFrame(UnityEngine.Playables.Playable playable, UnityEngine.Playables.FrameData info, object playerData)
+Mmd.Timeline.MmdVmdTimelineTrack :: (type) public sealed class MmdVmdTimelineTrack : UnityEngine.Timeline.TrackAsset
+Mmd.Timeline.MmdVmdTimelineTrack :: ctor public .ctor()
+Mmd.Timeline.MmdVmdTimelineTrack :: method public override UnityEngine.Playables.Playable CreateTrackMixer(UnityEngine.Playables.PlayableGraph graph, UnityEngine.GameObject go, int inputCount)

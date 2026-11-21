@@ -1,0 +1,4 @@
+Mmd.UnityIntegration.Cinemachine.MmdCinemachineCameraBinding :: (type) public sealed class MmdCinemachineCameraBinding : Mmd.UnityIntegration.MmdSceneEnvironmentBinding
+Mmd.UnityIntegration.Cinemachine.MmdCinemachineCameraBinding :: ctor public .ctor()
+Mmd.UnityIntegration.Cinemachine.MmdCinemachineCameraBinding :: method public override Mmd.UnityIntegration.MmdSceneCameraApplyStatus ApplyCameraState(Mmd.Motion.MmdCameraState state, float minFieldOfView = 1f, float importScale = 1f)
+Mmd.UnityIntegration.Cinemachine.MmdCinemachineCameraBinding :: property Unity.Cinemachine.CinemachineCamera TargetCinemachineCamera { public get; public set; }
