@@ -55,6 +55,7 @@
 4c6f2a3b7d1e4f8a9c0b5e6d7f812345 | Mmd.MmdVmdNativeContextCache
 4e34a340ad884726894d6cecf9759ffc | Mmd.Rendering.Universal.MmdSelfShadowRenderPass
 4f5b48a714724e04b652f8b1e8ed4425 | Mmd.UnityIntegration.MmdUnityModelFactory
+5192706ffa5e9c646aae103061ba76ec | Mmd.UnityIntegration.MmdTimelineLivePhysicsTransfer
 564b2aae742149daa505e11110988f8e | Mmd.Rendering.MmdMorphDescriptorBuilder
 56a737a31ab90854496d8077fcca3ede | Mmd.MmdHumanoidBoneMappingEvaluator
 56f6612b1ac0449298c8a0a7418465e2 | Mmd.Rendering.MmdTextureUvMorphEvaluator
@@ -146,7 +147,7 @@ ad1850449d5a4284d9842ffe972699ca | Mmd.Editor.MmdPmxScriptedImporterEditor
 b2d3bf66695846c4a50933ca0b14c1c6 | Mmd.UnityIntegration.MmdShaderBindingDiagnostics
 b360601f0bcb4d85af9da5b2760a420d | Mmd.Editor.MmdHumanoidClipConversionPlanner
 b42a5d6c87f641fc9b38e1ed6f5f1789 | Mmd.MmdHumanoidAppendTransformApplier
-b4e9d3c2f6a75b8e0d1f2a3b4c5d6e7f | Mmd.UnityIntegration.MmdTimelineLivePhysicsTransfer
+b4e9d3c2f6a75b8e0d1f2a3b4c5d6e7f | Mmd.UnityIntegration.MmdUnityPlaybackBinding
 b6930da7e175e3a4f86580fa4bf649ec | Mmd.UnityIntegration.MmdMultiCharacterWorkerPool
 b7e3a1c9d4f6528091ab3cde5678ef01 | Mmd.Parser.NativeMmdParser
 b847beb06ebc7764b9b71d9e68310881 | Mmd.Native.MmdRuntimeFfiTrackReadback
