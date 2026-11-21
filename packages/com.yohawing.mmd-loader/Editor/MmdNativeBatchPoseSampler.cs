@@ -92,5 +92,40 @@ namespace Mmd.Editor
                 : Quaternion.identity;
             rotation = MmdCoordinateSpace.MmdToUnityRotation(mmdRotation);
         }
+
+        internal static void ReadLocalPose(
+            ReadOnlySpan<float> frameWorld,
+            int boneIndex,
+            int[] parentBoneIndices,
+            Vector3[] staticParentPositions,
+            Quaternion[] staticParentRotations,
+            float importScale,
+            out Vector3 localPosition,
+            out Quaternion localRotation)
+        {
+            ReadWorldPose(
+                frameWorld,
+                boneIndex,
+                out Vector3 worldPosition,
+                out Quaternion worldRotation);
+            int parentBone = parentBoneIndices[boneIndex];
+            if (parentBone >= 0)
+            {
+                ReadWorldPose(
+                    frameWorld,
+                    parentBone,
+                    out Vector3 parentPosition,
+                    out Quaternion parentRotation);
+                Quaternion inverseParent = Quaternion.Inverse(parentRotation);
+                localPosition = inverseParent * (worldPosition - parentPosition) * importScale;
+                localRotation = inverseParent * worldRotation;
+                return;
+            }
+
+            Quaternion inverseStaticParent = Quaternion.Inverse(staticParentRotations[boneIndex]);
+            localPosition = inverseStaticParent * (
+                worldPosition * importScale - staticParentPositions[boneIndex]);
+            localRotation = inverseStaticParent * worldRotation;
+        }
     }
 }

@@ -571,7 +571,7 @@ namespace Mmd.Editor
                     for (int boneIndex = 0; boneIndex < mappedBones.Count; boneIndex++)
                     {
                         (_, Transform proxyTransform, _, MmdHumanoidRetargetBinding retargetBinding) = mappedBones[boneIndex];
-                        ReadNativeLocalPose(
+                        MmdNativeBatchPoseSampler.ReadLocalPose(
                             frameWorld,
                             retargetBinding.MmdBoneIndex,
                             parentBoneIndices,
@@ -604,41 +604,6 @@ namespace Mmd.Editor
                 hipsWorldPositions,
                 ancestorWorldRotations);
             return true;
-        }
-
-        private static void ReadNativeLocalPose(
-            ReadOnlySpan<float> frameWorld,
-            int boneIndex,
-            int[] parentBoneIndices,
-            Vector3[] staticParentPositions,
-            Quaternion[] staticParentRotations,
-            float importScale,
-            out Vector3 localPosition,
-            out Quaternion localRotation)
-        {
-            MmdNativeBatchPoseSampler.ReadWorldPose(
-                frameWorld,
-                boneIndex,
-                out Vector3 worldPosition,
-                out Quaternion worldRotation);
-            int parentBone = parentBoneIndices[boneIndex];
-            if (parentBone >= 0)
-            {
-                MmdNativeBatchPoseSampler.ReadWorldPose(
-                    frameWorld,
-                    parentBone,
-                    out Vector3 parentPosition,
-                    out Quaternion parentRotation);
-                Quaternion inverseParent = Quaternion.Inverse(parentRotation);
-                localPosition = inverseParent * (worldPosition - parentPosition) * importScale;
-                localRotation = inverseParent * worldRotation;
-                return;
-            }
-
-            Quaternion inverseStaticParent = Quaternion.Inverse(staticParentRotations[boneIndex]);
-            localPosition = inverseStaticParent * (
-                worldPosition * importScale - staticParentPositions[boneIndex]);
-            localRotation = inverseStaticParent * worldRotation;
         }
 
         private static void ApplyEvaluatedLocalPoseToProxy(

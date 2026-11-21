@@ -864,24 +864,15 @@ namespace Mmd.Editor
                         worldFloatsPerFrame);
                     for (int bone = 0; bone < instance.BoneTransforms.Length; bone++)
                     {
-                        MmdNativeBatchPoseSampler.ReadWorldPose(frameWorld, bone, out Vector3 worldPosition, out Quaternion worldRotation);
-                        int parentBone = parentBoneIndices[bone];
-                        Vector3 localPosition;
-                        Quaternion localRotation;
-                        if (parentBone >= 0)
-                        {
-                            MmdNativeBatchPoseSampler.ReadWorldPose(frameWorld, parentBone, out Vector3 parentPosition, out Quaternion parentRotation);
-                            Quaternion inverseParent = Quaternion.Inverse(parentRotation);
-                            localPosition = inverseParent * (worldPosition - parentPosition) * importScale;
-                            localRotation = inverseParent * worldRotation;
-                        }
-                        else
-                        {
-                            Quaternion inverseParent = Quaternion.Inverse(staticParentRotations[bone]);
-                            localPosition = inverseParent * (
-                                worldPosition * importScale - staticParentPositions[bone]);
-                            localRotation = inverseParent * worldRotation;
-                        }
+                        MmdNativeBatchPoseSampler.ReadLocalPose(
+                            frameWorld,
+                            bone,
+                            parentBoneIndices,
+                            staticParentPositions,
+                            staticParentRotations,
+                            importScale,
+                            out Vector3 localPosition,
+                            out Quaternion localRotation);
 
                         if (sample > 0)
                         {
