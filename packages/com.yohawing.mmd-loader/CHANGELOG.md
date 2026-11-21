@@ -7,7 +7,7 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 ### Breaking
 
 - Changed implementation types that were public but not part of the supported API to `internal`. Use the importer, playback, and asset entry points instead.
-  - `Mmd`: `MmdAnimationBakePlanner`, `MmdHumanoidAppendTransformApplier`, `MmdHumanoidAvatarBuildResult`, `MmdHumanoidBoneMappingEvaluator`, `MmdHumanoidBoneMappingMatch`, `MmdHumanoidBoneMappingReport`, `MmdHumanoidMappingReadiness`, `MmdHumanoidProxyRigFactory`, `MmdHumanoidProxyRigResult`, `MmdHumanoidRequiredBoneInfo`, `MmdHumanoidRetargeter`.
+  - `Mmd`: `MmdAnimationBakePlanner`, `MmdHumanoidAppendTransformApplier`, `MmdHumanoidAvatarBuildResult`, `MmdHumanoidBoneMappingEvaluator`, `MmdHumanoidBoneMappingMatch`, `MmdHumanoidBoneMappingReport`, `MmdHumanoidMappingReadiness`, `MmdHumanoidProxyRigFactory`, `MmdHumanoidProxyRigResult`, `MmdHumanoidRequiredBoneInfo`, `MmdHumanoidRetargeter`, `MmdPlaybackTime`.
   - `Mmd.Editor`: `MmdEditorBatchmodeDiagnosticsCommand`, `MmdEditorPlaybackLoader`, `MmdEditorPmxLoader`, `MmdEditorSelectionSnapshot`, `MmdEditorWorkflow`, `MmdGenericAnimationClipBakeWindow.ClipType`, `MmdMmeFxMaterialOverrideBuilder`, `MmdPbrTextureConventionScanner`.
   - `Mmd.Mme`: `MmeEmdEffectMap`, `MmeEmdMaterialEffectAssignment`, `MmeEmdParser`, `MmeFxEffectDescriptor`, `MmeFxFloatParameter`, `MmeFxParser`, `MmeFxScanner`.
   - `Mmd.Motion`: `MmdSelfShadowMappingPolicy`, `VmdSelfShadowSampler`.

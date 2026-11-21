@@ -15,7 +15,7 @@ namespace Mmd
         public bool beyondMotionMaxFrame;
     }
 
-    public static class MmdPlaybackTime
+    internal static class MmdPlaybackTime
     {
         public static int ToFrame(float time, float frameRate)
         {

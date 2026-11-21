@@ -75,7 +75,6 @@ Mmd.Runtime	Mmd.MmdPlaybackSnapshotBuilder	advanced	ARCHITECTURE: Runtime API (M
 Mmd.Runtime	Mmd.MmdPlaybackSnapshotDiagnostics	advanced	ARCHITECTURE: Runtime API (snapshot diagnostics)
 Mmd.Runtime	Mmd.MmdPlaybackSnapshotSequenceSummary	advanced	MmdPlaybackSnapshotDiagnostics の public signature から到達
 Mmd.Runtime	Mmd.MmdPlaybackSnapshotSummary	advanced	MmdPlaybackSnapshotDiagnostics の public signature から到達
-Mmd.Runtime	Mmd.MmdPlaybackTime	pending-internal	API-02 決定: internal にする (devtools は Runtime IVT で可)
 Mmd.Runtime	Mmd.MmdPlaybackTimeMapping	advanced	MmdRuntimeSession の public signature から到達
 Mmd.Runtime	Mmd.MmdPmxAsset	stable	plans/002 stable list
 Mmd.Runtime	Mmd.MmdPmxImportSummaryStatus	stable	MmdPmxAsset の public signature から到達
@@ -155,7 +154,7 @@ Mmd.Runtime	Mmd.Rendering.MmdTextureOrientationDescriptor	advanced	MmdRenderingD
 Mmd.Runtime	Mmd.Rendering.MmdUrpMaterialBindingDescriptor	advanced	MmdRenderingDescriptor の public signature から到達
 Mmd.Runtime	Mmd.Rendering.MmdVertexMorphDescriptor	advanced	MmdRenderingDescriptor の public signature から到達
 Mmd.Runtime	Mmd.Rendering.MmdVertexMorphOffsetDescriptor	advanced	MmdVertexMorphDescriptor の public signature から到達
-Mmd.Runtime	Mmd.UnityIntegration.MmdCameraStateToUnity	pending-internal	どの root からも public signature で到達しない
+Mmd.Runtime	Mmd.UnityIntegration.MmdCameraStateToUnity	advanced	Mmd.Cinemachine と MmdCinemachineCameraBinding の引数既定値(DefaultMinFieldOfView)が使用
 Mmd.Runtime	Mmd.UnityIntegration.MmdHumanoidRetargetGate	stable	MmdUnityPlaybackController の public signature から到達
 Mmd.Runtime	Mmd.UnityIntegration.MmdHumanoidRootMotionDriver	unity-entry	API-02 決定: unity-entry (PMX importer が付与し scene に serialize)
 Mmd.Runtime	Mmd.UnityIntegration.MmdLivePhysicsBodyDiagnostics	stable	MmdLivePhysicsFrameDiagnostics の public signature から到達
@@ -182,7 +181,7 @@ Mmd.Runtime	Mmd.UnityIntegration.MmdTextureBindingDiagnostics	advanced	MmdUnityM
 Mmd.Runtime	Mmd.UnityIntegration.MmdTextureReferenceDiagnostic	advanced	MmdTextureBindingDiagnostics の public signature から到達
 Mmd.Runtime	Mmd.UnityIntegration.MmdTextureUsage	advanced	MmdResolvedTexture の public signature から到達
 Mmd.Runtime	Mmd.UnityIntegration.MmdTimelineSetupTimingSummary	stable	MmdUnityPlaybackController の public signature から到達
-Mmd.Runtime	Mmd.UnityIntegration.MmdUnityCameraPose	pending-internal	どの root からも public signature で到達しない
+Mmd.Runtime	Mmd.UnityIntegration.MmdUnityCameraPose	advanced	Mmd.Cinemachine と MmdCinemachineCameraBinding の引数既定値(DefaultMinFieldOfView)が使用
 Mmd.Runtime	Mmd.UnityIntegration.MmdUnityMaterialBindingDiagnostic	advanced	MmdUnityModelInstance の public signature から到達
 Mmd.Runtime	Mmd.UnityIntegration.MmdUnityMaterialMissingPropertyDiagnostic	advanced	MmdUnityMaterialBindingDiagnostic の public signature から到達
 Mmd.Runtime	Mmd.UnityIntegration.MmdUnityModelFactory	advanced	ARCHITECTURE: Components (MmdUnityModelFactory)

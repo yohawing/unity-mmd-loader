@@ -3,6 +3,7 @@
 using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("Mmd.Editor")]
+[assembly: InternalsVisibleTo("Mmd.Editor.Timeline")]
 [assembly: InternalsVisibleTo("Mmd.EditModeTests")]
 [assembly: InternalsVisibleTo("Mmd.PlayModeTests")]
 [assembly: InternalsVisibleTo("Mmd.Rendering.Universal")]

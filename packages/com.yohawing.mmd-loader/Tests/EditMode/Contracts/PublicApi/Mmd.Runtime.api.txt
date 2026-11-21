@@ -376,13 +376,6 @@ Mmd.MmdPlaybackSnapshotSummary :: field public int vertexCount
 Mmd.MmdPlaybackSnapshotSummary :: field public int vertexMorphCount
 Mmd.MmdPlaybackSnapshotSummary :: field public string model
 Mmd.MmdPlaybackSnapshotSummary :: field public string motion
-Mmd.MmdPlaybackTime :: (type) public static class MmdPlaybackTime
-Mmd.MmdPlaybackTime :: method public static Mmd.MmdPlaybackTimeMapping Map(float time, float frameRate, int motionMaxFrame)
-Mmd.MmdPlaybackTime :: method public static float ToTime(int frame, float frameRate)
-Mmd.MmdPlaybackTime :: method public static int ToFrame(float time, float frameRate)
-Mmd.MmdPlaybackTime :: method public static void ValidateFrame(int frame)
-Mmd.MmdPlaybackTime :: method public static void ValidateFrameRate(float frameRate)
-Mmd.MmdPlaybackTime :: method public static void ValidateTime(float time)
 Mmd.MmdPlaybackTimeMapping :: (type) public sealed class MmdPlaybackTimeMapping
 Mmd.MmdPlaybackTimeMapping :: ctor public .ctor()
 Mmd.MmdPlaybackTimeMapping :: field public bool beyondMotionMaxFrame
