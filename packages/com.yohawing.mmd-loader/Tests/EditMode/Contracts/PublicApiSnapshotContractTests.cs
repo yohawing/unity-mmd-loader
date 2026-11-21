@@ -63,6 +63,41 @@ namespace Mmd.Tests.Contracts
                 Path.Combine(BaselineRoot, assemblyName + ".api.txt"));
         }
 
+        /// <summary>
+        /// InternalsVisibleTo grants widen the effective API as much as public
+        /// members do, so each grant must be listed here deliberately.
+        /// </summary>
+        [Test]
+        public void InternalsVisibleToGrantsAreExplicit()
+        {
+            var expected = new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                ["Mmd.Runtime"] = new[]
+                {
+                    "Mmd.DevTools.Editor", "Mmd.EditModeTests", "Mmd.Editor", "Mmd.PlayModeTests",
+                    "Mmd.Rendering.Universal", "Mmd.Timeline", "Mmd.TimelineEditModeTests"
+                },
+                ["Mmd.Timeline"] = new[] { "Mmd.TimelineEditModeTests" },
+                ["Mmd.Rendering.Universal"] = Array.Empty<string>(),
+                ["Mmd.Editor"] = new[] { "Mmd.EditModeTests", "Mmd.TimelineEditModeTests" },
+                ["Mmd.Editor.Timeline"] = new[] { "Mmd.Editor", "Mmd.TimelineEditModeTests" }
+            };
+
+            Assert.That(expected.Keys.OrderBy(name => name, StringComparer.Ordinal),
+                Is.EqualTo(SnapshotAssemblies.OrderBy(name => name, StringComparer.Ordinal)));
+            foreach (KeyValuePair<string, string[]> entry in expected)
+            {
+                string[] actual = PublicApiBaselineAssert.RequireLoadedAssembly(entry.Key)
+                    .GetCustomAttributes(typeof(System.Runtime.CompilerServices.InternalsVisibleToAttribute), false)
+                    .Cast<System.Runtime.CompilerServices.InternalsVisibleToAttribute>()
+                    .Select(attribute => attribute.AssemblyName)
+                    .OrderBy(name => name, StringComparer.Ordinal)
+                    .ToArray();
+                Assert.That(actual, Is.EqualTo(entry.Value.OrderBy(name => name, StringComparer.Ordinal).ToArray()),
+                    "InternalsVisibleTo grants of " + entry.Key);
+            }
+        }
+
         [Test]
         public void TierLedgerListsEveryPublicTypeExactlyOnce()
         {

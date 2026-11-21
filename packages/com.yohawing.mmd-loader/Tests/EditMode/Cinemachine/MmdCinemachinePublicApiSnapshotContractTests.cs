@@ -24,5 +24,13 @@ namespace Mmd.Tests.Cinemachine
         {
             PublicApiBaselineAssert.AssertMatchesBaseline(typeof(MmdCinemachineCameraBinding).Assembly, BaselinePath);
         }
+
+        [Test]
+        public void CinemachineAssemblyGrantsNoInternalsVisibleTo()
+        {
+            object[] grants = typeof(MmdCinemachineCameraBinding).Assembly
+                .GetCustomAttributes(typeof(System.Runtime.CompilerServices.InternalsVisibleToAttribute), false);
+            Assert.That(grants, Is.Empty, "Mmd.Cinemachine must not widen its API through InternalsVisibleTo.");
+        }
     }
 }
