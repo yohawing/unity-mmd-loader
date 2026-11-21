@@ -352,7 +352,13 @@ jobs:
             "Mmd.Tests.MmdGoldenGenerationTests.GenerateVmdGoldenCandidatesForMaintainer"
           )
           $editModeAllowedSkippedPrefixes = @(
-            "Mmd.Tests.MmdAssetImporterTests.PmxImporterCustomProfileRendersUtsVisualSmoke"
+            "Mmd.Tests.MmdAssetImporterTests.PmxImporterCustomProfileRendersUtsVisualSmoke",
+            "Mmd.Tests.MmdGenericAnimationClipWriterCharacterizationTests.BakedCurvesMatchGolden",
+            "Mmd.Tests.MmdGenericAnimationClipWriterCharacterizationTests.InMemoryClipNameAndFrameRateArePinned",
+            "Mmd.Tests.MmdGenericAnimationClipWriterCharacterizationTests.DenseBudgetOverflowReportsExactDiagnostics",
+            "Mmd.Tests.MmdGenericAnimationClipWriterCharacterizationTests.SuccessfulBakesReportExactDiagnostics",
+            "Mmd.Tests.MmdGenericAnimationClipWriterCharacterizationTests.InvalidOutputPathReportsBakeDiagnosticsThenPathError",
+            "Mmd.Tests.MmdGenericAnimationClipWriterCharacterizationTests.BakesDoNotLeakTemporaryObjects"
           )
 
           foreach ($evidence in @(

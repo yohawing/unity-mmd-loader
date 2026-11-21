@@ -378,6 +378,243 @@ namespace Mmd.Tests
             }
         }
 
+        private static readonly string[] ReadySuccessDiagnostics =
+        {
+            "conversion-prerequisites: ready",
+            "mapping-source: Imported PMX Humanoid settings.",
+            "writer-status: CanCreateClipNow is true (in-memory writer in H6 slice 1).",
+            "writer: enabled native batch evaluation for Humanoid IK sampling.",
+            "writer: sampled evaluated MMD IK pose through native batch output.",
+            "writer: wrote " + HumanTrait.MuscleCount + " Humanoid muscle curves.",
+            "root-motion: wrote native evaluated dense RootT/RootQ curves from mapped Hips hierarchy.",
+        };
+
+        private static readonly string[] ReadyPlanDiagnostics =
+        {
+            "conversion-prerequisites: ready",
+            "mapping-source: Imported PMX Humanoid settings.",
+            "writer-status: CanCreateClipNow is true (in-memory writer in H6 slice 1).",
+        };
+
+        [Test]
+        public void CreateInMemoryClipPinsDiagnosticsClipNameAndFrameRate()
+        {
+            MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(FixtureVmdPath);
+            var ownedObjects = new List<UnityEngine.Object>();
+            try
+            {
+                CreateReadyFixturePmx(out MmdPmxAsset pmxAsset, ownedObjects);
+                ConfigureImportedHumanoidState(pmxAsset, ownedObjects);
+                foreach ((float rate, int start, int end) in new[] { (30.0f, 0, 2), (24.0f, 1, 3) })
+                {
+                    MmdHumanoidClipConversionWriterResult result =
+                        MmdHumanoidClipConversionWriter.CreateInMemoryClip(pmxAsset, vmdAsset, rate, start, end);
+                    try
+                    {
+                        Assert.That(result.Clip, Is.Not.Null, string.Join("\n", result.Diagnostics));
+                        Assert.That(result.Diagnostics, Is.EqualTo(ReadySuccessDiagnostics));
+                        Assert.That(
+                            result.Clip!.name,
+                            Is.EqualTo("H6_HumanoidProxyClip_ready-h6-writer-slice1_pmx_"
+                                       + "Packages_com_yohawing_mmd-loader_Tests_Fixtures_Assets_test_1bone_cube_motion_vmd_"
+                                       + start + "_" + end + "_" + (int)rate + "fps"));
+                        Assert.That(result.Clip.frameRate, Is.EqualTo(rate));
+                    }
+                    finally
+                    {
+                        if (result.Clip != null) UnityEngine.Object.DestroyImmediate(result.Clip);
+                    }
+                }
+            }
+            finally
+            {
+                DestroyOwnedObjects(ownedObjects);
+            }
+        }
+
+        [Test]
+        public void CreateInMemoryClipNullInputsReportPlannerDiagnostics()
+        {
+            MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(FixtureVmdPath);
+            var ownedObjects = new List<UnityEngine.Object>();
+            try
+            {
+                CreateReadyFixturePmx(out MmdPmxAsset pmxAsset, ownedObjects);
+                ConfigureImportedHumanoidState(pmxAsset, ownedObjects);
+                const string notReady = "writer: prerequisites are not ready; cannot create in-memory clip.";
+                AssertNoClip(
+                    MmdHumanoidClipConversionWriter.CreateInMemoryClip(null!, vmdAsset, 30.0f),
+                    "pmx asset is null",
+                    notReady);
+                AssertNoClip(
+                    MmdHumanoidClipConversionWriter.CreateInMemoryClip(pmxAsset, null!, 30.0f),
+                    "vmd asset is null",
+                    notReady);
+                AssertNoClip(
+                    MmdHumanoidClipConversionWriter.CreateInMemoryClip(null!, null!, float.NaN, -1, -5),
+                    "pmx asset is null",
+                    "vmd asset is null",
+                    notReady);
+            }
+            finally
+            {
+                DestroyOwnedObjects(ownedObjects);
+            }
+        }
+
+        [TestCase(0.0f, 0, 2, "validation: frameRate must be finite and > 0.")]
+        [TestCase(-30.0f, 0, 2, "validation: frameRate must be finite and > 0.")]
+        [TestCase(float.NaN, 0, 2, "validation: frameRate must be finite and > 0.")]
+        [TestCase(float.PositiveInfinity, -1, 2, "validation: frameRate must be finite and > 0.")]
+        [TestCase(30.0f, -1, 2, "validation: startFrame must be >= 0.")]
+        [TestCase(30.0f, 5, 4, "validation: endFrame must be >= startFrame.")]
+        [TestCase(30.0f, 50, 50, "validation: startFrame must be <= motion.maxFrame 49.")]
+        [TestCase(30.0f, 0, 50, "validation: endFrame 50 must be <= motion.maxFrame 49.")]
+        public void CreateInMemoryClipInvalidSamplingInputsReportExactDiagnostics(
+            float rate,
+            int start,
+            int end,
+            string expected)
+        {
+            MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(FixtureVmdPath);
+            var ownedObjects = new List<UnityEngine.Object>();
+            try
+            {
+                CreateReadyFixturePmx(out MmdPmxAsset pmxAsset, ownedObjects);
+                ConfigureImportedHumanoidState(pmxAsset, ownedObjects);
+                AssertNoClip(
+                    MmdHumanoidClipConversionWriter.CreateInMemoryClip(pmxAsset, vmdAsset, rate, start, end),
+                    ReadyPlanDiagnostics.Append(expected).ToArray());
+            }
+            finally
+            {
+                DestroyOwnedObjects(ownedObjects);
+            }
+        }
+
+        [Test]
+        public void CreateInMemoryClipStartFrameBeyondMotionWithDefaultEndReportsEndBeforeStart()
+        {
+            MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(FixtureVmdPath);
+            var ownedObjects = new List<UnityEngine.Object>();
+            try
+            {
+                CreateReadyFixturePmx(out MmdPmxAsset pmxAsset, ownedObjects);
+                ConfigureImportedHumanoidState(pmxAsset, ownedObjects);
+                AssertNoClip(
+                    MmdHumanoidClipConversionWriter.CreateInMemoryClip(pmxAsset, vmdAsset, 30.0f, 60),
+                    ReadyPlanDiagnostics.Append("validation: endFrame must be >= startFrame.").ToArray());
+            }
+            finally
+            {
+                DestroyOwnedObjects(ownedObjects);
+            }
+        }
+
+        [Test]
+        public void CreateInMemoryClipBudgetOverflowReportsExactDiagnostics()
+        {
+            byte[] vmdBytes = MmdGenericAnimationClipWriterCharacterizationTests.BuildTwoKeyVmd("センター", 40_000);
+            MmdVmdAsset vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
+            vmdAsset.Initialize(vmdBytes, "budget.vmd", "Assets/budget.vmd", MmdVmdNativeSummaryAdapter.Read(vmdBytes));
+            var ownedObjects = new List<UnityEngine.Object> { vmdAsset };
+            try
+            {
+                CreateReadyFixturePmx(out MmdPmxAsset pmxAsset, ownedObjects);
+                ConfigureImportedHumanoidState(pmxAsset, ownedObjects);
+                AssertNoClip(
+                    MmdHumanoidClipConversionWriter.CreateInMemoryClip(pmxAsset, vmdAsset, 30.0f),
+                    ReadyPlanDiagnostics.Append(
+                        "validation: requested Frame Range exceeds the safe dense bake budget of 4,000,000 key "
+                        + "equivalents. Narrow Frame Range and try again.").ToArray());
+            }
+            finally
+            {
+                DestroyOwnedObjects(ownedObjects);
+            }
+        }
+
+        [TestCase("", "validation: output path is required.")]
+        [TestCase("C:/outside.anim", "validation: output path must be project-relative, not rooted.")]
+        [TestCase("Packages/outside.anim", "validation: output path must start with Assets/.")]
+        [TestCase("Assets/clip.asset", "validation: output path must end with .anim.")]
+        [TestCase("Assets//clip.anim", "validation: output path must not contain empty segments.")]
+        [TestCase("Assets/../clip.anim", "validation: output path must not contain '.' or '..' segments.")]
+        public void CreateHumanoidAnimationClipAssetInvalidPathReportsBakeDiagnosticsThenPathError(
+            string outputPath,
+            string expected)
+        {
+            MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(FixtureVmdPath);
+            var ownedObjects = new List<UnityEngine.Object>();
+            try
+            {
+                CreateReadyFixturePmx(out MmdPmxAsset pmxAsset, ownedObjects);
+                ConfigureImportedHumanoidState(pmxAsset, ownedObjects);
+                AssertNoClip(
+                    MmdHumanoidClipConversionWriter.CreateHumanoidAnimationClipAsset(
+                        pmxAsset, vmdAsset, 30.0f, 0, 2, outputPath),
+                    ReadySuccessDiagnostics.Append(expected).ToArray());
+            }
+            finally
+            {
+                DestroyOwnedObjects(ownedObjects);
+            }
+        }
+
+        [Test]
+        public void HumanoidBakesDoNotLeakTemporaryObjects()
+        {
+            MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(FixtureVmdPath);
+            byte[] budgetBytes = MmdGenericAnimationClipWriterCharacterizationTests.BuildTwoKeyVmd("センター", 40_000);
+            MmdVmdAsset budgetVmd = ScriptableObject.CreateInstance<MmdVmdAsset>();
+            budgetVmd.Initialize(budgetBytes, "budget.vmd", "Assets/budget.vmd", MmdVmdNativeSummaryAdapter.Read(budgetBytes));
+            var ownedObjects = new List<UnityEngine.Object> { budgetVmd };
+            try
+            {
+                CreateReadyFixturePmx(out MmdPmxAsset pmxAsset, ownedObjects);
+                ConfigureImportedHumanoidState(pmxAsset, ownedObjects);
+
+                void BakeAll()
+                {
+                    DestroyResultClip(MmdHumanoidClipConversionWriter.CreateInMemoryClip(pmxAsset, vmdAsset, 30.0f, 0, 2));
+                    DestroyResultClip(MmdHumanoidClipConversionWriter.CreateInMemoryClip(pmxAsset, vmdAsset, 30.0f, 0, 50));
+                    DestroyResultClip(MmdHumanoidClipConversionWriter.CreateInMemoryClip(pmxAsset, budgetVmd, 30.0f));
+                    DestroyResultClip(MmdHumanoidClipConversionWriter.CreateHumanoidAnimationClipAsset(
+                        pmxAsset, vmdAsset, 30.0f, 0, 2, "Assets/clip.asset"));
+                }
+
+                BakeAll();
+                string before = MmdGenericAnimationClipWriterCharacterizationTests.CountObjects();
+                BakeAll();
+                Assert.That(MmdGenericAnimationClipWriterCharacterizationTests.CountObjects(), Is.EqualTo(before));
+            }
+            finally
+            {
+                DestroyOwnedObjects(ownedObjects);
+            }
+        }
+
+        private static void AssertNoClip(MmdHumanoidClipConversionWriterResult result, params string[] expected)
+        {
+            try
+            {
+                Assert.That(result.Clip, Is.Null, string.Join("\n", result.Diagnostics));
+                Assert.That(result.Diagnostics, Is.EqualTo(expected), string.Join("\n", result.Diagnostics));
+            }
+            finally
+            {
+                DestroyResultClip(result);
+            }
+        }
+
+        private static void DestroyResultClip(MmdHumanoidClipConversionWriterResult result)
+        {
+            if (result.Clip != null && !AssetDatabase.Contains(result.Clip))
+            {
+                UnityEngine.Object.DestroyImmediate(result.Clip);
+            }
+        }
+
         private static void CreateReadyFixturePmx(
             out MmdPmxAsset pmxAsset,
             List<UnityEngine.Object> ownedObjects)
@@ -401,6 +638,10 @@ namespace Mmd.Tests
 
             ownedObjects.Add(pmxAsset);
             ownedObjects.Add(generatedAssets.Root);
+            // The renderer only references these; destroying the root does not destroy them.
+            ownedObjects.Add(generatedAssets.Mesh);
+            ownedObjects.AddRange(generatedAssets.Materials);
+            ownedObjects.AddRange(generatedAssets.OwnedTextures);
         }
 
         private static void ConfigureImportedHumanoidState(
