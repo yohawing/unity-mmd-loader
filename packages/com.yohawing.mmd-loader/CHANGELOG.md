@@ -33,6 +33,10 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
   - `Mmd.Editor.MmdHumanoidSetupAssetBuilder`, including `GetDefaultSetupAssetPath` and `CreateHumanoidSetupAsset`. Reimport the PMX with Animation Type = Humanoid instead.
   - `MmdHumanoidSetupAsset.Initialize`. Reimport the PMX with Animation Type = Humanoid and use the imported Avatar and retarget mapping. Existing `MmdHumanoidSetupAsset` files still load, and the obsolete `MmdHumanoidSetupPreset` enum stays because it is the type of their serialized `setupPreset` field.
 
+### Fixed
+
+- `MmdModelValidator` reports a missing `physics`, `physics.rigidbodies` or `physics.joints` as a validation error instead of throwing `NullReferenceException`.
+
 ## [0.5.1] - 2026-10-23
 
 ### Changed
