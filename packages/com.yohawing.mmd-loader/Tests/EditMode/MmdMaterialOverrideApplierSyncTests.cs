@@ -450,6 +450,180 @@ namespace Mmd.EditModeTests
             }
         }
 
+        // Surface decision table shared by the Material sink and the URP binding sink.
+        // Columns: surface override (null = no hasSurfaceMode), alpha override (null = no hasAlpha),
+        // hasAlphaClipThreshold, initial descriptor binding alpha, expected Material outcome,
+        // expected binding outcome. Material outcomes: "unchanged", "thresholdOnly" (clip
+        // threshold written without a surface change), "opaque", "alphaTest", "alphaBlend"
+        // (alphaBlend never clips). Binding outcomes are the transparencyMode, or "unchanged".
+        // Decision 2026-11-22: alpha < 1 plus an alpha clip threshold without a surface mode is
+        // transparent without clipping (alphaBlend) on both sinks.
+        private static readonly object?[][] SurfaceDecisionTable =
+        {
+            new object?[] { null, null, false, 1.0f, "unchanged", "unchanged" },
+            new object?[] { null, null, true, 1.0f, "alphaTest", "alphaTest" },
+            new object?[] { null, 0.5f, false, 1.0f, "alphaBlend", "alphaBlend" },
+            new object?[] { null, 0.5f, true, 1.0f, "alphaBlend", "alphaBlend" },
+            new object?[] { null, 1.0f, false, 1.0f, "unchanged", "unchanged" },
+            new object?[] { null, 1.0f, true, 1.0f, "alphaTest", "alphaTest" },
+            new object?[] { null, null, false, 0.5f, "unchanged", "alphaBlend" },
+            new object?[] { null, null, true, 0.5f, "alphaTest", "alphaTest" },
+            new object?[] { MmdMaterialOverrideSurfaceMode.Preserve, null, false, 1.0f, "unchanged", "unchanged" },
+            new object?[] { MmdMaterialOverrideSurfaceMode.Preserve, null, true, 1.0f, "thresholdOnly", "unchanged" },
+            new object?[] { MmdMaterialOverrideSurfaceMode.Preserve, 0.5f, false, 1.0f, "unchanged", "unchanged" },
+            new object?[] { MmdMaterialOverrideSurfaceMode.Preserve, 0.5f, true, 1.0f, "thresholdOnly", "unchanged" },
+            new object?[] { MmdMaterialOverrideSurfaceMode.Preserve, 1.0f, false, 1.0f, "unchanged", "unchanged" },
+            new object?[] { MmdMaterialOverrideSurfaceMode.Preserve, 1.0f, true, 1.0f, "thresholdOnly", "unchanged" },
+            new object?[] { MmdMaterialOverrideSurfaceMode.Opaque, null, false, 1.0f, "opaque", "opaque" },
+            new object?[] { MmdMaterialOverrideSurfaceMode.Opaque, null, true, 1.0f, "opaque", "opaque" },
+            new object?[] { MmdMaterialOverrideSurfaceMode.Opaque, 0.5f, false, 1.0f, "opaque", "opaque" },
+            new object?[] { MmdMaterialOverrideSurfaceMode.Opaque, 0.5f, true, 1.0f, "opaque", "opaque" },
+            new object?[] { MmdMaterialOverrideSurfaceMode.Opaque, 1.0f, false, 1.0f, "opaque", "opaque" },
+            new object?[] { MmdMaterialOverrideSurfaceMode.Opaque, 1.0f, true, 1.0f, "opaque", "opaque" },
+            new object?[] { MmdMaterialOverrideSurfaceMode.AlphaTest, null, false, 1.0f, "alphaTest", "alphaTest" },
+            new object?[] { MmdMaterialOverrideSurfaceMode.AlphaTest, null, true, 1.0f, "alphaTest", "alphaTest" },
+            new object?[] { MmdMaterialOverrideSurfaceMode.AlphaTest, 0.5f, false, 1.0f, "alphaTest", "alphaTest" },
+            new object?[] { MmdMaterialOverrideSurfaceMode.AlphaTest, 0.5f, true, 1.0f, "alphaTest", "alphaTest" },
+            new object?[] { MmdMaterialOverrideSurfaceMode.AlphaTest, 1.0f, false, 1.0f, "alphaTest", "alphaTest" },
+            new object?[] { MmdMaterialOverrideSurfaceMode.AlphaTest, 1.0f, true, 1.0f, "alphaTest", "alphaTest" },
+            new object?[] { MmdMaterialOverrideSurfaceMode.AlphaBlend, null, false, 1.0f, "alphaBlend", "alphaBlend" },
+            new object?[] { MmdMaterialOverrideSurfaceMode.AlphaBlend, null, true, 1.0f, "alphaBlend", "alphaBlend" },
+            new object?[] { MmdMaterialOverrideSurfaceMode.AlphaBlend, 0.5f, false, 1.0f, "alphaBlend", "alphaBlend" },
+            new object?[] { MmdMaterialOverrideSurfaceMode.AlphaBlend, 0.5f, true, 1.0f, "alphaBlend", "alphaBlend" },
+            new object?[] { MmdMaterialOverrideSurfaceMode.AlphaBlend, 1.0f, false, 1.0f, "alphaBlend", "alphaBlend" },
+            new object?[] { MmdMaterialOverrideSurfaceMode.AlphaBlend, 1.0f, true, 1.0f, "alphaBlend", "alphaBlend" }
+        };
+
+        private const int SentinelRenderQueue = 2001;
+        private const float SentinelClipThreshold = 0.5f;
+        private const float EntryClipThreshold = 0.27f;
+        private const float DefaultClipThreshold = 0.01f;
+
+        [TestCaseSource(nameof(SurfaceDecisionTable))]
+        public void SurfaceDecisionTableIsSharedByMaterialAndBindingSinks(
+            MmdMaterialOverrideSurfaceMode? surfaceMode,
+            float? alpha,
+            bool hasAlphaClipThreshold,
+            float descriptorAlpha,
+            string expectedMaterial,
+            string expectedBinding)
+        {
+            Shader shader = Shader.Find(MmdUrpMaterialBindingDescriptorBuilder.MmdToonLitShaderName)
+                ?? throw new InvalidOperationException("MMD Toon Lit shader was not found.");
+            Material? material = null;
+            MmdMaterialOverrideAsset? asset = null;
+            try
+            {
+                var entry = new MmdMaterialOverrideEntry { materialIndex = 0 };
+                if (surfaceMode.HasValue)
+                {
+                    entry.hasSurfaceMode = true;
+                    entry.surfaceMode = surfaceMode.Value;
+                }
+
+                if (alpha.HasValue)
+                {
+                    entry.hasAlpha = true;
+                    entry.alpha = alpha.Value;
+                }
+
+                if (hasAlphaClipThreshold)
+                {
+                    entry.hasAlphaClipThreshold = true;
+                    entry.alphaClipThreshold = EntryClipThreshold;
+                }
+
+                asset = CreateAsset(entry);
+
+                material = new Material(shader) { name = "surface-table" };
+                AssertHasProperties(material,
+                    MmdMaterialPropertyNames.AlphaClipThreshold, MmdMaterialPropertyNames.ShadowAlphaClipThreshold);
+                material.renderQueue = SentinelRenderQueue;
+                material.SetFloat(MmdMaterialPropertyNames.AlphaClipThreshold, SentinelClipThreshold);
+                material.SetFloat(MmdMaterialPropertyNames.ShadowAlphaClipThreshold, SentinelClipThreshold);
+                MmdMaterialOverrideApplier.Apply(asset, new[] { material });
+
+                MmdRenderingDescriptor descriptor = CreateDescriptor();
+                MmdUrpMaterialBindingDescriptor binding = descriptor.urpMaterialBindings[0];
+                binding.alpha = descriptorAlpha;
+                binding.isTransparent = false;
+                binding.transparencyMode = "unchanged";
+                binding.renderOrderBucket = "unchanged";
+                MmdMaterialOverrideApplier.ApplyToRenderingDescriptor(asset, descriptor);
+
+                string actualMaterial = ObserveMaterialSurface(material);
+                string actualBinding = binding.transparencyMode;
+                Assert.That(
+                    new[] { actualMaterial, actualBinding },
+                    Is.EqualTo(new[] { expectedMaterial, expectedBinding }),
+                    "[material, binding] surface outcome");
+
+                float expectedShadowThreshold = hasAlphaClipThreshold ? EntryClipThreshold : DefaultClipThreshold;
+                switch (expectedMaterial)
+                {
+                    case "alphaBlend":
+                        Assert.That(material.renderQueue, Is.EqualTo((int)RenderQueue.Transparent));
+                        Assert.That(material.GetFloat(MmdMaterialPropertyNames.AlphaClipThreshold), Is.EqualTo(0.0f));
+                        Assert.That(material.GetFloat(MmdMaterialPropertyNames.ShadowAlphaClipThreshold),
+                            Is.EqualTo(expectedShadowThreshold).Within(0.00001f));
+                        break;
+                    case "alphaTest":
+                        Assert.That(material.GetFloat(MmdMaterialPropertyNames.AlphaClipThreshold),
+                            Is.EqualTo(expectedShadowThreshold).Within(0.00001f));
+                        Assert.That(material.GetFloat(MmdMaterialPropertyNames.ShadowAlphaClipThreshold),
+                            Is.EqualTo(expectedShadowThreshold).Within(0.00001f));
+                        break;
+                }
+
+                switch (expectedBinding)
+                {
+                    case "alphaBlend":
+                        Assert.That(binding.isTransparent, Is.True);
+                        Assert.That(binding.renderOrderBucket, Is.EqualTo("alphaBlend"));
+                        break;
+                    case "alphaTest":
+                    case "opaque":
+                        Assert.That(binding.isTransparent, Is.False);
+                        Assert.That(binding.renderOrderBucket, Is.EqualTo("opaque"));
+                        break;
+                    default:
+                        Assert.That(binding.isTransparent, Is.False);
+                        Assert.That(binding.renderOrderBucket, Is.EqualTo("unchanged"));
+                        break;
+                }
+            }
+            finally
+            {
+                Destroy(asset, material);
+            }
+        }
+
+        private static string ObserveMaterialSurface(Material material)
+        {
+            float clip = material.GetFloat(MmdMaterialPropertyNames.AlphaClipThreshold);
+            if (material.renderQueue == SentinelRenderQueue)
+            {
+                if (Mathf.Approximately(clip, SentinelClipThreshold))
+                {
+                    return "unchanged";
+                }
+
+                return Mathf.Approximately(clip, EntryClipThreshold) ? "thresholdOnly" : $"unexpected(queue={material.renderQueue}, clip={clip})";
+            }
+
+            if (material.renderQueue >= (int)RenderQueue.Transparent)
+            {
+                return "alphaBlend";
+            }
+
+            if (material.renderQueue == (int)RenderQueue.Geometry)
+            {
+                return clip > 0.0f ? "alphaTest" : "opaque";
+            }
+
+            return $"unexpected(queue={material.renderQueue}, clip={clip})";
+        }
+
         private static MmdMaterialOverrideEntry CreateAllFlagsEntry(
             Texture2D? normalMap,
             Texture2D? metallicMap,

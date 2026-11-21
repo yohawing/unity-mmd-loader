@@ -437,48 +437,67 @@ namespace Mmd.UnityIntegration
                 }
             }
 
-            if (entry.hasSurfaceMode && entry.surfaceMode != MmdMaterialOverrideSurfaceMode.Preserve)
-            {
-                ApplySurfaceMode(material, entry.surfaceMode, materialSlot, entry.hasAlphaClipThreshold ? entry.alphaClipThreshold : 0.01f);
-            }
-            else if (entry.hasSurfaceMode && entry.surfaceMode == MmdMaterialOverrideSurfaceMode.Preserve)
-            {
-                if (entry.hasAlphaClipThreshold)
-                {
-                    ApplyAlphaClipThreshold(material, entry.alphaClipThreshold);
-                }
-            }
-            else if (!preserveSurfaceClassification && TryResolveAlphaOverride(entry, out float alphaOverride))
-            {
-                if (alphaOverride < 1.0f)
-                {
-                    ApplySurfaceMode(
-                        material,
-                        MmdMaterialOverrideSurfaceMode.AlphaBlend,
-                        materialSlot,
-                        entry.hasAlphaClipThreshold ? entry.alphaClipThreshold : 0.01f);
-                }
-                else if (entry.hasAlphaClipThreshold)
-                {
-                    ApplySurfaceMode(
-                        material,
-                        MmdMaterialOverrideSurfaceMode.AlphaTest,
-                        materialSlot,
-                        entry.alphaClipThreshold);
-                }
-            }
-            else if (!preserveSurfaceClassification && entry.hasAlphaClipThreshold)
+            // The built material already reflects the descriptor alpha, so only the entry's own
+            // alpha takes part in the decision here (fallback 1).
+            MmdMaterialOverrideSurfaceMode? surfaceMode = ResolveSurfaceOverride(
+                entry,
+                preserveSurfaceClassification,
+                descriptorAlpha: 1.0f);
+            if (surfaceMode.HasValue)
             {
                 ApplySurfaceMode(
                     material,
-                    MmdMaterialOverrideSurfaceMode.AlphaTest,
+                    surfaceMode.Value,
                     materialSlot,
-                    entry.alphaClipThreshold);
+                    entry.hasAlphaClipThreshold ? entry.alphaClipThreshold : 0.01f);
             }
             else if (entry.hasAlphaClipThreshold)
             {
                 ApplyAlphaClipThreshold(material, entry.alphaClipThreshold);
             }
+        }
+
+        // Single surface decision for the Material sink and the URP binding sink. Returns null
+        // when the entry leaves the surface classification as it is.
+        // - An explicit surface mode wins; Preserve keeps the classification.
+        // - A later entry for a slot that already received an explicit mode keeps it.
+        // - An entry alpha (hasAlpha / hasBaseColor) below 1 means transparent without clipping,
+        //   even when the entry also carries an alpha clip threshold (decision 2026-11-22).
+        // - Otherwise an alpha clip threshold means alpha test.
+        // - Without entry alpha or clip, descriptorAlpha below 1 means transparent.
+        internal static MmdMaterialOverrideSurfaceMode? ResolveSurfaceOverride(
+            MmdMaterialOverrideEntry entry,
+            bool preserveSurfaceClassification,
+            float descriptorAlpha)
+        {
+            if (entry.hasSurfaceMode)
+            {
+                return entry.surfaceMode == MmdMaterialOverrideSurfaceMode.Preserve
+                    ? null
+                    : entry.surfaceMode;
+            }
+
+            if (preserveSurfaceClassification)
+            {
+                return null;
+            }
+
+            if (TryResolveAlphaOverride(entry, out float alphaOverride))
+            {
+                if (alphaOverride < 1.0f)
+                {
+                    return MmdMaterialOverrideSurfaceMode.AlphaBlend;
+                }
+
+                return entry.hasAlphaClipThreshold ? MmdMaterialOverrideSurfaceMode.AlphaTest : null;
+            }
+
+            if (entry.hasAlphaClipThreshold)
+            {
+                return MmdMaterialOverrideSurfaceMode.AlphaTest;
+            }
+
+            return descriptorAlpha < 1.0f ? MmdMaterialOverrideSurfaceMode.AlphaBlend : null;
         }
 
         private static void ApplyDescriptorEntry(
@@ -707,24 +726,13 @@ namespace Mmd.UnityIntegration
             MmdUrpMaterialBindingDescriptor binding,
             bool preserveSurfaceClassification)
         {
-            if (entry.hasSurfaceMode && entry.surfaceMode != MmdMaterialOverrideSurfaceMode.Preserve)
+            MmdMaterialOverrideSurfaceMode? surfaceMode = ResolveSurfaceOverride(
+                entry,
+                preserveSurfaceClassification,
+                binding.alpha);
+            if (surfaceMode.HasValue)
             {
-                ApplyBindingSurfaceMode(binding, entry.surfaceMode);
-            }
-            else if (entry.hasSurfaceMode && entry.surfaceMode == MmdMaterialOverrideSurfaceMode.Preserve)
-            {
-                return;
-            }
-            else if (!preserveSurfaceClassification)
-            {
-                if (entry.hasAlphaClipThreshold)
-                {
-                    ApplyBindingSurfaceMode(binding, MmdMaterialOverrideSurfaceMode.AlphaTest);
-                }
-                else if (binding.alpha < 1.0f)
-                {
-                    ApplyBindingSurfaceMode(binding, MmdMaterialOverrideSurfaceMode.AlphaBlend);
-                }
+                ApplyBindingSurfaceMode(binding, surfaceMode.Value);
             }
         }
 
