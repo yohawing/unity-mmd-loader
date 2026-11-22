@@ -284,7 +284,7 @@ namespace Mmd.Editor
             }
             catch (DecoderFallbackException)
             {
-                return Encoding.GetEncoding(932).GetString(bytes);
+                return MmdCp932Encoding.Get("MME normal-map effect text").GetString(bytes);
             }
         }
     }

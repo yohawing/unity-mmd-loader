@@ -629,7 +629,7 @@ namespace Mmd.UnityIntegration
             byte[] bytes = new byte[66];
             byte[] header = Encoding.ASCII.GetBytes("Vocaloid Motion Data 0002");
             Array.Copy(header, 0, bytes, 0, Math.Min(header.Length, 30));
-            byte[] name = Encoding.GetEncoding(932).GetBytes(modelName);
+            byte[] name = MmdCp932Encoding.Get("the model-only rest VMD target model name").GetBytes(modelName);
             Array.Copy(name, 0, bytes, 30, Math.Min(name.Length, 20));
             return bytes;
         }
