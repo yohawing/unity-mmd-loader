@@ -868,7 +868,7 @@ namespace Mmd.Tests
             }
         }
         [Test]
-        public void PmxScriptedImporterVersionIsThirtyForMaterialProfileMigration()
+        public void PmxScriptedImporterVersionIsThirtyOneForTransparencyReclassification()
         {
             object[] attributes = typeof(MmdPmxScriptedImporter).GetCustomAttributes(
                 typeof(ScriptedImporterAttribute),
@@ -876,8 +876,8 @@ namespace Mmd.Tests
 
             Assert.That(attributes, Has.Length.EqualTo(1));
             var attribute = (ScriptedImporterAttribute)attributes[0];
-            Assert.That(attribute.version, Is.EqualTo(30),
-                "PMX importer version must migrate persisted material profile provenance.");
+            Assert.That(attribute.version, Is.EqualTo(31),
+                "PMX importer version must reimport materials classified by the removed name heuristics and older texture decoding.");
         }
 
         private static void CreateUtsProfileAsset(Shader utsShader)

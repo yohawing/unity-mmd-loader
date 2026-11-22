@@ -45,7 +45,9 @@ namespace Mmd.Editor
         CustomProfile = 3
     }
 
-    [ScriptedImporter(30, "pmx")]
+    // 31: data-only transparency classification, content-sniffed texture decoders and the
+    // shared material override surface decision change imported materials (0.6.0).
+    [ScriptedImporter(31, "pmx")]
     public sealed class MmdPmxScriptedImporter : ScriptedImporter
     {
         [SerializeField] private float importScale = MmdPmxAsset.DefaultImportScale;
