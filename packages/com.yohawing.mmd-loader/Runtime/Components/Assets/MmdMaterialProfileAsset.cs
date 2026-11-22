@@ -19,14 +19,15 @@ namespace Mmd
 
         internal MmdMaterialTextureTargets ToRuntimeTargets()
         {
+            // Named arguments: a swapped string property cannot be caught by the compiler.
             return new MmdMaterialTextureTargets(
-                diffuseTextureProperties,
-                sphereTextureProperty,
-                toonTextureProperty,
-                diffuseTextureBoundProperty,
-                sphereModeProperty,
-                toonTextureBoundProperty,
-                sphereTextureBoundProperty);
+                diffuseTextureProperties: diffuseTextureProperties,
+                sphereTextureProperty: sphereTextureProperty,
+                toonTextureProperty: toonTextureProperty,
+                diffuseTextureBoundProperty: diffuseTextureBoundProperty,
+                sphereModeProperty: sphereModeProperty,
+                toonTextureBoundProperty: toonTextureBoundProperty,
+                sphereTextureBoundProperty: sphereTextureBoundProperty);
         }
     }
 
@@ -62,33 +63,35 @@ namespace Mmd
 
         internal MmdMaterialRenderingTargets ToRuntimeTargets()
         {
+            // Named arguments: the constructor takes 26 mostly-string parameters, so a positional
+            // swap would compile. MmdMaterialProfileAssetTests round-trips every member.
             return new MmdMaterialRenderingTargets(
-                baseColorProperty,
-                colorProperty,
-                ambientColorProperty,
-                alphaProperty,
-                alphaClipThresholdProperty,
-                shadowAlphaClipThresholdProperty,
-                textureAlphaOutputWeightProperty,
-                cullProperty,
-                surfaceProperty,
-                blendProperty,
-                sourceBlendProperty,
-                destinationBlendProperty,
-                zWriteProperty,
-                outlineColorProperty,
-                outlineWidthProperty,
-                outlineVisibleProperty,
-                outlineScreenSpaceWeightProperty,
-                outlineZTestProperty,
-                supportsRenderQueue,
-                unsupportedFeatures,
-                validatePropertyPresence,
-                requiredKeywords,
-                requiredPasses,
-                supportsMaterialMorphs,
-                textureAlphaClipMaskProperty,
-                alphaClipModeProperty);
+                baseColorProperty: baseColorProperty,
+                colorProperty: colorProperty,
+                ambientColorProperty: ambientColorProperty,
+                alphaProperty: alphaProperty,
+                alphaClipThresholdProperty: alphaClipThresholdProperty,
+                shadowAlphaClipThresholdProperty: shadowAlphaClipThresholdProperty,
+                textureAlphaOutputWeightProperty: textureAlphaOutputWeightProperty,
+                cullProperty: cullProperty,
+                surfaceProperty: surfaceProperty,
+                blendProperty: blendProperty,
+                sourceBlendProperty: sourceBlendProperty,
+                destinationBlendProperty: destinationBlendProperty,
+                zWriteProperty: zWriteProperty,
+                outlineColorProperty: outlineColorProperty,
+                outlineWidthProperty: outlineWidthProperty,
+                outlineVisibleProperty: outlineVisibleProperty,
+                outlineScreenSpaceWeightProperty: outlineScreenSpaceWeightProperty,
+                outlineZTestProperty: outlineZTestProperty,
+                supportsRenderQueue: supportsRenderQueue,
+                unsupportedFeatures: unsupportedFeatures,
+                validatePropertyPresence: validatePropertyPresence,
+                requiredKeywords: requiredKeywords,
+                requiredPasses: requiredPasses,
+                supportsMaterialMorphs: supportsMaterialMorphs,
+                textureAlphaClipMaskProperty: textureAlphaClipMaskProperty,
+                alphaClipModeProperty: alphaClipModeProperty);
         }
     }
 
