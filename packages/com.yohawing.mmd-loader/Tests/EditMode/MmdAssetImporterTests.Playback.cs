@@ -22,7 +22,7 @@ namespace Mmd.Tests
         [Test]
         public void ImportedPmxAssetCarriesCachedMaterialReferenceSummaryFromImporter()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
 
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             MmdModelDefinition model = pmxAsset.LoadModel();
@@ -52,7 +52,7 @@ namespace Mmd.Tests
         [Test]
         public void ImportedPmxAssetCarriesCachedPhysicsSummaryFromImporter()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
 
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             MmdModelDefinition model = pmxAsset.LoadModel();

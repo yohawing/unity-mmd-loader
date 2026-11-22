@@ -32,8 +32,8 @@ namespace Mmd.Tests
         [Test]
         public void CreatesBoundVmdTrackAndClipFromDroppedPmxObject()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
-            CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(TempVmdPath);
             MmdUnityModelInstance? instance = null;
@@ -88,14 +88,14 @@ namespace Mmd.Tests
                     Object.DestroyImmediate(timelineAsset);
                 }
 
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(instance);
             }
         }
 
         [Test]
         public void VmdTimelineClipEditorSetsDroppedClipDurationFromMotionAsset()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
             MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(TempVmdPath);
             TimelineAsset? timelineAsset = null;
 
@@ -267,9 +267,9 @@ namespace Mmd.Tests
         [Test]
         public void MultipleCreatedClipsDoNotConfigureControllerUntilEachClipEvaluates()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
-            CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
-            CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempAlternateVmdPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempAlternateVmdPath);
             PatchSecondBoneKeyframeRotationToIdentity(TempAlternateVmdPath);
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             MmdVmdAsset firstVmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(TempVmdPath);
@@ -323,15 +323,15 @@ namespace Mmd.Tests
                     Object.DestroyImmediate(timelineAsset);
                 }
 
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(instance);
             }
         }
 
         [Test]
         public void TimelineEvaluationRebindsExistingPmxSceneObjectAfterLiveInstanceIsLost()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
-            CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(TempVmdPath);
             MmdUnityModelInstance? instance = null;
@@ -364,16 +364,16 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(instance);
             }
         }
 
         [Test]
         public void TimelineEvaluationRebindsRawPmxPathSceneObject()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
             MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(TempVmdPath);
-            string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+            string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
             MmdUnityModelInstance? instance = null;
 
             try
@@ -402,15 +402,15 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyImporterCacheInstance(instance);
             }
         }
 
         [Test]
         public void MissingLivePmxInstanceThrows()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
-            CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(TempVmdPath);
             GameObject? root = null;
@@ -456,14 +456,6 @@ namespace Mmd.Tests
             }
         }
 
-        private static void CopyFixtureToAssetDatabase(string fixtureName, string destinationAssetPath)
-        {
-            string source = Path.Combine(RepositoryRoot, "packages", "com.yohawing.mmd-loader", "Tests", "Fixtures", "Assets", fixtureName);
-            Directory.CreateDirectory(Path.Combine(ProjectRoot, TempDirectory));
-            File.Copy(source, Path.Combine(ProjectRoot, destinationAssetPath), overwrite: true);
-            AssetDatabase.ImportAsset(destinationAssetPath, ImportAssetOptions.ForceUpdate);
-        }
-
         private static MmdVmdAsset CreateSyntheticVmdAssetWithCachedSummary(string sourceId, int maxFrame)
         {
             MmdVmdAsset asset = ScriptableObject.CreateInstance<MmdVmdAsset>();
@@ -480,13 +472,6 @@ namespace Mmd.Tests
         }
 
         private static string ProjectRoot => Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-
-        private static string RepositoryRoot => Path.GetFullPath(Path.Combine(ProjectRoot, ".."));
-
-        private static string ResolvePackageFixture(string fileName)
-        {
-            return Path.Combine(RepositoryRoot, "packages", "com.yohawing.mmd-loader", "Tests", "Fixtures", "Assets", fileName);
-        }
 
         private static void PatchSecondBoneKeyframeRotationToIdentity(string assetPath)
         {
@@ -523,40 +508,6 @@ namespace Mmd.Tests
             }
 
             return count;
-        }
-
-        private static void DestroyInstance(MmdUnityModelInstance? instance)
-        {
-            if (instance == null)
-            {
-                return;
-            }
-
-            if (instance.Root != null)
-            {
-                Object.DestroyImmediate(instance.Root);
-            }
-
-            if (instance.Mesh != null && !AssetDatabase.Contains(instance.Mesh))
-            {
-                Object.DestroyImmediate(instance.Mesh);
-            }
-
-            foreach (Material material in instance.Materials)
-            {
-                if (material != null && !AssetDatabase.Contains(material))
-                {
-                    Object.DestroyImmediate(material);
-                }
-            }
-
-            foreach (Texture2D texture in instance.OwnedTextures)
-            {
-                if (texture != null && !AssetDatabase.Contains(texture))
-                {
-                    Object.DestroyImmediate(texture);
-                }
-            }
         }
     }
 }

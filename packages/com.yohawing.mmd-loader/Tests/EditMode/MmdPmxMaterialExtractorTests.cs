@@ -23,7 +23,7 @@ namespace Mmd.Tests
         [SetUp]
         public void SetUp()
         {
-            DeleteTempDirectory();
+            MmdTestTempScope.DeleteAssetFolder(TempDirectory);
             string directoryName = TempDirectory.Substring("Assets/".Length);
             AssetDatabase.CreateFolder("Assets", directoryName);
             AssetDatabase.CreateFolder(TempDirectory, "Sources");
@@ -34,7 +34,7 @@ namespace Mmd.Tests
         [TearDown]
         public void TearDown()
         {
-            DeleteTempDirectory();
+            MmdTestTempScope.DeleteAssetFolder(TempDirectory);
         }
 
         [Test]
@@ -349,29 +349,6 @@ namespace Mmd.Tests
             }
 
             return material.HasProperty("_Color") ? material.GetColor("_Color") : Color.clear;
-        }
-
-        private static void DeleteTempDirectory()
-        {
-            AssetDatabase.DeleteAsset(TempDirectory);
-            string fullPath = Path.Combine(ProjectRoot, TempDirectory);
-            if (Directory.Exists(fullPath))
-            {
-                foreach (string path in Directory.EnumerateFileSystemEntries(fullPath, "*", SearchOption.AllDirectories))
-                {
-                    File.SetAttributes(path, FileAttributes.Normal);
-                }
-
-                Directory.Delete(fullPath, recursive: true);
-            }
-
-            if (File.Exists(fullPath + ".meta"))
-            {
-                File.SetAttributes(fullPath + ".meta", FileAttributes.Normal);
-                File.Delete(fullPath + ".meta");
-            }
-
-            AssetDatabase.Refresh();
         }
 
         private static string ProjectRoot => Path.GetFullPath(Path.Combine(Application.dataPath, ".."));

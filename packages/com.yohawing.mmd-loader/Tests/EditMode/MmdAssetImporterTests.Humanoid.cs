@@ -25,7 +25,7 @@ namespace Mmd.Tests
         [Test]
         public void SceneDragAndDropRejectsMixedRawPmxPathAndImportedVmdAsset()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
             MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(TempVmdPath);
             string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
 
@@ -153,7 +153,7 @@ namespace Mmd.Tests
         [Test]
         public void SceneDragAndDropLoadsPmxUnderHierarchyParent()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             var parent = new GameObject("mmd-pmx-drop-parent");
             MmdUnityModelInstance? instance = null;
@@ -187,7 +187,7 @@ namespace Mmd.Tests
         [Test]
         public void SceneDragAndDropLoadsPmxAssetAsImportedPrefabInstance()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             Assert.That(pmxAsset.ImportedRoot, Is.Not.Null);
             MmdUnityModelInstance? instance = null;
@@ -287,8 +287,8 @@ namespace Mmd.Tests
         [Test]
         public void SceneDragAndDropLoadsPlaybackUnderHierarchyParent()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
-            CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(TempVmdPath);
             var parent = new GameObject("mmd-playback-drop-parent");
@@ -319,8 +319,8 @@ namespace Mmd.Tests
         [Test]
         public void SceneDragAndDropAttachesVmdSourceComponentToExistingPmxModel()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
-            CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(TempVmdPath);
             MmdUnityModelInstance? instance = null;
@@ -388,7 +388,7 @@ namespace Mmd.Tests
         {
             // Focused test: PMX-only drag/load creates model source provider (not full source).
             // ModelAsset set, MotionAsset null, HasModelSource true, IsConfigured false, ModelSourceId stable.
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             MmdUnityModelInstance? instance = null;
 
@@ -417,8 +417,8 @@ namespace Mmd.Tests
         {
             // Focused test: VMD attach consumes existing model source provider (no duplicate component),
             // preserves model asset + local playback settings, sets motion asset.
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
-            CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(TempVmdPath);
             MmdUnityModelInstance? instance = null;

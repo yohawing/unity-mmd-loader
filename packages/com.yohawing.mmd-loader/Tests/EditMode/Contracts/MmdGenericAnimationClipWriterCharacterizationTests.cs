@@ -312,12 +312,12 @@ namespace Mmd.Tests
         {
             using var stream = new MemoryStream();
             using var writer = new BinaryWriter(stream);
-            WriteFixedSjis(writer, "Vocaloid Motion Data 0002", 30);
-            WriteFixedSjis(writer, modelName, 20);
+            MmdTestFixtures.WriteFixedSjis(writer, "Vocaloid Motion Data 0002", 30);
+            MmdTestFixtures.WriteFixedSjis(writer, modelName, 20);
             writer.Write(2u);
             foreach ((uint frame, float x) in new[] { (0u, 0.0f), (lastFrame, 1.0f) })
             {
-                WriteFixedSjis(writer, boneName, 15);
+                MmdTestFixtures.WriteFixedSjis(writer, boneName, 15);
                 writer.Write(frame);
                 writer.Write(x);
                 writer.Write(0.0f);
@@ -344,14 +344,6 @@ namespace Mmd.Tests
             writer.Write(0u); // self-shadow count
             writer.Write(0u); // show/IK count
             return stream.ToArray();
-        }
-
-        private static void WriteFixedSjis(BinaryWriter writer, string value, int byteCount)
-        {
-            byte[] buffer = new byte[byteCount];
-            byte[] encoded = Encoding.GetEncoding(932).GetBytes(value);
-            Array.Copy(encoded, 0, buffer, 0, Math.Min(encoded.Length, buffer.Length));
-            writer.Write(buffer);
         }
 
         private static void AssertDiagnostics(MmdGenericAnimationClipWriterResult result, params string[] expected)

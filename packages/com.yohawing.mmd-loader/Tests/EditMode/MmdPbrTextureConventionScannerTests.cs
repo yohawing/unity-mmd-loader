@@ -19,14 +19,14 @@ namespace Mmd.Tests
         [SetUp]
         public void SetUp()
         {
-            DeleteTempDirectory();
+            MmdTestTempScope.DeleteAssetFolder(TempDirectory);
             Directory.CreateDirectory(ToAbsolutePath(TempDirectory));
         }
 
         [TearDown]
         public void TearDown()
         {
-            DeleteTempDirectory();
+            MmdTestTempScope.DeleteAssetFolder(TempDirectory);
         }
 
         [Test]
@@ -170,24 +170,6 @@ namespace Mmd.Tests
         private static string ToAbsolutePath(string assetPath)
         {
             return Path.GetFullPath(Path.Combine(ProjectRoot, assetPath.Replace('/', Path.DirectorySeparatorChar)));
-        }
-
-        private static void DeleteTempDirectory()
-        {
-            AssetDatabase.DeleteAsset(TempDirectory);
-            string absolutePath = ToAbsolutePath(TempDirectory);
-            if (Directory.Exists(absolutePath))
-            {
-                Directory.Delete(absolutePath, recursive: true);
-            }
-
-            string metaPath = absolutePath + ".meta";
-            if (File.Exists(metaPath))
-            {
-                File.Delete(metaPath);
-            }
-
-            AssetDatabase.Refresh();
         }
     }
 }

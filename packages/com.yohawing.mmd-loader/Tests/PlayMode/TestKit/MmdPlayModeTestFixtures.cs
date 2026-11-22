@@ -148,7 +148,7 @@ namespace Mmd.Tests
             return stream.ToArray();
         }
 
-        private static void WriteFixedSjis(BinaryWriter writer, string value, int byteCount)
+        internal static void WriteFixedSjis(BinaryWriter writer, string value, int byteCount)
         {
             byte[] buffer = new byte[byteCount];
             byte[] encoded = Encoding.GetEncoding(932).GetBytes(value ?? string.Empty);

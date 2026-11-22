@@ -164,20 +164,6 @@ namespace Mmd.Tests
             }
         }
 
-        private static void DestroyInstance(MmdUnityModelInstance? instance)
-        {
-            if (instance == null)
-                return;
-            if (instance.Root != null)
-                Object.DestroyImmediate(instance.Root);
-            if (instance.Mesh != null)
-                Object.DestroyImmediate(instance.Mesh);
-            foreach (Material m in instance.Materials)
-                Object.DestroyImmediate(m);
-            foreach (Texture2D t in instance.OwnedTextures)
-                Object.DestroyImmediate(t);
-        }
-
         private static void DestroyProxyRig(MmdHumanoidProxyRigResult? rig)
         {
             if (rig?.ProxyRoot != null)
@@ -256,7 +242,7 @@ namespace Mmd.Tests
             }
 
             DestroyProxyRig(rig);
-            DestroyInstance(native);
+            MmdTestInstanceScope.DestroyInstance(native);
         }
 
         [Test]
@@ -323,7 +309,7 @@ namespace Mmd.Tests
             DestroyImmediateIfPossible(pmxAsset);
             DestroyImmediateIfPossible(pmxAsset.ImportedRoot);
             DestroyProxyRig(rig);
-            DestroyInstance(native);
+            MmdTestInstanceScope.DestroyInstance(native);
         }
 
         [Test]
@@ -363,7 +349,7 @@ namespace Mmd.Tests
             }
 
             DestroyProxyRig(rig);
-            DestroyInstance(native);
+            MmdTestInstanceScope.DestroyInstance(native);
         }
 
         [Test]
@@ -530,7 +516,7 @@ namespace Mmd.Tests
             finally
             {
                 Object.DestroyImmediate(proxyObject);
-                DestroyInstance(native);
+                MmdTestInstanceScope.DestroyInstance(native);
             }
         }
 
@@ -617,7 +603,7 @@ namespace Mmd.Tests
             {
                 Object.DestroyImmediate(proxyObject);
                 Object.DestroyImmediate(wrongTargetObject);
-                DestroyInstance(native);
+                MmdTestInstanceScope.DestroyInstance(native);
             }
         }
 
@@ -726,7 +712,7 @@ namespace Mmd.Tests
             Assert.That(foundOutOfRange, Is.True, "diagnostics must mention out-of-range index");
 
             DestroyProxyRig(rig);
-            DestroyInstance(native);
+            MmdTestInstanceScope.DestroyInstance(native);
         }
 
         [Test]
@@ -779,7 +765,7 @@ namespace Mmd.Tests
             }
 
             DestroyProxyRig(rig);
-            DestroyInstance(native);
+            MmdTestInstanceScope.DestroyInstance(native);
         }
 
         [Test]
@@ -822,7 +808,7 @@ namespace Mmd.Tests
             Assert.That(retargetResult.SkippedBoneCount, Is.GreaterThanOrEqualTo(1));
 
             DestroyProxyRig(rig);
-            DestroyInstance(native);
+            MmdTestInstanceScope.DestroyInstance(native);
         }
 
         [Test]
@@ -831,7 +817,7 @@ namespace Mmd.Tests
             MmdUnityModelInstance native = CreateNativeInstance(4);
             Assert.Throws<System.ArgumentNullException>(
                 () => MmdHumanoidRetargeter.RetargetPose(null!, native));
-            DestroyInstance(native);
+            MmdTestInstanceScope.DestroyInstance(native);
         }
 
         [Test]
@@ -872,7 +858,7 @@ namespace Mmd.Tests
             }
             Assert.That(hasRootNullDiag, Is.True);
 
-            DestroyInstance(native);
+            MmdTestInstanceScope.DestroyInstance(native);
         }
 
         [Test]
@@ -910,7 +896,7 @@ namespace Mmd.Tests
             Assert.That(result.SkippedBoneCount, Is.EqualTo(0));
 
             DestroyProxyRig(rig);
-            DestroyInstance(native);
+            MmdTestInstanceScope.DestroyInstance(native);
         }
 
         [Test]
@@ -956,7 +942,7 @@ namespace Mmd.Tests
             Assert.That(result.SkippedBoneCount, Is.EqualTo(0));
 
             DestroyProxyRig(rig);
-            DestroyInstance(native);
+            MmdTestInstanceScope.DestroyInstance(native);
         }
 
         [Test]
@@ -1027,7 +1013,7 @@ namespace Mmd.Tests
                 "LeftEye native position must remain unchanged");
 
             DestroyProxyRig(rig);
-            DestroyInstance(native);
+            MmdTestInstanceScope.DestroyInstance(native);
         }
 
         private static void DestroyImmediateIfPossible(UnityEngine.Object? target)
@@ -1091,7 +1077,7 @@ namespace Mmd.Tests
                 "finger position must not be changed by retargeter");
 
             DestroyProxyRig(rig);
-            DestroyInstance(native);
+            MmdTestInstanceScope.DestroyInstance(native);
         }
 
         [Test]

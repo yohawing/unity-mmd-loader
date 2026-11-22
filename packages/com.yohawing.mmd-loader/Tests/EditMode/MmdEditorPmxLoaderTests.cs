@@ -19,56 +19,22 @@ namespace Mmd.Tests
         [SetUp]
         public void SetUp()
         {
-            DeleteTempDirectory();
+            MmdTestTempScope.DeleteAssetFolder(TempDirectory);
         }
 
         [TearDown]
         public void TearDown()
         {
-            DeleteTempDirectory();
+            MmdTestTempScope.DeleteAssetFolder(TempDirectory);
         }
 
-        private static void DeleteTempDirectory()
-        {
-            AssetDatabase.DeleteAsset(TempDirectory);
-            string fullTempDirectory = Path.Combine(ProjectRoot, TempDirectory);
-            if (Directory.Exists(fullTempDirectory))
-            {
-                foreach (string path in Directory.EnumerateFileSystemEntries(fullTempDirectory, "*", SearchOption.AllDirectories))
-                {
-                    File.SetAttributes(path, FileAttributes.Normal);
-                }
-
-                Directory.Delete(fullTempDirectory, recursive: true);
-            }
-
-            string metaPath = fullTempDirectory + ".meta";
-            if (File.Exists(metaPath))
-            {
-                File.SetAttributes(metaPath, FileAttributes.Normal);
-                File.Delete(metaPath);
-            }
-
-            AssetDatabase.Refresh();
-        }
-
-        private static void CopyFixtureToAssetDatabase(string fixtureName, string destinationAssetPath)
-        {
-            string source = Path.Combine(RepositoryRoot, "packages", "com.yohawing.mmd-loader", "Tests", "Fixtures", "Assets", fixtureName);
-            Directory.CreateDirectory(Path.Combine(ProjectRoot, TempDirectory));
-            File.Copy(source, Path.Combine(ProjectRoot, destinationAssetPath), overwrite: true);
-            AssetDatabase.ImportAsset(destinationAssetPath, ImportAssetOptions.ForceUpdate);
-        }
-
-        private static string ProjectRoot => Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-        private static string RepositoryRoot => Path.GetFullPath(Path.Combine(ProjectRoot, ".."));
         [Test]
         public void LoadPmxIntoSceneCreatesSkinnedSceneObjectFromFixture()
         {
             MmdUnityModelInstance? instance = null;
             try
             {
-                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
+                string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
 
                 instance = MmdEditorPmxLoader.LoadPmxIntoScene(pmxPath);
 
@@ -98,7 +64,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
             }
         }
 
@@ -171,11 +137,6 @@ namespace Mmd.Tests
             }
         }
 
-        private static string ResolvePackageFixture(string fileName)
-        {
-            return MmdTestFixtures.FixtureAssetPath(fileName);
-        }
-
         private static byte[] CreateOnePixelBmp()
         {
             return new byte[]
@@ -190,51 +151,12 @@ namespace Mmd.Tests
                 0x00, 0xFF
             };
         }
-
-        private static void DestroyInstance(MmdUnityModelInstance? instance)
-        {
-            if (instance == null)
-            {
-                return;
-            }
-
-            if (instance.Root != null)
-            {
-                Object.DestroyImmediate(instance.Root);
-            }
-
-            if (instance.Mesh != null)
-            {
-                Object.DestroyImmediate(instance.Mesh);
-            }
-
-            if (instance.Materials == null)
-            {
-                return;
-            }
-
-            foreach (Material material in instance.Materials)
-            {
-                if (material != null)
-                {
-                    Object.DestroyImmediate(material);
-                }
-            }
-
-            foreach (Texture2D texture in instance.OwnedTextures)
-            {
-                if (texture != null)
-                {
-                    Object.DestroyImmediate(texture);
-                }
-            }
-        }
         [Test]
         public void D1_TryResolveMmdPmxAssetFromMainGameObjectReturnsMetadataForImportedPmxGo()
         {
             // D1: When the .pmx main object is a GameObject, TryResolveMmdPmxAssetFromMainGameObject
             // must return the metadata MmdPmxAsset sub-asset.
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
 
             GameObject? mainGo = AssetDatabase.LoadAssetAtPath<GameObject>(TempPmxPath);
             Assert.That(mainGo, Is.Not.Null, "precondition: imported .pmx must have a GameObject main object");
@@ -290,7 +212,7 @@ namespace Mmd.Tests
         [Test]
         public void D1_PmxAssetResolverAcceptsGameObjectMain()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
 
             GameObject? mainGo = AssetDatabase.LoadAssetAtPath<GameObject>(TempPmxPath);
             Assert.That(mainGo, Is.Not.Null, "precondition: imported .pmx must have a GameObject main object");

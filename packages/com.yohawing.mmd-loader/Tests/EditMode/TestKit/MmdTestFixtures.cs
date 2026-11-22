@@ -49,6 +49,18 @@ namespace Mmd.Tests
         internal static byte[] ReadFixtureAssetBytes(string fileName) =>
             File.ReadAllBytes(FixtureAssetPath(fileName));
 
+        /// <summary>
+        /// Copies a package fixture into the test project (for example under a test's
+        /// <c>Assets/</c> temp folder) and imports it so its ScriptedImporter runs.
+        /// </summary>
+        internal static void CopyFixtureToAssetDatabase(string fixtureName, string destinationAssetPath)
+        {
+            string destination = Path.Combine(ProjectRoot, destinationAssetPath);
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.Copy(FixtureAssetPath(fixtureName), destination, overwrite: true);
+            UnityEditor.AssetDatabase.ImportAsset(destinationAssetPath, UnityEditor.ImportAssetOptions.ForceUpdate);
+        }
+
         internal static void RequireGoldenGenerationOptIn()
         {
             Assert.That(
@@ -462,7 +474,7 @@ namespace Mmd.Tests
             return stream.ToArray();
         }
 
-        private static void WriteFixedSjis(BinaryWriter writer, string value, int byteCount)
+        internal static void WriteFixedSjis(BinaryWriter writer, string value, int byteCount)
         {
             byte[] buffer = new byte[byteCount];
             byte[] encoded = Encoding.GetEncoding(932).GetBytes(value ?? string.Empty);

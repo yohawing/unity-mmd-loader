@@ -26,8 +26,8 @@ namespace Mmd.Tests
         [Test]
         public void PmxAndVmdImportAsMmdAssetsAndValidateNativeClipHeader()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
-            CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
 
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(TempVmdPath);
@@ -77,7 +77,7 @@ namespace Mmd.Tests
         [Test]
         public void ImportedVmdUsesNativeRawSourceSubassetAndSurvivesReimport()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
 
             byte[] sourceBytes = File.ReadAllBytes(Path.Combine(ProjectRoot, TempVmdPath));
             MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(TempVmdPath);
@@ -253,7 +253,7 @@ namespace Mmd.Tests
         [Test]
         public void ImportedPmxAssetCarriesImportScaleSummaryFromImporter()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
 
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
 
@@ -262,7 +262,7 @@ namespace Mmd.Tests
         [Test]
         public void ImportedPmxAssetCarriesImportUiSettingsSummaryFromImporter()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
 
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
 
@@ -275,7 +275,7 @@ namespace Mmd.Tests
         [Test]
         public void InitialPmxImportAutoAssignsCharacterPresetFromStandardBones()
         {
-            CopyFixtureToAssetDatabase("test_semi_basic_bone.pmx", TempHumanoidPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_semi_basic_bone.pmx", TempHumanoidPmxPath);
 
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempHumanoidPmxPath);
 
@@ -285,7 +285,7 @@ namespace Mmd.Tests
         [Test]
         public void NoneAnimationTypeImportsWithoutAnimator()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             SetPmxImporterAnimationType(TempPmxPath, MmdPmxAnimationType.None);
 
             GameObject root = AssetDatabase.LoadAssetAtPath<GameObject>(TempPmxPath);
@@ -305,7 +305,7 @@ namespace Mmd.Tests
         [Test]
         public void GenericAnimationTypeImportsRootAnimatorWithGenericAvatar()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             SetPmxImporterAnimationType(TempPmxPath, MmdPmxAnimationType.Generic);
 
             GameObject root = AssetDatabase.LoadAssetAtPath<GameObject>(TempPmxPath);
@@ -338,7 +338,7 @@ namespace Mmd.Tests
         [Test]
         public void PmxImporterReimportUpdatesImportedAssetSettingsSummary()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             var importer = AssetImporter.GetAtPath(TempPmxPath) as MmdPmxScriptedImporter;
             Assert.That(importer, Is.Not.Null);
 
@@ -384,7 +384,7 @@ namespace Mmd.Tests
         [Test]
         public void PmxImporterUrpLitShaderPresetGeneratesUrpLitMaterials()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             var importer = AssetImporter.GetAtPath(TempPmxPath) as MmdPmxScriptedImporter;
             Assert.That(importer, Is.Not.Null);
 
@@ -404,7 +404,7 @@ namespace Mmd.Tests
         [Test]
         public void PmxImporterMmdToonLitShaderPresetGeneratesOptInToonLitMaterials()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             var importer = AssetImporter.GetAtPath(TempPmxPath) as MmdPmxScriptedImporter;
             Assert.That(importer, Is.Not.Null);
 
@@ -425,8 +425,8 @@ namespace Mmd.Tests
         [Test]
         public void PmxImporterCustomProfileUsesProfileShaderAndPreservesPresetSummary()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
-            CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
             var profile = ScriptableObject.CreateInstance<MmdMaterialProfileAsset>();
             profile.shader = Shader.Find(MmdUrpMaterialBindingDescriptorBuilder.UrpLitShaderName);
             profile.textureTargets = new MmdMaterialProfileTextureTargets
@@ -519,7 +519,7 @@ namespace Mmd.Tests
                 Assert.Ignore("Optional Unity Toon Shader is not installed.");
             }
 
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             CreateUtsProfileAsset(utsShader!);
             ConfigureCustomProfileImporter(TempPmxPath);
 
@@ -567,7 +567,7 @@ namespace Mmd.Tests
         [Test]
         public void PmxImporterAppliesPersistentMaterialOverrideAssetAfterTextureBinding()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             string normalMapPath = Path.Combine(ProjectRoot, TempNormalMapPath);
             WritePng(normalMapPath, new Color(0.2f, 0.3f, 0.4f, 1.0f));
             AssetDatabase.ImportAsset(TempNormalMapPath, ImportAssetOptions.ForceUpdate);
@@ -630,7 +630,7 @@ namespace Mmd.Tests
         [Test]
         public void PmxImporterAutoDiscoversMmeNormalMapAndExplicitOverrideWins()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempMmePmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempMmePmxPath);
 
             string autoFxAssetPath = TempDirectory + "/auto.fx";
             string autoEmdAssetPath = TempDirectory + "/mme_test_1bone_cube.emd";
@@ -735,7 +735,7 @@ namespace Mmd.Tests
         [Test]
         public void PmxImporterNormalizesInvalidImportScaleOnReimport()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             var importer = AssetImporter.GetAtPath(TempPmxPath) as MmdPmxScriptedImporter;
             Assert.That(importer, Is.Not.Null);
 
@@ -752,7 +752,7 @@ namespace Mmd.Tests
         [Test]
         public void HumanoidAnimationTypeImportsRootAnimatorWithReadyAvatar()
         {
-            CopyFixtureToAssetDatabase("test_semi_basic_bone.pmx", TempHumanoidPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_semi_basic_bone.pmx", TempHumanoidPmxPath);
 
             var importer = AssetImporter.GetAtPath(TempHumanoidPmxPath) as MmdPmxScriptedImporter;
             Assert.That(importer, Is.Not.Null);
@@ -945,7 +945,7 @@ namespace Mmd.Tests
         [Test]
         public void PmxImporterImportScaleZeroDotOneFlowsToAssetInstanceAndScalesMeshBounds()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             var importer = AssetImporter.GetAtPath(TempPmxPath) as MmdPmxScriptedImporter;
             Assert.That(importer, Is.Not.Null);
 
@@ -1008,7 +1008,7 @@ namespace Mmd.Tests
         [Test]
         public void ImportedPmxAssetCarriesCachedParseSummaryFromImporter()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
 
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
 

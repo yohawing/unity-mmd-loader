@@ -25,7 +25,7 @@ namespace Mmd.Tests
         [Test]
         public void D1_LoadAssetAtPathPmxImportContract()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
 
             GameObject? mainGameObject = AssetDatabase.LoadAssetAtPath<GameObject>(TempPmxPath);
             Assert.That(mainGameObject, Is.Not.Null,
@@ -101,7 +101,7 @@ namespace Mmd.Tests
             // sub-assets under the .pmx import path.
             // Uses type-name checks for MMD Timeline runtime/editor types so this test stays
             // in the importer test assembly while still pinning the sub-asset boundary.
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             MmdPmxAsset? pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             Assert.That(pmxAsset, Is.Not.Null, "precondition: PMX imports as MmdPmxAsset");
 
@@ -158,7 +158,7 @@ namespace Mmd.Tests
             // UnityEngine.AnimationClip sub-assets under the .vmd import path.
             // Humanoid AnimationClip bake is an explicit opt-in (H6 slice 1/2),
             // never automatic at import time.
-            CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
             MmdVmdAsset? vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(TempVmdPath);
             Assert.That(vmdAsset, Is.Not.Null, "precondition: VMD imports as MmdVmdAsset");
 
@@ -180,7 +180,7 @@ namespace Mmd.Tests
         [Test]
         public void ImportedPmxHierarchyCarriesSkinnedMeshRendererWithStableAssetReferences()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
 
             MmdPmxAsset? loadedPmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             Assert.That(loadedPmxAsset, Is.Not.Null);
@@ -222,7 +222,7 @@ namespace Mmd.Tests
         [Test]
         public void ImportedCharacterPmxHierarchyCarriesSelfShadowTarget()
         {
-            CopyFixtureToAssetDatabase("test_semi_basic_bone.pmx", TempHumanoidPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_semi_basic_bone.pmx", TempHumanoidPmxPath);
 
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempHumanoidPmxPath);
             Assert.That(pmxAsset, Is.Not.Null);
@@ -236,7 +236,7 @@ namespace Mmd.Tests
         [Test]
         public void ImportedPmxHierarchySurvivesSaveAndReimport()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
 
             // Get initial state
             MmdPmxAsset? loadedPmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
@@ -293,7 +293,7 @@ namespace Mmd.Tests
         [Test]
         public void LoadPmxAssetIntoSceneUsesImporterGeneratedMeshAndMaterials()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             MmdUnityModelInstance? instance = null;
             try
@@ -357,7 +357,7 @@ namespace Mmd.Tests
             // the imported hierarchy (not the same object, same hierarchy shape), use the importer's
             // Mesh and Material sub-assets, produce no 'Split Runtime' mesh, and keep
             // Controller model source behavior through MmdEditorPmxLoader.
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             MmdPmxAsset? loadedPmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             Assert.That(loadedPmxAsset, Is.Not.Null);
             MmdPmxAsset pmxAsset = loadedPmxAsset!;
@@ -431,7 +431,7 @@ namespace Mmd.Tests
         [Test]
         public void ImportedHierarchyWrapperDropsStaleSelfShadowTargetWhenExcluded()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             Assert.That(pmxAsset, Is.Not.Null);
             Assert.That(pmxAsset.ModelPreset, Is.EqualTo(nameof(MmdPmxModelPreset.Stage)));
@@ -470,7 +470,7 @@ namespace Mmd.Tests
         [Test]
         public void ImportedHierarchyBoneMismatchThrowsWithoutLeakingInstanceOrMaterialClones()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             Assert.That(pmxAsset, Is.Not.Null);
             Assert.That(pmxAsset.ImportedRoot, Is.Not.Null);
@@ -504,7 +504,7 @@ namespace Mmd.Tests
         [Test]
         public void ImportedHierarchyMissingSkinnedMeshRendererThrowsWithoutLeakingInstance()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             Assert.That(pmxAsset, Is.Not.Null);
             Assert.That(pmxAsset.ImportedRoot, Is.Not.Null);
@@ -539,7 +539,7 @@ namespace Mmd.Tests
         [Test]
         public void InstantiatedImportedHierarchyBoneMismatchDoesNotLeakMaterialClones()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             Assert.That(pmxAsset, Is.Not.Null);
             Assert.That(pmxAsset.ImportedRoot, Is.Not.Null);
@@ -673,7 +673,7 @@ namespace Mmd.Tests
         [Test]
         public void ImportedHierarchyWrapperAppliesMaterialOverrideToDescriptor()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             Assert.That(pmxAsset, Is.Not.Null);
             Assert.That(pmxAsset.ImportedRoot, Is.Not.Null);
@@ -729,7 +729,7 @@ namespace Mmd.Tests
         {
             // Focused name check: verify the mesh name is the importer's (not "Split Runtime")
             // and that no BuildMesh/ApplySkinning/BakeVertexMorphBlendShapes runs via this path.
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             MmdPmxAsset? loadedPmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             Assert.That(loadedPmxAsset, Is.Not.Null);
             MmdPmxAsset pmxAsset = loadedPmxAsset!;

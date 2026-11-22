@@ -31,11 +31,7 @@ namespace Mmd.Tests
         [Test]
         public void TimelineScrubSeekResumeKeepsHairPhysicsLive()
         {
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-            }
+            MmdBulletBackendTestGuard.RequireBulletBackend();
 
             MmdUnityPlaybackBinding? binding = null;
             try
@@ -91,11 +87,7 @@ namespace Mmd.Tests
         [Test]
         public void TimelineAnimationOnlyPreviewRetainsLivePhysicsBackendForResume()
         {
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-            }
+            MmdBulletBackendTestGuard.RequireBulletBackend();
 
             MmdUnityPlaybackBinding? binding = null;
             try
@@ -143,11 +135,7 @@ namespace Mmd.Tests
             // resets and re-seeds the simulation, easing the 揺れもの into the scrubbed pose (saba
             // SyncPhysics) — a settle with deltaTime 0, not a forward step. This shows a physics-plausible
             // pose during the scrub (no snap to the straight bind pose) and re-seeds for resume.
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-            }
+            MmdBulletBackendTestGuard.RequireBulletBackend();
 
             MmdUnityPlaybackBinding? binding = null;
             try
@@ -197,11 +185,7 @@ namespace Mmd.Tests
             // the disturbed end-of-loop pose into the next loop. A loop wrap is a backward time jump, so it
             // routes through the same backward-scrub reset path: soft reset (zero velocity, clean contact
             // pairs) + ease-in re-seed at frame 0 (saba SyncPhysics). This pins that loop restart == first play.
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-            }
+            MmdBulletBackendTestGuard.RequireBulletBackend();
 
             MmdUnityPlaybackBinding? binding = null;
             try
@@ -267,11 +251,7 @@ namespace Mmd.Tests
             // the bug by hauling the origin-bind body home over the settle. With free linear DOFs gravity acts
             // only vertically, so the body's HORIZONTAL position is exactly where the RESET placed it: at the
             // origin-bind (pre-fix) or under the translated anchor (post-fix).
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-            }
+            MmdBulletBackendTestGuard.RequireBulletBackend();
 
             MmdUnityPlaybackBinding? binding = null;
             try
@@ -339,11 +319,7 @@ namespace Mmd.Tests
             // forward step and asserts the mode-1 body does not jump far beyond the anchor's own per-frame
             // motion. Pre-fix the spurious kinematic velocity flings the hair body far and this FAILS; post-fix
             // the hair tracks the anchor and it PASSES.
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-            }
+            MmdBulletBackendTestGuard.RequireBulletBackend();
 
             MmdUnityPlaybackBinding? binding = null;
             try
@@ -456,11 +432,7 @@ namespace Mmd.Tests
             // A synthetic PMX mode-1 (pure dynamic) hair chain is used because the position of a mode-1
             // body comes entirely from the Bullet simulation in model space — if it is not dragged along
             // with the model, its bone stays at the world-space bind position while the body moves away.
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-            }
+            MmdBulletBackendTestGuard.RequireBulletBackend();
 
             MmdUnityPlaybackBinding? binding = null;
             try
@@ -503,11 +475,7 @@ namespace Mmd.Tests
         [Test]
         public void ForwardPlaybackImportScaleZeroDotOneKeepsNativeReadbackInMmdSpaceAndScalesUnityBones()
         {
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-            }
+            MmdBulletBackendTestGuard.RequireBulletBackend();
 
             Mode1ChainScaleSample scaleOne = RunMode1ChainForwardPlayback(importScale: 1.0f);
             Mode1ChainScaleSample scalePointOne = RunMode1ChainForwardPlayback(importScale: 0.1f);
@@ -537,7 +505,7 @@ namespace Mmd.Tests
         // animates, instead of staying at the bind pose.
         private static MmdModelDefinition CreateMode1ChainModel(out string pmxPath)
         {
-            pmxPath = ResolvePackageFixture(Mode1ChainPmxId);
+            pmxPath = MmdTestFixtures.FixtureAssetPath(Mode1ChainPmxId);
             var parser = new NativeMmdParser();
             MmdModelDefinition model = parser.LoadModel(File.ReadAllBytes(pmxPath));
             Assert.That(model.bones, Has.Count.GreaterThanOrEqualTo(2),
@@ -655,7 +623,7 @@ namespace Mmd.Tests
                 motion,
                 Mode1ChainPmxId,
                 "translate-root",
-                ResolvePackageFixture(Mode1ChainPmxId),
+                MmdTestFixtures.FixtureAssetPath(Mode1ChainPmxId),
                 importScale);
         }
 
@@ -672,22 +640,9 @@ namespace Mmd.Tests
             return model;
         }
 
-        private static MmdVertexDefinition CreateVertex(int index, float x, float y, float z, float u, float v, int bone)
-        {
-            return new MmdVertexDefinition
-            {
-                index = index,
-                position = new[] { x, y, z },
-                normal = new[] { 0.0f, 0.0f, 1.0f },
-                uv = new[] { u, v },
-                boneIndices = new[] { bone },
-                boneWeights = new[] { 1.0f }
-            };
-        }
-
         private static MmdModelDefinition LoadHairPhysicsModel(out string pmxPath)
         {
-            pmxPath = ResolvePackageFixture("test_hair_physics.pmx");
+            pmxPath = MmdTestFixtures.FixtureAssetPath("test_hair_physics.pmx");
             var parser = new NativeMmdParser();
             MmdModelDefinition model = parser.LoadModel(File.ReadAllBytes(pmxPath));
             Assert.That(model.physics.rigidbodies.Count, Is.GreaterThan(0),
@@ -747,13 +702,6 @@ namespace Mmd.Tests
             }
 
             binding?.Dispose();
-        }
-
-        private static string ResolvePackageFixture(string fileName)
-        {
-            string projectRoot = Path.GetDirectoryName(Application.dataPath);
-            string packageRoot = Path.GetFullPath(Path.Combine(projectRoot, "..", "packages", "com.yohawing.mmd-loader"));
-            return Path.Combine(packageRoot, "Tests", "Fixtures", "Assets", fileName);
         }
 
         private readonly struct Mode1ChainScaleSample

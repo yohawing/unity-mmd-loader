@@ -29,7 +29,7 @@ namespace Mmd.Tests
         public void PmxImporterFaultRollbackRestoresGenericImportObjectAndSubAssetBaselines(
             string stageName)
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             AssertFaultedReimportReturnsToBaseline(
                 TempPmxPath,
                 Enum.Parse<MmdPmxImportStage>(stageName));
@@ -40,7 +40,7 @@ namespace Mmd.Tests
         public void PmxImporterFaultRollbackRestoresHumanoidImportObjectAndSubAssetBaselines(
             string stageName)
         {
-            CopyFixtureToAssetDatabase("test_semi_basic_bone.pmx", TempHumanoidPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_semi_basic_bone.pmx", TempHumanoidPmxPath);
             SetPmxImporterAnimationType(TempHumanoidPmxPath, MmdPmxAnimationType.Humanoid);
             AssertFaultedReimportReturnsToBaseline(
                 TempHumanoidPmxPath,
@@ -50,7 +50,7 @@ namespace Mmd.Tests
         [Test]
         public void ImportObjectTransactionRejectsBorrowedPersistentAssets()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             MmdPmxAsset asset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             Assert.That(asset, Is.Not.Null);
 

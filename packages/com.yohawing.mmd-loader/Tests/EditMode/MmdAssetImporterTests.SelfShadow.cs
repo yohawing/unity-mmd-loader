@@ -384,7 +384,7 @@ namespace Mmd.Tests
         [Test]
         public void LoadPmxAssetIntoScenePersistsModelSourceAcrossSceneReload()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             MmdPmxAsset? initialPmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             Assert.That(initialPmxAsset, Is.Not.Null);
 
@@ -465,8 +465,8 @@ namespace Mmd.Tests
             // Focused test: PMX+VMD asset editor load path (MmdEditorVerificationFacade + PlaybackLoader menu path)
             // must create scene model using importer Mesh/Material sub-assets, then binding over existing.
             // Verifies no switch to runtime-generated materials (parity with drag / Load PMX + attach motion).
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
-            CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(TempVmdPath);
             Assert.That(pmxAsset, Is.Not.Null);
@@ -514,7 +514,7 @@ namespace Mmd.Tests
         [Test]
         public void LoadPmxAssetIntoSceneAppliesImporterMaterialRemaps()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             Material remappedMaterial = CreateTestMaterial("remapped_body");
             AssetDatabase.CreateAsset(remappedMaterial, TempRemapMaterialPath);
             AssetDatabase.ImportAsset(TempRemapMaterialPath, ImportAssetOptions.ForceUpdate);
@@ -549,7 +549,7 @@ namespace Mmd.Tests
         [Test]
         public void ImportedPmxAssetCarriesCachedModelBoundsFromImporter()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
 
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             MmdModelDefinition model = pmxAsset.LoadModel();

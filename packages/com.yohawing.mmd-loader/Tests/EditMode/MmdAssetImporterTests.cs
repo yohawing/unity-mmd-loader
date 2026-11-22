@@ -39,39 +39,15 @@ namespace Mmd.Tests
         public void SetUp()
         {
             previousShaderRenderPipeline = Shader.globalRenderPipeline;
-            DeleteTempDirectory();
+            MmdTestTempScope.DeleteAssetFolder(TempDirectory);
             Shader.globalRenderPipeline = "UniversalPipeline";
         }
 
         [TearDown]
         public void TearDown()
         {
-            DeleteTempDirectory();
+            MmdTestTempScope.DeleteAssetFolder(TempDirectory);
             Shader.globalRenderPipeline = previousShaderRenderPipeline ?? string.Empty;
-        }
-
-        private static void DeleteTempDirectory()
-        {
-            AssetDatabase.DeleteAsset(TempDirectory);
-            string fullTempDirectory = Path.Combine(ProjectRoot, TempDirectory);
-            if (Directory.Exists(fullTempDirectory))
-            {
-                foreach (string path in Directory.EnumerateFileSystemEntries(fullTempDirectory, "*", SearchOption.AllDirectories))
-                {
-                    File.SetAttributes(path, FileAttributes.Normal);
-                }
-
-                Directory.Delete(fullTempDirectory, recursive: true);
-            }
-
-            string metaPath = fullTempDirectory + ".meta";
-            if (File.Exists(metaPath))
-            {
-                File.SetAttributes(metaPath, FileAttributes.Normal);
-                File.Delete(metaPath);
-            }
-
-            AssetDatabase.Refresh();
         }
 
 
@@ -190,14 +166,6 @@ namespace Mmd.Tests
 
 
 
-
-        private static void CopyFixtureToAssetDatabase(string fixtureName, string destinationAssetPath)
-        {
-            string source = MmdTestFixtures.FixtureAssetPath(fixtureName);
-            Directory.CreateDirectory(Path.Combine(ProjectRoot, TempDirectory));
-            File.Copy(source, Path.Combine(ProjectRoot, destinationAssetPath), overwrite: true);
-            AssetDatabase.ImportAsset(destinationAssetPath, ImportAssetOptions.ForceUpdate);
-        }
 
         private static void SetPmxImporterAnimationType(string assetPath, MmdPmxAnimationType value)
         {

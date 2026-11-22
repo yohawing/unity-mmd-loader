@@ -266,7 +266,7 @@ namespace Mmd.Tests
         [Test]
         public void PmxPrefabExporterCreatesPrefabWithPersistentMeshMaterialAndProvenance()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             Scene activeScene = SceneManager.GetActiveScene();
             bool wasDirty = activeScene.isDirty;
@@ -334,7 +334,7 @@ namespace Mmd.Tests
         [Test]
         public void PmxPrefabExporterRejectsTraversalPathBeforeCreatingDirectories()
         {
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             string outsideDirectoryName = "__MmdPrefabTraversalShouldNotExist_" + System.Guid.NewGuid().ToString("N");
             string traversalPrefabPath = "Assets/../" + outsideDirectoryName + "/model.prefab";
@@ -348,7 +348,7 @@ namespace Mmd.Tests
         {
             // The existing test_1bone_cube fixture produces an importer-owned hierarchy
             // with SkinnedMeshRenderer + bones. All three readiness categories must be Ready.
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
 
             MmdPmxAsset pmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             Assert.That(pmxAsset, Is.Not.Null);

@@ -100,9 +100,9 @@ namespace Mmd.Tests
                 isMovable = true,
                 isRotatable = true
             });
-            model.vertices.Add(CreateVertex(0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f));
-            model.vertices.Add(CreateVertex(1, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f));
-            model.vertices.Add(CreateVertex(2, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f));
+            model.vertices.Add(MmdTestFixtures.CreateSyntheticVertex(0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f));
+            model.vertices.Add(MmdTestFixtures.CreateSyntheticVertex(1, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f));
+            model.vertices.Add(MmdTestFixtures.CreateSyntheticVertex(2, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f));
             model.indices.AddRange(new[] { 0, 1, 2 });
             model.materials.Add(new MmdMaterialDefinition
             {
@@ -129,10 +129,10 @@ namespace Mmd.Tests
                 isMovable = true,
                 isRotatable = true
             });
-            model.vertices.Add(CreateVertex(0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f));
-            model.vertices.Add(CreateVertex(1, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f));
-            model.vertices.Add(CreateVertex(2, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f));
-            model.vertices.Add(CreateVertex(3, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f));
+            model.vertices.Add(MmdTestFixtures.CreateSyntheticVertex(0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f));
+            model.vertices.Add(MmdTestFixtures.CreateSyntheticVertex(1, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f));
+            model.vertices.Add(MmdTestFixtures.CreateSyntheticVertex(2, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f));
+            model.vertices.Add(MmdTestFixtures.CreateSyntheticVertex(3, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f));
             model.indices.AddRange(new[] { 0, 1, 2, 1, 3, 2 });
             model.materials.Add(new MmdMaterialDefinition
             {
@@ -147,25 +147,6 @@ namespace Mmd.Tests
                 vertexCount = 3
             });
             return model;
-        }
-
-        private static MmdVertexDefinition CreateVertex(
-            int index,
-            float x,
-            float y,
-            float z,
-            float u,
-            float v)
-        {
-            return new MmdVertexDefinition
-            {
-                index = index,
-                position = new[] { x, y, z },
-                normal = new[] { 0.0f, 0.0f, 1.0f },
-                uv = new[] { u, v },
-                boneIndices = new[] { 0 },
-                boneWeights = new[] { 1.0f }
-            };
         }
     }
 }

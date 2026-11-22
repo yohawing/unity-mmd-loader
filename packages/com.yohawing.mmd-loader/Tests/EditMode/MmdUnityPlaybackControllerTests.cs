@@ -240,19 +240,15 @@ namespace Mmd.Tests
         [Test]
         public void PlaybackSourceConfigureKeepsControllerLivePhysicsMode()
         {
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-            }
+            MmdBulletBackendTestGuard.RequireBulletBackend();
 
             MmdPmxAsset? pmxAsset = null;
             MmdVmdAsset? vmdAsset = null;
             MmdUnityModelInstance? previewInstance = null;
             try
             {
-                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
-                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
+                string vmdPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
                 byte[] pmxBytes = File.ReadAllBytes(pmxPath);
                 byte[] vmdBytes = File.ReadAllBytes(vmdPath);
                 var parser = new NativeMmdParser();
@@ -293,8 +289,8 @@ namespace Mmd.Tests
 
             try
             {
-                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
-                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
+                string vmdPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
                 byte[] pmxBytes = File.ReadAllBytes(pmxPath);
                 byte[] vmdBytes = File.ReadAllBytes(vmdPath);
                 var parser = new NativeMmdParser();
@@ -394,8 +390,8 @@ namespace Mmd.Tests
 
             try
             {
-                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
-                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
+                string vmdPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
                 byte[] pmxBytes = File.ReadAllBytes(pmxPath);
                 byte[] vmdBytes = File.ReadAllBytes(vmdPath);
                 var parser = new NativeMmdParser();
@@ -474,8 +470,8 @@ namespace Mmd.Tests
 
             try
             {
-                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
-                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
+                string vmdPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
                 pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
                 pmxAsset.Initialize(
                     File.ReadAllBytes(pmxPath),
@@ -511,8 +507,8 @@ namespace Mmd.Tests
 
             try
             {
-                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
-                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
+                string vmdPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
                 byte[] pmxBytes = File.ReadAllBytes(pmxPath);
                 byte[] vmdBytes = File.ReadAllBytes(vmdPath);
                 var parser = new NativeMmdParser();
@@ -582,8 +578,8 @@ namespace Mmd.Tests
 
             try
             {
-                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
-                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
+                string vmdPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
                 byte[] pmxBytes = File.ReadAllBytes(pmxPath);
                 byte[] vmdBytes = File.ReadAllBytes(vmdPath);
                 var parser = new NativeMmdParser();
@@ -641,8 +637,8 @@ namespace Mmd.Tests
 
             try
             {
-                string pmxPath = ResolvePackageFixture(PlaybackPmxId);
-                string vmdPath = ResolvePackageFixture(PlaybackVmdId);
+                string pmxPath = MmdTestFixtures.FixtureAssetPath(PlaybackPmxId);
+                string vmdPath = MmdTestFixtures.FixtureAssetPath(PlaybackVmdId);
                 byte[] pmxBytes = File.ReadAllBytes(pmxPath);
                 byte[] vmdBytes = File.ReadAllBytes(vmdPath);
                 var parser = new NativeMmdParser();
@@ -696,8 +692,8 @@ namespace Mmd.Tests
 
             try
             {
-                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
-                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
+                string vmdPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
                 byte[] pmxBytes = File.ReadAllBytes(pmxPath);
                 byte[] vmdBytes = File.ReadAllBytes(vmdPath);
                 var parser = new NativeMmdParser();
@@ -790,8 +786,8 @@ namespace Mmd.Tests
 
             try
             {
-                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
-                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
+                string vmdPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
                 byte[] pmxBytes = File.ReadAllBytes(pmxPath);
                 byte[] vmdBytes = File.ReadAllBytes(vmdPath);
                 var parser = new NativeMmdParser();
@@ -852,7 +848,7 @@ namespace Mmd.Tests
             MmdBorrowedSceneMutationLease? lease = null;
             try
             {
-                string pmxPath = ResolvePackageFixture("test_hair_physics.pmx");
+                string pmxPath = MmdTestFixtures.FixtureAssetPath("test_hair_physics.pmx");
                 var parser = new NativeMmdParser();
                 MmdModelDefinition model = parser.LoadModel(File.ReadAllBytes(pmxPath));
                 previewInstance = MmdUnityModelFactory.CreateSkinnedModel(model, pmxPath);
@@ -1086,11 +1082,7 @@ namespace Mmd.Tests
         [Test]
         public void LivePhysicsAppliesNativeAfterPhysicsPoseForDeformAfterPhysicsBone()
         {
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-            }
+            MmdBulletBackendTestGuard.RequireBulletBackend();
 
             MmdUnityPlaybackBinding? binding = null;
             try
@@ -1120,11 +1112,7 @@ namespace Mmd.Tests
         [Test]
         public void LivePhysicsUsesEnabledFastRuntimeMotionAsNativeBridgeAuthority()
         {
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-            }
+            MmdBulletBackendTestGuard.RequireBulletBackend();
 
             MmdUnityPlaybackBinding? binding = null;
             try
@@ -1165,11 +1153,7 @@ namespace Mmd.Tests
         [Test]
         public void LivePhysicsReportsPinnedRigidbodySyncToAnimatedBone()
         {
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-            }
+            MmdBulletBackendTestGuard.RequireBulletBackend();
 
             MmdUnityPlaybackBinding? binding = null;
             try
@@ -1230,11 +1214,7 @@ namespace Mmd.Tests
         [Test]
         public void LivePhysicsReportsBodyDiagnosticsWithImportScaleOne()
         {
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-            }
+            MmdBulletBackendTestGuard.RequireBulletBackend();
 
             MmdUnityPlaybackBinding? binding = null;
             try
@@ -1409,11 +1389,7 @@ namespace Mmd.Tests
         [Test]
         public void SerializedPhysicsModeChangeAppliesToLoadedBindingAndRestartsLiveFromFrameZero()
         {
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-            }
+            MmdBulletBackendTestGuard.RequireBulletBackend();
 
             MmdUnityPlaybackBinding? binding = null;
             try
@@ -1452,11 +1428,7 @@ namespace Mmd.Tests
         [Test]
         public void ControllerExposesLastLivePhysicsDiagnosticsAfterApplyFrame()
         {
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-            }
+            MmdBulletBackendTestGuard.RequireBulletBackend();
 
             MmdUnityPlaybackBinding? binding = null;
             try
@@ -1492,11 +1464,7 @@ namespace Mmd.Tests
         [Test]
         public void LivePhysicsDiagnosticsExposeNativePhaseBreakdownAndStepReport()
         {
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-            }
+            MmdBulletBackendTestGuard.RequireBulletBackend();
 
             MmdUnityPlaybackBinding? binding = null;
             try
@@ -1586,11 +1554,7 @@ namespace Mmd.Tests
         [Test]
         public void PositiveIkIterationCapRejectsVmdLiveWithoutSeedOptionsAbi()
         {
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-            }
+            MmdBulletBackendTestGuard.RequireBulletBackend();
 
             MmdUnityPlaybackBinding? binding = null;
             try
@@ -1889,8 +1853,8 @@ namespace Mmd.Tests
             MmdUnityModelInstance? previewInstance = null;
             try
             {
-                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
-                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
+                string vmdPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
                 pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
                 pmxAsset.Initialize(File.ReadAllBytes(pmxPath), "test_1bone_cube.pmx", pmxPath, assetImportScale: 1.0f);
                 vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
@@ -1923,8 +1887,8 @@ namespace Mmd.Tests
             MmdUnityModelInstance? previewInstance = null;
             try
             {
-                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
-                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
+                string vmdPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
                 byte[] pmxBytes = File.ReadAllBytes(pmxPath);
                 var parser = new NativeMmdParser();
                 previewInstance = MmdUnityModelFactory.CreateSkinnedModel(parser.LoadModel(pmxBytes), pmxPath);
@@ -1972,8 +1936,8 @@ namespace Mmd.Tests
             const string nativeSetupFailure = "native runtime unavailable (forced by test).";
             try
             {
-                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
-                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
+                string vmdPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
                 byte[] pmxBytes = File.ReadAllBytes(pmxPath);
                 var parser = new NativeMmdParser();
                 previewInstance = MmdUnityModelFactory.CreateSkinnedModel(parser.LoadModel(pmxBytes), pmxPath);
@@ -2021,8 +1985,8 @@ namespace Mmd.Tests
             MmdUnityModelInstance? previewInstance = null;
             try
             {
-                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
-                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
+                string vmdPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
                 byte[] pmxBytes = File.ReadAllBytes(pmxPath);
                 var parser = new NativeMmdParser();
                 previewInstance = MmdUnityModelFactory.CreateSkinnedModel(parser.LoadModel(pmxBytes), pmxPath);
@@ -2056,8 +2020,8 @@ namespace Mmd.Tests
             MmdUnityPlaybackController? controller = null;
             try
             {
-                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
-                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
+                string vmdPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
                 pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
                 pmxAsset.Initialize(File.ReadAllBytes(pmxPath), "test_1bone_cube.pmx", pmxPath, assetImportScale: 1.0f);
                 vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
@@ -2096,8 +2060,8 @@ namespace Mmd.Tests
             MmdUnityModelInstance? previewInstance = null;
             try
             {
-                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
-                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
+                string vmdPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
                 byte[] pmxBytes = File.ReadAllBytes(pmxPath);
                 var parser = new NativeMmdParser();
                 previewInstance = MmdUnityModelFactory.CreateSkinnedModel(parser.LoadModel(pmxBytes), pmxPath);
@@ -2161,8 +2125,8 @@ namespace Mmd.Tests
             MmdUnityModelInstance? previewInstance = null;
             try
             {
-                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
-                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
+                string vmdPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
                 byte[] pmxBytes = File.ReadAllBytes(pmxPath);
                 var parser = new NativeMmdParser();
                 previewInstance = MmdUnityModelFactory.CreateSkinnedModel(parser.LoadModel(pmxBytes), pmxPath);
@@ -2216,10 +2180,10 @@ namespace Mmd.Tests
             MmdUnityModelInstance? previewInstance = null;
             try
             {
-                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
-                string incompatiblePath = ResolvePackageFixture("test_append_bone.pmx");
-                string incompatibleMotionPath = ResolvePackageFixture("test_append_bone.vmd");
-                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
+                string incompatiblePath = MmdTestFixtures.FixtureAssetPath("test_append_bone.pmx");
+                string incompatibleMotionPath = MmdTestFixtures.FixtureAssetPath("test_append_bone.vmd");
+                string vmdPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
                 byte[] pmxBytes = File.ReadAllBytes(pmxPath);
                 var parser = new NativeMmdParser();
                 previewInstance = MmdUnityModelFactory.CreateSkinnedModel(parser.LoadModel(pmxBytes), pmxPath);
@@ -2277,8 +2241,8 @@ namespace Mmd.Tests
             MmdUnityModelInstance? previewInstance = null;
             try
             {
-                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
-                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
+                string vmdPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
                 byte[] pmxBytes = File.ReadAllBytes(pmxPath);
                 var parser = new NativeMmdParser();
                 previewInstance = MmdUnityModelFactory.CreateSkinnedModel(parser.LoadModel(pmxBytes), pmxPath);
@@ -2318,8 +2282,8 @@ namespace Mmd.Tests
             MmdUnityModelInstance? previewInstance = null;
             try
             {
-                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
-                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
+                string vmdPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
                 var parser = new NativeMmdParser();
                 MmdModelDefinition model = parser.LoadModel(File.ReadAllBytes(pmxPath));
                 previewInstance = MmdUnityModelFactory.CreateSkinnedModel(model, pmxPath);
@@ -2358,8 +2322,8 @@ namespace Mmd.Tests
             MmdPmxAsset? pmxAssetForSource = null;
             try
             {
-                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
-                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
+                string vmdPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
                 var parser = new NativeMmdParser();
                 MmdModelDefinition model = parser.LoadModel(File.ReadAllBytes(pmxPath));
                 previewInstance = MmdUnityModelFactory.CreateSkinnedModel(model, pmxPath);
@@ -2401,8 +2365,8 @@ namespace Mmd.Tests
             MmdPmxAsset? pmxAssetForSource = null;
             try
             {
-                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
-                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
+                string vmdPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
                 var parser = new NativeMmdParser();
                 MmdModelDefinition model = parser.LoadModel(File.ReadAllBytes(pmxPath));
                 previewInstance = MmdUnityModelFactory.CreateSkinnedModel(model, pmxPath);
@@ -2463,8 +2427,8 @@ namespace Mmd.Tests
             MmdUnityModelInstance? previewInstance = null;
             try
             {
-                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
-                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
+                string vmdPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
                 var parser = new NativeMmdParser();
                 previewInstance = MmdUnityModelFactory.CreateSkinnedModel(parser.LoadModel(File.ReadAllBytes(pmxPath)), pmxPath);
                 MmdUnityPlaybackController controller = previewInstance.Root.AddComponent<MmdUnityPlaybackController>();
@@ -2506,8 +2470,8 @@ namespace Mmd.Tests
             MmdPlaybackConfigAsset? configAsset = null;
             try
             {
-                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
-                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
+                string vmdPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
                 var parser = new NativeMmdParser();
                 previewInstance = MmdUnityModelFactory.CreateSkinnedModel(parser.LoadModel(File.ReadAllBytes(pmxPath)), pmxPath);
                 MmdUnityPlaybackController controller = previewInstance.Root.AddComponent<MmdUnityPlaybackController>();
@@ -2554,7 +2518,7 @@ namespace Mmd.Tests
             try
             {
                 string missingPmxPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".pmx");
-                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                string vmdPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
                 var holder = new GameObject("mmd-runtime-importer-missing-path");
                 controller = holder.AddComponent<MmdUnityPlaybackController>();
                 MmdRuntimeImporterComponent importer = holder.AddComponent<MmdRuntimeImporterComponent>();
@@ -2587,8 +2551,8 @@ namespace Mmd.Tests
             {
                 const float frameRate = 30.0f;
                 float inputTime = 10.25f / frameRate;
-                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
-                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                string pmxPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
+                string vmdPath = MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
                 pmxAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
                 pmxAsset.Initialize(File.ReadAllBytes(pmxPath), "test_1bone_cube.pmx", pmxPath, assetImportScale: 1.0f);
                 vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
@@ -2766,11 +2730,6 @@ namespace Mmd.Tests
             }
         }
 
-        private static string ResolvePackageFixture(string fileName)
-        {
-            return MmdTestFixtures.FixtureAssetPath(fileName);
-        }
-
         private static (MmdModelDefinition Model, MmdMotionDefinition Motion) LoadPlaybackFixturePair()
         {
             var parser = new NativeMmdParser();
@@ -2807,7 +2766,7 @@ namespace Mmd.Tests
                 motion,
                 PlaybackPmxId,
                 motionId,
-                ResolvePackageFixture(PlaybackPmxId));
+                MmdTestFixtures.FixtureAssetPath(PlaybackPmxId));
         }
 
         private static int RootBoneIndex(MmdModelDefinition model)

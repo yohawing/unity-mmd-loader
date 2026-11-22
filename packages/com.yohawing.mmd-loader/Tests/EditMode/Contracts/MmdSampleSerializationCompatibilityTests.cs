@@ -33,14 +33,14 @@ namespace Mmd.Tests
         [SetUp]
         public void SetUp()
         {
-            DeleteTempDirectory();
+            MmdTestTempScope.DeleteAssetFolder(TempDirectory, refreshAssetDatabase: false);
         }
 
         [TearDown]
         public void TearDown()
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-            DeleteTempDirectory();
+            MmdTestTempScope.DeleteAssetFolder(TempDirectory, refreshAssetDatabase: false);
         }
 
         [Test]
@@ -358,21 +358,6 @@ namespace Mmd.Tests
         private static string FullPath(string assetPath)
         {
             return Path.Combine(Path.GetDirectoryName(Application.dataPath)!, assetPath);
-        }
-
-        private static void DeleteTempDirectory()
-        {
-            AssetDatabase.DeleteAsset(TempDirectory);
-            string fullPath = FullPath(TempDirectory);
-            if (Directory.Exists(fullPath))
-            {
-                Directory.Delete(fullPath, recursive: true);
-            }
-
-            if (File.Exists(fullPath + ".meta"))
-            {
-                File.Delete(fullPath + ".meta");
-            }
         }
     }
 }

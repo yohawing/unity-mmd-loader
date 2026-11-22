@@ -385,11 +385,7 @@ namespace Mmd.Tests.Contracts
         [Test]
         public void LiveWorkersMatchSerialPhysicsAcrossForwardAndSameFrameTransitions()
         {
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-            }
+            MmdBulletBackendTestGuard.RequireBulletBackend();
 
             string pmxPath = ResolveFixture("test_hair_physics.pmx");
             string vmdPath = ResolveFixture("test_1bone_cube_motion.vmd");

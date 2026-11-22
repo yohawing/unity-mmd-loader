@@ -26,14 +26,14 @@ namespace Mmd.Tests
         [SetUp]
         public void SetUp()
         {
-            DeleteTempDirectory();
+            MmdTestTempScope.DeleteAssetFolder(TempDirectory);
             Directory.CreateDirectory(ToAbsolutePath(TempDirectory));
         }
 
         [TearDown]
         public void TearDown()
         {
-            DeleteTempDirectory();
+            MmdTestTempScope.DeleteAssetFolder(TempDirectory);
         }
 
         [Test]
@@ -454,37 +454,6 @@ namespace Mmd.Tests
             {
                 UnityEngine.Object.DestroyImmediate(texture);
             }
-        }
-
-        private static void DeleteTempDirectory()
-        {
-            AssetDatabase.DeleteAsset(TempDirectory);
-            string absolutePath = ToAbsolutePath(TempDirectory);
-            if (Directory.Exists(absolutePath))
-            {
-                foreach (string item in Directory.EnumerateFileSystemEntries(absolutePath, "*", SearchOption.AllDirectories))
-                {
-                    try
-                    {
-                        File.SetAttributes(item, FileAttributes.Normal);
-                    }
-                    catch (Exception)
-                    {
-                        // Ignore files that disappear while deleting.
-                    }
-                }
-
-                Directory.Delete(absolutePath, recursive: true);
-            }
-
-            string metaPath = absolutePath + ".meta";
-            if (File.Exists(metaPath))
-            {
-                File.SetAttributes(metaPath, FileAttributes.Normal);
-                File.Delete(metaPath);
-            }
-
-            AssetDatabase.Refresh();
         }
     }
 }

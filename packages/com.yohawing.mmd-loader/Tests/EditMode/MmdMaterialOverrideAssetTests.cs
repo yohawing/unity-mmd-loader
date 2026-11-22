@@ -62,9 +62,9 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(baseline);
-                DestroyInstance(nullOverride);
-                DestroyInstance(emptyOverrideInstance);
+                MmdTestInstanceScope.DestroyInstance(baseline);
+                MmdTestInstanceScope.DestroyInstance(nullOverride);
+                MmdTestInstanceScope.DestroyInstance(emptyOverrideInstance);
                 if (emptyOverride != null)
                 {
                     UnityEngine.Object.DestroyImmediate(emptyOverride);
@@ -108,7 +108,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
                 if (overrideAsset != null)
                 {
                     UnityEngine.Object.DestroyImmediate(overrideAsset);
@@ -156,7 +156,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
                 if (overrideAsset != null)
                 {
                     UnityEngine.Object.DestroyImmediate(overrideAsset);
@@ -207,7 +207,7 @@ namespace Mmd.Tests
                     UnityEngine.Object.DestroyImmediate(normalMap);
                 }
 
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
                 if (overrideAsset != null)
                 {
                     UnityEngine.Object.DestroyImmediate(overrideAsset);
@@ -276,7 +276,7 @@ namespace Mmd.Tests
                     UnityEngine.Object.DestroyImmediate(occlusionMap);
                 }
 
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
                 if (overrideAsset != null)
                 {
                     UnityEngine.Object.DestroyImmediate(overrideAsset);
@@ -324,7 +324,7 @@ namespace Mmd.Tests
                     UnityEngine.Object.DestroyImmediate(normalMap);
                 }
 
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
                 if (overrideAsset != null)
                 {
                     UnityEngine.Object.DestroyImmediate(overrideAsset);
@@ -395,7 +395,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
                 if (overrideAsset != null)
                 {
                     UnityEngine.Object.DestroyImmediate(overrideAsset);
@@ -454,7 +454,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
                 if (overrideAsset != null)
                 {
                     UnityEngine.Object.DestroyImmediate(overrideAsset);
@@ -513,7 +513,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
                 if (overrideAsset != null)
                 {
                     UnityEngine.Object.DestroyImmediate(overrideAsset);
@@ -568,7 +568,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
                 if (overrideAsset != null)
                 {
                     UnityEngine.Object.DestroyImmediate(overrideAsset);
@@ -623,7 +623,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
                 if (overrideAsset != null)
                 {
                     UnityEngine.Object.DestroyImmediate(overrideAsset);
@@ -674,7 +674,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
                 if (overrideAsset != null)
                 {
                     UnityEngine.Object.DestroyImmediate(overrideAsset);
@@ -724,7 +724,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
                 if (overrideAsset != null)
                 {
                     UnityEngine.Object.DestroyImmediate(overrideAsset);
@@ -774,7 +774,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
                 if (overrideAsset != null)
                 {
                     UnityEngine.Object.DestroyImmediate(overrideAsset);
@@ -818,7 +818,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
                 if (overrideAsset != null)
                 {
                     UnityEngine.Object.DestroyImmediate(overrideAsset);
@@ -868,7 +868,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
                 if (overrideAsset != null)
                 {
                     UnityEngine.Object.DestroyImmediate(overrideAsset);
@@ -938,12 +938,12 @@ namespace Mmd.Tests
                 isMovable = true,
                 isRotatable = true
             });
-            model.vertices.Add(CreateVertex(0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f));
-            model.vertices.Add(CreateVertex(1, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f));
-            model.vertices.Add(CreateVertex(2, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f));
-            model.vertices.Add(CreateVertex(3, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f));
-            model.vertices.Add(CreateVertex(4, 1.0f, 1.0f, 0.0f, 1.0f, 0.0f));
-            model.vertices.Add(CreateVertex(5, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f));
+            model.vertices.Add(MmdTestFixtures.CreateSyntheticVertex(0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f));
+            model.vertices.Add(MmdTestFixtures.CreateSyntheticVertex(1, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f));
+            model.vertices.Add(MmdTestFixtures.CreateSyntheticVertex(2, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f));
+            model.vertices.Add(MmdTestFixtures.CreateSyntheticVertex(3, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f));
+            model.vertices.Add(MmdTestFixtures.CreateSyntheticVertex(4, 1.0f, 1.0f, 0.0f, 1.0f, 0.0f));
+            model.vertices.Add(MmdTestFixtures.CreateSyntheticVertex(5, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f));
             model.indices.AddRange(new[] { 0, 1, 2, 3, 4, 5 });
             model.materials.Add(new MmdMaterialDefinition
             {
@@ -958,59 +958,6 @@ namespace Mmd.Tests
                 vertexCount = 3
             });
             return model;
-        }
-
-        private static MmdVertexDefinition CreateVertex(
-            int index,
-            float x,
-            float y,
-            float z,
-            float u,
-            float v)
-        {
-            return new MmdVertexDefinition
-            {
-                index = index,
-                position = new[] { x, y, z },
-                normal = new[] { 0.0f, 0.0f, 1.0f },
-                uv = new[] { u, v },
-                boneIndices = new[] { 0 },
-                boneWeights = new[] { 1.0f }
-            };
-        }
-
-        private static void DestroyInstance(MmdUnityModelInstance? instance)
-        {
-            if (instance == null)
-            {
-                return;
-            }
-
-            if (instance.Root != null)
-            {
-                UnityEngine.Object.DestroyImmediate(instance.Root);
-            }
-
-            if (instance.Mesh != null)
-            {
-                UnityEngine.Object.DestroyImmediate(instance.Mesh);
-            }
-
-            foreach (Material material in instance.Materials)
-            {
-                if (material != null)
-                {
-                    UnityEngine.Object.DestroyImmediate(material);
-                }
-            }
-
-            foreach (Texture2D texture in instance.OwnedTextures)
-            {
-                if (texture != null)
-                {
-                    UnityEngine.Object.DestroyImmediate(texture);
-                }
-            }
         }
     }
 }

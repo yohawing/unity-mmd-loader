@@ -103,9 +103,9 @@ namespace Mmd.Tests
             TimelineAsset? timelineAsset = null;
             try
             {
-                byte[] pmxBytes = File.ReadAllBytes(ResolvePackageFixture("test_1bone_cube.pmx"));
-                byte[] firstVmdBytes = File.ReadAllBytes(ResolvePackageFixture("test_1bone_cube_motion.vmd"));
-                byte[] secondVmdBytes = File.ReadAllBytes(ResolvePackageFixture("test_append_bone.vmd"));
+                byte[] pmxBytes = File.ReadAllBytes(MmdPlayModeTestFixtures.ResolvePackageFixture("test_1bone_cube.pmx"));
+                byte[] firstVmdBytes = File.ReadAllBytes(MmdPlayModeTestFixtures.ResolvePackageFixture("test_1bone_cube_motion.vmd"));
+                byte[] secondVmdBytes = File.ReadAllBytes(MmdPlayModeTestFixtures.ResolvePackageFixture("test_append_bone.vmd"));
                 Assert.That(secondVmdBytes, Is.Not.EqualTo(firstVmdBytes));
 
                 modelAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
@@ -271,8 +271,8 @@ namespace Mmd.Tests
             MmdUnityPlaybackBinding? binding = null;
             try
             {
-                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
-                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                string pmxPath = MmdPlayModeTestFixtures.ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = MmdPlayModeTestFixtures.ResolvePackageFixture("test_1bone_cube_motion.vmd");
                 modelAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
                 modelAsset.Initialize(File.ReadAllBytes(pmxPath), modelSourceId, pmxPath);
                 motionAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
@@ -375,17 +375,12 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator HairPhysicsFixtureWithPureWorldAnchorJointsIsRejectedByLivePhysics()
         {
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-                yield break;
-            }
+            MmdBulletBackendTestGuard.RequireBulletBackend();
 
             MmdUnityPlaybackBinding? binding = null;
             try
             {
-                string pmxPath = ResolvePackageFixture("test_hair_physics.pmx");
+                string pmxPath = MmdPlayModeTestFixtures.ResolvePackageFixture("test_hair_physics.pmx");
                 byte[] pmxBytes = File.ReadAllBytes(pmxPath);
                 var parser = new NativeMmdParser();
                 MmdModelDefinition model = parser.LoadModel(pmxBytes);
@@ -423,18 +418,13 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator HairPhysicsFixtureLiveForwardPlaybackProducesDiagnostics()
         {
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-                yield break;
-            }
+            MmdBulletBackendTestGuard.RequireBulletBackend();
 
             MmdUnityPlaybackBinding? binding = null;
             MmdModelDefinition? model = null;
             try
             {
-                string pmxPath = ResolvePackageFixture("test_hair_physics.pmx");
+                string pmxPath = MmdPlayModeTestFixtures.ResolvePackageFixture("test_hair_physics.pmx");
                 byte[] pmxBytes = File.ReadAllBytes(pmxPath);
                 var parser = new NativeMmdParser();
                 model = parser.LoadModel(pmxBytes);
@@ -610,12 +600,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator HairPhysicsFixtureImportScaleZeroDotOneKeepsNativeReadbackInMmdSpaceAndScalesUnityObjects()
         {
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-                yield break;
-            }
+            MmdBulletBackendTestGuard.RequireBulletBackend();
 
             HairPhysicsScaleSample scaleOne = RunHairPhysicsForwardPlayback(importScale: 1.0f);
             HairPhysicsScaleSample scalePointOne = RunHairPhysicsForwardPlayback(importScale: 0.1f);
@@ -636,12 +621,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator HumanoidRetargetLateUpdateStepsLivePhysicsFromCurrentPose()
         {
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-                yield break;
-            }
+            MmdBulletBackendTestGuard.RequireBulletBackend();
 
             MmdUnityModelInstance? instance = null;
             MmdPmxAsset? pmxAsset = null;
@@ -651,7 +631,7 @@ namespace Mmd.Tests
             PlayableGraph graph = default;
             try
             {
-                string pmxPath = ResolvePackageFixture("test_hair_physics.pmx");
+                string pmxPath = MmdPlayModeTestFixtures.ResolvePackageFixture("test_hair_physics.pmx");
                 byte[] pmxBytes = File.ReadAllBytes(pmxPath);
                 MmdModelDefinition model = LoadHairPhysicsModelForLive(pmxPath);
                 instance = MmdUnityModelFactory.CreateSkinnedModel(
@@ -665,7 +645,7 @@ namespace Mmd.Tests
                     pmxPath,
                     MmdPmxAsset.DefaultImportScale,
                     parseSummary: MmdPmxParseSummary.FromModel(model));
-                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                string vmdPath = MmdPlayModeTestFixtures.ResolvePackageFixture("test_1bone_cube_motion.vmd");
                 vmdAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
                 vmdAsset.Initialize(File.ReadAllBytes(vmdPath), "test_1bone_cube_motion.vmd", vmdPath);
                 SkinnedMeshRenderer renderer = instance.SkinnedMeshRenderer!;
@@ -965,12 +945,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator HumanoidRetargetLateUpdateCreatesModelOnlyPhysicsBindingFromModelAsset()
         {
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-                yield break;
-            }
+            MmdBulletBackendTestGuard.RequireBulletBackend();
 
             MmdUnityModelInstance? instance = null;
             MmdPmxAsset? pmxAsset = null;
@@ -979,7 +954,7 @@ namespace Mmd.Tests
             PlayableGraph graph = default;
             try
             {
-                string pmxPath = ResolvePackageFixture("test_hair_physics.pmx");
+                string pmxPath = MmdPlayModeTestFixtures.ResolvePackageFixture("test_hair_physics.pmx");
                 byte[] pmxBytes = File.ReadAllBytes(pmxPath);
                 MmdModelDefinition model = LoadHairPhysicsModelForLive(pmxPath);
                 instance = MmdUnityModelFactory.CreateSkinnedModel(
@@ -1142,12 +1117,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator HumanoidRetargetLateUpdateLatchesModelOnlyPhysicsBindingFailureUntilReconfigured()
         {
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-                yield break;
-            }
+            MmdBulletBackendTestGuard.RequireBulletBackend();
 
             MmdUnityModelInstance? instance = null;
             MmdPmxAsset? pmxAsset = null;
@@ -1156,7 +1126,7 @@ namespace Mmd.Tests
             PlayableGraph graph = default;
             try
             {
-                string pmxPath = ResolvePackageFixture("test_hair_physics.pmx");
+                string pmxPath = MmdPlayModeTestFixtures.ResolvePackageFixture("test_hair_physics.pmx");
                 byte[] pmxBytes = File.ReadAllBytes(pmxPath);
                 MmdModelDefinition model = LoadHairPhysicsModelForLive(pmxPath);
                 instance = MmdUnityModelFactory.CreateSkinnedModel(
@@ -1327,12 +1297,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator HumanoidAnimationTrackSingleTrackMuscleClipDrivesProxyAndRetargetsAndStepsPhysics()
         {
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-                yield break;
-            }
+            MmdBulletBackendTestGuard.RequireBulletBackend();
 
             MmdUnityModelInstance? instance = null;
             MmdPmxAsset? pmxAsset = null;
@@ -1343,7 +1308,7 @@ namespace Mmd.Tests
             GameObject? directorObject = null;
             try
             {
-                string pmxPath = ResolvePackageFixture("test_hair_physics.pmx");
+                string pmxPath = MmdPlayModeTestFixtures.ResolvePackageFixture("test_hair_physics.pmx");
                 byte[] pmxBytes = File.ReadAllBytes(pmxPath);
                 MmdModelDefinition model = LoadHairPhysicsModelForLive(pmxPath);
                 instance = MmdUnityModelFactory.CreateSkinnedModel(
@@ -1899,7 +1864,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator HumanoidRetargetPhysicsOffUsesNativeAppendAndIkWithoutConsoleErrors()
         {
-            string pmxPath = ResolvePackageFixture("test_semi_basic_bone.pmx");
+            string pmxPath = MmdPlayModeTestFixtures.ResolvePackageFixture("test_semi_basic_bone.pmx");
             MmdPmxAsset? pmxAsset = null;
             MmdUnityModelInstance? instance = null;
             MmdHumanoidProxyRigResult? proxyRig = null;
@@ -2071,14 +2036,9 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator HumanoidRetargetLiveUsesNativeAppendAndIkFinalPose()
         {
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-                yield break;
-            }
+            MmdBulletBackendTestGuard.RequireBulletBackend();
 
-            string pmxPath = ResolvePackageFixture("test_semi_basic_bone.pmx");
+            string pmxPath = MmdPlayModeTestFixtures.ResolvePackageFixture("test_semi_basic_bone.pmx");
             MmdPmxAsset? pmxAsset = null;
             MmdUnityModelInstance? instance = null;
             MmdHumanoidProxyRigResult? proxyRig = null;
@@ -2364,12 +2324,7 @@ namespace Mmd.Tests
             // director.Evaluate(), so they cannot be distinguished — the Play Mode boundary is the contract
             // (scrubbing is an Editor/non-playing operation). Editor-side suppression (Application.isPlaying
             // == false) is covered by the EditMode timeline behaviour tests.
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-                yield break;
-            }
+            MmdBulletBackendTestGuard.RequireBulletBackend();
 
             MmdUnityPlaybackBinding? binding = null;
             TimelineAsset? timelineAsset = null;
@@ -2432,12 +2387,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator ApplyLivePhysicsForwardFrameSeedsAtArbitraryStartFrame()
         {
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-                yield break;
-            }
+            MmdBulletBackendTestGuard.RequireBulletBackend();
 
             MmdUnityPlaybackBinding? binding = null;
             try
@@ -2560,8 +2510,8 @@ namespace Mmd.Tests
             try
             {
                 MmdVmdTimelineBehaviour.ProcessFrameEvaluated += processFrameObserver;
-                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
-                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                string pmxPath = MmdPlayModeTestFixtures.ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = MmdPlayModeTestFixtures.ResolvePackageFixture("test_1bone_cube_motion.vmd");
                 modelAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
                 motionAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
                 modelAsset.Initialize(File.ReadAllBytes(pmxPath), Path.GetFileName(pmxPath), pmxPath);
@@ -2722,8 +2672,8 @@ namespace Mmd.Tests
             try
             {
                 MmdVmdTimelineBehaviour.ProcessFrameEvaluated += processFrameObserver;
-                string pmxPath = ResolvePackageFixture("test_1bone_cube.pmx");
-                string vmdPath = ResolvePackageFixture("test_1bone_cube_motion.vmd");
+                string pmxPath = MmdPlayModeTestFixtures.ResolvePackageFixture("test_1bone_cube.pmx");
+                string vmdPath = MmdPlayModeTestFixtures.ResolvePackageFixture("test_1bone_cube_motion.vmd");
                 modelAsset = ScriptableObject.CreateInstance<MmdPmxAsset>();
                 motionAsset = ScriptableObject.CreateInstance<MmdVmdAsset>();
                 modelAsset.Initialize(File.ReadAllBytes(pmxPath), Path.GetFileName(pmxPath), pmxPath);
@@ -2921,12 +2871,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator TimelineForwardPlaybackEvaluationStepsLivePhysics()
         {
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-                yield break;
-            }
+            MmdBulletBackendTestGuard.RequireBulletBackend();
 
             MmdUnityPlaybackBinding? binding = null;
             try
@@ -2971,12 +2916,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator TimelineScrubSuspendsLivePhysicsAndResumeReseeds()
         {
-            MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
-            if (!availability.backendAvailable)
-            {
-                Assert.Ignore("Bullet physics backend is not available: " + availability.unsupportedReason);
-                yield break;
-            }
+            MmdBulletBackendTestGuard.RequireBulletBackend();
 
             MmdUnityPlaybackBinding? binding = null;
             try
@@ -3026,6 +2966,7 @@ namespace Mmd.Tests
         [UnityTest]
         public IEnumerator TimelineForwardPlaybackPropagatesHairPhysicsToBones()
         {
+            // This test has no other yield, so the guard keeps its own yield break to stay an iterator.
             MmdPhysicsBackendAvailability availability = MmdAnimPhysicsBackend.ProbeAvailability();
             if (!availability.backendAvailable)
             {
@@ -3036,7 +2977,7 @@ namespace Mmd.Tests
             MmdUnityPlaybackBinding? binding = null;
             try
             {
-                string pmxPath = ResolvePackageFixture("test_hair_physics.pmx");
+                string pmxPath = MmdPlayModeTestFixtures.ResolvePackageFixture("test_hair_physics.pmx");
                 var parser = new NativeMmdParser();
                 MmdModelDefinition model = parser.LoadModel(File.ReadAllBytes(pmxPath));
                 Assert.That(model.physics.rigidbodies.Count, Is.GreaterThan(0),
@@ -3132,20 +3073,6 @@ namespace Mmd.Tests
             }
         }
 
-        // NOTE: An end-to-end test that calls PlayableDirector.Play() and yields frames to assert
-        // live physics steps during real forward playback is intentionally omitted: in headless
-        // -batchmode -runTests the PlayableDirector does not advance playback time across
-        // `yield return null` (and an unfocused Editor throttles the player loop), so the
-        // Playback-evaluation gate cannot be exercised here. The forward routing and hair-bone
-        // propagation are covered deterministically by TimelineForwardPlaybackEvaluationStepsLivePhysics,
-        // TimelineScrubSuspendsLivePhysicsAndResumeReseeds, and TimelineForwardPlaybackPropagatesHairPhysicsToBones
-        // (via the runLivePhysics flag); the FrameData.evaluationType == Playback gate itself is computed
-        // in MmdVmdTimelineBehaviour.ProcessFrame and was verified via Editor.log instrumentation.
-        private static string ResolvePackageFixture(string fileName)
-        {
-            return MmdPlayModeTestFixtures.ResolvePackageFixture(fileName);
-        }
-
         private static string ResolveBasicPlaybackSampleAsset(string fileName)
         {
             return MmdPlayModeTestFixtures.ResolveBasicPlaybackSampleAsset(fileName);
@@ -3156,7 +3083,7 @@ namespace Mmd.Tests
             MmdUnityPlaybackBinding? binding = null;
             try
             {
-                string pmxPath = ResolvePackageFixture("test_hair_physics.pmx");
+                string pmxPath = MmdPlayModeTestFixtures.ResolvePackageFixture("test_hair_physics.pmx");
                 MmdModelDefinition model = LoadHairPhysicsModelForLive(pmxPath);
                 MmdMotionDefinition motion = CreateRestPoseMotion(model);
                 binding = MmdUnityPlaybackBinding.CreateSkinned(
@@ -3317,8 +3244,8 @@ namespace Mmd.Tests
         {
             using var stream = new MemoryStream();
             using var writer = new BinaryWriter(stream);
-            WriteFixedSjis(writer, "Vocaloid Motion Data 0002", 30);
-            WriteFixedSjis(writer, modelName, 20);
+            MmdPlayModeTestFixtures.WriteFixedSjis(writer, "Vocaloid Motion Data 0002", 30);
+            MmdPlayModeTestFixtures.WriteFixedSjis(writer, modelName, 20);
             writer.Write(0u); // bone count
             writer.Write(0u); // morph count
             writer.Write(0u); // camera count
@@ -3326,14 +3253,6 @@ namespace Mmd.Tests
             writer.Write(0u); // self-shadow count
             writer.Write(0u); // show/IK count
             return stream.ToArray();
-        }
-
-        private static void WriteFixedSjis(BinaryWriter writer, string value, int byteCount)
-        {
-            byte[] buffer = new byte[byteCount];
-            byte[] encoded = Encoding.GetEncoding(932).GetBytes(value ?? string.Empty);
-            Array.Copy(encoded, 0, buffer, 0, Math.Min(encoded.Length, buffer.Length));
-            writer.Write(buffer);
         }
 
         private readonly struct HairPhysicsScaleSample

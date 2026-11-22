@@ -51,7 +51,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
                 Directory.Delete(tempRoot, recursive: true);
             }
         }
@@ -131,7 +131,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
                 Directory.Delete(tempRoot, recursive: true);
             }
         }
@@ -376,13 +376,13 @@ namespace Mmd.Tests
                 Assert.That(failed.resolvedPath, Is.EqualTo("corrupt.png"));
                 AssertDiagnosticsDoNotContain(instance.TextureDiagnostics, tempRoot, pmxPath);
 
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
                 instance = null;
                 Assert.That(CountLoadedTexture2D(), Is.EqualTo(textureCountBefore));
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
                 Directory.Delete(tempRoot, recursive: true);
             }
         }
@@ -427,13 +427,13 @@ namespace Mmd.Tests
                     Is.True);
                 AssertDiagnosticsDoNotContain(instance.TextureDiagnostics, tempRoot, pmxPath, lockedPath);
 
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
                 instance = null;
                 Assert.That(CountLoadedTexture2D(), Is.EqualTo(textureCountBefore));
             }
             finally
             {
-                DestroyInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
                 Directory.Delete(tempRoot, recursive: true);
             }
         }
@@ -698,9 +698,9 @@ namespace Mmd.Tests
                 isMovable = true,
                 isRotatable = true
             });
-            model.vertices.Add(CreateVertex(0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f));
-            model.vertices.Add(CreateVertex(1, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f));
-            model.vertices.Add(CreateVertex(2, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f));
+            model.vertices.Add(MmdTestFixtures.CreateSyntheticVertex(0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f));
+            model.vertices.Add(MmdTestFixtures.CreateSyntheticVertex(1, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f));
+            model.vertices.Add(MmdTestFixtures.CreateSyntheticVertex(2, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f));
             model.indices.AddRange(new[] { 0, 1, 2 });
             model.materials.Add(new MmdMaterialDefinition
             {
@@ -709,25 +709,6 @@ namespace Mmd.Tests
                 vertexCount = 3
             });
             return model;
-        }
-
-        private static MmdVertexDefinition CreateVertex(
-            int index,
-            float x,
-            float y,
-            float z,
-            float u,
-            float v)
-        {
-            return new MmdVertexDefinition
-            {
-                index = index,
-                position = new[] { x, y, z },
-                normal = new[] { 0.0f, 0.0f, 1.0f },
-                uv = new[] { u, v },
-                boneIndices = new[] { 0 },
-                boneWeights = new[] { 1.0f }
-            };
         }
 
         private static string CreateTempDirectory()
@@ -764,34 +745,6 @@ namespace Mmd.Tests
             }
 
             return material.HasProperty("_MainTex") ? material.GetTexture("_MainTex") : null;
-        }
-
-        private static void DestroyInstance(MmdUnityModelInstance? instance)
-        {
-            if (instance == null)
-            {
-                return;
-            }
-
-            if (instance.Root != null)
-            {
-                Object.DestroyImmediate(instance.Root);
-            }
-
-            if (instance.Mesh != null)
-            {
-                Object.DestroyImmediate(instance.Mesh);
-            }
-
-            foreach (Material material in instance.Materials.Where(material => material != null).Distinct())
-            {
-                Object.DestroyImmediate(material);
-            }
-
-            foreach (Texture2D texture in instance.OwnedTextures.Where(texture => texture != null).Distinct())
-            {
-                Object.DestroyImmediate(texture);
-            }
         }
     }
 }

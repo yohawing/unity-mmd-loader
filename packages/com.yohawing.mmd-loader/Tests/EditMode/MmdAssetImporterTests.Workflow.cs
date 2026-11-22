@@ -27,7 +27,7 @@ namespace Mmd.Tests
         {
             // D1 regression pin: scene and prefab references are the highest-risk serialized
             // object references when the .pmx main object later changes from MmdPmxAsset to GameObject.
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
 
             MmdPmxAsset? initialPmxAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(TempPmxPath);
             Assert.That(initialPmxAsset, Is.Not.Null);
@@ -101,7 +101,7 @@ namespace Mmd.Tests
         {
             // D1: TryGetDraggedAssets must accept a .pmx GameObject main object and resolve
             // it to the same MmdPmxAsset as LoadAssetAtPath<MmdPmxAsset>.
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
 
             GameObject mainGo = AssetDatabase.LoadAssetAtPath<GameObject>(TempPmxPath);
             Assert.That(mainGo, Is.Not.Null, "precondition: .pmx must have a GameObject main object");
@@ -124,8 +124,8 @@ namespace Mmd.Tests
         public void D1_Slice2a_TryGetDraggedAssetsAcceptsPmxGameObjectWithVmdAsset()
         {
             // D1: GameObject main + MmdVmdAsset must be accepted.
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
-            CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
 
             GameObject mainGo = AssetDatabase.LoadAssetAtPath<GameObject>(TempPmxPath);
             Assert.That(mainGo, Is.Not.Null);
@@ -152,7 +152,7 @@ namespace Mmd.Tests
         public void D1_Slice2a_TryGetDraggedAssetsRejectsGameObjectAndDirectPmxForSamePmx()
         {
             // D1: GameObject main + direct MmdPmxAsset for the same .pmx is ambiguous and must be rejected.
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
 
             GameObject mainGo = AssetDatabase.LoadAssetAtPath<GameObject>(TempPmxPath);
             Assert.That(mainGo, Is.Not.Null);
@@ -177,7 +177,7 @@ namespace Mmd.Tests
             // D1: TryGetDraggedSources with objectReferences containing PMX GameObject main
             // and paths containing TempPmxPath/project path must resolve as asset drag,
             // pmxPath remains null, vmdPath remains null.
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
 
             GameObject mainGo = AssetDatabase.LoadAssetAtPath<GameObject>(TempPmxPath);
             Assert.That(mainGo, Is.Not.Null, "precondition: .pmx must have a GameObject main object");
@@ -214,7 +214,7 @@ namespace Mmd.Tests
             Assert.That(method, Is.Not.Null, "reflection: ContainsMmdAssetReference must exist");
 
             // (1) .pmx GameObject main object must be recognised.
-            CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
+            MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
             GameObject mainGo = AssetDatabase.LoadAssetAtPath<GameObject>(TempPmxPath);
             Assert.That(mainGo, Is.Not.Null, "precondition: .pmx must have a GameObject main object");
 

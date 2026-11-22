@@ -288,7 +288,7 @@ namespace Mmd.Tests
             using var stream = new MemoryStream();
             using var writer = new BinaryWriter(stream);
             WriteFixedAscii(writer, "Vocaloid Motion Data 0002", 30);
-            WriteFixedSjis(writer, "native-property", 20);
+            MmdTestFixtures.WriteFixedSjis(writer, "native-property", 20);
             writer.Write(0u); // bone frames
             writer.Write(0u); // morph frames
             writer.Write(0u); // camera frames
@@ -298,7 +298,7 @@ namespace Mmd.Tests
             writer.Write(14u);
             writer.Write(visibility);
             writer.Write(1u); // IK states
-            WriteFixedSjis(writer, "左IK", 20);
+            MmdTestFixtures.WriteFixedSjis(writer, "左IK", 20);
             writer.Write(ikEnabled);
             return stream.ToArray();
         }
@@ -338,14 +338,6 @@ namespace Mmd.Tests
         {
             byte[] buffer = new byte[byteCount];
             byte[] encoded = Encoding.ASCII.GetBytes(value);
-            Buffer.BlockCopy(encoded, 0, buffer, 0, Math.Min(encoded.Length, buffer.Length));
-            writer.Write(buffer);
-        }
-
-        private static void WriteFixedSjis(BinaryWriter writer, string value, int byteCount)
-        {
-            byte[] buffer = new byte[byteCount];
-            byte[] encoded = Encoding.GetEncoding(932).GetBytes(value);
             Buffer.BlockCopy(encoded, 0, buffer, 0, Math.Min(encoded.Length, buffer.Length));
             writer.Write(buffer);
         }
