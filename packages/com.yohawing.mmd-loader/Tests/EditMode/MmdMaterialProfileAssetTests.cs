@@ -197,6 +197,154 @@ namespace Mmd.Tests
             }
         }
 
+        // Bool members of the rendering targets. null = every bool at its default; otherwise only
+        // that member is flipped, so two swapped bools cannot hide behind equal values.
+        private static readonly object?[] RenderingTargetBoolCases =
+        {
+            null,
+            nameof(MmdMaterialProfileRenderingTargets.supportsRenderQueue),
+            nameof(MmdMaterialProfileRenderingTargets.validatePropertyPresence),
+            nameof(MmdMaterialProfileRenderingTargets.supportsMaterialMorphs)
+        };
+
+        // profile asset -> runtime targets -> provenance (MmdPmxAsset) -> runtime targets. Members are
+        // enumerated by reflection and filled with mutually distinct values, so a swapped or dropped
+        // argument in any of the hand-written copies fails here.
+        [TestCaseSource(nameof(RenderingTargetBoolCases))]
+        public void RenderingTargetsRoundTripEveryMemberThroughRuntimeAndProvenance(string? flippedBool)
+        {
+            FieldInfo[] profileFields = typeof(MmdMaterialProfileRenderingTargets)
+                .GetFields(BindingFlags.Public | BindingFlags.Instance);
+            PropertyInfo[] runtimeProperties = typeof(MmdMaterialRenderingTargets)
+                .GetProperties(BindingFlags.Public | BindingFlags.Instance);
+            AssertMemberBijection(profileFields, runtimeProperties);
+            Assert.That(
+                RenderingTargetBoolCases.Length - 1,
+                Is.EqualTo(Array.FindAll(profileFields, field => field.FieldType == typeof(bool)).Length),
+                "Add every bool member of the rendering targets to RenderingTargetBoolCases.");
+
+            var profile = new MmdMaterialProfileRenderingTargets();
+            FillDistinctValues(profile, profileFields, flippedBool);
+
+            MmdMaterialRenderingTargets runtime = profile.ToRuntimeTargets();
+            foreach (FieldInfo field in profileFields)
+            {
+                object? expected = field.GetValue(profile);
+                if (field.Name == nameof(MmdMaterialProfileRenderingTargets.unsupportedFeatures) &&
+                    !profile.supportsMaterialMorphs)
+                {
+                    expected = Append((string[])expected!, "material-morph");
+                }
+
+                AssertMemberValue(field.Name, expected, FindRuntimeProperty(runtimeProperties, field).GetValue(runtime));
+            }
+
+            MmdMaterialProfileProvenance provenance = MmdMaterialProfileProvenance.Create(
+                "round-trip-id",
+                "round-trip-name",
+                new[] { runtime });
+            foreach (FieldInfo field in profileFields)
+            {
+                AssertMemberValue(
+                    "provenance." + field.Name,
+                    FindRuntimeProperty(runtimeProperties, field).GetValue(runtime),
+                    field.GetValue(provenance.renderingTargets));
+            }
+
+            Assert.That(
+                provenance.TryCreateRuntimeRenderingTargets(1, out MmdMaterialRenderingTargets[] restored, out string reason),
+                Is.True,
+                reason);
+            foreach (PropertyInfo property in runtimeProperties)
+            {
+                AssertMemberValue("restored." + property.Name, property.GetValue(runtime), property.GetValue(restored[0]));
+            }
+        }
+
+        [Test]
+        public void TextureTargetsMapEveryMemberToRuntimeTargets()
+        {
+            FieldInfo[] profileFields = typeof(MmdMaterialProfileTextureTargets)
+                .GetFields(BindingFlags.Public | BindingFlags.Instance);
+            PropertyInfo[] runtimeProperties = typeof(MmdMaterialTextureTargets)
+                .GetProperties(BindingFlags.Public | BindingFlags.Instance);
+            AssertMemberBijection(profileFields, runtimeProperties);
+
+            var profile = new MmdMaterialProfileTextureTargets();
+            FillDistinctValues(profile, profileFields, flippedBool: null);
+
+            MmdMaterialTextureTargets runtime = profile.ToRuntimeTargets();
+            foreach (FieldInfo field in profileFields)
+            {
+                AssertMemberValue(field.Name, field.GetValue(profile), FindRuntimeProperty(runtimeProperties, field).GetValue(runtime));
+            }
+        }
+
+        private static void AssertMemberBijection(FieldInfo[] profileFields, PropertyInfo[] runtimeProperties)
+        {
+            string[] profileNames = Array.ConvertAll(profileFields, field => ToPascalCase(field.Name));
+            string[] runtimeNames = Array.ConvertAll(runtimeProperties, property => property.Name);
+            Array.Sort(profileNames, StringComparer.Ordinal);
+            Array.Sort(runtimeNames, StringComparer.Ordinal);
+            Assert.That(profileNames, Is.EqualTo(runtimeNames),
+                "Profile fields and runtime target properties must correspond one to one by name.");
+        }
+
+        private static PropertyInfo FindRuntimeProperty(PropertyInfo[] runtimeProperties, FieldInfo field)
+        {
+            string name = ToPascalCase(field.Name);
+            return Array.Find(runtimeProperties, property => property.Name == name)
+                ?? throw new AssertionException($"Runtime property {name} is missing.");
+        }
+
+        private static void FillDistinctValues(object target, FieldInfo[] fields, string? flippedBool)
+        {
+            foreach (FieldInfo field in fields)
+            {
+                if (field.FieldType == typeof(string))
+                {
+                    field.SetValue(target, "_RoundTrip_" + field.Name);
+                }
+                else if (field.FieldType == typeof(string[]))
+                {
+                    field.SetValue(target, new[] { "rt-" + field.Name + "-a", "rt-" + field.Name + "-b" });
+                }
+                else if (field.FieldType == typeof(bool))
+                {
+                    bool value = (bool)field.GetValue(target)!;
+                    field.SetValue(target, field.Name == flippedBool ? !value : value);
+                }
+                else
+                {
+                    Assert.Fail($"Unsupported target member type {field.FieldType} on {field.Name}. Extend FillDistinctValues.");
+                }
+            }
+        }
+
+        private static void AssertMemberValue(string member, object? expected, object? actual)
+        {
+            if (expected is System.Collections.IEnumerable expectedList && expected is not string)
+            {
+                Assert.That(actual, Is.EqualTo(expectedList).AsCollection, member);
+                return;
+            }
+
+            Assert.That(actual, Is.EqualTo(expected), member);
+        }
+
+        private static string[] Append(string[] values, string value)
+        {
+            var result = new string[values.Length + 1];
+            Array.Copy(values, result, values.Length);
+            result[values.Length] = value;
+            return result;
+        }
+
+        private static string ToPascalCase(string name)
+        {
+            return char.ToUpperInvariant(name[0]) + name.Substring(1);
+        }
+
         private static void SetProfileState(
             MmdPmxAsset modelAsset,
             MmdMaterialProfileAsset? profile,

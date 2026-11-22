@@ -598,6 +598,244 @@ namespace Mmd.EditModeTests
             }
         }
 
+        // Descriptor -> URP binding projection table. Each row applies one entry (one has* flag, or a
+        // documented combination) and names every field shared by MmdMaterialDescriptor and
+        // MmdUrpMaterialBindingDescriptor that the entry writes. After the apply, those fields must
+        // hold the same (normalized) value on both sinks, and every other shared field must keep its
+        // sentinel on both sinks. Surface fields that only exist on the binding are covered by
+        // SurfaceDecisionTable.
+        private static readonly object[][] DescriptorProjectionTable =
+        {
+            new object[] { new[] { "hasBaseColor" }, new[] { "alpha", "diffuseColor" } },
+            new object[] { new[] { "hasAlpha" }, new[] { "alpha" } },
+            new object[] { new[] { "hasBaseColor", "hasAlpha" }, new[] { "alpha", "diffuseColor" } },
+            new object[] { new[] { "hasAmbientColor" }, new[] { "ambientColor" } },
+            new object[] { new[] { "hasEmissionColor" }, new[] { "emissionColor" } },
+            new object[] { new[] { "hasEmissionIntensity" }, new[] { "emissionIntensity" } },
+            new object[] { new[] { "hasEmissionMap" }, new[] { "usesEmissionMap" } },
+            new object[] { new[] { "hasEmissionMask" }, new[] { "usesEmissionMask" } },
+            new object[] { new[] { "hasToonBoundary" }, new[] { "toonBoundary" } },
+            new object[] { new[] { "hasToonFeather" }, new[] { "toonFeather" } },
+            new object[] { new[] { "hasToonBandCount" }, new[] { "toonBandCount" } },
+            new object[] { new[] { "hasStylizedSpecularColor" }, new[] { "stylizedSpecularColor" } },
+            new object[] { new[] { "hasStylizedSpecularBoundary" }, new[] { "stylizedSpecularBoundary" } },
+            new object[] { new[] { "hasStylizedSpecularFeather" }, new[] { "stylizedSpecularFeather" } },
+            new object[] { new[] { "hasRimColor" }, new[] { "rimColor" } },
+            new object[] { new[] { "hasRimBoundary" }, new[] { "rimBoundary" } },
+            new object[] { new[] { "hasRimFeather" }, new[] { "rimFeather" } },
+            new object[] { new[] { "hasRimLightFollow" }, new[] { "rimLightFollow" } },
+            new object[] { new[] { "hasOutlineColor" }, new[] { "edgeColor" } },
+            new object[] { new[] { "hasOutlineWidth" }, new[] { "drawEdgeFlag", "edgeSize" } },
+            new object[] { new[] { "hasAlphaClipThreshold" }, Array.Empty<string>() },
+            new object[] { new[] { "hasColor" }, Array.Empty<string>() },
+            new object[] { new[] { "hasMetallic" }, Array.Empty<string>() },
+            new object[] { new[] { "hasMetallicMap" }, Array.Empty<string>() },
+            new object[] { new[] { "hasNormalMap" }, Array.Empty<string>() },
+            new object[] { new[] { "hasNormalScale" }, Array.Empty<string>() },
+            new object[] { new[] { "hasOcclusionMap" }, Array.Empty<string>() },
+            new object[] { new[] { "hasOcclusionStrength" }, Array.Empty<string>() },
+            new object[] { new[] { "hasRoughnessMap" }, Array.Empty<string>() },
+            new object[] { new[] { "hasSmoothness" }, Array.Empty<string>() },
+            new object[] { new[] { "hasSurfaceMode" }, Array.Empty<string>() }
+        };
+
+        [Test]
+        public void DescriptorProjectionTableCoversEveryHasFlag()
+        {
+            string[] covered = DescriptorProjectionTable
+                .SelectMany(row => (string[])row[0])
+                .Distinct()
+                .OrderBy(name => name, StringComparer.Ordinal)
+                .ToArray();
+            string[] flags = typeof(MmdMaterialOverrideEntry)
+                .GetFields(BindingFlags.Public | BindingFlags.Instance)
+                .Where(field => field.FieldType == typeof(bool) && field.Name.StartsWith("has", StringComparison.Ordinal))
+                .Select(field => field.Name)
+                .OrderBy(name => name, StringComparer.Ordinal)
+                .ToArray();
+            Assert.That(covered, Is.EqualTo(flags));
+        }
+
+        [TestCaseSource(nameof(DescriptorProjectionTable))]
+        public void DescriptorEntryProjectsWrittenFieldsOntoUrpBinding(string[] flags, string[] expectedWritten)
+        {
+            MmdMaterialOverrideEntry entry = CreateProjectionEntry(flags);
+            MmdMaterialOverrideAsset asset = CreateAsset(entry);
+            try
+            {
+                MmdRenderingDescriptor descriptor = CreateDescriptor();
+                MmdMaterialDescriptor material = descriptor.materials[0];
+                MmdUrpMaterialBindingDescriptor binding = descriptor.urpMaterialBindings[0];
+                FieldInfo[] sharedMaterialFields = SharedDescriptorFields();
+                FillProjectionSentinels(material, binding, sharedMaterialFields);
+                object?[] materialBefore = sharedMaterialFields.Select(field => CloneValue(field.GetValue(material))).ToArray();
+                object?[] bindingBefore = sharedMaterialFields
+                    .Select(field => CloneValue(BindingField(field).GetValue(binding)))
+                    .ToArray();
+
+                MmdMaterialOverrideApplier.ApplyToRenderingDescriptor(asset, descriptor);
+
+                var materialWritten = new System.Collections.Generic.List<string>();
+                var bindingWritten = new System.Collections.Generic.List<string>();
+                for (int i = 0; i < sharedMaterialFields.Length; i++)
+                {
+                    FieldInfo materialField = sharedMaterialFields[i];
+                    object? materialAfter = materialField.GetValue(material);
+                    object? bindingAfter = BindingField(materialField).GetValue(binding);
+                    if (!ValueEquals(materialBefore[i], materialAfter))
+                    {
+                        materialWritten.Add(materialField.Name);
+                    }
+
+                    if (!ValueEquals(bindingBefore[i], bindingAfter))
+                    {
+                        bindingWritten.Add(materialField.Name);
+                        Assert.That(ValueEquals(materialAfter, bindingAfter), Is.True,
+                            $"binding.{materialField.Name} must equal the material descriptor value.");
+                        if (materialAfter is float[] materialArray)
+                        {
+                            Assert.That(bindingAfter, Is.Not.SameAs(materialArray),
+                                $"binding.{materialField.Name} must not alias the material descriptor array.");
+                        }
+                    }
+                }
+
+                string[] expected = expectedWritten.OrderBy(name => name, StringComparer.Ordinal).ToArray();
+                Assert.That(materialWritten.OrderBy(name => name, StringComparer.Ordinal).ToArray(), Is.EqualTo(expected),
+                    "material descriptor fields written");
+                Assert.That(bindingWritten.OrderBy(name => name, StringComparer.Ordinal).ToArray(), Is.EqualTo(expected),
+                    "URP binding fields written");
+            }
+            finally
+            {
+                Destroy(asset);
+            }
+        }
+
+        // Values are chosen so the normalized result differs from every sentinel; several are out
+        // of range so the binding has to carry the normalized (not the raw entry) value.
+        private static MmdMaterialOverrideEntry CreateProjectionEntry(string[] flags)
+        {
+            var entry = new MmdMaterialOverrideEntry
+            {
+                materialIndex = 0,
+                baseColor = new Color(1.5f, 0.22f, -0.3f, 0.66f),
+                color = new Color(0.44f, 0.55f, 0.66f, 0.88f),
+                alpha = 0.42f,
+                ambientColor = new Color(0.13f, 2.0f, 0.35f, 1.0f),
+                emissionColor = new Color(2.1f, 1.2f, 0.4f, 1.0f),
+                emissionIntensity = 12.0f,
+                emissionMap = null,
+                emissionMask = null,
+                toonBoundary = 3.0f,
+                toonFeather = 0.12f,
+                toonBandCount = 3.0f,
+                stylizedSpecularColor = new Color(0.91f, 0.81f, 0.71f, 0.61f),
+                stylizedSpecularBoundary = 0.90f,
+                stylizedSpecularFeather = -4.0f,
+                rimColor = new Color(0.19f, 0.29f, 0.39f, 0.49f),
+                rimBoundary = 0.72f,
+                rimFeather = 0.08f,
+                rimLightFollow = 1.65f,
+                outlineColor = new Color(0.72f, 0.61f, 0.5f, 0.39f),
+                outlineWidth = 1.75f,
+                metallic = 0.73f,
+                smoothness = 0.64f,
+                normalScale = 0.87f,
+                occlusionStrength = 0.58f,
+                surfaceMode = MmdMaterialOverrideSurfaceMode.AlphaTest,
+                alphaClipThreshold = 0.27f
+            };
+            foreach (string flag in flags)
+            {
+                FieldInfo field = typeof(MmdMaterialOverrideEntry).GetField(flag, BindingFlags.Public | BindingFlags.Instance)
+                    ?? throw new InvalidOperationException($"Unknown override flag {flag}.");
+                field.SetValue(entry, true);
+            }
+
+            return entry;
+        }
+
+        private static FieldInfo[] SharedDescriptorFields()
+        {
+            return typeof(MmdMaterialDescriptor)
+                .GetFields(BindingFlags.Public | BindingFlags.Instance)
+                .Where(field => typeof(MmdUrpMaterialBindingDescriptor).GetField(field.Name, BindingFlags.Public | BindingFlags.Instance) != null)
+                .ToArray();
+        }
+
+        private static FieldInfo BindingField(FieldInfo materialField)
+        {
+            return typeof(MmdUrpMaterialBindingDescriptor).GetField(materialField.Name, BindingFlags.Public | BindingFlags.Instance)!;
+        }
+
+        // Material and binding sentinels differ from each other and from every override result, so a
+        // field written on one sink only, or copied from the wrong source, is visible.
+        private static void FillProjectionSentinels(
+            MmdMaterialDescriptor material,
+            MmdUrpMaterialBindingDescriptor binding,
+            FieldInfo[] sharedMaterialFields)
+        {
+            for (int i = 0; i < sharedMaterialFields.Length; i++)
+            {
+                FieldInfo materialField = sharedMaterialFields[i];
+                FieldInfo bindingField = BindingField(materialField);
+                Type type = materialField.FieldType;
+                if (materialField.Name == nameof(MmdMaterialDescriptor.materialIndex) ||
+                    materialField.Name == nameof(MmdMaterialDescriptor.name))
+                {
+                    continue;
+                }
+
+                if (type == typeof(float))
+                {
+                    materialField.SetValue(material, 0.301f + (i * 0.001f));
+                    bindingField.SetValue(binding, 0.601f + (i * 0.001f));
+                }
+                else if (type == typeof(float[]))
+                {
+                    int length = ((float[])materialField.GetValue(material)!).Length;
+                    materialField.SetValue(material, Enumerable.Repeat(0.301f + (i * 0.001f), length).ToArray());
+                    bindingField.SetValue(binding, Enumerable.Repeat(0.601f + (i * 0.001f), length).ToArray());
+                }
+                else if (type == typeof(bool))
+                {
+                    bool sentinel = materialField.Name != nameof(MmdMaterialDescriptor.drawEdgeFlag);
+                    materialField.SetValue(material, sentinel);
+                    bindingField.SetValue(binding, sentinel);
+                }
+                else if (type == typeof(int))
+                {
+                    materialField.SetValue(material, 100 + i);
+                    bindingField.SetValue(binding, 200 + i);
+                }
+                else if (type == typeof(string))
+                {
+                    materialField.SetValue(material, "material-" + materialField.Name);
+                    bindingField.SetValue(binding, "binding-" + materialField.Name);
+                }
+                else
+                {
+                    Assert.Fail($"Unsupported shared descriptor field type {type} on {materialField.Name}.");
+                }
+            }
+        }
+
+        private static object? CloneValue(object? value)
+        {
+            return value is float[] array ? array.Clone() : value;
+        }
+
+        private static bool ValueEquals(object? left, object? right)
+        {
+            if (left is float[] leftArray && right is float[] rightArray)
+            {
+                return leftArray.SequenceEqual(rightArray);
+            }
+
+            return Equals(left, right);
+        }
+
         private static string ObserveMaterialSurface(Material material)
         {
             float clip = material.GetFloat(MmdMaterialPropertyNames.AlphaClipThreshold);
