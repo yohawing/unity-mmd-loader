@@ -730,15 +730,12 @@ namespace Mmd.UnityIntegration
             MmdModelDefinition model,
             float importScale)
         {
+            // The topology check guarantees non-null bones with bone.index == list position and
+            // parentIndex in [-1, bones.Count), so both indexings below stay in range.
             ValidateHostPoseTopology(model);
             var origins = new Vector3[model.bones.Count];
             foreach (MmdBoneDefinition bone in model.bones)
             {
-                if (bone.index < 0 || bone.index >= origins.Length)
-                {
-                    throw new InvalidOperationException("Humanoid native host pose PMX bone index is invalid: " + bone.index);
-                }
-
                 origins[bone.index] = MmdCoordinateSpace.ToVector3(bone.origin);
             }
 
@@ -748,12 +745,6 @@ namespace Mmd.UnityIntegration
                 Vector3 localOrigin = origins[bone.index];
                 if (bone.parentIndex >= 0)
                 {
-                    if (bone.parentIndex >= origins.Length)
-                    {
-                        throw new InvalidOperationException(
-                            "Humanoid native host pose PMX parent bone index is invalid: " + bone.parentIndex);
-                    }
-
                     localOrigin -= origins[bone.parentIndex];
                 }
 
