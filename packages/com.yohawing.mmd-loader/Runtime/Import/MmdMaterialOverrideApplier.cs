@@ -219,7 +219,7 @@ namespace Mmd.UnityIntegration
             return -1;
         }
 
-        // has* flag を追加したら ApplyDescriptorEntry / ApplyBindingSurfaceOverride と MmdMaterialOverrideApplierSyncTests の inventory を同時に更新する（3 sink 同期契約）。
+        // has* flag を追加したら ApplyDescriptorEntry / BindingProjections / ApplyBindingSurfaceOverride と MmdMaterialOverrideApplierSyncTests の inventory を同時に更新する（3 sink 同期契約）。
         private static void ApplyEntry(
             MmdMaterialOverrideEntry entry,
             Material material,
@@ -509,32 +509,16 @@ namespace Mmd.UnityIntegration
             {
                 material.diffuseColor = new[] { Clamp01(entry.baseColor.r), Clamp01(entry.baseColor.g), Clamp01(entry.baseColor.b) };
                 material.alpha = Clamp01(entry.baseColor.a);
-
-                if (binding != null)
-                {
-                    binding.diffuseColor = (float[])material.diffuseColor.Clone();
-                    binding.alpha = material.alpha;
-                }
             }
 
             if (entry.hasAlpha)
             {
                 material.alpha = Clamp01(entry.alpha);
-
-                if (binding != null)
-                {
-                    binding.alpha = material.alpha;
-                }
             }
 
             if (entry.hasAmbientColor)
             {
                 material.ambientColor = new[] { Clamp01(entry.ambientColor.r), Clamp01(entry.ambientColor.g), Clamp01(entry.ambientColor.b) };
-
-                if (binding != null)
-                {
-                    binding.ambientColor = (float[])material.ambientColor.Clone();
-                }
             }
 
             if (entry.hasEmissionColor)
@@ -545,71 +529,36 @@ namespace Mmd.UnityIntegration
                     NormalizeHdr(entry.emissionColor.g),
                     NormalizeHdr(entry.emissionColor.b)
                 };
-
-                if (binding != null)
-                {
-                    binding.emissionColor = (float[])material.emissionColor.Clone();
-                }
             }
 
             if (entry.hasEmissionIntensity)
             {
                 material.emissionIntensity = NormalizeEmissionIntensity(entry.emissionIntensity);
-
-                if (binding != null)
-                {
-                    binding.emissionIntensity = material.emissionIntensity;
-                }
             }
 
             if (entry.hasEmissionMap)
             {
                 material.usesEmissionMap = entry.emissionMap != null;
-
-                if (binding != null)
-                {
-                    binding.usesEmissionMap = material.usesEmissionMap;
-                }
             }
 
             if (entry.hasEmissionMask)
             {
                 material.usesEmissionMask = entry.emissionMask != null;
-
-                if (binding != null)
-                {
-                    binding.usesEmissionMask = material.usesEmissionMask;
-                }
             }
 
             if (entry.hasToonBoundary)
             {
                 material.toonBoundary = NormalizeToonOptional(entry.toonBoundary);
-
-                if (binding != null)
-                {
-                    binding.toonBoundary = material.toonBoundary;
-                }
             }
 
             if (entry.hasToonFeather)
             {
                 material.toonFeather = NormalizeToonOptional(entry.toonFeather);
-
-                if (binding != null)
-                {
-                    binding.toonFeather = material.toonFeather;
-                }
             }
 
             if (entry.hasToonBandCount)
             {
                 material.toonBandCount = NormalizeToonBandCount(entry.toonBandCount);
-
-                if (binding != null)
-                {
-                    binding.toonBandCount = material.toonBandCount;
-                }
             }
 
             if (entry.hasStylizedSpecularColor)
@@ -620,31 +569,16 @@ namespace Mmd.UnityIntegration
                     Clamp01(entry.stylizedSpecularColor.g),
                     Clamp01(entry.stylizedSpecularColor.b)
                 };
-
-                if (binding != null)
-                {
-                    binding.stylizedSpecularColor = (float[])material.stylizedSpecularColor.Clone();
-                }
             }
 
             if (entry.hasStylizedSpecularBoundary)
             {
                 material.stylizedSpecularBoundary = NormalizeToonOptional(entry.stylizedSpecularBoundary);
-
-                if (binding != null)
-                {
-                    binding.stylizedSpecularBoundary = material.stylizedSpecularBoundary;
-                }
             }
 
             if (entry.hasStylizedSpecularFeather)
             {
                 material.stylizedSpecularFeather = NormalizeToonOptional(entry.stylizedSpecularFeather);
-
-                if (binding != null)
-                {
-                    binding.stylizedSpecularFeather = material.stylizedSpecularFeather;
-                }
             }
 
             if (entry.hasRimColor)
@@ -655,41 +589,21 @@ namespace Mmd.UnityIntegration
                     Clamp01(entry.rimColor.g),
                     Clamp01(entry.rimColor.b)
                 };
-
-                if (binding != null)
-                {
-                    binding.rimColor = (float[])material.rimColor.Clone();
-                }
             }
 
             if (entry.hasRimBoundary)
             {
                 material.rimBoundary = NormalizeToonOptional(entry.rimBoundary);
-
-                if (binding != null)
-                {
-                    binding.rimBoundary = material.rimBoundary;
-                }
             }
 
             if (entry.hasRimFeather)
             {
                 material.rimFeather = NormalizeToonOptional(entry.rimFeather);
-
-                if (binding != null)
-                {
-                    binding.rimFeather = material.rimFeather;
-                }
             }
 
             if (entry.hasRimLightFollow)
             {
                 material.rimLightFollow = Clamp01(entry.rimLightFollow);
-
-                if (binding != null)
-                {
-                    binding.rimLightFollow = material.rimLightFollow;
-                }
             }
 
             if (entry.hasOutlineColor)
@@ -701,22 +615,66 @@ namespace Mmd.UnityIntegration
                     Clamp01(entry.outlineColor.b),
                     Clamp01(entry.outlineColor.a)
                 };
-
-                if (binding != null)
-                {
-                    binding.edgeColor = (float[])material.edgeColor.Clone();
-                }
             }
 
             if (entry.hasOutlineWidth)
             {
                 material.edgeSize = Math.Max(0.0f, IsFinite(entry.outlineWidth) ? entry.outlineWidth : 0.0f);
                 material.drawEdgeFlag = material.edgeSize > 0.0f;
+            }
 
-                if (binding != null)
+            if (binding != null)
+            {
+                ProjectDescriptorEntryToBinding(entry, material, binding);
+            }
+        }
+
+        // Descriptor -> URP binding projection for override entries: each row copies the material
+        // descriptor fields that an entry flag has just written (already normalized) onto the
+        // binding. Color arrays are cloned so the two sinks never alias. Surface classification is
+        // handled separately by ApplyBindingSurfaceOverride. Pinned by
+        // MmdMaterialOverrideApplierSyncTests.DescriptorProjectionTable.
+        private static readonly (Func<MmdMaterialOverrideEntry, bool> Written,
+            Action<MmdMaterialDescriptor, MmdUrpMaterialBindingDescriptor> Project)[] BindingProjections =
+        {
+            (entry => entry.hasBaseColor, (material, binding) => binding.diffuseColor = (float[])material.diffuseColor.Clone()),
+            (entry => entry.hasBaseColor || entry.hasAlpha, (material, binding) => binding.alpha = material.alpha),
+            (entry => entry.hasAmbientColor, (material, binding) => binding.ambientColor = (float[])material.ambientColor.Clone()),
+            (entry => entry.hasEmissionColor, (material, binding) => binding.emissionColor = (float[])material.emissionColor.Clone()),
+            (entry => entry.hasEmissionIntensity, (material, binding) => binding.emissionIntensity = material.emissionIntensity),
+            (entry => entry.hasEmissionMap, (material, binding) => binding.usesEmissionMap = material.usesEmissionMap),
+            (entry => entry.hasEmissionMask, (material, binding) => binding.usesEmissionMask = material.usesEmissionMask),
+            (entry => entry.hasToonBoundary, (material, binding) => binding.toonBoundary = material.toonBoundary),
+            (entry => entry.hasToonFeather, (material, binding) => binding.toonFeather = material.toonFeather),
+            (entry => entry.hasToonBandCount, (material, binding) => binding.toonBandCount = material.toonBandCount),
+            (entry => entry.hasStylizedSpecularColor,
+                (material, binding) => binding.stylizedSpecularColor = (float[])material.stylizedSpecularColor.Clone()),
+            (entry => entry.hasStylizedSpecularBoundary,
+                (material, binding) => binding.stylizedSpecularBoundary = material.stylizedSpecularBoundary),
+            (entry => entry.hasStylizedSpecularFeather,
+                (material, binding) => binding.stylizedSpecularFeather = material.stylizedSpecularFeather),
+            (entry => entry.hasRimColor, (material, binding) => binding.rimColor = (float[])material.rimColor.Clone()),
+            (entry => entry.hasRimBoundary, (material, binding) => binding.rimBoundary = material.rimBoundary),
+            (entry => entry.hasRimFeather, (material, binding) => binding.rimFeather = material.rimFeather),
+            (entry => entry.hasRimLightFollow, (material, binding) => binding.rimLightFollow = material.rimLightFollow),
+            (entry => entry.hasOutlineColor, (material, binding) => binding.edgeColor = (float[])material.edgeColor.Clone()),
+            (entry => entry.hasOutlineWidth, (material, binding) =>
+            {
+                binding.edgeSize = material.edgeSize;
+                binding.drawEdgeFlag = material.drawEdgeFlag;
+            })
+        };
+
+        private static void ProjectDescriptorEntryToBinding(
+            MmdMaterialOverrideEntry entry,
+            MmdMaterialDescriptor material,
+            MmdUrpMaterialBindingDescriptor binding)
+        {
+            foreach (var projection in BindingProjections)
+            {
+                if (projection.Written(entry))
                 {
-                    binding.edgeSize = material.edgeSize;
-                    binding.drawEdgeFlag = material.drawEdgeFlag;
+                    projection.Project(material, binding);
                 }
             }
         }
