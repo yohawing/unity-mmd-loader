@@ -13,20 +13,19 @@ using Object = UnityEngine.Object;
 namespace Mmd.Tests
 {
     /// <summary>
-    /// Characterization of the two proxy rig construction paths in
-    /// <see cref="MmdHumanoidProxyRigFactory"/>: the model-definition overload
-    /// (used only by tests) and the imported-hierarchy transform path (the only
-    /// production path, reached through <c>CreateProxyRig(MmdPmxAsset)</c>).
+    /// Parity of the model-definition overload of <see cref="MmdHumanoidProxyRigFactory"/>
+    /// (used by tests) with the imported-hierarchy transform path (the only production
+    /// path, reached through <c>CreateProxyRig(MmdPmxAsset)</c>).
     ///
     /// Every observable output is compared: readiness, ordered matches, proxy
     /// hierarchy (parent/child and sibling order), per-bone pose and diagnostics.
-    /// Known differences are asserted explicitly instead of being tolerated.
+    /// The model overload delegates to the transform path, so no difference is allowed.
     /// </summary>
     public sealed class MmdHumanoidProxyRigFactoryParityTests
     {
         private const string FixtureDirectory = "Packages/com.yohawing.mmd-loader/Tests/Fixtures/Assets/";
         private const string ImportedHierarchyDiagnostic = "proxy-rig: input=ImportedHierarchy";
-        private const string OriginsFoundDiagnosticPrefix = "proxy-rig: origins found=";
+        private const string RemovedOriginsDiagnosticPrefix = "proxy-rig: origins found=";
         private const float PositionTolerance = 1e-4f;
         private const float RotationToleranceDegrees = 1e-3f;
 
@@ -78,7 +77,7 @@ namespace Mmd.Tests
                 // path always works in unscaled MMD units. Compare in proxy-root space.
                 Assert.That(fromAsset.Readiness, Is.EqualTo(ExpectedFixtureReadiness(fixture)), label + " readiness pin");
                 AssertProxyRigsEquivalent(fromModel, fromAsset, asset.ImportScale, label);
-                AssertKnownDiagnosticDifference(fromModel, fromAsset, label);
+                AssertDiagnosticsIdentical(fromModel, fromAsset, label);
                 AssertHipsIsAncestorOfSpineWhenMapped(fromAsset, label);
             }
             finally
@@ -111,10 +110,10 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void EmptyModelWithOverridesRecordsOverrideDiagnosticDifference()
+        public void EmptyModelWithOverridesReportsOverridesLikeTransformPath()
         {
-            // Known difference: the model path returns before applying overrides when the
-            // model has no bones, while the transform path applies (and reports) them first.
+            // Before unification the model path returned before applying overrides when the
+            // model had no bones; both paths now apply (and report) them first.
             var model = new MmdModelDefinition();
             var overrides = new[] { new MmdHumanoidBoneMappingOverride("missing-head", HumanBodyBones.Head) };
 
@@ -133,17 +132,15 @@ namespace Mmd.Tests
                 Assert.That(fromTransforms.ProxyRoot, Is.Null);
                 Assert.That(fromModel.Matches, Is.Empty);
                 Assert.That(fromTransforms.Matches, Is.Empty);
-                Assert.That(fromModel.Diagnostics, Is.EqualTo(new[]
-                {
-                    "no-bones: PMX model has no bones.",
-                }));
-                Assert.That(fromTransforms.Diagnostics, Is.EqualTo(new[]
+                var expectedDiagnostics = new[]
                 {
                     ImportedHierarchyDiagnostic,
                     "no-bones: PMX model has no bones.",
                     "manual-override: ignored missing MMD bone 'missing-head' for Head",
                     "manual-overrides: applied=0 ignored=1",
-                }));
+                };
+                Assert.That(fromModel.Diagnostics, Is.EqualTo(expectedDiagnostics));
+                Assert.That(fromTransforms.Diagnostics, Is.EqualTo(expectedDiagnostics));
             }
             finally
             {
@@ -152,11 +149,10 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void UnsortedBoneListRecordsMatchOrderDifference()
+        public void UnsortedBoneListUsesImporterIndexOrderLikeTransformPath()
         {
-            // Known difference: the model path collects matches in model.bones list order,
-            // while the importer hierarchy (and therefore the transform path) is ordered by
-            // bone index. Bone indices, hierarchy and poses are identical.
+            // Before unification the model path collected matches in model.bones list order;
+            // it now follows the importer hierarchy, which is ordered by bone index.
             MmdModelDefinition sorted = CreateSyntheticModel("sibling-torso");
             var model = new MmdModelDefinition();
             for (int i = sorted.bones.Count - 1; i >= 0; i--)
@@ -174,16 +170,10 @@ namespace Mmd.Tests
                 fromTransforms = MmdHumanoidProxyRigFactory.CreateProxyRigFromBoneTransforms(bones, hierarchyRoot.transform);
 
                 Assert.That(fromModel.Matches.Select(match => match.MmdBoneIndex),
-                    Is.Ordered.Descending, "model path follows list order");
-                Assert.That(fromTransforms.Matches.Select(match => match.MmdBoneIndex),
-                    Is.Ordered.Ascending, "transform path follows importer index order");
-                Assert.That(DescribeMatches(fromTransforms.Matches).OrderBy(s => s, StringComparer.Ordinal),
-                    Is.EqualTo(DescribeMatches(fromModel.Matches).OrderBy(s => s, StringComparer.Ordinal)));
-                Assert.That(fromTransforms.Readiness, Is.EqualTo(fromModel.Readiness));
-                Assert.That(DescribeHierarchy(fromTransforms.ProxyRoot!.transform),
-                    Is.EqualTo(DescribeHierarchy(fromModel.ProxyRoot!.transform)));
-                AssertBonePosesEquivalent(fromModel, fromTransforms, 1f, "unsorted");
-                AssertKnownDiagnosticDifference(fromModel, fromTransforms, "unsorted");
+                    Is.Ordered.Ascending, "model path follows importer index order");
+                Assert.That(fromModel.Readiness, Is.EqualTo(MmdHumanoidMappingReadiness.Ready));
+                AssertProxyRigsEquivalent(fromModel, fromTransforms, 1f, "unsorted");
+                AssertDiagnosticsIdentical(fromModel, fromTransforms, "unsorted");
             }
             finally
             {
@@ -197,14 +187,15 @@ namespace Mmd.Tests
         }
 
         [Test]
-        public void GapAndDuplicateBoneIndicesRecordMatchIndexDifference()
+        public void GapAndDuplicateBoneIndicesUseImporterListPosition()
         {
-            // Known difference: the model path reports MmdBoneDefinition.index as
-            // MmdBoneIndex, while the transform path reports the position in the importer's
-            // index-ordered bone list. They agree whenever indices are 0..n-1 (every parsed
-            // PMX), and differ only for synthetic models with gaps or duplicate indices.
-            // With duplicate indices the importer keeps only the last bone per index for
-            // every list slot of that index, so 上半身 is not visible to the transform path.
+            // Before unification the model path reported MmdBoneDefinition.index as
+            // MmdBoneIndex. It now reports the position in the index-ordered bone list, like
+            // the transform path, so a gap index (999) no longer leaks into matches.
+            // Remaining known difference, for duplicate indices only (never produced by the
+            // parser): the importer keeps only the last bone per index for every list slot
+            // of that index, so 上半身 is not visible to the transform path, while the model
+            // overload keeps each bone as its own slot.
             var gap = new MmdModelDefinition();
             gap.bones.Add(new MmdBoneDefinition { index = 0, name = "下半身", parentIndex = -1 });
             gap.bones.Add(new MmdBoneDefinition { index = 1, name = "上半身", parentIndex = 0 });
@@ -218,10 +209,10 @@ namespace Mmd.Tests
             duplicate.bones.Add(new MmdBoneDefinition { index = 2, name = "首", parentIndex = 1 });
 
             AssertMatchIndices(gap, "gap",
-                expectedModelPath: new[] { "Hips:0", "Spine:1", "Neck:2", "Head:999" },
+                expectedModelPath: new[] { "Hips:0", "Spine:1", "Neck:2", "Head:3" },
                 expectedTransformPath: new[] { "Hips:0", "Spine:1", "Neck:2", "Head:3" });
             AssertMatchIndices(duplicate, "duplicate",
-                expectedModelPath: new[] { "Hips:0", "Spine:1", "RightUpperArm:1", "Neck:2" },
+                expectedModelPath: new[] { "Hips:0", "Spine:1", "RightUpperArm:2", "Neck:3" },
                 expectedTransformPath: new[] { "Hips:0", "RightUpperArm:1", "Neck:3" });
         }
 
@@ -281,7 +272,7 @@ namespace Mmd.Tests
 
                 Assert.That(fromTransforms.Readiness, Is.EqualTo(expectedReadiness), label + " readiness pin");
                 AssertProxyRigsEquivalent(fromModel, fromTransforms, 1f, label);
-                AssertKnownDiagnosticDifference(fromModel, fromTransforms, label);
+                AssertDiagnosticsIdentical(fromModel, fromTransforms, label);
                 AssertHipsIsAncestorOfSpineWhenMapped(fromTransforms, label);
             }
             finally
@@ -356,24 +347,19 @@ namespace Mmd.Tests
         }
 
         /// <summary>
-        /// Known diagnostic difference: the transform path prepends
-        /// "proxy-rig: input=ImportedHierarchy", while the model path appends
-        /// "proxy-rig: origins found=N fallback-zero=M" after building a proxy root.
-        /// Every other diagnostic line must be identical and in the same order.
+        /// Before unification the model path omitted "proxy-rig: input=ImportedHierarchy"
+        /// and appended "proxy-rig: origins found=N fallback-zero=M". Both paths now emit
+        /// the transform path's diagnostics, line for line.
         /// </summary>
-        private static void AssertKnownDiagnosticDifference(
+        private static void AssertDiagnosticsIdentical(
             MmdHumanoidProxyRigResult fromModel,
             MmdHumanoidProxyRigResult fromTransforms,
             string label)
         {
-            int originLines = fromModel.Diagnostics.Count(line => line.StartsWith(OriginsFoundDiagnosticPrefix, StringComparison.Ordinal));
-            Assert.That(originLines, Is.EqualTo(fromModel.ProxyRoot != null ? 1 : 0), label + " model origins diagnostic");
-            Assert.That(fromTransforms.Diagnostics.Count(line => line.StartsWith(OriginsFoundDiagnosticPrefix, StringComparison.Ordinal)),
-                Is.Zero, label + " transform path has no origins diagnostic");
-
-            var expected = new List<string> { ImportedHierarchyDiagnostic };
-            expected.AddRange(fromModel.Diagnostics.Where(line => !line.StartsWith(OriginsFoundDiagnosticPrefix, StringComparison.Ordinal)));
-            Assert.That(fromTransforms.Diagnostics, Is.EqualTo(expected), label + " diagnostics");
+            Assert.That(fromModel.Diagnostics, Has.Some.EqualTo(ImportedHierarchyDiagnostic), label + " input marker");
+            Assert.That(fromModel.Diagnostics.Any(line => line.StartsWith(RemovedOriginsDiagnosticPrefix, StringComparison.Ordinal)),
+                Is.False, label + " removed model-only diagnostic");
+            Assert.That(fromTransforms.Diagnostics, Is.EqualTo(fromModel.Diagnostics), label + " diagnostics");
         }
 
         private static void AssertHipsIsAncestorOfSpineWhenMapped(MmdHumanoidProxyRigResult result, string label)
@@ -429,7 +415,11 @@ namespace Mmd.Tests
             foreach (MmdBoneDefinition bone in ordered)
             {
                 string name = string.IsNullOrWhiteSpace(bone.name) ? "bone_" + bone.index : bone.name;
-                transformsByIndex[bone.index] = new GameObject(name).transform;
+                // Parent every bone under root immediately so a duplicate index (whose earlier
+                // transform is replaced in the map) is still destroyed with root.
+                Transform created = new GameObject(name).transform;
+                created.SetParent(root.transform, worldPositionStays: false);
+                transformsByIndex[bone.index] = created;
                 boneByIndex[bone.index] = bone;
             }
 

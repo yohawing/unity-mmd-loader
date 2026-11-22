@@ -184,6 +184,34 @@ namespace Mmd.Tests
                 Object.DestroyImmediate(rig.ProxyRoot);
         }
 
+        /// <summary>
+        /// Rebuild a factory result with selected match indices replaced, to exercise
+        /// retargeter guards for match indices the factory itself never produces.
+        /// </summary>
+        private static MmdHumanoidProxyRigResult WithMatchIndices(
+            MmdHumanoidProxyRigResult rig,
+            IReadOnlyDictionary<HumanBodyBones, int> indexByHumanBone)
+        {
+            var matches = new List<MmdHumanoidBoneMappingMatch>(rig.Matches.Count);
+            foreach (MmdHumanoidBoneMappingMatch match in rig.Matches)
+            {
+                matches.Add(indexByHumanBone.TryGetValue(match.HumanBone, out int index)
+                    ? new MmdHumanoidBoneMappingMatch(match.HumanBone, match.MmdBoneName, index, match.Required)
+                    : match);
+            }
+
+            Assert.That(
+                indexByHumanBone.Keys.All(humanBone => rig.Matches.Any(match => match.HumanBone == humanBone)),
+                Is.True,
+                "every remapped HumanBodyBones must be matched by the factory");
+            return new MmdHumanoidProxyRigResult(
+                rig.ProxyRoot,
+                rig.BoneMap,
+                matches,
+                rig.Readiness,
+                rig.Diagnostics.ToArray());
+        }
+
         // ── Tests ───────────────────────────────────────────────────────
 
         [Test]
@@ -661,15 +689,18 @@ namespace Mmd.Tests
         [Test]
         public void RetargetRejectsOutOfRangeMmdBoneIndex()
         {
-            // Arrange: create a model where the last bone has an index beyond native array.
+            // Arrange: a rig whose Head match points beyond the native array. The factory
+            // always reports in-range list positions, so the invalid match is injected.
             var model = new MmdModelDefinition();
             AddBone(model, 0, "下半身", -1);
             AddBone(model, 1, "上半身", 0);
             AddBone(model, 2, "首", 1);
-            // Bone index 999 does not exist in the 4-bone native array.
-            AddBone(model, 999, "頭", 2);
+            AddBone(model, 3, "頭", 2);
 
-            MmdHumanoidProxyRigResult rig = MmdHumanoidProxyRigFactory.CreateProxyRig(model);
+            // Bone index 999 does not exist in the 4-bone native array.
+            MmdHumanoidProxyRigResult rig = WithMatchIndices(
+                MmdHumanoidProxyRigFactory.CreateProxyRig(model),
+                new Dictionary<HumanBodyBones, int> { [HumanBodyBones.Head] = 999 });
             Assert.That(rig.ProxyRoot, Is.Not.Null);
             SetProxyRotations(rig);
 
@@ -701,17 +732,22 @@ namespace Mmd.Tests
         [Test]
         public void RetargetDetectsDuplicateNativeTargetIndices()
         {
-            // Arrange: create a model where two different HumanBodyBones share
-            // the same MmdBoneIndex. We add bones at index 1 (Spine) and index
-            // 1 again (RightUpperArm) by manually building a model with
-            // duplicate bone indices.
+            // Arrange: a rig where two different HumanBodyBones share the same
+            // MmdBoneIndex. The factory always reports unique list positions, so the
+            // duplicate is injected: Spine at index 1 and RightUpperArm also at index 1.
             var model = new MmdModelDefinition();
             AddBone(model, 0, "下半身", -1);       // Hips at index 0
             AddBone(model, 1, "上半身", 0);       // Spine at index 1
-            AddBone(model, 1, "右腕", 0);         // RightUpperArm also at index 1 (duplicate index)
-            AddBone(model, 2, "首", 1);           // Neck at index 2
+            AddBone(model, 2, "右腕", 0);         // RightUpperArm, remapped to index 1 below
+            AddBone(model, 3, "首", 1);           // Neck, remapped to index 2 below
 
-            MmdHumanoidProxyRigResult rig = MmdHumanoidProxyRigFactory.CreateProxyRig(model);
+            MmdHumanoidProxyRigResult rig = WithMatchIndices(
+                MmdHumanoidProxyRigFactory.CreateProxyRig(model),
+                new Dictionary<HumanBodyBones, int>
+                {
+                    [HumanBodyBones.RightUpperArm] = 1,
+                    [HumanBodyBones.Neck] = 2,
+                });
             Assert.That(rig.ProxyRoot, Is.Not.Null);
             SetProxyRotations(rig);
 

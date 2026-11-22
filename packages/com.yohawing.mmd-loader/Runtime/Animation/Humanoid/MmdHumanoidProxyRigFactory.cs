@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using UnityEngine;
 using Mmd.Parser;
 using Mmd.UnityIntegration;
@@ -173,10 +174,10 @@ namespace Mmd
     /// relationships for the HumanBodyBones detected from an MMD model's bone
     /// list. No Avatar, Animator, or mapping assets are created.
     ///
-    /// Transform world position is set from MmdBoneDefinition.origin with
-    /// MMD->Unity conversion [-x, y, -z], then preserved while reparenting into
-    /// the Humanoid hierarchy. MMD helper bones and unmapped MMD parents are not
-    /// mirrored into the proxy rig.
+    /// Proxy bone world pose is copied from the source bone transforms (the
+    /// importer hierarchy), then preserved while reparenting into the Humanoid
+    /// hierarchy. MMD helper bones and unmapped MMD parents are not mirrored into
+    /// the proxy rig.
     ///
     /// Design: Dual Rig 方式の Hidden Humanoid Proxy Rig 生成を担当する。
     /// 生成された Transform 階層は HumanBodyBones 名にマッピングされた MMD ボーンのみを含む。
@@ -187,6 +188,14 @@ namespace Mmd
         /// <summary>
         /// Create a hidden proxy rig from an MMD model definition.
         /// </summary>
+        /// <remarks>
+        /// Production builds proxy rigs from the importer hierarchy via
+        /// <see cref="CreateProxyRig(MmdPmxAsset, string, IReadOnlyList{MmdHumanoidBoneMappingOverride})"/>.
+        /// This overload builds a transient source hierarchy equivalent to the importer's
+        /// (bones ordered by index, converted origin, identity rotation, unscaled MMD units)
+        /// and runs the same <see cref="CreateProxyRigFromBoneTransforms"/> path, so callers
+        /// exercise the production construction instead of a parallel implementation.
+        /// </remarks>
         /// <param name="model">Validated MmdModelDefinition containing the bone list.</param>
         /// <param name="proxyRootName">Optional name for the proxy root GameObject (default: "MmdHumanoidProxyRig").</param>
         /// <returns>A result containing the proxy root, bone map, matches, and diagnostics.</returns>
@@ -200,131 +209,69 @@ namespace Mmd
                 throw new ArgumentNullException(nameof(model));
             }
 
-            // Step 1: Evaluate mapping from MMD bone names to HumanBodyBones.
-            MmdHumanoidBoneMappingReport report = MmdHumanoidBoneMappingEvaluator.Evaluate(model);
-            string readiness = report.Readiness;
-
-            // Stop early if there are no bones at all.
-            if (readiness == MmdHumanoidMappingReadiness.NoBones)
+            var sourceRoot = new GameObject("MmdHumanoidProxyRigSource");
+            sourceRoot.hideFlags = HideFlags.HideAndDontSave;
+            try
             {
-                return new MmdHumanoidProxyRigResult(
-                    null,
-                    null,
-                    Array.Empty<MmdHumanoidBoneMappingMatch>(),
-                    readiness,
-                    report.Diagnostics);
+                Transform[] sourceBones = CreateSourceBoneTransforms(model, sourceRoot.transform);
+                return CreateProxyRigFromBoneTransforms(
+                    sourceBones,
+                    sourceRoot.transform,
+                    proxyRootName,
+                    mappingOverrides);
             }
-
-            // Step 2: Collect mapping matches (only exact, unambiguous first matches).
-            var matches = new List<MmdHumanoidBoneMappingMatch>();
-            var usedHumanBones = new HashSet<HumanBodyBones>();
-            foreach (MmdBoneDefinition bone in model.bones)
+            finally
             {
-                if (bone == null || string.IsNullOrWhiteSpace(bone.name))
-                {
-                    continue;
-                }
-
-                if (!MmdHumanoidBoneMappingEvaluator.TryMapBoneName(
-                        bone.name, out HumanBodyBones humanBone, out bool required))
-                {
-                    continue;
-                }
-
-                // Skip if we already have a match for this HumanBodyBones (use first match).
-                if (!usedHumanBones.Add(humanBone))
-                {
-                    continue;
-                }
-
-                matches.Add(new MmdHumanoidBoneMappingMatch(
-                    humanBone,
-                    bone.name,
-                    bone.index,
-                    required));
+                UnityEngine.Object.DestroyImmediate(sourceRoot);
             }
+        }
 
-            var combinedDiagnostics = new List<string>();
-            combinedDiagnostics.AddRange(report.Diagnostics);
-            if (HasMappingOverrides(mappingOverrides))
+        /// <summary>
+        /// Mirror the importer bone pose (MmdUnityModelFactory.BuildBoneTransforms at import
+        /// scale 1) as flat transforms: <see cref="CreateProxyRigFromBoneTransforms"/> reads only
+        /// each source bone's name, world pose and list position. A missing origin falls back
+        /// to zero.
+        /// </summary>
+        private static Transform[] CreateSourceBoneTransforms(MmdModelDefinition model, Transform sourceRoot)
+        {
+            // A null bone list behaves like an empty one (NoBones), as the evaluator treats it.
+            IReadOnlyList<MmdBoneDefinition> bones = model.bones != null
+                ? model.bones
+                : Array.Empty<MmdBoneDefinition>();
+            var orderedBones = new List<MmdBoneDefinition>(bones.Count);
+            foreach (MmdBoneDefinition bone in bones)
             {
-                matches = ApplyMappingOverrides(
-                    matches,
-                    BuildModelBoneNameList(model),
-                    BuildModelBoneIndexList(model),
-                    mappingOverrides,
-                    combinedDiagnostics,
-                    out int appliedOverrideCount);
-                if (appliedOverrideCount > 0)
+                if (bone != null)
                 {
-                    readiness = ClassifyMergedReadiness(matches, model.bones.Count);
+                    orderedBones.Add(bone);
                 }
             }
 
-            // Step 3: Build the proxy Transform hierarchy.
-            // The hidden proxy uses Unity Humanoid parent relationships, not the
-            // MMD/imported hierarchy. This keeps helpers such as center/groove/waist
-            // out of the Avatar skeleton while preserving source world pose.
-            var boneMap = new Dictionary<HumanBodyBones, Transform>();
-            var mmdBoneIndexToUnityPos = new Dictionary<int, Vector3>();
+            // Index order, matching the importer's bone list (stable for duplicate indices).
+            MmdBoneDefinition[] sortedBones = orderedBones
+                .Select((bone, order) => (bone, order))
+                .OrderBy(entry => entry.bone.index)
+                .ThenBy(entry => entry.order)
+                .Select(entry => entry.bone)
+                .ToArray();
 
-            GameObject root = new GameObject(proxyRootName);
-            root.hideFlags = HideFlags.HideInHierarchy;
-            root.SetActive(false);
-
-            // First pass: create Transforms for each mapped bone.
-            foreach (MmdHumanoidBoneMappingMatch match in matches)
+            var transforms = new Transform[sortedBones.Length];
+            for (int i = 0; i < sortedBones.Length; i++)
             {
-                GameObject boneObject = new GameObject(match.HumanBone.ToString());
-                boneObject.hideFlags = HideFlags.HideInHierarchy;
+                MmdBoneDefinition bone = sortedBones[i];
+                string boneName = string.IsNullOrWhiteSpace(bone.name)
+                    ? "bone_" + bone.index
+                    : bone.name;
+                var boneObject = new GameObject(boneName);
+                boneObject.hideFlags = HideFlags.HideAndDontSave;
                 Transform boneTransform = boneObject.transform;
-                boneTransform.SetParent(root.transform, worldPositionStays: false);
-                boneTransform.hideFlags = HideFlags.HideInHierarchy;
-                boneMap[match.HumanBone] = boneTransform;
-
-                // Record Unity-space origin position for localPosition calculation.
-                MmdBoneDefinition? boneDef = FindBoneByIndex(model, match.MmdBoneIndex);
-                Vector3 unityPos = MmdOriginToUnityPosition(boneDef?.origin);
-                mmdBoneIndexToUnityPos[match.MmdBoneIndex] = unityPos;
-                boneTransform.SetPositionAndRotation(unityPos, Quaternion.identity);
+                boneTransform.SetParent(sourceRoot, worldPositionStays: false);
+                boneTransform.SetPositionAndRotation(MmdOriginToUnityPosition(bone.origin), Quaternion.identity);
                 boneTransform.localScale = Vector3.one;
+                transforms[i] = boneTransform;
             }
 
-            foreach (MmdHumanoidBoneMappingMatch match in EnumerateMatchesInHumanoidOrder(matches))
-            {
-                if (!boneMap.TryGetValue(match.HumanBone, out Transform currentTransform))
-                    continue;
-
-                Vector3 myUnityPos = mmdBoneIndexToUnityPos[match.MmdBoneIndex];
-                Quaternion myUnityRot = Quaternion.identity;
-                Transform parentTransform = ResolveHumanoidParent(match.HumanBone, boneMap, root.transform);
-
-                currentTransform.SetPositionAndRotation(myUnityPos, myUnityRot);
-                currentTransform.SetParent(parentTransform, worldPositionStays: true);
-                currentTransform.SetPositionAndRotation(myUnityPos, myUnityRot);
-                currentTransform.localScale = Vector3.one;
-            }
-            ApplyHumanoidSiblingOrder(root.transform, boneMap);
-
-            // Build combined diagnostics.
-            int originCount = 0;
-            int originZeroCount = 0;
-            foreach (MmdBoneDefinition b in model.bones)
-            {
-                if (b != null && b.origin != null && b.origin.Length >= 3)
-                    originCount++;
-                else if (b != null)
-                    originZeroCount++;
-            }
-            combinedDiagnostics.Add("proxy-rig: created " + boneMap.Count + " bone transforms, root hidden");
-            combinedDiagnostics.Add("proxy-rig: origins found=" + originCount + " fallback-zero=" + originZeroCount);
-
-            return new MmdHumanoidProxyRigResult(
-                root,
-                boneMap,
-                matches,
-                readiness,
-                combinedDiagnostics.ToArray());
+            return transforms;
         }
 
         /// <summary>
@@ -484,7 +431,6 @@ namespace Mmd
                 matches = ApplyMappingOverrides(
                     matches,
                     sourceBoneNames,
-                    null,
                     mappingOverrides,
                     diagnostics,
                     out int appliedOverrideCount);
@@ -1054,50 +1000,14 @@ namespace Mmd
                    float.IsFinite(value.z);
         }
 
-        /// <summary>
-        /// Find an MmdBoneDefinition by index in the model's bone list.
-        /// </summary>
-        private static MmdBoneDefinition? FindBoneByIndex(MmdModelDefinition model, int index)
-        {
-            foreach (MmdBoneDefinition b in model.bones)
-            {
-                if (b.index == index)
-                    return b;
-            }
-            return null;
-        }
-
         private static bool HasMappingOverrides(IReadOnlyList<MmdHumanoidBoneMappingOverride>? mappingOverrides)
         {
             return mappingOverrides != null && mappingOverrides.Count > 0;
         }
 
-        private static string[] BuildModelBoneNameList(MmdModelDefinition model)
-        {
-            var names = new string[model.bones.Count];
-            for (int i = 0; i < model.bones.Count; i++)
-            {
-                names[i] = model.bones[i]?.name ?? string.Empty;
-            }
-
-            return names;
-        }
-
-        private static int[] BuildModelBoneIndexList(MmdModelDefinition model)
-        {
-            var indices = new int[model.bones.Count];
-            for (int i = 0; i < model.bones.Count; i++)
-            {
-                indices[i] = model.bones[i]?.index ?? i;
-            }
-
-            return indices;
-        }
-
         private static List<MmdHumanoidBoneMappingMatch> ApplyMappingOverrides(
             List<MmdHumanoidBoneMappingMatch> automaticMatches,
             IReadOnlyList<string> sourceBoneNames,
-            IReadOnlyList<int>? sourceBoneIndices,
             IReadOnlyList<MmdHumanoidBoneMappingOverride>? mappingOverrides,
             List<string> diagnostics,
             out int appliedOverrideCount)
@@ -1136,7 +1046,6 @@ namespace Mmd
                         continue;
                     }
 
-                    int mmdBoneIndex = ResolveSourceBoneIndex(sourceBoneIndices, sourceIndex);
                     if (!overrideMatches.ContainsKey(humanBone))
                     {
                         overrideOrder.Add(humanBone);
@@ -1145,7 +1054,7 @@ namespace Mmd
                     overrideMatches[humanBone] = new MmdHumanoidBoneMappingMatch(
                         humanBone,
                         sourceBoneNames[sourceIndex],
-                        mmdBoneIndex,
+                        sourceIndex,
                         MmdHumanoidBoneMappingEvaluator.IsRequiredHumanBone(humanBone));
                     applied++;
                 }
@@ -1218,16 +1127,6 @@ namespace Mmd
             }
 
             return -1;
-        }
-
-        private static int ResolveSourceBoneIndex(IReadOnlyList<int>? sourceBoneIndices, int sourceListIndex)
-        {
-            if (sourceBoneIndices == null || sourceListIndex < 0 || sourceListIndex >= sourceBoneIndices.Count)
-            {
-                return sourceListIndex;
-            }
-
-            return sourceBoneIndices[sourceListIndex];
         }
 
         private static string ClassifyMergedReadiness(IReadOnlyList<MmdHumanoidBoneMappingMatch> matches, int sourceBoneCount)
