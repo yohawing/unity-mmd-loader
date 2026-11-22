@@ -123,22 +123,12 @@ try {
     }
 
     try {
-        $optionalUtsSkipPrefixes = @(
-            "Mmd.Tests.MmdAssetImporterTests.PmxImporterCustomProfileUsesUtsShaderAndDeclaredMaterialStates",
-            "Mmd.Tests.MmdAssetImporterTests.PmxImporterCustomProfileRendersUtsVisualSmoke"
-        )
-        $allowedSkippedTests = @(
-            foreach ($skippedTestName in @($testSummary.SkippedTestNames)) {
-                foreach ($skipPrefix in $optionalUtsSkipPrefixes) {
-                    $skipName = [string] $skippedTestName
-                    if ($skipName.Equals($skipPrefix, [System.StringComparison]::Ordinal) -or
-                        $skipName.StartsWith($skipPrefix + "(", [System.StringComparison]::Ordinal)) {
-                        [string] $skippedTestName
-                        break
-                    }
-                }
-            }
-        )
+        # The optional UTS tests skip when the clean consumer has no Unity Toon Shader;
+        # their prefixes are listed for the lts-editmode gate in unity-skip-allowlist.json.
+        $allowedSkippedTests = Get-NUnitAllowedSkippedTests `
+            -Summary $testSummary `
+            -Gate "lts-editmode" `
+            -Context "Unity LTS compatibility gate"
         Assert-NUnitTestRunEvidence `
             -Summary $testSummary `
             -MinimumTotal 1 `

@@ -294,101 +294,21 @@ jobs:
           $editModePath = Get-SingleNUnitResult -Directory "$env:GITHUB_WORKSPACE/evidence/editmode" -Context "EditMode evidence"
           $playModePath = Get-SingleNUnitResult -Directory "$env:GITHUB_WORKSPACE/evidence/playmode" -Context "PlayMode evidence"
 
-          # These tests are intentionally environment-dependent diagnostics. Their exact
-          # names are allowlisted so a clean Linux runner may lack local corpus data,
-          # graphics, optional parity tooling, or non-Linux native probes. Do not add
-          # core importer, playback, physics, or inconclusive tests here; new names must
-          # fail the gate until reviewed. Tests marked [Explicit] are admitted from the
-          # NUnit runstate below; runnable environment skips remain listed here by name.
-          $editModeAllowedSkippedTests = @(
-            "Mmd.Tests.MmdAssetImporterTests.PmxImporterCustomProfileUsesUtsShaderAndDeclaredMaterialStates",
-            "Mmd.Tests.LocalCorpusManifestContractTests.LocalThreeMmdLoaderCorpusManifestImportsPmxAndPmdWhenPresent",
-            "Mmd.Tests.MmdGenericAnimationClipWriterTests.NativeUnavailableFailsClosedWithoutManagedTransformFallback",
-            "Mmd.Tests.MmdNativeHandleLifetimeStressContractTests.PackagedNativePlaybackHandlesSurviveBoundedReplacementAndCleanupStress",
-            "Mmd.Tests.MmdNativeHandleLifetimeStressContractTests.PackagedNativeSceneTrackSamplersSurviveBoundedReplacementAndCleanupStress",
-            "Mmd.Tests.MmdMmeFxMaterialOverrideBuilderTests.MmeNormalMapPostprocessor_PreservesRootedProjectAssetReference",
-            "Mmd.Tests.MmdMmeFxMaterialOverrideBuilderTests.MmeNormalMapPostprocessor_RejectsNormalMapReferenceThroughJunction",
-            'Mmd.Tests.NativeInteropContractTests.RuntimeFfiClipFrameBatchMatchesSequentialEvaluation("ik_append_history.pmx")',
-            'Mmd.Tests.NativeInteropContractTests.RuntimeFfiClipFrameBatchMatchesSequentialEvaluation("test_1bone_cube.pmx")',
-            "Mmd.Tests.NativeInteropContractTests.ReducedPoseEnumeratesSparseKeysAfterSourceSessionIsDisposed",
-            "Mmd.Tests.Contracts.MmdRuntimeFfiHostPoseSessionTests.SemiBasicBoneHostPoseRoundTripIsDeterministicWithoutPhysicsWorld",
-            "Mmd.Tests.Contracts.MmdRuntimeFfiHostPoseSessionTests.AppendDependentIkHostSamplesRemainIndependent",
-            "Mmd.Tests.MmdGenericAnimationClipWriterTests.BakeUsesNativeSparseTranslationAndEulerCurvesWithPhysicsOff",
-            "Mmd.Tests.MmdGenericAnimationClipWriterTests.DenseBakeIsRepeatableForSameInputs",
-            "Mmd.Tests.MmdGenericAnimationClipWriterTests.VertexMorphBakeWritesBlendShapeCurveInPercentUnits",
-            "Mmd.Tests.MmdGenericAnimationClipWriterTests.BatchMorphCurveMatchesFastRuntimeApplication",
-            "Mmd.Tests.MmdGenericAnimationClipWriterTests.ExplicitAssetPersistenceUsesValidatedAnimPathAndCanBeCleanedUp",
-            "Mmd.Tests.MmdGenericAnimationClipWriterTests.DisablingKeyReductionRetainsEverySampledFrame",
-            "Mmd.Tests.MmdGenericAnimationClipWriterTests.NativeSparseBakeRemainsEnabledAtDefaultPointOneImportScale",
-            "Mmd.Tests.MmdGenericAnimationClipWriterTests.NativeSparseTransformCurvesMatchFastRuntimeWithNonzeroStartAndDefaultScale",
-            "Mmd.Tests.RuntimeTextureBindingContractTests.JunctionInsidePmxDirectoryCannotReadOutsideTrustedRoot",
-            "Mmd.Tests.MmdVmdTimelineBehaviourTests.ProviderMotionConfigurationUsesCachedNativeHeaderMetadata",
-            "Mmd.Tests.MmdVmdTimelineBehaviourTests.TimelineWorkerRejectsDifferentSameSizedMotionAndSynchronousPathUsesActiveSource",
-            "Mmd.Tests.MmdVmdNativeClipPerformanceTests.GeneratedDenseVmdNativeClipBuildHasP95Under100Milliseconds",
-            "Mmd.Tests.MmdVmdImportTimelinePerformanceTests.GeneratedVmdImportTimelineFirstEvaluateHasP95Under100Milliseconds",
-            "Mmd.Tests.MmdVmdImportTimelinePerformanceTests.GeneratedVmdImportTimelineHandleLifetimeStressStaysWithinCleanupAllowance"
-          )
-          $editModeAllowedExplicitSkippedTests = @(
-            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampOpaqueOutline_IsDeterministicAndMatchesGolden",
-            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksAmbientShAndFogWhileLegacyStaysInvariant",
-            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksHdrEmissionWhileLegacyStaysInvariant",
-            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksReflectionProbeWhileLegacyStaysInvariant",
-            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksRimLightFollowWhileLegacyStaysInvariant",
-            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksRimLightWhileLegacyStaysInvariant",
-            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksSsaoWhileLegacyStaysInvariant",
-            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksStylizedSpecularWhileLegacyStaysInvariant",
-            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksToonBandCountWhileLegacyStaysInvariant",
-            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksToonBoundaryAndFeatherWhileLegacyStaysInvariant",
-            "Mmd.Tests.MmdGeneratedPmxVisualParityTests.ToonRampToonLit_TracksUnityMainLightWhileLegacyStaysInvariant",
-            "Mmd.Tests.Contracts.MmdNativeParityTests.MmdAnimCliParityReportComparesCliWithPackagedNativeRuntime",
-            "Mmd.Tests.MmdRuntimeNativeUnavailableBoundaryContractTests.PhysicalAbiMismatchProbeClassifiesUnsupportedRuntime",
-            "Mmd.Tests.MmdRuntimeNativeUnavailableBoundaryContractTests.PhysicalInvalidNativeBytesProbeReportsNativeLastError",
-            "Mmd.Tests.MmdRuntimeNativeUnavailableBoundaryContractTests.PhysicalMissingNativeDllProbeClassifiesUnavailableRuntime",
-            "Mmd.Tests.MmdRuntimeNativeUnavailableBoundaryContractTests.PhysicalMissingNativeEntryPointProbeClassifiesUnavailableRuntime",
-            "Mmd.Tests.MmdUnityPlaybackControllerHumanoidRetargetTests.NativeHostPoseTimelineSupportsRepeatAndReverseWithoutDrift",
-            "Mmd.Tests.MmdHumanoidAnimationTrackEditScrubTests.EditScrubPosesProxyAndRetargetsNativeViaAnimationMode",
-            "Mmd.Tests.MmdHumanoidAnimationTrackWorkflowTests.DestroyedHumanoidEditModeTargetReleasesOwnedAnimationModeOnGraphCleanup",
-            "Mmd.Tests.MmdGoldenGenerationTests.GeneratePmxGoldenCandidatesForMaintainer",
-            "Mmd.Tests.MmdGoldenGenerationTests.GenerateVmdGoldenCandidatesForMaintainer"
-          )
-          $editModeAllowedSkippedPrefixes = @(
-            "Mmd.Tests.MmdAssetImporterTests.PmxImporterCustomProfileRendersUtsVisualSmoke",
-            "Mmd.Tests.MmdGenericAnimationClipWriterCharacterizationTests.BakedCurvesMatchGolden",
-            "Mmd.Tests.MmdGenericAnimationClipWriterCharacterizationTests.InMemoryClipNameAndFrameRateArePinned",
-            "Mmd.Tests.MmdGenericAnimationClipWriterCharacterizationTests.DenseBudgetOverflowReportsExactDiagnostics",
-            "Mmd.Tests.MmdGenericAnimationClipWriterCharacterizationTests.SuccessfulBakesReportExactDiagnostics",
-            "Mmd.Tests.MmdGenericAnimationClipWriterCharacterizationTests.InvalidOutputPathReportsBakeDiagnosticsThenPathError",
-            "Mmd.Tests.MmdGenericAnimationClipWriterCharacterizationTests.BakesDoNotLeakTemporaryObjects",
-            "Mmd.Tests.RuntimeTextureBindingContractTests.LockedTextureFileIsContainedAsUnreadableDiagnosticWithoutLeakingTextures"
-          )
-
+          # Skipped-test allowlists (exact names, parameterized-case prefixes, and approved
+          # [Explicit] tests) live in scripts/unity-skip-allowlist.json; see its comment for
+          # the policy. Get-NUnitAllowedSkippedTests reads the checked-out file and fails on
+          # unapproved [Explicit] EditMode skips; new skip names must fail the gate until
+          # reviewed.
           foreach ($evidence in @(
-            @{ Path = $editModePath; Context = "Release EditMode evidence"; AllowedSkippedTests = $editModeAllowedSkippedTests; AllowedSkippedPrefixes = $editModeAllowedSkippedPrefixes },
-            @{ Path = $playModePath; Context = "Release PlayMode evidence"; AllowedSkippedTests = @(); AllowedSkippedPrefixes = @() }
+            @{ Path = $editModePath; Context = "Release EditMode evidence"; Gate = "ci-editmode" },
+            @{ Path = $playModePath; Context = "Release PlayMode evidence"; Gate = "ci-playmode" }
           )) {
             $summary = Read-NUnitTestRunSummary -Path $evidence.Path -Context $evidence.Context
-            $allowedSkippedTests = @($evidence.AllowedSkippedTests)
-            if ($evidence.Context -eq "Release EditMode evidence") {
-              $unapprovedExplicitSkippedTests = @(
-                $summary.ExplicitSkippedTestNames |
-                    Where-Object { $editModeAllowedExplicitSkippedTests -notcontains [string] $_ }
-              )
-              if ($unapprovedExplicitSkippedTests.Count -gt 0) {
-                throw "Release EditMode evidence has unapproved explicit skipped tests: $($unapprovedExplicitSkippedTests -join ', '); path=$($summary.Path)"
-              }
-              $allowedSkippedTests += @($summary.ExplicitSkippedTestNames)
-            }
-            foreach ($skippedTestName in @($summary.SkippedTestNames)) {
-              foreach ($skipPrefix in @($evidence.AllowedSkippedPrefixes)) {
-                $skipName = [string] $skippedTestName
-                $skipPrefixText = [string] $skipPrefix
-                if ($skipName.Equals($skipPrefixText, [System.StringComparison]::Ordinal) -or
-                    $skipName.StartsWith($skipPrefixText + "(", [System.StringComparison]::Ordinal)) {
-                  $allowedSkippedTests += $skipName
-                  break
-                }
-              }
-            }
+            $allowedSkippedTests = Get-NUnitAllowedSkippedTests `
+              -Summary $summary `
+              -Gate $evidence.Gate `
+              -AllowlistPath "$env:GITHUB_WORKSPACE/scripts/unity-skip-allowlist.json" `
+              -Context $evidence.Context
             Assert-NUnitTestRunEvidence `
               -Summary $summary `
               -MinimumTotal 1 `

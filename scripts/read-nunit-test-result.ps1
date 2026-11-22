@@ -231,3 +231,151 @@ function Assert-NUnitTestRunEvidence {
 
     return $Summary
 }
+
+# Skipped-test allowlists live in one tracked data file next to this script. Each gate
+# (CI release evidence, local unity-tests.ps1, LTS compatibility gate) names its entries
+# there; this is the only place that interprets exact, prefix, and explicit matches.
+$script:NUnitSkipAllowlistDefaultPath = Join-Path $PSScriptRoot "unity-skip-allowlist.json"
+
+function Get-NUnitSkipAllowlist {
+    <#
+    .SYNOPSIS
+        Loads the skipped-test allowlist of one gate from unity-skip-allowlist.json.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][string] $Gate,
+        [string] $Path = $script:NUnitSkipAllowlistDefaultPath
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Path) -or -not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        throw "Skipped-test allowlist was not found: $Path"
+    }
+
+    try {
+        $document = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
+    }
+    catch {
+        throw "Skipped-test allowlist is malformed: $Path ($($_.Exception.Message))"
+    }
+
+    if ([string] $document.schemaVersion -ne "1") {
+        throw "Skipped-test allowlist has an unsupported schemaVersion '$($document.schemaVersion)': $Path"
+    }
+
+    $gateProperty = $null
+    if ($null -ne $document.gates) {
+        $gateProperty = $document.gates.PSObject.Properties[$Gate]
+    }
+    if ($null -eq $gateProperty) {
+        throw "Skipped-test allowlist has no gate '$Gate': $Path"
+    }
+
+    $explicitPolicy = [string] $gateProperty.Value.explicitPolicy
+    if (@("listed", "any", "none") -notcontains $explicitPolicy) {
+        throw "Skipped-test allowlist gate '$Gate' has an invalid explicitPolicy '$explicitPolicy': $Path"
+    }
+
+    $exact = New-Object System.Collections.Generic.List[string]
+    $prefixes = New-Object System.Collections.Generic.List[string]
+    $explicit = New-Object System.Collections.Generic.List[string]
+    foreach ($test in @($document.tests)) {
+        $name = [string] $test.name
+        if ([string]::IsNullOrWhiteSpace($name)) {
+            throw "Skipped-test allowlist contains an entry without a name: $Path"
+        }
+        if ($null -eq $test.match) {
+            throw "Skipped-test allowlist entry '$name' has no match: $Path"
+        }
+
+        $matchProperty = $test.match.PSObject.Properties[$Gate]
+        if ($null -eq $matchProperty) {
+            continue
+        }
+
+        switch -CaseSensitive ([string] $matchProperty.Value) {
+            "exact" { $exact.Add($name) }
+            "prefix" { $prefixes.Add($name) }
+            "explicit" { $explicit.Add($name) }
+            default {
+                throw "Skipped-test allowlist entry '$name' has an invalid match '$($matchProperty.Value)' for gate '$Gate': $Path"
+            }
+        }
+    }
+
+    [pscustomobject] @{
+        Path = $Path
+        Gate = $Gate
+        ExplicitPolicy = $explicitPolicy
+        Exact = $exact.ToArray()
+        Prefixes = $prefixes.ToArray()
+        Explicit = $explicit.ToArray()
+    }
+}
+
+function Test-NUnitSkipPrefixMatch {
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string] $Name,
+        [Parameter(Mandatory = $true)][string] $Prefix
+    )
+
+    # A prefix admits the test itself and its parameterized cases, nothing broader.
+    return $Name.Equals($Prefix, [System.StringComparison]::Ordinal) -or
+        $Name.StartsWith($Prefix + "(", [System.StringComparison]::Ordinal)
+}
+
+function Get-NUnitAllowedSkippedTests {
+    <#
+    .SYNOPSIS
+        Returns the skipped test names a gate admits for a parsed NUnit summary.
+
+    .DESCRIPTION
+        The result is passed to Assert-NUnitTestRunEvidence -AllowedSkippedTests, which
+        still requires every skipped test to be named. Exact entries are admitted as is,
+        prefix entries admit the skipped tests they match, and [Explicit] skips are
+        admitted according to the gate's explicitPolicy. With 'listed', an [Explicit]
+        skip that is not listed fails here.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][psobject] $Summary,
+        [Parameter(Mandatory = $true)][string] $Gate,
+        [string] $AllowlistPath = $script:NUnitSkipAllowlistDefaultPath,
+        [string] $Context = "NUnit test evidence"
+    )
+
+    $allowlist = Get-NUnitSkipAllowlist -Gate $Gate -Path $AllowlistPath
+    $allowed = New-Object System.Collections.Generic.List[string]
+    foreach ($name in $allowlist.Exact) {
+        $allowed.Add($name)
+    }
+
+    $explicitSkippedTestNames = @($Summary.ExplicitSkippedTestNames | Where-Object { $null -ne $_ })
+    if ($allowlist.ExplicitPolicy -eq "listed") {
+        $unapprovedExplicitSkippedTests = @(
+            $explicitSkippedTestNames |
+                Where-Object { $allowlist.Explicit -notcontains [string] $_ }
+        )
+        if ($unapprovedExplicitSkippedTests.Count -gt 0) {
+            throw "$Context has unapproved explicit skipped tests: $($unapprovedExplicitSkippedTests -join ', '); path=$($Summary.Path)"
+        }
+    }
+    if ($allowlist.ExplicitPolicy -eq "listed" -or $allowlist.ExplicitPolicy -eq "any") {
+        foreach ($name in $explicitSkippedTestNames) {
+            $allowed.Add([string] $name)
+        }
+    }
+
+    if ($allowlist.Prefixes.Count -gt 0) {
+        foreach ($skippedTestName in @($Summary.SkippedTestNames)) {
+            foreach ($prefix in $allowlist.Prefixes) {
+                if (Test-NUnitSkipPrefixMatch -Name ([string] $skippedTestName) -Prefix $prefix) {
+                    $allowed.Add([string] $skippedTestName)
+                    break
+                }
+            }
+        }
+    }
+
+    return ,$allowed.ToArray()
+}

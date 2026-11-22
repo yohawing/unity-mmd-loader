@@ -8,6 +8,7 @@ scripts/*
 !scripts/run-visual-shading-tier.ps1
 !scripts/VisualShadingTierBootstrap.cs
 !scripts/read-nunit-test-result.ps1
+!scripts/unity-skip-allowlist.json
 !scripts/run-local-asset-fixture-gate.ps1
 !scripts/run-mmd-anim-cli-parity-report.ps1
 !scripts/unity-project-guard.ps1
