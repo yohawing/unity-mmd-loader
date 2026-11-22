@@ -64,10 +64,14 @@ namespace Mmd.Tests.Contracts
                     rotations,
                     scales,
                     new float[model.morphs.Count],
-                    new byte[model.ik.Count]);
+                    new byte[model.ik.Count],
+                    hostPoseCaptureMs: null);
                 MmdLivePhysicsFrameDiagnostics? diagnosticsBefore = binding.LastLivePhysicsDiagnostics;
                 Assert.That(diagnosticsBefore, Is.Not.Null);
                 Assert.That(diagnosticsBefore!.evaluationPath, Is.EqualTo("HumanoidNativeFinal"));
+                Assert.That(diagnosticsBefore.hostPoseCapturePresent, Is.False,
+                    "A host pose step without a caller-side capture measurement reports the phase as absent.");
+                Assert.That(diagnosticsBefore.hostPoseCaptureMs, Is.Zero);
 
                 // A non-negative forward frame makes a would-be backward scrub observable: if the guard ran
                 // after the scrub detection, lastForwardPlaybackFrame would move to the requested frame.

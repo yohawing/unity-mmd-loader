@@ -747,6 +747,8 @@ namespace Mmd.Tests
                 Assert.That(controller.LastLivePhysicsDiagnostics.physicsWorldStepRuntimeMs, Is.Zero);
                 Assert.That(controller.LastLivePhysicsDiagnostics.hostPoseCapturePresent, Is.True,
                     "Humanoid Live must retain Animator/retarget output as its host-pose authority.");
+                Assert.That(controller.LastLivePhysicsDiagnostics.hostPoseCaptureMs, Is.GreaterThan(0.0),
+                    "Humanoid Live must report the controller-side retarget capture, not an empty interval.");
                 Assert.That(controller.LastLivePhysicsDiagnostics.managedBodyTransformApplyPresent, Is.False,
                     "Humanoid Live applies the native final matrix pose instead of the VMD compatibility body path.");
                 Assert.That(controller.LastLivePhysicsDiagnostics.nativeSubstepCount, Is.GreaterThanOrEqualTo(0));
@@ -768,6 +770,7 @@ namespace Mmd.Tests
                 Assert.That(initialGolden.phaseDiagnosticsPresent, Is.True);
                 Assert.That(initialGolden.nativeStepReportPresent, Is.True);
                 Assert.That(initialGolden.hostPoseCapturePresent, Is.True);
+                Assert.That(initialGolden.hostPoseCaptureMs, Is.GreaterThan(0.0));
                 Assert.That(initialGolden.pinnedDiagnosticsPresent, Is.True);
                 Assert.That(initialGolden.pinMarshalPresent, Is.True);
                 Assert.That(initialGolden.nativeHostFramePresent, Is.True);
@@ -854,6 +857,7 @@ namespace Mmd.Tests
                 Assert.That(steppedGolden.phaseDiagnosticsPresent, Is.True);
                 Assert.That(steppedGolden.nativeStepReportPresent, Is.True);
                 Assert.That(steppedGolden.hostPoseCapturePresent, Is.True);
+                Assert.That(steppedGolden.hostPoseCaptureMs, Is.GreaterThan(0.0));
                 Assert.That(steppedGolden.pinnedDiagnosticsPresent, Is.True);
                 Assert.That(steppedGolden.pinMarshalPresent, Is.True);
                 Assert.That(steppedGolden.nativeHostFramePresent, Is.True);

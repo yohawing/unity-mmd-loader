@@ -54,6 +54,7 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 - `MmdUnityModelFactory.CreateFromImportedHierarchy` no longer leaves the instantiated hierarchy or cloned materials behind when validation fails, and static hierarchies use the mesh of the renderer they bind.
 - A material override with alpha below 1 and an alpha clip threshold but no explicit surface mode is now transparent without clipping on both the material and its URP binding.
 - `MmdModelValidator` reports a missing `physics`, `physics.rigidbodies` or `physics.joints` as a validation error instead of throwing `NullReferenceException`.
+- In Humanoid Live playback, `MmdLivePhysicsFrameDiagnostics.hostPoseCaptureMs` now reports the time spent retargeting the Humanoid pose into the physics input. It used to time an empty interval and was always close to zero.
 
 ## [0.5.1] - 2026-10-23
 

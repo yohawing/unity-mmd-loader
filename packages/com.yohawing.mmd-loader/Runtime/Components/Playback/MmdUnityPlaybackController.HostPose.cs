@@ -34,6 +34,9 @@ namespace Mmd.UnityIntegration
         private MmdPmxAsset? humanoidHostPoseFailureModelAsset;
         private string humanoidHostPoseFailureReason = string.Empty;
         private uint humanoidHostPoseInputFingerprint;
+        // Duration of the most recent host pose capture (fresh native input arrays filled from the
+        // proxy pose by the retargeter). Humanoid Live reports it as its hostPoseCapture phase.
+        private double humanoidHostPoseCaptureMs;
 
         /// <summary>
         /// Reports the most recent native HostRig failure. An empty value means no failure has
@@ -142,6 +145,7 @@ namespace Mmd.UnityIntegration
                 ConfigureHumanoidHostPoseRig(humanoidHostPoseModel!, humanoidHostPoseBones!);
             }
 
+            long captureStart = System.Diagnostics.Stopwatch.GetTimestamp();
             PrepareHumanoidHostPoseArrays();
             nativeResult = MmdHumanoidRetargeter.RetargetPoseToNativeArrays(
                 humanoidRetargetEntries,
@@ -151,6 +155,9 @@ namespace Mmd.UnityIntegration
                 humanoidHostPosePositions!,
                 humanoidHostPoseRotations!,
                 humanoidHostPoseScales!);
+            humanoidHostPoseCaptureMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(
+                captureStart,
+                System.Diagnostics.Stopwatch.GetTimestamp());
             if ((requireCopiedBones && nativeResult.CopiedBoneCount <= 0) || !nativeResult.AllSucceeded)
             {
                 humanoidHostPoseFailureReason = nativeResult.Diagnostics.Count > 0

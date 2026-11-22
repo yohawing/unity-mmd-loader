@@ -217,6 +217,11 @@ namespace Mmd.UnityIntegration
             return ApplyLivePhysicsFrame(frame, frameRate, allowArbitraryStart: true);
         }
 
+        /// <param name="hostPoseCaptureMs">
+        /// Duration the caller spent capturing the host pose arrays (for the controller, the
+        /// retarget into fresh native input arrays). The arrays are built outside the binding,
+        /// so the binding cannot time that work itself; null reports the phase as absent.
+        /// </param>
         internal void StepLivePhysicsFromHostPose(
             int sequenceFrame,
             float deltaTime,
@@ -225,7 +230,8 @@ namespace Mmd.UnityIntegration
             float[] localRotations,
             float[] localScales,
             float[] morphWeights,
-            byte[] ikEnabled)
+            byte[] ikEnabled,
+            double? hostPoseCaptureMs)
         {
             if (localPositionOffsets == null || localRotations == null || localScales == null ||
                 morphWeights == null || ikEnabled == null)
@@ -238,7 +244,8 @@ namespace Mmd.UnityIntegration
             }
 
             StepLivePhysicsPose(sequenceFrame, deltaTime, resetOnFirstStep,
-                localPositionOffsets, localRotations, localScales, morphWeights, ikEnabled);
+                localPositionOffsets, localRotations, localScales, morphWeights, ikEnabled,
+                hostPoseCaptureMs);
         }
 
         private void StepLivePhysicsPose(
@@ -249,7 +256,8 @@ namespace Mmd.UnityIntegration
             float[] localRotations,
             float[] localScales,
             float[] morphWeights,
-            byte[] ikEnabled)
+            byte[] ikEnabled,
+            double? hostPoseCaptureMs)
         {
             MmdPlaybackTime.ValidateFrame(sequenceFrame);
             if (deltaTime < 0.0f || float.IsNaN(deltaTime) || float.IsInfinity(deltaTime))
@@ -285,7 +293,8 @@ namespace Mmd.UnityIntegration
                 localRotations,
                 localScales,
                 morphWeights,
-                ikEnabled);
+                ikEnabled,
+                hostPoseCaptureMs);
             totalWatch.Stop();
             diagnostics.totalMs = totalWatch.Elapsed.TotalMilliseconds;
             lastLivePhysicsDiagnostics = diagnostics;
@@ -901,21 +910,17 @@ namespace Mmd.UnityIntegration
             float[] localRotations,
             float[] localScales,
             float[] morphWeights,
-            byte[] ikEnabled)
+            byte[] ikEnabled,
+            double? hostPoseCaptureMs)
         {
             livePhysicsReadbackTransformCount = 0;
             livePhysicsReadbackShapeTypeCount = 0;
             long bridgeStartTimestamp = Stopwatch.GetTimestamp();
             var stageWatch = Stopwatch.StartNew();
-            long hostPoseCaptureStartTimestamp = Stopwatch.GetTimestamp();
-            long hostPoseCaptureEndTimestamp = Stopwatch.GetTimestamp();
             long pinnedDiagnosticsStartTimestamp = Stopwatch.GetTimestamp();
             MmdLivePhysicsPinnedBodyDiagnostics pinnedBodyDiagnostics =
                 BuildHostPosePinnedBodyDiagnostics(resetSeed);
             long pinnedDiagnosticsEndTimestamp = Stopwatch.GetTimestamp();
-            double hostPoseCaptureMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(
-                hostPoseCaptureStartTimestamp,
-                hostPoseCaptureEndTimestamp);
             double pinnedDiagnosticsMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(
                 pinnedDiagnosticsStartTimestamp,
                 pinnedDiagnosticsEndTimestamp);
@@ -1017,7 +1022,9 @@ namespace Mmd.UnityIntegration
                 evaluationPath = nativeHumanoidHostPoseEnabled ? "HumanoidNativeFinal" : "VMDCompatibility",
                 phaseDiagnosticsPresent = true,
                 nativeStepReportPresent = nativeStepDiagnostics.reportPresent,
-                hostPoseCapturePresent = true,
+                // The caller captures the host pose arrays before this step and passes the measured
+                // duration; a caller without a measurement reports the phase as absent.
+                hostPoseCapturePresent = hostPoseCaptureMs.HasValue,
                 pinnedDiagnosticsPresent = true,
                 pinMarshalPresent = nativeStepDiagnostics.reportPresent,
                 nativeHostFramePresent = nativeStepDiagnostics.reportPresent,
@@ -1044,7 +1051,7 @@ namespace Mmd.UnityIntegration
                 snapshotBuildPresent = false,
                 deltaTime = deltaTime,
                 totalMs = totalWatch.Elapsed.TotalMilliseconds,
-                hostPoseCaptureMs = hostPoseCaptureMs,
+                hostPoseCaptureMs = hostPoseCaptureMs ?? 0.0,
                 pinnedDiagnosticsMs = pinnedDiagnosticsMs,
                 pinMarshalMs = nativeStepDiagnostics.pinMarshalMs,
                 nativeHostFrameMs = nativeStepDiagnostics.nativeHostFrameMs,

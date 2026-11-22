@@ -87,7 +87,8 @@ namespace Mmd.UnityIntegration
                 localRotations,
                 localScales,
                 morphWeights,
-                ikEnabled);
+                ikEnabled,
+                humanoidHostPoseCaptureMs);
             lastHumanoidLivePhysicsFrameCount = Time.frameCount;
             lastHumanoidNativeHostPoseInputFingerprint = humanoidHostPoseInputFingerprint;
             hasLastHumanoidNativeHostPoseInputFingerprint = true;
