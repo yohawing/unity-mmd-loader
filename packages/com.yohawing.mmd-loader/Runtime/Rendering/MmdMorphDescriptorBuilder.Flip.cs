@@ -17,7 +17,15 @@ namespace Mmd.Rendering
             }
 
             MmdModelValidator.ThrowIfInvalid(model);
+            return BuildFlipMorphsFromValidated(model);
+        }
 
+        /// <summary>
+        /// Same as <see cref="BuildFlipMorphs"/> for a model the caller has already validated with
+        /// <see cref="MmdModelValidator.ThrowIfInvalid"/>; skips the repeated validation.
+        /// </summary>
+        internal static IReadOnlyList<MmdFlipMorphDescriptor> BuildFlipMorphsFromValidated(MmdModelDefinition model)
+        {
             var morphIndexToName = new Dictionary<int, string>(model.morphs.Count);
             var morphIndexToType = new Dictionary<int, string>(model.morphs.Count);
             foreach (MmdMorphDefinition morph in model.morphs)

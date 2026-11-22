@@ -27,6 +27,15 @@ namespace Mmd.Rendering
             }
 
             MmdModelValidator.ThrowIfInvalid(model);
+            return BuildVerticesFromValidated(model);
+        }
+
+        /// <summary>
+        /// Same as <see cref="BuildVertices"/> for a model the caller has already validated with
+        /// <see cref="MmdModelValidator.ThrowIfInvalid"/>; skips the repeated validation.
+        /// </summary>
+        internal static IReadOnlyList<MmdMeshVertexDescriptor> BuildVerticesFromValidated(MmdModelDefinition model)
+        {
             var descriptors = new List<MmdMeshVertexDescriptor>(model.vertices.Count);
             foreach (MmdVertexDefinition vertex in model.vertices.OrderBy(vertex => vertex.index))
             {
@@ -51,6 +60,15 @@ namespace Mmd.Rendering
             }
 
             MmdModelValidator.ThrowIfInvalid(model);
+            return BuildIndicesFromValidated(model);
+        }
+
+        /// <summary>
+        /// Same as <see cref="BuildIndices"/> for a model the caller has already validated with
+        /// <see cref="MmdModelValidator.ThrowIfInvalid"/>; skips the repeated validation.
+        /// </summary>
+        internal static IReadOnlyList<int> BuildIndicesFromValidated(MmdModelDefinition model)
+        {
             return model.indices.ToList();
         }
     }

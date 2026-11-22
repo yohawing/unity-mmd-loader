@@ -17,7 +17,15 @@ namespace Mmd.Rendering
             }
 
             MmdModelValidator.ThrowIfInvalid(model);
+            return BuildUvMorphsFromValidated(model);
+        }
 
+        /// <summary>
+        /// Same as <see cref="BuildUvMorphs"/> for a model the caller has already validated with
+        /// <see cref="MmdModelValidator.ThrowIfInvalid"/>; skips the repeated validation.
+        /// </summary>
+        internal static IReadOnlyList<MmdUvMorphDescriptor> BuildUvMorphsFromValidated(MmdModelDefinition model)
+        {
             var knownUvTypes = new HashSet<string>(StringComparer.Ordinal)
             {
                 "texture", "uva1", "uva2", "uva3", "uva4"

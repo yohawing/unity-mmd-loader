@@ -17,6 +17,15 @@ namespace Mmd.Rendering
             }
 
             MmdModelValidator.ThrowIfInvalid(model);
+            return BuildVertexMorphsFromValidated(model);
+        }
+
+        /// <summary>
+        /// Same as <see cref="BuildVertexMorphs"/> for a model the caller has already validated with
+        /// <see cref="MmdModelValidator.ThrowIfInvalid"/>; skips the repeated validation.
+        /// </summary>
+        internal static IReadOnlyList<MmdVertexMorphDescriptor> BuildVertexMorphsFromValidated(MmdModelDefinition model)
+        {
             return model.morphs
                 .Where(morph => string.Equals(NormalizeMorphType(morph.type), "vertex", StringComparison.Ordinal))
                 .OrderBy(morph => morph.index)

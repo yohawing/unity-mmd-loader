@@ -58,6 +58,15 @@ namespace Mmd.Rendering
             }
 
             MmdModelValidator.ThrowIfInvalid(model);
+            return BuildFromValidated(model);
+        }
+
+        /// <summary>
+        /// Same as <see cref="Build"/> for a model the caller has already validated with
+        /// <see cref="MmdModelValidator.ThrowIfInvalid"/>; skips the repeated validation.
+        /// </summary>
+        internal static IReadOnlyList<MmdMaterialDescriptor> BuildFromValidated(MmdModelDefinition model)
+        {
             var descriptors = new List<MmdMaterialDescriptor>(model.materials.Count);
             int vertexStart = 0;
             foreach (MmdMaterialDefinition material in model.materials.OrderBy(item => item.index))

@@ -39,22 +39,23 @@ namespace Mmd.Rendering
                 throw new ArgumentNullException(nameof(model));
             }
 
+            // Validate once; the sub-builders below run on the validated model.
             MmdModelValidator.ThrowIfInvalid(model);
-            List<MmdMaterialDescriptor> materials = MmdMaterialDescriptorBuilder.Build(model).ToList();
-            List<MmdMeshVertexDescriptor> vertices = MmdMeshDescriptorBuilder.BuildVertices(model).ToList();
+            List<MmdMaterialDescriptor> materials = MmdMaterialDescriptorBuilder.BuildFromValidated(model).ToList();
+            List<MmdMeshVertexDescriptor> vertices = MmdMeshDescriptorBuilder.BuildVerticesFromValidated(model).ToList();
             return new MmdRenderingDescriptor
             {
                 vertices = vertices,
-                indices = MmdMeshDescriptorBuilder.BuildIndices(model).ToList(),
-                skinning = MmdSkinningDescriptorBuilder.Build(model).ToList(),
+                indices = MmdMeshDescriptorBuilder.BuildIndicesFromValidated(model).ToList(),
+                skinning = MmdSkinningDescriptorBuilder.BuildFromValidated(model).ToList(),
                 materials = materials,
                 submeshes = MmdSubmeshDescriptorBuilder.Build(materials).ToList(),
                 urpMaterialBindings = MmdUrpMaterialBindingDescriptorBuilder.Build(materials, preset).ToList(),
-                vertexMorphs = MmdMorphDescriptorBuilder.BuildVertexMorphs(model).ToList(),
-                groupMorphs = MmdMorphDescriptorBuilder.BuildGroupMorphs(model).ToList(),
-                uvMorphs = MmdMorphDescriptorBuilder.BuildUvMorphs(model).ToList(),
-                materialMorphs = MmdMorphDescriptorBuilder.BuildMaterialMorphs(model).ToList(),
-                flipMorphs = MmdMorphDescriptorBuilder.BuildFlipMorphs(model).ToList(),
+                vertexMorphs = MmdMorphDescriptorBuilder.BuildVertexMorphsFromValidated(model).ToList(),
+                groupMorphs = MmdMorphDescriptorBuilder.BuildGroupMorphsFromValidated(model).ToList(),
+                uvMorphs = MmdMorphDescriptorBuilder.BuildUvMorphsFromValidated(model).ToList(),
+                materialMorphs = MmdMorphDescriptorBuilder.BuildMaterialMorphsFromValidated(model).ToList(),
+                flipMorphs = MmdMorphDescriptorBuilder.BuildFlipMorphsFromValidated(model).ToList(),
                 textureOrientation = MmdTextureOrientationDescriptorBuilder.Build(vertices),
                 ikCount = model.ik.Count
             };

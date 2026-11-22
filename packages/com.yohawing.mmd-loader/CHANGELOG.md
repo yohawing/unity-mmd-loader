@@ -37,6 +37,7 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
   - `Mmd.Editor.MmdHumanoidSetupAssetBuilder`, including `GetDefaultSetupAssetPath` and `CreateHumanoidSetupAsset`. Reimport the PMX with Animation Type = Humanoid instead.
   - `MmdHumanoidSetupAsset.Initialize`. Reimport the PMX with Animation Type = Humanoid and use the imported Avatar and retarget mapping. Existing `MmdHumanoidSetupAsset` files still load, and the obsolete `MmdHumanoidSetupPreset` enum stays because it is the type of their serialized `setupPreset` field.
 - Removed `Mmd.Editor.MmdPmxPrefabExporter.CreatePrefabWithFeedback`, which no menu or window called. Call `CreatePrefab(pmxAsset, GetDefaultPrefabPath(pmxAsset))` instead; it throws on failure and does not change the selection.
+- `MmdUnityModelFactory.CreateExistingSkinnedModelInstance` and the other paths that rebind an existing mesh now throw `InvalidOperationException` with the validator's message for an invalid model, instead of an `AggregateException` that wrapped the same error four times.
 
 ### Added
 

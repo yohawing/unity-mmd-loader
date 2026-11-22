@@ -17,7 +17,15 @@ namespace Mmd.Rendering
             }
 
             MmdModelValidator.ThrowIfInvalid(model);
+            return BuildGroupMorphsFromValidated(model);
+        }
 
+        /// <summary>
+        /// Same as <see cref="BuildGroupMorphs"/> for a model the caller has already validated with
+        /// <see cref="MmdModelValidator.ThrowIfInvalid"/>; skips the repeated validation.
+        /// </summary>
+        internal static IReadOnlyList<MmdGroupMorphDescriptor> BuildGroupMorphsFromValidated(MmdModelDefinition model)
+        {
             var morphIndexToName = new Dictionary<int, string>(model.morphs.Count);
             foreach (MmdMorphDefinition morph in model.morphs)
             {

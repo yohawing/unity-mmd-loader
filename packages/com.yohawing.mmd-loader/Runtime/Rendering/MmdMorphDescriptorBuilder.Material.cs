@@ -17,7 +17,15 @@ namespace Mmd.Rendering
             }
 
             MmdModelValidator.ThrowIfInvalid(model);
+            return BuildMaterialMorphsFromValidated(model);
+        }
 
+        /// <summary>
+        /// Same as <see cref="BuildMaterialMorphs"/> for a model the caller has already validated with
+        /// <see cref="MmdModelValidator.ThrowIfInvalid"/>; skips the repeated validation.
+        /// </summary>
+        internal static IReadOnlyList<MmdMaterialMorphDescriptor> BuildMaterialMorphsFromValidated(MmdModelDefinition model)
+        {
             return model.morphs
                 .Where(morph => string.Equals(NormalizeMorphType(morph.type), "material", StringComparison.Ordinal))
                 .OrderBy(morph => morph.index)

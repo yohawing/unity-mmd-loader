@@ -523,16 +523,17 @@ namespace Mmd.UnityIntegration
             MmdMaterialPreset preset)
         {
             // Existing imported meshes already own geometry, skinning and vertex-morph deltas.
-            // Build only metadata still consumed by playback, in parallel over the immutable,
-            // already-validated PMX definition.
+            // Build only metadata still consumed by playback, in parallel over the immutable PMX
+            // definition, validated once here instead of once per parallel builder.
+            MmdModelValidator.ThrowIfInvalid(model);
             Task<List<MmdMaterialDescriptor>> materialsTask = Task.Run(
-                () => MmdMaterialDescriptorBuilder.Build(model).ToList());
+                () => MmdMaterialDescriptorBuilder.BuildFromValidated(model).ToList());
             Task<List<MmdGroupMorphDescriptor>> groupsTask = Task.Run(
-                () => MmdMorphDescriptorBuilder.BuildGroupMorphs(model).ToList());
+                () => MmdMorphDescriptorBuilder.BuildGroupMorphsFromValidated(model).ToList());
             Task<List<MmdMaterialMorphDescriptor>> materialMorphsTask = Task.Run(
-                () => MmdMorphDescriptorBuilder.BuildMaterialMorphs(model).ToList());
+                () => MmdMorphDescriptorBuilder.BuildMaterialMorphsFromValidated(model).ToList());
             Task<List<MmdFlipMorphDescriptor>> flipsTask = Task.Run(
-                () => MmdMorphDescriptorBuilder.BuildFlipMorphs(model).ToList());
+                () => MmdMorphDescriptorBuilder.BuildFlipMorphsFromValidated(model).ToList());
             Task.WaitAll(materialsTask, groupsTask, materialMorphsTask, flipsTask);
 
             List<MmdMaterialDescriptor> materials = materialsTask.Result;
@@ -574,7 +575,6 @@ namespace Mmd.UnityIntegration
                 ikCount = model.ik.Count
             };
         }
-
         private static MmdMaterialRenderingTargets[] BuildMaterialRenderingTargets(
             int materialCount,
             MmdMaterialPreset preset)
