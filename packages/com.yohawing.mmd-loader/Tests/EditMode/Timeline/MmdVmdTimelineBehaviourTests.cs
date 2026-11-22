@@ -824,6 +824,8 @@ namespace Mmd.Tests
                 MmdUnityPlaybackController controller = instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.ConfigureModelAsset(pmxAsset);
                 pmxAsset.BeginSynchronousPlaybackPreload().GetAwaiter().GetResult();
+                MmdUnityPlaybackController.NativeRuntimeAvailabilityOverrideForTests =
+                    HoldNativeAvailabilityCheckOpen;
                 var behaviour = new MmdVmdTimelineBehaviour
                 {
                     MotionAsset = vmdAsset,
@@ -864,7 +866,7 @@ namespace Mmd.Tests
                 Assert.That(timing.pmxSourceBufferBorrowed, Is.True);
                 Assert.That(timing.pmxParseCacheHit, Is.True);
                 Assert.That(timing.sharedVmdContextMs, Is.GreaterThanOrEqualTo(0.0));
-                Assert.That(timing.nativeAvailabilityMs, Is.GreaterThan(0.0));
+                AssertNativeAvailabilityCheckWasTimed(timing.nativeAvailabilityMs);
                 Assert.That(timing.sceneBindingMs, Is.GreaterThan(0.0));
                 Assert.That(timing.nativeSessionMs, Is.GreaterThan(0.0));
                 Assert.That(timing.controllerConfigureMs, Is.GreaterThan(0.0));
@@ -888,6 +890,7 @@ namespace Mmd.Tests
             }
             finally
             {
+                MmdUnityPlaybackController.NativeRuntimeAvailabilityOverrideForTests = null;
                 MmdTestInstanceScope.DestroyInstance(instance);
                 Object.DestroyImmediate(pmxAsset);
                 Object.DestroyImmediate(vmdAsset);
@@ -996,6 +999,8 @@ namespace Mmd.Tests
                 MmdRuntimeImporterComponent importer = instance.Root.AddComponent<MmdRuntimeImporterComponent>();
                 importer.ConfigurePaths(pmxPath, vmdPath, 30.0f, 0, shouldPlayOnStart: false);
                 var behaviour = new MmdVmdTimelineBehaviour { FrameRate = 30.0f };
+                MmdUnityPlaybackController.NativeRuntimeAvailabilityOverrideForTests =
+                    HoldNativeAvailabilityCheckOpen;
                 MethodInfo prepare = typeof(MmdVmdTimelineBehaviour).GetMethod(
                     "TryPrepareTimelinePlayback",
                     BindingFlags.Instance | BindingFlags.NonPublic)!;
@@ -1011,7 +1016,7 @@ namespace Mmd.Tests
                     timing.pmxParseMs,
                     timing.pmxParseCacheHit ? Is.EqualTo(0.0) : Is.GreaterThan(0.0));
                 Assert.That(timing.motionHeaderMs, Is.GreaterThan(0.0));
-                Assert.That(timing.nativeAvailabilityMs, Is.GreaterThan(0.0));
+                AssertNativeAvailabilityCheckWasTimed(timing.nativeAvailabilityMs);
                 Assert.That(timing.sceneBindingMs, Is.GreaterThan(0.0));
                 Assert.That(timing.nativeSessionMs, Is.GreaterThan(0.0));
                 Assert.That(timing.initialSeedMs, Is.GreaterThan(0.0));
@@ -1019,6 +1024,7 @@ namespace Mmd.Tests
             }
             finally
             {
+                MmdUnityPlaybackController.NativeRuntimeAvailabilityOverrideForTests = null;
                 MmdTestInstanceScope.DestroyInstance(instance);
             }
         }
@@ -1628,6 +1634,37 @@ namespace Mmd.Tests
             controller.SetPhysicsMode(MmdPhysicsMode.Off);
             controller.ConfigureModelAsset(pmxAsset);
             return controller;
+        }
+
+        // The availability check is one ABI-version P/Invoke that returns a constant. It can
+        // finish inside a single Stopwatch tick (100 ns on Windows) and then records exactly
+        // 0 ms, so "> 0" on the real call is timer-resolution dependent. Holding the check open
+        // for a known number of ticks proves that the recorded phase encloses the check. The
+        // hook returns true, so the real ABI validation still runs inside the same window.
+        private const double NativeAvailabilityHoldMilliseconds = 1.0;
+
+        private static long NativeAvailabilityHoldTicks =>
+            (long)Math.Ceiling(System.Diagnostics.Stopwatch.Frequency * NativeAvailabilityHoldMilliseconds / 1000.0);
+
+        private static bool HoldNativeAvailabilityCheckOpen(byte[] pmxBytes, byte[] vmdBytes)
+        {
+            long start = System.Diagnostics.Stopwatch.GetTimestamp();
+            long holdTicks = NativeAvailabilityHoldTicks;
+            while (System.Diagnostics.Stopwatch.GetTimestamp() - start < holdTicks)
+            {
+                Thread.SpinWait(16);
+            }
+
+            return true;
+        }
+
+        private static void AssertNativeAvailabilityCheckWasTimed(double nativeAvailabilityMs)
+        {
+            double heldMs = NativeAvailabilityHoldTicks * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+            Assert.That(double.IsNaN(nativeAvailabilityMs) || double.IsInfinity(nativeAvailabilityMs), Is.False,
+                "nativeAvailabilityMs must be finite.");
+            Assert.That(nativeAvailabilityMs, Is.GreaterThanOrEqualTo(heldMs),
+                "nativeAvailabilityMs must enclose the native availability check.");
         }
 
         private static MmdVmdAsset CreateVmdAsset(string vmdPath)
