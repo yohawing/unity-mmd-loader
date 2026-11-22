@@ -38,17 +38,17 @@ Mmd.Editor.MmdGenericAnimationClipBakeOptions :: property bool ReduceKeys { publ
 Mmd.Editor.MmdGenericAnimationClipBakeOptions :: property static Mmd.Editor.MmdGenericAnimationClipBakeOptions Default { public get; }
 Mmd.Editor.MmdGenericAnimationClipBakeWindow :: (type) public sealed class MmdGenericAnimationClipBakeWindow : UnityEditor.EditorWindow
 Mmd.Editor.MmdGenericAnimationClipBakeWindow :: ctor public .ctor()
-Mmd.Editor.MmdGenericAnimationClipBakeWindow :: method public static Mmd.Editor.MmdGenericAnimationClipBakeWindow OpenFromVmd(Mmd.MmdVmdAsset vmdAsset)
+Mmd.Editor.MmdGenericAnimationClipBakeWindow :: method public static Mmd.Editor.MmdGenericAnimationClipBakeWindow OpenFromVmd(Mmd.MmdVmdAsset? vmdAsset)
 Mmd.Editor.MmdGenericAnimationClipWriter :: (type) public static class MmdGenericAnimationClipWriter
-Mmd.Editor.MmdGenericAnimationClipWriter :: method public static Mmd.Editor.MmdGenericAnimationClipWriterResult CreateAnimationClipAsset(Mmd.MmdPmxAsset pmxAsset, Mmd.MmdVmdAsset vmdAsset, float frameRate, int startFrame = 0, int? endFrame = null, string outputPath = null)
-Mmd.Editor.MmdGenericAnimationClipWriter :: method public static Mmd.Editor.MmdGenericAnimationClipWriterResult CreateAnimationClipAsset(Mmd.MmdPmxAsset pmxAsset, Mmd.MmdVmdAsset vmdAsset, float frameRate, int startFrame, int? endFrame, string outputPath, Mmd.Editor.MmdGenericAnimationClipBakeOptions options)
+Mmd.Editor.MmdGenericAnimationClipWriter :: method public static Mmd.Editor.MmdGenericAnimationClipWriterResult CreateAnimationClipAsset(Mmd.MmdPmxAsset pmxAsset, Mmd.MmdVmdAsset vmdAsset, float frameRate, int startFrame = 0, int? endFrame = null, string? outputPath = null)
+Mmd.Editor.MmdGenericAnimationClipWriter :: method public static Mmd.Editor.MmdGenericAnimationClipWriterResult CreateAnimationClipAsset(Mmd.MmdPmxAsset pmxAsset, Mmd.MmdVmdAsset vmdAsset, float frameRate, int startFrame, int? endFrame, string? outputPath, Mmd.Editor.MmdGenericAnimationClipBakeOptions options)
 Mmd.Editor.MmdGenericAnimationClipWriter :: method public static Mmd.Editor.MmdGenericAnimationClipWriterResult CreateInMemoryClip(Mmd.MmdPmxAsset pmxAsset, Mmd.MmdVmdAsset vmdAsset, float frameRate, int startFrame = 0, int? endFrame = null)
 Mmd.Editor.MmdGenericAnimationClipWriter :: method public static Mmd.Editor.MmdGenericAnimationClipWriterResult CreateInMemoryClip(Mmd.MmdPmxAsset pmxAsset, Mmd.MmdVmdAsset vmdAsset, float frameRate, int startFrame, int? endFrame, Mmd.Editor.MmdGenericAnimationClipBakeOptions options)
-Mmd.Editor.MmdGenericAnimationClipWriter :: method public static string GetDefaultOutputPath(Mmd.MmdPmxAsset pmxAsset, Mmd.MmdVmdAsset vmdAsset)
+Mmd.Editor.MmdGenericAnimationClipWriter :: method public static string GetDefaultOutputPath(Mmd.MmdPmxAsset? pmxAsset, Mmd.MmdVmdAsset? vmdAsset)
 Mmd.Editor.MmdGenericAnimationClipWriterResult :: (type) public sealed class MmdGenericAnimationClipWriterResult
 Mmd.Editor.MmdGenericAnimationClipWriterResult :: property Mmd.Physics.MmdPhysicsMode PhysicsMode { public get; }
 Mmd.Editor.MmdGenericAnimationClipWriterResult :: property System.Collections.Generic.IReadOnlyList<string> Diagnostics { public get; }
-Mmd.Editor.MmdGenericAnimationClipWriterResult :: property UnityEngine.AnimationClip Clip { public get; }
+Mmd.Editor.MmdGenericAnimationClipWriterResult :: property UnityEngine.AnimationClip? Clip { public get; }
 Mmd.Editor.MmdGenericAnimationClipWriterResult :: property string AssetPath { public get; }
 Mmd.Editor.MmdHumanoidClipConversionPlan :: (type) public sealed class MmdHumanoidClipConversionPlan
 Mmd.Editor.MmdHumanoidClipConversionPlan :: ctor public .ctor(bool prerequisitesReady, bool canCreateClipNow, string readiness, System.Collections.Generic.IReadOnlyList<string> diagnostics, string pmxSourceId, string vmdSourceId, int pmxBoneCount, string pmxHierarchyReadiness, string pmxRendererReadiness, string pmxBoneBindingReadiness, int vmdMaxFrame, int vmdBoneKeyframeCount, int vmdMorphKeyframeCount, int vmdModelKeyframeCount)
@@ -70,17 +70,17 @@ Mmd.Editor.MmdHumanoidClipConversionPlanner :: (type) public static class MmdHum
 Mmd.Editor.MmdHumanoidClipConversionPlanner :: const public string ImportedPmxHumanoidMappingSource = "Imported PMX Humanoid settings"
 Mmd.Editor.MmdHumanoidClipConversionPlanner :: const public string NotReadyReadiness = "prerequisites-not-ready"
 Mmd.Editor.MmdHumanoidClipConversionPlanner :: const public string ReadyReadiness = "prerequisites-ready"
-Mmd.Editor.MmdHumanoidClipConversionPlanner :: method public static Mmd.Editor.MmdHumanoidClipConversionPlan AnalyzePrerequisites(Mmd.MmdPmxAsset pmxAsset, Mmd.MmdVmdAsset vmdAsset)
+Mmd.Editor.MmdHumanoidClipConversionPlanner :: method public static Mmd.Editor.MmdHumanoidClipConversionPlan AnalyzePrerequisites(Mmd.MmdPmxAsset? pmxAsset, Mmd.MmdVmdAsset? vmdAsset)
 Mmd.Editor.MmdHumanoidClipConversionWriter :: (type) public static class MmdHumanoidClipConversionWriter
-Mmd.Editor.MmdHumanoidClipConversionWriter :: method public static Mmd.Editor.MmdHumanoidClipConversionWriterResult CreateHumanoidAnimationClipAsset(Mmd.MmdPmxAsset pmxAsset, Mmd.MmdVmdAsset vmdAsset, float frameRate, int startFrame = 0, int? endFrame = null, string outputPath = null)
+Mmd.Editor.MmdHumanoidClipConversionWriter :: method public static Mmd.Editor.MmdHumanoidClipConversionWriterResult CreateHumanoidAnimationClipAsset(Mmd.MmdPmxAsset pmxAsset, Mmd.MmdVmdAsset vmdAsset, float frameRate, int startFrame = 0, int? endFrame = null, string? outputPath = null)
 Mmd.Editor.MmdHumanoidClipConversionWriter :: method public static Mmd.Editor.MmdHumanoidClipConversionWriterResult CreateInMemoryClip(Mmd.MmdPmxAsset pmxAsset, Mmd.MmdVmdAsset vmdAsset, float frameRate, int startFrame = 0, int? endFrame = null)
 Mmd.Editor.MmdHumanoidClipConversionWriter :: method public static bool TryNormalizeAndValidateOutputPath(string outputPath, System.Collections.Generic.List<string> diagnostics, out string normalizedOutputPath)
-Mmd.Editor.MmdHumanoidClipConversionWriter :: method public static string GetDefaultOutputPath(Mmd.MmdPmxAsset pmxAsset, Mmd.MmdVmdAsset vmdAsset)
+Mmd.Editor.MmdHumanoidClipConversionWriter :: method public static string GetDefaultOutputPath(Mmd.MmdPmxAsset? pmxAsset, Mmd.MmdVmdAsset? vmdAsset)
 Mmd.Editor.MmdHumanoidClipConversionWriterResult :: (type) public sealed class MmdHumanoidClipConversionWriterResult
-Mmd.Editor.MmdHumanoidClipConversionWriterResult :: ctor public .ctor(UnityEngine.AnimationClip clip, Mmd.Editor.MmdHumanoidClipConversionPlan plan, System.Collections.Generic.IReadOnlyList<string> diagnostics)
+Mmd.Editor.MmdHumanoidClipConversionWriterResult :: ctor public .ctor(UnityEngine.AnimationClip? clip, Mmd.Editor.MmdHumanoidClipConversionPlan plan, System.Collections.Generic.IReadOnlyList<string> diagnostics)
 Mmd.Editor.MmdHumanoidClipConversionWriterResult :: property Mmd.Editor.MmdHumanoidClipConversionPlan Plan { public get; }
 Mmd.Editor.MmdHumanoidClipConversionWriterResult :: property System.Collections.Generic.IReadOnlyList<string> Diagnostics { public get; }
-Mmd.Editor.MmdHumanoidClipConversionWriterResult :: property UnityEngine.AnimationClip Clip { public get; }
+Mmd.Editor.MmdHumanoidClipConversionWriterResult :: property UnityEngine.AnimationClip? Clip { public get; }
 Mmd.Editor.MmdHumanoidClipConversionWriterResult :: property bool CanCreateClipNow { public get; }
 Mmd.Editor.MmdHumanoidClipConversionWriterResult :: property bool PrerequisitesReady { public get; }
 Mmd.Editor.MmdMmeNormalMapTexturePostprocessor :: (type) public sealed class MmdMmeNormalMapTexturePostprocessor : UnityEditor.AssetPostprocessor
@@ -130,7 +130,7 @@ Mmd.Editor.MmdPmxScriptedImporter :: property Mmd.Editor.MmdPmxModelPreset Model
 Mmd.Editor.MmdPmxScriptedImporter :: property Mmd.Editor.MmdPmxShaderPreset ShaderPreset { public get; }
 Mmd.Editor.MmdPmxScriptedImporter :: property Mmd.MmdHumanoidBoneMappingOverride[] HumanoidBoneMappingOverrides { public get; }
 Mmd.Editor.MmdPmxScriptedImporter :: property Mmd.MmdHumanoidRetargetQualitySettings HumanoidRetargetQualitySettings { public get; }
-Mmd.Editor.MmdPmxScriptedImporter :: property Mmd.MmdMaterialProfileAsset MaterialProfileAsset { public get; }
+Mmd.Editor.MmdPmxScriptedImporter :: property Mmd.MmdMaterialProfileAsset? MaterialProfileAsset { public get; }
 Mmd.Editor.MmdPmxScriptedImporter :: property UnityEngine.Material[] MaterialRemaps { public get; }
 Mmd.Editor.MmdPmxScriptedImporter :: property float ImportScale { public get; }
 Mmd.Editor.MmdPmxScriptedImporterEditor :: (type) public sealed class MmdPmxScriptedImporterEditor : UnityEditor.AssetImporters.ScriptedImporterEditor

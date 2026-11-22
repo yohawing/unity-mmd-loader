@@ -275,15 +275,16 @@ namespace Mmd.Tests
                 }
 
                 string visibility = field.IsPublic ? "public" : "protected";
+                string fieldType = FormatMemberType(field.FieldType, field.GetCustomAttributesData(), field, field);
                 if (field.IsLiteral)
                 {
-                    lines.Add(owner + "const " + visibility + Obsolete(field) + " " + FormatType(field.FieldType) + " " + field.Name +
+                    lines.Add(owner + "const " + visibility + Obsolete(field) + " " + fieldType + " " + field.Name +
                               " = " + FormatConstant(field.GetRawConstantValue(), field.FieldType));
                     continue;
                 }
 
                 string modifiers = (field.IsStatic ? " static" : string.Empty) + (field.IsInitOnly ? " readonly" : string.Empty);
-                lines.Add(owner + "field " + visibility + Obsolete(field) + modifiers + " " + FormatType(field.FieldType) + " " + field.Name);
+                lines.Add(owner + "field " + visibility + Obsolete(field) + modifiers + " " + fieldType + " " + field.Name);
             }
 
             foreach (EventInfo evt in type.GetEvents(DeclaredMembers))
@@ -295,7 +296,7 @@ namespace Mmd.Tests
                 }
 
                 lines.Add(owner + "event " + Visibility(add) + Obsolete(evt) + MethodModifiers(add, type) +
-                          FormatType(evt.EventHandlerType!) + " " + evt.Name);
+                          FormatMemberType(evt.EventHandlerType!, evt.GetCustomAttributesData(), evt, evt) + " " + evt.Name);
             }
         }
 
@@ -428,7 +429,8 @@ namespace Mmd.Tests
                 ? "this[" + FormatParameters(indexParameters) + "]"
                 : property.Name;
             return "property" + Obsolete(property) + MethodModifiers(primary, owner).TrimEnd() + " " +
-                   FormatType(property.PropertyType) + " " + name + " { " + string.Join(" ", accessors) + " }";
+                   FormatMemberType(property.PropertyType, property.GetCustomAttributesData(), property, property) +
+                   " " + name + " { " + string.Join(" ", accessors) + " }";
         }
 
         private static bool IsVisible(MethodBase method) =>
@@ -489,14 +491,16 @@ namespace Mmd.Tests
         private static string FormatReturnType(MethodInfo method)
         {
             Type returnType = method.ReturnType;
+            IList<CustomAttributeData> attributes = method.ReturnParameter.GetCustomAttributesData();
             if (returnType.IsByRef)
             {
-                bool readOnly = method.ReturnParameter.GetCustomAttributesData()
+                bool readOnly = attributes
                     .Any(data => data.AttributeType.FullName == "System.Runtime.CompilerServices.IsReadOnlyAttribute");
-                return (readOnly ? "ref readonly " : "ref ") + FormatType(returnType.GetElementType()!);
+                return (readOnly ? "ref readonly " : "ref ") +
+                       FormatMemberType(returnType.GetElementType()!, attributes, method, method);
             }
 
-            return FormatType(returnType);
+            return FormatMemberType(returnType, attributes, method, method);
         }
 
         private static string FormatParameters(ParameterInfo[] parameters)
@@ -530,7 +534,7 @@ namespace Mmd.Tests
                 builder.Append("params ");
             }
 
-            builder.Append(FormatType(parameterType));
+            builder.Append(FormatMemberType(parameterType, parameter.GetCustomAttributesData(), parameter.Member, parameter.Member));
             if (!string.IsNullOrEmpty(parameter.Name))
             {
                 builder.Append(' ').Append(parameter.Name);
@@ -615,27 +619,91 @@ namespace Mmd.Tests
             return prefix + SimpleName(type) + FormatGenericParameters(ownGenerics);
         }
 
+        /// <summary>
+        /// Renders a type without nullable reference annotations. Used for base types,
+        /// constraints and the serialized surface, where <c>T</c> and <c>T?</c> are not
+        /// distinguished.
+        /// </summary>
         internal static string FormatType(Type type)
         {
-            if (type.IsGenericParameter)
+            return FormatType(type, null);
+        }
+
+        /// <summary>
+        /// Renders the type of a member signature (parameter, return value, property,
+        /// field or event) and appends <c>?</c> to reference types the compiler marked as
+        /// annotated. Oblivious (<c>#nullable disable</c>) and not-annotated positions
+        /// render the same as before, without <c>?</c>.
+        /// </summary>
+        private static string FormatMemberType(
+            Type type,
+            IList<CustomAttributeData> attributes,
+            MemberInfo contextMember,
+            MemberInfo describedMember)
+        {
+            NullableFlags flags = NullableFlags.Read(attributes, contextMember);
+            string formatted;
+            try
             {
-                return type.Name;
+                formatted = FormatType(type, flags);
+            }
+            catch (InvalidOperationException exception)
+            {
+                throw new InvalidOperationException(
+                    exception.Message + " Type " + type + " on " + describedMember.DeclaringType + "." + describedMember.Name + ".",
+                    exception);
             }
 
+            flags.AssertFullyConsumed(describedMember, type);
+            return formatted;
+        }
+
+        // Mirrors the compiler's NullableAttribute layout (and NullabilityInfoContext,
+        // which Unity's class library does not ship): by-ref and pointer wrappers carry no
+        // flag, a non-generic value type carries none, a generic value type carries one
+        // flag followed by its arguments, Nullable<T> is rendered from T, and every other
+        // type (reference types, arrays and unconstrained type parameters) carries one flag
+        // before its element or arguments.
+        private static string FormatType(Type type, NullableFlags? flags)
+        {
             if (type.IsByRef)
             {
-                return "ref " + FormatType(type.GetElementType()!);
+                return "ref " + FormatType(type.GetElementType()!, flags);
             }
 
             if (type.IsPointer)
             {
-                return FormatType(type.GetElementType()!) + "*";
+                return FormatType(type.GetElementType()!, flags) + "*";
             }
 
+            if (type.IsValueType)
+            {
+                Type? nullableUnderlying = Nullable.GetUnderlyingType(type);
+                Type underlying = nullableUnderlying ?? type;
+                if (underlying.IsGenericType)
+                {
+                    flags?.Next();
+                }
+
+                string valueType = FormatNamedType(underlying, flags);
+                return nullableUnderlying != null ? valueType + "?" : valueType;
+            }
+
+            string annotation = flags != null && flags.Next() == NullableFlags.Annotated ? "?" : string.Empty;
             if (type.IsArray)
             {
                 int rank = type.GetArrayRank();
-                return FormatType(type.GetElementType()!) + "[" + new string(',', rank - 1) + "]";
+                return FormatType(type.GetElementType()!, flags) + "[" + new string(',', rank - 1) + "]" + annotation;
+            }
+
+            return FormatNamedType(type, flags) + annotation;
+        }
+
+        private static string FormatNamedType(Type type, NullableFlags? flags)
+        {
+            if (type.IsGenericParameter)
+            {
+                return type.Name;
             }
 
             if (Keywords.TryGetValue(type, out string? keyword))
@@ -643,27 +711,121 @@ namespace Mmd.Tests
                 return keyword!;
             }
 
-            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
-            {
-                return FormatType(type.GetGenericArguments()[0]) + "?";
-            }
-
             Type definition = type.IsGenericType ? type.GetGenericTypeDefinition() : type;
             Type[] arguments = type.IsGenericType ? type.GetGenericArguments() : Type.EmptyTypes;
-            return FormatTypeName(definition, arguments, arguments.Length);
+            // Arguments consume flags in declaration order, outer type arguments first.
+            var formattedArguments = new string[arguments.Length];
+            for (int i = 0; i < arguments.Length; i++)
+            {
+                formattedArguments[i] = FormatType(arguments[i], flags);
+            }
+
+            return FormatTypeName(definition, formattedArguments, formattedArguments.Length);
         }
 
-        private static string FormatTypeName(Type definition, Type[] arguments, int argumentEnd)
+        private static string FormatTypeName(Type definition, string[] formattedArguments, int argumentEnd)
         {
             int ownCount = OwnGenericParameters(definition).Length;
             int ownStart = argumentEnd - ownCount;
             string prefix = definition.IsNested
-                ? FormatTypeName(definition.DeclaringType!, arguments, ownStart) + "."
+                ? FormatTypeName(definition.DeclaringType!, formattedArguments, ownStart) + "."
                 : string.IsNullOrEmpty(definition.Namespace) ? string.Empty : definition.Namespace + ".";
             string suffix = ownCount == 0
                 ? string.Empty
-                : "<" + string.Join(", ", arguments.Skip(ownStart).Take(ownCount).Select(FormatType)) + ">";
+                : "<" + string.Join(", ", formattedArguments.Skip(ownStart).Take(ownCount)) + ">";
             return prefix + SimpleName(definition) + suffix;
+        }
+
+        /// <summary>
+        /// Reads the compiler-emitted <c>NullableAttribute</c> of one signature position,
+        /// falling back to the nearest <c>NullableContextAttribute</c> on the member or its
+        /// declaring types (0 = oblivious when none is found). The attributes are matched by
+        /// name because each assembly embeds its own copy of them.
+        /// </summary>
+        private sealed class NullableFlags
+        {
+            internal const byte Annotated = 2;
+            private const string NullableAttributeName = "System.Runtime.CompilerServices.NullableAttribute";
+            private const string NullableContextAttributeName = "System.Runtime.CompilerServices.NullableContextAttribute";
+
+            private readonly byte[]? perPosition;
+            private readonly byte uniform;
+            private int position;
+
+            private NullableFlags(byte[]? perPosition, byte uniform)
+            {
+                this.perPosition = perPosition;
+                this.uniform = uniform;
+            }
+
+            internal static NullableFlags Read(IList<CustomAttributeData> attributes, MemberInfo contextMember)
+            {
+                foreach (CustomAttributeData data in attributes)
+                {
+                    if (data.AttributeType.FullName != NullableAttributeName || data.ConstructorArguments.Count != 1)
+                    {
+                        continue;
+                    }
+
+                    object? value = data.ConstructorArguments[0].Value;
+                    if (value is byte single)
+                    {
+                        return new NullableFlags(null, single);
+                    }
+
+                    if (value is IEnumerable<CustomAttributeTypedArgument> elements)
+                    {
+                        return new NullableFlags(elements.Select(element => (byte)element.Value!).ToArray(), 0);
+                    }
+
+                    throw new InvalidOperationException("Unsupported NullableAttribute argument on " + contextMember.Name + ".");
+                }
+
+                return new NullableFlags(null, ReadContext(contextMember));
+            }
+
+            private static byte ReadContext(MemberInfo member)
+            {
+                for (MemberInfo? current = member; current != null; current = current.DeclaringType)
+                {
+                    foreach (CustomAttributeData data in current.GetCustomAttributesData())
+                    {
+                        if (data.AttributeType.FullName == NullableContextAttributeName &&
+                            data.ConstructorArguments.Count == 1 &&
+                            data.ConstructorArguments[0].Value is byte context)
+                        {
+                            return context;
+                        }
+                    }
+                }
+
+                return 0;
+            }
+
+            internal byte Next()
+            {
+                if (perPosition == null)
+                {
+                    return uniform;
+                }
+
+                if (position >= perPosition.Length)
+                {
+                    throw new InvalidOperationException("NullableAttribute has fewer flags than the type has positions.");
+                }
+
+                return perPosition[position++];
+            }
+
+            internal void AssertFullyConsumed(MemberInfo member, Type type)
+            {
+                if (perPosition != null && position != perPosition.Length)
+                {
+                    throw new InvalidOperationException(
+                        "NullableAttribute flag count " + perPosition.Length + " does not match the " + position +
+                        " positions of " + type + " on " + member.DeclaringType + "." + member.Name + ".");
+                }
+            }
         }
 
         private static string FormatConstant(object? value, Type declaredType)

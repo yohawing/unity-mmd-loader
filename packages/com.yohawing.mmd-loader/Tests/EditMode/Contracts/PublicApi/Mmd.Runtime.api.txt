@@ -60,8 +60,8 @@ Mmd.MmdEvaluatedMorphWeight :: field public string name
 Mmd.MmdHumanoidAppendTransformBinding :: (type) public sealed class MmdHumanoidAppendTransformBinding
 Mmd.MmdHumanoidAppendTransformBinding :: property UnityEngine.Quaternion AppendParentBindLocalRotation { public get; }
 Mmd.MmdHumanoidAppendTransformBinding :: property UnityEngine.Quaternion TargetBindLocalRotation { public get; }
-Mmd.MmdHumanoidAppendTransformBinding :: property UnityEngine.Transform AppendParentTransform { public get; }
-Mmd.MmdHumanoidAppendTransformBinding :: property UnityEngine.Transform TargetTransform { public get; }
+Mmd.MmdHumanoidAppendTransformBinding :: property UnityEngine.Transform? AppendParentTransform { public get; }
+Mmd.MmdHumanoidAppendTransformBinding :: property UnityEngine.Transform? TargetTransform { public get; }
 Mmd.MmdHumanoidAppendTransformBinding :: property UnityEngine.Vector3 AppendParentBindLocalPosition { public get; }
 Mmd.MmdHumanoidAppendTransformBinding :: property UnityEngine.Vector3 TargetBindLocalPosition { public get; }
 Mmd.MmdHumanoidAppendTransformBinding :: property bool AppendLocal { public get; }
@@ -95,9 +95,9 @@ Mmd.MmdHumanoidRetargetBinding :: (type) public sealed class MmdHumanoidRetarget
 Mmd.MmdHumanoidRetargetBinding :: property UnityEngine.HumanBodyBones HumanBone { public get; }
 Mmd.MmdHumanoidRetargetBinding :: property UnityEngine.Quaternion NativeBindLocalRotation { public get; }
 Mmd.MmdHumanoidRetargetBinding :: property UnityEngine.Quaternion ProxyBindLocalRotation { public get; }
-Mmd.MmdHumanoidRetargetBinding :: property UnityEngine.Transform NativeTransform { public get; }
-Mmd.MmdHumanoidRetargetBinding :: property UnityEngine.Transform ProxyTransform { public get; }
-Mmd.MmdHumanoidRetargetBinding :: property UnityEngine.Transform TranslationTargetTransform { public get; }
+Mmd.MmdHumanoidRetargetBinding :: property UnityEngine.Transform? NativeTransform { public get; }
+Mmd.MmdHumanoidRetargetBinding :: property UnityEngine.Transform? ProxyTransform { public get; }
+Mmd.MmdHumanoidRetargetBinding :: property UnityEngine.Transform? TranslationTargetTransform { public get; }
 Mmd.MmdHumanoidRetargetBinding :: property UnityEngine.Vector3 ProxyBindLocalPosition { public get; }
 Mmd.MmdHumanoidRetargetBinding :: property UnityEngine.Vector3 TranslationTargetBindLocalPosition { public get; }
 Mmd.MmdHumanoidRetargetBinding :: property bool CopyLocalPosition { public get; }
@@ -142,7 +142,7 @@ Mmd.MmdHumanoidSetupAsset :: const public string NotEvaluatedReadiness = "NotEva
 Mmd.MmdHumanoidSetupAsset :: const public string ReadyReadiness = "Ready"
 Mmd.MmdHumanoidSetupAsset :: ctor public .ctor()
 Mmd.MmdHumanoidSetupAsset :: property Mmd.MmdHumanoidSetupPreset SetupPreset { public get; }
-Mmd.MmdHumanoidSetupAsset :: property Mmd.MmdPmxAsset PmxAsset { public get; }
+Mmd.MmdHumanoidSetupAsset :: property Mmd.MmdPmxAsset? PmxAsset { public get; }
 Mmd.MmdHumanoidSetupAsset :: property System.Collections.Generic.IReadOnlyList<Mmd.MmdSerializableBoneMappingEntry> MappingEntries { public get; }
 Mmd.MmdHumanoidSetupAsset :: property System.Collections.Generic.IReadOnlyList<string> MappingDiagnostics { public get; }
 Mmd.MmdHumanoidSetupAsset :: property int AmbiguousMappingCount { public get; }
@@ -177,12 +177,12 @@ Mmd.MmdMaterialOverrideEntry :: field public UnityEngine.Color emissionColor
 Mmd.MmdMaterialOverrideEntry :: field public UnityEngine.Color outlineColor
 Mmd.MmdMaterialOverrideEntry :: field public UnityEngine.Color rimColor
 Mmd.MmdMaterialOverrideEntry :: field public UnityEngine.Color stylizedSpecularColor
-Mmd.MmdMaterialOverrideEntry :: field public UnityEngine.Texture2D emissionMap
-Mmd.MmdMaterialOverrideEntry :: field public UnityEngine.Texture2D emissionMask
-Mmd.MmdMaterialOverrideEntry :: field public UnityEngine.Texture2D metallicMap
-Mmd.MmdMaterialOverrideEntry :: field public UnityEngine.Texture2D normalMap
-Mmd.MmdMaterialOverrideEntry :: field public UnityEngine.Texture2D occlusionMap
-Mmd.MmdMaterialOverrideEntry :: field public UnityEngine.Texture2D roughnessMap
+Mmd.MmdMaterialOverrideEntry :: field public UnityEngine.Texture2D? emissionMap
+Mmd.MmdMaterialOverrideEntry :: field public UnityEngine.Texture2D? emissionMask
+Mmd.MmdMaterialOverrideEntry :: field public UnityEngine.Texture2D? metallicMap
+Mmd.MmdMaterialOverrideEntry :: field public UnityEngine.Texture2D? normalMap
+Mmd.MmdMaterialOverrideEntry :: field public UnityEngine.Texture2D? occlusionMap
+Mmd.MmdMaterialOverrideEntry :: field public UnityEngine.Texture2D? roughnessMap
 Mmd.MmdMaterialOverrideEntry :: field public bool enabled
 Mmd.MmdMaterialOverrideEntry :: field public bool hasAlpha
 Mmd.MmdMaterialOverrideEntry :: field public bool hasAlphaClipThreshold
@@ -251,9 +251,9 @@ Mmd.MmdMaterialProfileAsset :: const public int CurrentSchemaVersion = 1
 Mmd.MmdMaterialProfileAsset :: ctor public .ctor()
 Mmd.MmdMaterialProfileAsset :: field public Mmd.MmdMaterialProfileRenderingTargets renderingTargets
 Mmd.MmdMaterialProfileAsset :: field public Mmd.MmdMaterialProfileTextureTargets textureTargets
-Mmd.MmdMaterialProfileAsset :: field public UnityEngine.Shader shader
+Mmd.MmdMaterialProfileAsset :: field public UnityEngine.Shader? shader
 Mmd.MmdMaterialProfileAsset :: field public int schemaVersion
-Mmd.MmdMaterialProfileAsset :: method public bool TryCreateMapperSet(out Mmd.UnityIntegration.MmdMaterialMapperSet mapperSet, out string reason)
+Mmd.MmdMaterialProfileAsset :: method public bool TryCreateMapperSet(out Mmd.UnityIntegration.MmdMaterialMapperSet? mapperSet, out string reason)
 Mmd.MmdMaterialProfileProvenance :: (type) public sealed class MmdMaterialProfileProvenance
 Mmd.MmdMaterialProfileProvenance :: const public int CurrentSchemaVersion = 1
 Mmd.MmdMaterialProfileProvenance :: field public Mmd.MmdMaterialProfileRenderingTargets renderingTargets
@@ -370,23 +370,23 @@ Mmd.MmdPlaybackTimeMapping :: field public string frameSelectionPolicy
 Mmd.MmdPmxAsset :: (type) public sealed class MmdPmxAsset : UnityEngine.ScriptableObject
 Mmd.MmdPmxAsset :: const public float DefaultImportScale = 0.1f
 Mmd.MmdPmxAsset :: ctor public .ctor()
-Mmd.MmdPmxAsset :: method public Mmd.Parser.MmdModelDefinition LoadModel(Mmd.Parser.IMmdParser parser = null)
+Mmd.MmdPmxAsset :: method public Mmd.Parser.MmdModelDefinition LoadModel(Mmd.Parser.IMmdParser? parser = null)
 Mmd.MmdPmxAsset :: method public byte[] GetBytesCopy()
-Mmd.MmdPmxAsset :: method public void Initialize(byte[] bytes, string assetSourceId, string assetSourcePath, float assetImportScale = 0.1f, string assetModelPreset = "Custom", string assetMeshGenerationMode = "SingleMesh", string assetMaterialTexturePolicy = "ResolveReferencesOnly", string assetShaderPreset = "MmdBasicUrpToon", Mmd.MmdPmxParseSummary? parseSummary = null, UnityEngine.Mesh importedMeshAsset = null, UnityEngine.Material[] importedMaterialAssets = null, UnityEngine.Material[] materialRemapAssets = null, UnityEngine.GameObject importedRootAsset = null, Mmd.MmdImportReadiness hierarchyReadinessValue = 0, Mmd.MmdImportReadiness rendererReadinessValue = 0, Mmd.MmdImportReadiness boneBindingReadinessValue = 0, string hierarchyReadinessDiagnosticValue = null, string rendererReadinessDiagnosticValue = null, string boneBindingReadinessDiagnosticValue = null, string assetAnimationType = "Generic", Mmd.MmdMaterialOverrideAsset importedMaterialOverrideAsset = null)
+Mmd.MmdPmxAsset :: method public void Initialize(byte[] bytes, string assetSourceId, string assetSourcePath, float assetImportScale = 0.1f, string assetModelPreset = "Custom", string assetMeshGenerationMode = "SingleMesh", string assetMaterialTexturePolicy = "ResolveReferencesOnly", string assetShaderPreset = "MmdBasicUrpToon", Mmd.MmdPmxParseSummary? parseSummary = null, UnityEngine.Mesh? importedMeshAsset = null, UnityEngine.Material[]? importedMaterialAssets = null, UnityEngine.Material[]? materialRemapAssets = null, UnityEngine.GameObject? importedRootAsset = null, Mmd.MmdImportReadiness hierarchyReadinessValue = 0, Mmd.MmdImportReadiness rendererReadinessValue = 0, Mmd.MmdImportReadiness boneBindingReadinessValue = 0, string? hierarchyReadinessDiagnosticValue = null, string? rendererReadinessDiagnosticValue = null, string? boneBindingReadinessDiagnosticValue = null, string assetAnimationType = "Generic", Mmd.MmdMaterialOverrideAsset? importedMaterialOverrideAsset = null)
 Mmd.MmdPmxAsset :: property Mmd.MmdHumanoidBoneMappingDiagnosticSummary HumanoidBoneMappingDiagnostics { public get; }
 Mmd.MmdPmxAsset :: property Mmd.MmdImportReadiness BoneBindingReadiness { public get; }
 Mmd.MmdPmxAsset :: property Mmd.MmdImportReadiness HierarchyReadiness { public get; }
 Mmd.MmdPmxAsset :: property Mmd.MmdImportReadiness RendererReadiness { public get; }
-Mmd.MmdPmxAsset :: property Mmd.MmdMaterialOverrideAsset MaterialOverrideAsset { public get; }
-Mmd.MmdPmxAsset :: property Mmd.MmdMaterialProfileAsset MaterialProfileAsset { public get; }
-Mmd.MmdPmxAsset :: property Mmd.MmdMaterialProfileProvenance MaterialProfileProvenance { public get; }
+Mmd.MmdPmxAsset :: property Mmd.MmdMaterialOverrideAsset? MaterialOverrideAsset { public get; }
+Mmd.MmdPmxAsset :: property Mmd.MmdMaterialProfileAsset? MaterialProfileAsset { public get; }
+Mmd.MmdPmxAsset :: property Mmd.MmdMaterialProfileProvenance? MaterialProfileProvenance { public get; }
 Mmd.MmdPmxAsset :: property Mmd.MmdPmxImportSummaryStatus ImportSummaryStatus { public get; }
 Mmd.MmdPmxAsset :: property Mmd.MmdPmxMaterialSummary[] MaterialSummaries { public get; }
-Mmd.MmdPmxAsset :: property UnityEngine.Avatar ImportedAvatar { public get; }
-Mmd.MmdPmxAsset :: property UnityEngine.GameObject ImportedRoot { public get; }
+Mmd.MmdPmxAsset :: property UnityEngine.Avatar? ImportedAvatar { public get; }
+Mmd.MmdPmxAsset :: property UnityEngine.GameObject? ImportedRoot { public get; }
 Mmd.MmdPmxAsset :: property UnityEngine.Material[] ImportedMaterials { public get; }
 Mmd.MmdPmxAsset :: property UnityEngine.Material[] MaterialRemaps { public get; }
-Mmd.MmdPmxAsset :: property UnityEngine.Mesh ImportedMesh { public get; }
+Mmd.MmdPmxAsset :: property UnityEngine.Mesh? ImportedMesh { public get; }
 Mmd.MmdPmxAsset :: property UnityEngine.Vector3 BoundsMax { public get; }
 Mmd.MmdPmxAsset :: property UnityEngine.Vector3 BoundsMin { public get; }
 Mmd.MmdPmxAsset :: property UnityEngine.Vector3 BoundsSize { public get; }
@@ -437,7 +437,7 @@ Mmd.MmdPmxMaterialSummary :: field public string name
 Mmd.MmdPmxMaterialSummary :: field public string sphereTexture
 Mmd.MmdPmxMaterialSummary :: field public string toonTexture
 Mmd.MmdPmxParseSummary :: (type) public readonly struct MmdPmxParseSummary
-Mmd.MmdPmxParseSummary :: ctor public .ctor(string modelName, int vertexCount, int indexCount, int boneCount, int morphCount, int materialCount, int diffuseTextureReferenceCount, int sphereTextureReferenceCount, int toonTextureReferenceCount, int transparentMaterialCount, int edgeMaterialCount, int ikCount, int rigidbodyCount, int jointCount, UnityEngine.Vector3 boundsMin, UnityEngine.Vector3 boundsMax, Mmd.MmdPmxMaterialSummary[] materialSummaries = null, string modelEnglishName = null, string modelComment = null, string modelEnglishComment = null)
+Mmd.MmdPmxParseSummary :: ctor public .ctor(string modelName, int vertexCount, int indexCount, int boneCount, int morphCount, int materialCount, int diffuseTextureReferenceCount, int sphereTextureReferenceCount, int toonTextureReferenceCount, int transparentMaterialCount, int edgeMaterialCount, int ikCount, int rigidbodyCount, int jointCount, UnityEngine.Vector3 boundsMin, UnityEngine.Vector3 boundsMax, Mmd.MmdPmxMaterialSummary[]? materialSummaries = null, string? modelEnglishName = null, string? modelComment = null, string? modelEnglishComment = null)
 Mmd.MmdPmxParseSummary :: method public static Mmd.MmdPmxParseSummary FromModel(Mmd.Parser.MmdModelDefinition model)
 Mmd.MmdPmxParseSummary :: property Mmd.MmdPmxMaterialSummary[] MaterialSummaries { public get; }
 Mmd.MmdPmxParseSummary :: property UnityEngine.Vector3 BoundsMax { public get; }
@@ -465,7 +465,7 @@ Mmd.MmdPmxPrefabProvenance :: const public string ExportOperationPolicy = "prefa
 Mmd.MmdPmxPrefabProvenance :: const public string TextureCopyPolicy = "do-not-copy-source-textures-by-default"
 Mmd.MmdPmxPrefabProvenance :: ctor public .ctor()
 Mmd.MmdPmxPrefabProvenance :: method public void Initialize(Mmd.MmdPmxAsset pmxAsset, string prefabPath, string[] exportedMeshAssetPaths, string[] exportedMaterialAssetPaths, int exportedVertexCount, int exportedMaterialCount, int exportedLoadedDiffuseTextureCount, int exportedLoadedSphereTextureCount, int exportedLoadedToonTextureCount, int exportedMissingTextureCount, int exportedUnsupportedTextureCount)
-Mmd.MmdPmxPrefabProvenance :: property Mmd.MmdPmxAsset SourceAsset { public get; }
+Mmd.MmdPmxPrefabProvenance :: property Mmd.MmdPmxAsset? SourceAsset { public get; }
 Mmd.MmdPmxPrefabProvenance :: property int LoadedDiffuseTextureCount { public get; }
 Mmd.MmdPmxPrefabProvenance :: property int LoadedSphereTextureCount { public get; }
 Mmd.MmdPmxPrefabProvenance :: property int LoadedToonTextureCount { public get; }
@@ -516,9 +516,9 @@ Mmd.MmdSerializableBoneMappingEntry :: property string MmdBoneName { public get;
 Mmd.MmdVmdAsset :: (type) public sealed class MmdVmdAsset : UnityEngine.ScriptableObject
 Mmd.MmdVmdAsset :: ctor public .ctor()
 Mmd.MmdVmdAsset :: method public Mmd.Parser.MmdMotionDefinition CreateNativeClipMotionHeader()
-Mmd.MmdVmdAsset :: method public Mmd.Parser.MmdMotionDefinition LoadMotion(Mmd.Parser.IMmdParser parser = null)
+Mmd.MmdVmdAsset :: method public Mmd.Parser.MmdMotionDefinition LoadMotion(Mmd.Parser.IMmdParser? parser = null)
 Mmd.MmdVmdAsset :: method public byte[] GetBytesCopy()
-Mmd.MmdVmdAsset :: method public void Initialize(byte[] bytes, string assetSourceId, string assetSourcePath, Mmd.MmdVmdParseSummary? vmdParseSummary = null, System.Collections.Generic.IReadOnlyList<string> importDiagnostics = null)
+Mmd.MmdVmdAsset :: method public void Initialize(byte[] bytes, string assetSourceId, string assetSourcePath, Mmd.MmdVmdParseSummary? vmdParseSummary = null, System.Collections.Generic.IReadOnlyList<string>? importDiagnostics = null)
 Mmd.MmdVmdAsset :: property Mmd.MmdVmdImportSummaryStatus ImportSummaryStatus { public get; }
 Mmd.MmdVmdAsset :: property System.Collections.Generic.IReadOnlyList<string> StructuralDiagnostics { public get; }
 Mmd.MmdVmdAsset :: property int BoneKeyframeCount { public get; }
@@ -766,7 +766,7 @@ Mmd.Parser.MmdModelKeyframeDefinition :: field public System.Collections.Generic
 Mmd.Parser.MmdModelKeyframeDefinition :: field public bool visible
 Mmd.Parser.MmdModelKeyframeDefinition :: field public int frame
 Mmd.Parser.MmdModelValidator :: (type) public static class MmdModelValidator
-Mmd.Parser.MmdModelValidator :: method public static System.Collections.Generic.IReadOnlyList<string> ValidateStructuralModel(Mmd.Parser.MmdModelDefinition model)
+Mmd.Parser.MmdModelValidator :: method public static System.Collections.Generic.IReadOnlyList<string> ValidateStructuralModel(Mmd.Parser.MmdModelDefinition? model)
 Mmd.Parser.MmdModelValidator :: method public static void ThrowIfInvalid(Mmd.Parser.MmdModelDefinition model)
 Mmd.Parser.MmdMorphDefinition :: (type) public sealed class MmdMorphDefinition
 Mmd.Parser.MmdMorphDefinition :: ctor public .ctor()
@@ -800,7 +800,7 @@ Mmd.Parser.MmdMotionDefinition :: field public int maxFrame
 Mmd.Parser.MmdMotionDefinition :: field public int selfShadowKeyframeCount
 Mmd.Parser.MmdMotionDefinition :: field public string targetModelName
 Mmd.Parser.MmdMotionValidator :: (type) public static class MmdMotionValidator
-Mmd.Parser.MmdMotionValidator :: method public static System.Collections.Generic.IReadOnlyList<string> ValidateStructuralMotion(Mmd.Parser.MmdMotionDefinition motion)
+Mmd.Parser.MmdMotionValidator :: method public static System.Collections.Generic.IReadOnlyList<string> ValidateStructuralMotion(Mmd.Parser.MmdMotionDefinition? motion)
 Mmd.Parser.MmdMotionValidator :: method public static void ThrowIfInvalid(Mmd.Parser.MmdMotionDefinition motion)
 Mmd.Parser.MmdPhysicsDefinition :: (type) public sealed class MmdPhysicsDefinition
 Mmd.Parser.MmdPhysicsDefinition :: ctor public .ctor()
@@ -1203,7 +1203,7 @@ Mmd.UnityIntegration.MmdMaterialMapperSet :: property Mmd.UnityIntegration.MmdMa
 Mmd.UnityIntegration.MmdMaterialMapperSet :: property Mmd.UnityIntegration.MmdMaterialTextureTargets DefaultTextureTargets { public get; }
 Mmd.UnityIntegration.MmdMaterialMapperSet :: property static Mmd.UnityIntegration.MmdMaterialMapperSet BuiltIn { public get; }
 Mmd.UnityIntegration.MmdMaterialRenderingTargets :: (type) public sealed class MmdMaterialRenderingTargets
-Mmd.UnityIntegration.MmdMaterialRenderingTargets :: ctor public .ctor(string baseColorProperty = "_BaseColor", string colorProperty = "_Color", string ambientColorProperty = "_AmbientColor", string alphaProperty = "_Alpha", string alphaClipThresholdProperty = "_AlphaClipThreshold", string shadowAlphaClipThresholdProperty = "_ShadowAlphaClipThreshold", string textureAlphaOutputWeightProperty = "_TextureAlphaOutputWeight", string cullProperty = "_Cull", string surfaceProperty = "_Surface", string blendProperty = "_Blend", string sourceBlendProperty = "_SrcBlend", string destinationBlendProperty = "_DstBlend", string zWriteProperty = "_ZWrite", string outlineColorProperty = "_OutlineColor", string outlineWidthProperty = "_OutlineWidth", string outlineVisibleProperty = "_OutlineVisible", string outlineScreenSpaceWeightProperty = "_OutlineScreenSpaceWeight", string outlineZTestProperty = "_OutlineZTest", bool supportsRenderQueue = true, System.Collections.Generic.IEnumerable<string> unsupportedFeatures = null, bool validatePropertyPresence = true, System.Collections.Generic.IEnumerable<string> requiredKeywords = null, System.Collections.Generic.IEnumerable<string> requiredPasses = null, bool supportsMaterialMorphs = true, string textureAlphaClipMaskProperty = null, string alphaClipModeProperty = null)
+Mmd.UnityIntegration.MmdMaterialRenderingTargets :: ctor public .ctor(string? baseColorProperty = "_BaseColor", string? colorProperty = "_Color", string? ambientColorProperty = "_AmbientColor", string? alphaProperty = "_Alpha", string? alphaClipThresholdProperty = "_AlphaClipThreshold", string? shadowAlphaClipThresholdProperty = "_ShadowAlphaClipThreshold", string? textureAlphaOutputWeightProperty = "_TextureAlphaOutputWeight", string? cullProperty = "_Cull", string? surfaceProperty = "_Surface", string? blendProperty = "_Blend", string? sourceBlendProperty = "_SrcBlend", string? destinationBlendProperty = "_DstBlend", string? zWriteProperty = "_ZWrite", string? outlineColorProperty = "_OutlineColor", string? outlineWidthProperty = "_OutlineWidth", string? outlineVisibleProperty = "_OutlineVisible", string? outlineScreenSpaceWeightProperty = "_OutlineScreenSpaceWeight", string? outlineZTestProperty = "_OutlineZTest", bool supportsRenderQueue = true, System.Collections.Generic.IEnumerable<string>? unsupportedFeatures = null, bool validatePropertyPresence = true, System.Collections.Generic.IEnumerable<string>? requiredKeywords = null, System.Collections.Generic.IEnumerable<string>? requiredPasses = null, bool supportsMaterialMorphs = true, string? textureAlphaClipMaskProperty = null, string? alphaClipModeProperty = null)
 Mmd.UnityIntegration.MmdMaterialRenderingTargets :: property System.Collections.Generic.IReadOnlyList<string> RequiredKeywords { public get; }
 Mmd.UnityIntegration.MmdMaterialRenderingTargets :: property System.Collections.Generic.IReadOnlyList<string> RequiredPasses { public get; }
 Mmd.UnityIntegration.MmdMaterialRenderingTargets :: property System.Collections.Generic.IReadOnlyList<string> UnsupportedFeatures { public get; }
@@ -1233,7 +1233,7 @@ Mmd.UnityIntegration.MmdMaterialRenderingTargets :: property string TextureAlpha
 Mmd.UnityIntegration.MmdMaterialRenderingTargets :: property string TextureAlphaOutputWeightProperty { public get; }
 Mmd.UnityIntegration.MmdMaterialRenderingTargets :: property string ZWriteProperty { public get; }
 Mmd.UnityIntegration.MmdMaterialTextureTargets :: (type) public sealed class MmdMaterialTextureTargets
-Mmd.UnityIntegration.MmdMaterialTextureTargets :: ctor public .ctor(System.Collections.Generic.IEnumerable<string> diffuseTextureProperties, string sphereTextureProperty = null, string toonTextureProperty = null, string diffuseTextureBoundProperty = null, string sphereModeProperty = null, string toonTextureBoundProperty = null, string sphereTextureBoundProperty = null)
+Mmd.UnityIntegration.MmdMaterialTextureTargets :: ctor public .ctor(System.Collections.Generic.IEnumerable<string>? diffuseTextureProperties, string? sphereTextureProperty = null, string? toonTextureProperty = null, string? diffuseTextureBoundProperty = null, string? sphereModeProperty = null, string? toonTextureBoundProperty = null, string? sphereTextureBoundProperty = null)
 Mmd.UnityIntegration.MmdMaterialTextureTargets :: property System.Collections.Generic.IReadOnlyList<string> DiffuseTextureProperties { public get; }
 Mmd.UnityIntegration.MmdMaterialTextureTargets :: property static Mmd.UnityIntegration.MmdMaterialTextureTargets BuiltIn { public get; }
 Mmd.UnityIntegration.MmdMaterialTextureTargets :: property static Mmd.UnityIntegration.MmdMaterialTextureTargets UrpLit { public get; }
@@ -1252,12 +1252,12 @@ Mmd.UnityIntegration.MmdResolvedTexture :: property string ResolvedPath { public
 Mmd.UnityIntegration.MmdRuntimeImporterComponent :: (type) public sealed class MmdRuntimeImporterComponent : UnityEngine.MonoBehaviour
 Mmd.UnityIntegration.MmdRuntimeImporterComponent :: ctor public .ctor()
 Mmd.UnityIntegration.MmdRuntimeImporterComponent :: method public Mmd.MmdPlaybackConfig ToConfig()
-Mmd.UnityIntegration.MmdRuntimeImporterComponent :: method public bool TryConfigureController(Mmd.UnityIntegration.MmdUnityPlaybackController controller = null)
+Mmd.UnityIntegration.MmdRuntimeImporterComponent :: method public bool TryConfigureController(Mmd.UnityIntegration.MmdUnityPlaybackController? controller = null)
 Mmd.UnityIntegration.MmdRuntimeImporterComponent :: method public void ConfigureLocalPlaybackSettings(float playbackFrameRate, int startFrame, bool shouldPlayOnStart)
 Mmd.UnityIntegration.MmdRuntimeImporterComponent :: method public void ConfigureModelPath(string pmxPath)
 Mmd.UnityIntegration.MmdRuntimeImporterComponent :: method public void ConfigurePaths(string pmxPath, string vmdPath, float playbackFrameRate = 30f, int startFrame = 0, bool shouldPlayOnStart = true)
-Mmd.UnityIntegration.MmdRuntimeImporterComponent :: method public void ConfigurePlaybackConfigAsset(Mmd.MmdPlaybackConfigAsset configAsset)
-Mmd.UnityIntegration.MmdRuntimeImporterComponent :: property Mmd.MmdPlaybackConfigAsset PlaybackConfigAsset { public get; }
+Mmd.UnityIntegration.MmdRuntimeImporterComponent :: method public void ConfigurePlaybackConfigAsset(Mmd.MmdPlaybackConfigAsset? configAsset)
+Mmd.UnityIntegration.MmdRuntimeImporterComponent :: property Mmd.MmdPlaybackConfigAsset? PlaybackConfigAsset { public get; }
 Mmd.UnityIntegration.MmdRuntimeImporterComponent :: property bool PlayOnStart { public get; }
 Mmd.UnityIntegration.MmdRuntimeImporterComponent :: property float FrameRate { public get; }
 Mmd.UnityIntegration.MmdRuntimeImporterComponent :: property int InitialFrame { public get; }
@@ -1272,7 +1272,7 @@ Mmd.UnityIntegration.MmdRuntimeTextureResolution :: property System.Collections.
 Mmd.UnityIntegration.MmdRuntimeTextureResolution :: property System.Collections.Generic.IReadOnlyList<Mmd.UnityIntegration.MmdResolvedTexture> SphereTextures { public get; }
 Mmd.UnityIntegration.MmdRuntimeTextureResolution :: property System.Collections.Generic.IReadOnlyList<Mmd.UnityIntegration.MmdResolvedTexture> ToonTextures { public get; }
 Mmd.UnityIntegration.MmdRuntimeTextureResolver :: (type) public static class MmdRuntimeTextureResolver
-Mmd.UnityIntegration.MmdRuntimeTextureResolver :: method public static Mmd.UnityIntegration.MmdRuntimeTextureResolution ResolveDiffuseTextures(Mmd.Rendering.MmdRenderingDescriptor descriptor, Mmd.UnityIntegration.MmdUnityModelSourceContext sourceContext)
+Mmd.UnityIntegration.MmdRuntimeTextureResolver :: method public static Mmd.UnityIntegration.MmdRuntimeTextureResolution ResolveDiffuseTextures(Mmd.Rendering.MmdRenderingDescriptor descriptor, Mmd.UnityIntegration.MmdUnityModelSourceContext? sourceContext)
 Mmd.UnityIntegration.MmdSceneCameraApplyStatus :: (type) public enum MmdSceneCameraApplyStatus : int
 Mmd.UnityIntegration.MmdSceneCameraApplyStatus :: enum Applied = 1
 Mmd.UnityIntegration.MmdSceneCameraApplyStatus :: enum AppliedOrthographicNotSupported = 3
@@ -1297,9 +1297,9 @@ Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: property Mmd.UnityIntegration
 Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: property Mmd.UnityIntegration.MmdSceneLightApplyStatus LastLightApplyStatus { public get; }
 Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: property Mmd.UnityIntegration.MmdSceneSelfShadowApplyStatus LastSelfShadowApplyStatus { public get; }
 Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: property Mmd.UnityIntegration.MmdSceneSelfShadowDiagnosticStatus LastSelfShadowDiagnosticStatus { public get; }
-Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: property UnityEngine.Camera TargetCamera { public get; public set; }
-Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: property UnityEngine.Light SelfShadowDirectionLight { public get; public set; }
-Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: property UnityEngine.Light TargetLight { public get; public set; }
+Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: property UnityEngine.Camera? TargetCamera { public get; public set; }
+Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: property UnityEngine.Light? SelfShadowDirectionLight { public get; public set; }
+Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: property UnityEngine.Light? TargetLight { public get; public set; }
 Mmd.UnityIntegration.MmdSceneEnvironmentBinding :: property bool SelfShadowEnabled { public get; public set; }
 Mmd.UnityIntegration.MmdSceneLightApplyStatus :: (type) public enum MmdSceneLightApplyStatus : int
 Mmd.UnityIntegration.MmdSceneLightApplyStatus :: enum Applied = 1
@@ -1341,7 +1341,7 @@ Mmd.UnityIntegration.MmdSelfShadowTarget :: method public bool TryGetActiveProje
 Mmd.UnityIntegration.MmdSelfShadowTarget :: method public bool TryGetSelfShadowLightDirection(out UnityEngine.Vector3 direction)
 Mmd.UnityIntegration.MmdSelfShadowTarget :: method public static void CollectActiveTargets(System.Collections.Generic.List<Mmd.UnityIntegration.MmdSelfShadowTarget> buffer)
 Mmd.UnityIntegration.MmdSelfShadowTarget :: property Mmd.Motion.MmdSelfShadowProjectionPolicy ProjectionPolicy { public get; public set; }
-Mmd.UnityIntegration.MmdSelfShadowTarget :: property Mmd.UnityIntegration.MmdSceneEnvironmentBinding SceneEnvironment { public get; public set; }
+Mmd.UnityIntegration.MmdSelfShadowTarget :: property Mmd.UnityIntegration.MmdSceneEnvironmentBinding? SceneEnvironment { public get; public set; }
 Mmd.UnityIntegration.MmdSelfShadowTarget :: property UnityEngine.Transform BoundsRoot { public get; public set; }
 Mmd.UnityIntegration.MmdSelfShadowTarget :: property bool SelfShadowEnabled { public get; public set; }
 Mmd.UnityIntegration.MmdSelfShadowTarget :: property static int ActiveTargetCount { public get; }
@@ -1455,21 +1455,21 @@ Mmd.UnityIntegration.MmdUnityMaterialMissingPropertyDiagnostic :: field public s
 Mmd.UnityIntegration.MmdUnityMaterialMissingPropertyDiagnostic :: field public string reason
 Mmd.UnityIntegration.MmdUnityModelFactory :: (type) public static class MmdUnityModelFactory
 Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance ApplyMaterialRemaps(Mmd.UnityIntegration.MmdUnityModelInstance instance, UnityEngine.Material[] remaps)
-Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateExistingSkinnedModelInstance(UnityEngine.GameObject root, Mmd.Parser.MmdModelDefinition model, string sourcePath)
-Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateExistingSkinnedModelInstance(UnityEngine.GameObject root, Mmd.Parser.MmdModelDefinition model, string sourcePath, float importScale, bool includeSelfShadowTarget = true, Mmd.MmdMaterialOverrideAsset materialOverride = null, bool preserveExistingSelfShadowTarget = false, Mmd.Rendering.MmdMaterialPreset materialPreset = 0, Mmd.Rendering.MmdRenderingDescriptor existingPlaybackDescriptor = null)
-Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateFromImportedHierarchy(UnityEngine.GameObject importedRoot, Mmd.Parser.MmdModelDefinition model, string sourcePath, float importScale, Mmd.MmdMaterialOverrideAsset materialOverride = null)
+Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateExistingSkinnedModelInstance(UnityEngine.GameObject root, Mmd.Parser.MmdModelDefinition model, string? sourcePath)
+Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateExistingSkinnedModelInstance(UnityEngine.GameObject root, Mmd.Parser.MmdModelDefinition model, string? sourcePath, float importScale, bool includeSelfShadowTarget = true, Mmd.MmdMaterialOverrideAsset? materialOverride = null, bool preserveExistingSelfShadowTarget = false, Mmd.Rendering.MmdMaterialPreset materialPreset = 0, Mmd.Rendering.MmdRenderingDescriptor? existingPlaybackDescriptor = null)
+Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateFromImportedHierarchy(UnityEngine.GameObject importedRoot, Mmd.Parser.MmdModelDefinition model, string? sourcePath, float importScale, Mmd.MmdMaterialOverrideAsset? materialOverride = null)
 Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateSkinnedModel(Mmd.Parser.MmdModelDefinition model)
-Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateSkinnedModel(Mmd.Parser.MmdModelDefinition model, string sourcePath)
-Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateSkinnedModel(Mmd.Parser.MmdModelDefinition model, string sourcePath, float importScale)
-Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateSkinnedModel(Mmd.Parser.MmdModelDefinition model, string sourcePath, float importScale, Mmd.Rendering.MmdMaterialPreset preset)
-Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateSkinnedModel(Mmd.Parser.MmdModelDefinition model, string sourcePath, float importScale, Mmd.Rendering.MmdMaterialPreset preset, Mmd.MmdMaterialOverrideAsset materialOverride)
-Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateSkinnedModel(Mmd.Parser.MmdModelDefinition model, string sourcePath, float importScale, Mmd.Rendering.MmdMaterialPreset preset, Mmd.MmdMaterialOverrideAsset materialOverride, Mmd.UnityIntegration.MmdMaterialMapperSet materialMappers)
+Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateSkinnedModel(Mmd.Parser.MmdModelDefinition model, string? sourcePath)
+Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateSkinnedModel(Mmd.Parser.MmdModelDefinition model, string? sourcePath, float importScale)
+Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateSkinnedModel(Mmd.Parser.MmdModelDefinition model, string? sourcePath, float importScale, Mmd.Rendering.MmdMaterialPreset preset)
+Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateSkinnedModel(Mmd.Parser.MmdModelDefinition model, string? sourcePath, float importScale, Mmd.Rendering.MmdMaterialPreset preset, Mmd.MmdMaterialOverrideAsset? materialOverride)
+Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateSkinnedModel(Mmd.Parser.MmdModelDefinition model, string? sourcePath, float importScale, Mmd.Rendering.MmdMaterialPreset preset, Mmd.MmdMaterialOverrideAsset? materialOverride, Mmd.UnityIntegration.MmdMaterialMapperSet materialMappers)
 Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateStaticModel(Mmd.Parser.MmdModelDefinition model)
-Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateStaticModel(Mmd.Parser.MmdModelDefinition model, string sourcePath)
-Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateStaticModel(Mmd.Parser.MmdModelDefinition model, string sourcePath, float importScale)
-Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateStaticModel(Mmd.Parser.MmdModelDefinition model, string sourcePath, float importScale, Mmd.Rendering.MmdMaterialPreset preset)
-Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateStaticModel(Mmd.Parser.MmdModelDefinition model, string sourcePath, float importScale, Mmd.Rendering.MmdMaterialPreset preset, Mmd.MmdMaterialOverrideAsset materialOverride)
-Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateStaticModel(Mmd.Parser.MmdModelDefinition model, string sourcePath, float importScale, Mmd.Rendering.MmdMaterialPreset preset, Mmd.MmdMaterialOverrideAsset materialOverride, Mmd.UnityIntegration.MmdMaterialMapperSet materialMappers)
+Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateStaticModel(Mmd.Parser.MmdModelDefinition model, string? sourcePath)
+Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateStaticModel(Mmd.Parser.MmdModelDefinition model, string? sourcePath, float importScale)
+Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateStaticModel(Mmd.Parser.MmdModelDefinition model, string? sourcePath, float importScale, Mmd.Rendering.MmdMaterialPreset preset)
+Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateStaticModel(Mmd.Parser.MmdModelDefinition model, string? sourcePath, float importScale, Mmd.Rendering.MmdMaterialPreset preset, Mmd.MmdMaterialOverrideAsset? materialOverride)
+Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateStaticModel(Mmd.Parser.MmdModelDefinition model, string? sourcePath, float importScale, Mmd.Rendering.MmdMaterialPreset preset, Mmd.MmdMaterialOverrideAsset? materialOverride, Mmd.UnityIntegration.MmdMaterialMapperSet materialMappers)
 Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateStaticModel(Mmd.Rendering.MmdRenderingDescriptor descriptor, string modelName)
 Mmd.UnityIntegration.MmdUnityModelFactory :: method public static Mmd.UnityIntegration.MmdUnityModelInstance CreateStaticModel(Mmd.Rendering.MmdRenderingDescriptor descriptor, string modelName, Mmd.UnityIntegration.MmdMaterialMapperSet materialMappers)
 Mmd.UnityIntegration.MmdUnityModelInstance :: (type) public sealed class MmdUnityModelInstance
@@ -1478,16 +1478,16 @@ Mmd.UnityIntegration.MmdUnityModelInstance :: property Mmd.UnityIntegration.MmdM
 Mmd.UnityIntegration.MmdUnityModelInstance :: property Mmd.UnityIntegration.MmdShaderBindingDiagnostics ShaderDiagnostics { public get; }
 Mmd.UnityIntegration.MmdUnityModelInstance :: property Mmd.UnityIntegration.MmdTextureBindingDiagnostics TextureDiagnostics { public get; }
 Mmd.UnityIntegration.MmdUnityModelInstance :: property Mmd.UnityIntegration.MmdUnityMaterialBindingDiagnostic[] MaterialBindingDiagnostics { public get; }
-Mmd.UnityIntegration.MmdUnityModelInstance :: property Mmd.UnityIntegration.MmdUnityModelSourceContext SourceContext { public get; }
+Mmd.UnityIntegration.MmdUnityModelInstance :: property Mmd.UnityIntegration.MmdUnityModelSourceContext? SourceContext { public get; }
 Mmd.UnityIntegration.MmdUnityModelInstance :: property Mmd.UnityIntegration.MmdUnityPhysicsBody[] PhysicsBodies { public get; }
 Mmd.UnityIntegration.MmdUnityModelInstance :: property System.Collections.Generic.IReadOnlyDictionary<string, int> BlendShapeIndexMap { public get; }
 Mmd.UnityIntegration.MmdUnityModelInstance :: property System.Collections.Generic.IReadOnlyList<Mmd.UnityIntegration.MmdUnityVertexMorphBlendShapeBinding> VertexMorphBlendShapes { public get; }
 Mmd.UnityIntegration.MmdUnityModelInstance :: property UnityEngine.GameObject Root { public get; }
 Mmd.UnityIntegration.MmdUnityModelInstance :: property UnityEngine.Material[] Materials { public get; }
 Mmd.UnityIntegration.MmdUnityModelInstance :: property UnityEngine.Mesh Mesh { public get; }
-Mmd.UnityIntegration.MmdUnityModelInstance :: property UnityEngine.MeshRenderer MeshRenderer { public get; }
+Mmd.UnityIntegration.MmdUnityModelInstance :: property UnityEngine.MeshRenderer? MeshRenderer { public get; }
 Mmd.UnityIntegration.MmdUnityModelInstance :: property UnityEngine.Quaternion[] BindLocalRotations { public get; }
-Mmd.UnityIntegration.MmdUnityModelInstance :: property UnityEngine.SkinnedMeshRenderer SkinnedMeshRenderer { public get; }
+Mmd.UnityIntegration.MmdUnityModelInstance :: property UnityEngine.SkinnedMeshRenderer? SkinnedMeshRenderer { public get; }
 Mmd.UnityIntegration.MmdUnityModelInstance :: property UnityEngine.Texture2D[] OwnedTextures { public get; }
 Mmd.UnityIntegration.MmdUnityModelInstance :: property UnityEngine.Transform[] BoneTransforms { public get; }
 Mmd.UnityIntegration.MmdUnityModelInstance :: property UnityEngine.Vector3[] BindLocalPositions { public get; }
@@ -1504,7 +1504,7 @@ Mmd.UnityIntegration.MmdUnityModelInstance :: property int SubmeshCount { public
 Mmd.UnityIntegration.MmdUnityModelInstance :: property int UnsupportedTextureReferenceCount { public get; }
 Mmd.UnityIntegration.MmdUnityModelInstance :: property int VertexCount { public get; }
 Mmd.UnityIntegration.MmdUnityModelSourceContext :: (type) public sealed class MmdUnityModelSourceContext
-Mmd.UnityIntegration.MmdUnityModelSourceContext :: method public static Mmd.UnityIntegration.MmdUnityModelSourceContext FromOptionalPath(string sourcePath)
+Mmd.UnityIntegration.MmdUnityModelSourceContext :: method public static Mmd.UnityIntegration.MmdUnityModelSourceContext? FromOptionalPath(string? sourcePath)
 Mmd.UnityIntegration.MmdUnityModelSourceContext :: property string SourceDirectory { public get; }
 Mmd.UnityIntegration.MmdUnityModelSourceContext :: property string SourcePath { public get; }
 Mmd.UnityIntegration.MmdUnityPhysicsBody :: (type) public sealed class MmdUnityPhysicsBody : UnityEngine.MonoBehaviour
@@ -1536,19 +1536,19 @@ Mmd.UnityIntegration.MmdUnityPlaybackBinding :: method public Mmd.MmdPlaybackSna
 Mmd.UnityIntegration.MmdUnityPlaybackBinding :: method public Mmd.MmdPlaybackSnapshot ApplyTime(float time, float frameRate)
 Mmd.UnityIntegration.MmdUnityPlaybackBinding :: method public bool TryEnableFastRuntime(byte[] pmxBytes, byte[] vmdBytes, out string reason, bool abiAlreadyValidated = false)
 Mmd.UnityIntegration.MmdUnityPlaybackBinding :: method public static Mmd.UnityIntegration.MmdUnityPlaybackBinding CreateSkinned(Mmd.MmdPmxAsset modelAsset, Mmd.MmdVmdAsset motionAsset)
-Mmd.UnityIntegration.MmdUnityPlaybackBinding :: method public static Mmd.UnityIntegration.MmdUnityPlaybackBinding CreateSkinned(Mmd.Parser.MmdModelDefinition model, Mmd.Parser.MmdMotionDefinition motion, string modelId, string motionId, string sourcePath = null, Mmd.Rendering.MmdMaterialPreset materialPreset = 0)
-Mmd.UnityIntegration.MmdUnityPlaybackBinding :: method public static Mmd.UnityIntegration.MmdUnityPlaybackBinding CreateSkinned(Mmd.Parser.MmdModelDefinition model, Mmd.Parser.MmdMotionDefinition motion, string modelId, string motionId, string sourcePath, float importScale, Mmd.MmdMaterialOverrideAsset materialOverride = null)
-Mmd.UnityIntegration.MmdUnityPlaybackBinding :: method public static Mmd.UnityIntegration.MmdUnityPlaybackBinding CreateSkinned(Mmd.Parser.MmdModelDefinition model, Mmd.Parser.MmdMotionDefinition motion, string modelId, string motionId, string sourcePath, float importScale, Mmd.Rendering.MmdMaterialPreset materialPreset, Mmd.MmdMaterialOverrideAsset materialOverride = null)
+Mmd.UnityIntegration.MmdUnityPlaybackBinding :: method public static Mmd.UnityIntegration.MmdUnityPlaybackBinding CreateSkinned(Mmd.Parser.MmdModelDefinition model, Mmd.Parser.MmdMotionDefinition motion, string modelId, string motionId, string? sourcePath = null, Mmd.Rendering.MmdMaterialPreset materialPreset = 0)
+Mmd.UnityIntegration.MmdUnityPlaybackBinding :: method public static Mmd.UnityIntegration.MmdUnityPlaybackBinding CreateSkinned(Mmd.Parser.MmdModelDefinition model, Mmd.Parser.MmdMotionDefinition motion, string modelId, string motionId, string? sourcePath, float importScale, Mmd.MmdMaterialOverrideAsset? materialOverride = null)
+Mmd.UnityIntegration.MmdUnityPlaybackBinding :: method public static Mmd.UnityIntegration.MmdUnityPlaybackBinding CreateSkinned(Mmd.Parser.MmdModelDefinition model, Mmd.Parser.MmdMotionDefinition motion, string modelId, string motionId, string? sourcePath, float importScale, Mmd.Rendering.MmdMaterialPreset materialPreset, Mmd.MmdMaterialOverrideAsset? materialOverride = null)
 Mmd.UnityIntegration.MmdUnityPlaybackBinding :: method public static Mmd.UnityIntegration.MmdUnityPlaybackBinding CreateSkinned(Mmd.UnityIntegration.MmdUnityModelInstance instance, Mmd.MmdPmxAsset modelAsset, Mmd.MmdVmdAsset motionAsset)
 Mmd.UnityIntegration.MmdUnityPlaybackBinding :: method public static Mmd.UnityIntegration.MmdUnityPlaybackBinding CreateSkinned(Mmd.UnityIntegration.MmdUnityModelInstance instance, Mmd.MmdPmxAsset modelAsset, Mmd.MmdVmdAsset motionAsset, Mmd.Parser.MmdMotionDefinition motion)
-Mmd.UnityIntegration.MmdUnityPlaybackBinding :: method public static Mmd.UnityIntegration.MmdUnityPlaybackBinding CreateSkinned(Mmd.UnityIntegration.MmdUnityModelInstance instance, Mmd.Parser.MmdModelDefinition model, Mmd.MmdVmdAsset motionAsset, Mmd.Parser.MmdMotionDefinition motion, string modelId, string sourcePath = null)
+Mmd.UnityIntegration.MmdUnityPlaybackBinding :: method public static Mmd.UnityIntegration.MmdUnityPlaybackBinding CreateSkinned(Mmd.UnityIntegration.MmdUnityModelInstance instance, Mmd.Parser.MmdModelDefinition model, Mmd.MmdVmdAsset motionAsset, Mmd.Parser.MmdMotionDefinition motion, string modelId, string? sourcePath = null)
 Mmd.UnityIntegration.MmdUnityPlaybackBinding :: method public static Mmd.UnityIntegration.MmdUnityPlaybackBinding CreateSkinnedFromExistingSceneModel(UnityEngine.GameObject root, Mmd.MmdPmxAsset modelAsset, Mmd.MmdVmdAsset motionAsset, Mmd.Parser.MmdMotionDefinition motion)
 Mmd.UnityIntegration.MmdUnityPlaybackBinding :: method public void DisableFastRuntime()
 Mmd.UnityIntegration.MmdUnityPlaybackBinding :: method public void Dispose()
 Mmd.UnityIntegration.MmdUnityPlaybackBinding :: method public void ResetLivePhysics()
 Mmd.UnityIntegration.MmdUnityPlaybackBinding :: method public void SetPhysicsMode(Mmd.Physics.MmdPhysicsMode mode)
 Mmd.UnityIntegration.MmdUnityPlaybackBinding :: property Mmd.Physics.MmdPhysicsMode PhysicsMode { public get; }
-Mmd.UnityIntegration.MmdUnityPlaybackBinding :: property Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics LastLivePhysicsDiagnostics { public get; }
+Mmd.UnityIntegration.MmdUnityPlaybackBinding :: property Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics? LastLivePhysicsDiagnostics { public get; }
 Mmd.UnityIntegration.MmdUnityPlaybackBinding :: property Mmd.UnityIntegration.MmdUnityModelInstance Instance { public get; }
 Mmd.UnityIntegration.MmdUnityPlaybackBinding :: property bool IsFastRuntimeEnabled { public get; }
 Mmd.UnityIntegration.MmdUnityPlaybackBinding :: property int IkMaxIterationsCap { public get; public set; }
@@ -1557,7 +1557,7 @@ Mmd.UnityIntegration.MmdUnityPlaybackBinding :: property int MotionMaxFrame { pu
 Mmd.UnityIntegration.MmdUnityPlaybackBinding :: property string MotionId { public get; }
 Mmd.UnityIntegration.MmdUnityPlaybackController :: (type) public sealed class MmdUnityPlaybackController : UnityEngine.MonoBehaviour
 Mmd.UnityIntegration.MmdUnityPlaybackController :: ctor public .ctor()
-Mmd.UnityIntegration.MmdUnityPlaybackController :: event public System.Action<Mmd.MmdPlaybackSnapshot> PoseApplied
+Mmd.UnityIntegration.MmdUnityPlaybackController :: event public System.Action<Mmd.MmdPlaybackSnapshot>? PoseApplied
 Mmd.UnityIntegration.MmdUnityPlaybackController :: method public Mmd.MmdPlaybackSnapshot ApplyFrame(int frame)
 Mmd.UnityIntegration.MmdUnityPlaybackController :: method public Mmd.MmdPlaybackSnapshot ApplyTime(float time)
 Mmd.UnityIntegration.MmdUnityPlaybackController :: method public Mmd.MmdPlaybackSnapshot ApplyTime(float time, float playbackFrameRate)
@@ -1580,18 +1580,18 @@ Mmd.UnityIntegration.MmdUnityPlaybackController :: method public void SetPhysics
 Mmd.UnityIntegration.MmdUnityPlaybackController :: method public void SetPlayOnStart(bool value)
 Mmd.UnityIntegration.MmdUnityPlaybackController :: method public void Stop()
 Mmd.UnityIntegration.MmdUnityPlaybackController :: method public void Tick(float deltaTime)
-Mmd.UnityIntegration.MmdUnityPlaybackController :: property Mmd.MmdHumanoidRetargeterResult LastHumanoidRetargetResult { public get; }
-Mmd.UnityIntegration.MmdUnityPlaybackController :: property Mmd.MmdPlaybackSnapshot LastSnapshot { public get; }
-Mmd.UnityIntegration.MmdUnityPlaybackController :: property Mmd.MmdPmxAsset ModelAssetSource { public get; }
-Mmd.UnityIntegration.MmdUnityPlaybackController :: property Mmd.MmdVmdAsset MotionAssetSource { public get; }
+Mmd.UnityIntegration.MmdUnityPlaybackController :: property Mmd.MmdHumanoidRetargeterResult? LastHumanoidRetargetResult { public get; }
+Mmd.UnityIntegration.MmdUnityPlaybackController :: property Mmd.MmdPlaybackSnapshot? LastSnapshot { public get; }
+Mmd.UnityIntegration.MmdUnityPlaybackController :: property Mmd.MmdPmxAsset? ModelAssetSource { public get; }
+Mmd.UnityIntegration.MmdUnityPlaybackController :: property Mmd.MmdVmdAsset? MotionAssetSource { public get; }
 Mmd.UnityIntegration.MmdUnityPlaybackController :: property Mmd.Physics.MmdPhysicsMode PhysicsMode { public get; }
 Mmd.UnityIntegration.MmdUnityPlaybackController :: property Mmd.UnityIntegration.MmdHumanoidRetargetGate LastHumanoidRetargetGate { public get; }
-Mmd.UnityIntegration.MmdUnityPlaybackController :: property Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics LastLivePhysicsDiagnostics { public get; }
-Mmd.UnityIntegration.MmdUnityPlaybackController :: property Mmd.UnityIntegration.MmdTimelineSetupTimingSummary LastTimelineSetupTiming { public get; }
+Mmd.UnityIntegration.MmdUnityPlaybackController :: property Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics? LastLivePhysicsDiagnostics { public get; }
+Mmd.UnityIntegration.MmdUnityPlaybackController :: property Mmd.UnityIntegration.MmdTimelineSetupTimingSummary? LastTimelineSetupTiming { public get; }
 Mmd.UnityIntegration.MmdUnityPlaybackController :: property System.Collections.Generic.IReadOnlyList<Mmd.MmdHumanoidAppendTransformBinding> HumanoidAppendEntries { public get; }
 Mmd.UnityIntegration.MmdUnityPlaybackController :: property System.Collections.Generic.IReadOnlyList<Mmd.MmdHumanoidRetargetBinding> HumanoidRetargetEntries { public get; }
-Mmd.UnityIntegration.MmdUnityPlaybackController :: property UnityEngine.GameObject ConfiguredInstanceRoot { public get; }
-Mmd.UnityIntegration.MmdUnityPlaybackController :: property UnityEngine.Transform HumanoidProxyRoot { public get; }
+Mmd.UnityIntegration.MmdUnityPlaybackController :: property UnityEngine.GameObject? ConfiguredInstanceRoot { public get; }
+Mmd.UnityIntegration.MmdUnityPlaybackController :: property UnityEngine.Transform? HumanoidProxyRoot { public get; }
 Mmd.UnityIntegration.MmdUnityPlaybackController :: property bool HasModelSource { public get; }
 Mmd.UnityIntegration.MmdUnityPlaybackController :: property bool IsConfigured { public get; }
 Mmd.UnityIntegration.MmdUnityPlaybackController :: property bool IsFastRuntimeEnabled { public get; }
