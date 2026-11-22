@@ -41,6 +41,31 @@ namespace Mmd.UnityIntegration
             return new Quaternion(-unity.x, unity.y, -unity.z, unity.w);
         }
 
+        /// <summary>
+        /// Converts PMX Euler angles (radians, MMD space) to an MMD-space rotation. PMX composes the
+        /// axes as <c>qz * qy * qx</c>, the same order as the native PMX path (glam <c>EulerRot::ZYX</c>).
+        /// Pure math so the physics descriptor-world fallback can call it off the main thread.
+        /// </summary>
+        public static Quaternion MmdEulerToRotation(float[]? rotation)
+        {
+            if (rotation == null || rotation.Length < 3)
+            {
+                return Quaternion.identity;
+            }
+
+            float cx = System.MathF.Cos(rotation[0] * 0.5f);
+            float sx = System.MathF.Sin(rotation[0] * 0.5f);
+            float cy = System.MathF.Cos(rotation[1] * 0.5f);
+            float sy = System.MathF.Sin(rotation[1] * 0.5f);
+            float cz = System.MathF.Cos(rotation[2] * 0.5f);
+            float sz = System.MathF.Sin(rotation[2] * 0.5f);
+            return new Quaternion(
+                sx * cy * cz - cx * sy * sz,
+                cx * sy * cz + sx * cy * sz,
+                cx * cy * sz - sx * sy * cz,
+                cx * cy * cz + sx * sy * sz);
+        }
+
         private static float NormalizeScale(float importScale)
         {
             return float.IsFinite(importScale) && importScale > 0.0f ? importScale : 1.0f;

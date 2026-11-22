@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Mmd.Native;
 using Mmd.Parser;
+using Mmd.UnityIntegration;
 
 namespace Mmd.Physics
 {
@@ -583,7 +584,7 @@ namespace Mmd.Physics
             world = descriptorWorld;
         }
 
-        private static MmdRuntimeFfiMethods.PhysicsRigidbodyDescriptor CreateRigidbodyDescriptor(
+        internal static MmdRuntimeFfiMethods.PhysicsRigidbodyDescriptor CreateRigidbodyDescriptor(
             MmdModelDefinition modelDefinition,
             MmdRigidbodyDefinition body)
         {
@@ -612,7 +613,14 @@ namespace Mmd.Physics
                 bodyPosition[1] - boneOrigin[1],
                 bodyPosition[2] - boneOrigin[2]
             };
-            float[] bodyFromBoneRotation = EulerXyzToQuaternion(bodyRotation[0], bodyRotation[1], bodyRotation[2]);
+            UnityEngine.Quaternion bodyRotationQuaternion = MmdCoordinateSpace.MmdEulerToRotation(bodyRotation);
+            float[] bodyFromBoneRotation = new[]
+            {
+                bodyRotationQuaternion.x,
+                bodyRotationQuaternion.y,
+                bodyRotationQuaternion.z,
+                bodyRotationQuaternion.w
+            };
             float[] boneFromBodyRotation = QuaternionInverse(bodyFromBoneRotation);
             float[] boneFromBodyPosition = Negate(RotateVector(boneFromBodyRotation, bodyFromBonePosition));
 
@@ -712,23 +720,6 @@ namespace Mmd.Physics
 
             float[] origin = modelDefinition.bones[boneIndex].origin;
             return origin.Length == 3 ? origin : new[] { 0.0f, 0.0f, 0.0f };
-        }
-
-        private static float[] EulerXyzToQuaternion(float x, float y, float z)
-        {
-            float c1 = MathF.Cos(x * 0.5f);
-            float c2 = MathF.Cos(y * 0.5f);
-            float c3 = MathF.Cos(z * 0.5f);
-            float s1 = MathF.Sin(x * 0.5f);
-            float s2 = MathF.Sin(y * 0.5f);
-            float s3 = MathF.Sin(z * 0.5f);
-            return new[]
-            {
-                s1 * c2 * c3 + c1 * s2 * s3,
-                c1 * s2 * c3 - s1 * c2 * s3,
-                c1 * c2 * s3 + s1 * s2 * c3,
-                c1 * c2 * c3 - s1 * s2 * s3
-            };
         }
 
         private static float[] QuaternionInverse(float[] quaternion)

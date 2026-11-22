@@ -88,19 +88,6 @@ namespace Mmd.UnityIntegration
             return new Quaternion(rotation[0], rotation[1], rotation[2], rotation[3]);
         }
 
-        private static Quaternion ToMmdEulerRotation(float[] rotation)
-        {
-            if (rotation == null || rotation.Length < 3)
-            {
-                return Quaternion.identity;
-            }
-
-            Quaternion rotateX = Quaternion.AngleAxis(rotation[0] * Mathf.Rad2Deg, Vector3.right);
-            Quaternion rotateY = Quaternion.AngleAxis(rotation[1] * Mathf.Rad2Deg, Vector3.up);
-            Quaternion rotateZ = Quaternion.AngleAxis(rotation[2] * Mathf.Rad2Deg, Vector3.forward);
-            return rotateZ * rotateY * rotateX;
-        }
-
         private Vector3 GetBoneOrigin(int boneIndex)
         {
             for (int i = 0; i < model.bones.Count; i++)

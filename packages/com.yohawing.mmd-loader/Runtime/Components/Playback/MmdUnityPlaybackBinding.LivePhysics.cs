@@ -1348,7 +1348,7 @@ namespace Mmd.UnityIntegration
                 Transform root = playbackInstance.Root.transform;
                 Vector3 bodyOffset = ToMmdVector3(body.position) - GetBoneOrigin(body.boneIndex);
                 Quaternion bodyModelRotation = ToMmdQuaternion(bodyTransform.rotation);
-                Quaternion bodyLocalRotation = ToMmdEulerRotation(body.rotation);
+                Quaternion bodyLocalRotation = MmdCoordinateSpace.MmdEulerToRotation(body.rotation);
                 Quaternion boneModelRotation = bodyModelRotation * Quaternion.Inverse(bodyLocalRotation);
                 if (!IsDynamicWithBonePhysicsKind(body.physicsKind))
                 {

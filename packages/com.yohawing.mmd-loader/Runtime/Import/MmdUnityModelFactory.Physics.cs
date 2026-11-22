@@ -52,7 +52,7 @@ namespace Mmd.UnityIntegration
                 var bodyObject = new GameObject(ResolvePhysicsBodyName(body, i));
                 bodyObject.transform.SetParent(parent, worldPositionStays: false);
                 bodyObject.transform.localPosition = localPosition;
-                bodyObject.transform.localRotation = ToUnityModelRotation(ToMmdEulerRotation(body.rotation));
+                bodyObject.transform.localRotation = ToUnityModelRotation(MmdCoordinateSpace.MmdEulerToRotation(body.rotation));
                 bodyObject.transform.localScale = Vector3.one;
 
                 Collider collider = AddCollider(bodyObject, body, scale);

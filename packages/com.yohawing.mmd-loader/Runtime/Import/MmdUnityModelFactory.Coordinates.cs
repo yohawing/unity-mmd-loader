@@ -50,19 +50,6 @@ namespace Mmd.UnityIntegration
             return new Vector3(values[0], values[1], values[2]);
         }
 
-        private static Quaternion ToMmdEulerRotation(float[] rotation)
-        {
-            if (rotation == null || rotation.Length < 3)
-            {
-                return Quaternion.identity;
-            }
-
-            Quaternion rotateX = Quaternion.AngleAxis(rotation[0] * Mathf.Rad2Deg, Vector3.right);
-            Quaternion rotateY = Quaternion.AngleAxis(rotation[1] * Mathf.Rad2Deg, Vector3.up);
-            Quaternion rotateZ = Quaternion.AngleAxis(rotation[2] * Mathf.Rad2Deg, Vector3.forward);
-            return rotateZ * rotateY * rotateX;
-        }
-
         private static bool IsFinite(float value)
         {
             return !float.IsNaN(value) && !float.IsInfinity(value);
