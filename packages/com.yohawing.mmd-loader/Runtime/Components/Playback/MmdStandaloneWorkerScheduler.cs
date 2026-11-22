@@ -48,6 +48,12 @@ namespace Mmd.UnityIntegration
 
         private static readonly List<MmdUnityPlaybackController> registered = new();
         private static readonly List<PendingEvaluation> pending = new();
+        private static readonly MmdPlayerLoopBoundary.Spec Boundary = new(
+            typeof(Update.ScriptRunBehaviourUpdate),
+            typeof(BoundaryMarker),
+            DriveRegisteredControllers,
+            afterMarkerType: null,
+            afterUpdate: null);
         private static bool installed;
         private static bool callbackActive;
         private static ulong generation;
@@ -175,8 +181,11 @@ namespace Mmd.UnityIntegration
         internal static bool EnsureInstalled()
         {
             PlayerLoopSystem current = PlayerLoop.GetCurrentPlayerLoop();
-            if (installed && HasInstalledBoundary(current))
+            if (installed && MmdPlayerLoopBoundary.IsInstalled(current, Boundary))
             {
+                // Unlike the Timeline scheduler, the verified tree is not re-published here:
+                // Register calls this on every controller enable, and a replaced loop without
+                // the marker already fails the check above and is re-patched below.
                 return true;
             }
 
@@ -197,128 +206,7 @@ namespace Mmd.UnityIntegration
             PlayerLoopSystem current,
             out PlayerLoopSystem patched)
         {
-            if (current.type == typeof(Update))
-            {
-                patched = current;
-                if (!TryPatchUpdate(current.subSystemList, out PlayerLoopSystem[] children))
-                {
-                    return false;
-                }
-
-                patched.subSystemList = children;
-                return true;
-            }
-
-            PlayerLoopSystem[]? currentChildren = current.subSystemList;
-            if (currentChildren != null)
-            {
-                for (int i = 0; i < currentChildren.Length; i++)
-                {
-                    if (!TryPatchPlayerLoop(currentChildren[i], out PlayerLoopSystem childPatched))
-                    {
-                        continue;
-                    }
-
-                    var children = (PlayerLoopSystem[])currentChildren.Clone();
-                    children[i] = childPatched;
-                    patched = current;
-                    patched.subSystemList = children;
-                    return true;
-                }
-            }
-
-            patched = current;
-            return false;
-        }
-
-        private static bool HasInstalledBoundary(PlayerLoopSystem current)
-        {
-            if (current.type == typeof(Update))
-            {
-                PlayerLoopSystem[]? children = current.subSystemList;
-                if (children == null)
-                {
-                    return false;
-                }
-
-                int markerIndex = FindType<BoundaryMarker>(children);
-                int anchorIndex = FindType<Update.ScriptRunBehaviourUpdate>(children);
-                return markerIndex >= 0 && anchorIndex >= 0 &&
-                    markerIndex + 1 == anchorIndex &&
-                    children[markerIndex].updateDelegate != null;
-            }
-
-            PlayerLoopSystem[]? currentChildren = current.subSystemList;
-            if (currentChildren == null)
-            {
-                return false;
-            }
-
-            for (int i = 0; i < currentChildren.Length; i++)
-            {
-                if (HasInstalledBoundary(currentChildren[i]))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool TryPatchUpdate(
-            PlayerLoopSystem[]? current,
-            out PlayerLoopSystem[] patched)
-        {
-            patched = Array.Empty<PlayerLoopSystem>();
-            if (current == null)
-            {
-                return false;
-            }
-
-            int markerIndex = FindType<BoundaryMarker>(current);
-            int anchorIndex = FindType<Update.ScriptRunBehaviourUpdate>(current);
-            if (anchorIndex < 0)
-            {
-                return false;
-            }
-
-            if (markerIndex >= 0)
-            {
-                if (markerIndex + 1 != anchorIndex)
-                {
-                    return false;
-                }
-
-                var repaired = (PlayerLoopSystem[])current.Clone();
-                repaired[markerIndex].updateDelegate = DriveRegisteredControllers;
-                patched = repaired;
-                return true;
-            }
-
-            var children = new List<PlayerLoopSystem>(current);
-            children.Insert(
-                anchorIndex,
-                new PlayerLoopSystem
-                {
-                    type = typeof(BoundaryMarker),
-                    updateDelegate = DriveRegisteredControllers
-                });
-            patched = children.ToArray();
-            return true;
-        }
-
-        private static int FindType<T>(IReadOnlyList<PlayerLoopSystem> systems)
-        {
-            Type type = typeof(T);
-            for (int i = 0; i < systems.Count; i++)
-            {
-                if (systems[i].type == type)
-                {
-                    return i;
-                }
-            }
-
-            return -1;
+            return MmdPlayerLoopBoundary.TryPatch(current, Boundary, out patched);
         }
 
         private static void DriveRegisteredControllers()

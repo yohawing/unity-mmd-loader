@@ -14,6 +14,7 @@
 14f26a1ff600cf745b46a928227c0b4f | Mmd.Editor.Timeline.MmdVmdCameraClipEditor
 16be0d1b831944dcb6cf2d5c4cc83be9 | Mmd.UnityIntegration.MmdUnityPlaybackBinding
 18b7370c8084a454f8be4ad65c756abe | Mmd.Timeline.MmdHumanoidAnimationTrack
+1a301c053ca641849ecad2bad5df4397 | Mmd.UnityIntegration.MmdPlayerLoopBoundary
 1a7ec18586d04c4b9f9503dbefe843f8 | Mmd.UnityIntegration.MmdUnityModelFactory
 1b8e6071e8abc3348897d49f1d212eb0 | Mmd.Parser.MmdModelDefinition
 1c7d9c6e7ce649b4b3e5c1b5c6f4d2a1 | Mmd.UnityIntegration.MmdMaterialSurfaceState

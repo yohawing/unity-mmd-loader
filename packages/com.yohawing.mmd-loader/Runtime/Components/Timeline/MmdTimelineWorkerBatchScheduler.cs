@@ -75,6 +75,12 @@ namespace Mmd.Timeline
         }
 
         private static readonly List<PendingEvaluation> pending = new();
+        private static readonly MmdPlayerLoopBoundary.Spec Boundary = new(
+            typeof(Update.DirectorUpdate),
+            typeof(CollectionBoundaryMarker),
+            BeginCollectionBoundary,
+            typeof(DrainBoundaryMarker),
+            DrainCollectionBoundary);
         private static bool collectionWindowActive;
         private static bool installed;
         private static ulong generation;
@@ -110,7 +116,7 @@ namespace Mmd.Timeline
         internal static bool EnsureInstalled()
         {
             PlayerLoopSystem current = PlayerLoop.GetCurrentPlayerLoop();
-            if (installed && HasInstalledBoundaryPair(current))
+            if (installed && MmdPlayerLoopBoundary.IsInstalled(current, Boundary))
             {
                 // Re-publish the current tree as well. Unity's test runner and a few host
                 // integrations replace the active loop without clearing our installation flag;
@@ -130,44 +136,6 @@ namespace Mmd.Timeline
             PlayerLoop.SetPlayerLoop(patched);
             installed = true;
             return true;
-        }
-
-        private static bool HasInstalledBoundaryPair(PlayerLoopSystem current)
-        {
-            if (current.type == typeof(Update))
-            {
-                PlayerLoopSystem[]? children = current.subSystemList;
-                if (children == null)
-                {
-                    return false;
-                }
-
-                int collectionMarkerIndex = FindType<CollectionBoundaryMarker>(children);
-                int drainMarkerIndex = FindType<DrainBoundaryMarker>(children);
-                int collectionAnchorIndex = FindType<Update.DirectorUpdate>(children);
-                return collectionMarkerIndex >= 0 &&
-                    drainMarkerIndex >= 0 &&
-                    children[collectionMarkerIndex].updateDelegate != null &&
-                    children[drainMarkerIndex].updateDelegate != null &&
-                    collectionMarkerIndex + 1 == collectionAnchorIndex &&
-                    drainMarkerIndex == collectionAnchorIndex + 1;
-            }
-
-            PlayerLoopSystem[]? currentChildren = current.subSystemList;
-            if (currentChildren == null)
-            {
-                return false;
-            }
-
-            for (int i = 0; i < currentChildren.Length; i++)
-            {
-                if (HasInstalledBoundaryPair(currentChildren[i]))
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         internal static MmdTimelineWorkerQueueResult TryEnqueue(
@@ -275,105 +243,7 @@ namespace Mmd.Timeline
             PlayerLoopSystem current,
             out PlayerLoopSystem patched)
         {
-            if (current.type == typeof(Update))
-            {
-                patched = current;
-                if (!TryPatchUpdate(current.subSystemList, out PlayerLoopSystem[] children))
-                {
-                    return false;
-                }
-
-                patched.subSystemList = children;
-                return true;
-            }
-
-            PlayerLoopSystem[]? currentChildren = current.subSystemList;
-            if (currentChildren != null)
-            {
-                for (int i = 0; i < currentChildren.Length; i++)
-                {
-                    if (!TryPatchPlayerLoop(currentChildren[i], out PlayerLoopSystem childPatched))
-                    {
-                        continue;
-                    }
-
-                    var children = (PlayerLoopSystem[])currentChildren.Clone();
-                    children[i] = childPatched;
-                    patched = current;
-                    patched.subSystemList = children;
-                    return true;
-                }
-            }
-
-            patched = current;
-            return false;
-        }
-
-        private static bool TryPatchUpdate(
-            PlayerLoopSystem[]? current,
-            out PlayerLoopSystem[] patched)
-        {
-            patched = Array.Empty<PlayerLoopSystem>();
-            if (current == null)
-            {
-                return false;
-            }
-
-            int collectionMarkerIndex = FindType<CollectionBoundaryMarker>(current);
-            int drainMarkerIndex = FindType<DrainBoundaryMarker>(current);
-            int collectionAnchorIndex = FindType<Update.DirectorUpdate>(current);
-            if (collectionAnchorIndex < 0)
-            {
-                return false;
-            }
-
-            if (collectionMarkerIndex >= 0 || drainMarkerIndex >= 0)
-            {
-                if (collectionMarkerIndex < 0 || drainMarkerIndex < 0 ||
-                    collectionMarkerIndex + 1 != collectionAnchorIndex ||
-                    drainMarkerIndex != collectionAnchorIndex + 1)
-                {
-                    return false;
-                }
-
-                var repairedChildren = (PlayerLoopSystem[])current.Clone();
-                repairedChildren[collectionMarkerIndex].updateDelegate = BeginCollectionBoundary;
-                repairedChildren[drainMarkerIndex].updateDelegate = DrainCollectionBoundary;
-                patched = repairedChildren;
-                return true;
-            }
-
-            var children = new List<PlayerLoopSystem>(current);
-            children.Insert(
-                collectionAnchorIndex,
-                new PlayerLoopSystem
-                {
-                    type = typeof(CollectionBoundaryMarker),
-                    updateDelegate = BeginCollectionBoundary
-                });
-            children.Insert(
-                collectionAnchorIndex + 2,
-                new PlayerLoopSystem
-                {
-                    type = typeof(DrainBoundaryMarker),
-                    updateDelegate = DrainCollectionBoundary
-                });
-            patched = children.ToArray();
-            return true;
-        }
-
-        private static int FindType<T>(IReadOnlyList<PlayerLoopSystem> systems)
-        {
-            Type type = typeof(T);
-            for (int i = 0; i < systems.Count; i++)
-            {
-                if (systems[i].type == type)
-                {
-                    return i;
-                }
-            }
-
-            return -1;
+            return MmdPlayerLoopBoundary.TryPatch(current, Boundary, out patched);
         }
 
         private static void BeginCollectionBoundary()
