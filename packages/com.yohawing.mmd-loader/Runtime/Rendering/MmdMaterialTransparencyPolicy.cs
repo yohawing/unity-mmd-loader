@@ -7,8 +7,8 @@ namespace Mmd.Rendering
 {
     /// <summary>
     /// Pure runtime/rendering policy for classifying PMX material transparency
-    /// from material alpha, material name, texture extension, and texture alpha
-    /// scan data. This type does not reference UnityEngine.
+    /// from material alpha, material name, and texture alpha scan data. This type
+    /// does not reference UnityEngine.
     /// </summary>
     internal static class MmdMaterialTransparencyPolicy
     {
@@ -157,8 +157,6 @@ namespace Mmd.Rendering
         /// Resolve the final material transparency mode from:
         /// - PMX material alpha
         /// - material name (for the soft-overlay alphaTest-&gt;alphaBlend upgrade)
-        /// - texture extension (accepted for signature compatibility; no longer affects
-        ///   classification now that texture alpha drives every extension)
         /// - optional texture alpha scan values (may be null when no texture is present)
         ///
         /// Returns one of <see cref="ModeOpaque"/>, <see cref="ModeAlphaTest"/>,
@@ -167,7 +165,6 @@ namespace Mmd.Rendering
         public static string ResolveMaterialTransparencyMode(
             float materialAlpha,
             string materialName,
-            string? textureExtension,
             IReadOnlyList<int>? textureAlphaValues)
         {
             // PMX alpha below 1.0 is always alphaBlend.
@@ -206,12 +203,10 @@ namespace Mmd.Rendering
         public static bool IsLikelyMmdAlphaOverlayMaterial(string? materialName)
         {
             string name = (materialName ?? string.Empty).ToLowerInvariant();
-            return ContainsOrdinal(name, "hair shadow") ||
-                ContainsOrdinal(name, "hairshadow") ||
-                ContainsOrdinal(name, "shadow") ||
+            // Substring needles: "shadow" also matches "hair shadow" / "hairshadow", and the
+            // kage (shadow) kanji also matches the kami-kage / kami-no-kage (hair shadow) spellings.
+            return ContainsOrdinal(name, "shadow") ||
                 ContainsOrdinal(name, "shade") ||
-                ContainsOrdinal(name, "\u9aea\u5f71") ||
-                ContainsOrdinal(name, "\u9aea\u306e\u5f71") ||
                 ContainsOrdinal(name, "\u5f71");
         }
 

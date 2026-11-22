@@ -666,5 +666,65 @@ namespace Mmd.Tests
                 if (opaqueTex != null) UnityEngine.Object.DestroyImmediate(opaqueTex);
             }
         }
+
+        [TestCase("triangle-material", "body.png", "body.png", false)]
+        [TestCase("triangle-material", "hair_shadow.png", "body.png", true)]
+        [TestCase("triangle-material", "body.png", "Textures/cheek.png", true)]
+        [TestCase("影", "body.png", "body.png", true)]
+        public void ReapplyImportedMaterialTransparencyUsesMaterialAndTextureNamesForSoftOverlayUpgrade(
+            string materialName,
+            string diffuseReference,
+            string diffuseResolvedPath,
+            bool expectBlend)
+        {
+            // A 0/255 checkerboard classifies as a hard cutout (alphaTest). The soft-overlay name
+            // check sees the material name plus both texture file names, and upgrades to alphaBlend.
+            MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
+            model.materials[0].alpha = 1.0f;
+            model.materials[0].name = materialName;
+            MmdRenderingDescriptor descriptor = MmdRenderingDescriptorBuilder.Build(model);
+
+            Shader shader = Shader.Find("MMD Basic URP Toon")
+                ?? Shader.Find("Universal Render Pipeline/Lit")
+                ?? Shader.Find("Standard")
+                ?? throw new InvalidOperationException("No fallback shader found.");
+            Material material = new Material(shader);
+            Texture2D cutoutTex = new Texture2D(8, 8, TextureFormat.RGBA32, mipChain: false);
+            try
+            {
+                var pixels = new Color32[64];
+                for (int k = 0; k < pixels.Length; k++)
+                {
+                    byte a = (byte)((((k % 8) + (k / 8)) % 2 == 0) ? 255 : 0);
+                    pixels[k] = new Color32(255, 255, 255, a);
+                }
+
+                cutoutTex.SetPixels32(pixels);
+                cutoutTex.Apply();
+
+                MmdUnityMaterialBuilder.ReapplyImportedMaterialTransparency(
+                    material, descriptor, descriptor.materials[0], 3, diffuseReference, diffuseResolvedPath, cutoutTex);
+
+                if (expectBlend)
+                {
+                    Assert.That(material.renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent + 3));
+                    Assert.That(
+                        material.GetFloat("_DstBlend"),
+                        Is.EqualTo((float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha).Within(0.00001f));
+                }
+                else
+                {
+                    Assert.That(material.renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Geometry));
+                    Assert.That(
+                        material.GetFloat("_DstBlend"),
+                        Is.EqualTo((float)UnityEngine.Rendering.BlendMode.Zero).Within(0.00001f));
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(material);
+                UnityEngine.Object.DestroyImmediate(cutoutTex);
+            }
+        }
     }
 }
