@@ -33,6 +33,34 @@ Obj[16] = ""fx\body.fx""
             Assert.That(assignments[1].effectPath, Is.EqualTo(@"fx\body.fx"));
         }
 
+        [TestCase("")]
+        [TestCase("fa-IR")]
+        [TestCase("tr-TR")]
+        public void ParseMaterialEffectAssignments_ParsesAsciiIndicesIndependentOfCurrentCulture(string cultureName)
+        {
+            string content = "[Effect]\n" +
+                "Obj[007] = a.fx\n" +
+                "Obj[٣] = arabic-indic-digit.fx\n" +
+                "Obj[99999999999] = overflow.fx\n";
+
+            System.Globalization.CultureInfo previous = System.Globalization.CultureInfo.CurrentCulture;
+            try
+            {
+                System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo(cultureName);
+
+                IReadOnlyList<MmeEmdMaterialEffectAssignment> assignments =
+                    MmeEmdParser.ParseMaterialEffectAssignments(content);
+
+                Assert.That(assignments, Has.Count.EqualTo(1));
+                Assert.That(assignments[0].materialIndex, Is.EqualTo(7));
+                Assert.That(assignments[0].effectPath, Is.EqualTo("a.fx"));
+            }
+            finally
+            {
+                System.Globalization.CultureInfo.CurrentCulture = previous;
+            }
+        }
+
         [Test]
         public void ParseMaterialEffectAssignments_IgnoresObjOutsideEffectSection()
         {

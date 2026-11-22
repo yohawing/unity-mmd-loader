@@ -336,11 +336,7 @@ namespace Mmd.Physics
             try
             {
                 uint abiVersion = MmdRuntimeFfiMethods.ValidateAbiVersion();
-                uint featureFlags = MmdRuntimeFfiMethods.FeatureFlags();
-                uint requiredFlags = MmdRuntimeFfiMethods.FeatureSplitPhysicsEvaluation |
-                    MmdRuntimeFfiMethods.FeaturePhysicsBulletNative |
-                    MmdRuntimeFfiMethods.FeatureHostPoseNativeMorphs;
-                if ((featureFlags & requiredFlags) != requiredFlags)
+                if (!HasRequiredPhysicsFeatures(out uint featureFlags))
                 {
                     return Unavailable($"mmd-anim physics features are unavailable (flags=0x{featureFlags:X8}).");
                 }
@@ -375,6 +371,15 @@ namespace Mmd.Physics
             };
         }
 
+        private static bool HasRequiredPhysicsFeatures(out uint featureFlags)
+        {
+            const uint requiredFlags = MmdRuntimeFfiMethods.FeatureSplitPhysicsEvaluation |
+                MmdRuntimeFfiMethods.FeaturePhysicsBulletNative |
+                MmdRuntimeFfiMethods.FeatureHostPoseNativeMorphs;
+            featureFlags = MmdRuntimeFfiMethods.FeatureFlags();
+            return (featureFlags & requiredFlags) == requiredFlags;
+        }
+
         internal static bool TryCreate(
             byte[]? pmxBytes,
             string modelId,
@@ -393,11 +398,7 @@ namespace Mmd.Physics
             try
             {
                 MmdRuntimeFfiMethods.ValidateAbiVersion();
-                uint featureFlags = MmdRuntimeFfiMethods.FeatureFlags();
-                uint requiredFlags = MmdRuntimeFfiMethods.FeatureSplitPhysicsEvaluation |
-                    MmdRuntimeFfiMethods.FeaturePhysicsBulletNative |
-                    MmdRuntimeFfiMethods.FeatureHostPoseNativeMorphs;
-                if ((featureFlags & requiredFlags) != requiredFlags)
+                if (!HasRequiredPhysicsFeatures(out uint featureFlags))
                 {
                     reason = $"mmd-runtime physics host features are unavailable (flags=0x{featureFlags:X8}).";
                     return false;
@@ -412,8 +413,6 @@ namespace Mmd.Physics
                 reason = ex.Message;
             }
 
-            backend?.Dispose();
-            backend = null;
             return false;
         }
 
@@ -458,8 +457,6 @@ namespace Mmd.Physics
                 reason = ex.Message;
             }
 
-            backend?.Dispose();
-            backend = null;
             return false;
         }
 
@@ -489,8 +486,6 @@ namespace Mmd.Physics
             {
                 reason = ex.Message;
             }
-            backend?.Dispose();
-            backend = null;
             return false;
         }
 

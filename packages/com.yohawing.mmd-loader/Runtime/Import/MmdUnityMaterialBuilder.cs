@@ -129,17 +129,7 @@ namespace Mmd.UnityIntegration
             {
                 foreach (Material material in materials)
                 {
-                    if (material != null)
-                    {
-                        if (Application.isPlaying)
-                        {
-                            UnityEngine.Object.Destroy(material);
-                        }
-                        else
-                        {
-                            UnityEngine.Object.DestroyImmediate(material);
-                        }
-                    }
+                    MmdUnityModelFactory.DestroyGeneratedObject(material);
                 }
 
                 throw;

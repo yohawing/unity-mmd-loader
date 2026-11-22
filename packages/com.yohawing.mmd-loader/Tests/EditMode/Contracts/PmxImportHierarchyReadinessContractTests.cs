@@ -103,5 +103,40 @@ namespace Mmd.Tests
             Assert.That(rendererDiagnostic, Does.Contain("No SkinnedMeshRenderer"));
             Assert.That(boneBindingDiagnostic, Does.Contain("No SkinnedMeshRenderer"));
         }
+
+        [TestCase(0, "ImportedRoot exists, no child transforms (static model)")]
+        [TestCase(1, "ImportedRoot exists with children")]
+        public void HierarchyReadinessIsReadyAndDiagnosticDependsOnlyOnChildCount(
+            int childCount,
+            string expectedDiagnostic)
+        {
+            var root = new GameObject("HierarchyReadinessRoot");
+            try
+            {
+                for (int i = 0; i < childCount; i++)
+                {
+                    var child = new GameObject("Child" + i);
+                    child.SetActive(false);
+                    child.transform.SetParent(root.transform, worldPositionStays: false);
+                }
+
+                MmdPmxAsset.ComputeHierarchyReadiness(
+                    root,
+                    assetBoneCount: 0,
+                    out MmdImportReadiness hierarchyReadiness,
+                    out _,
+                    out _,
+                    out string hierarchyDiagnostic,
+                    out _,
+                    out _);
+
+                Assert.That(hierarchyReadiness, Is.EqualTo(MmdImportReadiness.Ready));
+                Assert.That(hierarchyDiagnostic, Is.EqualTo(expectedDiagnostic));
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+            }
+        }
     }
 }

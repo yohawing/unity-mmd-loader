@@ -897,14 +897,7 @@ namespace Mmd.UnityIntegration
                 return;
             }
 
-            if (Application.isPlaying)
-            {
-                UnityEngine.Object.Destroy(value);
-            }
-            else
-            {
-                UnityEngine.Object.DestroyImmediate(value);
-            }
+            MmdUnityModelFactory.DestroyGeneratedObject(value);
         }
     }
 }

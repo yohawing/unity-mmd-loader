@@ -146,27 +146,11 @@ namespace Mmd.UnityIntegration
                 reason = string.Empty;
                 return true;
             }
-            catch (DllNotFoundException ex)
-            {
-                reason = ex.GetType().Name + ": " + ex.Message;
-                return false;
-            }
-            catch (EntryPointNotFoundException ex)
-            {
-                reason = ex.GetType().Name + ": " + ex.Message;
-                return false;
-            }
-            catch (BadImageFormatException ex)
-            {
-                reason = ex.GetType().Name + ": " + ex.Message;
-                return false;
-            }
-            catch (MmdRuntimeNativeUnavailableException ex)
-            {
-                reason = ex.GetType().Name + ": " + ex.Message;
-                return false;
-            }
-            catch (InvalidOperationException ex)
+            catch (Exception ex) when (ex is DllNotFoundException ||
+                ex is EntryPointNotFoundException ||
+                ex is BadImageFormatException ||
+                ex is MmdRuntimeNativeUnavailableException ||
+                ex is InvalidOperationException)
             {
                 reason = ex.GetType().Name + ": " + ex.Message;
                 return false;

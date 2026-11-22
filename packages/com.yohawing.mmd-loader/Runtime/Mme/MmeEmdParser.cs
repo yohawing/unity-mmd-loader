@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace Mmd.Mme
@@ -89,7 +90,11 @@ namespace Mmd.Mme
 
                 Match materialMatch = MaterialEffectRegex.Match(trimmed);
                 if (!materialMatch.Success ||
-                    !int.TryParse(materialMatch.Groups[1].Value, out int materialIndex))
+                    !int.TryParse(
+                        materialMatch.Groups[1].Value,
+                        NumberStyles.Integer,
+                        CultureInfo.InvariantCulture,
+                        out int materialIndex))
                 {
                     continue;
                 }

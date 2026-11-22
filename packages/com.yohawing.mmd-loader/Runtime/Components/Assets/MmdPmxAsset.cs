@@ -903,7 +903,7 @@ namespace Mmd
                 hierarchyReadiness = MmdImportReadiness.Blocked;
                 hierarchyDiagnostic = "ImportedRoot is null";
             }
-            else if (importedRoot.transform.childCount == 0 && importedRoot.GetComponentInChildren<Transform>(includeInactive: true) == importedRoot.transform)
+            else if (importedRoot.transform.childCount == 0)
             {
                 hierarchyReadiness = MmdImportReadiness.Ready;
                 hierarchyDiagnostic = "ImportedRoot exists, no child transforms (static model)";

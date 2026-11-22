@@ -504,14 +504,7 @@ namespace Mmd.UnityIntegration
             {
                 foreach (Material clone in clones.Where(material => material != null))
                 {
-                    if (Application.isPlaying)
-                    {
-                        UnityEngine.Object.Destroy(clone);
-                    }
-                    else
-                    {
-                        UnityEngine.Object.DestroyImmediate(clone);
-                    }
+                    DestroyGeneratedObject(clone);
                 }
 
                 throw;
@@ -795,7 +788,11 @@ namespace Mmd.UnityIntegration
             }
         }
 
-        private static void DestroyGeneratedObject(UnityEngine.Object? value)
+        /// <summary>
+        /// Destroys a generated Unity object with the call that is valid for the current mode:
+        /// <c>Destroy</c> in Play Mode, <c>DestroyImmediate</c> in Edit Mode. Null is ignored.
+        /// </summary>
+        internal static void DestroyGeneratedObject(UnityEngine.Object? value)
         {
             if (value == null)
             {
@@ -852,14 +849,7 @@ namespace Mmd.UnityIntegration
                 return;
             }
 
-            if (Application.isPlaying)
-            {
-                UnityEngine.Object.Destroy(existingTarget);
-            }
-            else
-            {
-                UnityEngine.Object.DestroyImmediate(existingTarget);
-            }
+            DestroyGeneratedObject(existingTarget);
         }
 
         private static Transform FindModelRoot(Transform root)

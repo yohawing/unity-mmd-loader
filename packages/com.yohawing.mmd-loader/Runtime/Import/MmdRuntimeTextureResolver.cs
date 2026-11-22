@@ -195,14 +195,7 @@ namespace Mmd.UnityIntegration
                 return;
             }
 
-            if (Application.isPlaying)
-            {
-                UnityEngine.Object.Destroy(texture);
-            }
-            else
-            {
-                UnityEngine.Object.DestroyImmediate(texture);
-            }
+            MmdUnityModelFactory.DestroyGeneratedObject(texture);
         }
 
         private static void ResolveMaterialTextures(
