@@ -225,13 +225,18 @@ namespace Mmd.Tests
 
         internal static IEnumerable<ModelFixtureEntry> LoadLocalCorpusModelFixtures()
         {
-            if (string.IsNullOrWhiteSpace(LocalCorpusManifestPath) || !File.Exists(LocalCorpusManifestPath))
+            return LoadLocalCorpusModelFixtures(LocalCorpusManifestPath);
+        }
+
+        internal static IEnumerable<ModelFixtureEntry> LoadLocalCorpusModelFixtures(string? manifestPath)
+        {
+            if (string.IsNullOrWhiteSpace(manifestPath) || !File.Exists(manifestPath))
             {
                 yield break;
             }
 
-            string json = File.ReadAllText(LocalCorpusManifestPath);
-            string basePath = MatchRequiredString(json, "basePath");
+            string json = File.ReadAllText(manifestPath);
+            string basePath = ResolveLocalCorpusRoot(manifestPath, json);
             foreach (string format in new[] { "pmx", "pmd" })
             {
                 KeyValuePair<string, string>? item = ExtractFirstReleaseSmokePath(json, format);
@@ -288,17 +293,32 @@ namespace Mmd.Tests
             return resolved;
         }
 
+        // Same root selection as scripts/run-local-asset-fixture-gate.ps1: the top-level
+        // basePath, else root, else "."; a relative root is resolved against the directory of
+        // the manifest file (not the Unity process working directory).
+        private static string ResolveLocalCorpusRoot(string manifestPath, string json)
+        {
+            LocalCorpusManifestRoot roots = JsonUtility.FromJson<LocalCorpusManifestRoot>(json) ?? new LocalCorpusManifestRoot();
+            string declaredRoot = !string.IsNullOrWhiteSpace(roots.basePath)
+                ? roots.basePath
+                : !string.IsNullOrWhiteSpace(roots.root) ? roots.root : ".";
+            string manifestDirectory = Path.GetDirectoryName(Path.GetFullPath(manifestPath))!;
+            return Path.IsPathRooted(declaredRoot)
+                ? Path.GetFullPath(declaredRoot)
+                : Path.GetFullPath(Path.Combine(manifestDirectory, declaredRoot));
+        }
+
+        [Serializable]
+        private sealed class LocalCorpusManifestRoot
+        {
+            public string basePath = string.Empty;
+            public string root = string.Empty;
+        }
+
         private static string ResolveLocalCorpusPath(string basePath, string value)
         {
             string resolved = Path.IsPathRooted(value) ? value : Path.Combine(basePath, value);
             return Path.GetFullPath(resolved);
-        }
-
-        private static string MatchRequiredString(string json, string fieldName)
-        {
-            Match match = Regex.Match(json, "\"" + Regex.Escape(fieldName) + "\"\\s*:\\s*\"(?<value>(?:\\\\.|[^\"])*)\"");
-            Assert.That(match.Success, Is.True, "missing string field: " + fieldName);
-            return Regex.Unescape(match.Groups["value"].Value);
         }
 
         private static KeyValuePair<string, string>? ExtractFirstReleaseSmokePath(string json, string format)

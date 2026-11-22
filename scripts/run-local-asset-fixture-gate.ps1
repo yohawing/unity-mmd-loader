@@ -18,11 +18,27 @@ Directory for sanitized output. Defaults to artifacts/release-gate/local-assets-
 .PARAMETER RequireLocalAssets
 Fail when the manifest is missing, references are missing, or local references
 resolve outside the declared root.
+
+.PARAMETER RunUnityContract
+After the manifest passes validation, run the EditMode contract
+Mmd.Tests.LocalCorpusManifestContractTests in batchmode with
+YMU_LOCAL_FIXTURES_MANIFEST pointing at the manifest. The contract must pass:
+a skip counts as a failure because the manifest is known to exist. When the
+manifest is missing, the contract is skipped like the rest of this gate.
+
+.PARAMETER Unity
+Unity executable for -RunUnityContract. Defaults to Resolve-UnityExecutable.
+
+.PARAMETER ProjectPath
+Unity project for -RunUnityContract. Defaults to unity-mmd under the repository.
 #>
 param(
     [string] $FixtureManifest = "",
     [string] $ReportDir = "",
-    [switch] $RequireLocalAssets
+    [switch] $RequireLocalAssets,
+    [switch] $RunUnityContract,
+    [string] $Unity = "",
+    [string] $ProjectPath = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -206,6 +222,75 @@ function Get-ArrayValue {
     return @($value)
 }
 
+function Invoke-LocalCorpusUnityContract {
+    param(
+        [Parameter(Mandatory = $true)][string] $ManifestPath,
+        [Parameter(Mandatory = $true)][string] $OutputDirectory,
+        [string] $UnityPath = "",
+        [string] $UnityProjectPath = ""
+    )
+
+    . (Join-Path $PSScriptRoot "unity-batch-common.ps1")
+    . (Join-Path $PSScriptRoot "read-nunit-test-result.ps1")
+
+    $context = "local-corpus-contract"
+    $testName = "Mmd.Tests.LocalCorpusManifestContractTests.LocalThreeMmdLoaderCorpusManifestImportsPmxAndPmdWhenPresent"
+    if ([string]::IsNullOrWhiteSpace($UnityProjectPath)) {
+        $UnityProjectPath = Join-Path $root "unity-mmd"
+    }
+    $UnityPath = Resolve-UnityExecutable $UnityPath
+    $resultsPath = Join-Path $OutputDirectory "local-corpus-contract-results.xml"
+    $logPath = Join-Path $OutputDirectory "local-corpus-contract.log"
+
+    Assert-NoRunningUnityProject -ProjectPath $UnityProjectPath -OperationName $context
+    Clear-StaleUnityProjectLocks -ProjectPath $UnityProjectPath
+    Remove-Item -LiteralPath $resultsPath, $logPath -Force -ErrorAction SilentlyContinue
+
+    # The contract reads the manifest path from this variable; without it the test skips.
+    $manifestVariable = "YMU_LOCAL_FIXTURES_MANIFEST"
+    $previousManifest = [Environment]::GetEnvironmentVariable($manifestVariable, "Process")
+    [Environment]::SetEnvironmentVariable($manifestVariable, $ManifestPath, "Process")
+    try {
+        $unityExitCode = Invoke-UnityBatch -Unity $UnityPath -Arguments @(
+            "-batchmode",
+            "-runTests",
+            "-projectPath", $UnityProjectPath,
+            "-testPlatform", "EditMode",
+            "-testResults", $resultsPath,
+            "-logFile", $logPath,
+            "-testFilter", $testName)
+    }
+    finally {
+        [Environment]::SetEnvironmentVariable($manifestVariable, $previousManifest, "Process")
+    }
+
+    Wait-ForFile -Path $resultsPath -TimeoutSeconds 5 | Out-Null
+    try {
+        $testSummary = Read-NUnitTestRunSummary -Path $resultsPath -Context $context
+        # No skip is admitted: the manifest exists, so a skip means the variable did not
+        # reach the test or the manifest could not be read.
+        Assert-NUnitTestRunEvidence `
+            -Summary $testSummary `
+            -MinimumTotal 1 `
+            -MinimumPassed 1 `
+            -AllowedSkippedTests @() `
+            -Context $context | Out-Null
+    }
+    catch {
+        Write-Host ("FAIL {0}: exitCode={1}; results={2}; log={3}; {4}" -f $context, $unityExitCode, $resultsPath, $logPath, $_.Exception.Message)
+        return 1
+    }
+
+    if ($unityExitCode -ne 0) {
+        Write-Host ("FAIL {0}: exitCode={1}; result={2}; results={3}; log={4}" -f $context, $unityExitCode, $testSummary.Result, $resultsPath, $logPath)
+        return 1
+    }
+
+    Write-Host ("PASS {0}: total={1}; passed={2}; failed={3}; skipped={4}; results={5}" -f `
+        $context, $testSummary.Total, $testSummary.Passed, $testSummary.Failed, $testSummary.Skipped, $resultsPath)
+    return 0
+}
+
 $summaryPath = Join-Path $ReportDir "summary.json"
 
 if (-not (Test-Path -LiteralPath $FixtureManifest)) {
@@ -236,6 +321,9 @@ if (-not (Test-Path -LiteralPath $FixtureManifest)) {
     }
 
     Write-Host "SKIP local-assets: fixture manifest is missing; summary=$summaryPath"
+    if ($RunUnityContract) {
+        Write-Host "SKIP local-corpus-contract: fixture manifest is missing"
+    }
     exit 0
 }
 
@@ -407,6 +495,17 @@ Write-Host ("{0} local-assets: refs={1}, existing={2}, missing={3}, outsideRoot=
 
 if ($status -eq "failed") {
     exit 1
+}
+
+if ($RunUnityContract) {
+    $contractExitCode = Invoke-LocalCorpusUnityContract `
+        -ManifestPath $FixtureManifest `
+        -OutputDirectory $ReportDir `
+        -UnityPath $Unity `
+        -UnityProjectPath $ProjectPath
+    if ($contractExitCode -ne 0) {
+        exit 1
+    }
 }
 
 exit 0
