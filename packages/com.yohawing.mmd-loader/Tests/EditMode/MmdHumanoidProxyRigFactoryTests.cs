@@ -1464,6 +1464,56 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void CreateProxyRigFromBoneTransformsOrdersRootLevelProxyBonesInHumanoidOrder()
+        {
+            // Without Spine/Chest, Neck and both shoulders have no humanoid parent and stay
+            // under the proxy root next to Hips. They are created in PMX bone order, and
+            // re-parenting to the same root does not move them, so only the explicit sibling
+            // pass puts the root-level bones into humanoid traversal order.
+            var root = new GameObject("ImportedHierarchyRoot");
+            MmdHumanoidProxyRigResult? result = null;
+            try
+            {
+                Transform rightShoulder = AddBoneToHierarchy(root, "右肩", null, new Vector3(-2f, 14f, 0f));
+                Transform neck = AddBoneToHierarchy(root, "首", null, new Vector3(0f, 16f, 0f));
+                Transform hips = AddBoneToHierarchy(root, "下半身", null, new Vector3(0f, 10f, 0f));
+                Transform leftShoulder = AddBoneToHierarchy(root, "左肩", null, new Vector3(2f, 14f, 0f));
+
+                result = MmdHumanoidProxyRigFactory.CreateProxyRigFromBoneTransforms(
+                    new[] { rightShoulder, neck, hips, leftShoulder },
+                    root.transform,
+                    "ImportedProxyRig");
+
+                Assert.That(result.ProxyRoot, Is.Not.Null);
+                Transform proxyRoot = result.ProxyRoot!.transform;
+                var childNames = new List<string>();
+                for (int i = 0; i < proxyRoot.childCount; i++)
+                {
+                    childNames.Add(proxyRoot.GetChild(i).name);
+                }
+
+                Assert.That(
+                    childNames,
+                    Is.EqualTo(new[]
+                    {
+                        nameof(HumanBodyBones.Hips),
+                        nameof(HumanBodyBones.Neck),
+                        nameof(HumanBodyBones.LeftShoulder),
+                        nameof(HumanBodyBones.RightShoulder),
+                    }));
+            }
+            finally
+            {
+                if (result?.ProxyRoot != null)
+                {
+                    Object.DestroyImmediate(result.ProxyRoot);
+                }
+
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
         public void CreateProxyRigFromBoneTransformsUsesHumanoidHierarchyAndPreservesWorldPoseForSiblingTorso()
         {
             var root = new GameObject("ImportedHierarchyRoot");

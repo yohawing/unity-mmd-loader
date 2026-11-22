@@ -486,6 +486,9 @@ namespace Mmd
                 proxyBoneTransform.SetPositionAndRotation(pose.position, pose.rotation);
                 proxyBoneTransform.localScale = pose.scale;
             }
+            // Re-parenting appends to a new parent in humanoid order, but bones that stay under
+            // the proxy root (Hips, or bones whose humanoid parent is unmapped) keep PMX order
+            // because SetParent to the same parent does not move them.
             ApplyHumanoidSiblingOrder(root.transform, boneMap);
 
             diagnostics.Add(
