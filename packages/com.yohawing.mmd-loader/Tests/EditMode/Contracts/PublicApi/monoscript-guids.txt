@@ -175,6 +175,7 @@ e72469932e90b8042bd82b37772a0f3a | Mmd.Rendering.MmdMaterialPropertyNames
 e8642d1bf9c54fd2b92ea60882b67b32 | Mmd.UnityIntegration.MmdRuntimeTextureResolver
 e9a74429721d4f51a2ec54fbb86f9a26 | Mmd.UnityIntegration.MmdTextureDecodeBudget
 ed3e925c3c09dd743b470f056b6380f4 | Mmd.Timeline.MmdVmdCameraBehaviour
+ed6ecd38eb5e4c3dadc03b66d5250b06 | Mmd.MmdCp932Encoding
 ef5b5302a3af40ac943aa5def2694a90 | Mmd.Rendering.MmdMorphDescriptorBuilder
 f292163f66bec3f448f27dc91798ccec | Mmd.Editor.MmdVmdScriptedImporter
 f39ab91dbc384cde87e29cd3f85b0e78 | Mmd.Editor.MmdAnimationClipBakeBudget

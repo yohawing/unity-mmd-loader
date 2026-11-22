@@ -12,8 +12,6 @@ namespace Mmd.Parser
     /// </summary>
     internal static class MmdNativeMotionReadbackConverter
     {
-        private static readonly Encoding? Cp932Encoding = TryGetCp932Encoding();
-
         internal static MmdMotionDefinition BuildRaw(
             MmdVmdParseSummary summary,
             MmdRuntimeFfiMethods.VmdRawBoneKeyframe[] boneKeys,
@@ -193,9 +191,12 @@ namespace Mmd.Parser
                 length++;
             }
 
-            Encoding encoding = Cp932Encoding ?? throw new MmdRuntimeUnsupportedException(
-                "CP932/Shift-JIS decoding is unavailable for native raw VMD " + channel +
-                " names.");
+            // Build the purpose text only on failure: this runs once per bone/morph key.
+            if (!MmdCp932Encoding.TryGet(out Encoding encoding, out _))
+            {
+                encoding = MmdCp932Encoding.Get("native raw VMD " + channel + " names");
+            }
+
             string name = encoding.GetString(values, 0, length);
 
             name = name.TrimEnd(' ', '\0');
@@ -376,8 +377,7 @@ namespace Mmd.Parser
                 length++;
             }
 
-            Encoding encoding = Cp932Encoding ?? throw new MmdRuntimeUnsupportedException(
-                "CP932/Shift-JIS decoding is unavailable for native property IK names.");
+            Encoding encoding = MmdCp932Encoding.Get("native property IK names");
             string name = encoding.GetString(values, 0, length);
 
             name = name.TrimEnd(' ', '\0');
@@ -389,18 +389,5 @@ namespace Mmd.Parser
 
             return name;
         }
-
-        private static Encoding? TryGetCp932Encoding()
-        {
-            try
-            {
-                return Encoding.GetEncoding(932);
-            }
-            catch (ArgumentException)
-            {
-                return null;
-            }
-        }
-
     }
 }

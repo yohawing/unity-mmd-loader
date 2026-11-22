@@ -225,7 +225,7 @@ namespace Mmd.Mme
             }
             catch (DecoderFallbackException)
             {
-                return TrimByteOrderMark(Encoding.GetEncoding(932).GetString(bytes));
+                return TrimByteOrderMark(MmdCp932Encoding.Get("MME effect text").GetString(bytes));
             }
         }
 

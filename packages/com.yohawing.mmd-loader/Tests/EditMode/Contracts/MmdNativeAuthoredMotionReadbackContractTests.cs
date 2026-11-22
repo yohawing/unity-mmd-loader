@@ -13,6 +13,19 @@ namespace Mmd.Tests
     public sealed class MmdNativeAuthoredMotionReadbackContractTests
     {
         [Test]
+        public void SharedCp932LookupReturnsShiftJisAndIsStable()
+        {
+            Assert.That(MmdCp932Encoding.TryGet(out Encoding encoding, out string failureReason), Is.True);
+            Assert.That(failureReason, Is.Empty);
+            Assert.That(encoding.CodePage, Is.EqualTo(932));
+            Assert.That(MmdCp932Encoding.Get("test"), Is.SameAs(encoding));
+
+            // "センター" (center bone) in Shift-JIS.
+            byte[] center = { 0x83, 0x5A, 0x83, 0x93, 0x83, 0x5E, 0x81, 0x5B };
+            Assert.That(encoding.GetString(center), Is.EqualTo("センター"));
+        }
+
+        [Test]
         public void LoadMotionPreservesRawCp932BoneNames()
         {
             byte[] vmdBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube_motion.vmd");

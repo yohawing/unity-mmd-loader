@@ -11,8 +11,6 @@ namespace Mmd
     /// </summary>
     internal static class MmdVmdNativeSummaryAdapter
     {
-        private static readonly Encoding? Cp932Encoding = TryGetCp932Encoding();
-
         internal static MmdVmdParseSummary Read(byte[] vmdBytes)
         {
             if (vmdBytes == null || vmdBytes.Length == 0)
@@ -89,21 +87,8 @@ namespace Mmd
                 end++;
             }
 
-            Encoding encoding = Cp932Encoding ?? throw new InvalidOperationException(
-                "Native VMD summary requires code page 932 to decode the target model name.");
+            Encoding encoding = MmdCp932Encoding.Get("the native VMD summary target model name");
             return encoding.GetString(bytes, 0, end).TrimEnd(' ', '\0');
-        }
-
-        private static Encoding? TryGetCp932Encoding()
-        {
-            try
-            {
-                return Encoding.GetEncoding(932);
-            }
-            catch (ArgumentException)
-            {
-                return null;
-            }
         }
     }
 }
