@@ -64,38 +64,22 @@ namespace Mmd.UnityIntegration
             MmdRuntimeTextureResolution textureResolution)
         {
             MmdResolvedTexture? diffuseTexture = FindResolvedDiffuseTexture(textureResolution, source.materialIndex);
-            return ResolveTextureTransparencyMode(
-                descriptor,
-                source,
-                diffuseTexture?.Texture,
-                diffuseTexture?.Reference,
-                diffuseTexture?.ResolvedPath);
+            return ResolveTextureTransparencyMode(descriptor, source, diffuseTexture?.Texture);
         }
 
         /// <summary>
         /// Shared classification step of the import and re-apply paths: scans the used diffuse
-        /// texture alpha, then classifies with the material name extended by the diffuse texture
-        /// file names (so an overlay hint in either name upgrades a hard cutout to alpha blend).
+        /// texture alpha and classifies from the PMX material alpha and that scan only. Material
+        /// and texture names are deliberately not consulted.
         /// </summary>
         private static MmdMaterialSurfaceMode ResolveTextureTransparencyMode(
             MmdRenderingDescriptor descriptor,
             MmdMaterialDescriptor source,
-            Texture2D? diffuseTextureForAlpha,
-            string? diffuseReference,
-            string? diffuseResolvedPath)
+            Texture2D? diffuseTextureForAlpha)
         {
             int[]? alphaValues = ExtractTextureAlphaValues(diffuseTextureForAlpha, descriptor, source.materialIndex);
-            string effectiveMaterialName = source.name ?? string.Empty;
-            if (diffuseTextureForAlpha != null)
-            {
-                // The names only matter when an alpha scan exists, which requires the texture.
-                effectiveMaterialName += " " + System.IO.Path.GetFileNameWithoutExtension(diffuseReference ?? string.Empty);
-                effectiveMaterialName += " " + System.IO.Path.GetFileNameWithoutExtension(diffuseResolvedPath ?? string.Empty);
-            }
-
             string mode = MmdMaterialTransparencyPolicy.ResolveMaterialTransparencyMode(
                 source.alpha,
-                effectiveMaterialName,
                 alphaValues);
             return MapTransparencyMode(mode);
         }
@@ -294,8 +278,6 @@ namespace Mmd.UnityIntegration
             MmdRenderingDescriptor descriptor,
             MmdMaterialDescriptor source,
             int materialRenderOrder,
-            string? diffuseReference,
-            string? diffuseResolvedPath,
             Texture2D? diffuseTextureForAlpha,
             MmdMaterialRenderingTargets? renderingTargets = null)
         {
@@ -303,9 +285,7 @@ namespace Mmd.UnityIntegration
             MmdMaterialSurfaceMode transparencyMode = ResolveTextureTransparencyMode(
                 descriptor,
                 source,
-                diffuseTextureForAlpha,
-                diffuseReference,
-                diffuseResolvedPath);
+                diffuseTextureForAlpha);
             MmdMaterialRenderingTargets effectiveTargets =
                 renderingTargets ?? MmdMaterialRenderingTargets.BuiltIn;
             ApplyMaterialRenderingPolicy(

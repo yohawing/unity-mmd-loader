@@ -38,6 +38,11 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
   - `MmdHumanoidSetupAsset.Initialize`. Reimport the PMX with Animation Type = Humanoid and use the imported Avatar and retarget mapping. Existing `MmdHumanoidSetupAsset` files still load, and the obsolete `MmdHumanoidSetupPreset` enum stays because it is the type of their serialized `setupPreset` field.
 - Removed `Mmd.Editor.MmdPmxPrefabExporter.CreatePrefabWithFeedback`, which no menu or window called. Call `CreatePrefab(pmxAsset, GetDefaultPrefabPath(pmxAsset))` instead; it throws on failure and does not change the selection.
 
+### Changed
+
+- Material transparency is now decided only from the PMX material alpha and the alpha of the diffuse texture over the used UVs. Material and texture names are no longer consulted: a material whose name or diffuse file name contains words such as "shadow", "shade", "影", "cheek", "blush", "頰", "ほほ" or "チーク" is no longer upgraded from alpha test to alpha blend.
+  - Visual impact: only an opaque-alpha material whose texture scans as a hard cutout (mostly fully opaque texels with a few transparent ones) and whose name contains one of those words changes. It now renders as alpha test (Geometry queue, alpha clip) instead of alpha blend (Transparent queue after earlier materials). Materials with PMX alpha below 1, or whose texture scans as opaque or soft alpha, are unchanged. No material in the bundled fixtures or samples changes.
+
 ### Fixed
 
 - Humanoid Live playback no longer re-parses the PMX every frame after the model-only physics binding fails to build; it retries once after the scene is reconfigured or Live physics is re-enabled.

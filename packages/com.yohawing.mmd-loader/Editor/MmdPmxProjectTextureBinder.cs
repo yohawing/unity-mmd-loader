@@ -130,13 +130,11 @@ namespace Mmd.Editor
                     if (descriptor != null && i < descriptor.materials.Count)
                     {
                         MmdMaterialDescriptor source = descriptor.materials[i];
-                        string? diffuseAssetPath = null;
                         Texture2D? decodedAlphaTexture = null;
                         if (!string.IsNullOrWhiteSpace(matDef.texture) &&
                             MmdAssetPathUtility.TryResolveProjectRelativeAssetPathCandidate(pmxAssetPath, matDef.texture, out string resolvedAssetPath) &&
                             System.IO.File.Exists(resolvedAssetPath))
                         {
-                            diffuseAssetPath = resolvedAssetPath;
                             try
                             {
                                 byte[] texBytes = MmdTextureDecodeBudget.Default.ReadFileBytes(resolvedAssetPath);
@@ -158,8 +156,6 @@ namespace Mmd.Editor
                                 descriptor,
                                 source,
                                 i,
-                                matDef.texture,
-                                diffuseAssetPath,
                                 decodedAlphaTexture,
                                 renderingTargets);
                         }

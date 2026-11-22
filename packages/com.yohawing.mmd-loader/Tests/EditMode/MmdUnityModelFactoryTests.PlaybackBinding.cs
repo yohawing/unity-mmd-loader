@@ -626,7 +626,7 @@ namespace Mmd.Tests
                 alphaTex.Apply();
 
                 MmdUnityMaterialBuilder.ReapplyImportedMaterialTransparency(
-                    material, descriptor, descriptor.materials[0], 0, "tex.png", "tex.png", alphaTex);
+                    material, descriptor, descriptor.materials[0], 0, alphaTex);
 
                 Assert.That(
                     material.GetFloat("_DstBlend"),
@@ -648,7 +648,7 @@ namespace Mmd.Tests
                 opaqueTex.Apply();
 
                 MmdUnityMaterialBuilder.ReapplyImportedMaterialTransparency(
-                    material, descriptor, descriptor.materials[0], 0, "tex.png", "tex.png", opaqueTex);
+                    material, descriptor, descriptor.materials[0], 0, opaqueTex);
 
                 Assert.That(
                     material.GetFloat("_DstBlend"),
@@ -667,18 +667,32 @@ namespace Mmd.Tests
             }
         }
 
-        [TestCase("triangle-material", "body.png", "body.png", false)]
-        [TestCase("triangle-material", "hair_shadow.png", "body.png", true)]
-        [TestCase("triangle-material", "body.png", "Textures/cheek.png", true)]
-        [TestCase("影", "body.png", "body.png", true)]
-        public void ReapplyImportedMaterialTransparencyUsesMaterialAndTextureNamesForSoftOverlayUpgrade(
-            string materialName,
-            string diffuseReference,
-            string diffuseResolvedPath,
-            bool expectBlend)
+        [TestCase("hair shadow")]
+        [TestCase("face_shade")]
+        [TestCase("影")]
+        [TestCase("前髪影")]
+        [TestCase("cheek")]
+        [TestCase("Blush")]
+        [TestCase("頰")]
+        [TestCase("ほほ")]
+        [TestCase("チーク")]
+        public void ReapplyImportedMaterialTransparencyIgnoresOverlayLookingMaterialNames(string overlayLookingName)
         {
-            // A 0/255 checkerboard classifies as a hard cutout (alphaTest). The soft-overlay name
-            // check sees the material name plus both texture file names, and upgrades to alphaBlend.
+            // A 0/255 checkerboard classifies as a hard cutout (alphaTest). Transparency is decided
+            // from alpha data only, so a material named like a shadow/cheek overlay must classify
+            // exactly like a neutrally named material with the same texture.
+            (int Queue, float DstBlend, float AlphaClip) neutral = ReapplyCheckerboardCutout("triangle-material");
+            (int Queue, float DstBlend, float AlphaClip) overlay = ReapplyCheckerboardCutout(overlayLookingName);
+
+            Assert.That(neutral.Queue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Geometry));
+            Assert.That(
+                neutral.DstBlend,
+                Is.EqualTo((float)UnityEngine.Rendering.BlendMode.Zero).Within(0.00001f));
+            Assert.That(overlay, Is.EqualTo(neutral));
+        }
+
+        private (int Queue, float DstBlend, float AlphaClip) ReapplyCheckerboardCutout(string materialName)
+        {
             MmdModelDefinition model = CreateMinimalTriangleModel(includeTextureReferences: false);
             model.materials[0].alpha = 1.0f;
             model.materials[0].name = materialName;
@@ -703,22 +717,10 @@ namespace Mmd.Tests
                 cutoutTex.Apply();
 
                 MmdUnityMaterialBuilder.ReapplyImportedMaterialTransparency(
-                    material, descriptor, descriptor.materials[0], 3, diffuseReference, diffuseResolvedPath, cutoutTex);
+                    material, descriptor, descriptor.materials[0], 3, cutoutTex);
 
-                if (expectBlend)
-                {
-                    Assert.That(material.renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent + 3));
-                    Assert.That(
-                        material.GetFloat("_DstBlend"),
-                        Is.EqualTo((float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha).Within(0.00001f));
-                }
-                else
-                {
-                    Assert.That(material.renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Geometry));
-                    Assert.That(
-                        material.GetFloat("_DstBlend"),
-                        Is.EqualTo((float)UnityEngine.Rendering.BlendMode.Zero).Within(0.00001f));
-                }
+                float alphaClip = material.HasProperty("_AlphaClip") ? material.GetFloat("_AlphaClip") : -1.0f;
+                return (material.renderQueue, material.GetFloat("_DstBlend"), alphaClip);
             }
             finally
             {

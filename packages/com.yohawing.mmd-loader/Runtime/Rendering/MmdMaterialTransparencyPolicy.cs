@@ -7,8 +7,8 @@ namespace Mmd.Rendering
 {
     /// <summary>
     /// Pure runtime/rendering policy for classifying PMX material transparency
-    /// from material alpha, material name, and texture alpha scan data. This type
-    /// does not reference UnityEngine.
+    /// from material alpha and texture alpha scan data only. Material and texture
+    /// names never influence the result. This type does not reference UnityEngine.
     /// </summary>
     internal static class MmdMaterialTransparencyPolicy
     {
@@ -156,15 +156,17 @@ namespace Mmd.Rendering
         /// <summary>
         /// Resolve the final material transparency mode from:
         /// - PMX material alpha
-        /// - material name (for the soft-overlay alphaTest-&gt;alphaBlend upgrade)
         /// - optional texture alpha scan values (may be null when no texture is present)
+        ///
+        /// Only data decides the mode: material and texture names are not inputs, so a
+        /// material named like an overlay (shadow, cheek, ...) classifies exactly like any
+        /// other material with the same alpha data.
         ///
         /// Returns one of <see cref="ModeOpaque"/>, <see cref="ModeAlphaTest"/>,
         /// or <see cref="ModeAlphaBlend"/>.
         /// </summary>
         public static string ResolveMaterialTransparencyMode(
             float materialAlpha,
-            string materialName,
             IReadOnlyList<int>? textureAlphaValues)
         {
             // PMX alpha below 1.0 is always alphaBlend.
@@ -182,48 +184,10 @@ namespace Mmd.Rendering
             // Texture alpha drives the transparency mode for every extension. Real MMD (and the
             // faithful saba reference) always multiplies the diffuse texture alpha into the fragment
             // and alpha-blends, so a TGA carrying a meaningful alpha mask (e.g. a hair shape that
-            // fades to fully transparent) blends just like a PNG would. The earlier
-            // "TGA alpha is ignored unless the material name looks like an overlay" heuristic was a
-            // previous compatibility shortcut that diverged from the reference renderer: it painted such a TGA as a
-            // solid opaque block instead of the alpha-shaped blend the real renderer produces. The
-            // alpha scan already keeps fully-opaque textures (min alpha >= opaque threshold) opaque,
-            // so a regular opaque TGA stays opaque without the extension special-case.
-            TextureAlphaScanResult scan = ClassifyTextureAlpha(textureAlphaValues);
-
-            // alphaTest upgraded to alphaBlend for likely soft overlay materials.
-            if (scan.textureAlphaMode == ModeAlphaTest &&
-                IsLikelyMmdSoftAlphaOverlayMaterial(materialName))
-            {
-                return ModeAlphaBlend;
-            }
-
-            return scan.textureAlphaMode;
-        }
-
-        public static bool IsLikelyMmdAlphaOverlayMaterial(string? materialName)
-        {
-            string name = (materialName ?? string.Empty).ToLowerInvariant();
-            // Substring needles: "shadow" also matches "hair shadow" / "hairshadow", and the
-            // kage (shadow) kanji also matches the kami-kage / kami-no-kage (hair shadow) spellings.
-            return ContainsOrdinal(name, "shadow") ||
-                ContainsOrdinal(name, "shade") ||
-                ContainsOrdinal(name, "\u5f71");
-        }
-
-        public static bool IsLikelyMmdSoftAlphaOverlayMaterial(string? materialName)
-        {
-            string name = (materialName ?? string.Empty).ToLowerInvariant();
-            return IsLikelyMmdAlphaOverlayMaterial(name) ||
-                ContainsOrdinal(name, "cheek") ||
-                ContainsOrdinal(name, "blush") ||
-                ContainsOrdinal(name, "\u9830") ||
-                ContainsOrdinal(name, "\u307b\u307b") ||
-                ContainsOrdinal(name, "\u30c1\u30fc\u30af");
-        }
-
-        private static bool ContainsOrdinal(string value, string needle)
-        {
-            return value.IndexOf(needle, StringComparison.Ordinal) >= 0;
+            // fades to fully transparent) blends just like a PNG would. The alpha scan already keeps
+            // fully-opaque textures (min alpha >= opaque threshold) opaque, so a regular opaque TGA
+            // stays opaque without an extension special-case.
+            return ClassifyTextureAlpha(textureAlphaValues).textureAlphaMode;
         }
     }
 }

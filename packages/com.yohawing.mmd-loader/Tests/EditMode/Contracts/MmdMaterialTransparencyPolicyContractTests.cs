@@ -2,6 +2,7 @@
 
 using System;
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using Mmd.Rendering;
 
@@ -105,84 +106,50 @@ namespace Mmd.Tests
             int[] opaque = Enumerable.Repeat(255, 16).ToArray();
 
             Assert.That(
-                MmdMaterialTransparencyPolicy.ResolveMaterialTransparencyMode(0.99f, "body", opaque),
+                MmdMaterialTransparencyPolicy.ResolveMaterialTransparencyMode(0.99f, opaque),
                 Is.EqualTo(MmdMaterialTransparencyPolicy.ModeAlphaBlend));
             Assert.That(
-                MmdMaterialTransparencyPolicy.ResolveMaterialTransparencyMode(1.0f, "body", null),
+                MmdMaterialTransparencyPolicy.ResolveMaterialTransparencyMode(1.0f, null),
                 Is.EqualTo(MmdMaterialTransparencyPolicy.ModeOpaque));
             Assert.That(
-                MmdMaterialTransparencyPolicy.ResolveMaterialTransparencyMode(1.0f, "body", Array.Empty<int>()),
+                MmdMaterialTransparencyPolicy.ResolveMaterialTransparencyMode(1.0f, Array.Empty<int>()),
                 Is.EqualTo(MmdMaterialTransparencyPolicy.ModeOpaque));
             Assert.That(
-                MmdMaterialTransparencyPolicy.ResolveMaterialTransparencyMode(1.0f, "body", opaque),
+                MmdMaterialTransparencyPolicy.ResolveMaterialTransparencyMode(1.0f, opaque),
                 Is.EqualTo(MmdMaterialTransparencyPolicy.ModeOpaque));
-        }
-
-        [TestCase("body hair", "alphaTest")]
-        [TestCase("hair shadow", "alphaBlend")]
-        [TestCase("頰", "alphaBlend")]
-        public void ResolveMaterialTransparencyModeUpgradesHardCutoutOnlyForSoftOverlayNames(
-            string materialName,
-            string expectedMode)
-        {
-            int[] hardCutout = Enumerable.Repeat(255, 90).Concat(Enumerable.Repeat(0, 10)).ToArray();
-
-            Assert.That(
-                MmdMaterialTransparencyPolicy.ResolveMaterialTransparencyMode(1.0f, materialName, hardCutout),
-                Is.EqualTo(expectedMode));
         }
 
         [Test]
-        public void ResolveMaterialTransparencyModeOverlayNameDoesNotChangeOpaqueOrBlendScans()
+        public void ResolveMaterialTransparencyModeReturnsTheTextureScanModeForOpaquePmxAlpha()
         {
             int[] opaque = Enumerable.Repeat(255, 16).ToArray();
+            int[] hardCutout = Enumerable.Repeat(255, 90).Concat(Enumerable.Repeat(0, 10)).ToArray();
             int[] dense = Enumerable.Repeat(255, 2).Concat(Enumerable.Repeat(128, 2)).ToArray();
 
+            // A hard cutout stays alphaTest: nothing upgrades it to alphaBlend except alpha data.
             Assert.That(
-                MmdMaterialTransparencyPolicy.ResolveMaterialTransparencyMode(1.0f, "影", opaque),
+                MmdMaterialTransparencyPolicy.ResolveMaterialTransparencyMode(1.0f, hardCutout),
+                Is.EqualTo(MmdMaterialTransparencyPolicy.ModeAlphaTest));
+            Assert.That(
+                MmdMaterialTransparencyPolicy.ResolveMaterialTransparencyMode(1.0f, opaque),
                 Is.EqualTo(MmdMaterialTransparencyPolicy.ModeOpaque));
             Assert.That(
-                MmdMaterialTransparencyPolicy.ResolveMaterialTransparencyMode(1.0f, "body", dense),
+                MmdMaterialTransparencyPolicy.ResolveMaterialTransparencyMode(1.0f, dense),
                 Is.EqualTo(MmdMaterialTransparencyPolicy.ModeAlphaBlend));
         }
 
-        [TestCase("Hair Shadow")]
-        [TestCase("hairshadow")]
-        [TestCase("SHADOW")]
-        [TestCase("face_shade")]
-        [TestCase("髪影")]
-        [TestCase("髪の影")]
-        [TestCase("前髪影２")]
-        [TestCase("影")]
-        public void AlphaOverlayNamesAreRecognized(string materialName)
+        [Test]
+        public void TransparencyPolicyTakesNoNameInput()
         {
-            Assert.That(MmdMaterialTransparencyPolicy.IsLikelyMmdAlphaOverlayMaterial(materialName), Is.True);
-            Assert.That(MmdMaterialTransparencyPolicy.IsLikelyMmdSoftAlphaOverlayMaterial(materialName), Is.True);
-        }
+            // Transparency must be decided from data (PMX alpha, texture alpha scan), never from
+            // material or texture names. The policy therefore exposes no string-typed input at all.
+            var stringInputs = typeof(MmdMaterialTransparencyPolicy)
+                .GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.DeclaredOnly)
+                .Where(method => method.GetParameters().Any(parameter => parameter.ParameterType == typeof(string)))
+                .Select(method => method.Name)
+                .ToArray();
 
-        [TestCase("cheek")]
-        [TestCase("Blush")]
-        [TestCase("頰")]
-        [TestCase("ほほ")]
-        [TestCase("チーク")]
-        public void SoftOverlayOnlyNamesAreNotAlphaOverlayNames(string materialName)
-        {
-            Assert.That(MmdMaterialTransparencyPolicy.IsLikelyMmdAlphaOverlayMaterial(materialName), Is.False);
-            Assert.That(MmdMaterialTransparencyPolicy.IsLikelyMmdSoftAlphaOverlayMaterial(materialName), Is.True);
-        }
-
-        [TestCase(null)]
-        [TestCase("")]
-        [TestCase("body")]
-        [TestCase("hair")]
-        [TestCase("shad")]
-        [TestCase("sh adow")]
-        [TestCase("face")]
-        [TestCase("髪")]
-        public void UnrelatedNamesAreNotOverlayNames(string? materialName)
-        {
-            Assert.That(MmdMaterialTransparencyPolicy.IsLikelyMmdAlphaOverlayMaterial(materialName), Is.False);
-            Assert.That(MmdMaterialTransparencyPolicy.IsLikelyMmdSoftAlphaOverlayMaterial(materialName), Is.False);
+            Assert.That(stringInputs, Is.Empty);
         }
     }
 }
