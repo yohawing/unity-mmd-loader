@@ -66,12 +66,12 @@ namespace Mmd.Rendering
                 {
                     materialIndex = material.index,
                     name = material.name,
-                    texture = NormalizeOptionalString(material.texture),
-                    sphereTexture = NormalizeOptionalString(material.sphereTexture),
-                    toonTexture = NormalizeOptionalString(material.toonTexture),
+                    texture = MmdMaterialDescriptorValues.NormalizeOptionalString(material.texture),
+                    sphereTexture = MmdMaterialDescriptorValues.NormalizeOptionalString(material.sphereTexture),
+                    toonTexture = MmdMaterialDescriptorValues.NormalizeOptionalString(material.toonTexture),
                     alpha = material.alpha,
-                    diffuseColor = CopyColor(material.diffuseColor, 3, new[] { 1.0f, 1.0f, 1.0f }),
-                    ambientColor = CopyColor(material.ambientColor, 3, new[] { 0.25f, 0.25f, 0.25f }),
+                    diffuseColor = MmdMaterialDescriptorValues.CopyColor(material.diffuseColor, 3, new[] { 1.0f, 1.0f, 1.0f }),
+                    ambientColor = MmdMaterialDescriptorValues.CopyColor(material.ambientColor, 3, new[] { 0.25f, 0.25f, 0.25f }),
                     emissionColor = new[] { 1.0f, 1.0f, 1.0f },
                     emissionIntensity = -1.0f,
                     usesEmissionMap = false,
@@ -86,12 +86,12 @@ namespace Mmd.Rendering
                     rimBoundary = -1.0f,
                     rimFeather = -1.0f,
                     rimLightFollow = 0.0f,
-                    edgeColor = CopyColor(material.edgeColor, 4, new[] { 0.0f, 0.0f, 0.0f, 1.0f }),
-                    edgeSize = ClampNonNegative(material.edgeSize),
-                    sphereTextureMode = NormalizeOptionalString(material.sphereTextureMode),
+                    edgeColor = MmdMaterialDescriptorValues.CopyColor(material.edgeColor, 4, new[] { 0.0f, 0.0f, 0.0f, 1.0f }),
+                    edgeSize = MmdMaterialDescriptorValues.ClampNonNegative(material.edgeSize),
+                    sphereTextureMode = MmdMaterialDescriptorValues.NormalizeOptionalString(material.sphereTextureMode),
                     toonShared = material.toonShared,
                     sharedToonIndex = material.sharedToonIndex,
-                    cullingPolicy = NormalizeCullingPolicy(material.cullingPolicy),
+                    cullingPolicy = MmdMaterialDescriptorValues.NormalizeCullingPolicy(material.cullingPolicy),
                     drawEdgeFlag = material.drawEdgeFlag,
                     vertexStart = vertexStart,
                     vertexCount = material.vertexCount
@@ -101,13 +101,18 @@ namespace Mmd.Rendering
 
             return descriptors;
         }
+    }
 
-        private static string NormalizeOptionalString(string? value)
+    // Value normalization shared by MmdMaterialDescriptorBuilder and
+    // MmdUrpMaterialBindingDescriptorBuilder.
+    internal static class MmdMaterialDescriptorValues
+    {
+        internal static string NormalizeOptionalString(string? value)
         {
             return string.IsNullOrWhiteSpace(value) ? string.Empty : value;
         }
 
-        private static string NormalizeCullingPolicy(string? value)
+        internal static string NormalizeCullingPolicy(string? value)
         {
             if (string.Equals(value, "double-sided", StringComparison.Ordinal) ||
                 string.Equals(value, "backface-culling", StringComparison.Ordinal))
@@ -118,7 +123,7 @@ namespace Mmd.Rendering
             return "unknown";
         }
 
-        private static float[] CopyColor(float[]? values, int length, float[] fallback)
+        internal static float[] CopyColor(float[]? values, int length, float[] fallback)
         {
             var result = new float[length];
             for (int i = 0; i < length; i++)
@@ -143,7 +148,7 @@ namespace Mmd.Rendering
             return result;
         }
 
-        private static float ClampNonNegative(float value)
+        internal static float ClampNonNegative(float value)
         {
             return float.IsNaN(value) || float.IsInfinity(value) || value < 0.0f ? 0.0f : value;
         }

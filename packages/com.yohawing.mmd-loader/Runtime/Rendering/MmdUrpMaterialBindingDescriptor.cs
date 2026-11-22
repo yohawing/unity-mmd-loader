@@ -89,16 +89,16 @@ namespace Mmd.Rendering
                     materialIndex = material.materialIndex,
                     name = material.name ?? string.Empty,
                     shaderName = shaderName,
-                    baseMapTexture = NormalizeOptionalString(material.texture),
-                    sphereTexture = NormalizeOptionalString(material.sphereTexture),
-                    toonTexture = NormalizeOptionalString(material.toonTexture),
+                    baseMapTexture = MmdMaterialDescriptorValues.NormalizeOptionalString(material.texture),
+                    sphereTexture = MmdMaterialDescriptorValues.NormalizeOptionalString(material.sphereTexture),
+                    toonTexture = MmdMaterialDescriptorValues.NormalizeOptionalString(material.toonTexture),
                     sphereTextureModeHint = ResolveSphereTextureModeHint(material.sphereTextureMode, material.sphereTexture),
                     toonTextureSourceHint = ResolveToonTextureSourceHint(material.toonShared, material.toonTexture),
                     usesSphereTexture = !string.IsNullOrWhiteSpace(material.sphereTexture),
                     usesToonTexture = !string.IsNullOrWhiteSpace(material.toonTexture),
                     alpha = material.alpha,
-                    diffuseColor = CopyColor(material.diffuseColor, 3, new[] { 1.0f, 1.0f, 1.0f }),
-                    ambientColor = CopyColor(material.ambientColor, 3, new[] { 0.25f, 0.25f, 0.25f }),
+                    diffuseColor = MmdMaterialDescriptorValues.CopyColor(material.diffuseColor, 3, new[] { 1.0f, 1.0f, 1.0f }),
+                    ambientColor = MmdMaterialDescriptorValues.CopyColor(material.ambientColor, 3, new[] { 0.25f, 0.25f, 0.25f }),
                     emissionColor = CopyHdrColor(material.emissionColor, 3, new[] { 1.0f, 1.0f, 1.0f }),
                     emissionIntensity = material.emissionIntensity,
                     usesEmissionMap = material.usesEmissionMap,
@@ -106,42 +106,26 @@ namespace Mmd.Rendering
                     toonBoundary = material.toonBoundary,
                     toonFeather = material.toonFeather,
                     toonBandCount = material.toonBandCount,
-                    stylizedSpecularColor = CopyColor(material.stylizedSpecularColor, 3, new[] { 1.0f, 1.0f, 1.0f }),
+                    stylizedSpecularColor = MmdMaterialDescriptorValues.CopyColor(material.stylizedSpecularColor, 3, new[] { 1.0f, 1.0f, 1.0f }),
                     stylizedSpecularBoundary = material.stylizedSpecularBoundary,
                     stylizedSpecularFeather = material.stylizedSpecularFeather,
-                    rimColor = CopyColor(material.rimColor, 3, new[] { 1.0f, 1.0f, 1.0f }),
+                    rimColor = MmdMaterialDescriptorValues.CopyColor(material.rimColor, 3, new[] { 1.0f, 1.0f, 1.0f }),
                     rimBoundary = material.rimBoundary,
                     rimFeather = material.rimFeather,
                     rimLightFollow = material.rimLightFollow,
-                    edgeColor = CopyColor(material.edgeColor, 4, new[] { 0.0f, 0.0f, 0.0f, 1.0f }),
-                    edgeSize = material.drawEdgeFlag ? ClampNonNegative(material.edgeSize) : 0.0f,
+                    edgeColor = MmdMaterialDescriptorValues.CopyColor(material.edgeColor, 4, new[] { 0.0f, 0.0f, 0.0f, 1.0f }),
+                    edgeSize = material.drawEdgeFlag ? MmdMaterialDescriptorValues.ClampNonNegative(material.edgeSize) : 0.0f,
                     drawEdgeFlag = material.drawEdgeFlag,
                     isTransparent = material.alpha < 1.0f,
                     transparencyMode = material.alpha < 1.0f ? "alphaBlend" : "opaque",
                     renderOrderBucket = material.alpha < 1.0f ? "alphaBlend" : "opaque",
-                    cullingPolicy = NormalizeCullingPolicy(material.cullingPolicy),
+                    cullingPolicy = MmdMaterialDescriptorValues.NormalizeCullingPolicy(material.cullingPolicy),
                     vertexStart = material.vertexStart,
                     vertexCount = material.vertexCount
                 });
             }
 
             return bindings;
-        }
-
-        private static string NormalizeOptionalString(string? value)
-        {
-            return string.IsNullOrWhiteSpace(value) ? string.Empty : value;
-        }
-
-        private static string NormalizeCullingPolicy(string? value)
-        {
-            if (string.Equals(value, "double-sided", StringComparison.Ordinal) ||
-                string.Equals(value, "backface-culling", StringComparison.Ordinal))
-            {
-                return value!;
-            }
-
-            return "unknown";
         }
 
         private static string ResolveSphereTextureModeHint(string? mode, string? texture)
@@ -183,31 +167,6 @@ namespace Mmd.Rendering
                 : "custom-toon-reference";
         }
 
-        private static float[] CopyColor(float[]? values, int length, float[] fallback)
-        {
-            var result = new float[length];
-            for (int i = 0; i < length; i++)
-            {
-                float value = values != null && i < values.Length ? values[i] : fallback[i];
-                if (float.IsNaN(value) || float.IsInfinity(value))
-                {
-                    value = fallback[i];
-                }
-                else if (value < 0.0f)
-                {
-                    value = 0.0f;
-                }
-                else if (value > 1.0f)
-                {
-                    value = 1.0f;
-                }
-
-                result[i] = value;
-            }
-
-            return result;
-        }
-
         private static float[] CopyHdrColor(float[]? values, int length, float[] fallback)
         {
             var result = new float[length];
@@ -218,11 +177,6 @@ namespace Mmd.Rendering
             }
 
             return result;
-        }
-
-        private static float ClampNonNegative(float value)
-        {
-            return float.IsNaN(value) || float.IsInfinity(value) || value < 0.0f ? 0.0f : value;
         }
     }
 }
