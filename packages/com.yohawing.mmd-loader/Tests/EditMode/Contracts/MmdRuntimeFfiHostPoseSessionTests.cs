@@ -13,9 +13,7 @@ namespace Mmd.Tests.Contracts
         [Test]
         public void SemiBasicBoneHostPoseRoundTripIsDeterministicWithoutPhysicsWorld()
         {
-#if !UNITY_EDITOR_WIN
-            Assert.Ignore("The distributed mmd-runtime host-pose gate is Windows Editor only.");
-#endif
+            IgnoreIfNativeRuntimeUnavailable();
             using MmdRuntimeFfiHostPoseSession session = CreateSession();
 
             Assert.That(session.BoneCount, Is.GreaterThan(0));
@@ -235,9 +233,7 @@ namespace Mmd.Tests.Contracts
         [Test]
         public void AppendDependentIkHostSamplesRemainIndependent()
         {
-#if !UNITY_EDITOR_WIN
-            Assert.Ignore("The distributed mmd-runtime host-pose gate is Windows Editor only.");
-#endif
+            IgnoreIfNativeRuntimeUnavailable();
             using var session = MmdRuntimeFfiHostPoseSession.CreateWithRig(
                 MmdTestFixtures.ReadFixtureAssetBytes("ik_append_history.pmx"),
                 Array.Empty<uint>(), new uint[] { 3, 7 });
@@ -253,6 +249,9 @@ namespace Mmd.Tests.Contracts
             session.EvaluateAndCopy(positions, rotations, scales, morphs, ik, repeated);
             CollectionAssert.AreEqual(first, repeated);
         }
+
+        private static void IgnoreIfNativeRuntimeUnavailable() =>
+            MmdNativeRuntimeTestGuard.IgnoreIfUnavailable(() => MmdRuntimeFfiMethods.ValidateAbiVersion());
 
         private static MmdRuntimeFfiHostPoseSession CreateSession()
         {

@@ -15,6 +15,9 @@ namespace Mmd.Tests
 {
     public sealed class MmdGenericAnimationClipWriterTests
     {
+        private static void IgnoreIfNativeRuntimeUnavailable() =>
+            MmdNativeRuntimeTestGuard.IgnoreIfUnavailable(() => MmdRuntimeFfiMethods.ValidateAbiVersion());
+
         private static string CubePmx => MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
         private static string CubeVmd => MmdTestFixtures.FixtureAssetPath("test_1bone_cube_motion.vmd");
         private static string MorphPmx => MmdTestFixtures.FixtureAssetPath("test_vertex_morph.pmx");
@@ -74,9 +77,7 @@ namespace Mmd.Tests
         [Test]
         public void BakeUsesNativeSparseTranslationAndEulerCurvesWithPhysicsOff()
         {
-#if !UNITY_EDITOR_WIN
-            Assert.Ignore("mmd-runtime native generic bake is only distributed for the Windows Editor.");
-#endif
+            IgnoreIfNativeRuntimeUnavailable();
             CreateAssets(CubePmx, CubeVmd, out MmdPmxAsset pmx, out MmdVmdAsset vmd);
             try
             {
@@ -89,25 +90,16 @@ namespace Mmd.Tests
                 EditorCurveBinding[] transformBindings = bindings
                     .Where(binding => binding.type == typeof(Transform))
                     .ToArray();
-#if UNITY_EDITOR_WIN
                 Assert.That(transformBindings, Has.Length.EqualTo(6));
                 Assert.That(transformBindings.Count(binding => binding.propertyName.StartsWith("m_LocalPosition.", StringComparison.Ordinal)), Is.EqualTo(3));
                 Assert.That(transformBindings.Count(binding => binding.propertyName.StartsWith("localEulerAnglesRaw.", StringComparison.Ordinal)), Is.EqualTo(3));
-#else
-                Assert.That(transformBindings, Has.Length.EqualTo(7));
-#endif
                 int[] keyCounts = bindings
                     .Where(binding => binding.type == typeof(Transform))
                     .Select(binding => AnimationUtility.GetEditorCurve(result.Clip!, binding)!.keys.Length)
                     .ToArray();
                 Assert.That(result.Diagnostics, Has.Some.Contains("persistent native evaluation"));
-#if UNITY_EDITOR_WIN
                 Assert.That(keyCounts.Max(), Is.LessThan(10), "native reducer output remains sparse");
                 Assert.That(result.Diagnostics, Has.Some.Contains("exclusively from mmd-runtime generic sparse track descriptors and keys"));
-#else
-                Assert.That(keyCounts, Does.Contain(10));
-                Assert.That(result.Diagnostics, Has.Some.Contains("compacted"));
-#endif
             }
             finally
             {
@@ -118,9 +110,7 @@ namespace Mmd.Tests
         [Test]
         public void DenseBakeIsRepeatableForSameInputs()
         {
-#if !UNITY_EDITOR_WIN
-            Assert.Ignore("mmd-runtime native generic bake is only distributed for the Windows Editor.");
-#endif
+            IgnoreIfNativeRuntimeUnavailable();
             CreateAssets(CubePmx, CubeVmd, out MmdPmxAsset pmx, out MmdVmdAsset vmd);
             try
             {
@@ -141,9 +131,7 @@ namespace Mmd.Tests
         [Test]
         public void VertexMorphBakeWritesBlendShapeCurveInPercentUnits()
         {
-#if !UNITY_EDITOR_WIN
-            Assert.Ignore("mmd-runtime native generic bake is only distributed for the Windows Editor.");
-#endif
+            IgnoreIfNativeRuntimeUnavailable();
             CreateAssets(MorphPmx, MorphVmd, out MmdPmxAsset pmx, out MmdVmdAsset vmd);
             try
             {
@@ -152,13 +140,9 @@ namespace Mmd.Tests
                 EditorCurveBinding morphBinding = AnimationUtility.GetCurveBindings(result.Clip!)
                     .Single(binding => binding.type == typeof(SkinnedMeshRenderer) && binding.propertyName.StartsWith("blendShape.", StringComparison.Ordinal));
                 AnimationCurve curve = AnimationUtility.GetEditorCurve(result.Clip!, morphBinding)!;
-#if UNITY_EDITOR_WIN
                 Assert.That(curve.keys.Length, Is.LessThan(11));
                 Assert.That(curve.keys.All(key => float.IsFinite(key.inTangent) && float.IsFinite(key.outTangent)), Is.True);
                 Assert.That(result.Diagnostics, Has.Some.Contains("generic sparse track descriptors and keys"));
-#else
-                Assert.That(curve.keys, Has.Length.EqualTo(11));
-#endif
                 Assert.That(curve.keys.Max(key => key.value), Is.GreaterThan(0.0f).And.LessThanOrEqualTo(100.0f));
                 UnityEngine.Object.DestroyImmediate(result.Clip);
             }
@@ -168,9 +152,7 @@ namespace Mmd.Tests
         [Test]
         public void BatchMorphCurveMatchesFastRuntimeApplication()
         {
-#if !UNITY_EDITOR_WIN
-            Assert.Ignore("mmd-runtime batch playback is only distributed for the Windows Editor.");
-#endif
+            IgnoreIfNativeRuntimeUnavailable();
             CreateAssets(MorphPmx, MorphVmd, out MmdPmxAsset pmx, out MmdVmdAsset vmd);
             MmdUnityPlaybackBinding? binding = null;
             AnimationClip? clip = null;
@@ -235,9 +217,7 @@ namespace Mmd.Tests
         [Test]
         public void ExplicitAssetPersistenceUsesValidatedAnimPathAndCanBeCleanedUp()
         {
-#if !UNITY_EDITOR_WIN
-            Assert.Ignore("mmd-runtime native generic bake is only distributed for the Windows Editor.");
-#endif
+            IgnoreIfNativeRuntimeUnavailable();
             string directory = "Assets/MmdGenericAnimationClipWriterTests_" + Guid.NewGuid().ToString("N");
             string path = directory + "/clip.anim";
             CreateAssets(CubePmx, CubeVmd, out MmdPmxAsset pmx, out MmdVmdAsset vmd);
@@ -282,9 +262,7 @@ namespace Mmd.Tests
         [Test]
         public void DisablingKeyReductionRetainsEverySampledFrame()
         {
-#if !UNITY_EDITOR_WIN
-            Assert.Ignore("mmd-runtime native generic bake is only distributed for the Windows Editor.");
-#endif
+            IgnoreIfNativeRuntimeUnavailable();
             CreateAssets(CubePmx, CubeVmd, out MmdPmxAsset pmx, out MmdVmdAsset vmd);
             try
             {
@@ -456,9 +434,7 @@ namespace Mmd.Tests
         [Test]
         public void NativeSparseBakeRemainsEnabledAtDefaultPointOneImportScale()
         {
-#if !UNITY_EDITOR_WIN
-            Assert.Ignore("mmd-runtime sparse curve baking is only distributed for the Windows Editor.");
-#endif
+            IgnoreIfNativeRuntimeUnavailable();
             CreateAssets(CubePmx, CubeVmd, out MmdPmxAsset pmx, out MmdVmdAsset vmd, 0.1f);
             try
             {
@@ -486,9 +462,7 @@ namespace Mmd.Tests
         [Test]
         public void NativeSparseTransformCurvesMatchFastRuntimeWithNonzeroStartAndDefaultScale()
         {
-#if !UNITY_EDITOR_WIN
-            Assert.Ignore("mmd-runtime sparse curve baking is only distributed for the Windows Editor.");
-#endif
+            IgnoreIfNativeRuntimeUnavailable();
             const float FrameRate = 30.0f;
             const int StartFrame = 2;
             const int EndFrame = 9;

@@ -7,6 +7,7 @@ using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
 using Mmd.Editor;
+using Mmd.Native;
 using Mmd.UnityIntegration;
 
 namespace Mmd.Tests
@@ -24,6 +25,9 @@ namespace Mmd.Tests
 
         private const string NativeEnabled = "writer: enabled persistent native evaluation for Generic bake.";
         private const string SparseBuilt = "writer: built AnimationClip exclusively from mmd-runtime generic sparse track descriptors and keys.";
+
+        private static void IgnoreIfNativeRuntimeUnavailable() =>
+            MmdNativeRuntimeTestGuard.IgnoreIfUnavailable(() => MmdRuntimeFfiMethods.ValidateAbiVersion());
 
         private static readonly MmdGenericAnimationClipBakeOptions Dense = new(reduceKeys: false, highPrecision: false);
 
@@ -43,7 +47,9 @@ namespace Mmd.Tests
             bool reduceKeys)
         {
 #if !UNITY_EDITOR_WIN
-            Assert.Ignore("mmd-runtime native generic bake is only distributed for the Windows Editor.");
+            // The native runtime also runs on Linux, but these goldens pin exact float bits produced
+            // by the Windows x86_64 native build; other platforms are not guaranteed to round alike.
+            Assert.Ignore("Bit-exact Generic bake goldens are pinned on the Windows Editor native build.");
 #endif
             CreateAssets(AppendPmx, AppendVmd, importScale, out MmdPmxAsset pmx, out MmdVmdAsset vmd);
             AnimationClip? clip = null;
@@ -72,9 +78,7 @@ namespace Mmd.Tests
         [Test]
         public void InMemoryClipNameAndFrameRateArePinned()
         {
-#if !UNITY_EDITOR_WIN
-            Assert.Ignore("mmd-runtime native generic bake is only distributed for the Windows Editor.");
-#endif
+            IgnoreIfNativeRuntimeUnavailable();
             CreateAssets(CubePmx, CubeVmd, 1.0f, out MmdPmxAsset pmx, out MmdVmdAsset vmd);
             try
             {
@@ -186,9 +190,7 @@ namespace Mmd.Tests
         [Test]
         public void DenseBudgetOverflowReportsExactDiagnostics()
         {
-#if !UNITY_EDITOR_WIN
-            Assert.Ignore("mmd-runtime native generic bake is only distributed for the Windows Editor.");
-#endif
+            IgnoreIfNativeRuntimeUnavailable();
             CreateAssets(CubePmx, null, 1.0f, out MmdPmxAsset pmx, out MmdVmdAsset vmd, BuildTwoKeyVmd("全ての親", 600_000));
             try
             {
@@ -207,9 +209,7 @@ namespace Mmd.Tests
         [Test]
         public void SuccessfulBakesReportExactDiagnostics()
         {
-#if !UNITY_EDITOR_WIN
-            Assert.Ignore("mmd-runtime native generic bake is only distributed for the Windows Editor.");
-#endif
+            IgnoreIfNativeRuntimeUnavailable();
             CreateAssets(CubePmx, CubeVmd, 1.0f, out MmdPmxAsset pmx, out MmdVmdAsset vmd);
             try
             {
@@ -241,9 +241,7 @@ namespace Mmd.Tests
         [TestCase("Assets/../clip.anim", "EmptyOrDotSegment")]
         public void InvalidOutputPathReportsBakeDiagnosticsThenPathError(string outputPath, string error)
         {
-#if !UNITY_EDITOR_WIN
-            Assert.Ignore("mmd-runtime native generic bake is only distributed for the Windows Editor.");
-#endif
+            IgnoreIfNativeRuntimeUnavailable();
             CreateAssets(CubePmx, CubeVmd, 1.0f, out MmdPmxAsset pmx, out MmdVmdAsset vmd);
             try
             {
@@ -261,9 +259,7 @@ namespace Mmd.Tests
         [Test]
         public void BakesDoNotLeakTemporaryObjects()
         {
-#if !UNITY_EDITOR_WIN
-            Assert.Ignore("mmd-runtime native generic bake is only distributed for the Windows Editor.");
-#endif
+            IgnoreIfNativeRuntimeUnavailable();
             CreateAssets(AppendPmx, AppendVmd, 0.1f, out MmdPmxAsset appendPmx, out MmdVmdAsset appendVmd);
             CreateAssets(CubePmx, CubeVmd, 1.0f, out MmdPmxAsset cubePmx, out MmdVmdAsset cubeVmd);
             try

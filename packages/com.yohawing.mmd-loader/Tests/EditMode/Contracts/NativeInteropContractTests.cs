@@ -811,6 +811,24 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void NativeRuntimeGuardIgnoresOnlyNativeLoadFailures()
+        {
+            // Native-dependent tests skip by runtime availability, not by Editor OS. Only load or
+            // ABI failures may turn into a skip; any other exception must still fail the test.
+            Assert.DoesNotThrow(() => MmdNativeRuntimeTestGuard.IgnoreIfUnavailable(() => { }));
+            Assert.Throws<IgnoreException>(() => MmdNativeRuntimeTestGuard.IgnoreIfUnavailable(
+                () => throw new DllNotFoundException("missing")));
+            Assert.Throws<IgnoreException>(() => MmdNativeRuntimeTestGuard.IgnoreIfUnavailable(
+                () => throw new EntryPointNotFoundException("missing")));
+            Assert.Throws<IgnoreException>(() => MmdNativeRuntimeTestGuard.IgnoreIfUnavailable(
+                () => throw new BadImageFormatException("wrong")));
+            Assert.Throws<IgnoreException>(() => MmdNativeRuntimeTestGuard.IgnoreIfUnavailable(
+                () => throw new InvalidOperationException("abi")));
+            Assert.Throws<ArgumentException>(() => MmdNativeRuntimeTestGuard.IgnoreIfUnavailable(
+                () => throw new ArgumentException("not a load failure")));
+        }
+
+        [Test]
         public void ReducedPoseZeroKeyBufferUsesSharedEmptyArray()
         {
             MmdRuntimeFfiMethods.GenericCurveKey[] keys =
@@ -868,9 +886,7 @@ namespace Mmd.Tests
         [TestCase("test_1bone_cube.pmx")]
         public void RuntimeFfiClipFrameBatchMatchesSequentialEvaluation(string modelFile)
         {
-#if !UNITY_EDITOR_WIN
-            Assert.Ignore("mmd-runtime batch playback is only distributed for the Windows Editor.");
-#endif
+            IgnoreIfNativeRuntimeUnavailable();
             byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes(modelFile);
             byte[] vmdBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube_motion.vmd");
             using var session = MmdRuntimeFfiPlaybackSession.Create(pmxBytes, vmdBytes);
@@ -904,9 +920,7 @@ namespace Mmd.Tests
         [Test]
         public void ReducedPoseEnumeratesSparseKeysAfterSourceSessionIsDisposed()
         {
-#if !UNITY_EDITOR_WIN
-            Assert.Ignore("mmd-runtime reduced curves are only distributed for the Windows Editor.");
-#endif
+            IgnoreIfNativeRuntimeUnavailable();
             byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube.pmx");
             byte[] vmdBytes = MmdTestFixtures.ReadFixtureAssetBytes("test_1bone_cube_motion.vmd");
             MmdRuntimeReducedPose reducedPose;
@@ -1065,6 +1079,9 @@ namespace Mmd.Tests
             Assert.That(Path.Combine(pluginRoot, "yohawing_mmd_unity_native.dll"), Does.Not.Exist);
             Assert.That(Path.Combine(pluginRoot, "yohawing_mmd_unity_native.dll.meta"), Does.Not.Exist);
         }
+
+        private static void IgnoreIfNativeRuntimeUnavailable() =>
+            MmdNativeRuntimeTestGuard.IgnoreIfUnavailable(() => MmdRuntimeFfiMethods.ValidateAbiVersion());
 
         private static void AssertRuntimeFfiSignature(string methodName, Type returnType, params Type[] parameterTypes)
         {

@@ -1578,33 +1578,8 @@ namespace Mmd.Tests
             return asset;
         }
 
-        private static void IgnoreIfNativeRuntimeUnavailable()
-        {
-#if !UNITY_EDITOR_WIN
-            Assert.Ignore("The native header metadata test is only supported by the Windows Editor runtime.");
-#else
-            try
-            {
-                MmdRuntimeFfiMethods.ValidateAbiVersion();
-            }
-            catch (DllNotFoundException ex)
-            {
-                Assert.Ignore("Native runtime is unavailable: " + ex.Message);
-            }
-            catch (EntryPointNotFoundException ex)
-            {
-                Assert.Ignore("Native runtime ABI entry point is unavailable: " + ex.Message);
-            }
-            catch (BadImageFormatException ex)
-            {
-                Assert.Ignore("Native runtime binary is incompatible: " + ex.Message);
-            }
-            catch (InvalidOperationException ex)
-            {
-                Assert.Ignore("Native runtime ABI is unsupported: " + ex.Message);
-            }
-#endif
-        }
+        private static void IgnoreIfNativeRuntimeUnavailable() =>
+            MmdNativeRuntimeTestGuard.IgnoreIfUnavailable(() => MmdRuntimeFfiMethods.ValidateAbiVersion());
 
         private static MmdUnityPlaybackController CreateProviderController(
             string pmxPath,
