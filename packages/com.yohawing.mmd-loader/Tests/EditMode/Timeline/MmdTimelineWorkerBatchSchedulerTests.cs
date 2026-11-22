@@ -79,6 +79,65 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void PlayerLoopInsertionOnDefaultLoopAddsExactlyOneMarkerPairAroundAnchor()
+        {
+            PlayerLoopSystem current = PlayerLoop.GetDefaultPlayerLoop();
+            Type collectionMarker = GetMarkerType("CollectionBoundaryMarker");
+            Type drainMarker = GetMarkerType("DrainBoundaryMarker");
+            int originalUpdateLength = FindNode(current, typeof(Update)).subSystemList!.Length;
+
+            Assert.That(
+                MmdTimelineWorkerBatchScheduler.TryPatchPlayerLoop(current, out PlayerLoopSystem patched),
+                Is.True);
+            AssertSingleMarkerPairAroundAnchor(patched, collectionMarker, drainMarker);
+            Assert.That(
+                FindNode(patched, typeof(Update)).subSystemList,
+                Has.Length.EqualTo(originalUpdateLength + 2));
+
+            Assert.That(
+                MmdTimelineWorkerBatchScheduler.TryPatchPlayerLoop(patched, out PlayerLoopSystem patchedAgain),
+                Is.True);
+            AssertSingleMarkerPairAroundAnchor(patchedAgain, collectionMarker, drainMarker);
+            Assert.That(
+                FindNode(patchedAgain, typeof(Update)).subSystemList,
+                Has.Length.EqualTo(originalUpdateLength + 2));
+        }
+
+        [Test]
+        public void EnsureInstalledPublishesOneMarkerPairAndRecoversAfterResetAndLoopReplacement()
+        {
+            RunWithIsolatedPlayerLoop(() =>
+            {
+                Type collectionMarker = GetMarkerType("CollectionBoundaryMarker");
+                Type drainMarker = GetMarkerType("DrainBoundaryMarker");
+                Assert.That(CountType(PlayerLoop.GetCurrentPlayerLoop(), collectionMarker), Is.Zero);
+                Assert.That(CountType(PlayerLoop.GetCurrentPlayerLoop(), drainMarker), Is.Zero);
+
+                Assert.That(EnsureInstalled(), Is.True);
+                Assert.That(IsInstalled(), Is.True);
+                AssertSingleMarkerPairAroundAnchor(PlayerLoop.GetCurrentPlayerLoop(), collectionMarker, drainMarker);
+
+                // A second install re-publishes the verified tree instead of inserting again.
+                Assert.That(EnsureInstalled(), Is.True);
+                AssertSingleMarkerPairAroundAnchor(PlayerLoop.GetCurrentPlayerLoop(), collectionMarker, drainMarker);
+
+                // Domain-reload reset clears the flag while the published tree still holds the
+                // markers; reinstalling must repair them in place without duplicates.
+                InvokeResetForDomainReload();
+                Assert.That(IsInstalled(), Is.False);
+                Assert.That(EnsureInstalled(), Is.True);
+                Assert.That(IsInstalled(), Is.True);
+                AssertSingleMarkerPairAroundAnchor(PlayerLoop.GetCurrentPlayerLoop(), collectionMarker, drainMarker);
+
+                // Another system replaces the active loop without clearing our flag.
+                PlayerLoop.SetPlayerLoop(PlayerLoop.GetDefaultPlayerLoop());
+                Assert.That(CountType(PlayerLoop.GetCurrentPlayerLoop(), collectionMarker), Is.Zero);
+                Assert.That(EnsureInstalled(), Is.True);
+                AssertSingleMarkerPairAroundAnchor(PlayerLoop.GetCurrentPlayerLoop(), collectionMarker, drainMarker);
+            });
+        }
+
+        [Test]
         public void TimelineWorkerDispatchesEveryControllerBeforeAnyCompletion()
         {
             var barrier = new Barrier(3);
@@ -184,6 +243,66 @@ namespace Mmd.Tests
                 pool.Dispose();
                 UnityEngine.Object.DestroyImmediate(controllerObject);
             }
+        }
+
+        private static void AssertSingleMarkerPairAroundAnchor(
+            PlayerLoopSystem loop,
+            Type collectionMarker,
+            Type drainMarker)
+        {
+            Assert.That(CountType(loop, collectionMarker), Is.EqualTo(1));
+            Assert.That(CountType(loop, drainMarker), Is.EqualTo(1));
+            PlayerLoopSystem update = FindNode(loop, typeof(Update));
+            int collectionIndex = FindType(update, collectionMarker);
+            int drainIndex = FindType(update, drainMarker);
+            int anchorIndex = FindType(update, typeof(Update.DirectorUpdate));
+            Assert.That(anchorIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(collectionIndex + 1, Is.EqualTo(anchorIndex));
+            Assert.That(drainIndex, Is.EqualTo(anchorIndex + 1));
+            Assert.That(update.subSystemList![collectionIndex].updateDelegate, Is.Not.Null);
+            Assert.That(update.subSystemList![drainIndex].updateDelegate, Is.Not.Null);
+        }
+
+        // EditMode drives the editor's PlayerLoop, so every live install test restores the
+        // original tree and installation flag. Starting from the default loop keeps the test
+        // independent from markers a previous run may have left behind.
+        private static void RunWithIsolatedPlayerLoop(Action body)
+        {
+            FieldInfo installedField = typeof(MmdTimelineWorkerBatchScheduler).GetField(
+                "installed",
+                BindingFlags.NonPublic | BindingFlags.Static)!;
+            PlayerLoopSystem original = PlayerLoop.GetCurrentPlayerLoop();
+            object originalInstalled = installedField.GetValue(null)!;
+            try
+            {
+                PlayerLoop.SetPlayerLoop(PlayerLoop.GetDefaultPlayerLoop());
+                installedField.SetValue(null, false);
+                body();
+            }
+            finally
+            {
+                PlayerLoop.SetPlayerLoop(original);
+                installedField.SetValue(null, originalInstalled);
+            }
+        }
+
+        private static bool EnsureInstalled()
+        {
+            return MmdTimelineWorkerBatchScheduler.EnsureInstalled();
+        }
+
+        private static bool IsInstalled()
+        {
+            return (bool)typeof(MmdTimelineWorkerBatchScheduler)
+                .GetField("installed", BindingFlags.NonPublic | BindingFlags.Static)!
+                .GetValue(null)!;
+        }
+
+        private static void InvokeResetForDomainReload()
+        {
+            typeof(MmdTimelineWorkerBatchScheduler)
+                .GetMethod("ResetForDomainReload", BindingFlags.NonPublic | BindingFlags.Static)!
+                .Invoke(null, null);
         }
 
         private static PlayerLoopSystem CreatePlayerLoop(

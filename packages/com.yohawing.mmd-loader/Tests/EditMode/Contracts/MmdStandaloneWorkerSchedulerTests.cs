@@ -169,6 +169,105 @@ namespace Mmd.Tests.Contracts
             Assert.That(patched.subSystemList, Is.SameAs(current.subSystemList));
         }
 
+        [Test]
+        public void PlayerLoopInsertionOnDefaultLoopAddsExactlyOneMarkerBeforeAnchor()
+        {
+            PlayerLoopSystem current = PlayerLoop.GetDefaultPlayerLoop();
+            Type marker = GetMarkerType();
+            int originalUpdateLength = FindNode(current, typeof(Update)).subSystemList!.Length;
+
+            Assert.That(
+                MmdStandaloneWorkerScheduler.TryPatchPlayerLoop(current, out PlayerLoopSystem patched),
+                Is.True);
+            Assert.That(CountType(patched, marker), Is.EqualTo(1));
+            AssertSingleMarkerBeforeAnchor(patched, marker);
+            Assert.That(
+                FindNode(patched, typeof(Update)).subSystemList,
+                Has.Length.EqualTo(originalUpdateLength + 1));
+
+            Assert.That(
+                MmdStandaloneWorkerScheduler.TryPatchPlayerLoop(patched, out PlayerLoopSystem patchedAgain),
+                Is.True);
+            Assert.That(CountType(patchedAgain, marker), Is.EqualTo(1));
+            AssertSingleMarkerBeforeAnchor(patchedAgain, marker);
+            Assert.That(
+                FindNode(patchedAgain, typeof(Update)).subSystemList,
+                Has.Length.EqualTo(originalUpdateLength + 1));
+        }
+
+        [Test]
+        public void EnsureInstalledPublishesOneMarkerAndRecoversAfterResetAndLoopReplacement()
+        {
+            RunWithIsolatedPlayerLoop(() =>
+            {
+                Type marker = GetMarkerType();
+                Assert.That(CountType(PlayerLoop.GetCurrentPlayerLoop(), marker), Is.Zero);
+
+                Assert.That(MmdStandaloneWorkerScheduler.EnsureInstalled(), Is.True);
+                Assert.That(MmdStandaloneWorkerScheduler.IsInstalled, Is.True);
+                AssertSingleMarkerBeforeAnchor(PlayerLoop.GetCurrentPlayerLoop(), marker);
+
+                // A second install must verify the published tree instead of inserting again.
+                Assert.That(MmdStandaloneWorkerScheduler.EnsureInstalled(), Is.True);
+                AssertSingleMarkerBeforeAnchor(PlayerLoop.GetCurrentPlayerLoop(), marker);
+
+                // Domain-reload reset clears the flag while the published tree still holds the
+                // marker; reinstalling must repair it in place without a duplicate.
+                InvokeResetForDomainReload();
+                Assert.That(MmdStandaloneWorkerScheduler.IsInstalled, Is.False);
+                Assert.That(MmdStandaloneWorkerScheduler.EnsureInstalled(), Is.True);
+                Assert.That(MmdStandaloneWorkerScheduler.IsInstalled, Is.True);
+                AssertSingleMarkerBeforeAnchor(PlayerLoop.GetCurrentPlayerLoop(), marker);
+
+                // Another system replaces the active loop without clearing our flag.
+                PlayerLoop.SetPlayerLoop(PlayerLoop.GetDefaultPlayerLoop());
+                Assert.That(CountType(PlayerLoop.GetCurrentPlayerLoop(), marker), Is.Zero);
+                Assert.That(MmdStandaloneWorkerScheduler.EnsureInstalled(), Is.True);
+                AssertSingleMarkerBeforeAnchor(PlayerLoop.GetCurrentPlayerLoop(), marker);
+            });
+        }
+
+        private static void AssertSingleMarkerBeforeAnchor(PlayerLoopSystem loop, Type marker)
+        {
+            Assert.That(CountType(loop, marker), Is.EqualTo(1));
+            PlayerLoopSystem update = FindNode(loop, typeof(Update));
+            int markerIndex = FindType(update, marker);
+            int anchorIndex = FindType(update, typeof(Update.ScriptRunBehaviourUpdate));
+            Assert.That(markerIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(markerIndex + 1, Is.EqualTo(anchorIndex));
+            Assert.That(update.subSystemList![markerIndex].updateDelegate, Is.Not.Null);
+        }
+
+        // EditMode drives the editor's PlayerLoop, so every live install test restores the
+        // original tree and installation flag. Starting from the default loop keeps the test
+        // independent from markers a previous run may have left behind.
+        private static void RunWithIsolatedPlayerLoop(Action body)
+        {
+            FieldInfo installedField = typeof(MmdStandaloneWorkerScheduler).GetField(
+                "installed",
+                BindingFlags.NonPublic | BindingFlags.Static)!;
+            PlayerLoopSystem original = PlayerLoop.GetCurrentPlayerLoop();
+            object originalInstalled = installedField.GetValue(null)!;
+            try
+            {
+                PlayerLoop.SetPlayerLoop(PlayerLoop.GetDefaultPlayerLoop());
+                installedField.SetValue(null, false);
+                body();
+            }
+            finally
+            {
+                PlayerLoop.SetPlayerLoop(original);
+                installedField.SetValue(null, originalInstalled);
+            }
+        }
+
+        private static void InvokeResetForDomainReload()
+        {
+            typeof(MmdStandaloneWorkerScheduler)
+                .GetMethod("ResetForDomainReload", BindingFlags.NonPublic | BindingFlags.Static)!
+                .Invoke(null, null);
+        }
+
         private static PlayerLoopSystem CreatePlayerLoop(bool includeAnchor)
         {
             var updateChildren = new List<PlayerLoopSystem>();
