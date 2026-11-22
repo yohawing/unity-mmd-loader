@@ -573,7 +573,7 @@ namespace Mmd.Editor
 
                 Undo.RegisterCreatedObjectUndo(instanceRoot, "Load PMX Asset Into Scene");
                 MmdModelDefinition model = pmxAsset.LoadModel();
-                return MmdUnityModelFactory.CreateFromInstantiatedImportedHierarchy(
+                return MmdUnityModelFactory.CreateFromInstantiatedImportedHierarchyForSceneDrop(
                     instanceRoot,
                     model,
                     string.IsNullOrWhiteSpace(pmxAsset.SourcePath) ? null : pmxAsset.SourcePath,

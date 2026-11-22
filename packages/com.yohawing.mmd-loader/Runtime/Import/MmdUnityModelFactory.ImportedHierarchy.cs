@@ -77,6 +77,51 @@ namespace Mmd.UnityIntegration
             MmdMaterialOverrideAsset? materialOverride = null,
             MmdMaterialRenderingTargets[]? materialRenderingTargets = null)
         {
+            return CreateFromInstantiatedImportedHierarchy(
+                instanceRoot,
+                model,
+                sourcePath,
+                importScale,
+                includeSelfShadowTarget,
+                materialOverride,
+                materialRenderingTargets,
+                metadataOnlyDescriptor: false);
+        }
+
+        /// <summary>
+        /// Scene drag-and-drop entry. The dropped instance is only used for its root, so its
+        /// rendering descriptor carries metadata only (no geometry, skinning or morph offsets).
+        /// </summary>
+        internal static MmdUnityModelInstance CreateFromInstantiatedImportedHierarchyForSceneDrop(
+            GameObject instanceRoot,
+            MmdModelDefinition model,
+            string? sourcePath,
+            float importScale,
+            bool includeSelfShadowTarget,
+            MmdMaterialOverrideAsset? materialOverride,
+            MmdMaterialRenderingTargets[]? materialRenderingTargets)
+        {
+            return CreateFromInstantiatedImportedHierarchy(
+                instanceRoot,
+                model,
+                sourcePath,
+                importScale,
+                includeSelfShadowTarget,
+                materialOverride,
+                materialRenderingTargets,
+                metadataOnlyDescriptor: true);
+        }
+
+        private static MmdUnityModelInstance CreateFromInstantiatedImportedHierarchy(
+            GameObject instanceRoot,
+            MmdModelDefinition model,
+            string? sourcePath,
+            float importScale,
+            bool includeSelfShadowTarget,
+            MmdMaterialOverrideAsset? materialOverride,
+            MmdMaterialRenderingTargets[]? materialRenderingTargets,
+            bool metadataOnlyDescriptor)
+        {
             if (instanceRoot == null)
             {
                 throw new ArgumentNullException(nameof(instanceRoot));
@@ -90,9 +135,21 @@ namespace Mmd.UnityIntegration
             float scale = MmdCoordinateSpace.NormalizeImportScale(importScale);
             ClearNonSceneHideFlags(instanceRoot.transform);
 
-            MmdRenderingDescriptor descriptor = BuildRuntimeRenderingDescriptor(model);
-            MmdMaterialOverrideApplier.ApplyToRenderingDescriptor(materialOverride, descriptor);
-            ValidateDescriptor(descriptor);
+            MmdRenderingDescriptor descriptor;
+            if (metadataOnlyDescriptor)
+            {
+                // The imported hierarchy already owns the mesh (geometry, skinning, vertex-morph
+                // blend shapes) and this path never rebuilds it, so build only the metadata instead
+                // of the full split descriptor. The model is validated there.
+                descriptor = BuildRuntimePlaybackRenderingDescriptor(model, MmdMaterialPreset.MmdToon);
+                MmdMaterialOverrideApplier.ApplyToRenderingDescriptor(materialOverride, descriptor);
+            }
+            else
+            {
+                descriptor = BuildRuntimeRenderingDescriptor(model);
+                MmdMaterialOverrideApplier.ApplyToRenderingDescriptor(materialOverride, descriptor);
+                ValidateDescriptor(descriptor);
+            }
 
             if (model.bones != null && model.bones.Count > 0)
             {
