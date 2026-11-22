@@ -827,12 +827,23 @@ namespace Mmd.Tests
                 // This redistributable fixture intentionally exercises static + dynamicBone bodies;
                 // its rest pose is already at equilibrium, so this case verifies host-pose routing
                 // and complete native readback rather than inventing a motion oracle for the hair.
+                // Native physics advances in fixed substeps from an accumulator, so five frames of
+                // wall-clock delta can sum below one substep on a fast machine. Fix the frame delta
+                // so these five frames always step, independent of how long the setup took.
+                FixLivePhysicsTestFrameDeltaTime();
+                int nativeSubstepTotal = 0;
                 for (int i = 1; i <= 5; i++)
                 {
                     proxyHips.localPosition = proxyBindPosition + new Vector3(0.05f + 0.01f * i, 0.0f, 0.0f);
                     proxyHips.localRotation = Quaternion.Euler(0.0f, 4.0f + i, 0.0f);
                     yield return null;
+                    nativeSubstepTotal += controller.LastLivePhysicsDiagnostics?.nativeSubstepCount ?? 0;
                 }
+
+                RestoreLivePhysicsTestFrameDeltaTime();
+                Assert.That(nativeSubstepTotal, Is.GreaterThan(0),
+                    "Humanoid Live must run at least one native physics substep over five fixed-delta frames; " +
+                    "without a substep the hair readback check below cannot observe motion.");
                 Assert.That(controller.LastLivePhysicsDiagnostics, Is.Not.Null);
                 Assert.That(controller.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(5));
                 Assert.That(controller.LastLivePhysicsDiagnostics.deltaTime, Is.GreaterThan(0.0f));
@@ -941,6 +952,7 @@ namespace Mmd.Tests
             }
             finally
             {
+                RestoreLivePhysicsTestFrameDeltaTime();
                 if (graph.IsValid())
                 {
                     graph.Destroy();
@@ -1082,12 +1094,23 @@ namespace Mmd.Tests
                 // The real fixture is the graph/binding probe here; deterministic mode-1 movement
                 // is covered by the synthetic two-bone Timeline regression in EditMode.
 
+                // Native physics advances in fixed substeps from an accumulator, so five frames of
+                // wall-clock delta can sum below one substep on a fast machine. Fix the frame delta
+                // so these five frames always step, independent of how long the setup took.
+                FixLivePhysicsTestFrameDeltaTime();
+                int nativeSubstepTotal = 0;
                 for (int i = 1; i <= 5; i++)
                 {
                     proxyHips.localPosition = proxyBindPosition + new Vector3(0.05f + 0.01f * i, 0.0f, 0.0f);
                     proxyHips.localRotation = Quaternion.Euler(0.0f, 4.0f + i, 0.0f);
                     yield return null;
+                    nativeSubstepTotal += controller.LastLivePhysicsDiagnostics?.nativeSubstepCount ?? 0;
                 }
+
+                RestoreLivePhysicsTestFrameDeltaTime();
+                Assert.That(nativeSubstepTotal, Is.GreaterThan(0),
+                    "Humanoid Live must run at least one native physics substep over five fixed-delta frames; " +
+                    "without a substep the hair readback check below cannot observe motion.");
                 Assert.That(controller.LastLivePhysicsDiagnostics, Is.Not.Null);
                 Assert.That(controller.LastLivePhysicsDiagnostics!.frame, Is.EqualTo(5));
                 Assert.That(controller.LastLivePhysicsDiagnostics.deltaTime, Is.GreaterThan(0.0f));
@@ -1115,6 +1138,7 @@ namespace Mmd.Tests
             }
             finally
             {
+                RestoreLivePhysicsTestFrameDeltaTime();
                 if (graph.IsValid())
                 {
                     graph.Destroy();
@@ -3193,6 +3217,28 @@ namespace Mmd.Tests
             }
 
             return slots;
+        }
+
+        // Twice the 60 Hz native substep, so every frame of the Live loops runs native physics.
+        private const float LivePhysicsTestFrameDeltaTime = 1.0f / 30.0f;
+
+        // The original Time.captureDeltaTime is restored (not reset to 0) so a session that already
+        // fixed the frame delta keeps it; nothing is restored if the delta was never fixed.
+        private float? savedCaptureDeltaTime;
+
+        private void FixLivePhysicsTestFrameDeltaTime()
+        {
+            savedCaptureDeltaTime ??= Time.captureDeltaTime;
+            Time.captureDeltaTime = LivePhysicsTestFrameDeltaTime;
+        }
+
+        private void RestoreLivePhysicsTestFrameDeltaTime()
+        {
+            if (savedCaptureDeltaTime.HasValue)
+            {
+                Time.captureDeltaTime = savedCaptureDeltaTime.Value;
+                savedCaptureDeltaTime = null;
+            }
         }
 
         private static bool HasNativeHairBodyReadbackChanged(
