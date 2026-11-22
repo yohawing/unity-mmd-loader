@@ -280,9 +280,6 @@ namespace Mmd.UnityIntegration
                 resetOnFirstStep ? 0.0f : deltaTime,
                 totalWatch,
                 ensureBackendMs,
-                evaluateFrameMs: 0.0,
-                applyAnimationFrameMs: 0.0,
-                evaluatedFrame: null,
                 out _,
                 localPositionOffsets,
                 localRotations,
@@ -899,9 +896,6 @@ namespace Mmd.UnityIntegration
             float deltaTime,
             Stopwatch totalWatch,
             double ensureBackendMs,
-            double evaluateFrameMs,
-            double applyAnimationFrameMs,
-            MmdEvaluatedFrame? evaluatedFrame,
             out double refreshSnapshotFrameMs,
             float[] localPositionOffsets,
             float[] localRotations,
@@ -1014,17 +1008,6 @@ namespace Mmd.UnityIntegration
                 sampledDiagnosticsStartTimestamp,
                 sampledDiagnosticsEndTimestamp);
 
-            long evaluatedFrameRefreshStartTimestamp = Stopwatch.GetTimestamp();
-            bool evaluatedFrameRefreshPresent = evaluatedFrame != null;
-            if (evaluatedFrame != null)
-            {
-                RefreshEvaluatedFrameFromUnityTransforms(evaluatedFrame);
-            }
-            long evaluatedFrameRefreshEndTimestamp = Stopwatch.GetTimestamp();
-            double evaluatedFrameRefreshMs = MmdLivePhysicsDiagnosticsClock.Milliseconds(
-                evaluatedFrameRefreshStartTimestamp,
-                evaluatedFrameRefreshEndTimestamp);
-
             refreshSnapshotFrameMs = stageWatch.Elapsed.TotalMilliseconds;
             long diagnosticsConstructionStartTimestamp = Stopwatch.GetTimestamp();
             MmdLivePhysicsFrameDiagnostics diagnostics = new MmdLivePhysicsFrameDiagnostics
@@ -1051,7 +1034,9 @@ namespace Mmd.UnityIntegration
                 matrixTransformApplyPresent = true,
                 sampledDiagnosticsPresent = true,
                 sampledBodyDiagnosticsThisFrame = sampledBodyDiagnosticsThisFrame,
-                evaluatedFrameRefreshPresent = evaluatedFrameRefreshPresent,
+                // Pose stepping receives host-pose buffers, never an evaluated VMD frame: there is
+                // no evaluated-frame refresh, and no evaluate/apply duration is measured here.
+                evaluatedFrameRefreshPresent = false,
                 diagnosticsConstructionPresent = true,
                 ensureBackendPresent = true,
                 evaluateFramePresent = !nativeHumanoidHostPoseEnabled,
@@ -1072,10 +1057,10 @@ namespace Mmd.UnityIntegration
                 afterPhysicsMatrixReadbackMs = afterPhysicsMatrixReadbackMs,
                 matrixTransformApplyMs = matrixTransformApplyMs,
                 sampledDiagnosticsMs = sampledDiagnosticsMs,
-                evaluatedFrameRefreshMs = evaluatedFrameRefreshMs,
+                evaluatedFrameRefreshMs = 0.0,
                 ensureBackendMs = ensureBackendMs,
-                evaluateFrameMs = evaluateFrameMs,
-                applyAnimationFrameMs = applyAnimationFrameMs,
+                evaluateFrameMs = 0.0,
+                applyAnimationFrameMs = 0.0,
                 syncBoneDrivenBodiesMs = syncBoneDrivenBodiesMs,
                 stepPhysicsMs = stepPhysicsMs,
                 applyPhysicsBodiesMs = applyPhysicsBodiesMs,
@@ -1092,9 +1077,9 @@ namespace Mmd.UnityIntegration
                 comparisonSpace = "runtime-forward-playback-diagnostics",
                 importScale = playbackInstance.ImportScale,
                 modelBoneCount = model.bones.Count,
-                appliedBoneCount = fastSession != null ? fastPoseBoneIndices.Length : evaluatedFrame?.bones.Count ?? model.bones.Count,
+                appliedBoneCount = fastSession != null ? fastPoseBoneIndices.Length : model.bones.Count,
                 modelMorphCount = model.morphs.Count,
-                appliedMorphCount = fastSession != null ? fastMorphIndices.Length : evaluatedFrame?.morphs.Count ?? model.morphs.Count,
+                appliedMorphCount = fastSession != null ? fastMorphIndices.Length : model.morphs.Count,
                 bodyDiagnosticsFrame = lastLivePhysicsBodyDiagnosticsFrame,
                 bodyDiagnostics = lastLivePhysicsBodyDiagnostics
             };
@@ -1122,11 +1107,6 @@ namespace Mmd.UnityIntegration
             if (!sampledBodyDiagnosticsThisFrame)
             {
                 diagnostics.sampledDiagnosticsMs = 0.0;
-            }
-
-            if (!evaluatedFrameRefreshPresent)
-            {
-                diagnostics.evaluatedFrameRefreshMs = 0.0;
             }
 
             lastLivePhysicsDiagnostics = diagnostics;

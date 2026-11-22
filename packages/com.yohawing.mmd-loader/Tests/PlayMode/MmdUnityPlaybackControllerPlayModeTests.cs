@@ -787,6 +787,10 @@ namespace Mmd.Tests
                 Assert.That(initialGolden.evaluateFramePresent, Is.False);
                 Assert.That(initialGolden.applyAnimationFramePresent, Is.False);
                 Assert.That(initialGolden.snapshotBuildPresent, Is.False);
+                // Pose stepping never measures these stages, so they stay exactly zero (not timing noise).
+                Assert.That(initialGolden.evaluatedFrameRefreshMs, Is.Zero);
+                Assert.That(initialGolden.evaluateFrameMs, Is.Zero);
+                Assert.That(initialGolden.applyAnimationFrameMs, Is.Zero);
                 Assert.That(initialGolden.readbackTransformCount, Is.EqualTo(16));
                 Assert.That(initialGolden.nativeRigidbodyCount, Is.EqualTo(16));
                 Assert.That(initialGolden.nativeBoneCount, Is.EqualTo(21));
@@ -869,6 +873,10 @@ namespace Mmd.Tests
                 Assert.That(steppedGolden.evaluateFramePresent, Is.False);
                 Assert.That(steppedGolden.applyAnimationFramePresent, Is.False);
                 Assert.That(steppedGolden.snapshotBuildPresent, Is.False);
+                // Pose stepping never measures these stages, so they stay exactly zero (not timing noise).
+                Assert.That(steppedGolden.evaluatedFrameRefreshMs, Is.Zero);
+                Assert.That(steppedGolden.evaluateFrameMs, Is.Zero);
+                Assert.That(steppedGolden.applyAnimationFrameMs, Is.Zero);
                 Assert.That(steppedGolden.readbackTransformCount, Is.EqualTo(16));
                 Assert.That(steppedGolden.nativeRigidbodyCount, Is.EqualTo(16));
                 Assert.That(steppedGolden.nativeBoneCount, Is.EqualTo(21));
