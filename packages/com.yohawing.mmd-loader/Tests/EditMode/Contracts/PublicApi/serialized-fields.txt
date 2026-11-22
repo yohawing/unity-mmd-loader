@@ -1046,10 +1046,13 @@
 [Mmd.Runtime] Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: matrixTransformApplyPresent : bool
 [Mmd.Runtime] Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: modelBoneCount : int
 [Mmd.Runtime] Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: modelMorphCount : int
+[Mmd.Runtime] Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: nativeAccumulatorTime : float
 [Mmd.Runtime] Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: nativeBoneCount : int
 [Mmd.Runtime] Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: nativeBonesWrittenBack : int
+[Mmd.Runtime] Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: nativeClampedDeltaTime : float
 [Mmd.Runtime] Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: nativeHostFrameMs : double
 [Mmd.Runtime] Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: nativeHostFramePresent : bool
+[Mmd.Runtime] Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: nativeInputDeltaTime : float
 [Mmd.Runtime] Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: nativeKinematicRigidbodiesFed : int
 [Mmd.Runtime] Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: nativeRigidbodyCopyMs : double
 [Mmd.Runtime] Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: nativeRigidbodyCopyPresent : bool

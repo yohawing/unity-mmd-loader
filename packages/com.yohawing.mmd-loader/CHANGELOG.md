@@ -38,6 +38,10 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
   - `MmdHumanoidSetupAsset.Initialize`. Reimport the PMX with Animation Type = Humanoid and use the imported Avatar and retarget mapping. Existing `MmdHumanoidSetupAsset` files still load, and the obsolete `MmdHumanoidSetupPreset` enum stays because it is the type of their serialized `setupPreset` field.
 - Removed `Mmd.Editor.MmdPmxPrefabExporter.CreatePrefabWithFeedback`, which no menu or window called. Call `CreatePrefab(pmxAsset, GetDefaultPrefabPath(pmxAsset))` instead; it throws on failure and does not change the selection.
 
+### Added
+
+- `MmdLivePhysicsFrameDiagnostics` reports the native physics tick of each Live frame in three new fields: `nativeInputDeltaTime` (the seconds passed to the tick), `nativeClampedDeltaTime` (the seconds added to the tick's fixed-step accumulator after its maximum-step clamp; not the simulated time, which follows the substep count) and `nativeAccumulatorTime` (the fixed-step remainder carried into the next frame, which can be slightly negative within single-precision epsilon). They are filled for both VMD and Humanoid Live playback, and are zero on a seed frame.
+
 ### Changed
 
 - The PMX importer version is now 31, so existing PMX assets reimport once after updating and pick up the material changes in this release.

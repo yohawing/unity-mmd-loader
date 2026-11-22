@@ -24,6 +24,12 @@ namespace Mmd.Tests
     public sealed class MmdUnityPlaybackControllerPlayModeTests
     {
         private const string SyntheticPlayModeModelName = MmdPlayModeTestFixtures.MinimalTriangleModelName;
+        // Lower bound for MmdLivePhysicsFrameDiagnostics.nativeAccumulatorTime. The native tick
+        // (mmd-anim-runtime advance_physics_tick_clock) runs a substep while
+        // `accumulator + f32::EPSILON >= fixed_substep_seconds` and then subtracts the full step,
+        // so a valid remainder can reach -f32::EPSILON (1.1920929e-7), plus up to half an ulp of
+        // the 1/120 s step (about 5e-10) from rounding that sum. Twice f32::EPSILON covers both.
+        private const float NativeAccumulatorLowerBound = -2.0f * 1.1920929e-7f;
 
         [UnityTest]
         public IEnumerator PlayOnStartBeginsForwardPlaybackInPlayMode()
@@ -771,6 +777,10 @@ namespace Mmd.Tests
                 Assert.That(initialGolden.nativeStepReportPresent, Is.True);
                 Assert.That(initialGolden.hostPoseCapturePresent, Is.True);
                 Assert.That(initialGolden.hostPoseCaptureMs, Is.GreaterThan(0.0));
+                // The seed host frame does not advance the native tick.
+                Assert.That(initialGolden.nativeInputDeltaTime, Is.Zero);
+                Assert.That(initialGolden.nativeClampedDeltaTime, Is.Zero);
+                Assert.That(initialGolden.nativeAccumulatorTime, Is.Zero);
                 Assert.That(initialGolden.pinnedDiagnosticsPresent, Is.True);
                 Assert.That(initialGolden.pinMarshalPresent, Is.True);
                 Assert.That(initialGolden.nativeHostFramePresent, Is.True);
@@ -858,6 +868,12 @@ namespace Mmd.Tests
                 Assert.That(steppedGolden.nativeStepReportPresent, Is.True);
                 Assert.That(steppedGolden.hostPoseCapturePresent, Is.True);
                 Assert.That(steppedGolden.hostPoseCaptureMs, Is.GreaterThan(0.0));
+                Assert.That(steppedGolden.nativeInputDeltaTime, Is.EqualTo(steppedGolden.deltaTime),
+                    "The native tick must receive the frame delta the controller passed.");
+                Assert.That(steppedGolden.nativeClampedDeltaTime, Is.GreaterThan(0.0f));
+                Assert.That(steppedGolden.nativeClampedDeltaTime, Is.LessThanOrEqualTo(steppedGolden.nativeInputDeltaTime));
+                Assert.That(steppedGolden.nativeAccumulatorTime, Is.GreaterThanOrEqualTo(NativeAccumulatorLowerBound));
+                Assert.That(float.IsFinite(steppedGolden.nativeAccumulatorTime), Is.True);
                 Assert.That(steppedGolden.pinnedDiagnosticsPresent, Is.True);
                 Assert.That(steppedGolden.pinMarshalPresent, Is.True);
                 Assert.That(steppedGolden.nativeHostFramePresent, Is.True);

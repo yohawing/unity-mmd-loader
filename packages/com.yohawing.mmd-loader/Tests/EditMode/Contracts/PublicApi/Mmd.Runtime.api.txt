@@ -1150,6 +1150,9 @@ Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: field public double syncB
 Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: field public double totalMs
 Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: field public float deltaTime
 Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: field public float importScale
+Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: field public float nativeAccumulatorTime
+Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: field public float nativeClampedDeltaTime
+Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: field public float nativeInputDeltaTime
 Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: field public int appliedBoneCount
 Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: field public int appliedMorphCount
 Mmd.UnityIntegration.MmdLivePhysicsFrameDiagnostics :: field public int bodyDiagnosticsFrame

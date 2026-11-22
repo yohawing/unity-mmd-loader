@@ -32,6 +32,12 @@ namespace Mmd.Tests
         private const string PlaybackPmxId = "test_1bone_cube.pmx";
         private const string PlaybackVmdId = "test_1bone_cube_motion.vmd";
         private const int LivePhysicsPlaybackFrame = 10;
+        // Lower bound for MmdLivePhysicsFrameDiagnostics.nativeAccumulatorTime. The native tick
+        // (mmd-anim-runtime advance_physics_tick_clock) runs a substep while
+        // `accumulator + f32::EPSILON >= fixed_substep_seconds` and then subtracts the full step,
+        // so a valid remainder can reach -f32::EPSILON (1.1920929e-7), plus up to half an ulp of
+        // the 1/120 s step (about 5e-10) from rounding that sum. Twice f32::EPSILON covers both.
+        private const float NativeAccumulatorLowerBound = -2.0f * 1.1920929e-7f;
 
         [Test]
         public void PoseAppliedPublishesSuccessfulPoseAndIsolatesSubscriberFailure()
@@ -1475,6 +1481,16 @@ namespace Mmd.Tests
                 MmdUnityPlaybackController controller = binding.Instance.Root.AddComponent<MmdUnityPlaybackController>();
                 controller.Configure(binding, 30.0f);
                 controller.SetPhysicsMode(MmdPhysicsMode.Live);
+                MmdLivePhysicsFrameDiagnostics? seedDiagnostics = binding.LastLivePhysicsDiagnostics;
+                Assert.That(seedDiagnostics, Is.Not.Null);
+                Assert.That(seedDiagnostics!.frame, Is.Zero);
+                Assert.That(seedDiagnostics.nativeStepReportPresent, Is.True);
+                Assert.That(seedDiagnostics.deltaTime, Is.Zero);
+                Assert.That(seedDiagnostics.nativeInputDeltaTime, Is.Zero,
+                    "The VMD seed settles the world with a zero-delta native tick.");
+                Assert.That(seedDiagnostics.nativeClampedDeltaTime, Is.Zero);
+                Assert.That(seedDiagnostics.nativeAccumulatorTime, Is.Zero);
+                Assert.That(seedDiagnostics.nativeSubstepCount, Is.Zero);
                 // SetPhysicsMode(Live) seeds frame 0; apply it explicitly so this assertion
                 // remains tied to a normal forward (non-seed) VMD frame if that setup changes.
                 controller.ApplyFrame(0);
@@ -1516,6 +1532,13 @@ namespace Mmd.Tests
                 Assert.That(diagnostics.nativeSubstepCount, Is.GreaterThanOrEqualTo(0));
                 Assert.That(diagnostics.nativeKinematicRigidbodiesFed, Is.GreaterThanOrEqualTo(0));
                 Assert.That(diagnostics.nativeBonesWrittenBack, Is.GreaterThanOrEqualTo(0));
+                Assert.That(diagnostics.deltaTime, Is.EqualTo(LivePhysicsPlaybackFrame / 30.0f));
+                Assert.That(diagnostics.nativeInputDeltaTime, Is.EqualTo(diagnostics.deltaTime),
+                    "The native tick must receive the frame delta the binding resolved.");
+                Assert.That(diagnostics.nativeClampedDeltaTime, Is.GreaterThan(0.0f));
+                Assert.That(diagnostics.nativeClampedDeltaTime, Is.LessThanOrEqualTo(diagnostics.nativeInputDeltaTime));
+                Assert.That(diagnostics.nativeAccumulatorTime, Is.GreaterThanOrEqualTo(NativeAccumulatorLowerBound));
+                Assert.That(float.IsFinite(diagnostics.nativeAccumulatorTime), Is.True);
 
                 Assert.That(diagnostics.hostPoseCaptureMs, Is.GreaterThanOrEqualTo(0.0));
                 Assert.That(diagnostics.pinnedDiagnosticsMs, Is.GreaterThanOrEqualTo(0.0));

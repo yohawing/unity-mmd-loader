@@ -70,6 +70,26 @@ namespace Mmd.UnityIntegration
         public int nativeRigidbodyCount;
         public int nativeBoneCount;
         public int nativeSubstepCount;
+        /// <summary>
+        /// Seconds the native physics tick received for this frame, before clamping. Zero on a
+        /// seed frame. Valid when <see cref="nativeStepReportPresent"/> is true.
+        /// </summary>
+        public float nativeInputDeltaTime;
+        /// <summary>
+        /// Seconds the native physics tick added to its fixed-step accumulator for this frame:
+        /// the input clamped to the tick's maximum step. Never larger than
+        /// <see cref="nativeInputDeltaTime"/>. This is not the simulated time: the substeps run
+        /// from the accumulator, so a small input can run no substep and a carried remainder can
+        /// make a frame simulate more than its input (see <see cref="nativeSubstepCount"/>).
+        /// </summary>
+        public float nativeClampedDeltaTime;
+        /// <summary>
+        /// Seconds left in the native fixed-step accumulator after this frame's substeps, carried
+        /// into the next frame. The value is reported as is. It can be slightly negative, down to
+        /// about -1.2e-7 (single-precision epsilon), because the native tick runs a substep once
+        /// the remainder is within that epsilon of a full step and then subtracts the full step.
+        /// </summary>
+        public float nativeAccumulatorTime;
         public int nativeKinematicRigidbodiesFed;
         public int nativeBonesWrittenBack;
         public int bodyDiagnosticsFrame = -1;

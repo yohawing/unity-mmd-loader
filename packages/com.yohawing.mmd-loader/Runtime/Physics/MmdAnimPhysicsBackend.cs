@@ -30,6 +30,9 @@ namespace Mmd.Physics
         internal readonly int nativeRigidbodyCount;
         internal readonly int nativeBoneCount;
         internal readonly int nativeSubstepCount;
+        internal readonly float nativeInputDeltaTime;
+        internal readonly float nativeClampedDeltaTime;
+        internal readonly float nativeAccumulatorTime;
         internal readonly int nativeKinematicRigidbodiesFed;
         internal readonly int nativeBonesWrittenBack;
         internal readonly bool reportPresent;
@@ -48,6 +51,9 @@ namespace Mmd.Physics
             int nativeRigidbodyCount,
             int nativeBoneCount,
             int nativeSubstepCount,
+            float nativeInputDeltaTime,
+            float nativeClampedDeltaTime,
+            float nativeAccumulatorTime,
             int nativeKinematicRigidbodiesFed,
             int nativeBonesWrittenBack,
             bool reportPresent)
@@ -65,6 +71,9 @@ namespace Mmd.Physics
             this.nativeRigidbodyCount = nativeRigidbodyCount;
             this.nativeBoneCount = nativeBoneCount;
             this.nativeSubstepCount = nativeSubstepCount;
+            this.nativeInputDeltaTime = nativeInputDeltaTime;
+            this.nativeClampedDeltaTime = nativeClampedDeltaTime;
+            this.nativeAccumulatorTime = nativeAccumulatorTime;
             this.nativeKinematicRigidbodiesFed = nativeKinematicRigidbodiesFed;
             this.nativeBonesWrittenBack = nativeBonesWrittenBack;
             this.reportPresent = reportPresent;
@@ -937,6 +946,9 @@ namespace Mmd.Physics
                 nativeRigidbodyCount: rigidbodyStates.Length / TransformFloatCount,
                 nativeBoneCount: boneCount,
                 nativeSubstepCount: CheckedCount(report.tick.substeps, "native physics substep count"),
+                nativeInputDeltaTime: report.tick.inputDtSeconds,
+                nativeClampedDeltaTime: report.tick.clampedDtSeconds,
+                nativeAccumulatorTime: report.tick.accumulatorSeconds,
                 nativeKinematicRigidbodiesFed: MmdFfiMarshal.CheckedIntPtrToInt(report.kinematicRigidbodiesFed, "native kinematic rigidbody count"),
                 nativeBonesWrittenBack: MmdFfiMarshal.CheckedIntPtrToInt(report.bonesWrittenBack, "native bones written back count"),
                 reportPresent: true);
@@ -1090,6 +1102,9 @@ namespace Mmd.Physics
                 nativeRigidbodyCount: rigidbodyStates.Length / TransformFloatCount,
                 nativeBoneCount: boneCount,
                 nativeSubstepCount: CheckedCount(report.tick.substeps, "native physics substep count"),
+                nativeInputDeltaTime: report.tick.inputDtSeconds,
+                nativeClampedDeltaTime: report.tick.clampedDtSeconds,
+                nativeAccumulatorTime: report.tick.accumulatorSeconds,
                 nativeKinematicRigidbodiesFed: MmdFfiMarshal.CheckedIntPtrToInt(report.kinematicRigidbodiesFed, "native kinematic rigidbody count"),
                 nativeBonesWrittenBack: MmdFfiMarshal.CheckedIntPtrToInt(report.bonesWrittenBack, "native bones written back count"),
                 reportPresent: true);

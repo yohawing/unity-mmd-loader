@@ -509,12 +509,15 @@ namespace Mmd.Tests.Contracts
             float[] rigidbodyRotations,
             out MmdPhysicsHostStepDiagnostics diagnostics)
         {
-            bool seed = lastFrame < 0;
+            // Use the shared Live step rule the workers use. A time difference such as
+            // 2/30f - 1/30f is one ulp away from 1/30f, and the native tick reports the delta it
+            // received, so the reference must pass the bit-identical value.
+            bool seed = MmdUnityPlaybackBinding.ResolveLivePhysicsStep(frame, lastFrame, 30.0f, out float deltaTime);
             backend.StepPlaybackFrame(
                 session,
                 frame,
                 seed,
-                seed ? 0.0f : time - lastTime,
+                deltaTime,
                 before,
                 morph,
                 ik,
@@ -572,6 +575,15 @@ namespace Mmd.Tests.Contracts
                 Assert.That(diagnostics.nativeRigidbodyCount, Is.EqualTo(expectedDiagnostics.nativeRigidbodyCount));
                 Assert.That(diagnostics.nativeBoneCount, Is.EqualTo(expectedDiagnostics.nativeBoneCount));
                 Assert.That(diagnostics.nativeSubstepCount, Is.EqualTo(expectedDiagnostics.nativeSubstepCount));
+                Assert.That(
+                    BitConverter.SingleToInt32Bits(diagnostics.nativeInputDeltaTime),
+                    Is.EqualTo(BitConverter.SingleToInt32Bits(expectedDiagnostics.nativeInputDeltaTime)));
+                Assert.That(
+                    BitConverter.SingleToInt32Bits(diagnostics.nativeClampedDeltaTime),
+                    Is.EqualTo(BitConverter.SingleToInt32Bits(expectedDiagnostics.nativeClampedDeltaTime)));
+                Assert.That(
+                    BitConverter.SingleToInt32Bits(diagnostics.nativeAccumulatorTime),
+                    Is.EqualTo(BitConverter.SingleToInt32Bits(expectedDiagnostics.nativeAccumulatorTime)));
                 Assert.That(diagnostics.nativeKinematicRigidbodiesFed, Is.EqualTo(expectedDiagnostics.nativeKinematicRigidbodiesFed));
                 Assert.That(diagnostics.nativeBonesWrittenBack, Is.EqualTo(expectedDiagnostics.nativeBonesWrittenBack));
             }
