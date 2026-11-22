@@ -242,7 +242,7 @@ namespace Mmd.Parser
                     diffuseColor = ClampColor3(Vec3From4(material.diffuse), new[] { 1.0f, 1.0f, 1.0f }),
                     ambientColor = ClampColor3(material.ambient, new[] { 0.25f, 0.25f, 0.25f }),
                     edgeColor = ClampColor4(material.edgeColor, new[] { 0.0f, 0.0f, 0.0f, 1.0f }),
-                    edgeSize = ClampNonNegative(material.edgeSize),
+                    edgeSize = NonNegativeFiniteOrZero(material.edgeSize),
                     sphereTextureMode = SphereTextureModeName(material.sphereMode),
                     toonShared = material.sharedToonIndex >= 0,
                     sharedToonIndex = material.sharedToonIndex,
@@ -442,11 +442,6 @@ namespace Mmd.Parser
             }
 
             return value < 0.0f ? 0.0f : value > 1.0f ? 1.0f : value;
-        }
-
-        private static float ClampNonNegative(float value)
-        {
-            return IsFinite(value) && value >= 0.0f ? value : 0.0f;
         }
 
         private static float[] ClampColor3(float[]? values, float[] fallback)
