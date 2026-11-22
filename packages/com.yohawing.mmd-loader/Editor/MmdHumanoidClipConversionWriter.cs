@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -276,7 +277,7 @@ namespace Mmd.Editor
                             + MmdAssetPathUtility.NormalizeIdentifier(vmdAsset.SourceId) + "_"
                             + startFrame + "_"
                             + effectiveEndFrame
-                            + "_" + frameRate + "fps";
+                            + "_" + frameRate.ToString(CultureInfo.InvariantCulture) + "fps";
                 clip.frameRate = frameRate;
 
                 float sampleFrameToTimeFactor = 1.0f / frameRate;

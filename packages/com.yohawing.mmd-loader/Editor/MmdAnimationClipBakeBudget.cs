@@ -19,6 +19,15 @@ namespace Mmd.Editor
         // is approximately one Keyframe per sample.
         private const int HumanoidExtraKeyEquivalentChannels = 9;
 
+        // The Humanoid writer emits one dense curve per muscle plus eight root curves:
+        // RootT (3), RootQ (4) and MmdHumanoidRootMotionDriver.clipRootVerticalOffset (1).
+        internal const int HumanoidWrittenExtraCurveCount = 8;
+
+        internal static long EstimateHumanoidWrittenKeyCount(long frameCount, int muscleCount)
+        {
+            return frameCount * (muscleCount + HumanoidWrittenExtraCurveCount);
+        }
+
         internal static bool TryValidateGeneric(
             long frameCount,
             int boneCount,

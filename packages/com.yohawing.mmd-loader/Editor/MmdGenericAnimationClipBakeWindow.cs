@@ -215,7 +215,9 @@ namespace Mmd.Editor
                 return;
             }
 
-            long estimatedKeyCount = frameCount * (HumanTrait.MuscleCount + 7);
+            long estimatedKeyCount = MmdAnimationClipBakeBudget.EstimateHumanoidWrittenKeyCount(
+                frameCount,
+                HumanTrait.MuscleCount);
             if (estimatedKeyCount < 500_000)
             {
                 return;

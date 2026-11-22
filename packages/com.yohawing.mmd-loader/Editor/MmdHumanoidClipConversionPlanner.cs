@@ -20,7 +20,6 @@ namespace Mmd.Editor
             MmdVmdAsset? vmdAsset)
         {
             var diagnostics = new List<string>();
-            MmdMotionDefinition? motion = null;
 
             if (pmxAsset == null)
             {
@@ -40,8 +39,7 @@ namespace Mmd.Editor
                     notReadyReadiness: NotReadyReadiness,
                     diagnostics: diagnostics,
                     pmxAsset: pmxAsset,
-                    vmdAsset: vmdAsset,
-                    motion: null);
+                    vmdAsset: vmdAsset);
             }
 
             ValidatePmxImportReadiness(pmxAsset!, diagnostics);
@@ -61,10 +59,6 @@ namespace Mmd.Editor
                 out cachedVmdMorphKeyframeCount,
                 out cachedVmdModelKeyframeCount);
 
-            // motion remains null for analysis path (counts come from vmdAsset cache via CreateResult fallback).
-            // Explicit bake/write paths (outside this analysis) may still LoadMotion when creating clip.
-            motion = null;
-
             bool ready = diagnostics.Count == 0;
             string readiness = ready ? ReadyReadiness : NotReadyReadiness;
             if (ready)
@@ -81,7 +75,6 @@ namespace Mmd.Editor
                 diagnostics,
                 pmxAsset,
                 vmdAsset,
-                motion,
                 cachedVmdMaxFrame: cachedVmdMaxFrame,
                 cachedVmdBoneKeyframeCount: cachedVmdBoneKeyframeCount,
                 cachedVmdMorphKeyframeCount: cachedVmdMorphKeyframeCount,
@@ -340,22 +333,15 @@ namespace Mmd.Editor
             List<string> diagnostics,
             MmdPmxAsset? pmxAsset,
             MmdVmdAsset? vmdAsset,
-            MmdMotionDefinition? motion,
             int cachedVmdMaxFrame = 0,
             int cachedVmdBoneKeyframeCount = 0,
             int cachedVmdMorphKeyframeCount = 0,
             int cachedVmdModelKeyframeCount = 0)
         {
-            int vmdMaxFrame = motion != null ? motion.maxFrame : (vmdAsset != null ? vmdAsset.MaxFrame : cachedVmdMaxFrame);
-            int vmdBoneKeyframeCount = motion != null
-                ? (motion.boneKeyframes != null ? motion.boneKeyframes.Count : 0)
-                : (vmdAsset != null ? vmdAsset.BoneKeyframeCount : cachedVmdBoneKeyframeCount);
-            int vmdMorphKeyframeCount = motion != null
-                ? (motion.morphKeyframes != null ? motion.morphKeyframes.Count : 0)
-                : (vmdAsset != null ? vmdAsset.MorphKeyframeCount : cachedVmdMorphKeyframeCount);
-            int vmdModelKeyframeCount = motion != null
-                ? (motion.modelKeyframes != null ? motion.modelKeyframes.Count : 0)
-                : (vmdAsset != null ? vmdAsset.ModelKeyframeCount : cachedVmdModelKeyframeCount);
+            int vmdMaxFrame = vmdAsset != null ? vmdAsset.MaxFrame : cachedVmdMaxFrame;
+            int vmdBoneKeyframeCount = vmdAsset != null ? vmdAsset.BoneKeyframeCount : cachedVmdBoneKeyframeCount;
+            int vmdMorphKeyframeCount = vmdAsset != null ? vmdAsset.MorphKeyframeCount : cachedVmdMorphKeyframeCount;
+            int vmdModelKeyframeCount = vmdAsset != null ? vmdAsset.ModelKeyframeCount : cachedVmdModelKeyframeCount;
 
             return new MmdHumanoidClipConversionPlan(
                 prerequisitesReady,

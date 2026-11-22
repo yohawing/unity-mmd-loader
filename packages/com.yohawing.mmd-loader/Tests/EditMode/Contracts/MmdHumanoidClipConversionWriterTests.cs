@@ -433,6 +433,79 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void CreateInMemoryClipNameUsesInvariantFrameRateUnderNonInvariantCulture()
+        {
+            MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(FixtureVmdPath);
+            var ownedObjects = new List<UnityEngine.Object>();
+            System.Globalization.CultureInfo originalCulture = System.Globalization.CultureInfo.CurrentCulture;
+            try
+            {
+                CreateReadyFixturePmx(out MmdPmxAsset pmxAsset, ownedObjects);
+                ConfigureImportedHumanoidState(pmxAsset, ownedObjects);
+                System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("de-DE");
+                foreach ((float rate, string rateText) in new[] { (30.0f, "30"), (29.97f, "29.97") })
+                {
+                    MmdHumanoidClipConversionWriterResult result =
+                        MmdHumanoidClipConversionWriter.CreateInMemoryClip(pmxAsset, vmdAsset, rate, 0, 2);
+                    try
+                    {
+                        Assert.That(result.Clip, Is.Not.Null, string.Join("\n", result.Diagnostics));
+                        Assert.That(
+                            result.Clip!.name,
+                            Is.EqualTo("H6_HumanoidProxyClip_ready-h6-writer-slice1_pmx_"
+                                       + "Packages_com_yohawing_mmd-loader_Tests_Fixtures_Assets_test_1bone_cube_motion_vmd_"
+                                       + "0_2_" + rateText + "fps"));
+                    }
+                    finally
+                    {
+                        if (result.Clip != null) UnityEngine.Object.DestroyImmediate(result.Clip);
+                    }
+                }
+            }
+            finally
+            {
+                System.Globalization.CultureInfo.CurrentCulture = originalCulture;
+                DestroyOwnedObjects(ownedObjects);
+            }
+        }
+
+        [Test]
+        public void HumanoidWrittenKeyEstimateMatchesDenseKeysWrittenByWriter()
+        {
+            MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(FixtureVmdPath);
+            var ownedObjects = new List<UnityEngine.Object>();
+            try
+            {
+                CreateReadyFixturePmx(out MmdPmxAsset pmxAsset, ownedObjects);
+                ConfigureImportedHumanoidState(pmxAsset, ownedObjects);
+                const int startFrame = 0;
+                const int endFrame = 2;
+                MmdHumanoidClipConversionWriterResult result =
+                    MmdHumanoidClipConversionWriter.CreateInMemoryClip(pmxAsset, vmdAsset, 30.0f, startFrame, endFrame);
+                try
+                {
+                    Assert.That(result.Clip, Is.Not.Null, string.Join("\n", result.Diagnostics));
+                    long writtenKeyCount = AnimationUtility.GetCurveBindings(result.Clip!)
+                        .Sum(binding => (long)AnimationUtility.GetEditorCurve(result.Clip!, binding).length);
+                    long frameCount = endFrame - startFrame + 1;
+
+                    Assert.That(
+                        MmdAnimationClipBakeBudget.EstimateHumanoidWrittenKeyCount(frameCount, HumanTrait.MuscleCount),
+                        Is.EqualTo(writtenKeyCount));
+                    Assert.That(writtenKeyCount, Is.EqualTo((HumanTrait.MuscleCount + 8L) * frameCount));
+                }
+                finally
+                {
+                    if (result.Clip != null) UnityEngine.Object.DestroyImmediate(result.Clip);
+                }
+            }
+            finally
+            {
+                DestroyOwnedObjects(ownedObjects);
+            }
+        }
+
+        [Test]
         public void CreateInMemoryClipNullInputsReportPlannerDiagnostics()
         {
             MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(FixtureVmdPath);
