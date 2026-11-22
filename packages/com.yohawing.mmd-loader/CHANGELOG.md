@@ -45,7 +45,7 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 
 ### Changed
 
-- Faster PMX and VMD handling with identical results: building a model's rendering descriptor validates the model once instead of ten times (about 5x faster on large models), mesh splitting no longer allocates a string per index, and VMD reimports no longer hash the whole file (about 2.5x faster for large motions).
+- Faster PMX and VMD handling with identical results: building a model's rendering descriptor validates the model once instead of ten times (about 5x faster on large models), mesh splitting no longer allocates a string per index, and VMD reimports no longer hash the whole file (about 2.5x faster for large motions). Dropping an imported PMX into the scene reuses the imported mesh without rebuilding its full rendering descriptor (about 2.5x faster).
 
 - The PMX importer version is now 31, so existing PMX assets reimport once after updating and pick up the material changes in this release.
 
