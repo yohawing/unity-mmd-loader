@@ -45,7 +45,7 @@ namespace Mmd.Rendering
             var splitSubmeshes = new List<MmdSubmeshDescriptor>(source.submeshes.Count);
             var vertexSources = new List<MmdSplitVertexSourceDescriptor>(source.indices.Count);
             var splitIndicesBySourceVertex = new Dictionary<int, List<int>>(source.vertices.Count);
-            var splitIndexBySubmeshAndSource = new Dictionary<string, int>(source.indices.Count, StringComparer.Ordinal);
+            var splitIndexBySubmeshAndSource = new Dictionary<(int SubmeshIndex, int SourceVertexIndex), int>(source.indices.Count);
 
             foreach (MmdSubmeshDescriptor submesh in source.submeshes.OrderBy(item => item.submeshIndex))
             {
@@ -54,7 +54,7 @@ namespace Mmd.Rendering
                 for (int i = submesh.indexStart; i < sourceEnd; i++)
                 {
                     int sourceVertexIndex = source.indices[i];
-                    string key = BuildKey(submesh.submeshIndex, sourceVertexIndex);
+                    (int, int) key = (submesh.submeshIndex, sourceVertexIndex);
                     if (!splitIndexBySubmeshAndSource.TryGetValue(key, out int splitVertexIndex))
                     {
                         splitVertexIndex = splitVertices.Count;
@@ -189,11 +189,6 @@ namespace Mmd.Rendering
                     throw new ArgumentException($"Submesh {submesh.submeshIndex} range exceeds the source index buffer.", nameof(source));
                 }
             }
-        }
-
-        private static string BuildKey(int submeshIndex, int sourceVertexIndex)
-        {
-            return submeshIndex.ToString() + ":" + sourceVertexIndex.ToString();
         }
 
         private static MmdMeshVertexDescriptor CloneVertex(MmdMeshVertexDescriptor source, int splitVertexIndex)
