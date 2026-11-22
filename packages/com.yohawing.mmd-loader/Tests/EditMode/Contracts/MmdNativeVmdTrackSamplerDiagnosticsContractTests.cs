@@ -45,6 +45,57 @@ namespace Mmd.Tests
             Assert.That(secondCameraReason, Is.EqualTo(cameraReason));
         }
 
+        [Test]
+        public void TryCreateReportsTrackAbsenceAsTypedResultInsteadOfDiagnosticText()
+        {
+            byte[] cameraOnlyBytes = MmdTestFixtures.BuildCameraTrackVmdBytes("absent_tracks");
+
+            Assert.That(
+                NativeVmdCameraTrackSampler.TryCreate(
+                    cameraOnlyBytes,
+                    out NativeVmdCameraTrackSampler? camera,
+                    out string cameraReason,
+                    out bool cameraAbsent),
+                Is.True);
+            using (camera)
+            {
+                Assert.That(camera, Is.Not.Null);
+                Assert.That(cameraReason, Is.Empty);
+                Assert.That(cameraAbsent, Is.False);
+            }
+
+            Assert.That(
+                NativeVmdLightTrackSampler.TryCreate(
+                    cameraOnlyBytes,
+                    out NativeVmdLightTrackSampler? light,
+                    out string lightReason,
+                    out bool lightAbsent),
+                Is.False);
+            Assert.That(light, Is.Null);
+            Assert.That(lightAbsent, Is.True);
+            Assert.That(lightReason, Is.EqualTo("native track creation returned null"));
+
+            Assert.That(
+                NativeVmdSelfShadowTrackSampler.TryCreate(
+                    cameraOnlyBytes,
+                    out NativeVmdSelfShadowTrackSampler? selfShadow,
+                    out _,
+                    out bool selfShadowAbsent),
+                Is.False);
+            Assert.That(selfShadow, Is.Null);
+            Assert.That(selfShadowAbsent, Is.True);
+
+            Assert.That(
+                NativeVmdLightTrackSampler.TryCreate(
+                    Array.Empty<byte>(),
+                    out _,
+                    out string emptyReason,
+                    out bool emptyAbsent),
+                Is.False);
+            Assert.That(emptyAbsent, Is.False, "empty source is not an absent native track");
+            Assert.That(emptyReason, Is.EqualTo("source bytes are empty"));
+        }
+
         [TestCase("dll", "native DLL is unavailable")]
         [TestCase("entry-point", "native entry point is unavailable")]
         [TestCase("image", "native DLL has an incompatible image format")]

@@ -43,11 +43,11 @@ namespace Mmd.Timeline
 
         public MmdSceneCameraApplyStatus LastApplyStatus { get; private set; }
 
-        public string NativeCameraTrackDiagnostic { get; private set; } = string.Empty;
+        public string NativeCameraTrackDiagnostic => OwnedOrNull(cameraTrack)?.Diagnostic ?? string.Empty;
 
-        public string NativeLightTrackDiagnostic { get; private set; } = string.Empty;
+        public string NativeLightTrackDiagnostic => OwnedOrNull(lightTrack)?.Diagnostic ?? string.Empty;
 
-        public string NativeSelfShadowTrackDiagnostic { get; private set; } = string.Empty;
+        public string NativeSelfShadowTrackDiagnostic => OwnedOrNull(selfShadowTrack)?.Diagnostic ?? string.Empty;
 
         // Imported assets carry these counts from the binary summary. A zero count means that a
         // native track is legitimately absent; null means that the source has not been summarized,
@@ -58,16 +58,12 @@ namespace Mmd.Timeline
 
         public int? ExpectedSelfShadowKeyframeCount { get; set; }
 
-        private NativeVmdCameraTrackSampler? nativeCameraSampler;
-        private byte[]? nativeCameraSamplerSource;
-        private bool nativeCameraSamplerUnavailable;
-        private NativeVmdLightTrackSampler? nativeLightSampler;
-        private byte[]? nativeLightSamplerSource;
-        private bool nativeLightSamplerUnavailable;
-        private NativeVmdSelfShadowTrackSampler? nativeSelfShadowSampler;
-        private byte[]? nativeSelfShadowSamplerSource;
-        private bool nativeSelfShadowSamplerUnavailable;
-        private bool nativeSelfShadowTrackAbsent;
+        // Native track slots are owned per behaviour instance. ScriptPlayable.Create(graph, template)
+        // copies the template with a shallow PlayableBehaviour.Clone(), so a copied reference must
+        // never be used: every access checks the slot owner and replaces a slot it does not own.
+        private NativeTrackSlot<NativeVmdCameraTrackSampler, MmdCameraState>? cameraTrack;
+        private NativeTrackSlot<NativeVmdLightTrackSampler, MmdLightState>? lightTrack;
+        private NativeTrackSlot<NativeVmdSelfShadowTrackSampler, MmdSelfShadowState>? selfShadowTrack;
 
         public override void ProcessFrame(Playable playable, FrameData info, object playerData)
         {
@@ -87,9 +83,10 @@ namespace Mmd.Timeline
 
         public override void OnPlayableDestroy(Playable playable)
         {
-            DisposeNativeCameraSampler();
-            DisposeNativeLightSampler();
-            DisposeNativeSelfShadowSampler();
+            // A slot copied from a template belongs to the template; leave it alone.
+            OwnedOrNull(cameraTrack)?.Dispose();
+            OwnedOrNull(lightTrack)?.Dispose();
+            OwnedOrNull(selfShadowTrack)?.Dispose();
         }
 
         /// <summary>
@@ -119,7 +116,7 @@ namespace Mmd.Timeline
 
             float frame = (float)(sourceTime * FrameRate);
 
-            if (TrySampleCamera(frame, out MmdCameraState cameraState))
+            if (OwnedCameraTrack().TrySample(MotionBytes, ExpectedCameraKeyframeCount, frame, out MmdCameraState cameraState))
             {
                 LastApplyStatus = target.ApplyCameraState(cameraState, MinFieldOfView, ImportScale);
             }
@@ -128,12 +125,16 @@ namespace Mmd.Timeline
                 LastApplyStatus = MmdSceneCameraApplyStatus.NotApplied;
             }
 
-            if (TrySampleLight(frame, out MmdLightState lightState))
+            if (OwnedLightTrack().TrySample(MotionBytes, ExpectedLightKeyframeCount, frame, out MmdLightState lightState))
             {
                 target.ApplyLightState(lightState);
             }
 
-            if (TrySampleNativeSelfShadow(frame, out MmdSelfShadowState selfShadowState))
+            if (OwnedSelfShadowTrack().TrySample(
+                    MotionBytes,
+                    ExpectedSelfShadowKeyframeCount,
+                    frame,
+                    out MmdSelfShadowState selfShadowState))
             {
                 target.ApplySelfShadowState(selfShadowState);
             }
@@ -141,210 +142,147 @@ namespace Mmd.Timeline
             return LastApplyStatus;
         }
 
-        private bool TrySampleCamera(float frame, out MmdCameraState state)
+        private NativeTrackSlot<NativeVmdCameraTrackSampler, MmdCameraState> OwnedCameraTrack()
         {
-            if (TrySampleNativeCamera(frame, out state))
-            {
-                return true;
-            }
-
-            state = MmdCameraState.Default;
-            return false;
+            return OwnedOrNull(cameraTrack) ?? (cameraTrack =
+                new NativeTrackSlot<NativeVmdCameraTrackSampler, MmdCameraState>(
+                    this,
+                    "camera",
+                    EmptyCameraTrackDiagnostic,
+                    MmdCameraState.Default,
+                    NativeVmdCameraTrackSampler.TryCreate));
         }
 
-        private bool TrySampleNativeCamera(float frame, out MmdCameraState state)
+        private NativeTrackSlot<NativeVmdLightTrackSampler, MmdLightState> OwnedLightTrack()
         {
-            state = MmdCameraState.Default;
-            byte[]? motionBytes = MotionBytes;
-            if (motionBytes == null || motionBytes.Length == 0)
+            return OwnedOrNull(lightTrack) ?? (lightTrack =
+                new NativeTrackSlot<NativeVmdLightTrackSampler, MmdLightState>(
+                    this,
+                    "light",
+                    EmptyLightTrackDiagnostic,
+                    MmdLightState.Default,
+                    NativeVmdLightTrackSampler.TryCreate));
+        }
+
+        private NativeTrackSlot<NativeVmdSelfShadowTrackSampler, MmdSelfShadowState> OwnedSelfShadowTrack()
+        {
+            return OwnedOrNull(selfShadowTrack) ?? (selfShadowTrack =
+                new NativeTrackSlot<NativeVmdSelfShadowTrackSampler, MmdSelfShadowState>(
+                    this,
+                    "self-shadow",
+                    EmptySelfShadowTrackDiagnostic,
+                    MmdSelfShadowState.Default,
+                    NativeVmdSelfShadowTrackSampler.TryCreate));
+        }
+
+        private TSlot? OwnedOrNull<TSlot>(TSlot? slot)
+            where TSlot : class, INativeTrackSlot
+        {
+            return slot != null && ReferenceEquals(slot.Owner, this) ? slot : null;
+        }
+
+        private interface INativeTrackSlot
+        {
+            object Owner { get; }
+        }
+
+        private delegate bool TryCreateSampler<TSampler>(
+            byte[] vmdBytes,
+            out TSampler? sampler,
+            out string failureReason,
+            out bool trackAbsent)
+            where TSampler : class;
+
+        /// <summary>
+        /// Owns one native scene-track sampler (camera, light or self-shadow). The sampler is created
+        /// once per source byte array, and a creation failure is latched for that array so that every
+        /// frame does not retry native creation. Replacing the array recreates it.
+        /// </summary>
+        private sealed class NativeTrackSlot<TSampler, TState> : INativeTrackSlot
+            where TSampler : NativeVmdTrackSampler<TState>
+        {
+            private readonly string trackName;
+            private readonly string emptySourceDiagnostic;
+            private readonly TState defaultState;
+            private readonly TryCreateSampler<TSampler> tryCreate;
+            private TSampler? sampler;
+            private byte[]? samplerSource;
+            private bool samplerUnavailable;
+
+            public NativeTrackSlot(
+                object owner,
+                string trackName,
+                string emptySourceDiagnostic,
+                TState defaultState,
+                TryCreateSampler<TSampler> tryCreate)
             {
-                DisposeNativeCameraSampler();
-                NativeCameraTrackDiagnostic = EmptyCameraTrackDiagnostic;
-                return false;
+                Owner = owner;
+                this.trackName = trackName;
+                this.emptySourceDiagnostic = emptySourceDiagnostic;
+                this.defaultState = defaultState;
+                this.tryCreate = tryCreate;
             }
 
-            if (!ReferenceEquals(nativeCameraSamplerSource, motionBytes))
+            public object Owner { get; }
+
+            public string Diagnostic { get; private set; } = string.Empty;
+
+            public bool TrySample(byte[]? motionBytes, int? expectedKeyframeCount, float frame, out TState state)
             {
-                DisposeNativeCameraSampler();
-                nativeCameraSamplerSource = motionBytes;
-                nativeCameraSamplerUnavailable = false;
-                if (!NativeVmdCameraTrackSampler.TryCreate(
-                        motionBytes,
-                        out nativeCameraSampler,
-                        out string failureReason))
+                state = defaultState;
+                if (motionBytes == null || motionBytes.Length == 0)
                 {
-                    nativeCameraSamplerUnavailable = true;
-                    NativeCameraTrackDiagnostic = IsExpectedTrackAbsent(ExpectedCameraKeyframeCount, failureReason)
-                        ? string.Empty
-                        : TrackUnavailable("camera", failureReason);
+                    Dispose();
+                    Diagnostic = emptySourceDiagnostic;
                     return false;
                 }
 
-                NativeCameraTrackDiagnostic = string.Empty;
-            }
-
-            if (nativeCameraSamplerUnavailable)
-            {
-                return false;
-            }
-
-            if (nativeCameraSampler != null && nativeCameraSampler.TrySample(frame, out state))
-            {
-                NativeCameraTrackDiagnostic = string.Empty;
-                return true;
-            }
-
-            NativeCameraTrackDiagnostic = TrackUnavailable(
-                "camera",
-                nativeCameraSampler?.LastFailureReason ?? "native sampler is unavailable");
-            return false;
-        }
-
-        private bool TrySampleLight(float frame, out MmdLightState state)
-        {
-            if (TrySampleNativeLight(frame, out state))
-            {
-                return true;
-            }
-
-            state = MmdLightState.Default;
-            return false;
-        }
-
-        private bool TrySampleNativeLight(float frame, out MmdLightState state)
-        {
-            state = MmdLightState.Default;
-            byte[]? motionBytes = MotionBytes;
-            if (motionBytes == null || motionBytes.Length == 0)
-            {
-                DisposeNativeLightSampler();
-                NativeLightTrackDiagnostic = EmptyLightTrackDiagnostic;
-                return false;
-            }
-
-            if (!ReferenceEquals(nativeLightSamplerSource, motionBytes))
-            {
-                DisposeNativeLightSampler();
-                nativeLightSamplerSource = motionBytes;
-                nativeLightSamplerUnavailable = false;
-                if (!NativeVmdLightTrackSampler.TryCreate(
-                        motionBytes,
-                        out nativeLightSampler,
-                        out string failureReason))
+                if (!ReferenceEquals(samplerSource, motionBytes))
                 {
-                    nativeLightSamplerUnavailable = true;
-                    NativeLightTrackDiagnostic = IsExpectedTrackAbsent(ExpectedLightKeyframeCount, failureReason)
-                        ? string.Empty
-                        : TrackUnavailable("light", failureReason);
+                    Dispose();
+                    samplerSource = motionBytes;
+                    if (!tryCreate(motionBytes, out sampler, out string failureReason, out bool trackAbsent))
+                    {
+                        samplerUnavailable = true;
+                        // A zero summary count means the VMD legitimately has no records for this
+                        // track; without a summary a null native track stays a diagnosable failure.
+                        Diagnostic = trackAbsent && expectedKeyframeCount == 0
+                            ? string.Empty
+                            : TrackUnavailable(failureReason);
+                        return false;
+                    }
+
+                    Diagnostic = string.Empty;
+                }
+
+                if (samplerUnavailable)
+                {
                     return false;
                 }
 
-                NativeLightTrackDiagnostic = string.Empty;
-            }
-
-            if (nativeLightSamplerUnavailable)
-            {
-                return false;
-            }
-
-            if (nativeLightSampler != null && nativeLightSampler.TrySample(frame, out state))
-            {
-                NativeLightTrackDiagnostic = string.Empty;
-                return true;
-            }
-
-            NativeLightTrackDiagnostic = TrackUnavailable(
-                "light",
-                nativeLightSampler?.LastFailureReason ?? "native sampler is unavailable");
-            return false;
-        }
-
-        private bool TrySampleNativeSelfShadow(float frame, out MmdSelfShadowState state)
-        {
-            state = MmdSelfShadowState.Default;
-            byte[]? motionBytes = MotionBytes;
-            if (motionBytes == null || motionBytes.Length == 0)
-            {
-                DisposeNativeSelfShadowSampler();
-                NativeSelfShadowTrackDiagnostic = EmptySelfShadowTrackDiagnostic;
-                return false;
-            }
-
-            if (!ReferenceEquals(nativeSelfShadowSamplerSource, motionBytes))
-            {
-                DisposeNativeSelfShadowSampler();
-                nativeSelfShadowSamplerSource = motionBytes;
-                nativeSelfShadowSamplerUnavailable = false;
-                if (!NativeVmdSelfShadowTrackSampler.TryCreate(
-                        motionBytes,
-                        out nativeSelfShadowSampler,
-                        out string failureReason))
+                if (sampler != null && sampler.TrySample(frame, out state))
                 {
-                    nativeSelfShadowSamplerUnavailable = true;
-                    nativeSelfShadowTrackAbsent = IsExpectedTrackAbsent(ExpectedSelfShadowKeyframeCount, failureReason);
-                    NativeSelfShadowTrackDiagnostic = nativeSelfShadowTrackAbsent
-                        ? string.Empty
-                        : TrackUnavailable("self-shadow", failureReason);
-                    return false;
+                    Diagnostic = string.Empty;
+                    return true;
                 }
 
-                NativeSelfShadowTrackDiagnostic = string.Empty;
-            }
-
-            if (nativeSelfShadowSamplerUnavailable)
-            {
+                Diagnostic = TrackUnavailable(sampler?.LastFailureReason ?? "native sampler is unavailable");
                 return false;
             }
 
-            if (nativeSelfShadowSampler != null && nativeSelfShadowSampler.TrySample(frame, out state))
+            public void Dispose()
             {
-                NativeSelfShadowTrackDiagnostic = string.Empty;
-                return true;
+                sampler?.Dispose();
+                sampler = null;
+                samplerSource = null;
+                samplerUnavailable = false;
+                Diagnostic = string.Empty;
             }
 
-            NativeSelfShadowTrackDiagnostic = TrackUnavailable(
-                "self-shadow",
-                nativeSelfShadowSampler?.LastFailureReason ?? "native sampler is unavailable");
-            return false;
-        }
-
-        private static string TrackUnavailable(string track, string reason)
-        {
-            return "VMD native " + track + " track unavailable: " + reason;
-        }
-
-        private static bool IsExpectedTrackAbsent(int? expectedKeyframeCount, string failureReason)
-        {
-            return expectedKeyframeCount == 0 &&
-                string.Equals(failureReason, "native track creation returned null", StringComparison.Ordinal);
-        }
-
-        private void DisposeNativeCameraSampler()
-        {
-            nativeCameraSampler?.Dispose();
-            nativeCameraSampler = null;
-            nativeCameraSamplerSource = null;
-            nativeCameraSamplerUnavailable = false;
-            NativeCameraTrackDiagnostic = string.Empty;
-        }
-
-        private void DisposeNativeLightSampler()
-        {
-            nativeLightSampler?.Dispose();
-            nativeLightSampler = null;
-            nativeLightSamplerSource = null;
-            nativeLightSamplerUnavailable = false;
-            NativeLightTrackDiagnostic = string.Empty;
-        }
-
-        private void DisposeNativeSelfShadowSampler()
-        {
-            nativeSelfShadowSampler?.Dispose();
-            nativeSelfShadowSampler = null;
-            nativeSelfShadowSamplerSource = null;
-            nativeSelfShadowSamplerUnavailable = false;
-            nativeSelfShadowTrackAbsent = false;
-            NativeSelfShadowTrackDiagnostic = string.Empty;
+            private string TrackUnavailable(string reason)
+            {
+                return "VMD native " + trackName + " track unavailable: " + reason;
+            }
         }
     }
 }

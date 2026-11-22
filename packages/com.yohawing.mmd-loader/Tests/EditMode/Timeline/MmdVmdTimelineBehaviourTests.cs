@@ -94,6 +94,82 @@ namespace Mmd.Tests
             }
         }
 
+        [TestCase(double.NaN)]
+        [TestCase(double.PositiveInfinity)]
+        [TestCase(-0.5)]
+        [TestCase(1.0e39)]
+        public void EvaluateAtLocalTimeRejectsInvalidTimeBeforeConfiguringTarget(double localTime)
+        {
+            var go = new GameObject("timeline-validation");
+            try
+            {
+                MmdUnityPlaybackController controller = go.AddComponent<MmdUnityPlaybackController>();
+                var behaviour = new MmdVmdTimelineBehaviour { FrameRate = 30.0f };
+
+                ArgumentOutOfRangeException exception = Assert.Throws<ArgumentOutOfRangeException>(
+                    () => behaviour.EvaluateAtLocalTime(controller, localTime));
+                Assert.That(exception.ParamName, Is.EqualTo("localTime"));
+                Assert.That(controller.IsConfigured, Is.False);
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void EvaluateAtLocalTimeValidatesClipSettingsAndRequiresConfigurableTarget()
+        {
+            var go = new GameObject("timeline-validation");
+            try
+            {
+                MmdUnityPlaybackController controller = go.AddComponent<MmdUnityPlaybackController>();
+
+                Assert.Throws<ArgumentNullException>(
+                    () => new MmdVmdTimelineBehaviour().EvaluateAtLocalTime(null!, 0.0));
+                Assert.Throws<ArgumentOutOfRangeException>(
+                    () => new MmdVmdTimelineBehaviour { FrameRate = 0.0f }.EvaluateAtLocalTime(controller, 0.0));
+                Assert.Throws<ArgumentOutOfRangeException>(
+                    () => new MmdVmdTimelineBehaviour { StartOffsetSeconds = -1.0f }.EvaluateAtLocalTime(controller, 0.0));
+
+                InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
+                    () => new MmdVmdTimelineBehaviour { FrameRate = 30.0f }.EvaluateAtLocalTime(controller, 0.0));
+                Assert.That(
+                    exception.Message,
+                    Is.EqualTo("Timeline target playback controller is not configured and has no provider-owned PMX/VMD source."));
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void EvaluateAtLocalTimeBackfillsMotionSourceIdBeforeRangeCheck()
+        {
+            var go = new GameObject("timeline-validation");
+            MmdVmdAsset motion = ScriptableObject.CreateInstance<MmdVmdAsset>();
+            try
+            {
+                motion.name = "motion-asset-name";
+                motion.Initialize(MmdTestFixtures.BuildCameraTrackVmdBytes("backfill"), "motion-source-id", "motion.vmd");
+                MmdUnityPlaybackController controller = go.AddComponent<MmdUnityPlaybackController>();
+                var behaviour = new MmdVmdTimelineBehaviour
+                {
+                    MotionAsset = motion,
+                    FrameRate = 30.0f
+                };
+
+                Assert.Throws<ArgumentOutOfRangeException>(() => behaviour.EvaluateAtLocalTime(controller, 1.0e39));
+                Assert.That(behaviour.MotionSourceId, Is.EqualTo("motion-source-id"));
+            }
+            finally
+            {
+                Object.DestroyImmediate(motion);
+                Object.DestroyImmediate(go);
+            }
+        }
+
         [Test]
         public void TimelineBehaviourUsesSharedTimePolicyForRepeatAndReverseSeek()
         {

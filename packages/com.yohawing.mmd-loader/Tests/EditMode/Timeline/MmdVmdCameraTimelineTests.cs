@@ -187,6 +187,289 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void AbsentNativeTracksWithZeroSummaryCountsLeaveDiagnosticsEmpty()
+        {
+            var bindingGo = new GameObject("binding");
+            var behaviour = new MmdVmdCameraBehaviour
+            {
+                MotionBytes = BuildLightOnlyVmdBytes(),
+                FrameRate = 30f,
+                ImportScale = 1.0f,
+                ExpectedCameraKeyframeCount = 0,
+                ExpectedLightKeyframeCount = 2,
+                ExpectedSelfShadowKeyframeCount = 0
+            };
+
+            try
+            {
+                MmdSceneEnvironmentBinding binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
+
+                MmdSceneCameraApplyStatus status = behaviour.EvaluateAtLocalTime(binding, 0.5);
+
+                Assert.That(status, Is.EqualTo(MmdSceneCameraApplyStatus.NotApplied));
+                Assert.That(behaviour.NativeCameraTrackDiagnostic, Is.Empty);
+                Assert.That(behaviour.NativeLightTrackDiagnostic, Is.Empty);
+                Assert.That(behaviour.NativeSelfShadowTrackDiagnostic, Is.Empty);
+            }
+            finally
+            {
+                behaviour.OnPlayableDestroy(Playable.Null);
+                UnityEngine.Object.DestroyImmediate(bindingGo);
+            }
+        }
+
+        [TestCase(null)]
+        [TestCase(2)]
+        public void AbsentNativeTracksWithoutZeroSummaryCountReportCreationFailure(int? expectedKeyframeCount)
+        {
+            var bindingGo = new GameObject("binding");
+            var behaviour = new MmdVmdCameraBehaviour
+            {
+                MotionBytes = BuildLightOnlyVmdBytes(),
+                FrameRate = 30f,
+                ImportScale = 1.0f,
+                ExpectedCameraKeyframeCount = expectedKeyframeCount,
+                ExpectedSelfShadowKeyframeCount = expectedKeyframeCount
+            };
+
+            try
+            {
+                MmdSceneEnvironmentBinding binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
+
+                MmdSceneCameraApplyStatus status = behaviour.EvaluateAtLocalTime(binding, 0.5);
+
+                Assert.That(status, Is.EqualTo(MmdSceneCameraApplyStatus.NotApplied));
+                Assert.That(
+                    behaviour.NativeCameraTrackDiagnostic,
+                    Is.EqualTo("VMD native camera track unavailable: native track creation returned null"));
+                Assert.That(behaviour.NativeLightTrackDiagnostic, Is.Empty);
+                Assert.That(
+                    behaviour.NativeSelfShadowTrackDiagnostic,
+                    Is.EqualTo("VMD native self-shadow track unavailable: native track creation returned null"));
+            }
+            finally
+            {
+                behaviour.OnPlayableDestroy(Playable.Null);
+                UnityEngine.Object.DestroyImmediate(bindingGo);
+            }
+        }
+
+        [Test]
+        public void SameSourceKeepsLatchedTrackOutcomeUntilSourceArrayIsReplaced()
+        {
+            var bindingGo = new GameObject("binding");
+            var cameraGo = new GameObject("camera");
+            byte[] cameraOnlyBytes = BuildCameraVmdBytes();
+            var behaviour = new MmdVmdCameraBehaviour
+            {
+                MotionBytes = cameraOnlyBytes,
+                FrameRate = 30f,
+                ImportScale = 1.0f
+            };
+
+            try
+            {
+                MmdSceneEnvironmentBinding binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
+                binding.TargetCamera = cameraGo.AddComponent<Camera>();
+
+                behaviour.EvaluateAtLocalTime(binding, 0.5);
+                Assert.That(behaviour.NativeLightTrackDiagnostic, Does.StartWith("VMD native light track unavailable: "));
+
+                // The creation outcome is cached per source array: a later summary count does not
+                // re-run native creation while the same byte[] instance stays assigned.
+                behaviour.ExpectedLightKeyframeCount = 0;
+                Assert.That(
+                    behaviour.EvaluateAtLocalTime(binding, 0.5),
+                    Is.EqualTo(MmdSceneCameraApplyStatus.Applied));
+                Assert.That(behaviour.NativeLightTrackDiagnostic, Does.StartWith("VMD native light track unavailable: "));
+
+                // Replacing the array (even with identical content) recreates the samplers.
+                behaviour.MotionBytes = (byte[])cameraOnlyBytes.Clone();
+                Assert.That(
+                    behaviour.EvaluateAtLocalTime(binding, 0.5),
+                    Is.EqualTo(MmdSceneCameraApplyStatus.Applied));
+                Assert.That(behaviour.NativeLightTrackDiagnostic, Is.Empty);
+            }
+            finally
+            {
+                behaviour.OnPlayableDestroy(Playable.Null);
+                UnityEngine.Object.DestroyImmediate(cameraGo);
+                UnityEngine.Object.DestroyImmediate(bindingGo);
+            }
+        }
+
+        [Test]
+        public void OnPlayableDestroyClearsDiagnosticsAndNextEvaluationRecreatesSamplers()
+        {
+            var bindingGo = new GameObject("binding");
+            var cameraGo = new GameObject("camera");
+            byte[] cameraOnlyBytes = BuildCameraVmdBytes();
+            var behaviour = new MmdVmdCameraBehaviour
+            {
+                MotionBytes = cameraOnlyBytes,
+                FrameRate = 30f,
+                ImportScale = 1.0f
+            };
+
+            try
+            {
+                Camera camera = cameraGo.AddComponent<Camera>();
+                MmdSceneEnvironmentBinding binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
+                binding.TargetCamera = camera;
+
+                Assert.That(
+                    behaviour.EvaluateAtLocalTime(binding, 0.5),
+                    Is.EqualTo(MmdSceneCameraApplyStatus.Applied));
+                Assert.That(behaviour.NativeLightTrackDiagnostic, Is.Not.Empty);
+                Assert.That(behaviour.NativeSelfShadowTrackDiagnostic, Is.Not.Empty);
+
+                behaviour.OnPlayableDestroy(Playable.Null);
+
+                Assert.That(behaviour.NativeCameraTrackDiagnostic, Is.Empty);
+                Assert.That(behaviour.NativeLightTrackDiagnostic, Is.Empty);
+                Assert.That(behaviour.NativeSelfShadowTrackDiagnostic, Is.Empty);
+
+                // The same array is not treated as cached after destruction: creation runs again and
+                // reports the absent tracks again while the camera keeps applying.
+                camera.transform.position = Vector3.zero;
+                Assert.That(
+                    behaviour.EvaluateAtLocalTime(binding, 0.25),
+                    Is.EqualTo(MmdSceneCameraApplyStatus.Applied));
+                MmdUnityCameraPose expected = MmdCameraStateToUnity.Convert(SampleNativeCamera(cameraOnlyBytes, 7.5f));
+                Assert.That(Vector3.Distance(camera.transform.position, expected.Position), Is.LessThan(0.001f));
+                Assert.That(behaviour.NativeLightTrackDiagnostic, Does.StartWith("VMD native light track unavailable: "));
+                Assert.That(
+                    behaviour.NativeSelfShadowTrackDiagnostic,
+                    Does.StartWith("VMD native self-shadow track unavailable: "));
+            }
+            finally
+            {
+                behaviour.OnPlayableDestroy(Playable.Null);
+                UnityEngine.Object.DestroyImmediate(cameraGo);
+                UnityEngine.Object.DestroyImmediate(bindingGo);
+            }
+        }
+
+        [Test]
+        public void PlayablesClonedFromOneTemplateOwnTheirNativeTracks()
+        {
+            var bindingGo = new GameObject("binding");
+            var cameraGo = new GameObject("camera");
+            PlayableGraph graph = PlayableGraph.Create("MmdVmdCameraTemplateCloneTest");
+            var template = new MmdVmdCameraBehaviour
+            {
+                FrameRate = 30f,
+                ImportScale = 1.0f
+            };
+            MmdVmdCameraBehaviour? first = null;
+            MmdVmdCameraBehaviour? second = null;
+
+            try
+            {
+                MmdSceneEnvironmentBinding binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
+                binding.TargetCamera = cameraGo.AddComponent<Camera>();
+
+                var firstPlayable = ScriptPlayable<MmdVmdCameraBehaviour>.Create(graph, template);
+                var secondPlayable = ScriptPlayable<MmdVmdCameraBehaviour>.Create(graph, template);
+                first = firstPlayable.GetBehaviour();
+                second = secondPlayable.GetBehaviour();
+                Assert.That(first, Is.Not.SameAs(second));
+
+                first.MotionBytes = BuildCameraVmdBytes();
+                second.MotionBytes = BuildLightOnlyVmdBytes();
+
+                Assert.That(first.EvaluateAtLocalTime(binding, 0.5), Is.EqualTo(MmdSceneCameraApplyStatus.Applied));
+                Assert.That(first.NativeLightTrackDiagnostic, Does.StartWith("VMD native light track unavailable: "));
+
+                // A zero summary count would clear the light diagnostic only if the first clone's
+                // light track were recreated, so the latched diagnostic proves it was not touched.
+                first.ExpectedLightKeyframeCount = 0;
+                Assert.That(second.EvaluateAtLocalTime(binding, 0.5), Is.EqualTo(MmdSceneCameraApplyStatus.NotApplied));
+                Assert.That(second.NativeLightTrackDiagnostic, Is.Empty);
+                Assert.That(second.NativeCameraTrackDiagnostic, Does.StartWith("VMD native camera track unavailable: "));
+
+                Assert.That(first.EvaluateAtLocalTime(binding, 0.5), Is.EqualTo(MmdSceneCameraApplyStatus.Applied));
+                Assert.That(first.NativeLightTrackDiagnostic, Does.StartWith("VMD native light track unavailable: "));
+                Assert.That(first.NativeCameraTrackDiagnostic, Is.Empty);
+
+                second.OnPlayableDestroy(secondPlayable);
+                Assert.That(second.NativeCameraTrackDiagnostic, Is.Empty);
+                Assert.That(first.NativeLightTrackDiagnostic, Does.StartWith("VMD native light track unavailable: "));
+                Assert.That(first.NativeSelfShadowTrackDiagnostic, Does.StartWith("VMD native self-shadow track unavailable: "));
+                Assert.That(template.NativeLightTrackDiagnostic, Is.Empty);
+                Assert.That(first.EvaluateAtLocalTime(binding, 0.25), Is.EqualTo(MmdSceneCameraApplyStatus.Applied));
+            }
+            finally
+            {
+                first?.OnPlayableDestroy(Playable.Null);
+                second?.OnPlayableDestroy(Playable.Null);
+                template.OnPlayableDestroy(Playable.Null);
+                if (graph.IsValid())
+                {
+                    graph.Destroy();
+                }
+
+                UnityEngine.Object.DestroyImmediate(cameraGo);
+                UnityEngine.Object.DestroyImmediate(bindingGo);
+            }
+        }
+
+        [Test]
+        public void ClearingMotionBytesDisposesSamplersAndRestoringThemRecreates()
+        {
+            var bindingGo = new GameObject("binding");
+            var cameraGo = new GameObject("camera");
+            byte[] cameraOnlyBytes = BuildCameraVmdBytes();
+            var behaviour = new MmdVmdCameraBehaviour
+            {
+                MotionBytes = cameraOnlyBytes,
+                FrameRate = 30f,
+                ImportScale = 1.0f,
+                ExpectedLightKeyframeCount = 0,
+                ExpectedSelfShadowKeyframeCount = 0
+            };
+
+            try
+            {
+                Camera camera = cameraGo.AddComponent<Camera>();
+                MmdSceneEnvironmentBinding binding = bindingGo.AddComponent<MmdSceneEnvironmentBinding>();
+                binding.TargetCamera = camera;
+
+                Assert.That(
+                    behaviour.EvaluateAtLocalTime(binding, 0.5),
+                    Is.EqualTo(MmdSceneCameraApplyStatus.Applied));
+
+                behaviour.MotionBytes = null;
+                Assert.That(
+                    behaviour.EvaluateAtLocalTime(binding, 0.5),
+                    Is.EqualTo(MmdSceneCameraApplyStatus.NotApplied));
+                Assert.That(
+                    behaviour.NativeCameraTrackDiagnostic,
+                    Is.EqualTo("VMD native camera track unavailable: source bytes are empty"));
+                Assert.That(
+                    behaviour.NativeLightTrackDiagnostic,
+                    Is.EqualTo("VMD native light track unavailable: source bytes are empty"));
+                Assert.That(
+                    behaviour.NativeSelfShadowTrackDiagnostic,
+                    Is.EqualTo("VMD native self-shadow track unavailable: source bytes are empty"));
+
+                behaviour.MotionBytes = cameraOnlyBytes;
+                Assert.That(
+                    behaviour.EvaluateAtLocalTime(binding, 0.5),
+                    Is.EqualTo(MmdSceneCameraApplyStatus.Applied));
+                Assert.That(behaviour.NativeCameraTrackDiagnostic, Is.Empty);
+                Assert.That(behaviour.NativeLightTrackDiagnostic, Is.Empty);
+                Assert.That(behaviour.NativeSelfShadowTrackDiagnostic, Is.Empty);
+            }
+            finally
+            {
+                behaviour.OnPlayableDestroy(Playable.Null);
+                UnityEngine.Object.DestroyImmediate(cameraGo);
+                UnityEngine.Object.DestroyImmediate(bindingGo);
+            }
+        }
+
+        [Test]
         public void EvaluateAtLocalTimeAppliesLightToBoundProxy()
         {
             var bindingGo = new GameObject("binding");

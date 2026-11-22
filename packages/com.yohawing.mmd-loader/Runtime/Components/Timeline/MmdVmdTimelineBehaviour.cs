@@ -99,34 +99,7 @@ namespace Mmd.Timeline
                 return false;
             }
 
-            if (double.IsNaN(localTime) || double.IsInfinity(localTime) || localTime < 0.0)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(localTime),
-                    "Timeline local time must be a non-negative finite value.");
-            }
-
-            MmdPlaybackTime.ValidateFrameRate(FrameRate);
-            MmdPlaybackTime.ValidateTime(StartOffsetSeconds);
-            if (MotionAsset != null && string.IsNullOrWhiteSpace(MotionSourceId))
-            {
-                MotionSourceId = string.IsNullOrWhiteSpace(MotionAsset.SourceId) ? MotionAsset.name : MotionAsset.SourceId;
-            }
-
-            double sourceTime = localTime + StartOffsetSeconds;
-            if (sourceTime > float.MaxValue)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(localTime),
-                    "Timeline local time is too large for playback evaluation.");
-            }
-
-            if (!TryConfigureTimelineTarget(target, setupTiming: null))
-            {
-                throw new InvalidOperationException(
-                    "Timeline target playback controller is not configured and has no provider-owned PMX/VMD source.");
-            }
-
+            float sourceTimeValue = ResolveSourceTimeAndConfigureTarget(target, localTime);
             if (!target.TryGetOrCreateTimelineWorkerPool(
                     out MmdMultiCharacterWorkerPool pool,
                     out _))
@@ -136,7 +109,6 @@ namespace Mmd.Timeline
                 return false;
             }
 
-            float sourceTimeValue = (float)sourceTime;
             var request = new MmdMultiCharacterWorkerRequest(
                 MmdPlaybackTime.ToFrame(sourceTimeValue, FrameRate),
                 sourceTimeValue,
@@ -204,6 +176,26 @@ namespace Mmd.Timeline
                 throw new ArgumentNullException(nameof(target));
             }
 
+            float sourceTime = ResolveSourceTimeAndConfigureTarget(target, localTime);
+
+            // Forward Play Mode playback steps Live physics so 揺れもの simulate during Timeline play.
+            // Random-access (scrub/seek/editor preview) instead uses ApplyTimelineTime, which evaluates
+            // animation-only while retaining the warmed native physics backend.
+            if (runLivePhysics && target.PhysicsMode == MmdPhysicsMode.Live)
+            {
+                return target.ApplyTimelineLivePhysicsForward(sourceTime, FrameRate);
+            }
+
+            return target.ApplyTimelineTime(sourceTime, FrameRate);
+        }
+
+        /// <summary>
+        /// Shared preamble of the synchronous and worker evaluation paths: validates the local time and
+        /// clip settings, backfills <see cref="MotionSourceId"/> from the motion asset, and configures
+        /// the target. Returns the source time (local time plus start offset).
+        /// </summary>
+        private float ResolveSourceTimeAndConfigureTarget(MmdUnityPlaybackController target, double localTime)
+        {
             if (double.IsNaN(localTime) || double.IsInfinity(localTime) || localTime < 0.0)
             {
                 throw new ArgumentOutOfRangeException(nameof(localTime), "Timeline local time must be a non-negative finite value.");
@@ -227,15 +219,7 @@ namespace Mmd.Timeline
                 throw new InvalidOperationException("Timeline target playback controller is not configured and has no provider-owned PMX/VMD source.");
             }
 
-            // Forward Play Mode playback steps Live physics so 揺れもの simulate during Timeline play.
-            // Random-access (scrub/seek/editor preview) instead uses ApplyTimelineTime, which evaluates
-            // animation-only while retaining the warmed native physics backend.
-            if (runLivePhysics && target.PhysicsMode == MmdPhysicsMode.Live)
-            {
-                return target.ApplyTimelineLivePhysicsForward((float)sourceTime, FrameRate);
-            }
-
-            return target.ApplyTimelineTime((float)sourceTime, FrameRate);
+            return (float)sourceTime;
         }
 
         private bool TryConfigureTimelineTarget(

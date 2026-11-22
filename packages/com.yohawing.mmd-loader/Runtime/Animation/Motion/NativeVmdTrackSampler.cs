@@ -46,11 +46,13 @@ namespace Mmd.Motion
             Func<IntPtr, int, TSampler> createSampler,
             string frameCountLabel,
             out TSampler? sampler,
-            out string failureReason)
+            out string failureReason,
+            out bool trackAbsent)
             where TSampler : NativeVmdTrackSampler<TState>
         {
             sampler = null;
             failureReason = string.Empty;
+            trackAbsent = false;
             if (vmdBytes == null || vmdBytes.Length == 0)
             {
                 failureReason = "source bytes are empty";
@@ -74,6 +76,7 @@ namespace Mmd.Motion
                 if (sampler == null)
                 {
                     failureReason = NativeTrackCreationReturnedNullReason;
+                    trackAbsent = true;
                     return false;
                 }
 
@@ -97,7 +100,10 @@ namespace Mmd.Motion
 
                 if (sampler == null && string.IsNullOrEmpty(failureReason))
                 {
+                    // Native creation returns null when the VMD has no records for this track.
+                    // Callers read trackAbsent instead of matching the diagnostic text.
                     failureReason = NativeTrackCreationReturnedNullReason;
+                    trackAbsent = true;
                 }
             }
         }
