@@ -45,6 +45,8 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 
 ### Changed
 
+- Faster PMX and VMD handling with identical results: building a model's rendering descriptor validates the model once instead of ten times (about 5x faster on large models), mesh splitting no longer allocates a string per index, and VMD reimports no longer hash the whole file (about 2.5x faster for large motions).
+
 - The PMX importer version is now 31, so existing PMX assets reimport once after updating and pick up the material changes in this release.
 
 - Material transparency is now decided only from the PMX material alpha and the alpha of the diffuse texture over the used UVs. Material and texture names are no longer consulted: a material whose name or diffuse file name contains words such as "shadow", "shade", "影", "cheek", "blush", "頰", "ほほ" or "チーク" is no longer upgraded from alpha test to alpha blend.
