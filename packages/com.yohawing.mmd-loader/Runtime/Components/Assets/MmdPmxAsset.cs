@@ -485,6 +485,9 @@ namespace Mmd
 
         public string SourceId => sourceId;
 
+        /// <summary>Source id used for playback/diagnostic identity: <see cref="SourceId"/>, or the asset name when it is blank.</summary>
+        internal string ResolvedSourceId => string.IsNullOrWhiteSpace(sourceId) ? name : sourceId;
+
         public string SourcePath => sourcePath;
 
         public float ImportScale => importScale;

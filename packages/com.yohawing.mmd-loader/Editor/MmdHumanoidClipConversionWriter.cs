@@ -518,9 +518,7 @@ namespace Mmd.Editor
             Quaternion[] ancestorWorldRotations = hipsParentIndex >= 0
                 ? new Quaternion[frameCount]
                 : Array.Empty<Quaternion>();
-            float importScale = float.IsFinite(instance.ImportScale) && instance.ImportScale > 0.0f
-                ? instance.ImportScale
-                : 1.0f;
+            float importScale = MmdCoordinateSpace.NormalizeImportScale(instance.ImportScale);
 
             for (int chunkStart = 0; chunkStart < frameCount; chunkStart += ChunkFrameCount)
             {
@@ -823,7 +821,7 @@ namespace Mmd.Editor
 
             MmdBoneDefinition? hipsParent = FindBoneByIndex(model, hipsBone.parentIndex);
             Quaternion bindAncestorRotation = Quaternion.identity;
-            float scale = float.IsFinite(importScale) && importScale > 0.0f ? importScale : 1.0f;
+            float scale = MmdCoordinateSpace.NormalizeImportScale(importScale);
             float normalizedHumanScale = float.IsFinite(humanScale) && humanScale > 0.0f ? humanScale : 1.0f;
             if (hipsParent != null && rootMotionSamples.AncestorWorldRotations.Length != frameCount)
             {

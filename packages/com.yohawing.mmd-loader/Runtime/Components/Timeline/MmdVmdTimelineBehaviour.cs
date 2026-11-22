@@ -205,7 +205,7 @@ namespace Mmd.Timeline
             MmdPlaybackTime.ValidateTime(StartOffsetSeconds);
             if (MotionAsset != null && string.IsNullOrWhiteSpace(MotionSourceId))
             {
-                MotionSourceId = string.IsNullOrWhiteSpace(MotionAsset.SourceId) ? MotionAsset.name : MotionAsset.SourceId;
+                MotionSourceId = MotionAsset.ResolvedSourceId;
             }
 
             double sourceTime = localTime + StartOffsetSeconds;

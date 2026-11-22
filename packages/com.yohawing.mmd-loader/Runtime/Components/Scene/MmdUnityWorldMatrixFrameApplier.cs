@@ -106,7 +106,7 @@ namespace Mmd.UnityIntegration
                 throw new ArgumentException($"World matrix buffer must contain at least {required} float values.", nameof(worldMatrices));
             }
 
-            importScale = NormalizeImportScale(importScale);
+            importScale = MmdCoordinateSpace.NormalizeImportScale(importScale);
             if (boneIndices == null)
             {
                 for (int boneIndex = 0; boneIndex < boneCount; boneIndex++)
@@ -184,7 +184,7 @@ namespace Mmd.UnityIntegration
                     nameof(worldMatrices));
             }
 
-            importScale = NormalizeImportScale(importScale);
+            importScale = MmdCoordinateSpace.NormalizeImportScale(importScale);
             ValidateHostRigHierarchy(root, bones, modelBones, boneTransformSet);
 
             for (int boneIndex = 0; boneIndex < boneCount; boneIndex++)
@@ -240,17 +240,15 @@ namespace Mmd.UnityIntegration
             for (int boneIndex = 0; boneIndex < boneCount; boneIndex++)
             {
                 MmdBoneDefinition? modelBone = modelBones[boneIndex];
-                if (modelBone == null || modelBone.index != boneIndex)
+                switch (MmdModelValidator.CheckContiguousBone(modelBone, boneIndex, boneCount))
                 {
-                    throw new InvalidOperationException(
-                        "HostRig PMX bone topology has a non-contiguous index at " + boneIndex + ".");
-                }
-
-                if (modelBone.parentIndex < -1 || modelBone.parentIndex >= boneCount)
-                {
-                    throw new InvalidOperationException(
-                        "HostRig PMX parent index is invalid for bone " + boneIndex + ": " +
-                        modelBone.parentIndex + ".");
+                    case MmdModelValidator.ContiguousBoneViolation.NonContiguousIndex:
+                        throw new InvalidOperationException(
+                            "HostRig PMX bone topology has a non-contiguous index at " + boneIndex + ".");
+                    case MmdModelValidator.ContiguousBoneViolation.ParentOutOfRange:
+                        throw new InvalidOperationException(
+                            "HostRig PMX parent index is invalid for bone " + boneIndex + ": " +
+                            modelBone!.parentIndex + ".");
                 }
 
                 if (bones[boneIndex] == null)
@@ -437,11 +435,6 @@ namespace Mmd.UnityIntegration
         private static Quaternion ToUnityModelRotation(Quaternion rotation)
         {
             return MmdCoordinateSpace.MmdToUnityRotation(rotation);
-        }
-
-        private static float NormalizeImportScale(float importScale)
-        {
-            return float.IsFinite(importScale) && importScale > 0.0f ? importScale : 1.0f;
         }
     }
 }

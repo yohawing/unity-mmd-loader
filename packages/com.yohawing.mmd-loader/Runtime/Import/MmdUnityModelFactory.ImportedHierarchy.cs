@@ -87,7 +87,7 @@ namespace Mmd.UnityIntegration
                 throw new ArgumentNullException(nameof(model));
             }
 
-            float scale = NormalizeImportScale(importScale);
+            float scale = MmdCoordinateSpace.NormalizeImportScale(importScale);
             ClearNonSceneHideFlags(instanceRoot.transform);
 
             MmdRenderingDescriptor descriptor = BuildRuntimeRenderingDescriptor(model);

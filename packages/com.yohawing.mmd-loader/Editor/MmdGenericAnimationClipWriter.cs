@@ -840,9 +840,7 @@ namespace Mmd.Editor
             int morphFloatsPerFrame = binding.FastRuntimeMorphWeightCount;
             var worldMatrices = new float[checked(worldFloatsPerFrame * Math.Min(frameCount, ChunkFrameCount))];
             var morphWeights = new float[checked(morphFloatsPerFrame * Math.Min(frameCount, ChunkFrameCount))];
-            float importScale = float.IsFinite(instance.ImportScale) && instance.ImportScale > 0.0f
-                ? instance.ImportScale
-                : 1.0f;
+            float importScale = MmdCoordinateSpace.NormalizeImportScale(instance.ImportScale);
 
             for (int chunkStart = 0; chunkStart < frameCount; chunkStart += ChunkFrameCount)
             {

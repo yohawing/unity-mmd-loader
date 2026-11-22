@@ -13,7 +13,7 @@ namespace Mmd.UnityIntegration
 
         private static Vector3 ToUnityPosition(float[] position, float importScale)
         {
-            float scale = NormalizeImportScale(importScale);
+            float scale = MmdCoordinateSpace.NormalizeImportScale(importScale);
             return MmdCoordinateSpace.MmdToUnityPosition(
                 new Vector3(position[0], position[1], position[2]),
                 scale);
@@ -26,7 +26,7 @@ namespace Mmd.UnityIntegration
 
         private static Vector3 ToUnityPosition(Vector3 position, float importScale)
         {
-            float scale = NormalizeImportScale(importScale);
+            float scale = MmdCoordinateSpace.NormalizeImportScale(importScale);
             return MmdCoordinateSpace.MmdToUnityPosition(position, scale);
         }
 
@@ -40,24 +40,9 @@ namespace Mmd.UnityIntegration
             return MmdCoordinateSpace.MmdToUnityPosition(new Vector3(normal[0], normal[1], normal[2]));
         }
 
-        private static Vector3 ToVector3(float[] values)
-        {
-            if (values == null || values.Length < 3)
-            {
-                return Vector3.zero;
-            }
-
-            return new Vector3(values[0], values[1], values[2]);
-        }
-
         private static bool IsFinite(float value)
         {
             return !float.IsNaN(value) && !float.IsInfinity(value);
-        }
-
-        private static float NormalizeImportScale(float value)
-        {
-            return float.IsFinite(value) && value > 0.0f ? value : 1.0f;
         }
     }
 }

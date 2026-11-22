@@ -265,7 +265,7 @@ namespace Mmd.UnityIntegration
                 }
 
                 throw CreateMissingSceneModelException(
-                    ResolveAssetSourceId(providerPmxAsset),
+                    providerPmxAsset.ResolvedSourceId,
                     timelineEvaluation);
             }
 
@@ -311,7 +311,7 @@ namespace Mmd.UnityIntegration
                     model,
                     nativeMotion,
                     resolvedPmxPath,
-                    string.IsNullOrWhiteSpace(vmdAsset.SourceId) ? vmdAsset.name : vmdAsset.SourceId,
+                    vmdAsset.ResolvedSourceId,
                     resolvedPmxPath,
                     playbackDescriptor: null,
                     sourcesAlreadyValidated: true),
@@ -330,7 +330,7 @@ namespace Mmd.UnityIntegration
 
             return binding != null && string.Equals(
                 MotionSourceId,
-                ResolveAssetSourceId(motion),
+                motion.ResolvedSourceId,
                 StringComparison.Ordinal);
         }
 
@@ -378,7 +378,7 @@ namespace Mmd.UnityIntegration
             }
 
             throw CreateMissingSceneModelException(
-                ResolveAssetSourceId(pmxAsset),
+                pmxAsset.ResolvedSourceId,
                 timelineEvaluation);
         }
 
@@ -527,11 +527,6 @@ namespace Mmd.UnityIntegration
             }
         }
 
-        private static string ResolveAssetSourceId(MmdVmdAsset asset)
-        {
-            return string.IsNullOrWhiteSpace(asset.SourceId) ? asset.name : asset.SourceId;
-        }
-
         private static MmdPmxRuntimeParseCache.Result LoadRuntimePmxSource(
             string resolvedPmxPath,
             MmdTimelineSetupTimingSummary? setupTiming)
@@ -547,17 +542,12 @@ namespace Mmd.UnityIntegration
             return cachedPmx;
         }
 
-        private static string ResolveAssetSourceId(MmdPmxAsset asset)
-        {
-            return string.IsNullOrWhiteSpace(asset.SourceId) ? asset.name : asset.SourceId;
-        }
-
         private string ResolveProviderModelSourceId()
         {
             MmdPmxAsset? sourceAsset = ModelAssetSource;
             if (sourceAsset != null)
             {
-                return ResolveAssetSourceId(sourceAsset);
+                return sourceAsset.ResolvedSourceId;
             }
 
             MmdRuntimeImporterComponent? importer = GetComponent<MmdRuntimeImporterComponent>();
@@ -569,7 +559,7 @@ namespace Mmd.UnityIntegration
             MmdVmdAsset? motionAsset = MotionAssetSource;
             if (motionAsset != null)
             {
-                return ResolveAssetSourceId(motionAsset);
+                return motionAsset.ResolvedSourceId;
             }
 
             MmdRuntimeImporterComponent? importer = GetComponent<MmdRuntimeImporterComponent>();

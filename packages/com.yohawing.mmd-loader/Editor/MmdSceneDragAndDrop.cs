@@ -340,7 +340,7 @@ namespace Mmd.Editor
                 "Attached VMD asset to existing MMD model source: target={0}; pmx={1}; vmd={2}",
                 controller.name,
                 controller.ModelSourceId,
-                string.IsNullOrWhiteSpace(vmdAsset.SourceId) ? vmdAsset.name : vmdAsset.SourceId);
+                vmdAsset.ResolvedSourceId);
             return true;
         }
 

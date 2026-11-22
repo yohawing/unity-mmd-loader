@@ -87,7 +87,7 @@ namespace Mmd.UnityIntegration
 
         public void RecordNativeTransform(float[] position, float[] rotation)
         {
-            this.nativePosition = ToVector3(position);
+            this.nativePosition = MmdCoordinateSpace.ToVector3(position);
             this.nativeRotation = ToQuaternion(rotation);
             this.hasNativeTransform = true;
         }
@@ -97,16 +97,6 @@ namespace Mmd.UnityIntegration
             hasNativeTransform = hasTransform;
             nativePosition = position;
             nativeRotation = rotation;
-        }
-
-        private static Vector3 ToVector3(float[] values)
-        {
-            if (values == null || values.Length < 3)
-            {
-                return Vector3.zero;
-            }
-
-            return new Vector3(values[0], values[1], values[2]);
         }
 
         private static Quaternion ToQuaternion(float[] values)

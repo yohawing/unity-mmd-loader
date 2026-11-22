@@ -43,7 +43,7 @@ namespace Mmd.UnityIntegration
                 renderingDescriptor,
                 materials,
                 MaterialRenderingTargets);
-            ImportScale = (float.IsFinite(importScale) && importScale > 0.0f) ? importScale : 1.0f;
+            ImportScale = MmdCoordinateSpace.NormalizeImportScale(importScale);
             BindLocalPositions = new Vector3[boneTransforms.Length];
             BindLocalRotations = new Quaternion[boneTransforms.Length];
             for (int i = 0; i < boneTransforms.Length; i++)

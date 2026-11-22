@@ -498,7 +498,7 @@ namespace Mmd.UnityIntegration
 
         private static Vector3 ToUnityPosition(float[] position, float importScale)
         {
-            float scale = (float.IsFinite(importScale) && importScale > 0.0f) ? importScale : 1.0f;
+            float scale = MmdCoordinateSpace.NormalizeImportScale(importScale);
             return MmdCoordinateSpace.MmdToUnityPosition(
                 new Vector3(position[0], position[1], position[2]),
                 scale);

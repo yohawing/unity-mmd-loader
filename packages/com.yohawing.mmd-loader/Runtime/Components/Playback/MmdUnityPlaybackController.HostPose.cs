@@ -217,7 +217,7 @@ namespace Mmd.UnityIntegration
                     SkinnedMeshRenderer renderer = MmdUnityModelFactory.ResolveExistingSkinnedMeshRenderer(gameObject);
                     bones = renderer.bones;
                     root = gameObject.transform;
-                    importScale = NormalizeHostPoseImportScale(modelAsset.ImportScale);
+                    importScale = MmdCoordinateSpace.NormalizeImportScale(modelAsset.ImportScale);
                     humanoidHostPoseModelAsset = modelAsset;
                     humanoidHostPoseModel = model;
                     humanoidHostPoseSourceBytes = sourceBytes;
@@ -323,14 +323,14 @@ namespace Mmd.UnityIntegration
                     continue;
                 }
 
-                if (IsActualHostPoseTarget(entry.NativeTransform, bones, entry.MmdBoneIndex) &&
+                if (MmdHumanoidRetargeter.IsActualNativeTarget(entry.NativeTransform, bones, entry.MmdBoneIndex) &&
                     drivenSet.Add(entry.MmdBoneIndex))
                 {
                     driven.Add(entry.MmdBoneIndex);
                 }
 
                 if (entry.CopyLocalPosition &&
-                    IsActualHostPoseTarget(
+                    MmdHumanoidRetargeter.IsActualNativeTarget(
                         entry.TranslationTargetTransform,
                         bones,
                         entry.TranslationTargetMmdBoneIndex) &&
@@ -380,15 +380,6 @@ namespace Mmd.UnityIntegration
             }
 
             return result;
-        }
-
-        private static bool IsActualHostPoseTarget(
-            Transform? target,
-            IReadOnlyList<Transform> bones,
-            int index)
-        {
-            return index >= 0 && index < bones.Count &&
-                   target != null && ReferenceEquals(target, bones[index]);
         }
 
         private static bool IsStrictDescendantOfDriven(
@@ -456,17 +447,15 @@ namespace Mmd.UnityIntegration
             for (int index = 0; index < model.bones.Count; index++)
             {
                 MmdBoneDefinition? bone = model.bones[index];
-                if (bone == null || bone.index != index)
+                switch (MmdModelValidator.CheckContiguousBone(bone, index, model.bones.Count))
                 {
-                    throw new InvalidOperationException(
-                        "Humanoid native host pose PMX bone topology has a non-contiguous index at " + index + ".");
-                }
-
-                if (bone.parentIndex < -1 || bone.parentIndex >= model.bones.Count)
-                {
-                    throw new InvalidOperationException(
-                        "Humanoid native host pose PMX parent index is invalid for bone " + index + ": " +
-                        bone.parentIndex + ".");
+                    case MmdModelValidator.ContiguousBoneViolation.NonContiguousIndex:
+                        throw new InvalidOperationException(
+                            "Humanoid native host pose PMX bone topology has a non-contiguous index at " + index + ".");
+                    case MmdModelValidator.ContiguousBoneViolation.ParentOutOfRange:
+                        throw new InvalidOperationException(
+                            "Humanoid native host pose PMX parent index is invalid for bone " + index + ": " +
+                            bone!.parentIndex + ".");
                 }
             }
 
@@ -634,7 +623,7 @@ namespace Mmd.UnityIntegration
                 return;
             }
 
-            float scale = NormalizeHostPoseImportScale(humanoidHostPoseImportScale);
+            float scale = MmdCoordinateSpace.NormalizeImportScale(humanoidHostPoseImportScale);
             for (int index = 0; index < boneCount; index++)
             {
                 // A destroyed bone has nothing to restore; keep restoring the surviving bones.
@@ -750,7 +739,7 @@ namespace Mmd.UnityIntegration
                     throw new InvalidOperationException("Humanoid native host pose PMX bone index is invalid: " + bone.index);
                 }
 
-                origins[bone.index] = ToHostPoseVector(bone.origin);
+                origins[bone.index] = MmdCoordinateSpace.ToVector3(bone.origin);
             }
 
             var bindPositions = new Vector3[origins.Length];
@@ -774,13 +763,6 @@ namespace Mmd.UnityIntegration
             return bindPositions;
         }
 
-        private static Vector3 ToHostPoseVector(float[] values)
-        {
-            return values != null && values.Length >= 3
-                ? new Vector3(values[0], values[1], values[2])
-                : Vector3.zero;
-        }
-
         private static float[] EnsureFloatBuffer(float[]? buffer, int length)
         {
             return buffer != null && buffer.Length == length ? buffer : new float[length];
@@ -789,11 +771,6 @@ namespace Mmd.UnityIntegration
         private static byte[] EnsureByteBuffer(byte[]? buffer, int length)
         {
             return buffer != null && buffer.Length == length ? buffer : new byte[length];
-        }
-
-        private static float NormalizeHostPoseImportScale(float value)
-        {
-            return float.IsFinite(value) && value > 0.0f ? value : 1.0f;
         }
 
         private static bool IsNativeHostPoseFailure(Exception exception)

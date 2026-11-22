@@ -11,7 +11,7 @@ namespace Mmd.UnityIntegration
         private void RefreshEvaluatedFrameFromUnityTransforms(MmdEvaluatedFrame frame)
         {
             Transform root = playbackInstance.Root.transform;
-            float importScale = NormalizeImportScale(playbackInstance.ImportScale);
+            float importScale = MmdCoordinateSpace.NormalizeImportScale(playbackInstance.ImportScale);
             foreach (MmdEvaluatedBonePose bonePose in frame.bones)
             {
                 int index = bonePose.index;
@@ -45,7 +45,7 @@ namespace Mmd.UnityIntegration
 
         private static Vector3 ToUnityModelPosition(float[] position, float importScale)
         {
-            return ToUnityModelPosition(position) * NormalizeImportScale(importScale);
+            return ToUnityModelPosition(position) * MmdCoordinateSpace.NormalizeImportScale(importScale);
         }
 
         private static Vector3 ToUnityModelPosition(Vector3 position)
@@ -55,7 +55,7 @@ namespace Mmd.UnityIntegration
 
         private static Vector3 ToUnityModelPosition(Vector3 position, float importScale)
         {
-            return ToUnityModelPosition(position) * NormalizeImportScale(importScale);
+            return ToUnityModelPosition(position) * MmdCoordinateSpace.NormalizeImportScale(importScale);
         }
 
         private static Quaternion ToUnityModelRotation(float[] rotation)
@@ -75,7 +75,7 @@ namespace Mmd.UnityIntegration
 
         private static Vector3 ToMmdModelPosition(Vector3 position, float importScale)
         {
-            return ToMmdModelPosition(position) / NormalizeImportScale(importScale);
+            return ToMmdModelPosition(position) / MmdCoordinateSpace.NormalizeImportScale(importScale);
         }
 
         private static Quaternion ToMmdModelRotation(Quaternion rotation)
@@ -95,21 +95,11 @@ namespace Mmd.UnityIntegration
                 MmdBoneDefinition bone = model.bones[i];
                 if (bone.index == boneIndex)
                 {
-                    return ToMmdVector3(bone.origin);
+                    return MmdCoordinateSpace.ToVector3(bone.origin);
                 }
             }
 
             return Vector3.zero;
-        }
-
-        private static Vector3 ToMmdVector3(float[] values)
-        {
-            if (values == null || values.Length < 3)
-            {
-                return Vector3.zero;
-            }
-
-            return new Vector3(values[0], values[1], values[2]);
         }
 
         private static float[] WriteVector3(float[]? destination, Vector3 value)
@@ -173,11 +163,6 @@ namespace Mmd.UnityIntegration
             destination[14] = matrix.m23;
             destination[15] = matrix.m33;
             return destination;
-        }
-
-        private static float NormalizeImportScale(float importScale)
-        {
-            return float.IsFinite(importScale) && importScale > 0.0f ? importScale : 1.0f;
         }
     }
 }

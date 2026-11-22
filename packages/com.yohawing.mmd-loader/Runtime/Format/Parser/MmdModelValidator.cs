@@ -39,6 +39,41 @@ namespace Mmd.Parser
             return errors;
         }
 
+        /// <summary>
+        /// Per-bone result of <see cref="CheckContiguousBone"/>.
+        /// </summary>
+        internal enum ContiguousBoneViolation
+        {
+            None,
+            NonContiguousIndex,
+            ParentOutOfRange
+        }
+
+        /// <summary>
+        /// Checks one bone against the contiguous PMX bone topology that the native-indexed runtime paths
+        /// (Humanoid retarget, Humanoid host pose, HostRig world-matrix apply) rely on: the list position
+        /// equals <c>bone.index</c> and <c>parentIndex</c> is -1 or inside the list. It only classifies, so
+        /// each caller keeps its own exception type and text and can interleave its own per-bone Unity
+        /// hierarchy checks in the same order as before.
+        /// </summary>
+        internal static ContiguousBoneViolation CheckContiguousBone(
+            MmdBoneDefinition? bone,
+            int listIndex,
+            int boneCount)
+        {
+            if (bone == null || bone.index != listIndex)
+            {
+                return ContiguousBoneViolation.NonContiguousIndex;
+            }
+
+            if (bone.parentIndex < -1 || bone.parentIndex >= boneCount)
+            {
+                return ContiguousBoneViolation.ParentOutOfRange;
+            }
+
+            return ContiguousBoneViolation.None;
+        }
+
         public static void ThrowIfInvalid(MmdModelDefinition model)
         {
             IReadOnlyList<string> errors = ValidateStructuralModel(model);

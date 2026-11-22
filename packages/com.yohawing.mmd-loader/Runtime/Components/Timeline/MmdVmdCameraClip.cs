@@ -89,7 +89,7 @@ namespace Mmd.Timeline
             MmdVmdCameraBehaviour behaviour = playable.GetBehaviour();
             behaviour.Binding = binding.Resolve(graph.GetResolver());
             behaviour.MotionSourceId = string.IsNullOrWhiteSpace(motionSourceId) && motionAsset != null
-                ? (string.IsNullOrWhiteSpace(motionAsset.SourceId) ? motionAsset.name : motionAsset.SourceId)
+                ? (motionAsset.ResolvedSourceId)
                 : motionSourceId;
             behaviour.FrameRate = frameRate;
             behaviour.StartOffsetSeconds = startOffsetSeconds;

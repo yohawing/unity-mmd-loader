@@ -1329,7 +1329,7 @@ namespace Mmd.UnityIntegration
 
         private void ApplyPhysicsBodyTransforms(MmdPhysicsBodyTransform[] readbackTransforms)
         {
-            float importScale = NormalizeImportScale(playbackInstance.ImportScale);
+            float importScale = MmdCoordinateSpace.NormalizeImportScale(playbackInstance.ImportScale);
             for (int i = 0; i < model.physics.rigidbodies.Count; i++)
             {
                 MmdRigidbodyDefinition body = model.physics.rigidbodies[i];
@@ -1346,13 +1346,13 @@ namespace Mmd.UnityIntegration
                 MmdPhysicsBodyTransform bodyTransform = readbackTransforms[i];
                 Transform bone = playbackInstance.BoneTransforms[body.boneIndex];
                 Transform root = playbackInstance.Root.transform;
-                Vector3 bodyOffset = ToMmdVector3(body.position) - GetBoneOrigin(body.boneIndex);
+                Vector3 bodyOffset = MmdCoordinateSpace.ToVector3(body.position) - GetBoneOrigin(body.boneIndex);
                 Quaternion bodyModelRotation = ToMmdQuaternion(bodyTransform.rotation);
                 Quaternion bodyLocalRotation = MmdCoordinateSpace.MmdEulerToRotation(body.rotation);
                 Quaternion boneModelRotation = bodyModelRotation * Quaternion.Inverse(bodyLocalRotation);
                 if (!IsDynamicWithBonePhysicsKind(body.physicsKind))
                 {
-                    Vector3 boneModelPosition = ToMmdVector3(bodyTransform.position) - (boneModelRotation * bodyOffset);
+                    Vector3 boneModelPosition = MmdCoordinateSpace.ToVector3(bodyTransform.position) - (boneModelRotation * bodyOffset);
                     bone.position = root.TransformPoint(ToUnityModelPosition(boneModelPosition, importScale));
                 }
 
@@ -1376,7 +1376,7 @@ namespace Mmd.UnityIntegration
             }
 
             Transform root = playbackInstance.Root.transform;
-            float importScale = NormalizeImportScale(playbackInstance.ImportScale);
+            float importScale = MmdCoordinateSpace.NormalizeImportScale(playbackInstance.ImportScale);
             for (int i = 0; i < model.physics.rigidbodies.Count; i++)
             {
                 MmdUnityPhysicsBody? physicsBody = metadata[i].physicsBody;
@@ -1402,7 +1402,7 @@ namespace Mmd.UnityIntegration
             MmdPhysicsBodyTransform[] readbackTransforms)
         {
             Transform root = playbackInstance.Root.transform;
-            float importScale = NormalizeImportScale(playbackInstance.ImportScale);
+            float importScale = MmdCoordinateSpace.NormalizeImportScale(playbackInstance.ImportScale);
             int count = model.physics.rigidbodies.Count;
             var result = new MmdLivePhysicsBodyDiagnostics[count];
             for (int i = 0; i < count; i++)
@@ -1417,7 +1417,7 @@ namespace Mmd.UnityIntegration
                 Vector3 boneModelPos = bone != null
                     ? ToMmdModelPosition(root.InverseTransformPoint(bone.position), importScale)
                     : Vector3.zero;
-                Vector3 readbackMmdPos = ToMmdVector3(bodyTransform.position);
+                Vector3 readbackMmdPos = MmdCoordinateSpace.ToVector3(bodyTransform.position);
                 Quaternion readbackMmdRot = ToMmdQuaternion(bodyTransform.rotation);
                 Vector3 readbackWorldPos = root.TransformPoint(ToUnityModelPosition(bodyTransform.position, importScale));
                 Quaternion readbackWorldRot = root.rotation * ToUnityModelRotation(bodyTransform.rotation);

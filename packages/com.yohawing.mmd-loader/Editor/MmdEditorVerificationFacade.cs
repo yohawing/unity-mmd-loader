@@ -89,7 +89,7 @@ namespace Mmd.Editor
             return new MmdEditorPmxSceneLoadResult(
                 model,
                 instance,
-                string.IsNullOrWhiteSpace(pmxAsset.SourceId) ? pmxAsset.name : pmxAsset.SourceId);
+                pmxAsset.ResolvedSourceId);
         }
 
         public static MmdEditorPlaybackSceneLoadResult LoadPlaybackIntoScene(
@@ -252,8 +252,8 @@ namespace Mmd.Editor
                     controller,
                     model,
                     motion,
-                    string.IsNullOrWhiteSpace(pmxAsset.SourceId) ? pmxAsset.name : pmxAsset.SourceId,
-                    string.IsNullOrWhiteSpace(vmdAsset.SourceId) ? vmdAsset.name : vmdAsset.SourceId,
+                    pmxAsset.ResolvedSourceId,
+                    vmdAsset.ResolvedSourceId,
                     snapshot);
             }
             catch

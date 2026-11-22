@@ -30,7 +30,7 @@ namespace Mmd.UnityIntegration
                 return Array.Empty<MmdUnityPhysicsBody>();
             }
 
-            float scale = NormalizeImportScale(importScale);
+            float scale = MmdCoordinateSpace.NormalizeImportScale(importScale);
             Dictionary<int, MmdBoneDefinition> bonesByIndex = BuildBoneDefinitionMap(bones);
             Dictionary<int, Transform> boneTransformsByIndex = BuildBoneTransformMap(bones, boneTransforms);
             var result = new MmdUnityPhysicsBody[physics.rigidbodies.Count];
@@ -42,9 +42,9 @@ namespace Mmd.UnityIntegration
                 if (boneTransformsByIndex.TryGetValue(body.boneIndex, out Transform boneTransform))
                 {
                     parent = boneTransform;
-                    Vector3 bodyPosition = ToVector3(body.position);
+                    Vector3 bodyPosition = MmdCoordinateSpace.ToVector3(body.position);
                     Vector3 boneOrigin = bonesByIndex.TryGetValue(body.boneIndex, out MmdBoneDefinition bone)
-                        ? ToVector3(bone.origin)
+                        ? MmdCoordinateSpace.ToVector3(bone.origin)
                         : Vector3.zero;
                     localPosition = ToUnityPosition(bodyPosition - boneOrigin, scale);
                 }
@@ -71,9 +71,9 @@ namespace Mmd.UnityIntegration
                     body.boneIndex,
                     body.boneName,
                     body.shapeType,
-                    ToVector3(body.size),
-                    ToVector3(body.position),
-                    ToVector3(body.rotation),
+                    MmdCoordinateSpace.ToVector3(body.size),
+                    MmdCoordinateSpace.ToVector3(body.position),
+                    MmdCoordinateSpace.ToVector3(body.rotation),
                     body.physicsKind,
                     body.mass,
                     body.linearDamping,
@@ -96,9 +96,9 @@ namespace Mmd.UnityIntegration
 
         private static Collider AddCollider(GameObject bodyObject, MmdRigidbodyDefinition body, float importScale)
         {
-            float scale = NormalizeImportScale(importScale);
+            float scale = MmdCoordinateSpace.NormalizeImportScale(importScale);
             string shapeType = body.shapeType ?? string.Empty;
-            Vector3 size = ToVector3(body.size);
+            Vector3 size = MmdCoordinateSpace.ToVector3(body.size);
             if (string.Equals(shapeType, "sphere", StringComparison.Ordinal))
             {
                 SphereCollider collider = bodyObject.AddComponent<SphereCollider>();

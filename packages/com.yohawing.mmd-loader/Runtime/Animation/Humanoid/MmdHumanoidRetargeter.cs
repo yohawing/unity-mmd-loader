@@ -334,7 +334,7 @@ namespace Mmd
             ValidateNativeArrayBoneMapping(model, nativeTransforms);
             ResetNativeArrayPose(localPositionOffsetsXyz, localRotationXyzw, localScalesXyz);
 
-            float scale = NormalizeImportScale(importScale);
+            float scale = MmdCoordinateSpace.NormalizeImportScale(importScale);
             return RetargetPoseCore(
                 entries,
                 copyLocalPositions,
@@ -549,13 +549,15 @@ namespace Mmd
             for (int listIndex = 0; listIndex < model.bones.Count; listIndex++)
             {
                 MmdBoneDefinition? bone = model.bones[listIndex];
-                if (bone == null || bone.index != listIndex)
-                    throw new ArgumentException(
-                        "Model bone indices must be a unique contiguous mapping.", nameof(model));
-
-                if (bone.parentIndex < -1 || bone.parentIndex >= model.bones.Count)
-                    throw new ArgumentException(
-                        $"Model parent index {bone.parentIndex} is invalid for bone {bone.index}.", nameof(model));
+                switch (MmdModelValidator.CheckContiguousBone(bone, listIndex, model.bones.Count))
+                {
+                    case MmdModelValidator.ContiguousBoneViolation.NonContiguousIndex:
+                        throw new ArgumentException(
+                            "Model bone indices must be a unique contiguous mapping.", nameof(model));
+                    case MmdModelValidator.ContiguousBoneViolation.ParentOutOfRange:
+                        throw new ArgumentException(
+                            $"Model parent index {bone!.parentIndex} is invalid for bone {bone.index}.", nameof(model));
+                }
 
                 if (nativeTransforms[listIndex] == null)
                     throw new ArgumentException(
@@ -563,7 +565,7 @@ namespace Mmd
             }
         }
 
-        private static bool IsActualNativeTarget(
+        internal static bool IsActualNativeTarget(
             Transform? target,
             IReadOnlyList<Transform> nativeTransforms,
             int index)
@@ -575,25 +577,13 @@ namespace Mmd
         private static Vector3 GetModelParentLocalRestPosition(MmdModelDefinition model, int index)
         {
             MmdBoneDefinition bone = model.bones[index];
-            Vector3 origin = ToMmdVector3(bone.origin);
+            Vector3 origin = MmdCoordinateSpace.ToVector3(bone.origin);
             if (bone.parentIndex < 0)
             {
                 return origin;
             }
 
-            return origin - ToMmdVector3(model.bones[bone.parentIndex].origin);
-        }
-
-        private static Vector3 ToMmdVector3(float[]? values)
-        {
-            return values != null && values.Length >= 3
-                ? new Vector3(values[0], values[1], values[2])
-                : Vector3.zero;
-        }
-
-        private static float NormalizeImportScale(float value)
-        {
-            return float.IsFinite(value) && value > 0.0f ? value : 1.0f;
+            return origin - MmdCoordinateSpace.ToVector3(model.bones[bone.parentIndex].origin);
         }
 
         private static void RequireExactArrayLength<T>(T[] values, int expected, string label)

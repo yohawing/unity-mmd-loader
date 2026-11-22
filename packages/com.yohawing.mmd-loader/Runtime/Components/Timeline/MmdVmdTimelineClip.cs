@@ -86,7 +86,7 @@ namespace Mmd.Timeline
             behaviour.MotionAsset = motionAsset;
             behaviour.ModelSourceId = modelSourceId;
             behaviour.MotionSourceId = string.IsNullOrWhiteSpace(motionSourceId) && motionAsset != null
-                ? (string.IsNullOrWhiteSpace(motionAsset.SourceId) ? motionAsset.name : motionAsset.SourceId)
+                ? (motionAsset.ResolvedSourceId)
                 : motionSourceId;
             behaviour.FrameRate = frameRate;
             behaviour.StartOffsetSeconds = startOffsetSeconds;

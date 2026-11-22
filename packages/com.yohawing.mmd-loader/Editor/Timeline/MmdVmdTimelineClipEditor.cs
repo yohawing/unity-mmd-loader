@@ -89,7 +89,7 @@ namespace Mmd.Editor.Timeline
 
             float frameRate = frameRateProperty?.floatValue ?? 30.0f;
             double duration = MmdTimelineAssetWorkflow.CalculateClipDurationSeconds(motionAsset.MaxFrame, frameRate);
-            string sourceId = string.IsNullOrWhiteSpace(motionAsset.SourceId) ? motionAsset.name : motionAsset.SourceId;
+            string sourceId = motionAsset.ResolvedSourceId;
 
             using (new EditorGUI.DisabledScope(true))
             {

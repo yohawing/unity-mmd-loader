@@ -58,7 +58,7 @@ namespace Mmd.UnityIntegration
         {
             float[] position = state.Position ?? Array.Empty<float>();
             float[] rotation = state.Rotation ?? Array.Empty<float>();
-            float scale = NormalizeImportScale(importScale);
+            float scale = MmdCoordinateSpace.NormalizeImportScale(importScale);
 
             // Guard the scalar inputs the same way Component() guards the array inputs, so a
             // non-finite upstream value never produces a non-finite Unity pose.
@@ -104,11 +104,6 @@ namespace Mmd.UnityIntegration
                 Quaternion.AngleAxis(-y * Mathf.Rad2Deg, Vector3.up) *
                 Quaternion.AngleAxis(-x * Mathf.Rad2Deg, Vector3.right) *
                 Quaternion.AngleAxis(-z * Mathf.Rad2Deg, Vector3.forward);
-        }
-
-        private static float NormalizeImportScale(float importScale)
-        {
-            return float.IsFinite(importScale) && importScale > 0.0f ? importScale : 1.0f;
         }
     }
 }

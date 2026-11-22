@@ -16,7 +16,7 @@ namespace Mmd.UnityIntegration
 
         private static Mesh BuildMesh(MmdRenderingDescriptor descriptor, float importScale)
         {
-            float scale = NormalizeImportScale(importScale);
+            float scale = MmdCoordinateSpace.NormalizeImportScale(importScale);
             var mesh = new Mesh
             {
                 name = "MMD Static Mesh",

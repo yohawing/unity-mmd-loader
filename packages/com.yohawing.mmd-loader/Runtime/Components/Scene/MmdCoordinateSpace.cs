@@ -22,7 +22,7 @@ namespace Mmd.UnityIntegration
 
         public static Vector3 MmdToUnityPosition(Vector3 mmd, float importScale)
         {
-            return MmdToUnityPosition(mmd) * NormalizeScale(importScale);
+            return MmdToUnityPosition(mmd) * NormalizeImportScale(importScale);
         }
 
         public static Quaternion MmdToUnityRotation(Quaternion mmd)
@@ -66,9 +66,22 @@ namespace Mmd.UnityIntegration
                 cx * cy * cz + sx * sy * sz);
         }
 
-        private static float NormalizeScale(float importScale)
+        /// <summary>
+        /// Import scale used by runtime conversions: a finite positive value, otherwise 1 (MMD units).
+        /// Asset-facing defaults that fall back to <see cref="MmdPmxAsset.DefaultImportScale"/> instead
+        /// are intentionally separate.
+        /// </summary>
+        public static float NormalizeImportScale(float importScale)
         {
             return float.IsFinite(importScale) && importScale > 0.0f ? importScale : 1.0f;
+        }
+
+        /// <summary>Reads an MMD float triple as-is (no axis flip); null or short arrays read as zero.</summary>
+        public static Vector3 ToVector3(float[]? values)
+        {
+            return values != null && values.Length >= 3
+                ? new Vector3(values[0], values[1], values[2])
+                : Vector3.zero;
         }
     }
 }

@@ -21,7 +21,7 @@ namespace Mmd.UnityIntegration
                 return Array.Empty<Transform>();
             }
 
-            float scale = NormalizeImportScale(importScale);
+            float scale = MmdCoordinateSpace.NormalizeImportScale(importScale);
             IReadOnlyList<MmdBoneDefinition> orderedBones = CreateOrderedBones(bones);
 
             var transformsByIndex = new Dictionary<int, Transform>(orderedBones.Count);
@@ -76,7 +76,7 @@ namespace Mmd.UnityIntegration
             Transform[] boneTransforms,
             float importScale)
         {
-            float scale = NormalizeImportScale(importScale);
+            float scale = MmdCoordinateSpace.NormalizeImportScale(importScale);
             for (int i = 0; i < orderedBones.Count; i++)
             {
                 MmdBoneDefinition bone = orderedBones[i];

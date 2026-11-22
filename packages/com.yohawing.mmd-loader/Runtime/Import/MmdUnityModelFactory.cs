@@ -111,7 +111,7 @@ namespace Mmd.UnityIntegration
                 throw new ArgumentNullException(nameof(model));
             }
 
-            float scale = NormalizeImportScale(importScale);
+            float scale = MmdCoordinateSpace.NormalizeImportScale(importScale);
             return CreateStaticModel(
                 BuildRuntimeRenderingDescriptor(model, preset),
                 model.name,
@@ -251,7 +251,7 @@ namespace Mmd.UnityIntegration
                 throw new ArgumentException("Skinned MMD model instantiation requires at least one bone.", nameof(model));
             }
 
-            float scale = NormalizeImportScale(importScale);
+            float scale = MmdCoordinateSpace.NormalizeImportScale(importScale);
             return CreateSkinnedModel(
                 BuildRuntimeRenderingDescriptor(model, preset),
                 model.name,
@@ -323,7 +323,7 @@ namespace Mmd.UnityIntegration
                 throw new ArgumentException("Existing skinned MMD model rebinding requires at least one bone.", nameof(model));
             }
 
-            float scale = NormalizeImportScale(importScale);
+            float scale = MmdCoordinateSpace.NormalizeImportScale(importScale);
             Transform modelRoot = FindExistingSkinnedModelRoot(root.transform);
             SkinnedMeshRenderer renderer = ResolveExistingSkinnedMeshRenderer(root, modelRoot);
             Mesh? sharedMesh = renderer.sharedMesh;

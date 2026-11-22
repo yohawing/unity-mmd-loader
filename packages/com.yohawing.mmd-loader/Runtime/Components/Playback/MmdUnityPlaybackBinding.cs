@@ -168,8 +168,8 @@ namespace Mmd.UnityIntegration
             MmdMotionValidator.ThrowIfInvalid(motion);
             float importScale = modelAsset.ImportScale;
             MmdMaterialPreset materialPreset = ResolveMaterialPreset(modelAsset);
-            string modelId = string.IsNullOrWhiteSpace(modelAsset.SourceId) ? modelAsset.name : modelAsset.SourceId;
-            string motionId = string.IsNullOrWhiteSpace(motionAsset.SourceId) ? motionAsset.name : motionAsset.SourceId;
+            string modelId = modelAsset.ResolvedSourceId;
+            string motionId = motionAsset.ResolvedSourceId;
             string? sourcePath = string.IsNullOrWhiteSpace(modelAsset.SourcePath) ? null : modelAsset.SourcePath;
             MmdMaterialMapperSet? materialMappers = modelAsset.ResolveMaterialMapperSet();
             if (materialMappers == null)
@@ -243,8 +243,8 @@ namespace Mmd.UnityIntegration
             var session = new MmdRuntimeSession(
                 model,
                 motion,
-                string.IsNullOrWhiteSpace(modelAsset.SourceId) ? modelAsset.name : modelAsset.SourceId,
-                string.IsNullOrWhiteSpace(motionAsset.SourceId) ? motionAsset.name : motionAsset.SourceId);
+                modelAsset.ResolvedSourceId,
+                motionAsset.ResolvedSourceId);
             var lease = new MmdBorrowedSceneMutationLease(
                 instance,
                 modelAsset.MaterialOverrideAsset,
@@ -254,8 +254,8 @@ namespace Mmd.UnityIntegration
                 instance,
                 session,
                 model,
-                string.IsNullOrWhiteSpace(modelAsset.SourceId) ? modelAsset.name : modelAsset.SourceId,
-                string.IsNullOrWhiteSpace(motionAsset.SourceId) ? motionAsset.name : motionAsset.SourceId,
+                modelAsset.ResolvedSourceId,
+                motionAsset.ResolvedSourceId,
                 MmdUnityModelInstanceOwnership.Borrowed,
                 lease);
         }
@@ -291,7 +291,7 @@ namespace Mmd.UnityIntegration
             MmdModelValidator.ThrowIfInvalid(model);
             MmdMotionValidator.ThrowIfInvalid(motion);
             string resolvedModelId = string.IsNullOrWhiteSpace(modelId) ? "PMX" : modelId;
-            string resolvedMotionId = string.IsNullOrWhiteSpace(motionAsset.SourceId) ? motionAsset.name : motionAsset.SourceId;
+            string resolvedMotionId = motionAsset.ResolvedSourceId;
             var session = new MmdRuntimeSession(model, motion, resolvedModelId, resolvedMotionId);
             var lease = new MmdBorrowedSceneMutationLease(instance);
             return new MmdUnityPlaybackBinding(
@@ -408,8 +408,8 @@ namespace Mmd.UnityIntegration
                 root,
                 model,
                 motion,
-                string.IsNullOrWhiteSpace(modelAsset.SourceId) ? modelAsset.name : modelAsset.SourceId,
-                string.IsNullOrWhiteSpace(motionAsset.SourceId) ? motionAsset.name : motionAsset.SourceId,
+                modelAsset.ResolvedSourceId,
+                motionAsset.ResolvedSourceId,
                 string.IsNullOrWhiteSpace(modelAsset.SourcePath) ? null : modelAsset.SourcePath,
                 modelAsset.ImportScale,
                 MmdPmxModelPresetPolicy.AllowsAutomaticSelfShadowTarget(modelAsset.ModelPreset),
@@ -530,7 +530,7 @@ namespace Mmd.UnityIntegration
             MmdMaterialPreset materialPreset = ResolveMaterialPreset(modelAsset);
             MmdMaterialRenderingTargets[]? materialRenderingTargets =
                 modelAsset.ResolveMaterialRenderingTargets(model.materials.Count);
-            string resolvedModelId = string.IsNullOrWhiteSpace(modelAsset.SourceId) ? modelAsset.name : modelAsset.SourceId;
+            string resolvedModelId = modelAsset.ResolvedSourceId;
             string resolvedMotionId = string.IsNullOrWhiteSpace(motionId) ? "humanoid-physics" : motionId;
             var sourceMutation = new MmdExistingSceneRebindLease(root);
             MmdUnityModelInstance? instance = null;
@@ -674,7 +674,7 @@ namespace Mmd.UnityIntegration
                 throw new ArgumentNullException(nameof(motion));
             }
 
-            float scale = (float.IsFinite(importScale) && importScale > 0.0f) ? importScale : 1.0f;
+            float scale = MmdCoordinateSpace.NormalizeImportScale(importScale);
             MmdUnityModelInstance instance = MmdUnityModelFactory.CreateSkinnedModel(
                 model,
                 sourcePath,

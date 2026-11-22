@@ -130,7 +130,7 @@ namespace Mmd.UnityIntegration
             float importScale,
             IReadOnlyList<MmdBoneDefinition>? bones)
         {
-            float scale = NormalizeImportScale(importScale);
+            float scale = MmdCoordinateSpace.NormalizeImportScale(importScale);
             int vertexCount = mesh.vertexCount;
             Vector3[] baseVertices = mesh.vertices;
 
@@ -180,7 +180,7 @@ namespace Mmd.UnityIntegration
             IReadOnlyList<MmdBoneDefinition>? bones,
             float importScale)
         {
-            float scale = NormalizeImportScale(importScale);
+            float scale = MmdCoordinateSpace.NormalizeImportScale(importScale);
             Vector3[] baseVertices = mesh.vertices;
             IReadOnlyList<MmdBoneDefinition> orderedBones = bones == null || bones.Count == 0
                 ? Array.Empty<MmdBoneDefinition>()
