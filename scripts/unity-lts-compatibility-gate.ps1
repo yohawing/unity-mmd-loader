@@ -10,9 +10,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-. (Join-Path $PSScriptRoot "unity-process-environment.ps1")
-Initialize-UnityProcessEnvironment
-. (Join-Path $PSScriptRoot "unity-project-guard.ps1")
+# unity-batch-common.ps1 also loads (and initializes) unity-process-environment.ps1 and
+# loads unity-project-guard.ps1.
+. (Join-Path $PSScriptRoot "unity-batch-common.ps1")
 . (Join-Path $PSScriptRoot "read-nunit-test-result.ps1")
 
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
@@ -107,13 +107,7 @@ try {
         "-logFile", $testLog,
         "-testFilter", $Filter
     )
-    $unityProcess = Start-Process `
-        -FilePath $Unity `
-        -ArgumentList $testArguments `
-        -WindowStyle Hidden `
-        -Wait `
-        -PassThru
-    $testExitCode = $unityProcess.ExitCode
+    $testExitCode = Invoke-UnityBatch -Unity $Unity -Arguments $testArguments
 
     try {
         $testSummary = Read-NUnitTestRunSummary -Path $testResults -Context "Unity LTS compatibility gate"
