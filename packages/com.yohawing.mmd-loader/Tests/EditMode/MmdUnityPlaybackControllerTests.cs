@@ -1817,6 +1817,58 @@ namespace Mmd.Tests
         }
 
         [Test]
+        public void FastRuntimeSourceMatchAcceptsEqualCopiesAndRejectsChangedBytes()
+        {
+            MmdUnityPlaybackBinding? binding = null;
+            try
+            {
+                byte[] pmxBytes = MmdTestFixtures.ReadFixtureAssetBytes(PlaybackPmxId);
+                MmdModelDefinition model = new NativeMmdParser().LoadModel(pmxBytes);
+                MmdMotionDefinition motion = MmdTestFixtures.ParseGeneratedBoneTranslationMotion(
+                    model.name,
+                    RootBoneName(model),
+                    LivePhysicsPlaybackFrame,
+                    endTranslationX: 2.0f);
+                byte[] vmdBytes = motion.sourceBytes!;
+                binding = MmdUnityPlaybackBinding.CreateSkinned(
+                    model,
+                    motion,
+                    PlaybackPmxId,
+                    "source-match.vmd",
+                    MmdTestFixtures.FixtureAssetPath(PlaybackPmxId));
+                Assert.That(binding.TryEnableFastRuntime(pmxBytes, vmdBytes, out string reason), Is.True, reason);
+
+                Assert.That(
+                    binding.TryMatchFastRuntimeSources(
+                        (byte[])pmxBytes.Clone(),
+                        (byte[])vmdBytes.Clone(),
+                        out reason),
+                    Is.True,
+                    reason);
+
+                byte[] changedVmd = (byte[])vmdBytes.Clone();
+                changedVmd[changedVmd.Length - 1] ^= 0x01;
+                Assert.That(binding.TryMatchFastRuntimeSources(pmxBytes, changedVmd, out reason), Is.False);
+                Assert.That(reason, Does.Contain("VMD source differs"));
+
+                byte[] changedPmx = (byte[])pmxBytes.Clone();
+                changedPmx[changedPmx.Length / 2] ^= 0x80;
+                Assert.That(binding.TryMatchFastRuntimeSources(changedPmx, vmdBytes, out reason), Is.False);
+                Assert.That(reason, Does.Contain("PMX source differs"));
+
+                byte[] extendedVmd = new byte[vmdBytes.Length + 1];
+                Array.Copy(vmdBytes, extendedVmd, vmdBytes.Length);
+                Assert.That(binding.TryMatchFastRuntimeSources(pmxBytes, extendedVmd, out reason), Is.False);
+                Assert.That(reason, Does.Contain("VMD source differs"));
+            }
+            finally
+            {
+                binding?.Dispose();
+                MmdTestInstanceScope.DestroyInstance(binding?.Instance);
+            }
+        }
+
+        [Test]
         public void TryEnableFastRuntimeFromConfiguredSourceReportsMissingSource()
         {
             MmdUnityPlaybackBinding? binding = null;

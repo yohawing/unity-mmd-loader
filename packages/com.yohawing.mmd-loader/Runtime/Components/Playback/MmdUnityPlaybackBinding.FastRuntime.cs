@@ -2,7 +2,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Security.Cryptography;
 using Mmd.Motion;
 using Mmd.Native;
 using Mmd.Parser;
@@ -16,8 +15,11 @@ namespace Mmd.UnityIntegration
         // Keep only digests for the bytes that built the active native session. The
         // caller-owned source arrays must not be retained: Timeline worker creation can
         // compare the provider source without making the binding a second source owner.
-        private byte[]? fastRuntimePmxSourceDigest;
-        private byte[]? fastRuntimeVmdSourceDigest;
+        // The digest only guards against pairing a worker with a different source, so a
+        // non-cryptographic hash is enough; SHA256 cost about 200ms per session on a
+        // 300k-key VMD, which dominated the first Timeline Evaluate.
+        private FastRuntimeSourceDigest? fastRuntimePmxSourceDigest;
+        private FastRuntimeSourceDigest? fastRuntimeVmdSourceDigest;
         private long fastRuntimeSourceRevision;
 
         /// <summary>
@@ -129,8 +131,8 @@ namespace Mmd.UnityIntegration
                 byte[] ikEnabled = new byte[created.IkEnabledCount];
                 float[] lastAppliedMorphWeights = new float[fastMorphIndices.Length];
                 MmdEvaluatedFrame? morphFrame = BuildFastMorphFrame(morphWeights);
-                byte[] pmxSourceDigest = ComputeFastRuntimeSourceDigest(pmxBytes);
-                byte[] vmdSourceDigest = ComputeFastRuntimeSourceDigest(vmdBytes);
+                FastRuntimeSourceDigest pmxSourceDigest = FastRuntimeSourceDigest.Compute(pmxBytes);
+                FastRuntimeSourceDigest vmdSourceDigest = FastRuntimeSourceDigest.Compute(vmdBytes);
 
                 fastSession = created;
                 fastWorldMatrices = worldMatrices;
@@ -212,13 +214,13 @@ namespace Mmd.UnityIntegration
                 return false;
             }
 
-            if (!FastRuntimeSourceDigestEquals(fastRuntimePmxSourceDigest, pmxBytes))
+            if (!fastRuntimePmxSourceDigest.Value.Matches(pmxBytes))
             {
                 reason = "The active fast-runtime PMX source differs from the provider source.";
                 return false;
             }
 
-            if (!FastRuntimeSourceDigestEquals(fastRuntimeVmdSourceDigest, vmdBytes))
+            if (!fastRuntimeVmdSourceDigest.Value.Matches(vmdBytes))
             {
                 reason = "The active fast-runtime VMD source differs from the provider source.";
                 return false;
@@ -294,29 +296,26 @@ namespace Mmd.UnityIntegration
             fastSnapshot = null;
         }
 
-        private static byte[] ComputeFastRuntimeSourceDigest(byte[] sourceBytes)
+        private readonly struct FastRuntimeSourceDigest
         {
-            using SHA256 sha256 = SHA256.Create();
-            return sha256.ComputeHash(sourceBytes);
-        }
+            private readonly Hash128 hash;
+            private readonly int length;
 
-        private static bool FastRuntimeSourceDigestEquals(byte[] expectedDigest, byte[] sourceBytes)
-        {
-            byte[] actualDigest = ComputeFastRuntimeSourceDigest(sourceBytes);
-            if (expectedDigest.Length != actualDigest.Length)
+            private FastRuntimeSourceDigest(Hash128 hash, int length)
             {
-                return false;
+                this.hash = hash;
+                this.length = length;
             }
 
-            for (int index = 0; index < expectedDigest.Length; index++)
+            internal static FastRuntimeSourceDigest Compute(byte[] sourceBytes)
             {
-                if (expectedDigest[index] != actualDigest[index])
-                {
-                    return false;
-                }
+                return new FastRuntimeSourceDigest(Hash128.Compute(sourceBytes), sourceBytes.Length);
             }
 
-            return true;
+            internal bool Matches(byte[] sourceBytes)
+            {
+                return sourceBytes.Length == length && Hash128.Compute(sourceBytes) == hash;
+            }
         }
 
         private void InvalidateFastMorphCache()
