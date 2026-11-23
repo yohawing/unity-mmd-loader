@@ -572,7 +572,10 @@ namespace Mmd.Editor
                 }
 
                 Undo.RegisterCreatedObjectUndo(instanceRoot, "Load PMX Asset Into Scene");
-                MmdModelDefinition model = pmxAsset.LoadModel();
+                // Reuse the asset's validated playback model cache instead of parsing again. The
+                // controller configured after the drop preloads the same cache, so the drop and
+                // later playback share one parse. The cached model is shared and only read here.
+                MmdModelDefinition model = pmxAsset.LoadValidatedModelForSynchronousPlayback(parser: null, out _);
                 return MmdUnityModelFactory.CreateFromInstantiatedImportedHierarchyForSceneDrop(
                     instanceRoot,
                     model,

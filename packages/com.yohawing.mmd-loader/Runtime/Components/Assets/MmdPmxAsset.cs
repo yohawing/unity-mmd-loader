@@ -817,8 +817,23 @@ namespace Mmd
             return SynchronousPlaybackCache.LoadDescriptor(preset, out cacheHit);
         }
 
-        private MmdPmxPlaybackCache SynchronousPlaybackCache =>
-            synchronousPlaybackCache ??= new MmdPmxPlaybackCache(data);
+        private MmdPmxPlaybackCache SynchronousPlaybackCache
+        {
+            get
+            {
+                // A reimport reloads the serialized bytes into this same managed object without
+                // going through InitializeImportedAsset, so a cache built for an earlier byte
+                // array is stale and is replaced.
+                MmdPmxPlaybackCache? cache = synchronousPlaybackCache;
+                if (cache == null || !cache.IsForSource(data))
+                {
+                    cache = new MmdPmxPlaybackCache(data);
+                    synchronousPlaybackCache = cache;
+                }
+
+                return cache;
+            }
+        }
 
         private static float NormalizeImportScale(float value)
         {

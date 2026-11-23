@@ -526,6 +526,17 @@ namespace Mmd.UnityIntegration
             // Build only metadata still consumed by playback, in parallel over the immutable PMX
             // definition, validated once here instead of once per parallel builder.
             MmdModelValidator.ThrowIfInvalid(model);
+            return BuildRuntimePlaybackRenderingDescriptorFromValidated(model, preset);
+        }
+
+        /// <summary>
+        /// <see cref="BuildRuntimePlaybackRenderingDescriptor"/> for a model that is already
+        /// validated, such as the one held by the PMX asset's synchronous playback cache.
+        /// </summary>
+        internal static MmdRenderingDescriptor BuildRuntimePlaybackRenderingDescriptorFromValidated(
+            MmdModelDefinition model,
+            MmdMaterialPreset preset)
+        {
             Task<List<MmdMaterialDescriptor>> materialsTask = Task.Run(
                 () => MmdMaterialDescriptorBuilder.BuildFromValidated(model).ToList());
             Task<List<MmdGroupMorphDescriptor>> groupsTask = Task.Run(

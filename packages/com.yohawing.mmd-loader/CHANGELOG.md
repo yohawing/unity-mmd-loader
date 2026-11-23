@@ -45,7 +45,7 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 
 ### Changed
 
-- Faster PMX and VMD handling with identical results: building a model's rendering descriptor validates the model once instead of ten times (about 5x faster on large models), mesh splitting no longer allocates a string per index, and VMD reimports no longer hash the whole file (about 2.5x faster for large motions). Dropping an imported PMX into the scene reuses the imported mesh without rebuilding its full rendering descriptor (about 2.5x faster).
+- Faster PMX and VMD handling with identical results: building a model's rendering descriptor validates the model once instead of ten times (about 5x faster on large models), mesh splitting no longer allocates a string per index, and VMD reimports no longer hash the whole file (about 2.5x faster for large motions). Dropping an imported PMX into the scene reuses the imported mesh without rebuilding its full rendering descriptor (about 2.5x faster), and dropping the same PMX again reuses the model already parsed for it (on the largest test model, 770 ms to 25 ms).
 
 - The PMX importer version is now 31, so existing PMX assets reimport once after updating and pick up the material changes in this release.
 
@@ -54,6 +54,7 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 
 ### Fixed
 
+- After a PMX is reimported with new content, playback and Timeline rebinds through `MmdPmxAsset` use the new model. They used to keep the model parsed before the reimport.
 - Humanoid Live playback no longer re-parses the PMX every frame after the model-only physics binding fails to build; it retries once after the scene is reconfigured or Live physics is re-enabled.
 - `MmdUnityPlaybackController` teardown (`OnDisable` and resource release) no longer leaks the native Humanoid host pose session when a bone transform was destroyed, and restores the surviving bones.
 - Pausing a controller that plays through the automatic worker keeps its Live physics state instead of reseeding physics on resume.

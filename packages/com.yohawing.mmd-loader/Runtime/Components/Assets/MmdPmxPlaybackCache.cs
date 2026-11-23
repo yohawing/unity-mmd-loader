@@ -43,6 +43,14 @@ namespace Mmd
             this.descriptorPreloadFaultObservedForTests = descriptorPreloadFaultObservedForTests;
         }
 
+        internal bool IsForSource(byte[] candidate)
+        {
+            lock (gate)
+            {
+                return ReferenceEquals(source, candidate);
+            }
+        }
+
         internal void ReplaceSource(byte[] nextSource, Action assignSerializedSource)
         {
             if (nextSource == null)

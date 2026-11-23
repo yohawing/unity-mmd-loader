@@ -91,6 +91,8 @@ namespace Mmd.UnityIntegration
         /// <summary>
         /// Scene drag-and-drop entry. The dropped instance is only used for its root, so its
         /// rendering descriptor carries metadata only (no geometry, skinning or morph offsets).
+        /// <paramref name="model"/> must already be validated (the PMX asset's synchronous playback
+        /// cache validates it) and is only read, never modified.
         /// </summary>
         internal static MmdUnityModelInstance CreateFromInstantiatedImportedHierarchyForSceneDrop(
             GameObject instanceRoot,
@@ -140,8 +142,8 @@ namespace Mmd.UnityIntegration
             {
                 // The imported hierarchy already owns the mesh (geometry, skinning, vertex-morph
                 // blend shapes) and this path never rebuilds it, so build only the metadata instead
-                // of the full split descriptor. The model is validated there.
-                descriptor = BuildRuntimePlaybackRenderingDescriptor(model, MmdMaterialPreset.MmdToon);
+                // of the full split descriptor. The scene-drop caller passes a validated model.
+                descriptor = BuildRuntimePlaybackRenderingDescriptorFromValidated(model, MmdMaterialPreset.MmdToon);
                 MmdMaterialOverrideApplier.ApplyToRenderingDescriptor(materialOverride, descriptor);
             }
             else
