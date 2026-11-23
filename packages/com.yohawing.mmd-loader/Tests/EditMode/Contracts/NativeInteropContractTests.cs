@@ -46,6 +46,26 @@ namespace Mmd.Tests
                 fixtureName + " multi-bone weighting expectation.");
         }
 
+        // One generated fixture per PMX deform type, so a parser regression in a single type
+        // (rather than in the mixed fixture's majority) still fails here.
+        [TestCase("GeneratedPmx/bdef1-single-bone-quad.pmx", "bdef1", 1)]
+        [TestCase("GeneratedPmx/bdef4-twist-cylinder.pmx", "bdef4", 4)]
+        [TestCase("GeneratedPmx/sdef-two-bone-elbow.pmx", "sdef", 2)]
+        [TestCase("GeneratedPmx/qdef-twist-cylinder.pmx", "qdef", 4)]
+        public void NativeParserReadsEachDeformTypeFixture(string fixtureName, string expectedMode, int expectedBoneSlots)
+        {
+            MmdModelDefinition model = new NativeMmdParser().LoadModel(
+                MmdTestFixtures.ReadFixtureAssetBytes(fixtureName));
+
+            MmdVertexDefinition[] typed = model.vertices.Where(vertex => vertex.skinningMode == expectedMode).ToArray();
+            Assert.That(typed, Is.Not.Empty, fixtureName + " must contain " + expectedMode + " vertices.");
+            Assert.That(typed.All(vertex => vertex.boneIndices.Length == expectedBoneSlots), Is.True,
+                fixtureName + " " + expectedMode + " vertices must carry " + expectedBoneSlots + " bone slots.");
+            Assert.That(typed.All(vertex => vertex.hasSdefParameters), Is.EqualTo(expectedMode == "sdef"),
+                fixtureName + " SDEF parameter expectation.");
+            Assert.DoesNotThrow(() => MmdModelValidator.ThrowIfInvalid(model), fixtureName + " must validate.");
+        }
+
         [Test]
         public void NativeParserUsesOneGeometryHandleAndFreesItAfterAllAccessors()
         {

@@ -1204,7 +1204,7 @@ namespace Mmd.Editor
             // is the only mode that sets a OneMinusSrcAlpha destination blend (opaque/alphaTest stay
             // SrcBlend=One, DstBlend=Zero), so read that back instead of re-deriving a parallel — and
             // divergent — classifier in the harness. This is what lets a regular opaque-PMX TGA whose
-            // texture alpha is a meaningful mask (mmd-tga-regular-hair-alpha-opaque) flow through the
+            // texture alpha is a meaningful mask flow through the
             // transparent path the loader chose, matching real MMD's always-alpha-blend behavior.
             return proxyMaterial.HasProperty("_DstBlend")
                 && Mathf.Approximately(proxyMaterial.GetFloat("_DstBlend"), (float)BlendMode.OneMinusSrcAlpha);
