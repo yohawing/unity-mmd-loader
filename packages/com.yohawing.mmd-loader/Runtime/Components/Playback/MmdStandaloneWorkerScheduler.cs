@@ -60,10 +60,6 @@ namespace Mmd.UnityIntegration
 
         internal static bool IsInstalled => installed;
 
-        internal static bool IsCallbackActive => callbackActive;
-
-        internal static int RegisteredCount => registered.Count;
-
         internal static int LastBatchSize { get; private set; }
 
         internal static ulong LastGeneration { get; private set; }

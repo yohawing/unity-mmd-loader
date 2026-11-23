@@ -17,9 +17,6 @@ namespace Mmd.Tests
 {
     public sealed class MmdHumanoidClipConversionWriterTests
     {
-        private const string FixturePmxPath =
-            "Packages/com.yohawing.mmd-loader/Tests/Fixtures/Assets/test_1bone_cube.pmx";
-
         private const string FixtureVmdPath =
             "Packages/com.yohawing.mmd-loader/Tests/Fixtures/Assets/test_1bone_cube_motion.vmd";
 

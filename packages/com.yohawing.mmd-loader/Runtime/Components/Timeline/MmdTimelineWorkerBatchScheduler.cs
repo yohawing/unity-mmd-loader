@@ -87,8 +87,6 @@ namespace Mmd.Timeline
 
         internal static bool IsCollectionWindowActive => collectionWindowActive;
 
-        internal static int PendingCount => pending.Count;
-
         internal static int LastCompletedBatchSize { get; private set; }
 
         internal static ulong LastCompletedGeneration { get; private set; }

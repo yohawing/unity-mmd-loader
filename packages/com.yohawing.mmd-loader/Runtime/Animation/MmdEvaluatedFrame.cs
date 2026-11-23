@@ -204,7 +204,7 @@ namespace Mmd
                     pose.localPosition[0] = localMatrixScratch[3] - restX;
                     pose.localPosition[1] = localMatrixScratch[7] - restY;
                     pose.localPosition[2] = localMatrixScratch[11] - restZ;
-                    ExtractQuaternionRowMajorInto(localMatrixScratch, 0, pose.localRotation, 0);
+                    ExtractQuaternionRowMajorInto(localMatrixScratch, pose.localRotation);
                 }
                 else
                 {
@@ -212,7 +212,7 @@ namespace Mmd
                     pose.localPosition[0] = pose.worldMatrix[3] - boneX;
                     pose.localPosition[1] = pose.worldMatrix[7] - boneY;
                     pose.localPosition[2] = pose.worldMatrix[11] - boneZ;
-                    ExtractQuaternionRowMajorInto(pose.worldMatrix, 0, pose.localRotation, 0);
+                    ExtractQuaternionRowMajorInto(pose.worldMatrix, pose.localRotation);
                 }
             }
 
@@ -324,15 +324,11 @@ namespace Mmd
             destination[destinationOffset + 15] = 1f;
         }
 
-        private static void ExtractQuaternionRowMajorInto(
-            float[] m,
-            int o,
-            float[] destination,
-            int destinationOffset)
+        private static void ExtractQuaternionRowMajorInto(float[] m, float[] destination)
         {
-            float m00 = m[o], m01 = m[o + 1], m02 = m[o + 2];
-            float m10 = m[o + 4], m11 = m[o + 5], m12 = m[o + 6];
-            float m20 = m[o + 8], m21 = m[o + 9], m22 = m[o + 10];
+            float m00 = m[0], m01 = m[1], m02 = m[2];
+            float m10 = m[4], m11 = m[5], m12 = m[6];
+            float m20 = m[8], m21 = m[9], m22 = m[10];
 
             float trace = m00 + m11 + m22;
             float x, y, z, w;
@@ -370,10 +366,10 @@ namespace Mmd
                 z = 0.25f * s;
             }
 
-            destination[destinationOffset] = x;
-            destination[destinationOffset + 1] = y;
-            destination[destinationOffset + 2] = z;
-            destination[destinationOffset + 3] = w;
+            destination[0] = x;
+            destination[1] = y;
+            destination[2] = z;
+            destination[3] = w;
         }
 
         private static void FindBoneOriginInto(

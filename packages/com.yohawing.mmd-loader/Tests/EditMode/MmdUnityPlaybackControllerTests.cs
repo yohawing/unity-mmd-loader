@@ -2833,20 +2833,6 @@ namespace Mmd.Tests
             return new Quaternion(rotation[0], rotation[1], rotation[2], rotation[3]);
         }
 
-        private static MmdPmxAsset CreatePmxAsset(string name)
-        {
-            var asset = ScriptableObject.CreateInstance<MmdPmxAsset>();
-            asset.name = name;
-            return asset;
-        }
-
-        private static MmdVmdAsset CreateVmdAsset(string name)
-        {
-            var asset = ScriptableObject.CreateInstance<MmdVmdAsset>();
-            asset.name = name;
-            return asset;
-        }
-
         private static void DestroyHierarchy(GameObject? root)
         {
             if (root == null)

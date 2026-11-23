@@ -132,7 +132,6 @@ namespace Mmd.UnityIntegration
         {
             float scale = MmdCoordinateSpace.NormalizeImportScale(importScale);
             int vertexCount = mesh.vertexCount;
-            Vector3[] baseVertices = mesh.vertices;
 
             if (descriptor.vertexMorphs != null && descriptor.vertexMorphs.Count > 0)
             {

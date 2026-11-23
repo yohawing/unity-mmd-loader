@@ -88,8 +88,6 @@ namespace Mmd.Physics
 
         void InitializeWorld(MmdModelDefinition model);
 
-        MmdPhysicsBodyTransform GetRigidbodyTransform(int bodyIndex);
-
         void CopyRigidbodyTransform(int bodyIndex, float[] position, float[] rotation);
 
         string GetRigidbodyShapeType(int bodyIndex);
@@ -772,17 +770,6 @@ namespace Mmd.Physics
         private static float[] Negate(float[] vector)
         {
             return new[] { -vector[0], -vector[1], -vector[2] };
-        }
-
-        public MmdPhysicsBodyTransform GetRigidbodyTransform(int bodyIndex)
-        {
-            var result = new MmdPhysicsBodyTransform
-            {
-                position = new float[3],
-                rotation = new float[4]
-            };
-            CopyRigidbodyTransform(bodyIndex, result.position, result.rotation);
-            return result;
         }
 
         public void CopyRigidbodyTransform(int bodyIndex, float[] position, float[] rotation)
