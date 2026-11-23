@@ -77,7 +77,7 @@ namespace Mmd.Tests
         public void SceneDragAndDropAfterReimportWithNewBytesUsesNewModel()
         {
             string pmxAssetPath = TempDirectory + "/dnd_model_cache_reimport.pmx";
-            Directory.CreateDirectory(Path.Combine(ProjectRoot, TempDirectory));
+            Directory.CreateDirectory(Path.Combine(MmdTestFixtures.ProjectRoot, TempDirectory));
             MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", pmxAssetPath);
             MmdPmxAsset firstAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(pmxAssetPath);
             Assert.That(firstAsset, Is.Not.Null);
@@ -96,7 +96,7 @@ namespace Mmd.Tests
                 // Same asset path, different PMX content.
                 File.Copy(
                     MmdTestFixtures.FixtureAssetPath("test_vertex_morph.pmx"),
-                    Path.Combine(ProjectRoot, pmxAssetPath),
+                    Path.Combine(MmdTestFixtures.ProjectRoot, pmxAssetPath),
                     overwrite: true);
                 AssetDatabase.ImportAsset(pmxAssetPath, ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
                 MmdPmxAsset secondAsset = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(pmxAssetPath);

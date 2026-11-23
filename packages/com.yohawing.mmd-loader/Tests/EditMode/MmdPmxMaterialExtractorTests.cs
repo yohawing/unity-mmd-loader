@@ -189,8 +189,8 @@ namespace Mmd.Tests
         public void ExtractedRemapSurvivesPmxReimportAndEditedMaterialIsNotOverwritten()
         {
             string source = MmdTestFixtures.FixtureAssetPath("test_1bone_cube.pmx");
-            Directory.CreateDirectory(Path.Combine(ProjectRoot, TempDirectory));
-            File.Copy(source, Path.Combine(ProjectRoot, PmxPath), overwrite: true);
+            Directory.CreateDirectory(Path.Combine(MmdTestFixtures.ProjectRoot, TempDirectory));
+            File.Copy(source, Path.Combine(MmdTestFixtures.ProjectRoot, PmxPath), overwrite: true);
             AssetDatabase.ImportAsset(PmxPath, ImportAssetOptions.ForceUpdate);
 
             MmdPmxAsset? before = AssetDatabase.LoadAssetAtPath<MmdPmxAsset>(PmxPath);
@@ -350,7 +350,5 @@ namespace Mmd.Tests
 
             return material.HasProperty("_Color") ? material.GetColor("_Color") : Color.clear;
         }
-
-        private static string ProjectRoot => Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
     }
 }

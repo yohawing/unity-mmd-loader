@@ -26,7 +26,7 @@ namespace Mmd.Tests
                 string textureDirectory = Path.Combine(tempRoot, "textures");
                 Directory.CreateDirectory(textureDirectory);
                 File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
-                WritePng(Path.Combine(textureDirectory, "diffuse.png"), Color.red);
+                MmdTestTextures.WritePng(Path.Combine(textureDirectory, "diffuse.png"), Color.red);
 
                 MmdModelDefinition model = CreateMinimalTriangleModel();
                 model.materials[0].texture = textureReference;
@@ -40,7 +40,7 @@ namespace Mmd.Tests
                 Assert.That(instance.OwnedTextures, Has.Length.EqualTo(1));
                 Assert.That(instance.MissingTextureReferenceCount, Is.EqualTo(0));
                 Assert.That(instance.UnsupportedTextureReferenceCount, Is.EqualTo(0));
-                Assert.That(ReadBoundDiffuseTexture(instance.Materials[0]), Is.EqualTo(instance.OwnedTextures[0]));
+                Assert.That(MmdTestTextures.ReadBoundDiffuseTexture(instance.Materials[0]), Is.EqualTo(instance.OwnedTextures[0]));
                 Assert.That(instance.MaterialBindingDiagnostics[0].baseMapBound, Is.True);
                 Assert.That(instance.MaterialBindingDiagnostics[0].mainTexBound, Is.True);
                 Assert.That(instance.MaterialBindingDiagnostics[0].baseMapTexture, Is.EqualTo(textureReference));
@@ -67,7 +67,7 @@ namespace Mmd.Tests
                 string textureDirectory = Path.Combine(tempRoot, "Textures");
                 Directory.CreateDirectory(textureDirectory);
                 File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
-                WritePng(Path.Combine(textureDirectory, "Diffuse.PNG"), Color.red);
+                MmdTestTextures.WritePng(Path.Combine(textureDirectory, "Diffuse.PNG"), Color.red);
 
                 MmdModelDefinition model = CreateMinimalTriangleModel();
                 model.materials[0].texture = @"textures\diffuse.png";
@@ -108,7 +108,7 @@ namespace Mmd.Tests
             {
                 string pmxPath = Path.Combine(tempRoot, "model.pmx");
                 File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
-                WritePng(Path.Combine(tempRoot, "shared.png"), Color.red);
+                MmdTestTextures.WritePng(Path.Combine(tempRoot, "shared.png"), Color.red);
 
                 MmdModelDefinition model = CreateMinimalTriangleModel();
                 model.indices.AddRange(new[] { 0, 1, 2 });
@@ -126,8 +126,8 @@ namespace Mmd.Tests
                 Assert.That(instance.LoadedDiffuseTextureCount, Is.EqualTo(2));
                 Assert.That(instance.TextureDiagnostics.TextureReferences, Has.Count.EqualTo(2));
                 Assert.That(instance.OwnedTextures, Has.Length.EqualTo(1));
-                Assert.That(ReadBoundDiffuseTexture(instance.Materials[0]), Is.SameAs(instance.OwnedTextures[0]));
-                Assert.That(ReadBoundDiffuseTexture(instance.Materials[1]), Is.SameAs(instance.OwnedTextures[0]));
+                Assert.That(MmdTestTextures.ReadBoundDiffuseTexture(instance.Materials[0]), Is.SameAs(instance.OwnedTextures[0]));
+                Assert.That(MmdTestTextures.ReadBoundDiffuseTexture(instance.Materials[1]), Is.SameAs(instance.OwnedTextures[0]));
             }
             finally
             {
@@ -145,7 +145,7 @@ namespace Mmd.Tests
             {
                 string pmxPath = Path.Combine(tempRoot, "model.pmx");
                 File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
-                WritePng(Path.Combine(tempRoot, "shared.png"), Color.blue);
+                MmdTestTextures.WritePng(Path.Combine(tempRoot, "shared.png"), Color.blue);
                 MmdModelDefinition model = CreateMinimalTriangleModel();
                 model.materials[0].texture = "shared.png";
                 model.materials[0].sphereTexture = "shared.png";
@@ -225,7 +225,7 @@ namespace Mmd.Tests
                 string pmxPath = Path.Combine(pmxDirectory, "model.pmx");
                 string outsidePath = Path.Combine(tempRoot, "outside.png");
                 File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
-                WritePng(outsidePath, Color.blue);
+                MmdTestTextures.WritePng(outsidePath, Color.blue);
 
                 MmdRuntimeTextureResolution resolution = ResolveSingleTexture(pmxPath, outsidePath);
 
@@ -289,7 +289,7 @@ namespace Mmd.Tests
                 string pmxPath = Path.Combine(pmxDirectory, "model.pmx");
                 string outsidePath = Path.Combine(outsideDirectory, "secret.png");
                 File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
-                WritePng(outsidePath, Color.green);
+                MmdTestTextures.WritePng(outsidePath, Color.green);
 
                 using (Process? process = Process.Start(new ProcessStartInfo
                 {
@@ -358,7 +358,7 @@ namespace Mmd.Tests
             {
                 string pmxPath = Path.Combine(tempRoot, "model.pmx");
                 File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
-                WritePng(Path.Combine(tempRoot, "valid.png"), Color.red);
+                MmdTestTextures.WritePng(Path.Combine(tempRoot, "valid.png"), Color.red);
                 File.WriteAllBytes(Path.Combine(tempRoot, "corrupt.png"), CreateCorruptIdatPng());
                 MmdModelDefinition model = CreateTwoMaterialModel("valid.png", "corrupt.png");
                 int textureCountBefore = CountLoadedTexture2D();
@@ -403,8 +403,8 @@ namespace Mmd.Tests
                 string pmxPath = Path.Combine(tempRoot, "model.pmx");
                 string lockedPath = Path.Combine(tempRoot, "locked.png");
                 File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
-                WritePng(Path.Combine(tempRoot, "valid.png"), Color.red);
-                WritePng(lockedPath, Color.blue);
+                MmdTestTextures.WritePng(Path.Combine(tempRoot, "valid.png"), Color.red);
+                MmdTestTextures.WritePng(lockedPath, Color.blue);
                 MmdModelDefinition model = CreateTwoMaterialModel("valid.png", "locked.png");
                 int textureCountBefore = CountLoadedTexture2D();
 
@@ -446,7 +446,7 @@ namespace Mmd.Tests
             {
                 string pmxPath = Path.Combine(tempRoot, "model.pmx");
                 File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
-                WritePng(Path.Combine(tempRoot, "valid.png"), Color.red);
+                MmdTestTextures.WritePng(Path.Combine(tempRoot, "valid.png"), Color.red);
                 MmdModelDefinition model = CreateMinimalTriangleModel();
                 model.materials[0].texture = "valid.png";
                 MmdRenderingDescriptor descriptor = MmdRenderingDescriptorBuilder.Build(model);
@@ -516,10 +516,10 @@ namespace Mmd.Tests
             {
                 string pmxPath = Path.Combine(tempRoot, "model.pmx");
                 File.WriteAllBytes(pmxPath, new byte[] { 0x50, 0x4d, 0x58 });
-                WritePng(Path.Combine(tempRoot, "shared.png"), Color.red);
+                MmdTestTextures.WritePng(Path.Combine(tempRoot, "shared.png"), Color.red);
                 if (!File.Exists(Path.Combine(tempRoot, "SHARED.png")))
                 {
-                    WritePng(Path.Combine(tempRoot, "SHARED.png"), Color.red);
+                    MmdTestTextures.WritePng(Path.Combine(tempRoot, "SHARED.png"), Color.red);
                 }
 
                 MmdModelDefinition model = CreateTwoMaterialModel("shared.png", "SHARED.png");
@@ -716,35 +716,6 @@ namespace Mmd.Tests
             string path = Path.Combine(Path.GetTempPath(), "mmd-unity-texture-contract-" + Path.GetRandomFileName());
             Directory.CreateDirectory(path);
             return path;
-        }
-
-        private static void WritePng(string path, Color color)
-        {
-            var texture = new Texture2D(2, 2, TextureFormat.RGBA32, mipChain: false);
-            try
-            {
-                texture.SetPixels(new[] { color, color, color, color });
-                texture.Apply();
-                File.WriteAllBytes(path, texture.EncodeToPNG());
-            }
-            finally
-            {
-                Object.DestroyImmediate(texture);
-            }
-        }
-
-        private static Texture? ReadBoundDiffuseTexture(Material material)
-        {
-            if (material.HasProperty("_BaseMap"))
-            {
-                Texture texture = material.GetTexture("_BaseMap");
-                if (texture != null)
-                {
-                    return texture;
-                }
-            }
-
-            return material.HasProperty("_MainTex") ? material.GetTexture("_MainTex") : null;
         }
     }
 }

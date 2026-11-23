@@ -306,7 +306,7 @@ namespace Mmd.Tests
             using var scope = new MmdTestInstanceScope(MmdUnityModelFactory.CreateStaticModel(model, pmxPath));
             MmdUnityModelInstance instance = scope.Instance;
 
-            Texture? nullableTexture = ReadBoundDiffuseTexture(instance.Materials[0]);
+            Texture? nullableTexture = MmdTestTextures.ReadBoundDiffuseTexture(instance.Materials[0]);
             Assert.That(nullableTexture, Is.Not.Null);
             var texture = (Texture2D)nullableTexture!;
             texture.filterMode = FilterMode.Point;

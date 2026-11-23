@@ -214,8 +214,6 @@ namespace Mmd.Tests
                    || string.Equals(name, "下半身", StringComparison.Ordinal);
         }
 
-        private static string ProjectRoot => Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-
         private static int CountMaterials(MmdModelDefinition model, Func<MmdMaterialDefinition, bool> predicate)
         {
             int count = 0;
@@ -314,37 +312,6 @@ namespace Mmd.Tests
                 vertexCount = 3
             });
             return model;
-        }
-
-        private static void WritePng(string path, Color color)
-        {
-            var texture = new Texture2D(2, 2, TextureFormat.RGBA32, mipChain: false);
-            try
-            {
-                texture.SetPixels(new[] { color, color, color, color });
-                texture.Apply();
-                File.WriteAllBytes(path, texture.EncodeToPNG());
-            }
-            finally
-            {
-                Object.DestroyImmediate(texture);
-            }
-        }
-
-        private static Texture? ReadBoundDiffuseTexture(Material material)
-        {
-            if (material.HasProperty("_BaseMap"))
-            {
-                Texture texture = material.GetTexture("_BaseMap");
-                if (texture != null)
-                {
-                    return texture;
-                }
-            }
-
-            return material.HasProperty("_MainTex")
-                ? material.GetTexture("_MainTex")
-                : null;
         }
 
         private static float ReadMaterialFloat(Material material, string propertyName)

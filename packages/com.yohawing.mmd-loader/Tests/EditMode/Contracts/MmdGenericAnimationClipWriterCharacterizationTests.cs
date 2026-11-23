@@ -71,7 +71,7 @@ namespace Mmd.Tests
             finally
             {
                 if (clip != null) UnityEngine.Object.DestroyImmediate(clip);
-                DestroyAssets(pmx, vmd);
+                MmdTestCleanup.DestroyAssets(pmx, vmd);
             }
         }
 
@@ -101,7 +101,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyAssets(pmx, vmd);
+                MmdTestCleanup.DestroyAssets(pmx, vmd);
             }
         }
 
@@ -123,7 +123,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyAssets(pmx, vmd);
+                MmdTestCleanup.DestroyAssets(pmx, vmd);
             }
         }
 
@@ -146,7 +146,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyAssets(pmx, vmd);
+                MmdTestCleanup.DestroyAssets(pmx, vmd);
             }
         }
 
@@ -164,7 +164,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyAssets(pmx, vmd);
+                MmdTestCleanup.DestroyAssets(pmx, vmd);
             }
         }
 
@@ -183,7 +183,7 @@ namespace Mmd.Tests
             finally
             {
                 MmdGenericAnimationClipWriter.NativeRuntimeAvailabilityOverrideForTests = null;
-                DestroyAssets(pmx, vmd);
+                MmdTestCleanup.DestroyAssets(pmx, vmd);
             }
         }
 
@@ -202,7 +202,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyAssets(pmx, vmd);
+                MmdTestCleanup.DestroyAssets(pmx, vmd);
             }
         }
 
@@ -228,7 +228,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyAssets(pmx, vmd);
+                MmdTestCleanup.DestroyAssets(pmx, vmd);
             }
         }
 
@@ -252,7 +252,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyAssets(pmx, vmd);
+                MmdTestCleanup.DestroyAssets(pmx, vmd);
             }
         }
 
@@ -289,8 +289,8 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyAssets(appendPmx, appendVmd);
-                DestroyAssets(cubePmx, cubeVmd);
+                MmdTestCleanup.DestroyAssets(appendPmx, appendVmd);
+                MmdTestCleanup.DestroyAssets(cubePmx, cubeVmd);
             }
         }
 
@@ -387,12 +387,6 @@ namespace Mmd.Tests
             {
                 vmd.Initialize(vmdBytes!, "generated.vmd", "Assets/generated.vmd");
             }
-        }
-
-        private static void DestroyAssets(MmdPmxAsset? pmx, MmdVmdAsset? vmd)
-        {
-            if (pmx != null) UnityEngine.Object.DestroyImmediate(pmx);
-            if (vmd != null) UnityEngine.Object.DestroyImmediate(vmd);
         }
     }
 }

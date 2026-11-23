@@ -33,19 +33,19 @@ namespace Mmd.Tests
 
             Type collectionMarker = GetMarkerType("CollectionBoundaryMarker");
             Type drainMarker = GetMarkerType("DrainBoundaryMarker");
-            PlayerLoopSystem update = FindNode(patched, typeof(Update));
-            Assert.That(FindType(update, collectionMarker) + 1, Is.EqualTo(FindType(
+            PlayerLoopSystem update = MmdTestPlayerLoop.FindNode(patched, typeof(Update));
+            Assert.That(MmdTestPlayerLoop.FindType(update, collectionMarker) + 1, Is.EqualTo(MmdTestPlayerLoop.FindType(
                 update,
                 typeof(Update.DirectorUpdate))));
-            Assert.That(FindType(update, drainMarker), Is.EqualTo(FindType(
+            Assert.That(MmdTestPlayerLoop.FindType(update, drainMarker), Is.EqualTo(MmdTestPlayerLoop.FindType(
                 update,
                 typeof(Update.DirectorUpdate)) + 1));
 
             Assert.That(
                 MmdTimelineWorkerBatchScheduler.TryPatchPlayerLoop(patched, out PlayerLoopSystem patchedAgain),
                 Is.True);
-            Assert.That(CountType(patchedAgain, collectionMarker), Is.EqualTo(1));
-            Assert.That(CountType(patchedAgain, drainMarker), Is.EqualTo(1));
+            Assert.That(MmdTestPlayerLoop.CountType(patchedAgain, collectionMarker), Is.EqualTo(1));
+            Assert.That(MmdTestPlayerLoop.CountType(patchedAgain, drainMarker), Is.EqualTo(1));
             Assert.That(patchedAgain.subSystemList, Has.Length.EqualTo(patched.subSystemList!.Length));
         }
 
@@ -84,14 +84,14 @@ namespace Mmd.Tests
             PlayerLoopSystem current = PlayerLoop.GetDefaultPlayerLoop();
             Type collectionMarker = GetMarkerType("CollectionBoundaryMarker");
             Type drainMarker = GetMarkerType("DrainBoundaryMarker");
-            int originalUpdateLength = FindNode(current, typeof(Update)).subSystemList!.Length;
+            int originalUpdateLength = MmdTestPlayerLoop.FindNode(current, typeof(Update)).subSystemList!.Length;
 
             Assert.That(
                 MmdTimelineWorkerBatchScheduler.TryPatchPlayerLoop(current, out PlayerLoopSystem patched),
                 Is.True);
             AssertSingleMarkerPairAroundAnchor(patched, collectionMarker, drainMarker);
             Assert.That(
-                FindNode(patched, typeof(Update)).subSystemList,
+                MmdTestPlayerLoop.FindNode(patched, typeof(Update)).subSystemList,
                 Has.Length.EqualTo(originalUpdateLength + 2));
 
             Assert.That(
@@ -99,7 +99,7 @@ namespace Mmd.Tests
                 Is.True);
             AssertSingleMarkerPairAroundAnchor(patchedAgain, collectionMarker, drainMarker);
             Assert.That(
-                FindNode(patchedAgain, typeof(Update)).subSystemList,
+                MmdTestPlayerLoop.FindNode(patchedAgain, typeof(Update)).subSystemList,
                 Has.Length.EqualTo(originalUpdateLength + 2));
         }
 
@@ -110,8 +110,8 @@ namespace Mmd.Tests
             {
                 Type collectionMarker = GetMarkerType("CollectionBoundaryMarker");
                 Type drainMarker = GetMarkerType("DrainBoundaryMarker");
-                Assert.That(CountType(PlayerLoop.GetCurrentPlayerLoop(), collectionMarker), Is.Zero);
-                Assert.That(CountType(PlayerLoop.GetCurrentPlayerLoop(), drainMarker), Is.Zero);
+                Assert.That(MmdTestPlayerLoop.CountType(PlayerLoop.GetCurrentPlayerLoop(), collectionMarker), Is.Zero);
+                Assert.That(MmdTestPlayerLoop.CountType(PlayerLoop.GetCurrentPlayerLoop(), drainMarker), Is.Zero);
 
                 Assert.That(EnsureInstalled(), Is.True);
                 Assert.That(IsInstalled(), Is.True);
@@ -131,7 +131,7 @@ namespace Mmd.Tests
 
                 // Another system replaces the active loop without clearing our flag.
                 PlayerLoop.SetPlayerLoop(PlayerLoop.GetDefaultPlayerLoop());
-                Assert.That(CountType(PlayerLoop.GetCurrentPlayerLoop(), collectionMarker), Is.Zero);
+                Assert.That(MmdTestPlayerLoop.CountType(PlayerLoop.GetCurrentPlayerLoop(), collectionMarker), Is.Zero);
                 Assert.That(EnsureInstalled(), Is.True);
                 AssertSingleMarkerPairAroundAnchor(PlayerLoop.GetCurrentPlayerLoop(), collectionMarker, drainMarker);
             });
@@ -250,12 +250,12 @@ namespace Mmd.Tests
             Type collectionMarker,
             Type drainMarker)
         {
-            Assert.That(CountType(loop, collectionMarker), Is.EqualTo(1));
-            Assert.That(CountType(loop, drainMarker), Is.EqualTo(1));
-            PlayerLoopSystem update = FindNode(loop, typeof(Update));
-            int collectionIndex = FindType(update, collectionMarker);
-            int drainIndex = FindType(update, drainMarker);
-            int anchorIndex = FindType(update, typeof(Update.DirectorUpdate));
+            Assert.That(MmdTestPlayerLoop.CountType(loop, collectionMarker), Is.EqualTo(1));
+            Assert.That(MmdTestPlayerLoop.CountType(loop, drainMarker), Is.EqualTo(1));
+            PlayerLoopSystem update = MmdTestPlayerLoop.FindNode(loop, typeof(Update));
+            int collectionIndex = MmdTestPlayerLoop.FindType(update, collectionMarker);
+            int drainIndex = MmdTestPlayerLoop.FindType(update, drainMarker);
+            int anchorIndex = MmdTestPlayerLoop.FindType(update, typeof(Update.DirectorUpdate));
             Assert.That(anchorIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(collectionIndex + 1, Is.EqualTo(anchorIndex));
             Assert.That(drainIndex, Is.EqualTo(anchorIndex + 1));
@@ -351,60 +351,6 @@ namespace Mmd.Tests
             return typeof(MmdTimelineWorkerBatchScheduler).GetNestedType(
                 name,
                 BindingFlags.NonPublic)!;
-        }
-
-        private static int FindType(PlayerLoopSystem loop, Type type)
-        {
-            PlayerLoopSystem[] children = loop.subSystemList!;
-            for (int i = 0; i < children.Length; i++)
-            {
-                if (children[i].type == type)
-                {
-                    return i;
-                }
-            }
-
-            return -1;
-        }
-
-        private static PlayerLoopSystem FindNode(PlayerLoopSystem loop, Type type)
-        {
-            if (loop.type == type)
-            {
-                return loop;
-            }
-
-            PlayerLoopSystem[]? children = loop.subSystemList;
-            if (children != null)
-            {
-                for (int i = 0; i < children.Length; i++)
-                {
-                    PlayerLoopSystem result = FindNode(children[i], type);
-                    if (result.type == type)
-                    {
-                        return result;
-                    }
-                }
-            }
-
-            return default;
-        }
-
-        private static int CountType(PlayerLoopSystem loop, Type type)
-        {
-            int count = loop.type == type ? 1 : 0;
-            PlayerLoopSystem[]? children = loop.subSystemList;
-            if (children == null)
-            {
-                return count;
-            }
-
-            for (int i = 0; i < children.Length; i++)
-            {
-                count += CountType(children[i], type);
-            }
-
-            return count;
         }
 
         private static void SetCollectionWindowForTest(bool active, ulong generationValue)

@@ -152,7 +152,7 @@ namespace Mmd.Tests
                 }
 
                 string artifactPath = Path.Combine(
-                    ProjectRoot,
+                    MmdTestFixtures.ProjectRoot,
                     "artifacts",
                     "visual",
                     "uts-profile-import",
@@ -345,14 +345,14 @@ namespace Mmd.Tests
             string sourcePmx = fixtureName == "test_1bone_cube.pmx"
                 ? MmdTestFixtures.FixtureAssetPath(fixtureName)
                 : MmdTestFixtures.FixtureAssetPath("GeneratedPmx/" + fixtureName);
-            string destinationPmx = Path.Combine(ProjectRoot, destinationPmxPath);
+            string destinationPmx = Path.Combine(MmdTestFixtures.ProjectRoot, destinationPmxPath);
             Directory.CreateDirectory(Path.GetDirectoryName(destinationPmx)!);
             File.Copy(sourcePmx, destinationPmx, overwrite: true);
             if (!string.IsNullOrWhiteSpace(textureName))
             {
                 string sourceTexture = MmdTestFixtures.FixtureAssetPath("GeneratedPmx/" + textureName);
                 string destinationTexture = Path.Combine(
-                    ProjectRoot,
+                    MmdTestFixtures.ProjectRoot,
                     TempDirectory,
                     textureName);
                 File.Copy(sourceTexture, destinationTexture, overwrite: true);

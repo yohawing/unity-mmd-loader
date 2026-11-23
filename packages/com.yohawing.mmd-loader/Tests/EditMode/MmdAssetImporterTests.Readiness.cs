@@ -341,7 +341,7 @@ namespace Mmd.Tests
 
             Assert.Throws<System.ArgumentException>(
                 () => MmdPmxPrefabExporter.CreatePrefab(pmxAsset, traversalPrefabPath));
-            Assert.That(Directory.Exists(Path.Combine(ProjectRoot, outsideDirectoryName)), Is.False);
+            Assert.That(Directory.Exists(Path.Combine(MmdTestFixtures.ProjectRoot, outsideDirectoryName)), Is.False);
         }
         [Test]
         public void ImportedPmxAssetReportsReadyForAllReadinessFields()

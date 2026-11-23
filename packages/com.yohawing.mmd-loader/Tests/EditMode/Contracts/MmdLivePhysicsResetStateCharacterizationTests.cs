@@ -104,7 +104,7 @@ namespace Mmd.Tests.Contracts
             }
             finally
             {
-                DestroyBinding(binding);
+                MmdTestCleanup.DestroyBinding(binding);
             }
         }
 
@@ -238,7 +238,7 @@ namespace Mmd.Tests.Contracts
             }
             finally
             {
-                DestroyBinding(binding);
+                MmdTestCleanup.DestroyBinding(binding);
             }
         }
 
@@ -273,7 +273,7 @@ namespace Mmd.Tests.Contracts
                 bool enabled = binding.TryEnableFastRuntime(pmxBytes, vmdBytes, out string reason);
                 if (!enabled)
                 {
-                    DestroyBinding(binding);
+                    MmdTestCleanup.DestroyBinding(binding);
                 }
 
                 Assert.That(enabled, Is.True, reason);
@@ -313,16 +313,6 @@ namespace Mmd.Tests.Contracts
             MethodInfo method = typeof(MmdUnityPlaybackBinding).GetMethod(name, PrivateInstance)
                 ?? throw new MissingMethodException(nameof(MmdUnityPlaybackBinding), name);
             method.Invoke(binding, null);
-        }
-
-        private static void DestroyBinding(MmdUnityPlaybackBinding? binding)
-        {
-            if (binding?.Instance?.Root != null)
-            {
-                Object.DestroyImmediate(binding.Instance.Root);
-            }
-
-            binding?.Dispose();
         }
     }
 }

@@ -471,11 +471,9 @@ namespace Mmd.Tests
             return asset;
         }
 
-        private static string ProjectRoot => Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-
         private static void PatchSecondBoneKeyframeRotationToIdentity(string assetPath)
         {
-            string fullPath = Path.Combine(ProjectRoot, assetPath);
+            string fullPath = Path.Combine(MmdTestFixtures.ProjectRoot, assetPath);
             byte[] bytes = File.ReadAllBytes(fullPath);
             const int headerSize = 30;
             const int modelNameSize = 20;

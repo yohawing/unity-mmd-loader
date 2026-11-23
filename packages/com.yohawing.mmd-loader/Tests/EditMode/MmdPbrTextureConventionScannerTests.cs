@@ -14,8 +14,6 @@ namespace Mmd.Tests
     {
         private const string TempDirectory = "Assets/__MmdPbrTextureConventionScannerTests";
 
-        private static string ProjectRoot => Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-
         [SetUp]
         public void SetUp()
         {
@@ -169,7 +167,7 @@ namespace Mmd.Tests
 
         private static string ToAbsolutePath(string assetPath)
         {
-            return Path.GetFullPath(Path.Combine(ProjectRoot, assetPath.Replace('/', Path.DirectorySeparatorChar)));
+            return Path.GetFullPath(Path.Combine(MmdTestFixtures.ProjectRoot, assetPath.Replace('/', Path.DirectorySeparatorChar)));
         }
     }
 }

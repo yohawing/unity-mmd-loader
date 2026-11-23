@@ -655,7 +655,7 @@ namespace Mmd.Tests
             Assert.That(instance.OwnedTextures, Has.Length.EqualTo(1));
             Assert.That(instance.OwnedTextures[0].width, Is.EqualTo(2));
             Assert.That(instance.OwnedTextures[0].height, Is.EqualTo(2));
-            Assert.That(ReadBoundDiffuseTexture(instance.Materials[0]), Is.EqualTo(instance.OwnedTextures[0]));
+            Assert.That(MmdTestTextures.ReadBoundDiffuseTexture(instance.Materials[0]), Is.EqualTo(instance.OwnedTextures[0]));
         }
         [Test]
         public void CreateStaticModelWithSourcePathLoadsRelativeDdsDiffuseTexture()
@@ -679,7 +679,7 @@ namespace Mmd.Tests
             Assert.That(instance.OwnedTextures, Has.Length.EqualTo(1));
             Assert.That(instance.OwnedTextures[0].width, Is.EqualTo(4));
             Assert.That(instance.OwnedTextures[0].height, Is.EqualTo(4));
-            Assert.That(ReadBoundDiffuseTexture(instance.Materials[0]), Is.EqualTo(instance.OwnedTextures[0]));
+            Assert.That(MmdTestTextures.ReadBoundDiffuseTexture(instance.Materials[0]), Is.EqualTo(instance.OwnedTextures[0]));
         }
         [Test]
         public void CreateStaticModelWithSourcePathLoadsSphereAndToonTexturesForDiagnostics()

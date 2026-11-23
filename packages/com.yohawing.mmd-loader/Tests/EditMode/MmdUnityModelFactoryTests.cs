@@ -627,23 +627,9 @@ namespace Mmd.Tests
                 deflate.Write(data, 0, data.Length);
             }
 
-            uint adler = Adler32(data);
+            uint adler = MmdTestTextures.Adler32(data);
             WriteInt32BigEndian(stream, unchecked((int)adler));
             return stream.ToArray();
-        }
-
-        private static uint Adler32(byte[] data)
-        {
-            const uint Mod = 65521;
-            uint a = 1;
-            uint b = 0;
-            foreach (byte value in data)
-            {
-                a = (a + value) % Mod;
-                b = (b + a) % Mod;
-            }
-
-            return (b << 16) | a;
         }
 
         private static void WritePngChunk(Stream stream, string type, byte[] data)
@@ -844,22 +830,6 @@ namespace Mmd.Tests
         {
             bytes[offset] = (byte)(value & 0xff);
             bytes[offset + 1] = (byte)((value >> 8) & 0xff);
-        }
-
-        private static Texture? ReadBoundDiffuseTexture(Material material)
-        {
-            if (material.HasProperty("_BaseMap"))
-            {
-                Texture texture = material.GetTexture("_BaseMap");
-                if (texture != null)
-                {
-                    return texture;
-                }
-            }
-
-            return material.HasProperty("_MainTex")
-                ? material.GetTexture("_MainTex")
-                : null;
         }
 
         private static Texture? ReadMaterialTexture(Material material, string propertyName)

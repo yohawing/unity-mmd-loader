@@ -103,7 +103,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyAssets(pmx, vmd);
+                MmdTestCleanup.DestroyAssets(pmx, vmd);
             }
         }
 
@@ -125,7 +125,7 @@ namespace Mmd.Tests
                 UnityEngine.Object.DestroyImmediate(first.Clip);
                 UnityEngine.Object.DestroyImmediate(second.Clip);
             }
-            finally { DestroyAssets(pmx, vmd); }
+            finally { MmdTestCleanup.DestroyAssets(pmx, vmd); }
         }
 
         [Test]
@@ -146,7 +146,7 @@ namespace Mmd.Tests
                 Assert.That(curve.keys.Max(key => key.value), Is.GreaterThan(0.0f).And.LessThanOrEqualTo(100.0f));
                 UnityEngine.Object.DestroyImmediate(result.Clip);
             }
-            finally { DestroyAssets(pmx, vmd); }
+            finally { MmdTestCleanup.DestroyAssets(pmx, vmd); }
         }
 
         [Test]
@@ -194,7 +194,7 @@ namespace Mmd.Tests
             {
                 binding?.Dispose();
                 if (clip != null) UnityEngine.Object.DestroyImmediate(clip);
-                DestroyAssets(pmx, vmd);
+                MmdTestCleanup.DestroyAssets(pmx, vmd);
             }
         }
 
@@ -211,7 +211,7 @@ namespace Mmd.Tests
                 Assert.That(result.Clip, Is.Null);
                 Assert.That(result.Diagnostics, Is.Not.Empty);
             }
-            finally { DestroyAssets(pmx, vmd); }
+            finally { MmdTestCleanup.DestroyAssets(pmx, vmd); }
         }
 
         [Test]
@@ -231,7 +231,7 @@ namespace Mmd.Tests
             finally
             {
                 AssetDatabase.DeleteAsset(directory);
-                DestroyAssets(pmx, vmd);
+                MmdTestCleanup.DestroyAssets(pmx, vmd);
             }
         }
 
@@ -243,7 +243,7 @@ namespace Mmd.Tests
             pmx.name = "model";
             vmd.name = "motion";
             Assert.That(MmdGenericAnimationClipWriter.GetDefaultOutputPath(pmx, vmd), Is.EqualTo("Assets/PMX_VMD.anim"));
-            DestroyAssets(pmx, vmd);
+            MmdTestCleanup.DestroyAssets(pmx, vmd);
         }
 
         [Test]
@@ -256,7 +256,7 @@ namespace Mmd.Tests
             Assert.That(
                 MmdGenericAnimationClipWriter.GetDefaultOutputPath(pmx, vmd),
                 Is.EqualTo("Assets/Model_Motion.anim"));
-            DestroyAssets(pmx, vmd);
+            MmdTestCleanup.DestroyAssets(pmx, vmd);
         }
 
         [Test]
@@ -284,7 +284,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyAssets(pmx, vmd);
+                MmdTestCleanup.DestroyAssets(pmx, vmd);
             }
         }
 
@@ -409,7 +409,7 @@ namespace Mmd.Tests
             finally
             {
                 MmdGenericAnimationClipWriter.NativeRuntimeAvailabilityOverrideForTests = null;
-                DestroyAssets(pmx, vmd);
+                MmdTestCleanup.DestroyAssets(pmx, vmd);
             }
         }
 
@@ -455,7 +455,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyAssets(pmx, vmd);
+                MmdTestCleanup.DestroyAssets(pmx, vmd);
             }
         }
 
@@ -531,7 +531,7 @@ namespace Mmd.Tests
             {
                 binding?.Dispose();
                 if (clip != null) UnityEngine.Object.DestroyImmediate(clip);
-                DestroyAssets(pmx, vmd);
+                MmdTestCleanup.DestroyAssets(pmx, vmd);
             }
         }
 
@@ -560,12 +560,6 @@ namespace Mmd.Tests
             pmx.Initialize(File.ReadAllBytes(pmxPath), Path.GetFileName(pmxPath), pmxPath, importScale);
             vmd = ScriptableObject.CreateInstance<MmdVmdAsset>();
             vmd.Initialize(File.ReadAllBytes(vmdPath), Path.GetFileName(vmdPath), vmdPath);
-        }
-
-        private static void DestroyAssets(MmdPmxAsset? pmx, MmdVmdAsset? vmd)
-        {
-            if (pmx != null) UnityEngine.Object.DestroyImmediate(pmx);
-            if (vmd != null) UnityEngine.Object.DestroyImmediate(vmd);
         }
     }
 }

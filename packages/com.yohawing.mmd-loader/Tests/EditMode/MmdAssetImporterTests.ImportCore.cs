@@ -79,7 +79,7 @@ namespace Mmd.Tests
         {
             MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube_motion.vmd", TempVmdPath);
 
-            byte[] sourceBytes = File.ReadAllBytes(Path.Combine(ProjectRoot, TempVmdPath));
+            byte[] sourceBytes = File.ReadAllBytes(Path.Combine(MmdTestFixtures.ProjectRoot, TempVmdPath));
             MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(TempVmdPath);
             Assert.That(vmdAsset, Is.Not.Null);
 
@@ -132,8 +132,8 @@ namespace Mmd.Tests
             const string cachePath = TempDirectory + "/summary-cache.vmd";
             byte[] firstBytes = MmdTestFixtures.CreateDenseVmdBytes("cache", "root", 2, 1);
             byte[] secondBytes = MmdTestFixtures.CreateDenseVmdBytes("cache", "root", 2, 16);
-            Directory.CreateDirectory(Path.Combine(ProjectRoot, TempDirectory));
-            string absolutePath = Path.Combine(ProjectRoot, cachePath);
+            Directory.CreateDirectory(Path.Combine(MmdTestFixtures.ProjectRoot, TempDirectory));
+            string absolutePath = Path.Combine(MmdTestFixtures.ProjectRoot, cachePath);
 
             File.WriteAllBytes(absolutePath, firstBytes);
             DateTime firstLastWriteTimeUtc = File.GetLastWriteTimeUtc(absolutePath);
@@ -162,8 +162,8 @@ namespace Mmd.Tests
             Assert.That(secondBytes.Length, Is.EqualTo(firstBytes.Length),
                 "The replacement fixture must preserve byte length to cover the mtime/length cache candidate.");
 
-            Directory.CreateDirectory(Path.Combine(ProjectRoot, TempDirectory));
-            string absolutePath = Path.Combine(ProjectRoot, rawSourcePath);
+            Directory.CreateDirectory(Path.Combine(MmdTestFixtures.ProjectRoot, TempDirectory));
+            string absolutePath = Path.Combine(MmdTestFixtures.ProjectRoot, rawSourcePath);
             File.WriteAllBytes(absolutePath, firstBytes);
             DateTime firstLastWriteTimeUtc = File.GetLastWriteTimeUtc(absolutePath);
             AssetDatabase.ImportAsset(rawSourcePath, ImportAssetOptions.ForceUpdate);
@@ -194,8 +194,8 @@ namespace Mmd.Tests
         public void ImportedInvalidVmdPreservesRawBytesAndRejectsNativeClipHeader()
         {
             byte[] invalidBytes = { 0x56, 0x4D, 0x44, 0x00 };
-            Directory.CreateDirectory(Path.Combine(ProjectRoot, TempDirectory));
-            File.WriteAllBytes(Path.Combine(ProjectRoot, TempVmdPath), invalidBytes);
+            Directory.CreateDirectory(Path.Combine(MmdTestFixtures.ProjectRoot, TempDirectory));
+            File.WriteAllBytes(Path.Combine(MmdTestFixtures.ProjectRoot, TempVmdPath), invalidBytes);
             AssetDatabase.ImportAsset(TempVmdPath, ImportAssetOptions.ForceUpdate);
 
             MmdVmdAsset vmdAsset = AssetDatabase.LoadAssetAtPath<MmdVmdAsset>(TempVmdPath);
@@ -541,14 +541,14 @@ namespace Mmd.Tests
         {
             const string pmxPath = TempDirectory + "/mmd-texture-alpha-used-uv-cutout.pmx";
             const string texturePath = TempDirectory + "/texture-alpha-cutout.png";
-            Directory.CreateDirectory(Path.Combine(ProjectRoot, TempDirectory));
+            Directory.CreateDirectory(Path.Combine(MmdTestFixtures.ProjectRoot, TempDirectory));
             File.Copy(
                 MmdTestFixtures.FixtureAssetPath("GeneratedPmx/mmd-texture-alpha-used-uv-cutout.pmx"),
-                Path.Combine(ProjectRoot, pmxPath),
+                Path.Combine(MmdTestFixtures.ProjectRoot, pmxPath),
                 overwrite: true);
             File.Copy(
                 MmdTestFixtures.FixtureAssetPath("GeneratedPmx/texture-alpha-cutout.png"),
-                Path.Combine(ProjectRoot, texturePath),
+                Path.Combine(MmdTestFixtures.ProjectRoot, texturePath),
                 overwrite: true);
             AssetDatabase.ImportAsset(texturePath, ImportAssetOptions.ForceUpdate);
             AssetDatabase.ImportAsset(pmxPath, ImportAssetOptions.ForceUpdate);
@@ -568,8 +568,8 @@ namespace Mmd.Tests
         public void PmxImporterAppliesPersistentMaterialOverrideAssetAfterTextureBinding()
         {
             MmdTestFixtures.CopyFixtureToAssetDatabase("test_1bone_cube.pmx", TempPmxPath);
-            string normalMapPath = Path.Combine(ProjectRoot, TempNormalMapPath);
-            WritePng(normalMapPath, new Color(0.2f, 0.3f, 0.4f, 1.0f));
+            string normalMapPath = Path.Combine(MmdTestFixtures.ProjectRoot, TempNormalMapPath);
+            MmdTestTextures.WritePng(normalMapPath, new Color(0.2f, 0.3f, 0.4f, 1.0f));
             AssetDatabase.ImportAsset(TempNormalMapPath, ImportAssetOptions.ForceUpdate);
             Texture2D? normalMap = AssetDatabase.LoadAssetAtPath<Texture2D>(TempNormalMapPath);
             Assert.That(normalMap, Is.Not.Null);
@@ -637,20 +637,20 @@ namespace Mmd.Tests
             string autoNormalMapAssetPath = TempDirectory + "/auto_normal.png";
             string explicitNormalMapAssetPath = TempDirectory + "/explicit_normal.png";
 
-            WritePng(Path.Combine(ProjectRoot, autoNormalMapAssetPath), new Color(0.2f, 0.8f, 0.4f, 1.0f));
-            WritePng(Path.Combine(ProjectRoot, explicitNormalMapAssetPath), new Color(0.8f, 0.3f, 0.1f, 1.0f));
+            MmdTestTextures.WritePng(Path.Combine(MmdTestFixtures.ProjectRoot, autoNormalMapAssetPath), new Color(0.2f, 0.8f, 0.4f, 1.0f));
+            MmdTestTextures.WritePng(Path.Combine(MmdTestFixtures.ProjectRoot, explicitNormalMapAssetPath), new Color(0.8f, 0.3f, 0.1f, 1.0f));
             File.WriteAllText(
-                Path.Combine(ProjectRoot, autoFxAssetPath),
+                Path.Combine(MmdTestFixtures.ProjectRoot, autoFxAssetPath),
                 "#define USE_NORMALMAP\n#define TEXTURE_NORMALMAP \"auto_normal.png\"\n#include \"AlternativeFull.fxsub\"\n");
             File.WriteAllText(
-                Path.Combine(ProjectRoot, autoEmdAssetPath),
+                Path.Combine(MmdTestFixtures.ProjectRoot, autoEmdAssetPath),
                 "[Effect]\nObj[0] = auto.fx\n");
 
             AssetDatabase.Refresh();
             AssetDatabase.ImportAsset(autoNormalMapAssetPath, ImportAssetOptions.ForceUpdate);
             AssetDatabase.ImportAsset(explicitNormalMapAssetPath, ImportAssetOptions.ForceUpdate);
             Shader.globalRenderPipeline = "UniversalPipeline";
-            string absoluteMmePmxPath = Path.Combine(ProjectRoot, TempMmePmxPath);
+            string absoluteMmePmxPath = Path.Combine(MmdTestFixtures.ProjectRoot, TempMmePmxPath);
             var scannedEffects = MmeFxScanner.ScanFromModelPath(absoluteMmePmxPath, materialCount: 1);
             Assert.That(scannedEffects, Has.Count.EqualTo(1),
                 $"pmx={absoluteMmePmxPath}; emdExists={File.Exists(Path.ChangeExtension(absoluteMmePmxPath, ".emd"))}");

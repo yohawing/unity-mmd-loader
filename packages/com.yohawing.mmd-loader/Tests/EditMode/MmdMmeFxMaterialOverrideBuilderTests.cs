@@ -16,11 +16,9 @@ namespace Mmd.Tests
     {
         private const string TempDirectory = "Assets/__MmdMmeFxMaterialOverrideBuilderTests";
 
-        private static string ProjectRoot => Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-
         private static string ToAbsolutePath(string relativeAssetPath)
         {
-            return Path.GetFullPath(Path.Combine(ProjectRoot, relativeAssetPath.Replace('/', Path.DirectorySeparatorChar)));
+            return Path.GetFullPath(Path.Combine(MmdTestFixtures.ProjectRoot, relativeAssetPath.Replace('/', Path.DirectorySeparatorChar)));
         }
 
         [SetUp]
@@ -48,7 +46,7 @@ namespace Mmd.Tests
             {
                 new MmeFxEffectDescriptor
                 {
-                    sourcePath = Path.Combine(ProjectRoot, TempDirectory, "body.fx")
+                    sourcePath = Path.Combine(MmdTestFixtures.ProjectRoot, TempDirectory, "body.fx")
                 }
             };
 
@@ -74,7 +72,7 @@ namespace Mmd.Tests
             {
                 new MmeFxEffectDescriptor
                 {
-                    sourcePath = Path.Combine(ProjectRoot, TempDirectory, "hair.fx")
+                    sourcePath = Path.Combine(MmdTestFixtures.ProjectRoot, TempDirectory, "hair.fx")
                 }
             };
 
@@ -94,11 +92,11 @@ namespace Mmd.Tests
             {
                 new MmeFxEffectDescriptor
                 {
-                    sourcePath = Path.Combine(ProjectRoot, TempDirectory, "fx_a", "body.fx")
+                    sourcePath = Path.Combine(MmdTestFixtures.ProjectRoot, TempDirectory, "fx_a", "body.fx")
                 },
                 new MmeFxEffectDescriptor
                 {
-                    sourcePath = Path.Combine(ProjectRoot, TempDirectory, "fx_b", "body.fx")
+                    sourcePath = Path.Combine(MmdTestFixtures.ProjectRoot, TempDirectory, "fx_b", "body.fx")
                 }
             };
 
@@ -371,7 +369,7 @@ namespace Mmd.Tests
             {
                 new MmeFxEffectDescriptor
                 {
-                    sourcePath = Path.Combine(ProjectRoot, TempDirectory, "body.fx"),
+                    sourcePath = Path.Combine(MmdTestFixtures.ProjectRoot, TempDirectory, "body.fx"),
                     effectType = "ray-mmd",
                     metalness = 0.25f,
                     smoothness = 0.75f
@@ -400,7 +398,7 @@ namespace Mmd.Tests
             {
                 new MmeFxEffectDescriptor
                 {
-                    sourcePath = Path.Combine(ProjectRoot, TempDirectory, "body.fx"),
+                    sourcePath = Path.Combine(MmdTestFixtures.ProjectRoot, TempDirectory, "body.fx"),
                     materialIndex = 4,
                     effectType = "AlternativeFull"
                 }
@@ -426,7 +424,7 @@ namespace Mmd.Tests
             {
                 new MmeFxEffectDescriptor
                 {
-                    sourcePath = Path.Combine(ProjectRoot, TempDirectory, "Body.emd")
+                    sourcePath = Path.Combine(MmdTestFixtures.ProjectRoot, TempDirectory, "Body.emd")
                 }
             };
 

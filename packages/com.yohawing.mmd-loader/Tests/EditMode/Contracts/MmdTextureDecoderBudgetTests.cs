@@ -423,22 +423,8 @@ namespace Mmd.Tests
                 deflate.Write(data, 0, data.Length);
             }
 
-            WriteInt32BigEndian(stream, unchecked((int)Adler32(data)));
+            WriteInt32BigEndian(stream, unchecked((int)MmdTestTextures.Adler32(data)));
             return stream.ToArray();
-        }
-
-        private static uint Adler32(byte[] data)
-        {
-            const uint Mod = 65521;
-            uint a = 1;
-            uint b = 0;
-            foreach (byte value in data)
-            {
-                a = (a + value) % Mod;
-                b = (b + a) % Mod;
-            }
-
-            return (b << 16) | a;
         }
 
         private static void WriteChunk(Stream stream, string type, byte[] data)

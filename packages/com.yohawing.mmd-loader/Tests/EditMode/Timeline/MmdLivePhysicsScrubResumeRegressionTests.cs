@@ -80,7 +80,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyBinding(binding);
+                MmdTestCleanup.DestroyBinding(binding);
             }
         }
 
@@ -124,7 +124,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyBinding(binding);
+                MmdTestCleanup.DestroyBinding(binding);
             }
         }
 
@@ -173,7 +173,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyBinding(binding);
+                MmdTestCleanup.DestroyBinding(binding);
             }
         }
 
@@ -229,7 +229,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyBinding(binding);
+                MmdTestCleanup.DestroyBinding(binding);
             }
         }
 
@@ -297,7 +297,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyBinding(binding);
+                MmdTestCleanup.DestroyBinding(binding);
             }
         }
 
@@ -381,7 +381,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyBinding(binding);
+                MmdTestCleanup.DestroyBinding(binding);
             }
         }
 
@@ -420,7 +420,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyBinding(binding);
+                MmdTestCleanup.DestroyBinding(binding);
             }
         }
 
@@ -468,7 +468,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyBinding(binding);
+                MmdTestCleanup.DestroyBinding(binding);
             }
         }
 
@@ -609,7 +609,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyBinding(binding);
+                MmdTestCleanup.DestroyBinding(binding);
             }
         }
 
@@ -692,16 +692,6 @@ namespace Mmd.Tests
         private static float[] ToArray(Vector3 value)
         {
             return new[] { value.x, value.y, value.z };
-        }
-
-        private static void DestroyBinding(MmdUnityPlaybackBinding? binding)
-        {
-            if (binding?.Instance?.Root != null)
-            {
-                Object.DestroyImmediate(binding.Instance.Root);
-            }
-
-            binding?.Dispose();
         }
 
         private readonly struct Mode1ChainScaleSample

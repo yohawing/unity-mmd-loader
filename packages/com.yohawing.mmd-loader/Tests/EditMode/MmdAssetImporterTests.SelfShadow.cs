@@ -44,10 +44,10 @@ namespace Mmd.Tests
             try
             {
                 // Create structure under Assets/ (required for project-relative resolution to return Assets/... path)
-                Directory.CreateDirectory(Path.Combine(ProjectRoot, textureAssetDir));
+                Directory.CreateDirectory(Path.Combine(MmdTestFixtures.ProjectRoot, textureAssetDir));
 
                 // Write a real image file and import it so AssetDatabase sees a Texture2D at the path.
-                WritePng(Path.Combine(ProjectRoot, textureAssetPath), Color.red);
+                MmdTestTextures.WritePng(Path.Combine(MmdTestFixtures.ProjectRoot, textureAssetPath), Color.red);
                 AssetDatabase.ImportAsset(textureAssetPath, ImportAssetOptions.ForceUpdate);
                 Texture2D projectTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(textureAssetPath);
                 Assert.That(projectTexture, Is.Not.Null, "test setup must produce an importable project Texture2D asset");
@@ -70,7 +70,7 @@ namespace Mmd.Tests
                 instance.RefreshMaterialBindingDiagnostics();
 
                 // The material must now reference the separate project Texture2D.
-                Texture? bound = ReadBoundDiffuseTexture(instance.Materials[0]);
+                Texture? bound = MmdTestTextures.ReadBoundDiffuseTexture(instance.Materials[0]);
                 Assert.That(bound, Is.Not.Null);
                 Assert.That(AssetDatabase.Contains(bound), Is.True, "bound texture must be a persisted project asset");
                 string boundAssetPath = AssetDatabase.GetAssetPath(bound);
@@ -164,7 +164,7 @@ namespace Mmd.Tests
             string pmxAssetPath = TempDirectory + "/missing_texture_resolver/model.pmx";
             string textureReference = "textures/missing_diffuse.png";
             string targetTextureAssetPath = TempDirectory + "/missing_texture_resolver/textures/missing_diffuse.png";
-            string searchRoot = Path.Combine(ProjectRoot, TempDirectory, "external_search_root");
+            string searchRoot = Path.Combine(MmdTestFixtures.ProjectRoot, TempDirectory, "external_search_root");
             string externalTexturePath = Path.Combine(searchRoot, "model_package", "textures", "missing_diffuse.png");
 
             try
@@ -176,10 +176,10 @@ namespace Mmd.Tests
                     MmdPmxProjectTextureBinder.BindProjectTextureAssetsToMaterials(model, pmxAssetPath, instance.Materials);
                 Assert.That(before.ResolvedReferenceCount, Is.EqualTo(0));
                 Assert.That(before.MissingReferenceCount, Is.EqualTo(1));
-                Assert.That(File.Exists(Path.Combine(ProjectRoot, targetTextureAssetPath)), Is.False);
+                Assert.That(File.Exists(Path.Combine(MmdTestFixtures.ProjectRoot, targetTextureAssetPath)), Is.False);
 
                 Directory.CreateDirectory(Path.GetDirectoryName(externalTexturePath)!);
-                WritePng(externalTexturePath, Color.green);
+                MmdTestTextures.WritePng(externalTexturePath, Color.green);
 
                 MmdPmxMissingTextureResolveResult result =
                     MmdPmxMissingTextureResolver.ResolveFirstMissingTextureReference(
@@ -191,7 +191,7 @@ namespace Mmd.Tests
                 Assert.That(result.Success, Is.True, result.Message);
                 Assert.That(result.Reference, Is.EqualTo(textureReference));
                 Assert.That(result.TargetAssetPath, Is.EqualTo(targetTextureAssetPath));
-                Assert.That(File.Exists(Path.Combine(ProjectRoot, targetTextureAssetPath)), Is.True);
+                Assert.That(File.Exists(Path.Combine(MmdTestFixtures.ProjectRoot, targetTextureAssetPath)), Is.True);
                 Assert.That(AssetDatabase.LoadAssetAtPath<Texture2D>(targetTextureAssetPath), Is.Not.Null);
 
                 MmdPmxProjectTextureBindingSummary after =
@@ -220,14 +220,14 @@ namespace Mmd.Tests
         [Test]
         public void MissingTextureResolverRejectsAmbiguousBasenameMatches()
         {
-            string searchRoot = Path.Combine(ProjectRoot, TempDirectory, "ambiguous_search_root");
+            string searchRoot = Path.Combine(MmdTestFixtures.ProjectRoot, TempDirectory, "ambiguous_search_root");
             string first = Path.Combine(searchRoot, "model_a", "textures", "missing_diffuse.png");
             string second = Path.Combine(searchRoot, "model_b", "textures", "missing_diffuse.png");
 
             Directory.CreateDirectory(Path.GetDirectoryName(first)!);
             Directory.CreateDirectory(Path.GetDirectoryName(second)!);
-            WritePng(first, Color.red);
-            WritePng(second, Color.blue);
+            MmdTestTextures.WritePng(first, Color.red);
+            MmdTestTextures.WritePng(second, Color.blue);
 
             MmdPmxMissingTextureResolveResult result =
                 MmdPmxMissingTextureResolver.ResolveFirstMissingTextureReference(
@@ -242,11 +242,11 @@ namespace Mmd.Tests
         [Test]
         public void MissingTextureResolverDoesNotMatchPartialDirectorySuffix()
         {
-            string searchRoot = Path.Combine(ProjectRoot, TempDirectory, "partial_suffix_search_root");
+            string searchRoot = Path.Combine(MmdTestFixtures.ProjectRoot, TempDirectory, "partial_suffix_search_root");
             string wrong = Path.Combine(searchRoot, "mytextures", "missing_diffuse.png");
 
             Directory.CreateDirectory(Path.GetDirectoryName(wrong)!);
-            WritePng(wrong, Color.red);
+            MmdTestTextures.WritePng(wrong, Color.red);
 
             MmdPmxMissingTextureResolveResult result =
                 MmdPmxMissingTextureResolver.ResolveFirstMissingTextureReference(
@@ -263,7 +263,7 @@ namespace Mmd.Tests
         {
             string pmxAssetPath = TempDirectory + "/missing_texture_invalid/model.pmx";
             string targetTextureAssetPath = TempDirectory + "/missing_texture_invalid/textures/missing_diffuse.png";
-            string searchRoot = Path.Combine(ProjectRoot, TempDirectory, "invalid_search_root");
+            string searchRoot = Path.Combine(MmdTestFixtures.ProjectRoot, TempDirectory, "invalid_search_root");
             string invalidTexturePath = Path.Combine(searchRoot, "textures", "missing_diffuse.png");
 
             Directory.CreateDirectory(Path.GetDirectoryName(invalidTexturePath)!);
@@ -289,14 +289,14 @@ namespace Mmd.Tests
         {
             string pmxAssetPath = TempDirectory + "/missing_texture_replace/model.pmx";
             string targetTextureAssetPath = TempDirectory + "/missing_texture_replace/textures/missing_diffuse.png";
-            string targetFullPath = Path.Combine(ProjectRoot, targetTextureAssetPath);
-            string searchRoot = Path.Combine(ProjectRoot, TempDirectory, "replacement_search_root");
+            string targetFullPath = Path.Combine(MmdTestFixtures.ProjectRoot, targetTextureAssetPath);
+            string searchRoot = Path.Combine(MmdTestFixtures.ProjectRoot, TempDirectory, "replacement_search_root");
             string sourceTexturePath = Path.Combine(searchRoot, "textures", "missing_diffuse.png");
 
             Directory.CreateDirectory(Path.GetDirectoryName(targetFullPath)!);
             File.WriteAllText(targetFullPath, "broken existing texture");
             Directory.CreateDirectory(Path.GetDirectoryName(sourceTexturePath)!);
-            WritePng(sourceTexturePath, Color.yellow);
+            MmdTestTextures.WritePng(sourceTexturePath, Color.yellow);
 
             MmdPmxMissingTextureResolveResult result =
                 MmdPmxMissingTextureResolver.ResolveFirstMissingTextureReference(
@@ -313,8 +313,8 @@ namespace Mmd.Tests
         {
             string pmxAssetPath = TempDirectory + "/missing_texture_restore/model.pmx";
             string targetTextureAssetPath = TempDirectory + "/missing_texture_restore/textures/missing_diffuse.png";
-            string targetFullPath = Path.Combine(ProjectRoot, targetTextureAssetPath);
-            string searchRoot = Path.Combine(ProjectRoot, TempDirectory, "restore_search_root");
+            string targetFullPath = Path.Combine(MmdTestFixtures.ProjectRoot, targetTextureAssetPath);
+            string searchRoot = Path.Combine(MmdTestFixtures.ProjectRoot, TempDirectory, "restore_search_root");
             string invalidSourcePath = Path.Combine(searchRoot, "textures", "missing_diffuse.png");
             string originalTargetContents = "original invalid target";
 
@@ -343,8 +343,8 @@ namespace Mmd.Tests
         {
             string pmxAssetPath = TempDirectory + "/missing_texture_same_file/model.pmx";
             string targetTextureAssetPath = TempDirectory + "/missing_texture_same_file/textures/missing_diffuse.png";
-            string targetFullPath = Path.Combine(ProjectRoot, targetTextureAssetPath);
-            string searchRoot = Path.Combine(ProjectRoot, TempDirectory, "missing_texture_same_file");
+            string targetFullPath = Path.Combine(MmdTestFixtures.ProjectRoot, targetTextureAssetPath);
+            string searchRoot = Path.Combine(MmdTestFixtures.ProjectRoot, TempDirectory, "missing_texture_same_file");
 
             Directory.CreateDirectory(Path.GetDirectoryName(targetFullPath)!);
             File.WriteAllText(targetFullPath, "broken existing texture");
@@ -365,7 +365,7 @@ namespace Mmd.Tests
             string pmxAssetPath = TempDirectory + "/texture_candidate_test/model.pmx";
             string missingTexturePath = TempDirectory + "/texture_candidate_test/textures/diffuse.png";
 
-            Assert.That(File.Exists(Path.Combine(ProjectRoot, missingTexturePath)), Is.False);
+            Assert.That(File.Exists(Path.Combine(MmdTestFixtures.ProjectRoot, missingTexturePath)), Is.False);
 
             bool existingResolved = MmdAssetPathUtility.TryResolveProjectRelativeAssetPath(
                 pmxAssetPath,

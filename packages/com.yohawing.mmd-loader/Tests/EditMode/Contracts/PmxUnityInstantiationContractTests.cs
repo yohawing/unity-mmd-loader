@@ -1,7 +1,6 @@
 #nullable enable
 
 using System.Collections.Generic;
-using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
 using Mmd.Parser;
@@ -54,7 +53,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyUnityModelInstance(instance);
+                MmdTestInstanceScope.DestroyInstance(instance);
             }
         }
 
@@ -77,40 +76,7 @@ namespace Mmd.Tests
             }
             finally
             {
-                DestroyUnityModelInstance(instance);
-            }
-        }
-
-        private static void DestroyUnityModelInstance(MmdUnityModelInstance? instance)
-        {
-            if (instance == null)
-            {
-                return;
-            }
-
-            if (instance.Root != null)
-            {
-                UnityEngine.Object.DestroyImmediate(instance.Root);
-            }
-
-            if (instance.Mesh != null)
-            {
-                UnityEngine.Object.DestroyImmediate(instance.Mesh);
-            }
-
-            if (instance.Materials == null)
-            {
-                return;
-            }
-
-            foreach (Material material in instance.Materials.Where(material => material != null).Distinct())
-            {
-                UnityEngine.Object.DestroyImmediate(material);
-            }
-
-            foreach (Texture2D texture in instance.OwnedTextures.Where(texture => texture != null).Distinct())
-            {
-                UnityEngine.Object.DestroyImmediate(texture);
+                MmdTestInstanceScope.DestroyInstance(instance);
             }
         }
     }

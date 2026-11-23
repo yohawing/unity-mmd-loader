@@ -176,13 +176,13 @@ namespace Mmd.Tests
 
         private MmdPmxAsset ImportCharacterizationFixture(string pmxFixture, string? textureFixture)
         {
-            Directory.CreateDirectory(Path.Combine(ProjectRoot, TempDirectory));
+            Directory.CreateDirectory(Path.Combine(MmdTestFixtures.ProjectRoot, TempDirectory));
             if (textureFixture != null)
             {
                 string textureAssetPath = TempDirectory + "/" + Path.GetFileName(textureFixture);
                 File.Copy(
                     MmdTestFixtures.FixtureAssetPath(textureFixture),
-                    Path.Combine(ProjectRoot, textureAssetPath),
+                    Path.Combine(MmdTestFixtures.ProjectRoot, textureAssetPath),
                     overwrite: true);
                 AssetDatabase.ImportAsset(textureAssetPath, ImportAssetOptions.ForceUpdate);
             }
