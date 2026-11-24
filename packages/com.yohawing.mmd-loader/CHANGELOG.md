@@ -47,6 +47,11 @@ All notable changes to `com.yohawing.mmd-loader` are documented here.
 
 - Faster PMX and VMD handling with identical results: building a model's rendering descriptor validates the model once instead of ten times (about 5x faster on large models), mesh splitting no longer allocates a string per index, and VMD reimports no longer hash the whole file (about 2.5x faster for large motions). Dropping an imported PMX into the scene reuses the imported mesh without rebuilding its full rendering descriptor (about 2.5x faster), and dropping the same PMX again reuses the model already parsed for it (on the largest test model, 770 ms to 25 ms). Starting native playback, including the first Timeline Evaluate, no longer computes a SHA256 of the whole PMX and VMD (for a 300,000-key VMD, about 250 ms to 32 ms).
 
+- Updated the bundled Windows runtime and native pin to `mmd-anim` v0.5.6 (`b65b1fbd1e2525255ad35af99a0b0f11eb7bde28`), from v0.5.3. ABI 3 is unchanged. Results can change in these cases:
+  - Live physics: bones driven by Append no longer get the Append transform applied twice when physics writes them back, physics bones follow the completed Bullet solver pose without a one-substep delay, and PMX rigid bodies use the PMX rotation order (Ry * Rx * Rz) consistently.
+  - VMD: when a VMD has duplicate keys for the same bone or morph and frame, the last one wins, and bone and morph names end at a line feed, as in MMD.
+  - PMX 2.1: the native runtime reads flip and impulse morph payloads with their correct layouts. Native playback used to reject PMX models with impulse morphs and could misread the data after a flip morph.
+
 - The PMX importer version is now 31, so existing PMX assets reimport once after updating and pick up the material changes in this release.
 
 - Material transparency is now decided only from the PMX material alpha and the alpha of the diffuse texture over the used UVs. Material and texture names are no longer consulted: a material whose name or diffuse file name contains words such as "shadow", "shade", "影", "cheek", "blush", "頰", "ほほ" or "チーク" is no longer upgraded from alpha test to alpha blend.
